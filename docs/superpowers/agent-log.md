@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 14:12 · Zcode Lead — 收工回报：画面推流优化两批落地（回链 13:33 / 8ea6719）
+- 完成：第一批 ack 定速产帧（createAckPacer 按转发节奏定速 ack，Chrome in-flight 满时跳过抓取+编码，产帧率钉 ~30fps）+ BIB_STREAM_QUALITY/MAX_W/MAX_H env 化，commit **`20903cd`**；第二批 观众计数下推（0 观众 stopScreencast、首位观众自动恢复、bib_ready 回显、末帧缓存秒开、binarySubscriptions WeakMap→Map+close 清理修泄漏），commit **`97da3ef`**；调研报告 bd6ecd0
+- 范围延伸（超出开工声明，向本线备案）：为让 env 质量配置生效改了 `src/services/remote-session-service.js`（quality 按需下发一行）+ `src/services/trajectory/trajectory-attach-{runner,service}.js`（去硬编码 quality:65 两处）——这三文件开工时自禁入，实际无他线冲突
+- 验收：characterize-screencast-timing PASS（timing 4 组 + stream config 3 组 + pacer 时序 3 组）；全量 `verify-all.sh` **ALL GREEN**；全部触及文件 eslint 0；ws-router/executor-ws/ws-server 模块级真实 import 通过
+- 遗留移交：①湿测未做（需在线执行机+真实 Chrome：验证 60Hz 屏下产帧率钉 30、0 观众 CPU 归零、重订阅首帧秒开）②local 模式 remote:subscribe 不自动 startScreencast（沿用 remote:start 语义，若产品要"订阅即看"需前端配合）③前向观众计数按 uuid 精确匹配，`addBinarySubscription` 传 null 的旧客户端仍走全量广播不受影响
+
 ## 2026-09-05 13:33 · Zcode Lead — 开工声明：画面推流优化（ack 定速产帧 + 零观众停推）
 - 开工：13:33。调研报告 research/2026-09-05-screencast-optimization.md（bd6ecd0）经用户批准，两批实施
 - 范围：`src/cdp/screencast-timing.js`、`executor/bib-bridge.js`、`src/cdp/remote-bridge/{screencast.js,state.js,ws-router.js,index.js}`、`src/executor-ws.js`、`src/ws-server.js`、`scripts/characterization/characterize-screencast-timing.mjs`、`config/.env.example`、`tmp/screencast_probe.mjs`、本文件
