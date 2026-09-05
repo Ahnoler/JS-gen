@@ -7,12 +7,13 @@
     "核心产品关联",
     "维护核心产品映射"
   ],
-  "menu_path": "产品管理→核心产品映射（#513 CDP title=核心产品映射；hash=#/pdMgt/pdInfMgt/corePdMpng；pageId=ZJJK00095454；hierarchy 无独立 functionId——与遗留 #59 同挂 9000000230）",
+  "menu_path": "产品管理→核心产品映射（functionId=9000000812；menu //li[@data-id='RES04066']；pageId=ZJJK00095454；#513 hash=#/pdMgt/pdInfMgt/corePdMpng；菜单 intermediate 修复后独立叶子，勿再挂 intermediate 目录 0230）",
   "biz_key_prefix": [],
   "hash_markers": [
     "corePdMpng",
     "pdMgtpdInfMgtcorePdMpng",
     "ZJJK00095454",
+    "RES04066",
     "pdInfMgt",
     "pdMgt"
   ],
@@ -30,7 +31,7 @@
     "产品树"
   ],
   "preconditions": [
-    "入口：产品管理→核心产品映射（#513 实证）；新建交易挂 functionId=9000000230（无独立节点）",
+    "入口：产品管理→核心产品映射（#513）；新建交易挂 functionId=9000000812（勿挂 intermediate 目录 0230）",
     "左树选中具体产品后，右侧自动按产品编号加载核心产品关联列表（#59/#513）",
     "新增前须已选树节点；主体类型默认对公；字段含核心产品编号/名称",
     "删除有确认框；修改走维护弹窗+确认；湿测 stamp 编号后尽量删除清理",
@@ -100,7 +101,7 @@
   "rules": [
     {
       "keyword": "入口",
-      "rule": "菜单=产品管理→核心产品映射（corePdMpng / ZJJK00095454）。hierarchy 无独立 function → 挂 9000000230。勿点产品库/查询产品信息"
+      "rule": "菜单=产品管理→核心产品映射（corePdMpng / ZJJK00095454 / RES04066）。挂载 9000000812。勿点产品库/查询产品信息；勿挂 intermediate 目录 0230"
     },
     {
       "keyword": "选树",
@@ -139,10 +140,11 @@
   ],
   "source": {
     "refs": [
-      "legacy #59 核心产品映射主页（recorded，29 steps，挂 9000000230）",
+      "legacy #59 核心产品映射主页（recorded，29 steps；原误挂 0230，现迁 9000000812）",
       "legacy #50 删除核心产品映射；#48 新增（draft）",
-      "wet-test #513 KB贯通-核心产品映射-20260905-0230（recorded，pageId=ZJJK00095454，21 steps，hash=corePdMpng）"
+      "wet-test #513 KB贯通-核心产品映射-20260905-0230（recorded，pageId=ZJJK00095454，21 steps，hash=corePdMpng）",
+      "菜单 intermediate 修复后正式 functionId=9000000812"
     ],
-    "notes": "I10 #513：CDP #/pdMgt/pdInfMgt/corePdMpng；选树→查询→新增 KBMAP0230→删除清理；region 含 corePdMpng"
+    "notes": "I10 #513：CDP #/pdMgt/pdInfMgt/corePdMpng；选树→查询→新增 KBMAP0230→删除清理；#48/#50/#58/#59/#513 已挂 0812"
   }
 }

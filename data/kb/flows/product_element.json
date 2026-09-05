@@ -10,7 +10,7 @@
     "新增组件",
     "新增类型"
   ],
-  "menu_path": "产品管理/产品要素库（SPA functionId=9000000468，menu data-id≈RES04070，data-url=/pdMgt/pdElmtMgt/elmtgroupOfIndex；遗留 #61/#66 误挂产品信息管理 9000000230）",
+  "menu_path": "产品管理→产品要素库（functionId=9000000468；menu //li[@data-id='RES04070']；hash/elmtgroupOfIndex；父目录「产品要素管理」0231 为 intermediate，勿挂；pageId 空属菜单预期）",
   "biz_key_prefix": [],
   "hash_markers": [
     "pdMgt",
@@ -31,7 +31,7 @@
     "要素列表"
   ],
   "preconditions": [
-    "入口：产品管理→产品要素库（遗留步骤菜单文案如此；新建交易优先挂 functionId=9000000468，勿再挂 9000000230）",
+    "入口：产品管理→产品要素库（挂 functionId=9000000468；勿挂 intermediate 目录 0230/0231）",
     "左树双根：**产品公共要素** / **产品个性化要素**；在类型节点下可【新增类型】，在类型下可【新增组件】（#61 阶段口径）",
     "删除：仅非根；有子分组或已被产品引用则不可删（提示失败）",
     "产品库侧挂载依赖本库：公共要素配置页签 ZJJK00136564 / 要素页 ZJJK00136733；个性化经产品阶段主页 ZJJK00094364【设置管控要素】——本卡主链=要素库树 CRUD，产品侧挂载另见 product_library",
@@ -99,7 +99,7 @@
   "rules": [
     {
       "keyword": "入口",
-      "rule": "菜单=产品管理→产品要素库（elmtgroupOfIndex）。遗留 #61/#66 挂在 9000000230 属挂载偏差；新建贯通挂 9000000468"
+      "rule": "菜单=产品管理→产品要素库（elmtgroupOfIndex / RES04070）。挂 9000000468；父「产品要素管理」0231 为 intermediate 勿挂"
     },
     {
       "keyword": "双根",
@@ -123,11 +123,11 @@
     }
   ],
   "exceptions": [
-    "产品要素管理 functionId=9000000231 unmatched_flag=1、menu_xpath 空——勿作挂载首选",
-    "产品要素库 9000000468 可能无 system_page 行；录制靠菜单 data-url / 可见文案",
+    "产品要素管理 functionId=9000000231 现为 intermediate（目录），勿作挂载；叶子仅 9000000468",
+    "要素库 pd_cmpt_ecd/pageId 空属菜单扫描预期（agent-log 10:31），导航靠 menu_xpath RES04070",
     "确认/保存按钮「确定」vs「确 定」、「保存」vs「保 存」须双候选；新增类型/组件弹窗实测走「保 存」",
     "全局弹窗「天元相关配置」可能遮挡要素库页；agent 环境守卫会暂停，勿自行点确定除非上层授权",
     "I5 #503 agent 全阶段 recorded 但 P2 业务失败（icon 定位）；CDP 补证 stamp+操作成功后回填"
   ],
-  "source": "R1 #61/#66 + R3 functionId=9000000468；I5 #503(20260904-2330) 浅湿测：挂载 9000000468 菜单进 elmtgroupOfIndex 双根可见；agent P2 QUALITY FAIL；CDP 点 folder-add→填组件名称 stamp→保 存→toast「操作成功」、树见 KB测要素类型-20260904-2330；未回退 0230"
+  "source": "R1 #61/#66；I5 #503 recorded 挂 9000000468；菜单 intermediate 修复后 0231=目录 / 0468=叶子"
 }

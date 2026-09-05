@@ -8,16 +8,15 @@
     "新增子阶段",
     "阶段树"
   ],
-  "menu_path": "产品管理→产品阶段管理（SUT 菜单 RES24008；#511 实证 hash=#/pdMgt/pdInfMgt/mntPdStg；挂载 functionId=9000000230——hierarchy 无独立阶段节点，与遗留 #56 同；文档亦作「维护产品阶段」/ZJJK00095902）",
+  "menu_path": "产品管理→产品阶段管理（functionId=9000000811；menu //li[@data-id='RES24008']；pageId=ZJJK00095902；#511 hash=#/pdMgt/pdInfMgt/mntPdStg；菜单 intermediate 修复后独立叶子，勿再挂 intermediate 目录 0230）",
   "biz_key_prefix": [],
   "hash_markers": [
     "mntPdStg",
     "pdMgtpdInfMgtmntPdStg",
-    "pdMgt",
-    "pdInfMgt",
     "ZJJK00095902",
-    "ZJJK00094364",
-    "ZJJK00098070"
+    "RES24008",
+    "pdInfMgt",
+    "pdMgt"
   ],
   "keywords": [
     "产品阶段",
@@ -31,7 +30,7 @@
     "mntPdStg"
   ],
   "preconditions": [
-    "入口：产品管理→产品阶段管理（#511 标题「产品阶段管理」）；新建交易挂 functionId=9000000230（无独立 function；勿挂 0740 产品库）",
+    "入口：产品管理→产品阶段管理（#511）；新建交易挂 functionId=9000000811（勿挂 intermediate 目录 0230，勿挂 0740 产品库）",
     "左树右编；工具栏图标：folder-add=「新增阶段」、document-add=「新增子阶段」、delete=「删除」（#511 CDP）",
     "子阶段：先选中父阶段再点「新增子阶段」；名称用 stamp",
     "删除前校验产品引用；与产品库交叉见 product_library（设置阶段/管控要素）",
@@ -107,7 +106,7 @@
   "rules": [
     {
       "keyword": "入口",
-      "rule": "菜单=产品管理→产品阶段管理（RES24008）；URL 含 mntPdStg；挂载 9000000230"
+      "rule": "菜单=产品管理→产品阶段管理（RES24008）；URL 含 mntPdStg；挂载 9000000811"
     },
     {
       "keyword": "新增阶段",
@@ -131,9 +130,9 @@
     }
   ],
   "exceptions": [
-    "hierarchy 无独立产品阶段 function——贯通挂 9000000230",
+    "历史曾挂 intermediate 目录 0230；菜单修复后正式挂 9000000811（#46/#56/#511 已迁）",
     "湿测前草稿 hash 缺 mntPdStg 时阶段页曾误注入产品库卡（#511）；回填后靠命中 markers 计分压制",
     "保存/确定空格双候选"
   ],
-  "source": "R1 #56/#46 + R2 §3.2；I8 #511(20260905-0120) recorded：mntPdStg、挂载 0230、folder-add=新增阶段 / document-add=新增子阶段，树见 KB测阶段+KB测子阶段"
+  "source": "R1 #56/#46 + R2 §3.2；I8 #511 recorded（mntPdStg）；菜单 intermediate 修复后 functionId=9000000811（RES24008 / ZJJK00095902）；folder-add=新增阶段 / document-add=新增子阶段"
 }

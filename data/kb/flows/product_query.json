@@ -7,7 +7,7 @@
     "产品查询列表",
     "enqrPdInf"
   ],
-  "menu_path": "产品管理→查询产品信息（SPA functionId=9000000467；menu xpath //li[@data-id='RES04069']；pageId=ZJJK00095907；hash/resPath=/pdMgt/pdInfMgt/enqrPdInf；遗留 #60 误挂产品信息管理 9000000230）",
+  "menu_path": "产品管理→查询产品信息（functionId=9000000467；menu //li[@data-id='RES04069']；pageId=ZJJK00095907；hash=/pdMgt/pdInfMgt/enqrPdInf；父「产品信息管理」0230 为 intermediate 勿挂）",
   "biz_key_prefix": [],
   "hash_markers": [
     "enqrPdInf",
@@ -31,7 +31,7 @@
     "叶子节点"
   ],
   "preconditions": [
-    "入口：产品管理→查询产品信息（新建交易挂 functionId=9000000467，勿再挂 9000000230）；落地页只读列表，非产品库树编辑",
+    "入口：产品管理→查询产品信息（挂 functionId=9000000467；勿挂 intermediate 目录 0230）；落地页只读列表，非产品库树编辑",
     "列表默认展示叶子节点产品；状态口径含禁用/启用/失效（以 SUT 筛选项为准）",
     "查询条件：产品名称/产品编号/产品状态/产品目录等；【查询】筛选、【重置】清空",
     "详情/历史为只读；导出 Excel 上限约 20000、且仅禁用+启用叶子（#60 task）；浅湿测可跳过导出",
@@ -100,7 +100,7 @@
   "rules": [
     {
       "keyword": "入口",
-      "rule": "菜单=产品管理→查询产品信息（enqrPdInf / RES04069）。遗留 #60 挂 9000000230 属挂载偏差；新建贯通挂 9000000467。勿与产品库 pdMgtMgtPg / 产品信息管理混淆"
+      "rule": "菜单=产品管理→查询产品信息（enqrPdInf / RES04069）。挂 9000000467；父「产品信息管理」0230 为 intermediate 勿挂。勿与产品库 pdMgtMgtPg 混淆"
     },
     {
       "keyword": "列表口径",

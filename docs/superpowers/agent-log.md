@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 10:39 · Cursor Lead — 开工声明：正式 systemId=1 全量 scan-menu 修复
+- 开工：10:39。用户「接下来修复正式 systemId=1」；scan 已启 `247e4ec8-a11b-4d57-b432-e744cf594025`
+- 范围：MySQL `system`/`system_page`（仅 systemId=1 扫描写回）；本文件 + todo/plan 勾选；`tmp/product-mgmt/_scan_*_1*`
+- 禁入：`src/**`、`data/kb/**`（他线 10:37 KB 挂载）、`9000000813`、推送 POST、`config/.env*`
+- 注意：与 Zcode 10:38 链B用信同 SUT；本线占 executor LMY 槽，不碰 Playwright MCP 会话
+- 方式：轮询 scan → 断言对公客户管理可导航+UML / 产品管理五叶
+
+## 2026-09-05 10:40 · Cursor Lead — 收工回报：产品 KB 卡挂载收尾（回链 10:37）
+- 完成：`product_stage`→**0811**、`product_core_mapping`→**0812**；`product_element`/`product_query` 注明 intermediate 父目录；through-report / todo ⑥ 更新
+- 验收：API 五叶+0230/0231 intermediate；交易已在对应叶子（本收工不改 DB）
+- 未改：`product_library.json`（Zcode 禁入）；要素 pageId 空保持预期
+- commit 开工 `c15308c`；本收工随卡片 commit
+
 ## 2026-09-05 10:37 · Cursor Lead — 开工声明：产品 KB 卡挂载收尾（0811/0812）
 - 开工：10:37。菜单 intermediate 修复后，回写 `product_stage`/`product_core_mapping`（及要素卡目录说明）为正式 functionId **9000000811 / 9000000812**；更新 todo/through-report；不改交易数据（已迁）
 - 范围：`data/kb/flows/product_stage.json`、`product_core_mapping.json`、`product_element.json`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`、`tmp/product-mgmt/through-report.md`
