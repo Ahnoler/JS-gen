@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode Lead — 开工声明：浏览器与会话生命周期/调用关系梳理（只读调研）
+- 开工：本会话。用户指示梳理「浏览器与会话的生命周期和调用关系」，带领 agent team
+- 范围：只读调研 `src/routes/**`、`src/services/**`、`scripts/{session_runner,agent,controller}/**`、`executor/**`；产出 `docs/superpowers/research/2026-09-05-browser-session-lifecycle.md` + 本文件；与 Cursor 12:09 SDD 线（menu-scan*/merge-intermediate）文件集零交集
+- 禁入：一切代码/数据写操作、工作区未提交改动（config/.env.example）、在途线热区
+- 方式：三路只读 Explore 并行（①Node 控制面浏览器会话与 executor 槽位 ②record/replay/stream/detach 轨迹链 ③Python agent/CDP 接线），主线程交叉验证后汇总成报告
+
 ## 2026-09-05 12:09 · Cursor Lead — 开工声明：SDD 实施 intermediate 同名升格合入
 - 开工：12:09。用户「按计划实施」+ `/subagent-driven-development`
 - 范围：`src/services/menu-scan-{service,apply,session}.js`、`scripts/characterization/characterize-menu-scan.mjs`、`scripts/maintenance/merge-intermediate-ai-twins.mjs`、api-docs overview、agent-log/todo；MySQL systemId=1 孪生清理
