@@ -4,11 +4,11 @@
  *
  * Resolution/quality are NOT controlled here — only forward cadence + CDP everyNthFrame.
  */
-export const TARGET_FPS = 11;
-export const DEFAULT_MIN_FORWARD_MS = 90;
-export const DEFAULT_EVERY_NTH_FRAME = 2;
+export const TARGET_FPS = 30;
+export const DEFAULT_MIN_FORWARD_MS = 33; // 1000 / 30fps
+export const DEFAULT_EVERY_NTH_FRAME = 1;
 
-const MIN_FORWARD_CLAMP = [50, 500];
+const MIN_FORWARD_CLAMP = [25, 500];
 const EVERY_NTH_CLAMP = [1, 5];
 
 function parseIntEnv(raw, fallback) {

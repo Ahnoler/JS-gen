@@ -1,6 +1,7 @@
 /**
- * Characterization: BiB screencast timing defaults (~11fps, resolution untouched).
+ * Characterization: BiB screencast timing defaults (~30fps, resolution untouched).
  * Spec: docs/superpowers/specs/2026-08-11-bib-stream-fps-cap-design.md
+ * 2026-09-05: default raised 11fps → 30fps (minForwardMs 90→33, everyNthFrame 2→1).
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,13 +17,13 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '../..');
 
-assert.equal(TARGET_FPS, 11);
-assert.equal(DEFAULT_MIN_FORWARD_MS, 90);
-assert.equal(DEFAULT_EVERY_NTH_FRAME, 2);
+assert.equal(TARGET_FPS, 30);
+assert.equal(DEFAULT_MIN_FORWARD_MS, 33);
+assert.equal(DEFAULT_EVERY_NTH_FRAME, 1);
 
 const base = resolveScreencastTiming({});
-assert.equal(base.minForwardMs, 90);
-assert.equal(base.everyNthFrame, 2);
+assert.equal(base.minForwardMs, 33);
+assert.equal(base.everyNthFrame, 1);
 
 const fromEnv = resolveScreencastTiming({
   BIB_STREAM_MIN_FORWARD_MS: '120',
@@ -35,7 +36,7 @@ const clampedLo = resolveScreencastTiming({
   BIB_STREAM_MIN_FORWARD_MS: '10',
   BIB_STREAM_EVERY_NTH_FRAME: '0',
 });
-assert.equal(clampedLo.minForwardMs, 50);
+assert.equal(clampedLo.minForwardMs, 25);
 assert.equal(clampedLo.everyNthFrame, 1);
 
 const clampedHi = resolveScreencastTiming({
@@ -49,8 +50,8 @@ const bad = resolveScreencastTiming({
   BIB_STREAM_MIN_FORWARD_MS: 'nope',
   BIB_STREAM_EVERY_NTH_FRAME: '',
 });
-assert.equal(bad.minForwardMs, 90);
-assert.equal(bad.everyNthFrame, 2);
+assert.equal(bad.minForwardMs, 33);
+assert.equal(bad.everyNthFrame, 1);
 
 // Cue: both producers must call startScreencast with everyNthFrame from timing
 const bib = fs.readFileSync(path.join(root, 'executor/bib-bridge.js'), 'utf8');
