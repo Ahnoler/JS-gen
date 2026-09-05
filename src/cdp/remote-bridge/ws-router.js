@@ -189,6 +189,11 @@ export function ensureWsHook(attachLive) {
         }).catch(() => null);
         addBinarySubscription(ws, remoteSessionUuid || live?.remoteSessionUuid || null);
         notifyStreamViewers(remoteSessionUuid || live?.remoteSessionUuid || null);
+        // 把回填的 uuid 写回 bind —— 否则退订时 prevUuid=null，观众下推会静默跳过
+        const bound = bridge.wsTrajectoryBind.get(ws);
+        if (bound && !bound.remoteSessionUuid && live?.remoteSessionUuid) {
+          bound.remoteSessionUuid = live.remoteSessionUuid;
+        }
         // 观众秒开：订阅成功即补发缓存的最后一帧（executor 模式缓存于 executor-ws）
         const lastPacket = getLastRscfPacket(remoteSessionUuid || live?.remoteSessionUuid || null);
         if (lastPacket && lastPacket.length) {
@@ -279,6 +284,8 @@ export function ensureWsHook(attachLive) {
           sendToExecutor(executorNodeUuid, 'session.bib_start', { sessionId: pickSessionId });
         } else if (type === 'remote:stop') {
           sendToExecutor(executorNodeUuid, 'session.bib_stop', { sessionId: pickSessionId });
+          // 停看也是观众离开 —— 同步重算观众数下推（0 → 执行机暂停推流）
+          notifyStreamViewers(remoteSessionUuid || null);
         } else if (type === 'remote:ack') {
           sendToExecutor(executorNodeUuid, 'session.bib_ack', {
             sessionId: pickSessionId,
