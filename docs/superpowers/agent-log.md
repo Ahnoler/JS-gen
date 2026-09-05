@@ -3,7 +3,7 @@
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
 ## 2026-09-05 12:55 · Cursor Lead — 收工回报：客户管理 KB 贯通（回链 12:37 / 3c3389a）
-- 完成：执行代理 Tasks 1–5；卡挂 **functionId=7**；traj **#515 recorded**；stamp **KB测客户-20260905-1245** 列表可见（CDP 补完；AI record 曾假成功）
+- 完成：执行代理 Tasks 1–5；卡挂 **functionId=7**；traj **#515 recorded**；stamp **KB测客户-20260905-1245** 列表可见（CDP 补完；AI record 曾假成功）；commit **`f6e6dba`**
 - 验收：`tmp/customer-mgmt/through-report.md`；召回 score=100；OCR 未触
 - 遗留：①引擎 phase_done 证据门闩 ②USCC 须 18 位 ③法定代表人引入浅过 ④可选复录沉淀步骤
 - 注意：提交仅本线卡/计划/todo/agent-log；未带安全审查删除的 docs 或 `.env.example`
