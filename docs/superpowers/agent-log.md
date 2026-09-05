@@ -2,6 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 12:06 · Cursor Lead — 设计确认：同名 intermediate 升格合入（source=json_import）
+- 完成：spec `2026-09-05-intermediate-promote-on-scan-design.md` + plan `2026-09-05-intermediate-promote-on-scan.md`；旧 intermediate spec §2/§5/§6 已修订
+- 待：用户审阅 spec 后实施（characterize → plan 升格 → apply → 存量孪生清理）
+- 禁入：推送、异名改名升格
+
 ## 2026-09-05 11:20 · Zcode Lead — 收工回报：菜单爬取 Xpath 真机验证（回链 10:57）
 - 完成：410 条 Xpath 全量真机普查（test.creditv5p2，701994，独立 Playwright 无头实例，未碰共享有头浏览器）——**全部匹配 0 失效**；但二级 386 条 `li[data-id]` 为隐藏 DOM（可见 flyout 链接是 `li.submenu-item[data-url=…]`），可见性点击工具定位不到=同事反馈根因；引擎 `el.click()` 配方实测隐藏节点一次点击导航成功（RES000000101→对公客户管理页）
 - 验收：报告 `tmp/menu_crawl/verify-report.md` + `_verify_stateA/BC/D.json` + 截图；同事样例 RES000000006（押品管理，一级）实测可定位且可见，已注明待同事提供其测试页面/工具细节
