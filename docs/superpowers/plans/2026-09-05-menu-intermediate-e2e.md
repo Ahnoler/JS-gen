@@ -61,7 +61,6 @@ SUT 权威叶（扫描 `unmatchedScanned` 带父） vs DB `type=3 AND intermedia
 
 ## 遗留
 
-- **产品要素库** 无 pageId：**预期**（SUT/天元读不到落地码），不强制 fill；uml 可保持数字串  
-- **正式 `systemId=1`**：误 import（未扫）后**产品管理五叶仍可导航**；但建模同名叶（含「对公客户管理」）已成 intermediate 且无同名可导航孪生——**尚不正确**，需对 `1` 全量 `scan-menu`（+ pageId 后 adopt）才与隔离实测对齐  
-- **推送**：下周一安排（先 `9000000813` wire 验证过的过滤逻辑；正式推哪个 system 届时定）  
-- 控制面已重启，新扫描会走「补采后二次 adopt」  
+- **产品要素库** 无 pageId：**预期**（SUT/天元读不到落地码），不强制 fill  
+- **正式 `systemId=1`**：已全量 scan `247e4ec8-…`（matched=257 created=172 adoptAfterPageId=79）；对公客户管理可导航孪生 + 产品管理五叶 OK  
+- **推送**：下周一安排  

@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 10:55 · Cursor Lead — 收工回报：正式 systemId=1 全量 scan（回链 10:39）
+- 完成：scan `247e4ec8-…` completed——scanned=429 matched=257 created=172 pageIdFilled=168 umlAdoptedAfterPageId=79
+- 验收：对公客户管理可导航孪生 `9000001478`（UML00005556+xpath+pageId）；产品管理五叶齐全（0811/0812/0740/0467/0468）；分组仍 intermediate；覆盖仅 SUT=0（相对本趟 unmatchedScanned）
+- 证据：`tmp/product-mgmt/_assert_scan_1.json`、`_coverage_1.json`、`_scan_done_1.json`
+- 遗留：推送下周一；产品要素库无 pageId 仍为预期
+
 ## 2026-09-05 · Zcode Lead — 收工回报：agent-log 收工条目梳理完成（回链本会话开工条目）
 - 完成：主文件 112 条目梳理——**27 条保留**（未闭环开工/进行中、现行裁决、各工作线收官），**88 条归档**至 `docs/superpowers/agent-log-archive-2026-09-05.md`（历史不删只归档，原文未改写）；顺带清理旧文件头模板残留
 - 验收：两路只读 Explore 盘点（112 条目闭环状态分组 + 82 个 commit hash 审计**全部有效无孤儿**）；归档文件头记录取代链（intermediate 三级回退等）与「未推送」状态勘误说明；主文件重排后人工通读核对
