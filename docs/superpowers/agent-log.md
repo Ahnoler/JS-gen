@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 10:57 · Zcode Lead — 开工声明：菜单爬取 Xpath 真机验证（同事反馈「定位不到」）
+- 开工：10:57。用户转达同事反馈「项目抓取的菜单路径无法使用/菜单 Xpath 定位不到」（截图示 `//li[@data-id='RES000…']`），附 `tmp/menu_crawl/menu_crawl_no_system.xlsx`，要求真机验证
+- 范围：`tmp/menu_crawl/menu_crawl_no_system.xlsx`（只读）+ `tmp/menu_crawl/` 新增验证脚本与报告（本线 scratch）；SUT test.creditv5p2 只读导航验证（登录+菜单悬停/计数，不提交任何业务单据）；本文件开工/收工条目
+- 禁入：`src/**`、`scripts/**`、`data/kb/**`、`config/.env*`（工作区他线 WIP）、`docs/superpowers/research/2026-09-01-replay-pipeline-handover.md`（untracked 他线）、MySQL、推送 POST、存量业务单据
+- 方式：openpyxl 读 Excel 全量 Xpath → Playwright MCP 有头浏览器登录 SUT → document.evaluate 批量计数匹配/可见性（含 flyout 展开前后对照）→ 出结论报告；不改任何产品代码（验证任务）
+
 ## 2026-09-05 10:55 · Cursor Lead — 收工回报：正式 systemId=1 全量 scan（回链 10:39）
 - 完成：scan `247e4ec8-…` completed——scanned=429 matched=257 created=172 pageIdFilled=168 umlAdoptedAfterPageId=79
 - 验收：对公客户管理可导航孪生 `9000001478`（UML00005556+xpath+pageId）；产品管理五叶齐全（0811/0812/0740/0467/0468）；分组仍 intermediate；覆盖仅 SUT=0（相对本趟 unmatchedScanned）
