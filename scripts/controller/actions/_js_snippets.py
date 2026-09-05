@@ -48,7 +48,6 @@ from .js_snippets.strip_dialogs import JS_STRIP_STALE_WRAPPERS
 from .js_snippets.real_click import JS_REAL_CLICK_RECT, JS_REAL_CLICK_ECHO, JS_TREE_POPOVER_OPEN
 from .js_snippets.xhr_log import JS_XHR_HOOK, JS_XHR_RECENT
 from .js_snippets.error_notify import JS_READ_ERROR_NOTIFY, JS_NOTIFY_HOOK
-from .js_snippets.save_section import JS_SAVE_SECTION
 from .js_snippets.semantic_snapshot import JS_SEMANTIC_SNAPSHOT
 from .js_snippets.verify_context import JS_VERIFY_CONTEXT
 from .js_snippets.page_id import JS_READ_PAGE_COMPONENT_CODE, JS_CLICK_MENU_XPATH, JS_FIND_MENU_DISMISS_POINT

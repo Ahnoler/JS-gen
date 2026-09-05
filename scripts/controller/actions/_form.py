@@ -194,23 +194,5 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
             return _ok(payload)
         return payload
 
-    @controller.action(
-        'Legacy compatibility alias for click_save (deprecated for new recordings). '
-        "save_section(section_title) is forwarded to click_save(button_text='保存', "
-        "region=section_title) — same unified save engine: locates the enabled 保存 "
-        'button within the nearest container scoped by the section title and uses the '
-        "four-way outcome verdict (ok-save-success / ok-save-navigation / "
-        'ok-save-no-feedback / err-save-*). Use this for multi-section pages where '
-        'every section has its own 保存 — the page-global 保存 click hits an ambiguous '
-        'coordinate and the wrong section save silently does nothing (KB-I5 run11). '
-        'For new recordings call click_save directly with region=<section title from '
-        "semantic_snapshot>. On success pair with read_xhr_log(url_filter='saveOrUpdate') "
-        "to verify the save request carried the section fields. Errors: "
-        "err-save-button-not-found:<title> (no such title / no 保存 in its container — "
-        're-check the section name from snapshot) plus all click_save error codes.'
-    )
-    async def save_section(section_title: str):
-        # Legacy alias：转发到 click_save 统一引擎（分区标题走 region 语义定位 +
-        # outcome 四路判定 + 落库为可导出的 click_element_by_index 步骤）。
-        # JS_SAVE_SECTION 本体保留：_replay.py 历史步骤仍按原动作名直接执行它。
-        return await _save_engine.click_save('保存', section_title, '')
+    # save_section 已移除：统一保存入口 click_save（分区保存 region=分区标题）。
+    # 历史轨迹中的 save_section 步骤由 _replay.py 映射为 click_save 回放。

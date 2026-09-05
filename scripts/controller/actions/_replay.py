@@ -597,6 +597,21 @@ async def replay_action_entries(
                     )
                 elif action_name in _FORM_ACTIONS:
                     result = await _replay_form_action(page, action_name, params, entry)
+                elif action_name == 'save_section':
+                    # 历史步骤：save_section 动作已移除，统一映射为 click_save 回放
+                    # （{section_title} → {button_text:'保存', region:section_title}）
+                    act = (controller_actions or {}).get('click_save')
+                    if not act:
+                        result = 'unknown-action:click_save'
+                    else:
+                        result = await _replay_controller_action(act, {
+                            'button_text': '保存',
+                            'region': str((params or {}).get('section_title') or ''),
+                        })
+                        await page.wait_for_timeout(WAIT_400_MS)
+                        await _wait_if_loading(page)
+                        if _result_ok('click_save', result):
+                            await _wait_after_save_page_idle(page)
                 else:
                     act = (controller_actions or {}).get(action_name)
                     if not act:

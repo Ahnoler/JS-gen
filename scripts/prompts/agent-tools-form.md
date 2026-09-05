@@ -139,5 +139,5 @@ run_form_assistant(region='系统评级结论')
   - 分区保存：`click_save(button_text="保存", region="<分区标题原文>")`——标题来自 semantic_snapshot，勿臆造；引擎会按标题找最近容器内的 enabled 保存按钮。
   - 保存后紧跟 `read_xhr_log(url_filter='saveOrUpdate')` 核对请求体关键字段（见 common）。
   - `err-save-validation` → 修字段再 click_save；`err-save-button-not-found` → 从 semantic_snapshot 核对分区标题原文重试，最多 1 次。
-- `save_section(...)` 已并入 click_save，仅为兼容保留：调用会被转发，新录制勿再使用。
+- `save_section` 动作已移除，不要再调用：历史轨迹中的 save_section 步骤由回放引擎映射为 click_save 回放。
 - 禁止用 `click_button` / `click_element_by_index` / `real_click` 点"保存/提交"——click_button 现在会直接返回 err-use-click-save 引导。
