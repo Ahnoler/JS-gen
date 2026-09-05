@@ -5,7 +5,7 @@
 ## 2026-09-05 18:35 · Cursor Task 5 — 收工回报：客户信息查询 KB 档位 B（回链 18:08）
 - 完成：traj **#526** recorded（stepCount=4，functionId=9000000039）；stamp **KB测客户-20260905-1315** 列表 hit=true；`customer_query.json` source 回填 + 重置 rule；todo ⑦ 档位 B 闭环；计划 Tasks 1–5 全勾选
 - 验收：`tmp/customer-mgmt/query/through-report.md`；`tmp/customer-mgmt/query/cdp-list-check.json`；`tmp/customer-mgmt/query/list526_stamp.png`
-- 注意：commit **待 Lead commit**（本 Task 5 子代理未提交）；未带 docs 三文件删除 / `.env` / 他线 WIP
+- 注意：commit **`8b52bff`**；未带 docs 三文件删除 / `.env` / 他线 WIP
 - 遗留移交：引擎 phase_done 门闩（P1/P3 仍 0 步假完成，与建档 #524 同类）；查询前重置已入卡 rules
 
 ## 2026-09-05 18:08 · Cursor Lead — 开工声明：客户信息查询 KB 档位 B（设计→计划）
