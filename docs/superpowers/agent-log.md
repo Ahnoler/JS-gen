@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 23:05 · ZCode Lead — 湿测窗口开工：rating 逐叶（Phase E 首跑+SKILL 协议验收）
+- 开工：23:05。按新 SKILL Phase E 模板跑 rating 模块逐叶湿测；本窗口同时承担协议验收（ZJJK 行可解析性/判定词表/黑名单/drift 回流是否够用）
+- 范围：`data/kb/req/rating/wet-test.md`（新建）、drift 回填 rating chapters、`tmp/kb-wet-test/rating/`、本文件
+- 禁入：`data/kb/flows/**`、promote/staging、源 .docx、他线 WIP、写操作黑名单（禁止一切落库动作）
+- 已知偏离：rating 为契约升级前切片，章末无标准 ZJJK 清单行（46 叶手工提取，回补问题记协议疏漏）
+- 方式：主线程 Playwright MCP 串行；一模块一 SUT 窗口
+
 ## 2026-09-05 22:50 · ZCode Lead — 收工：SKILL 步骤2 补 python-docx 降级预案（回链 22:20 开工的补遗）
 - 完成：用户核对想法清单发现 4 号（python-docx 降级一等公民）只落在 USAGE §6（Lead 视角）；已在 SKILL.md 步骤2「读源」补同款降级预案（worker 契约可见）。想法 2（FS 场景号）/3（文档口径标注）核实已完整落地（SKILL.md L43/L44）
 - 验收：grep 双文件凭证齐全；pin 不涉及
