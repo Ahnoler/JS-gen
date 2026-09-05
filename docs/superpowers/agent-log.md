@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 21:05 · ZCode Lead — 收工：需求分册批量导入 30/30 sliced（回链 20:05 开工）
+- 完成：30 个 moduleKey 全部 registered→sliced（P0=A_v5.2需求文档0824 27 册 + P1 补洞 collateral-info/collateral-func/system-mgmt）；product-mgmt 升级切片（sourcePath 换仓库内 0824 K01，未 reset）；每模块 chapters/ + through-chains.md 齐备，零 drafts、零 flows/staging/promote 触碰
+- 提交链：`bf75337`(开工) → `1ec6f0b`(batch1 会议/客户×3/评级) → `7fe573f`(batch2 授信×4/限额) → `d8ca1fb`(batch3 管控接口/用信×2/放还款×2) → `fc975b4`(batch4 贷后×3/催收/产品) → `81f472a`(batch5 档案/智控/门户/保全×2) → `09c30e2`(batch6 数字化×2/押品×2/系统管理)
+- 验收：逐批 manifest.status=sliced + chapters 非空 + through-chains 存在 30/30；characterize-kb-req-modules OK 11；`GET /api/v2/kb/req-modules` rows=30 全 sliced（控制面已重启至含该路由的构建，executor 已重连 online）
+- 方式：Lead 直调 registerReqModule 登记 + 6 批 ×5 并行子智能体切片（moduleKey 互斥，worker 未 commit）；officecli 全文超限时各 worker 按 USAGE §6 降级 python-docx（browser_use env），临时文件均已清理；源 .docx 未改动
+- 遗留：本批按约定不出 drafts；flows/promote/staging 另开任务；limit-ctrl-api 源文档报文字段整体缺失（各章已标待湿测）；个别文档口径矛盾点已逐章标「待湿测」；进度表 `tmp/kb-req-batch/`（gitignore）
+- 注意：他线未提交 WIP（service.py / trajectory*）未碰
+
 ## 2026-09-05 20:05 · ZCode Lead — 开工声明：需求分册批量导入 KB（registered→sliced）
 - 开工：20:05。按 `scripts/prompts/skills/req-doc-to-kb/USAGE.md` 批量导入：语料 P0=`A_v5.2需求文档0824`（27 册）+ P1 补洞（押品×2、系统管理×1），共 30 个 moduleKey
 - 范围：`data/kb/req/**`（新建/升级 30 个模块作业区：chapters/、through-chains.md、manifest）、`tmp/kb-req-batch/progress.md`、本文件；控制面路由 404 故经 `src/services/kb-req-modules.js` Node 直调登记（服务文件只读）
