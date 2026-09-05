@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 01:58 · ZCode Lead — 湿测窗口开工：credit-group 逐叶（流水线第五循环）
+- 开工：01:58（已 date 校时）。A→B→C 第 5 循环：A 预备 → B 湿测 → C 回填；验收线含 checker 第 0 步
+- 范围：`data/kb/req/credit-group/`（wet-test.md 新建、chapters 回补/回填）、`tmp/kb-wet-test/credit-group/`、双台账更新、本文件
+- 禁入：flows/promote/staging/源 docx/他线 WIP/其他模块文件；写操作黑名单
+- 方式：子代理不 commit 不写日志，Lead 验收（checker→截图 mtime→抽 2-3 叶→blocked 证据）后代提交
+
 ## 2026-09-06 02:00 · ZCode Lead — 阶段回报：credit-retail 逐叶湿测收口 81/81（协议 v4 首跑，流水线第四循环）
 - 完成：A 预备 81 叶+5 章清单行回补 → B 湿测 **match 46 / drift 2 / blocked 33 / not-found 0**（30 截图）→ C 回填 4 项 + 双台账更新。提交 `2eaa71c`/`6c23b16`/`31358d4`
 - Lead 验收线（v4 含 checker 第 0 步）：checker 零 FAIL（2 WARN=C 组回填前预期态）；30 截图 mtime 落执行窗口（01:34-01:50）；抽叶1（对私批复主页按钮/列/0 条）+叶17（无标题 2 步向导抽屉）页面复核均吻合 ✓
