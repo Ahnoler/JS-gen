@@ -127,16 +127,15 @@ function flattenSubdomains(nodes, ancestorModule, modules) {
       }
       // 无子领域（顶层即叶子）：functions 为空，pages 已挂模块自身，无需再递归
     } else if (isLeafSubdomain(node)) {
-      // 叶子子领域 → 功能，挂到顶层祖先模块
-      // managePage≥2 个不同 pageId：中间菜单（保留 umlEcd，目录页挂全量；不拆导航叶）
+      // 非顶层叶子子领域 → 一律中间菜单（保留 umlEcd + 全量 managePage 目录；
+      // 可点二级菜单只认扫描。含仅 1 个 managePage 的「产品要素管理」类分组标题。）
       const allPages = collectPages(node, { all: true });
-      const intermediate = allPages.length >= 2;
       ancestorModule.functions.push({
         umlEcd,
         name,
         seqNo,
-        pages: intermediate ? allPages : allPages.slice(0, 1),
-        intermediate,
+        pages: allPages,
+        intermediate: true,
       });
     } else {
       // 中间层非叶子：不建节点；自身直属活动页面并入最近已建祖先（模块）

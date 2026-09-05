@@ -29,12 +29,15 @@
 
 非顶层叶子子领域（`umlType=2` 且无子 umlType=2）：
 
-- **managePage 数 ≥ 2**：upsert 该子领域为 type=3，`intermediateFlag=1`，**不写**导航用 `pd_cmpt_ecd`（清空），不写 `menu_xpath`  
-  - 其下各活动的 managePage：**可**全部挂到该节点的 `system_page`（目录/对齐素材），**不**为每个活动新建可见功能节点  
-- **managePage 数 = 1**：保持现行为（一条可导航功能，`intermediateFlag=0`）  
-- **= 0**：可选建 intermediate 仅存 uml；本轮可与 ≥2 同样打标
+- **一律** `intermediateFlag=1`（含仅 1 个 managePage，如「产品要素管理」）  
+  - 保留子领域 `umlEcd`；**不写**导航用 `pd_cmpt_ecd` / `menu_xpath`  
+  - 其下活动的 managePage **全部**写入该节点 `system_page`（目录/对齐素材）  
+  - **不**按活动新建可见导航功能  
+- 可点二级菜单权威来源 = **菜单扫描**  
 
 顶层模块逻辑不变。
+
+> 修订（2026-09-05）：原「≥2 才 intermediate / =1 可导航」已废止——单页叶子在 SUT 上仍可能是不可点分组标题。
 
 ## 5. 二级菜单从哪来（层 2 修订）
 

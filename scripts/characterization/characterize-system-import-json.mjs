@@ -148,6 +148,7 @@ function testBuildPlanStructure() {
     assert.ok(f.umlEcd !== undefined, 'function umlEcd present');
     assert.ok(f.seqNo !== undefined, 'function seqNo present');
     assert.ok(Array.isArray(f.pages), 'function pages array');
+    assert.equal(f.intermediate, true, 'non-top leaf subdomain always intermediate');
     for (const p of f.pages) {
       assert.equal(p.pageType, 'managePage', 'pageType is managePage only');
       assert.ok(p.pageId, 'pageId present');
@@ -161,15 +162,16 @@ function testBuildPlanSharedManagePageDedup() {
   const fixture = buildFixture();
   const plan = buildImportJsonPlan(fixture);
   const gongGong = plan.modules[0].functions.find((f) => f.name === '对公客户管理');
+  assert.equal(gongGong.intermediate, true, 'single-page leaf also intermediate');
   const pageIds = gongGong.pages.map((p) => p.pageId);
-  assert.deepEqual(pageIds, ['ZJJK00066153'], 'only first managePage; guidePage ignored');
+  assert.deepEqual(pageIds, ['ZJJK00066153'], 'dedupe same managePage; guidePage ignored');
   assert.ok(!pageIds.includes('ZJJK99999999'), 'task-level pdCmptEcd ignored');
   assert.ok(!pageIds.includes('ZJJK00066158'), 'guidePage ZJJK00066158 not imported');
   assert.equal(gongGong.pages.length, 1);
   assert.equal(gongGong.pages[0].pageType, 'managePage');
 }
 
-/** 叶子子领域含 ≥2 个不同 managePage → intermediate + 全量 pages（不拆导航叶） */
+/** 多页 / 单页叶子子领域均 intermediate；不按活动拆导航叶 */
 function testBuildPlanMultiPageLeafIntermediate() {
   if (!importAvailable) { console.log('    (skipped: SUT not importable)'); return; }
   const managePage = (ecd, nm) => ({ pdCmptEcd: ecd, pdCmptNm: nm, resPath: '/' + ecd });
@@ -188,24 +190,35 @@ function testBuildPlanMultiPageLeafIntermediate() {
       activity('维护核心产品映射', 'ZJJK_C'),
     ],
   };
+  const elmtLeaf = {
+    umlType: '2',
+    umlNm: '产品要素管理',
+    umlEcd: 'UML_ELMT',
+    children: [activity('维护产品要素', 'ZJJK_E')],
+  };
   const mod = {
     umlType: '2',
     umlNm: '产品管理',
     umlEcd: 'UML_PD',
-    children: [infoLeaf],
+    children: [infoLeaf, elmtLeaf],
   };
   const plan = buildImportJsonPlan({ roots: [mod] });
   assert.equal(plan.modules.length, 1);
   const fn = plan.modules[0].functions.find((f) => f.name === '产品信息管理');
   assert.ok(fn, '产品信息管理 still in plan (catalog node)');
-  assert.equal(fn.intermediate, true, 'multi distinct managePages → intermediate');
+  assert.equal(fn.intermediate, true, 'multi-page leaf → intermediate');
   assert.equal(fn.pages.length, 3, 'all managePages kept for catalog');
   assert.deepEqual(
     fn.pages.map((p) => p.pageId),
     ['ZJJK_A', 'ZJJK_B', 'ZJJK_C'],
   );
-  // Must NOT invent separate nav functions per activity
   assert.ok(!plan.modules[0].functions.some((f) => f.name === '维护产品阶段'));
+
+  const elmt = plan.modules[0].functions.find((f) => f.name === '产品要素管理');
+  assert.ok(elmt, '产品要素管理 in plan');
+  assert.equal(elmt.intermediate, true, 'single managePage leaf also intermediate');
+  assert.equal(elmt.pages.length, 1);
+  assert.equal(elmt.pages[0].pageId, 'ZJJK_E');
 }
 
 function testBuildPlanEmptyGuidePageSkipped() {
@@ -213,6 +226,7 @@ function testBuildPlanEmptyGuidePageSkipped() {
   const fixture = buildFixture();
   const plan = buildImportJsonPlan(fixture);
   const siYe = plan.modules[0].functions.find((f) => f.name === '对私客户管理');
+  assert.equal(siYe.intermediate, true);
   const pageIds = siYe.pages.map((p) => p.pageId);
   assert.deepEqual(pageIds, ['ZJJK00067207'], 'empty guidePage pdCmptEcd skipped → only managePage');
 }
@@ -222,7 +236,8 @@ function testBuildPlanTopLevelLeafDedup() {
   const fixture = buildFixture();
   const plan = buildImportJsonPlan(fixture);
   const gongGao = plan.modules[0].functions.find((f) => f.name === '中征网公告管理');
-  assert.ok(gongGao, 'top-level leaf 中征网公告管理 is a function, not a module page');
+  assert.ok(gongGao, 'module-child leaf 中征网公告管理 is a function, not a module page');
+  assert.equal(gongGao.intermediate, true, 'module-child leaf always intermediate');
   const pageIds = gongGao.pages.map((p) => p.pageId);
   // Two activities share ZJJK00109712 → deduped to 1.
   assert.deepEqual(pageIds, ['ZJJK00109712'], 'shared managePage across two activities deduped to 1');
@@ -238,6 +253,7 @@ function testBuildPlanHeiMingDan() {
   const plan = buildImportJsonPlan(fixture);
   const hei = plan.modules[0].functions.find((f) => f.name === '黑名单管理');
   assert.ok(hei, '黑名单管理 appears under 客户管理.functions (leaf under intermediate flattened)');
+  assert.equal(hei.intermediate, true);
   const pageIds = hei.pages.map((p) => p.pageId);
   assert.deepEqual(pageIds, ['ZJJK00098110']);
 }
@@ -276,7 +292,7 @@ function main() {
     ['parseMenuJson valid array', testParseValidArray],
     ['buildImportJsonPlan structure & intermediates flattened', testBuildPlanStructure],
     ['buildImportJsonPlan shared managePage only (no guidePage)', testBuildPlanSharedManagePageDedup],
-    ['buildImportJsonPlan multi-page leaf → intermediate + all pages', testBuildPlanMultiPageLeafIntermediate],
+    ['buildImportJsonPlan multi/single-page leaf → always intermediate', testBuildPlanMultiPageLeafIntermediate],
     ['buildImportJsonPlan empty guidePage skipped', testBuildPlanEmptyGuidePageSkipped],
     ['buildImportJsonPlan top-level leaf as function', testBuildPlanTopLevelLeafDedup],
     ['buildImportJsonPlan 黑名单管理 leaf flattened', testBuildPlanHeiMingDan],
