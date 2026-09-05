@@ -4,6 +4,7 @@
  */
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
+import { maskAccountPassword } from '../dao/system-account-dao.js';
 import {
   NODE_TYPE,
   TYPE_LABEL,
@@ -88,7 +89,7 @@ export async function getTree({
     }
     for (const node of nodes) {
       if (node.type !== NODE_TYPE.SYSTEM) continue;
-      node.accounts = (accountsBySystem.get(Number(node.id)) || []).map((a) => ({
+      node.accounts = (accountsBySystem.get(Number(node.id)) || []).map((a) => maskAccountPassword({
         id: a.id,
         systemId: a.systemId,
         name: a.name,

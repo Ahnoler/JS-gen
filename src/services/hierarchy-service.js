@@ -5,6 +5,7 @@
 import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
+import { MASKED_PASSWORD, maskAccountPassword } from '../dao/system-account-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import {
   NODE_TYPE,
@@ -235,6 +236,13 @@ async function syncSystemAccounts(systemId, normalized, trx) {
       remark: item.remark,
       sortOrder: item.sortOrder,
     };
+    // 哨兵 '******' 表示前端未修改密码（掩码原样回传）：
+    // 更新已有账号 → 跳过 password 字段，保持库中原值；
+    // 新建账号 → 视为空密码。空字符串语义不变（更新即清空）。
+    if (item.password === MASKED_PASSWORD) {
+      if (target) delete data.password;
+      else data.password = '';
+    }
 
     let saved;
     try {
@@ -362,7 +370,7 @@ export async function getNode(id) {
   if (node && Number(node.type) === NODE_TYPE.SYSTEM) {
     // 详情回显系统账号（与 getTree includeAccounts 同形状），供编辑表单回显
     const accounts = await systemAccountDao.listBySystem(node.id);
-    node.accounts = accounts.map((a) => ({
+    node.accounts = accounts.map((a) => maskAccountPassword({
       id: a.id,
       systemId: a.systemId,
       name: a.name,

@@ -6,6 +6,25 @@ import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
 const TABLE = 'system_account';
 
+/**
+ * 固定哨兵掩码：账号出站回显时替换明文密码；写侧遇到该值跳过 password 更新。
+ * 前端编辑表单原样回传该值即表示「不修改密码」。
+ * @type {string}
+ */
+export const MASKED_PASSWORD = '******';
+
+/**
+ * 出站掩码：把账号对象中的明文 password 替换为哨兵 '******'（仅回显用；
+ * 内部登录/回放链路必须使用 DAO 原始行，禁止调用本函数后写库或驱动浏览器）。
+ * 密码为空/NULL 保持空字符串，不产生哨兵。
+ * @param {object|null} account 账号行（至少含 password 字段）
+ * @returns {object|null} 浅拷贝且 password 已掩码的账号对象（入参为 null 时返回 null）
+ */
+export function maskAccountPassword(account) {
+  if (!account || typeof account !== 'object') return account;
+  return { ...account, password: account.password ? MASKED_PASSWORD : '' };
+}
+
 function client(db) {
   return db || getDB();
 }
