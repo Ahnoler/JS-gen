@@ -12,9 +12,7 @@ import { getDB } from '#config/database.js';
 import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
 import {
   BUSINESS_DATA_SECTION_RE,
-  extractBusinessDataBlock,
   extractBusinessEntriesFromRequirement,
-  appendBusinessDataToPhases,
 } from './trajectory-text-extract.js';
 
 export {
@@ -23,6 +21,54 @@ export {
   extractBusinessDataBlock,
   extractBusinessEntriesFromRequirement,
 } from './trajectory-text-extract.js';
+
+/**
+ * 容错提取 "phases":[...] 内的字符串元素。
+ * LLM 输出的 JSON 字符串值里常带未转义的原始换行（长句折行），直接 JSON.parse
+ * 会失败；这里按引号/深度边界做顶层元素切分，再对每个元素做最小修复。
+ * @param {string} arrText "phases":[...] 方括号内的原文
+ * @returns {string[]} 阶段文本列表
+ */
+function extractPhaseElementsLoose(arrText) {
+  const elements = [];
+  let cur = '';
+  let inStr = false;
+  let escape = false;
+  let depth = 0;
+  for (const ch of arrText) {
+    if (inStr) {
+      cur += ch;
+      if (escape) escape = false;
+      else if (ch === '\\') escape = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; cur += ch; continue; }
+    if (ch === '[') { depth += 1; cur += ch; continue; }
+    if (ch === ']') { depth -= 1; cur += ch; continue; }
+    if (ch === ',' && depth === 0) { elements.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) elements.push(cur);
+
+  const phases = [];
+  for (const el of elements) {
+    const raw = el.trim();
+    if (!raw) continue;
+    try {
+      const v = JSON.parse(raw);
+      if (typeof v === 'string' && v.trim()) { phases.push(v.trim()); continue; }
+    } catch {}
+    // 最小修复：剥离外层引号 → 还原常见转义 → 把字符串内的裸换行折行折叠为空格
+    let s = raw.replace(/^"|"$/g, '')
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\');
+    s = s.replace(/\s*\n\s*/g, ' ').trim();
+    if (s) phases.push(s);
+  }
+  return phases;
+}
 
 function parseAnalyzePayload(raw) {
   const text = String(raw || '').trim();
@@ -49,6 +95,13 @@ function parseAnalyzePayload(raw) {
     } catch {}
   }
 
+  // JSON.parse 失败（多为字符串值内裸换行）：按引号边界容错提取 phases 数组
+  const arrMatch = text.match(/"phases"\s*:\s*\[([\s\S]*)\]/);
+  if (arrMatch) {
+    const loose = extractPhaseElementsLoose(arrMatch[1]);
+    if (loose.length) return { phases: loose };
+  }
+
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   const phases = [];
   for (const line of lines) {
@@ -58,29 +111,17 @@ function parseAnalyzePayload(raw) {
       .replace(/^"|"$/g, '')
       .trim();
     if (!cleaned) continue;
-    if (/^phases?\s*[:=]\s*\[/i.test(cleaned)) continue;
+    if (/^\{?\s*"phases?"\s*[:=]\s*\[/i.test(cleaned)) continue;
     if (/^businessEntries?\s*[:=]/i.test(cleaned)) continue;
     if (BUSINESS_DATA_SECTION_RE.test(cleaned)) continue;
-    if (/^\]$/.test(cleaned)) continue;
+    if (/^[\]}]+,?$/.test(cleaned)) continue;
     phases.push(cleaned.replace(/,$/, ''));
-  }
-
-  if (!phases.length) {
-    const m = text.match(/"phases"\s*:\s*\[(.*)\]/s);
-    if (m) {
-      try {
-        const arr = JSON.parse(`[${m[1]}]`);
-        if (Array.isArray(arr)) {
-          return {
-            phases: arr.map((p) => String(p).trim()).filter(Boolean),
-          };
-        }
-      } catch {}
-    }
   }
 
   return { phases };
 }
+
+export { parseAnalyzePayload };
 
 /**
  * Analyze a requirement into phases. Business-data block is NOT split into businessEntries;
@@ -98,8 +139,6 @@ export async function analyzeRequirementToPhases({
   const desc = String(description || '').trim();
   if (!desc) throw new Error('description is required');
 
-  const caseBlock = extractBusinessDataBlock(desc);
-
   const prompt = [
     '你是资深业务流程拆解助手。',
     '请把下面“需求描述”拆分成按执行顺序的阶段步骤列表（phases）。',
@@ -109,32 +148,37 @@ export async function analyzeRequirementToPhases({
     '2. 识别编号格式如「1、」「1.」「1)」「（1）」等；每条编号对应 phases 中的一项。',
     '3. 若用户未编号、只是连贯段落，再按自然操作边界拆分；有编号时禁止改写条数。',
     '4. 「业务数据 / 关键数据 / 测试数据」等段落不是操作步骤，不要计入 phases、不要拆成键值对。',
-    '5. 每个阶段必须是简短、可执行的中文操作描述，避免“分析/思考/总结”等元话术。',
-    '6. 不要在 phases 字符串里复制整段业务数据（系统会另行附加）。',
+    '5. 「硬性成功门槛」「禁止…」等约束性规则行（如【硬性成功门槛——…】、【禁止点击…】）是全局约束，不是操作步骤：既不计入 phases，也不要把这类文字复制进任何 phase 字符串（系统与执行端会另行处理这些约束）。',
+    '6. 每个阶段必须是简短、可执行的中文操作描述，避免“分析/思考/总结”等元话术。',
+    '7. 不要在 phases 字符串里复制任何业务数据（业务数据由系统在录制时统一注入到任务上下文，不写入阶段描述）。',
     '',
     '【预期结果规则 — 必须遵守】',
-    '1. 每个阶段字符串都必须包含「预期结果：…」。',
+    '1. 每个阶段字符串都必须包含「预期结果：…」，这是下游阶段分类的硬标记，不得省略或改用其他写法（如「验收标准：」）。',
     '2. 若原文某步已写「预期结果」，必须原样保留其含义与关键表述，不得删改或弱化。',
     '3. 若原文某步没有「预期结果」，由你根据该步操作补写合理、可验证的预期结果（页面跳转、提示文案、抵达菜单等）。',
-    '4. 建议格式：「{操作描述}。预期结果：{验收标准}」。',
+    '4. 强制格式：「{操作描述}。预期结果：{验收标准}」。验收标准若描述页面跳转，必须使用「打开 / 进入 / 抵达 / 到达 … 页面（界面/弹窗/列表）」的措辞，禁止改写成其他句式。',
     '',
     '【示例】',
     '输入：',
     '1、点击客户管理，点击对公客户管理。',
     '2、新增一个对公潜在客户。',
     '',
+    '【硬性成功门槛——任一门槛未满足不得结束本阶段】',
+    '- 禁止点击「OCR识别」及一切影像入口。',
+    '',
     '关键数据',
     '对公客户基本信息：',
     '法定责任人的客户名称：朱桂武',
     '客户标签：',
     '',
-    '输出示例（用户写了 2 条操作 → phases 恰好 2 项；业务数据不出现在 JSON 里）：',
+    '输出示例（用户写了 2 条操作 → phases 恰好 2 项；业务数据与硬性成功门槛等约束行都不出现在 JSON 里）：',
     '{"phases":[',
-    '"点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理。",',
+    '"点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理页面。",',
     '"新增一个对公潜在客户。预期结果：打开对公潜在客户新增表单。"',
     ']}',
     '',
     '输出必须是严格 JSON（不要 Markdown，不要解释），格式：{"phases":[...字符串...]}。',
+    'JSON 字符串值内禁止出现换行：每个 phase 字符串必须写在一行内，长句也不要折行。',
     '',
     '需求描述：',
     desc,
@@ -147,17 +191,18 @@ export async function analyzeRequirementToPhases({
   // Drop phases that are just business-data echoes
   let phases = (parsed.phases || [])
     .filter((p) => !BUSINESS_DATA_SECTION_RE.test(p))
-    .filter((p) => !/^(案例数据|关键数据)/.test(p));
+    .filter((p) => !/^(案例数据|关键数据)/.test(p))
+    // 门槛/禁止类约束行不是操作步骤（执行侧由 boundary gates 处理），LLM 漏带时兜底剔除
+    .filter((p) => !/^【?\s*(硬性成功门槛|禁止|不得|严禁)/.test(p));
 
-  // Append raw business-scenario business data to each phase (for AI fill reference)
-  phases = appendBusinessDataToPhases(phases, caseBlock);
+  // 业务数据不再逐条追加进 phase.description（落库保持干净目标文本）；
+  // 录制时由执行机 format_business_data_hint 在需要的阶段的任务文本后统一注入一次。
 
   // P1：analyze 附带结构化 KV（extractBusinessEntriesFromRequirement 规则解析，非 LLM 拆解）。
   // 前端创建轨迹时透传 → legacy business_data_entry 落库 + memory_fact(requirement/authoritative)。
   // 这是用户需求业务数据的 KV 投影，不是 system_ref（目标系统回写参考值）。
   // 禁止把本结果写入 system_ref_data / system_ref_entry。
-  // 注意：必须是 KV 数组（normalizeBusinessEntries 对非数组返回 []），raw 文本块
-  // 仅用于 appendBusinessDataToPhases，不作为 businessEntries。
+  // 注意：必须是 KV 数组（normalizeBusinessEntries 对非数组返回 []）。
   return { phases, businessEntries: extractBusinessEntriesFromRequirement(desc) };
 }
 
@@ -380,28 +425,43 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
     throw err;
   }
   const want = !!confirmed;
-  // 状态流转 V3：只有 待确认(recorded) 可人工确认到 已确认(completed)；
-  // 只有 已确认(completed) 可取消确认回到 待确认(recorded)。未录制/录制异常/录制中均不可直接确认。
-  if (want && traj.recordStatus !== 'recorded') {
-    const err = new Error(
-      traj.recordStatus === 'recording'
-        ? 'Cannot confirm while recording'
-        : 'Only a recorded (待确认) trajectory can be confirmed',
-    );
+  // 状态流转 V3：待确认(recorded) 可人工确认到 已确认(completed)；
+  // 录制中(recording)也允许人工确认——只写持久基线，不打断录制会话，
+  // 会话结束时 finishTransientRecording 以该基线收尾（显式成功不再降级回待确认）。
+  // 只有 已确认(completed) 可取消确认回到 待确认(recorded)。未录制/录制异常不可直接确认。
+  if (want && traj.recordStatus !== 'recorded' && traj.recordStatus !== 'recording') {
+    const err = new Error('Only a recorded (待确认) or recording (录制中) trajectory can be confirmed');
     err.statusCode = 409;
     throw err;
   }
-  if (!want && traj.recordStatus !== 'completed') {
+  if (!want && traj.recordStatus !== 'completed' && traj.recordStatus !== 'recording') {
     const err = new Error('Only a completed (已确认) trajectory can cancel confirmation');
     err.statusCode = 409;
     throw err;
   }
 
   if (want) {
-    await trajectoryDao.setPersistentRecordStatus(tid, 'completed');
+    if (traj.recordStatus === 'recording') {
+      // 录制中确认：record_status 保持 recording（前端仍显示录制中），
+      // 持久基线直接置为已确认，录制正常/异常/恢复结束时都不会丢失该确认。
+      await trajectoryDao.updateMeta(tid, {
+        persistentRecordStatus: 'completed',
+        isDone: true,
+        isSuccessful: true,
+      });
+    } else {
+      await trajectoryDao.setPersistentRecordStatus(tid, 'completed');
+      await trajectoryDao.updateMeta(tid, {
+        isDone: true,
+        isSuccessful: true,
+      });
+    }
+  } else if (traj.recordStatus === 'recording') {
+    // 录制中取消确认：与录制中确认互为逆操作，持久基线回待确认，不打断录制
     await trajectoryDao.updateMeta(tid, {
-      isDone: true,
-      isSuccessful: true,
+      persistentRecordStatus: 'recorded',
+      isDone: null,
+      isSuccessful: null,
     });
   } else {
     await trajectoryDao.updateMetaIf(tid, {

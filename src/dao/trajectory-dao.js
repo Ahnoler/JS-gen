@@ -443,7 +443,9 @@ export async function finishTransientRecording(trajectoryDbId, outcome, trx = nu
   const base = isPersistentRecordStatus(row?.persistentRecordStatus)
     ? row.persistentRecordStatus
     : 'draft';
-  const next = resolvePostRecordingStatus(base, outcome);
+  let next = resolvePostRecordingStatus(base, outcome);
+  // 录制中已人工确认（基线=已确认）：显式成功结束不把已确认降级回待确认
+  if (base === 'completed' && outcome === 'success') next = 'completed';
   await writeRecordStatusResilient(trajectoryDbId, next, trx);
   return next;
 }
