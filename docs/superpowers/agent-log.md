@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 12:30 · Cursor Lead — 收工回报：SDD intermediate 同名升格合入（回链 12:09）
+- 完成：Tasks 1–5——characterize 升格用例；`buildScanApplyPlan` promote；loadExistingModules 含 intermediate + phase2 跳过；apply 清 `intermediateFlag`；`merge-intermediate-ai-twins.mjs` 清理 systemId=1（86 对，含对公客户管理 `7`←`1478`，traj=21）
+- 验收：characterize-menu-scan 20/20、uml-adopt 4/4；整支评审 Approved（`.superpowers/sdd/final-review.md`）
+- 关键：`d0d63a3`…`c719094`；开工 `76187a4`
+- 遗留：推送下周一；可选再扫确认无新孪生；评审 Important 非阻断（apply wiring pin / system_page 重挂等）
+
 ## 2026-09-05 · Zcode Lead — 收工回报：浏览器与会话生命周期梳理完成（回链本会话开工条目）
 - 完成：报告 `docs/superpowers/research/2026-09-05-browser-session-lifecycle.md`（**`3fd3dad`**）——三路只读 Explore 并行（Node 会话层/轨迹链/Python 侧）+ 主线程交叉验证；零代码改动
 - 裁决（纠正既有认知）：①CDP 产品端口段=EXECUTOR_CDP_PORT_BASE **19242**（executor/config.js:193，每槽 base+slot），9242 仅 Python 裸跑兜底默认；②remote_session 状态机=active|idle|closed|crashed（constants.js:33），「live/draft」是 trajectory.record_status 概念非 remote_session 状态；③record/stop 不释放槽、stream/detach 保留槽+15min grace、detach 硬关——三分语义与既有认知一致已实证
