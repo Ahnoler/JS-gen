@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 10:37 · Cursor Lead — 开工声明：产品 KB 卡挂载收尾（0811/0812）
+- 开工：10:37。菜单 intermediate 修复后，回写 `product_stage`/`product_core_mapping`（及要素卡目录说明）为正式 functionId **9000000811 / 9000000812**；更新 todo/through-report；不改交易数据（已迁）
+- 范围：`data/kb/flows/product_stage.json`、`product_core_mapping.json`、`product_element.json`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`、`tmp/product-mgmt/through-report.md`
+- 禁入：`product_library.json`（Zcode 10:38 声明禁入）、`src/**`、`scripts/**`、`config/.env*`、信贷/用信线、菜单扫描代码
+- 方式：主会话只改正文挂载说明与 source；要素库 pageId 空属预期（见 10:31）不硬补
+
 ## 2026-09-05 10:38 · Zcode Lead — 开工声明：链B用信支线（授信批复项下对公用信申请全链）
 - 开工：10:38。用户指示「继续补债，A7 影像上传搁置」——补 P3 遗留债：链B授信批复 DGSXPF20260905020004 项下发起对公用信申请（贯通验证企业190416）并走完 wf_usecredit_001 审批链至批复生效
 - 范围：`tmp/e2e/`（脚本+截图+报告）、`docs/superpowers/agent-log.md`、`docs/superpowers/research/2026-09-05-engine-closure-phase2-plan.md`（§8 补记）、必要时 `data/kb/flows/credit_usage.json`；SUT test.creditv5p2 实机操作（701994/WN0001/135292 账号切换）
