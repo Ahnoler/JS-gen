@@ -13,11 +13,11 @@
 
 | 标记 | 谁写 | 含义 | 产品树默认 |
 |------|------|------|------------|
-| `intermediate_flag` | **导入**（可手工） | 建模有 umlEcd，对应 SUT 分组标题，**永不可导航** | **不展示** |
+| `intermediate_flag` | **导入**；**扫描同名升格可清 0** | 建模草稿，未证实前不可导航；SUT 同名可点证实后升格合入（见 `2026-09-05-intermediate-promote-on-scan-design.md`） | 为 1 时默认不展示 |
 | `unmatched_flag` | **扫描** | 本应是菜单，尚未对上 xpath；命中可清 0 | 可展示（现有） |
 | `removed_flag` | **导入** | JSON 版本下线 | 可展示或另议（现有） |
 
-中间菜单 **不得** 因扫描名称/xpath/pageId 命中而被「救活」清标。
+> **修订（2026-09-05）**：废除「中间菜单永不可导航 / 扫描不得救活」。同名可点证实 → 升格合入，保持 `source=json_import`。
 
 ## 3. 数据
 
@@ -41,7 +41,8 @@
 
 - **权威来源 = 菜单扫描**（真实 data-id / 文案）  
 - 导入 **不得** 按活动批量 `create` 导航功能（避免 `pdCfgVw` / `pdElmtEdit` 这类 SUT 飞出层不存在的假 L2）  
-- 扫描建叶后：可用 intermediate 上挂的 `system_page`（pageId/resPath）做 pageId 回填/对齐；对齐失败保持扫描叶，不把 intermediate 改成可导航
+- **同名升格**：扫描可点 L2 与 intermediate 同名 → 合入该节点（清 intermediate、写 xpath，保持 `json_import`）——见 promote-on-scan spec  
+- **异名叶**：仍 create/update 可导航叶；可用 intermediate 的 `system_page` 做 UML/pageId 回填
 
 ## 6. 过滤与禁写
 
@@ -50,7 +51,7 @@
 - hierarchy tree / 挂交易选功能  
 - push-menu 的 menus（path 不含中间名）  
 
-扫描：`buildScanApplyPlan` / apply **跳过** intermediate 节点（不更新 xpath、不清任何「中间」态、不参与改名吞并）。
+扫描：可导航优先匹配；未命中时允许**同名** intermediate **升格**（禁止异名改名升格）。
 
 可选：`?includeIntermediate=1` 仅调试。
 
