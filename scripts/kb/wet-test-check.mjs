@@ -90,7 +90,7 @@ function parseWetTest(filePath) {
   const rows = [];
   for (const line of text.split(/\r?\n/)) {
     if (!/^\s*\|/.test(line)) continue;
-    const verdictMatch = line.match(/\|\s*(match|drift|blocked|not-found|pending)(?:\s*\([^)]*\))?\s*\|/);
+    const verdictMatch = line.match(/\|\s*(match|drift|blocked|not-found|pending)(?:\s*\([^)]*\))?(?:\s+20\d{2}-\d{2}-\d{2})?\s*\|/);
     if (!verdictMatch) continue;
     const zjjkMatch = line.match(/ZJJK\d+/);
     rows.push({ zjjk: zjjkMatch ? zjjkMatch[0] : null, verdict: verdictMatch[1], line: line.trim() });
