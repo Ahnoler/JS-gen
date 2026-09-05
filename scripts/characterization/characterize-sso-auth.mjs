@@ -10,19 +10,40 @@
  */
 import assert from 'assert';
 import { readFileSync } from 'fs';
+import { createHmac } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { decodePaasToken, verifyPaasToken } from '../../src/services/sso/jwt-decode.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-// Real JWT captured from the account center (admin login, appKey 1920710182837141505).
-// payload: {"userId":1510076810578644992,"iat":1786936984,"jti":"tokenId"}
-const REAL_JWT =
-  'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjE1MTAwNzY4MTA1Nzg2NDQ5OTIsImlhdCI6MTc4NjkzNjk4NCwianRpIjoidG9rZW5JZCJ9.st5GLQc-BBLFHUysMWBcC-KngbkkLU-VXiwo0YQ1Uw4';
-const EXPECTED_USER_ID = '1510076810578644992';
-// Signature key from /api/ucenter/open/app/query_jwt_secret (Base64-decoded as HMAC key).
-const JWT_SECRET = 'paas-application';
+// Synthetic JWT (P0-4): self-signed in-script with a test-only secret — no real credentials in repo.
+// payload mirrors account-center shape: {"userId":<19-digit long>,"iat":...,"jti":"..."}
+const JWT_SECRET = 'test-jwt-secret-for-characterization';
+const EXPECTED_USER_ID = '1700000000000000001';
+
+/**
+ * Build an HS256 JWT signed the same way verifyPaasToken validates
+ * (HMAC-SHA256 over "header.payload" with Buffer.from(secret, 'base64') as key).
+ * @param {object|string} payload JWT payload object, or pre-serialized JSON string
+ *   (use the string form to keep 19-digit userId exact — JSON.stringify would round it)
+ * @param {string} secret signing secret
+ * @returns {string} compact serialized JWT
+ */
+function makeJwt(payload, secret = JWT_SECRET) {
+  const b64url = (s) => Buffer.from(s).toString('base64url');
+  const head = b64url(JSON.stringify({ alg: 'HS256' }));
+  const body = b64url(typeof payload === 'string' ? payload : JSON.stringify(payload));
+  const sig = createHmac('sha256', Buffer.from(String(secret), 'base64'))
+    .update(`${head}.${body}`)
+    .digest('base64url');
+  return `${head}.${body}.${sig}`;
+}
+
+// Raw numeric payload (account-center shape): 19-digit userId must appear verbatim in the
+// signed JSON — JSON.stringify on a JS number would silently round it past 2^53.
+const SYNTH_PAYLOAD = `{"userId":${EXPECTED_USER_ID},"iat":1786936984,"jti":"characterization-token"}`;
+const SYNTH_JWT = makeJwt(SYNTH_PAYLOAD);
 
 let failed = 0;
 function ok(name) { console.log(`  ✓ ${name}`); }
@@ -33,12 +54,13 @@ function run(name, fn) {
 function read(p) { return readFileSync(join(ROOT, p), 'utf8'); }
 
 function main() {
-  run('decode real JWT → userId exact 19 digits (no precision loss)', () => {
-    const dec = decodePaasToken(REAL_JWT);
+  run('decode synthetic JWT → userId exact 19 digits (no precision loss)', () => {
+    const dec = decodePaasToken(SYNTH_JWT);
     assert.ok(dec, 'decoded non-null');
     assert.strictEqual(dec.userId, EXPECTED_USER_ID);
     assert.strictEqual(typeof dec.userId, 'string');
-    // JSON.parse would round 1510076810578644992 → 1510076810578645000; guard the regression.
+    assert.strictEqual(dec.jti, 'characterization-token');
+    // JSON.parse would round the 19-digit userId; guard the regression.
     assert.ok(!dec.userId.endsWith('000'), `userId must not be rounded: ${dec.userId}`);
   });
 
@@ -51,27 +73,34 @@ function main() {
   });
 
   run('decode token without userId → null', () => {
-    // payload {"foo":"bar"} base64url
-    const tok = 'eyJhbGciOiJIUzI1NiJ9.eyJmb28iOiJiYXIifQ.x';
+    // payload {"foo":"bar"}, built in-script (no hardcoded JWT literals)
+    const tok = makeJwt({ foo: 'bar' });
     assert.strictEqual(decodePaasToken(tok), null);
   });
 
-  run('verify real JWT with paas-application secret → userId exact', () => {
-    const verified = verifyPaasToken(REAL_JWT, JWT_SECRET);
+  run('verify synthetic JWT with test secret → userId exact', () => {
+    const verified = verifyPaasToken(SYNTH_JWT, JWT_SECRET);
     assert.ok(verified, 'verified non-null');
     assert.strictEqual(verified.userId, EXPECTED_USER_ID);
   });
 
   run('verify tampered JWT → null (signature mismatch)', () => {
-    const [h, p] = REAL_JWT.split('.');
+    const [h, p] = SYNTH_JWT.split('.');
     const tampered = `${h}.${p}.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`;
     assert.strictEqual(verifyPaasToken(tampered, JWT_SECRET), null);
   });
 
+  run('verify tampered payload → null (payload swap rejected)', () => {
+    const forged = makeJwt({ userId: 999 });
+    const [h, , s] = SYNTH_JWT.split('.');
+    const forgedBody = forged.split('.')[1];
+    assert.strictEqual(verifyPaasToken(`${h}.${forgedBody}.${s}`, JWT_SECRET), null);
+  });
+
   run('verify with wrong/missing secret → null', () => {
-    assert.strictEqual(verifyPaasToken(REAL_JWT, 'wrong-secret'), null);
-    assert.strictEqual(verifyPaasToken(REAL_JWT, ''), null);
-    assert.strictEqual(verifyPaasToken(REAL_JWT, null), null);
+    assert.strictEqual(verifyPaasToken(SYNTH_JWT, 'wrong-secret'), null);
+    assert.strictEqual(verifyPaasToken(SYNTH_JWT, ''), null);
+    assert.strictEqual(verifyPaasToken(SYNTH_JWT, null), null);
     assert.strictEqual(verifyPaasToken('', JWT_SECRET), null);
   });
 
@@ -143,9 +172,9 @@ function main() {
     assert.ok(src.includes('userAccount: user?.userAccount || null'), 'me returns userAccount');
   });
 
-  run('config exports SSO_* with appKey default 1920710182837141505', () => {
+  run('config exports SSO_* with 19-digit appKey default', () => {
     const src = read('config/config.js');
-    assert.ok(src.includes("export const SSO_APP_KEY = _resolve('SSO_APP_KEY', '1920710182837141505')"), 'SSO_APP_KEY');
+    assert.ok(/export const SSO_APP_KEY = _resolve\('SSO_APP_KEY', '\d{19}'\)/.test(src), 'SSO_APP_KEY');
     assert.ok(src.includes("export const SSO_BASE_URL"), 'SSO_BASE_URL');
     assert.ok(src.includes("export const SSO_AUTH_REQUIRED"), 'SSO_AUTH_REQUIRED');
     assert.ok(src.includes("'false').toLowerCase() === 'true'"), 'boolean coerce');
@@ -231,7 +260,7 @@ function main() {
     assert.ok(cat.includes('...GROUP_AUTH,'), 'catalog spreads GROUP_AUTH into API_GROUPS');
     const grp = read('src/dashboard/api-docs/groups/auth.js');
     assert.ok(grp.includes("id: 'auth'"), 'auth group id');
-    assert.ok(grp.includes('1920710182837141505'), 'appKey documented');
+    assert.ok(/appKey|\d{19}/.test(grp), 'appKey documented');
     assert.ok(grp.includes('access_token'), 'header documented');
   });
 

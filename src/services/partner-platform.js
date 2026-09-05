@@ -2,8 +2,8 @@
  * Partner automation platform HTTP client.
  * Default prefix: http://172.20.101.162:11001/api（联调指向同事本地服务，原 test.atp 已停用）
  * Outbound auth: 转发调用方的 access_token（SSO JWT，与账号中心同源）；
- * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN，再回落 PARTNER_DEBUG_ACCESS_TOKEN
- * （硬编码联调 JWT，仅限无登录态脚本/联调；上线前需移除）。
+ * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN env（服务级 token，需在 .env 显式配置，
+ * 无默认兜底——缺失时 requireAccessToken 显式 400）。
  * Override: PARTNER_API_BASE / PARTNER_SYSTEM_BASE_URL / PARTNER_IMPORT_DEMAND_URL / PARTNER_ACCESS_TOKEN
  */
 import { resolve as configResolve, PARTNER_SECTION_TYPE } from '../../config/config.js';
@@ -11,14 +11,6 @@ import { resolve as configResolve, PARTNER_SECTION_TYPE } from '../../config/con
 const DEFAULT_API_BASE = 'http://172.20.101.162:11001/api';
 const DEFAULT_MENU_PUSH_BASE = 'http://172.20.101.63:11002/api';
 const DEFAULT_TIMEOUT_MS = 30_000;
-
-/**
- * 硬编码联调 JWT（同事 172.20.101.162 本地服务的 access token）。
- * 优先级最低：请求方 token → PARTNER_ACCESS_TOKEN env → 此常量。
- * 联调结束后移除（历史曾因误留被特征化 pin 为"已移除"，恢复需同步更新断言）。
- */
-export const PARTNER_DEBUG_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjE1MTAwNzY4MTA1Nzg2NDQ5OTIsImlhdCI6MTc4NzI5MjY4MiwianRpIjoidG9rZW5JZCJ9.zvyuKYTsl5IrawvdXaP7WbyKMn1kfqwx82Ymjo_TneQ';
 
 /** User-facing copy when partner nginx/upstream is unreachable or returns non-JSON. */
 export const PARTNER_NETWORK_ERROR_MSG = '网络异常，自动化平台无法连接';
@@ -56,10 +48,10 @@ function menuPushApiBase() {
  * Token for partner outbound calls (projects / systems / importDemand).
  * 优先转发调用方 access_token（header/body/query，Vue 登录态 SSO JWT——
  * 伙伴平台与账号中心同源，直接复用登录 token，按登录用户身份调用）；
- * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供无登录态的脚本/联调），
- * 再回落 PARTNER_DEBUG_ACCESS_TOKEN（硬编码联调 JWT，见上）。
+ * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供无登录态的脚本/联调；
+ * 需在 .env 显式配置，无硬编码兜底）。
  * @param {import('express').Request | { headers?: object, body?: object, query?: object }} req incoming request
- * @returns {string|null} resolved access token
+ * @returns {string|null} resolved access token（两处均无时为 null）
  */
 export function resolveAccessToken(req = {}) {
   const headers = req.headers || {};
@@ -73,7 +65,7 @@ export function resolveAccessToken(req = {}) {
   if (fromRequest) return fromRequest;
   const fromEnv = envOrConfig('PARTNER_ACCESS_TOKEN');
   if (fromEnv) return fromEnv;
-  return PARTNER_DEBUG_ACCESS_TOKEN || null;
+  return null;
 }
 
 /**
@@ -84,7 +76,7 @@ export function resolveAccessToken(req = {}) {
 export function requireAccessToken(req) {
   const token = resolveAccessToken(req);
   if (!token) {
-    const err = new Error('access_token is required (header, body, or PARTNER_ACCESS_TOKEN)');
+    const err = new Error('access_token is required (header, body, or env PARTNER_ACCESS_TOKEN；需配置 PARTNER_ACCESS_TOKEN)');
     err.statusCode = 400;
     throw err;
   }

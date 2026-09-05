@@ -3,6 +3,9 @@
  * Run: node scripts/characterization/characterize-partner-platform.mjs
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   resolveAccessToken,
   requireAccessToken,
@@ -11,9 +14,10 @@ import {
   DEFAULT_PARTNER_SYSTEM_ID,
   DEFAULT_PARTNER_PROJECT_ID,
   PARTNER_NETWORK_ERROR_MSG,
-  PARTNER_DEBUG_ACCESS_TOKEN,
 } from '../../src/services/partner-platform.js';
 import { resolve as configResolve } from '../../config/config.js';
+
+const SERVICE_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'services', 'partner-platform.js');
 
 assert.equal(PARTNER_NETWORK_ERROR_MSG, '网络异常，自动化平台无法连接');
 
@@ -24,13 +28,27 @@ assert.equal(resolveAccessToken({ headers: { Access_Token: 'h3' } }), 'h3');
 assert.equal(resolveAccessToken({ body: { accessToken: 'b1' } }), 'b1');
 assert.equal(resolveAccessToken({ query: { access_token: 'q1' } }), 'q1');
 
-// 无请求 token → PARTNER_ACCESS_TOKEN 回落 → 硬编码联调 JWT（172.20.101.162 联调中）
-const fallback = String(configResolve('PARTNER_ACCESS_TOKEN', '') || '').trim();
-assert.equal(resolveAccessToken({ headers: {}, body: {} }), fallback || PARTNER_DEBUG_ACCESS_TOKEN);
-assert.ok(PARTNER_DEBUG_ACCESS_TOKEN && PARTNER_DEBUG_ACCESS_TOKEN.length > 20, '硬编码联调 JWT 存在');
+// 安全断言（P0-4 修复后）：源码不含硬编码联调 JWT
+{
+  const src = readFileSync(SERVICE_PATH, 'utf8');
+  assert.ok(!src.includes('PARTNER_DEBUG_ACCESS_TOKEN'), '硬编码 token 常量已移除');
+  assert.ok(!/eyJ[A-Za-z0-9_-]{20,}/.test(src), '源码不含 eyJ 开头的 JWT 字面量');
+}
 
-// requireAccessToken：header/body/query/PARTNER_ACCESS_TOKEN 全无时回落硬编码 JWT（不 400）
-assert.equal(requireAccessToken({ headers: {} }), fallback || PARTNER_DEBUG_ACCESS_TOKEN);
+// 无请求 token → PARTNER_ACCESS_TOKEN env 回落；env 未配置时返回 null（无硬编码兜底）
+const fallback = String(configResolve('PARTNER_ACCESS_TOKEN', '') || '').trim();
+assert.equal(resolveAccessToken({ headers: {}, body: {} }), fallback || null);
+
+// requireAccessToken：header/body/query/PARTNER_ACCESS_TOKEN 全无时显式 400 报错（提示需配置 PARTNER_ACCESS_TOKEN）
+if (fallback) {
+  assert.equal(requireAccessToken({ headers: {} }), fallback);
+} else {
+  let threw = null;
+  try { requireAccessToken({ headers: {} }); } catch (err) { threw = err; }
+  assert.ok(threw, '无 token 无 env 时 requireAccessToken 必须报错');
+  assert.equal(threw.statusCode, 400);
+  assert.ok(/PARTNER_ACCESS_TOKEN/.test(threw.message), `报错信息需提示配置 PARTNER_ACCESS_TOKEN，实际: ${threw.message}`);
+}
 
 const d = resolveSystemProject({});
 assert.equal(d.systemId, DEFAULT_PARTNER_SYSTEM_ID);
