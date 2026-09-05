@@ -2,6 +2,17 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 18:57 · Cursor Lead — 收工回报：需求导入 KB 设计 spec（回链 18:57 开工）
+- 完成：brainstorming 方案 1 + §1–§4 用户批准；spec `docs/superpowers/specs/2026-09-05-req-doc-kb-import-design.md`
+- 验收：自检无 TBD/矛盾；范围=Skill@`scripts/prompts/skills/req-doc-to-kb` + 薄 API 登记；草稿禁 promote
+- 遗留：待用户审 spec 后 writing-plans；未实现代码
+
+## 2026-09-05 18:57 · Cursor Lead — 开工声明：需求文档导入 KB 设计落盘
+- 开工：18:57。将已批准的需求→KB 作业区设计写入 specs；零产品代码
+- 范围：`docs/superpowers/specs/2026-09-05-req-doc-kb-import-design.md`、本文件
+- 禁入：`src/**`、`data/kb/flows/**`、`scripts/kb/promote.py`、他线客户查询/用信 WIP
+- 方式：主会话写 spec + commit；计划等用户审阅后再 writing-plans
+
 ## 2026-09-05 18:35 · Cursor Task 5 — 收工回报：客户信息查询 KB 档位 B（回链 18:08）
 - 完成：traj **#526** recorded（stepCount=4，functionId=9000000039）；stamp **KB测客户-20260905-1315** 列表 hit=true；`customer_query.json` source 回填 + 重置 rule；todo ⑦ 档位 B 闭环；计划 Tasks 1–5 全勾选
 - 验收：`tmp/customer-mgmt/query/through-report.md`；`tmp/customer-mgmt/query/cdp-list-check.json`；`tmp/customer-mgmt/query/list526_stamp.png`
