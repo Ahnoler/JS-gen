@@ -54,7 +54,9 @@ function extractChapterLeaves(filePath) {
     if (groups && groups.length >= 1) {
       hasContractLine = true;
       for (const g of groups) {
-        for (const m of g.match(/ZJJK\d+/g) ?? []) leaves.push(m);
+        // 仅取括号前的前导编号（可含斜杠组）；括号内为 relCmpts 等注释性编号，不计叶
+        const head = g.match(/^ZJJK\d+(?:PDCP|PACP)?(?:\s*\/\s*ZJJK\d+(?:PDCP|PACP)?)*/);
+        for (const m of head?.[0]?.match(/ZJJK\d+/g) ?? []) leaves.push(m);
       }
     }
   }
