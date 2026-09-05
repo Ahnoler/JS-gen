@@ -166,7 +166,7 @@
 
 切片验收后的独立任务单元，**按模块推进**，每模块：
 
-1. 从 chapters 的 ZJJK 清单行建 `data/kb/req/<key>/wet-test.md` 判定表（SKILL 湿测节有模板与词表）。  
+1. 从 chapters 的 ZJJK 清单行建 `data/kb/req/<key>/wet-test.md` 判定表（SKILL 湿测节有模板与词表）；存量模块章末缺标准清单行的先回补（SKILL「存量回补条款」）。  
 2. 登录 SUT（见各模块作业区 wet-test.md 头部记录的入口/账号），**主线程串行**操作 Playwright MCP——共享浏览器，模块间也不并行。  
 3. 逐叶判定回填：match/drift/blocked/not-found；写操作黑名单（禁止一切落库动作）。  
 4. drift 回流：按分类学回填 chapters / 引擎 cue（SKILL「drift 分类学」表）。  
