@@ -15,6 +15,7 @@ JS-gen 是面向 Element UI / Vue 类业务系统的浏览器自动化后端。�
 - [安装与初始化](#安装与初始化)
 - [配置说明](#配置说明)
 - [启动方式](#启动方式)
+- [服务器发版（控制面打包部署）](#服务器发版控制面打包部署)
 - [核心流程](#核心流程)
 - [数据库模型](#数据库模型)
 - [接口入口](#接口入口)
@@ -279,6 +280,73 @@ npm run executor:dev
 ```
 
 Executor 会校验 token、连接控制面、注册节点容量，并按 slot 接收 `session.*` 指令。slot `i` 使用 `EXECUTOR_CDP_PORT_BASE + i`，避免多浏览器 CDP 端口冲突。
+
+## 服务器发版（控制面打包部署）
+
+> 原则：**严禁直接改服务器上的代码**，所有变更走"本机打包 → 上传 → 版本目录 + 软链切换"。服务器上只跑控制面（:4097），执行机在办公 Windows PC 上（见 `executor/.env.example`），前端发版见 vue-project 仓库 README。
+
+### 打包
+
+在仓库根目录（本机，Git Bash）：
+
+```bash
+bash pack-control-plane.sh
+# 产物：dist/JS-gen-control-plane-<时间戳>.tar.gz
+```
+
+包内含：`server.mjs`、`src/`、`config/`（config.js / database.js / knexfile.js / setup.html / .env.example）、`migrations/`、`package.json`+lock、`start-all.sh`/`stop-all.sh`、`api-docs.html`。
+不含：`executor/`、`scripts/`（执行机侧）、`config/.env`（线上密钥不进包）、`node_modules`、日志。
+
+### 发版步骤（以 <ts> 为时间戳）
+
+```bash
+# 1. 上传包到服务器（scp / SFTP 均可）
+scp dist/JS-gen-control-plane-<ts>.tar.gz root@47.101.58.49:/data/app/
+
+# 2. 服务器上：备份旧版 + 解压新版版本目录
+cp -a /data/app/JS-gen /data/app/JS-gen-backup-<ts>
+mkdir -p /data/app/JS-gen-releases/<ts>
+tar -xzf /data/app/JS-gen-control-plane-<ts>.tar.gz -C /data/app/JS-gen-releases/<ts>
+
+# 3. 沿用线上 .env（新包不带 .env，正是为了不覆盖现网配置）
+cp /data/app/JS-gen/config/.env /data/app/JS-gen-releases/<ts>/config/.env
+#    运维首次部署没有 .env 时：cp config/.env.example config/.env 按注释填写
+
+# 4. 装依赖（必须 --ignore-scripts：prepare 钩子引用包内不存在的 scripts/githooks）
+cd /data/app/JS-gen-releases/<ts> && mkdir -p logs tmp
+npm ci --ignore-scripts --no-audit --no-fund
+
+# 5. 数据库迁移
+npx knex migrate:latest --knexfile config/knexfile.js
+
+# 6. 原子切换 + 启动
+fuser -k 4097/tcp; sleep 2
+mv /data/app/JS-gen /data/app/JS-gen.gitrepo-<旧版本标记>   # 仅首次；之后旧目录已是历史版本
+ln -s /data/app/JS-gen-releases/<ts> /data/app/JS-gen
+cd /data/app/JS-gen && nohup npm start > logs/server.log 2>&1 &
+```
+
+> 实际目录布局：`/data/app/JS-gen` 是软链，指向 `/data/app/JS-gen-releases/<ts>/`；每次发版新增一个 releases 子目录，`ln -sfn` 切换即可，建议保留最近 3~5 个版本。
+
+### 回滚
+
+```bash
+ln -sfn /data/app/JS-gen-releases/<旧ts> /data/app/JS-gen
+fuser -k 4097/tcp; sleep 2
+cd /data/app/JS-gen && nohup npm start > logs/server.log 2>&1 &
+```
+
+### 验证
+
+- 健康检查：`curl http://127.0.0.1:4097/api/health`
+- 登录态（需带真实 token）：`curl http://127.0.0.1:3000/api/v2/auth/me -H 'access_token: <token>'`，返回 `paasUserId` 即正常
+- 监控台：<http://47.101.58.49:3000> 对应的前端功能走一遍
+
+### 注意事项
+
+- 数据库迁移是幂等的（knex 记录已应用版本），重复执行显示 `Already up to date` 是正常的。
+- `config/.env` 永远以服务器现存为准，打包内容不会覆盖它；新代码需要的新配置项对照 `config/.env.example` 手工补。
+- 发版只影响控制面；执行机（办公 PC）需要单独更新代码并重启才会用上新版执行逻辑。
 
 ### Linux 一键启动
 
