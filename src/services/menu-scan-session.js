@@ -250,10 +250,8 @@ async function loadExistingModules(systemNodeId) {
       name: String(mod.name || ''),
       source: String(mod.source || ''),
       unmatchedFlag: Number(mod.unmatchedFlag || 0),
-      // 中间菜单不参与扫描匹配 / phase2 幽灵（永不可导航）
-      children: children
-        .filter((fn) => Number(fn.intermediateFlag) !== 1)
-        .map((fn) => ({
+      // children 含 intermediate（供 buildScanApplyPlan 同名升格）；phase2 幽灵收集另跳过 intermediate
+      children: children.map((fn) => ({
           id: Number(fn.id),
           name: String(fn.name || ''),
           source: String(fn.source || ''),
@@ -276,6 +274,7 @@ async function loadGhostPageIdsByNodeIds(existing) {
   const ids = [];
   for (const mod of existing) {
     for (const fn of (Array.isArray(mod.children) ? mod.children : [])) {
+      if (Number(fn.intermediateFlag) === 1) continue;
       if (String(fn.source || '') !== 'json_import') continue;
       if (String(fn.menuXpath || '').trim()) continue;
       ids.push(Number(fn.id));
@@ -330,6 +329,7 @@ export async function runPhase2Match({ plan, runtime, execSession, existing, sys
           moduleId: Number(mod.id),
           moduleName: String(mod.name || ''),
         });
+        if (Number(fn.intermediateFlag) === 1) continue;
         if (String(fn.source || '') !== 'json_import') continue;
         if (String(fn.menuXpath || '').trim()) continue; // 已有 xpath（曾合并/曾匹配）不是幽灵——否则多页面幽灵会被后续菜单反复改名
         emptyXpathJsonFns.push({

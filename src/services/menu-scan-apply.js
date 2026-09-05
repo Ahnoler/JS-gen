@@ -118,6 +118,7 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
         {
           menuXpath: u.menuXpath,
           unmatchedFlag: 0,
+          ...(u.promote ? { intermediateFlag: 0 } : {}),
           ...(u.sortOrder !== undefined ? { sortOrder: u.sortOrder } : {}),
           ...(u.name ? { name: u.name } : {}),
         },
