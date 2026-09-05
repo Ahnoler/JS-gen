@@ -10,7 +10,7 @@ task_done 本就是 form_scan_utils 薄壳）。
 
 from scripts.state import _record_action
 from ._helpers import _ok
-from ._js_snippets import JS_IDENTIFY_CONTAINER, JS_SET_VUE_MODEL, JS_SAVE_SECTION
+from ._js_snippets import JS_IDENTIFY_CONTAINER, JS_SET_VUE_MODEL
 from ._workspace import _workspace_result
 from ...models import TaskList
 from .form_rules import get_has_button_keywords
@@ -195,25 +195,22 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
         return payload
 
     @controller.action(
-        'Save a module sub-view section by its title (section_title), e.g. '
-        "save_section('申请金额信息'). Locates the section header whose text equals "
-        'section_title, walks up to the smallest ancestor container holding a 保存 '
-        'button, clicks that button (mousedown event chain), waits 2.5s, and returns '
-        '{ok, clicked, toast}. Use this for multi-section pages where every section '
-        'has its own 保存 — the page-global 保存 click hits an ambiguous coordinate '
-        'and the wrong section save silently does nothing (KB-I5 run11: fields '
-        're-checked empty after re-entry). After ok:true pair with '
-        "read_xhr_log(url_filter='saveOrUpdate') to verify the save request actually "
-        'carried the section fields. Errors: err-section-not-found:<title> (no such '
-        'title / no 保存 in its container — re-check the section name from snapshot).'
+        'Legacy compatibility alias for click_save (deprecated for new recordings). '
+        "save_section(section_title) is forwarded to click_save(button_text='保存', "
+        "region=section_title) — same unified save engine: locates the enabled 保存 "
+        'button within the nearest container scoped by the section title and uses the '
+        "four-way outcome verdict (ok-save-success / ok-save-navigation / "
+        'ok-save-no-feedback / err-save-*). Use this for multi-section pages where '
+        'every section has its own 保存 — the page-global 保存 click hits an ambiguous '
+        'coordinate and the wrong section save silently does nothing (KB-I5 run11). '
+        'For new recordings call click_save directly with region=<section title from '
+        "semantic_snapshot>. On success pair with read_xhr_log(url_filter='saveOrUpdate') "
+        "to verify the save request carried the section fields. Errors: "
+        "err-save-button-not-found:<title> (no such title / no 保存 in its container — "
+        're-check the section name from snapshot) plus all click_save error codes.'
     )
     async def save_section(section_title: str):
-        page = await browser_context.get_current_page()
-        result = await page.evaluate(JS_SAVE_SECTION, [section_title])
-        # JS side already waits 2.5s for the save round-trip; small settle buffer.
-        await page.wait_for_timeout(300)
-        ok, payload = _workspace_result(result)
-        if ok:
-            _record_action('save_section', {'section_title': section_title}, payload)
-            return _ok(payload)
-        return payload
+        # Legacy alias：转发到 click_save 统一引擎（分区标题走 region 语义定位 +
+        # outcome 四路判定 + 落库为可导出的 click_element_by_index 步骤）。
+        # JS_SAVE_SECTION 本体保留：_replay.py 历史步骤仍按原动作名直接执行它。
+        return await _save_engine.click_save('保存', section_title, '')

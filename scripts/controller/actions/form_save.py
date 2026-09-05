@@ -18,6 +18,7 @@ from ._js_snippets import (
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_SCROLL_TO_FIRST_ERROR,
     JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME, JS_WATCH_SAVE_NOTIFICATIONS,
+    JS_STAMP_ICON_ARIA_LABELS,
 )
 from ...models import TaskList
 from .form_scan_utils import refresh_scan_buttons, _mark_query_ui_if_needed
@@ -180,6 +181,12 @@ class SaveEngine(_FormActionEngineBase):
         # Capture short-lived success toasts that may vanish between polls
         await page.evaluate(JS_WATCH_SAVE_NOTIFICATIONS)
 
+        # 图标保存按钮：先盖 aria-label（click_button 同款），btnText 才能回退到图标标签
+        try:
+            await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
+        except Exception:
+            sys.stderr.write("[click_save] JS_STAMP_ICON_ARIA_LABELS failed (pre-click)\n")
+            sys.stderr.flush()
         raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, [button_text or '保存', sec])
         try:
             info = json.loads(raw) if isinstance(raw, str) else (raw or {})

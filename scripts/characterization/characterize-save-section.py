@@ -30,15 +30,15 @@ checks = [
     ("scripts/controller/actions/_form.py", (
         "save_section",
         "JS_SAVE_SECTION",
-        "err-section-not-found",
+        "err-save-button-not-found",
         "read_xhr_log(url_filter='saveOrUpdate')",
     )),
     ("scripts/controller/actions/_js_snippets.py", ("save_section",)),
     ("scripts/prompts/agent-tools-form.md", (
-        "save_section(section_title)",
-        "err-section-not-found:<title>",
+        'click_save(button_text="保存", region=',
+        "err-save-button-not-found",
         "read_xhr_log(url_filter='saveOrUpdate')",
-        "勿用全局 click_button/real_click[保存]",
+        '点"保存/提交"——click_button 现在会直接返回 err-use-click-save',
     )),
 ]
 

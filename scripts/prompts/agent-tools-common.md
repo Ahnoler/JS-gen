@@ -129,4 +129,4 @@
 # 🚨 XHR 响应体读取（静默拒绝自诊 — KB-I5 run11 实证）
 前端把服务端拒绝静默吞掉（无 toast、无 formErrors，如 doDclScmNextCheck code:100 征信步闸）时，用 **`read_xhr_log(url_filter='NextCheck')`** 读最近 XHR 响应体定位真实原因：`{ok, historyTraced, matched, items:[{url,status,responseBody}]}`。
 - `historyTraced:false` = hook 本调用才装、历史请求不可追溯 → **先重触发一次该操作（再点下一步/保存），再读**。
-- 响应体 code:100 会给出缺失/校验文案 → 按文案补数据后重试；保存后用 `read_xhr_log(url_filter='saveOrUpdate')` 核对请求体关键字段（配合 save_section）。
+- 响应体 code:100 会给出缺失/校验文案 → 按文案补数据后重试；保存后用 `read_xhr_log(url_filter='saveOrUpdate')` 核对请求体关键字段（配合 click_save）。

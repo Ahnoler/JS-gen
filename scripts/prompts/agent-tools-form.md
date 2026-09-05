@@ -134,8 +134,10 @@ run_form_assistant(region='系统评级结论')
 7. **在任意弹窗/抽屉交互后**（如法人引入、客户搜索等），向导表单可能已被刷新/重置——仍须对每个可编辑字段执行写动作（同核心纪律）。
 8. **录制质量：** 表单维护类保存优先 `click_save`；引入/选人可用索引点「确认」。维护类成功判据同上 §2（`ok-save-*` 三码）。
 
-# 🚨 模块分区保存规则（多分区子视图 — KB-I5 run11 实证）
-模块子视图（如对公用信申请「住房开发贷款」页）每个分区各有独立「保存」按钮，页面级 real_click(保存) 恒命中同一坐标且**点错分区保存不生效**（重进字段为空）。规则：
-1. **模块分区保存一律用 `save_section(section_title)`**（section_title=分区标题原文，如 '申请金额信息'）——勿用全局 click_button/real_click[保存]。
-2. save_section 返回 `{ok, clicked, toast}` 后，必须紧跟 **`read_xhr_log(url_filter='saveOrUpdate')`** 核对请求体携带关键字段（如 aplyAmt=30000.00 / primWrntTp=3），形成持久化实证闭环；无该请求 → 保存未生效，换分区标题重试或排查。
-3. `err-section-not-found:<title>` → 从 semantic_snapshot 核对分区标题原文（勿臆造），最多重试 1 次。
+# 🚨 保存规则（统一入口）
+- 所有保存（主表单 / 弹窗 / 抽屉 / **分区**）一律 `click_save(button_text=…)`：
+  - 分区保存：`click_save(button_text="保存", region="<分区标题原文>")`——标题来自 semantic_snapshot，勿臆造；引擎会按标题找最近容器内的 enabled 保存按钮。
+  - 保存后紧跟 `read_xhr_log(url_filter='saveOrUpdate')` 核对请求体关键字段（见 common）。
+  - `err-save-validation` → 修字段再 click_save；`err-save-button-not-found` → 从 semantic_snapshot 核对分区标题原文重试，最多 1 次。
+- `save_section(...)` 已并入 click_save，仅为兼容保留：调用会被转发，新录制勿再使用。
+- 禁止用 `click_button` / `click_element_by_index` / `real_click` 点"保存/提交"——click_button 现在会直接返回 err-use-click-save 引导。

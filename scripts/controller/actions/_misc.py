@@ -386,6 +386,14 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         'Use get_page_state().iconButtons to discover true icon labels.'
     )
     async def click_button(button_text: str):
+        bt = str(button_text or '').strip()
+        if _is_form_submit_label(bt):
+            # 统一保存入口：保存/提交类一律走 click_save（outcome 校验 + 可导出落库）
+            return (
+                f'err-use-click-save:{bt} | '
+                f'"保存/提交/确认"类按钮请改用 click_save(button_text="{bt}")；'
+                f'分区保存用 click_save(button_text="{bt}", region="<分区标题>")'
+            )
         page = await browser_context.get_current_page()
         # Pre-strip stale dialog wrappers (tsscMutilDialog 关闭残留) so real
         # clicks reach the target; idempotent, <10ms.
