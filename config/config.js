@@ -158,7 +158,7 @@ export const EXECUTOR_DISCONNECT_GRACE_MS = parseInt(
   10,
 );
 export const REMOTE_SESSION_GRACE_MS = parseInt(
-  _resolve('REMOTE_SESSION_GRACE_MS', '60000'), // 临时测试值：1 分钟（原 900000=15 分钟，测完还原）
+  _resolve('REMOTE_SESSION_GRACE_MS', '900000'),
   10,
 );
 
