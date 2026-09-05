@@ -3,7 +3,7 @@
  * resolution (executor mode) and local screencast/input dispatch.
  */
 import { state } from '../../state.js';
-import { onWsMessage } from '../../ws-server.js';
+import { onWsMessage, addBinarySubscription, clearBinarySubscriptions } from '../../ws-server.js';
 import * as remoteSessionService from '../../services/remote-session-service.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import { sendToExecutor } from '../../executor-session-client.js';
@@ -142,12 +142,15 @@ export function ensureWsHook(attachLive) {
           remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : null,
           remoteSessionUuid: remoteSessionUuid || null,
         });
+        // RSCF 二进制帧按订阅过滤：记录该 socket 订阅的 remoteSessionUuid
+        //（payload 未带 uuid 时尝试从 live 状态回填；仍无则集合为空 → 保持全量，向后兼容）。
         const live = await remoteSessionService.getLiveStatus({
           trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
           sessionId: sessionId || undefined,
           remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : undefined,
           remoteSessionUuid: remoteSessionUuid || undefined,
         }).catch(() => null);
+        addBinarySubscription(ws, remoteSessionUuid || live?.remoteSessionUuid || null);
         ws.send(JSON.stringify({
           type: 'remote:status',
           payload: live || { attached: false, cdpReady: true, trajectoryId },
@@ -156,6 +159,7 @@ export function ensureWsHook(attachLive) {
       }
       if (type === 'remote:unsubscribe') {
         bridge.wsTrajectoryBind.delete(ws);
+        clearBinarySubscriptions(ws);
         return;
       }
 

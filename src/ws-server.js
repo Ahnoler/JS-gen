@@ -77,17 +77,82 @@ export function broadcast(type, payload) {
 const BINARY_BUFFERED_LIMIT = 2 * 1024 * 1024;
 
 /**
+ * Per-socket set of subscribed remoteSessionUuid values (RSCF binary frame filtering).
+ * Empty/absent set → socket receives all frames (backward compatible).
+ * @type {WeakMap<object, Set<string>>}
+ */
+const binarySubscriptions = new WeakMap();
+
+/**
+ * Record a dashboard socket's subscribed remoteSessionUuid (RSCF frame filtering).
+ * @param {object} ws dashboard WebSocket client
+ * @param {string|null} remoteSessionUuid subscribed remote session UUID (no-op when falsy)
+ * @returns {void}
+ */
+export function addBinarySubscription(ws, remoteSessionUuid) {
+  if (!ws || !remoteSessionUuid) return;
+  let set = binarySubscriptions.get(ws);
+  if (!set) {
+    set = new Set();
+    binarySubscriptions.set(ws, set);
+  }
+  set.add(String(remoteSessionUuid));
+}
+
+/**
+ * Clear a socket's binary-frame subscriptions (on unsubscribe; socket reverts to full broadcast).
+ * @param {object} ws dashboard WebSocket client
+ * @returns {void}
+ */
+export function clearBinarySubscriptions(ws) {
+  if (ws) binarySubscriptions.delete(ws);
+}
+
+/**
+ * Extract the remoteSessionUuid from an RSCF binary frame header.
+ * Local copy of remote-bridge parseRemoteFrame layout (magic + frameId + uuidLen + uuid + jpeg)
+ * to avoid an import cycle; keep in sync with src/cdp/remote-bridge/index.js.
+ * @param {Buffer|Uint8Array} data raw frame
+ * @returns {string|null} session uuid, or null when malformed / not RSCF
+ */
+function parseRscfSessionUuid(data) {
+  try {
+    const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    if (buf.length < 10 || buf.subarray(0, 4).toString('utf8') !== 'RSCF') return null;
+    const uuidLen = buf.readUInt16BE(8);
+    if (buf.length < 10 + uuidLen) return null;
+    return buf.subarray(10, 10 + uuidLen).toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Broadcast a binary Buffer/Uint8Array to all clients (remote screencast frames).
  * Skips clients whose outbound buffer is already large.
+ * When a client has a non-empty subscribed remoteSessionUuid set (via addBinarySubscription),
+ * only frames carrying one of its subscribed uuids are forwarded; clients without
+ * subscriptions keep receiving all frames (backward compatible).
  * @param {Buffer|Uint8Array} data data
  * @returns {number} number of clients that received the frame
  */
 export function broadcastBinary(data) {
   if (!wss) return 0;
   let count = 0;
+  let parsed = false;
+  let sessionUuid = null;
   for (const client of wss.clients) {
     if (client.readyState !== 1) continue;
     if ((client.bufferedAmount || 0) > BINARY_BUFFERED_LIMIT) continue;
+    const subs = binarySubscriptions.get(client);
+    if (subs && subs.size > 0) {
+      if (!parsed) {
+        sessionUuid = parseRscfSessionUuid(data);
+        parsed = true;
+      }
+      // 帧 解析不出 uuid（非 RSCF/损坏）时不投给已订阅过滤的客户端
+      if (!sessionUuid || !subs.has(sessionUuid)) continue;
+    }
     try {
       client.send(data);
       count++;

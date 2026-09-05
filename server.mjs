@@ -12,6 +12,7 @@ import registerAgentRoutes from './src/routes/agent.js';
 
 import registerLLMProxyRoutes from './src/routes/llm-proxy.js';
 import registerBrowserSessionRoutes from './src/routes/browser-session.js';
+import { verifyDashboardAccessToken, dashboardAccessAuth } from './src/middleware/sso-auth.js';
 import registerLegacyGoneRoutes from './src/routes/legacy-gone.js';
 import registerSetupRoutes from './src/routes/setup.js';
 import registerV2Routes from './src/routes/v2/__init__.js';
@@ -34,6 +35,9 @@ app.get('/api-docs.html', (req, res) => res.sendFile(path.join(PROJECT_DIR, 'api
 
 // Register all route modules
 registerLLMProxyRoutes(app);
+// /api/browser/* 访问鉴权：DASHBOARD_WS_TOKEN 匹配或有效 PaaS JWT；
+// SSO 关且未设 token 时放行（向后兼容，进程打一次 warn）。仅中间件层拦截，不影响 SSE 响应头。
+app.use('/api/browser', dashboardAccessAuth);
 registerBrowserSessionRoutes(app);
 // Legacy JSON catalogs: return 410 Gone → use /api/v2/trajectories|business-data
 registerLegacyGoneRoutes(app);
@@ -80,10 +84,19 @@ async function main() {
   const dashboardWss = initWebSocket();
   const executorWss = initExecutorWs();
 
-  httpServer.on('upgrade', (req, socket, head) => {
-    const { pathname } = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  httpServer.on('upgrade', async (req, socket, head) => {
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const { pathname } = url;
 
     if (pathname === '/ws') {
+      // Dashboard 升级鉴权：DASHBOARD_WS_TOKEN 匹配（常数时间）或有效 PaaS JWT（SSO 开启时）；
+      // 两者都未启用 → 放行（向后兼容，进程打一次 warn）。WS 无法带 header，token 取 query ?token=。
+      const wsToken = url.searchParams.get('token') || '';
+      const allowed = await verifyDashboardAccessToken(wsToken).catch(() => false);
+      if (!allowed) {
+        rejectUpgrade(socket, 401, 'Unauthorized');
+        return;
+      }
       dashboardWss.handleUpgrade(req, socket, head, (ws) => {
         dashboardWss.emit('connection', ws, req);
       });
@@ -173,6 +186,9 @@ async function main() {
   const server = httpServer.listen(PORT, HOST, () => {
     console.log(`[server] JS-gen control plane listening on http://${HOST}:${PORT}`);
     console.log(`[server] WebSocket at ws://${HOST}:${PORT}/ws`);
+    if (HOST === '127.0.0.1') {
+      console.log('[server] ⚠  HOST 默认仅监听本机（127.0.0.1）：远程执行机/前端如需访问请设 HOST=0.0.0.0');
+    }
     console.log(`[server] Executor WebSocket at ws://${HOST}:${PORT}/ws/executor`);
     console.log(`[server] Key endpoints:`);
     console.log(`  GET  /api/health`);
