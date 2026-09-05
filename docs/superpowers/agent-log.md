@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode Lead — 开工声明：P0 修复（安全审查第一批）
+- 开工：本会话。用户拍板「P0 先处理」，按 security-review-2026-09-05.md 修复路线实施
+- 范围：A 子智能体=server.mjs/src/middleware/**/src/cdp/remote-bridge/**/src/executor-ws.js/config/config.js（/ws 鉴权+/api/browser 鉴权+RSCF 订阅过滤+HOST 默认）；B 子智能体=hierarchy-tree-query/hierarchy-service/system-account-dao+对应特征化（密码掩码）；C 子智能体=partner-platform.js+characterize-sso-auth.mjs+相关 pin（移除真实 JWT）；主线程=config/.env.example 占位还原+验收代提交
+- 禁入：`config/.env`、data/kb/**、他线在途热区（Cursor 12:37→12:55 客户管理线已收工，其文件仍不碰）
+- 方式：三路并行实施（文件集互不相交，子智能体不 commit）+ 主线程验收（verify-all+lint+node --check）后代提交
+
 ## 2026-09-05 12:55 · Cursor Lead — 收工回报：客户管理 KB 贯通（回链 12:37 / 3c3389a）
 - 完成：执行代理 Tasks 1–5；卡挂 **functionId=7**；traj **#515 recorded**；stamp **KB测客户-20260905-1245** 列表可见（CDP 补完；AI record 曾假成功）；commit **`f6e6dba`**
 - 验收：`tmp/customer-mgmt/through-report.md`；召回 score=100；OCR 未触
