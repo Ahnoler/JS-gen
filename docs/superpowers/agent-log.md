@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode Lead — 开工声明：8 月集中开发安全/漏洞整体排查（只读审查）
+- 开工：本会话。用户要求对 8 月集中开发的潜在漏洞做整体排查，带 agent team
+- 范围：只读审查——A 路 `src/routes/**`+`src/services/**` API 面；B 路 `executor/**`+`src/cdp/**` WS/CDP 通道；C 路 `scripts/**` Python 面+migrations；D 路仓库卫生（secrets/gitignore/tmp/config）；产出 `docs/superpowers/security-review-2026-09-05.md`；基线=docs/superpowers/code-review-2026-08-31.md（已修 P0×7+P1×5+Python×3，不重报已修项）
+- 禁入：一切写操作（代码/数据/配置）；`config/.env`（只许读 `.env.example`）；他线在途热区（Cursor 12:37 客户管理 KB 线文件不碰）
+- 方式：四路只读 Explore 并行（范围互不相交），主线程交叉验证 + 分级（P0/P1/P2）后汇总报告；本轮只报告不修码，修复经用户拍板后另行立项
+
 ## 2026-09-05 12:37 · Cursor Lead — 开工声明：客户管理 KB 贯通（对公建档 A）
 - 开工：12:37。用户确认方案 1 + 档位 A；落设计/计划后按计划回写 `customer_onboarding`（挂 **functionId=7**）并湿测
 - 范围：`docs/superpowers/specs/2026-09-05-customer-mgmt-kb-design.md`、`docs/superpowers/plans/2026-09-05-customer-mgmt-kb.md`、`data/kb/flows/customer_onboarding.json`、`tmp/customer-mgmt/**`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`
