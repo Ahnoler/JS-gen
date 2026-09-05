@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode Lead — 开工声明：withTrajectoryLock 超时核实与修复 + todo 挂起登记
+- 开工：本会话。承接浏览器会话生命周期梳理的分诊结论，用户批准处理第 1 项（锁无超时核实/修复），第 2/3 项登记 todo 挂起表
+- 范围：只读调研 `src/services/remote-session-service.js`（锁实现）及全部 withTrajectoryLock 调用方；如需修复则改动锁实现文件 + 新增/扩展特征化；`docs/superpowers/todo-list.md`（挂起表 2 行）
+- 禁入：`config/.env*`、`data/kb/**`、engine/KB/产品线热区、他线未提交改动；Cursor 12:09 线已收工（12:30），menu-scan 系文件本线不碰
+- 方式：一路只读 Explore 核实锁实现与全部调用点 → 主线程最小修复 → verify-all 关键子集 + lint 0/0 → 收工
+
 ## 2026-09-05 12:30 · Cursor Lead — 收工回报：SDD intermediate 同名升格合入（回链 12:09）
 - 完成：Tasks 1–5——characterize 升格用例；`buildScanApplyPlan` promote；loadExistingModules 含 intermediate + phase2 跳过；apply 清 `intermediateFlag`；`merge-intermediate-ai-twins.mjs` 清理 systemId=1（86 对，含对公客户管理 `7`←`1478`，traj=21）
 - 验收：characterize-menu-scan 20/20、uml-adopt 4/4；整支评审 Approved（`.superpowers/sdd/final-review.md`）
