@@ -49,9 +49,9 @@
 **Interfaces:**
 - Produces: Skill 文本契约（步骤 1–6、禁区、检查清单、目录树）；与 API 的 `moduleKey` / `status` 枚举一致：`registered` \| `sliced` \| `drafted`
 
-- [ ] **Step 1: 创建 `data/kb/req/.gitkeep`**（空文件即可）
+- [x] **Step 1: 创建 `data/kb/req/.gitkeep`**（空文件即可）
 
-- [ ] **Step 2: 写 SKILL.md**
+- [x] **Step 2: 写 SKILL.md**
 
 文件须含 YAML frontmatter（name/description）+ 正文，至少覆盖：
 
@@ -91,7 +91,7 @@ description: >-
 
 （可按 create-skill 习惯稍作展开，但不得削弱禁区。）
 
-- [ ] **Step 3: 自检 Skill 含关键字**
+- [x] **Step 3: 自检 Skill 含关键字**
 
 Run:
 
@@ -101,7 +101,7 @@ rg -n "data/kb/flows|promote|chapters|through-chains|draftFrom" scripts/prompts/
 
 Expected: 均有命中；且出现「禁止」写 flows / promote。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** — `9681934`
 
 ```bash
 git add data/kb/req/.gitkeep scripts/prompts/skills/req-doc-to-kb/SKILL.md
@@ -142,7 +142,7 @@ git commit -m "docs(skill): add req-doc-to-kb workflow under scripts/prompts/ski
  */
 ```
 
-- [ ] **Step 1: 写失败 pin（临时 root）**
+- [x] **Step 1: 写失败 pin（临时 root）**
 
 `scripts/characterization/characterize-kb-req-modules.mjs` 骨架：
 
@@ -176,7 +176,7 @@ async function main() {
 main();
 ```
 
-- [ ] **Step 2: Run pin — expect fail（模块不存在）**
+- [x] **Step 2: Run pin — expect fail（模块不存在）**
 
 ```bash
 node scripts/characterization/characterize-kb-req-modules.mjs
@@ -184,7 +184,7 @@ node scripts/characterization/characterize-kb-req-modules.mjs
 
 Expected: `ERR_MODULE_NOT_FOUND` 或 assert 失败。
 
-- [ ] **Step 3: 实现 `src/services/kb-req-modules.js`**
+- [x] **Step 3: 实现 `src/services/kb-req-modules.js`**
 
 要点（完整实现须含 JSDoc）：
 
@@ -194,7 +194,7 @@ Expected: `ERR_MODULE_NOT_FOUND` 或 assert 失败。
 - `listReqModules`：读各子目录 manifest；跳过无 manifest 的项。
 - `getReqModule`：不存在抛可映射 404 的错误；返回 manifest + `{ hasChapters, hasThroughChains, draftCount }`（`fs` 探测）。
 
-- [ ] **Step 4: 补全 pin 用例**
+- [x] **Step 4: 补全 pin 用例**
 
 至少：
 
@@ -206,7 +206,7 @@ Expected: `ERR_MODULE_NOT_FOUND` 或 assert 失败。
 6. get 详情字段  
 7. **安全**：register 后 `data/kb/flows` 下文件数不变（对真实 flows 目录 `readdir` 前后对比，或断言服务从未 `writeFile` 到 flows——用临时 root 时改为：临时 root 外造一个 `flows` 哨兵文件，确认 mtime/内容不变）
 
-- [ ] **Step 5: Run pin — expect pass**
+- [x] **Step 5: Run pin — expect pass**
 
 ```bash
 node scripts/characterization/characterize-kb-req-modules.mjs
@@ -214,7 +214,7 @@ node scripts/characterization/characterize-kb-req-modules.mjs
 
 Expected: 全部 `✓`，结尾 `OK N`。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — `dc4f84d`
 
 ```bash
 git add src/services/kb-req-modules.js scripts/characterization/characterize-kb-req-modules.mjs
@@ -236,7 +236,7 @@ git commit -m "feat(kb): req-module workspace service with characterization pins
 - `GET /api/v2/kb/req-modules/:moduleKey`
 - `POST /api/v2/kb/req-modules/:moduleKey/source` → **501**（未实现上传）
 
-- [ ] **Step 1: 扩展 `kb.js`**
+- [x] **Step 1: 扩展 `kb.js`**
 
 在现有 `registerKbRoutes` 内追加（保持 cards/stale-cards 不动）：
 
@@ -274,12 +274,12 @@ app.post('/api/v2/kb/req-modules/:moduleKey/source', asyncHandler(async (_req, r
 
 非法 `moduleKey`：服务层抛错 → 路由转为 400。
 
-- [ ] **Step 2: 更新 `groups/kb.js`**
+- [x] **Step 2: 更新 `groups/kb.js`**
 
 - description 改为同时覆盖「洞察只读 + 需求作业区登记」  
 - 追加 4 个 endpoint 的 summary / reqExample / respExample / notes（上传注明 501）
 
-- [ ] **Step 3: 手工烟测（控制面需已启动）**
+- [x] **Step 3: 手工烟测（控制面需已启动）** — :4097 stale（Task 3 ephemeral app smoke OK）；见 Task 4 登记
 
 ```bash
 curl -s -X POST http://localhost:4097/api/v2/kb/req-modules -H "Content-Type: application/json" -d "{\"moduleKey\":\"smoke-req\",\"moduleName\":\"烟测模块\",\"sourcePath\":\"C:/nonexistent/demo.docx\"}"
@@ -297,9 +297,9 @@ curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:4097/api/v2/kb/r
 
 Expected: `501`（或业务信封 code 非 200）。
 
-- [ ] **Step 4: 清理烟测目录（可选）** — 删 `data/kb/req/smoke-req` 勿提交垃圾。
+- [x] **Step 4: 清理烟测目录（可选）** — `smoke-req` 已删，未提交
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** — `25a75c2`
 
 ```bash
 git add src/routes/v2/kb.js src/dashboard/api-docs/groups/kb.js
@@ -317,7 +317,7 @@ git commit -m "feat(api): register/list/get kb req-modules; upload stub 501"
 
 **Interfaces:** 无新代码 API。
 
-- [ ] **Step 1: 用真实或样例路径登记 `product-mgmt`（若桌面分册仍在）**
+- [x] **Step 1: 用真实或样例路径登记 `product-mgmt`（若桌面分册仍在）** — API SKIPPED（:4097 stale）；direct service 登记成功，见 Task 4 report
 
 ```bash
 curl -s -X POST http://localhost:4097/api/v2/kb/req-modules -H "Content-Type: application/json" --data-binary "@-" <<'EOF'
@@ -327,11 +327,11 @@ EOF
 
 （Windows 可用 PowerShell `ConvertTo-Json` / `Invoke-RestMethod`。）
 
-- [ ] **Step 2: 人工/Agent 按 Skill 跑切片（不强制本任务自动化）**
+- [x] **Step 2: 人工/Agent 按 Skill 跑切片（不强制本任务自动化）** — 最低验收达成（登记 + Skill + pin）；`sliced` 留 Lead 跟跑
 
 最低验收：**登记成功** + Skill 文件存在 + pin 绿。完整 `sliced` 跟跑可作为 Lead 手工项记录在 agent-log。
 
-- [ ] **Step 3: 确认未改 `data/kb/flows`**
+- [x] **Step 3: 确认未改 `data/kb/flows`**
 
 ```bash
 git status --short data/kb/flows

@@ -167,15 +167,15 @@ Body：`moduleKey`、`moduleName`、`sourcePath`、可选 `note`。
 
 ## 10. 实现分期（供 writing-plans）
 
-| 阶段 | 内容 |
-|------|------|
-| T1 | 目录约定 + Skill 初稿（可先无 API） |
-| T2 | API 登记/列表/详情 + catalog |
-| T3 | 上传 stub + 最小 characterize/pin |
-| T4 | 用产品管理分册或样例做一次跟跑验收 |
+| 阶段 | 内容 | 状态 |
+|------|------|------|
+| T1 | 目录约定 + Skill 初稿（可先无 API） | 已实现 `9681934` |
+| T2 | API 登记/列表/详情 + catalog | 服务 `dc4f84d`；路由+catalog `25a75c2` |
+| T3 | 上传 stub + 最小 characterize/pin | 同上；pin `OK 11` |
+| T4 | 用产品管理分册或样例做一次跟跑验收 | 最低验收完成（登记 `product-mgmt` @ `registered`）；完整 `sliced` 留 Lead |
 
 ## 11. 参考
 
 - 产品管理先例：`tmp/product-mgmt/req-mainchain.md`、`docs/superpowers/specs/2026-09-04-product-mgmt-kb-design.md`（需求作导航、不直接 promote）  
 - KB 交接：`docs/superpowers/research/2026-09-04-kb-build-handover.md`（湿测 → staging → promote）  
-- 计划位：`docs/superpowers/plans/2026-09-05-req-doc-kb-import.md`（已写；待执行）
+- 计划位：`docs/superpowers/plans/2026-09-05-req-doc-kb-import.md`（**已执行**；Tasks 1–4 勾选见计划；代码提交 `9681934` → `dc4f84d` → `25a75c2`）
