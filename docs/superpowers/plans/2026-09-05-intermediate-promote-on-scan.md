@@ -16,7 +16,7 @@
 | `src/dashboard/api-docs/groups/overview.js` | intermediate 文案一句 |
 | agent-log / todo | 同步 |
 
-## Task 1：特征化（先红）
+## Task 1：特征化（先红） ✅
 
 **文件：** `scripts/characterization/characterize-menu-scan.mjs`
 
@@ -32,7 +32,7 @@ node scripts/characterization/characterize-menu-scan.mjs
 
 预期：新用例先 FAIL（当前跳过 intermediate）。
 
-## Task 2：buildScanApplyPlan 升格匹配
+## Task 2：buildScanApplyPlan 升格匹配 ✅
 
 **文件：** `src/services/menu-scan-service.js`
 
@@ -51,7 +51,7 @@ if (interByName) {
 
 **验收：** Task 1 用例变绿。
 
-## Task 3：applyScanPlan 落库升格
+## Task 3：applyScanPlan 落库升格 ✅
 
 **文件：** `src/services/menu-scan-apply.js`（+ session 的 `loadExistingModules`）
 
@@ -60,7 +60,7 @@ if (interByName) {
 
 **验收：** characterize 全绿。
 
-## Task 4：存量孪生清理
+## Task 4：存量孪生清理 ✅
 
 **文件：** `scripts/maintenance/merge-intermediate-ai-twins.mjs`
 
@@ -72,11 +72,11 @@ node scripts/maintenance/merge-intermediate-ai-twins.mjs --systemId=1 --apply
 
 **验收：** 对公客户管理仅 `7`，`source=json_import`，xpath 非空，traj 仍 21。
 
-## Task 5：文档 / 可选再扫 / 收工
+## Task 5：文档 / 可选再扫 / 收工 ✅
 
-- api-docs intermediate 说明  
-- 正式 `1` 可选再 scan 确认无新孪生  
-- agent-log 收工；todo 勾选  
+- [x] api-docs intermediate 说明  
+- [ ] 正式 `1` 可选再 scan 确认无新孪生（跳过，非阻塞）  
+- [x] todo 勾选（agent-log 收工由 controller）  
 
 ```bash
 node scripts/characterization/characterize-menu-scan.mjs

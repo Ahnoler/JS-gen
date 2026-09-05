@@ -176,7 +176,7 @@ export const GROUP_OVERVIEW = [
         tryable: false,
         reqExample: 'form-data: file=@全部领域-建模组件关系.json',
         respExample: J({ created: 120, updated: 0, adopted: 24, markedOffline: 0, pagesImported: 411, tree: [] }),
-        notes: [':id 必须是系统类型节点 (type=1)', '非顶层叶子子领域一律 intermediateFlag=1（全量 system_page 目录；不按活动拆导航叶；无按系统白名单）；可点二级菜单靠扫描，扫描后同名/pageId 回填建模 umlEcd；guidePages 不入库', 'JSON 中消失的旧 json_import 菜单会保留并标记 removedFlag（版本下线）；unmatchedFlag 归扫描'],
+        notes: [':id 必须是系统类型节点 (type=1)', '非顶层叶子子领域一律 intermediateFlag=1（全量 system_page 目录；不按活动拆导航叶；无按系统白名单）；SUT 同名可点菜单扫描后可升格为可导航（intermediateFlag=0，source 保持 json_import）；异名叶仍 create(source=ai)；扫描后同名/pageId 可回填建模 umlEcd；guidePages 不入库', 'JSON 中消失的旧 json_import 菜单会保留并标记 removedFlag（版本下线）；unmatchedFlag 归扫描'],
       },
         {
           method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/scan-menu',
