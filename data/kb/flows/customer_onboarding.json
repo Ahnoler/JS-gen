@@ -197,5 +197,5 @@
       "do": "勿信 isSuccessful；以列表 stamp 查询为准；可 CDP 补完校验抽屉保存→编辑页保存→列表查询"
     }
   ],
-  "source": "K1 2026-08-31（tmp/k1_notes.md）；2026-09-05 贯通湿测 traj#515（functionId=7；stamp=KB测客户-20260905-1245；cstNo=26090512520196936；CDP 补完建档后列表可见）"
+  "source": "K1 2026-08-31（tmp/k1_notes.md）；2026-09-05 贯通湿测 traj#515（functionId=7；stamp=KB测客户-20260905-1245；cstNo=26090512520196936；CDP 补完）；复录 traj#524（stamp=KB测客户-20260905-1315；cstNo=26090513160716537；stepCount=9：P2 含新增/选类型/填 stamp+USCC/保存；列表 stamp 可见）"
 }

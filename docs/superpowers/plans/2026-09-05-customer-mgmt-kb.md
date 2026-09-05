@@ -89,8 +89,8 @@
 
 **Depends:** Task 4
 
-- [x] `customer_onboarding.json` source 挂湿测 traj。
-- [x] agent-log 收工；todo 挂「⑦ 客户管理 KB」。（收工草稿在 `tmp/customer-mgmt/agent-log-close-draft.md`；**待 Lead commit**）
-- [ ] commit（用户要求时）。
+- [x] `customer_onboarding.json` source 挂湿测 traj（#515 + 复录 #524）。
+- [x] agent-log 收工；todo「⑦」标档位 A 闭环（#524 stepCount=9 / 列表 stamp）。
+- [x] commit（Lead 收工单元）。
 
 **Verify:** source 含 traj id；收工回链开工。
