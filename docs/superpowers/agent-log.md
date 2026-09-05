@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 22:35 · ZCode Lead — 收工：req-doc-to-kb SKILL/USAGE 湿测协议化（回链 22:20 开工）
+- 完成：SKILL.md（视图3 wet-test.md 入目录树；ZJJK 清单行/FS 场景号/文档口径标注三强制契约；新增「湿测」节=判定词表+写操作黑名单+drift 分类学与回流+串行与会话窗口规则；drafts 湿测门槛；检查清单+2）；USAGE.md（§1.3 湿测阶段；Phase E 逐模块逐叶编排；Lead 湿测开场指令模板；§6 python-docx 降级详化+blocked 行）
+- 验收：characterize-kb-req-modules OK 11（pin 未动、无脚本 pin skill 文件）；manifest/status 枚举未改（湿测进度以 wet-test.md 为准，规避 pin 风险）
+- 决策记录：截图证据=文字为准、tmp 截图短寿命（用户未选入库方案，维持现状并写入 SKILL）
+- 遗留：drift 回填 chapters 尚未执行（credit-corp 的 3 处 drift 待回流，属湿测战役下一窗口）；引擎 cue 沉淀通道（behavior 类）暂记 wet-test.md，待引擎线接手
+- 提交：本条 commit 含 SKILL.md/USAGE.md/本文件
+
 ## 2026-09-05 22:20 · ZCode Lead — 开工声明：req-doc-to-kb SKILL/USAGE 契约升级（湿测协议化）
 - 开工：22:20。依据 credit-corp 首轮逐叶湿测经验（41/48，527db33），把湿测方法契约化，经用户批准按建议顺序执行
 - 范围：`scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`USAGE.md`、本文件（纯文档契约）；已核实 characterization 无脚本 pin 此二文件（grep 空），`characterize-kb-req-modules.mjs` 为服务行为 pin 不受影响
