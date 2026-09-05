@@ -230,6 +230,47 @@ async function main() {
       fail('withTrajectoryLock same-traj serial', joined);
     }
 
+    // Lock wait-timeout: waiter fast-fails 503, its fn never runs, holder and
+    // later waiters stay strictly serialized (never released early).
+    try {
+      const raw = await import('../src/services/remote-session-state.js');
+      const order2 = [];
+      let holderDoneResolve;
+      const holderDone = new Promise((r) => { holderDoneResolve = r; });
+      const holder2 = raw.withTrajectoryLock(t1, async () => {
+        order2.push('h-start');
+        await holderDone;
+        return 'h';
+      });
+      let timeoutErr = null;
+      const t0 = Date.now();
+      await raw.withTrajectoryLock(t1, async () => { order2.push('w1-should-not-run'); }, { waitTimeoutMs: 80 })
+        .catch((e) => { timeoutErr = e; });
+      if (timeoutErr?.code === 'traj_lock_wait_timeout' && timeoutErr?.statusCode === 503) {
+        pass('withTrajectoryLock waiter 503 fast-fail', `${Date.now() - t0}ms`);
+      } else {
+        fail('withTrajectoryLock waiter 503 fast-fail', `code=${timeoutErr?.code} status=${timeoutErr?.statusCode}`);
+      }
+      const w2 = raw.withTrajectoryLock(t1, async () => { order2.push('w2-start'); order2.push('w2-end'); });
+      await new Promise((r) => setTimeout(r, 150));
+      if (!order2.includes('w2-start') && !order2.includes('w1-should-not-run')) {
+        pass('withTrajectoryLock timeout keeps serialization', order2.join(','));
+      } else {
+        fail('withTrajectoryLock timeout keeps serialization', order2.join(','));
+      }
+      holderDoneResolve();
+      const hVal = await holder2;
+      await w2;
+      const j2 = order2.join(',');
+      if (hVal === 'h' && j2 === 'h-start,h-end,w2-start,w2-end') {
+        pass('withTrajectoryLock holder intact + later waiter ordered', j2);
+      } else {
+        fail('withTrajectoryLock holder intact + later waiter ordered', j2);
+      }
+    } catch (e) {
+      fail('withTrajectoryLock wait-timeout cases', e.message);
+    }
+
     clearExecutorLive();
     const single = restoreLiveBindingFromRow({
       id: 90001,

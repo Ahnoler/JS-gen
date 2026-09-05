@@ -4,6 +4,7 @@
  * Extracted from remote-session-service.js — move-only, no logic changes.
  */
 import { state } from '../state.js';
+import { TRAJ_LOCK_WAIT_TIMEOUT_MS } from '../../config/config.js';
 
 /**
  * @typedef {{
@@ -26,20 +27,66 @@ export const liveByRemoteSessionId = new Map();
 const trajLocks = new Map();
 
 /**
+ * Build a 503 error for a trajectory-lock wait timeout (fast-fail for queued
+ * callers while the current holder keeps the lock).
+ * @param {number} key trajectory lock key
+ * @param {number} waitTimeoutMs configured wait timeout in ms
+ * @returns {Error & { statusCode: number, code: string }} configured error
+ */
+function trajectoryLockWaitTimeoutError(key, waitTimeoutMs) {
+  const err = new Error(
+    `trajectory ${key} is busy: another lifecycle operation holds the lock (waited ${waitTimeoutMs}ms)`,
+  );
+  err.statusCode = 503;
+  err.code = 'traj_lock_wait_timeout';
+  err.trajectoryKey = key;
+  return err;
+}
+
+/**
  * Serialize prepare/detach/release calls per trajectory (promise-chain lock).
+ * Queued waiters fast-fail with 503 `traj_lock_wait_timeout` after the wait
+ * timeout (default TRAJ_LOCK_WAIT_TIMEOUT_MS, 0 disables). The timeout only
+ * rejects the waiter and skips its placeholder slot — it never releases the
+ * lock early, so the running holder and subsequent waiters stay strictly
+ * serialized.
  * @param {number} trajectoryId trajectory DB id
  * @param {() => Promise<unknown>} fn async work to run under the lock
+ * @param {{ waitTimeoutMs?: number }} [opts] explicit wait timeout override (tests)
  * @returns {Promise<unknown>} result of fn
  */
-export function withTrajectoryLock(trajectoryId, fn) {
+export function withTrajectoryLock(trajectoryId, fn, { waitTimeoutMs = TRAJ_LOCK_WAIT_TIMEOUT_MS } = {}) {
   const tid = Number(trajectoryId);
   const key = Number.isFinite(tid) && tid > 0 ? tid : 0;
   const prev = trajLocks.get(key) || Promise.resolve();
   let release;
   const gate = new Promise((r) => { release = r; });
-  const run = prev.then(() => fn()).finally(() => release());
+  let settled = false;
+  let cancelled = false;
+  let timer = null;
+  const run = prev.then(() => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (cancelled) return undefined;
+    return fn();
+  }).finally(() => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    release();
+  });
   trajLocks.set(key, gate.then(() => undefined, () => undefined));
-  return run;
+  return new Promise((resolve, reject) => {
+    if (waitTimeoutMs > 0) {
+      timer = setTimeout(() => {
+        if (settled) return;
+        cancelled = true;
+        settled = true;
+        reject(trajectoryLockWaitTimeoutError(key, waitTimeoutMs));
+      }, waitTimeoutMs);
+    }
+    run.then(
+      (v) => { if (!settled) { settled = true; resolve(v); } },
+      (e) => { if (!settled) { settled = true; reject(e); } },
+    );
+  });
 }
 
 /**

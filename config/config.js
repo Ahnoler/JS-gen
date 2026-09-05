@@ -161,6 +161,10 @@ export const REMOTE_SESSION_GRACE_MS = parseInt(
   _resolve('REMOTE_SESSION_GRACE_MS', '900000'),
   10,
 );
+export const TRAJ_LOCK_WAIT_TIMEOUT_MS = parseInt(
+  _resolve('TRAJ_LOCK_WAIT_TIMEOUT_MS', '30000'),
+  10,
+);
 
 // ── Replay 会话编排超时（runReplayActions 各调用方；毫秒）──
 /** rerun 前置动作复演（go_to_url + login 场景重建）的 replay_done 等待超时。 */
