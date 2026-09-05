@@ -314,6 +314,11 @@ function testWiringSessionPageIdFill() {
   const session = readFileSync(join(root, 'src/services/menu-scan-session.js'), 'utf8');
   assert.match(session, /fillEmptyPageIdsForSystem/, 'runScan calls pageId fill after apply');
   assert.match(session, /pageIdCandidates|pageIdFilled|pageIdSkipped/, 'runScan merges pageId stats into job.stats');
+  assert.match(
+    session,
+    /fillEmptyPageIdsForSystem[\s\S]*?adoptModelingUmlEcdUnderSystem/,
+    'runScan re-adopts modeling umlEcd after pageId fill',
+  );
 }
 
 /**

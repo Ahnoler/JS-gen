@@ -31,7 +31,7 @@ import * as systemPageDao from '../dao/system-page-dao.js';
 import * as execSession from '../executor-session-client.js';
 import { runReplayActions } from './replay-actions.js';
 import { getScanJob, clearCurrentScan } from './menu-scan-job.js';
-import { applyScanPlan } from './menu-scan-apply.js';
+import { applyScanPlan, adoptModelingUmlEcdUnderSystem } from './menu-scan-apply.js';
 import { buildScanApplyPlan } from './menu-scan-service.js';
 import { fillEmptyPageIdsForSystem } from './menu-scan-pageid.js';
 
@@ -130,6 +130,14 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
       console.warn('[menu-scan] pageId fill failed: %s', fillErr?.message || fillErr);
     }
 
+    // pageId 补采后再回填：同名已在 apply 内处理；此处补 pageId∈目录 的叶
+    let umlAdoptedAfterPageId = 0;
+    try {
+      umlAdoptedAfterPageId = await adoptModelingUmlEcdUnderSystem(systemNodeId);
+    } catch (adoptErr) {
+      console.warn('[menu-scan] uml adopt after pageId failed: %s', adoptErr?.message || adoptErr);
+    }
+
     job.status = 'completed';
     job.stats = {
       ...plan.stats,
@@ -138,6 +146,7 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
       mergedByPageId: phase2.merges.length,
       unmatchedMarked: applyStats.unmatchedMarked,
       ...pageIdStats,
+      umlAdoptedAfterPageId,
     };
     job.finishedAt = new Date().toISOString();
   } catch (err) {

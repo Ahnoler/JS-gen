@@ -30,11 +30,20 @@ async function assignAiUmlEcdFromId(created, trx) {
 
 /**
  * 同系统下：可导航叶从 intermediate 回填建模 umlEcd（同名或 pageId）。
+ * 须在 pageId 补采之后再跑一遍：新建 AI 叶在 apply 当时尚无 pdCmptEcd，
+ * 仅靠同名能回填；按 pageId 对齐依赖天元补采结果。
  * @param {number} systemNodeId 系统节点
- * @param {object} trx knex trx
+ * @param {object} [trx] knex trx；缺省时自开事务
  * @returns {Promise<number>} 回填条数
  */
-async function adoptModelingUmlEcdUnderSystem(systemNodeId, trx) {
+export async function adoptModelingUmlEcdUnderSystem(systemNodeId, trx) {
+  if (!trx) {
+    let adopted = 0;
+    await getDB().transaction(async (inner) => {
+      adopted = await adoptModelingUmlEcdUnderSystem(systemNodeId, inner);
+    });
+    return adopted;
+  }
   const modules = await systemDao.listByParent(systemNodeId, trx);
   let adopted = 0;
   for (const mod of modules) {
