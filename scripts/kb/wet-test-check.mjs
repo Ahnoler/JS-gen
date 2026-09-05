@@ -127,8 +127,12 @@ function checkModule(key) {
   const driftLeaves = [];
   for (const r of rows) {
     stats[r.verdict] += 1;
-    if (r.zjjk) actual.add(r.zjjk);
-    if (!/20\d{2}-\d{2}-\d{2}/.test(r.line)) {
+    const codes = r.line.match(/ZJJK\d+/g) ?? [];
+    for (const c of codes) actual.add(c);
+    if (r.zjjk === null && codes.length === 0 && r.verdict !== 'pending') {
+      warns.push(`判定行无 ZJJK（无编号场景叶请确认占行口径）: ${r.line.slice(0, 60)}`);
+    }
+    if (r.verdict !== 'pending' && !/20\d{2}-\d{2}-\d{2}/.test(r.line)) {
       fails.push(`判定行缺日期: ${r.zjjk ?? '(无ZJJK)'} ${r.verdict}`);
     }
     if (r.verdict === 'blocked' && !BLOCKED_EVIDENCE.test(r.line)) {
