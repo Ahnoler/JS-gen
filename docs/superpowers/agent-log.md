@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 22:20 · ZCode Lead — 开工声明：req-doc-to-kb SKILL/USAGE 契约升级（湿测协议化）
+- 开工：22:20。依据 credit-corp 首轮逐叶湿测经验（41/48，527db33），把湿测方法契约化，经用户批准按建议顺序执行
+- 范围：`scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`USAGE.md`、本文件（纯文档契约）；已核实 characterization 无脚本 pin 此二文件（grep 空），`characterize-kb-req-modules.mjs` 为服务行为 pin 不受影响
+- 内容：①ZJJK 清单行升为强制契约+FS 场景号+按钮文案标「文档口径」②新增湿测协议（视图3 wet-test.md 模板/判定词表/写操作黑名单/blocked 处理/串行与会话窗口规则）③drift 分类学与回流机制（湿测铁证>需求原文）④drafts 湿测门槛
+- 禁入：`src/**`、`data/kb/**`（wet-test.md 数据文件不在本条范围）、manifest/状态机与 pin 不动（单独验证才可改）、他线 WIP
+- 方式：主线程直编；完成后跑 characterize-kb-req-modules 确认 pin 绿
+
 ## 2026-09-05 22:00 · ZCode Lead — 阶段回报：credit-corp 逐叶湿测 41/48（战役继续，回链 21:40 开工）
 - 完成：credit-corp 48 叶清单建账（`data/kb/req/credit-corp/wet-test.md`）；本会话逐叶湿测 **41/48：match 33 / drift 3 / blocked 10**（提交 1037acd/320a6f5 + 本条提交）
 - 湿测铁证（文档未载，切片作业区已回填）：①作废前置校验=批复下存在关联在途/生效用信合同则不允许作废（后端 BizException 全文在案）；②授信向导客户放大镜**无条件查询返回 search false，必须带条件**；③未选行操作提示「请选择有效数据」；④SUT 按钮名「流程提交」≠文档「提交流程」；⑤主页列表默认不自动加载
