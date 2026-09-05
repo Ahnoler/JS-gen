@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 02:11 · ZCode Lead — 湿测窗口开工：credit-interbank 逐叶（流水线第六循环，授信域收官）
+- 开工：02:11。A→B→C 第 6 循环：A 预备 → B 湿测 → C 回填；验收线含 checker 第 0 步
+- 范围：`data/kb/req/credit-interbank/`（wet-test.md 新建、chapters 回补/回填）、`tmp/kb-wet-test/credit-interbank/`、双台账更新、本文件
+- 禁入：flows/promote/staging/源 docx/他线 WIP/其他模块文件；写操作黑名单
+- 方式：子代理不 commit 不写日志，Lead 验收（checker→截图 mtime→抽 2-3 叶→blocked 证据）后代提交
+
 ## 2026-09-06 02:20 · ZCode Lead — 阶段回报：credit-group 逐叶湿测收口 38/38（流水线第五循环）
 - 完成：A 预备 38 叶+4 章清单行回补 → B 湿测 **match 3 / drift 4 / blocked 31 / not-found 0**（7 截图；集团域 SUT 存量全为零，审批侧 298 条流程无集团记录，blocked 属环境常态）→ C 回填 4 项（含一次内容归属修正：叶21 批复选择实归 ch04 非清单归组的 ch05）。提交 `51f211a`/`22527f6`/`2aa064f`
 - Lead 验收线：checker 零 FAIL（4 WARN→C 回填后 ALL GREEN）；抽叶1（match 新增主页）+叶19（drift 变更主页自动加载）页面复核吻合 ✓（直连路由被守卫拦 404，改走页签导航——细节记坑）
