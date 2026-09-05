@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode Lead — 收工回报：P0 修复完成（回链本会话开工条目）
+- 完成：**P0-1/2/3/4/5 五项全部落地**，四提交——`de68582`（/ws+/api/browser 鉴权、RSCF 订阅过滤、HOST 默认 127.0.0.1）、`0323984`（账号密码出站掩码+写侧哨兵跳过）、`7c3374d`（移除两枚真实 JWT+验签密钥，合成 JWT 替换特征化）、`3a65fc7`（.env.example 占位还原+DASHBOARD_WS_TOKEN 示例）
+- 方式：三路并行实施子智能体（文件集互不相交，不 commit）+ 主线程验收代提交；子智能体改动经 diff 范围核查无越界
+- 验收：verify-all **ALL GREEN**（exit=0）；红线 grep（eyJ 真实 JWT/paas-application）本线文件零匹配；characterize-partner-platform/sso-auth(26/26)/system-node-accounts(10/10) 全绿
+- ⚠ 部署侧人工项（不做会导致不可用/残留风险）：①47.101 pull 后 .env 须显式 `HOST=0.0.0.0` ②.env 需补 `PARTNER_ACCESS_TOKEN`（轮换后新值）并在账号中心作废旧 JWT ③MinIO 密码/EXECUTOR_TOKEN 轮换（P0-6，仍挂账）④建议设 `DASHBOARD_WS_TOKEN` ⑤SSO 开启时前端 WS/SSE 需带 `?token=`
+- 遗留移交：①nine-rules 5/18 存量红（HEAD worktree 复现，不在 verify-all 闸内，归菜单线核对——疑似 12:09 intermediate 升格批次未同步该脚本）②v2/hierarchy.js+trajectory.js 仍有明文密码出站（回放链路需真实值，列入第二批）③工作区存在他线未提交删除（docs/superpowers 三文件）本线未触碰
+- P0-6（凭据轮换）为服务器人工操作，不在本批
+
 ## 2026-09-05 · Zcode Lead — 开工声明：P0 修复（安全审查第一批）
 - 开工：本会话。用户拍板「P0 先处理」，按 security-review-2026-09-05.md 修复路线实施
 - 范围：A 子智能体=server.mjs/src/middleware/**/src/cdp/remote-bridge/**/src/executor-ws.js/config/config.js（/ws 鉴权+/api/browser 鉴权+RSCF 订阅过滤+HOST 默认）；B 子智能体=hierarchy-tree-query/hierarchy-service/system-account-dao+对应特征化（密码掩码）；C 子智能体=partner-platform.js+characterize-sso-auth.mjs+相关 pin（移除真实 JWT）；主线程=config/.env.example 占位还原+验收代提交
