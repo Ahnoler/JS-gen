@@ -9,6 +9,11 @@
 - 方式变更注记：开工声明原写 Playwright MCP，因该浏览器被占用且用户明确「别动别人的浏览器」，改为独立无头实例执行；本收工未改任何 src/scripts 代码
 - commit 开工 `49d616e`
 
+## 2026-09-05 12:10 · Zcode Lead — 收工回报：执行子集清单+导出方案（回链 11:54）
+- 完成：核实 `replay_action_entries`（_replay.py:533）执行闭包并产出交付文档 `docs/superpowers/research/2026-09-05-replay-engine-handover-export.md`——回放核心 import 链（replay_*/_helpers/_js_snippets/js_snippets 34 文件/form_rules/models/feature_flags）+ 单源生成链（page-locator-helpers.js）+「随包不激活」的 autofill 链说明 + 版本化导出契约（MANIFEST+git hash+冒烟对拍）
+- 验收：service.py/_helpers/replay_* 逐文件 import 实查；browser_context= browser_use 会话、registry 兜底必需、PYTHONUTF8=1 三条硬约束入文；autofill 链 _watcher_mode 抑制实证（_replay.py:544）
+- 遗留移交：①导出脚本 `export_engine_subset.mjs` 未实施（§4 步骤 1，待用户确认后 0.5 天）②同步机制待同事确认是否需回放行为对齐（§3 前提）③menu 线同事侧 data-url 替代方案仍待其反馈
+
 ## 2026-09-05 11:54 · Zcode Lead — 开工声明：执行引擎执行子集清单 + 版本化导出方案
 - 开工：11:54。同事（Python 技术栈）要接手执行引擎；用户拍板不做旧组装器复活，改「提供现行 actions 执行子集 + 版本化导出契约」
 - 范围：新建 `docs/superpowers/research/2026-09-05-replay-engine-handover-export.md`（清单+方案）；只读盘点 `scripts/controller/**`、`src/cdp/page-locator-helpers.js`；本文件开工/收工条目
