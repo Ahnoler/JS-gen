@@ -1,0 +1,11 @@
+{
+  "moduleKey": "limit-quota",
+  "moduleName": "额度-限额",
+  "sourcePath": "D:/dev/JS-gen/docs/天阳信贷系统需求文档/A_v5.2需求文档0824/D02天阳信贷管理系统-额度管理需求分册【限额管理】.docx",
+  "sourceKind": "req",
+  "status": "sliced",
+  "warnings": [],
+  "createdAt": "2026-09-05T12:23:35.695Z",
+  "updatedAt": "2026-09-05T12:33:40.000Z",
+  "note": "batch 0824"
+}
