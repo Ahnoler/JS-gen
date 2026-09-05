@@ -10,7 +10,7 @@
 ### ⑦ 客户管理 KB
 
 - **档位 A（对公建档）已闭环**：#515+#524；fid=7；stamp 列表可见；P2 可回放。
-- **档位 B（客户信息查询）进行中**：独立卡 `customer_query` 挂 **9000000039**；浅成功=复用 stamp `KB测客户-20260905-1315` 列表命中；设计 `specs/2026-09-05-customer-query-kb-design.md`。
+- **档位 B（客户信息查询）已闭环**：traj **#526** recorded（stepCount=4）；独立卡 `customer_query` 挂 **9000000039**；stamp `KB测客户-20260905-1315` 列表 hit=true（hash `#/cstMgt/csinfEnqr/cstEnqr`）；设计 `specs/2026-09-05-customer-query-kb-design.md`。
 - 遗留（档外）：引擎 phase_done 门闩；法定代表人引入深录；个人客户/OCR。
 
 ### ⑥ 产品管理 KB（挂载收尾完成）

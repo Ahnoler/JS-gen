@@ -1,6 +1,6 @@
 # 客户信息查询 KB 贯通（档位 B）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 独立 KB 卡「客户信息查询」可召回 + 本产品新建交易挂 `functionId=9000000039` 浅录证：列表查询可见 stamp `KB测客户-20260905-1315`。
 
@@ -40,9 +40,9 @@
 **Consumes:** 控制面 `http://localhost:4097`；process 4 functions API。  
 **Produces:** 文件中写明 `functionId=9000000039`、`RES28003`、`ZJJK00104552`、`menuXpath`、勿挂列表。
 
-- [ ] **Step 1:** `GET /api/v2/processes/4/functions`，过滤 `id==9000000039`，确认 `intermediateFlag=0`、`name=客户信息查询`。
-- [ ] **Step 2:** 可选 `GET /api/v2/trajectories?functionId=9000000039` 摘要条数（只读）。
-- [ ] **Step 3:** 写入 `function-anchors.md`（表格：id / RES / pageId / xpath / 勿挂 7 与 9000000283）。
+- [x] **Step 1:** `GET /api/v2/processes/4/functions`，过滤 `id==9000000039`，确认 `intermediateFlag=0`、`name=客户信息查询`。
+- [x] **Step 2:** 可选 `GET /api/v2/trajectories?functionId=9000000039` 摘要条数（只读）。
+- [x] **Step 3:** 写入 `function-anchors.md`（表格：id / RES / pageId / xpath / 勿挂 7 与 9000000283）。
 
 **Verify:** 文件含字面量 `9000000039`、`RES28003`、`ZJJK00104552`。
 
@@ -57,7 +57,7 @@
 **Consumes:** Task 1 锚点；模板 `data/kb/flows/product_query.json` 结构。  
 **Produces:** 可 parse 的流程卡；召回命中本卡 flow 名。
 
-- [ ] **Step 1:** 创建卡，建议字段（湿测前 hash 可用 pageId/RES；进页后补专有 hash 段）：
+- [x] **Step 1:** 创建卡，建议字段（湿测前 hash 可用 pageId/RES；进页后补专有 hash 段）：
 
 ```json
 {
@@ -93,7 +93,7 @@
 }
 ```
 
-- [ ] **Step 2:** 召回抽查（在仓库根）：
+- [x] **Step 2:** 召回抽查（在仓库根）：
 
 ```bash
 D:/anaconda3/python.exe -c "from scripts.kb.recall import find_flow_for_task; from scripts.kb import store as kb_store; flows=kb_store.load_flows(); hit,s=find_flow_for_task(flows,'客户信息查询 按客户名称查询 KB测客户-20260905-1315'); print(hit and hit.get('flow'), s); hit2,s2=find_flow_for_task(flows,'对公客户建档 新增客户', page_hash='#/cstMgt/csinfMnt/cpctMgt/cpctMgtPg'); print('onboarding?', hit2 and hit2.get('flow'), s2)"
@@ -101,7 +101,7 @@ D:/anaconda3/python.exe -c "from scripts.kb.recall import find_flow_for_task; fr
 
 Expected: 第一行 flow 含「客户信息查询」；第二行应为建档卡（或至少不是查询卡独占错误）。
 
-- [ ] **Step 3:** Commit 卡草稿（可与 Task 5 合并；若单独提交 message 含 `customer_query`）。
+- [x] **Step 3:** Commit 卡草稿（可与 Task 5 合并；若单独提交 message 含 `customer_query`）。
 
 **Verify:** JSON parse OK；召回命中本卡。
 
@@ -119,7 +119,7 @@ Expected: 第一行 flow 含「客户信息查询」；第二行应为建档卡�
 - 参考 cstNo：`26090513160716537`
 - USCC（仅核对用，本线不新建）：`91310115MA260915A1`
 
-- [ ] **Step 1:** 写 `task-requirement.md`，编号步骤示例：
+- [x] **Step 1:** 写 `task-requirement.md`，编号步骤示例：
 
 ```
 【硬性成功门闩】列表查询可见「KB测客户-20260905-1315」前不得 done；禁止 OCR/影像/新增建档。
@@ -129,8 +129,8 @@ Expected: 第一行 flow 含「客户信息查询」；第二行应为建档卡�
 关键数据：客户名称=KB测客户-20260905-1315；stamp=20260905-1315
 ```
 
-- [ ] **Step 2:** `POST /api/v2/trajectories/analyze`，body 含 `functionId: 9000000039` 与 requirement 全文；审 phases（期望 ≥2：进页 / 查询核对）。
-- [ ] **Step 3:** `POST /api/v2/trajectories`：`name` 含 `KB贯通-客户信息查询-20260905`、`systemAccountId: 2`、`functionId: 9000000039`、requirement+phases；保存 `tmp/customer-mgmt/query/traj-id.txt`。
+- [x] **Step 2:** `POST /api/v2/trajectories/analyze`，body 含 `functionId: 9000000039` 与 requirement 全文；审 phases（期望 ≥2：进页 / 查询核对）。
+- [x] **Step 3:** `POST /api/v2/trajectories`：`name` 含 `KB贯通-客户信息查询-20260905`、`systemAccountId: 2`、`functionId: 9000000039`、requirement+phases；保存 `tmp/customer-mgmt/query/traj-id.txt`。
 
 **Verify:** 交易 `draft`；`phaseCount≥1`；`task` 非空；fid=9000000039。
 
@@ -142,10 +142,10 @@ Expected: 第一行 flow 含「客户信息查询」；第二行应为建档卡�
 
 **Deliverable:** recorded（或明确失败根因）+ `tmp/customer-mgmt/query/through-report.md`
 
-- [ ] **Step 1:** 确认 LMY（或空闲 executor）online；`POST .../record/prepare`（timeout 宜 ≥600s）。
-- [ ] **Step 2:** `POST .../record/start`（可带全部 phaseIds）；监控；若假成功则 CDP：导航到查询页 → 填 stamp → 查询 → 写 `cdp-list-check.json`。
-- [ ] **Step 3:** 进页后把实标筛选项名与 URL hash 回写到 `customer_query.json` 的 `nodes`/`hash_markers`（最小补丁）。
-- [ ] **Step 4:** `POST .../detach`；写 through-report（traj id、fid、stamp、阶段表、列表 hit、CDP 路径）。
+- [x] **Step 1:** 确认 LMY（或空闲 executor）online；`POST .../record/prepare`（timeout 宜 ≥600s）。
+- [x] **Step 2:** `POST .../record/start`（可带全部 phaseIds）；监控；若假成功则 CDP：导航到查询页 → 填 stamp → 查询 → 写 `cdp-list-check.json`。
+- [x] **Step 3:** 进页后把实标筛选项名与 URL hash 回写到 `customer_query.json` 的 `nodes`/`hash_markers`（最小补丁）。
+- [x] **Step 4:** `POST .../detach`；写 through-report（traj id、fid、stamp、阶段表、列表 hit、CDP 路径）。
 
 **Verify:** 列表可见 stamp **或** 报告写明阻塞与下一步（stamp 失踪时按 exceptions 升级 Lead）。
 
@@ -155,10 +155,10 @@ Expected: 第一行 flow 含「客户信息查询」；第二行应为建档卡�
 
 **Depends:** Task 4
 
-- [ ] **Step 1:** `customer_query.json` `source` 挂湿测 traj id + stamp + 列表证据一句。
-- [ ] **Step 2:** `todo-list.md` ⑦：档位 B 标闭环（或写明剩余缺口）。
-- [ ] **Step 3:** `agent-log.md` 收工回链 18:08 开工；勾选本计划 checkbox。
-- [ ] **Step 4:** Commit（仅本线：卡 / 计划勾选 / todo / agent-log；勿带 `.env` / docs 三文件删除 / 他线 WIP）。
+- [x] **Step 1:** `customer_query.json` `source` 挂湿测 traj id + stamp + 列表证据一句。
+- [x] **Step 2:** `todo-list.md` ⑦：档位 B 标闭环（或写明剩余缺口）。
+- [x] **Step 3:** `agent-log.md` 收工回链 18:08 开工；勾选本计划 checkbox。
+- [x] **Step 4:** Commit（仅本线：卡 / 计划勾选 / todo / agent-log；勿带 `.env` / docs 三文件删除 / 他线 WIP）。
 
 **Verify:** source 含 traj id；收工回链开工条目。
 

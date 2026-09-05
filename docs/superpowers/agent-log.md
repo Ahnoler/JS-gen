@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 18:35 · Cursor Task 5 — 收工回报：客户信息查询 KB 档位 B（回链 18:08）
+- 完成：traj **#526** recorded（stepCount=4，functionId=9000000039）；stamp **KB测客户-20260905-1315** 列表 hit=true；`customer_query.json` source 回填 + 重置 rule；todo ⑦ 档位 B 闭环；计划 Tasks 1–5 全勾选
+- 验收：`tmp/customer-mgmt/query/through-report.md`；`tmp/customer-mgmt/query/cdp-list-check.json`；`tmp/customer-mgmt/query/list526_stamp.png`
+- 注意：commit **待 Lead commit**（本 Task 5 子代理未提交）；未带 docs 三文件删除 / `.env` / 他线 WIP
+- 遗留移交：引擎 phase_done 门闩（P1/P3 仍 0 步假完成，与建档 #524 同类）；查询前重置已入卡 rules
+
 ## 2026-09-05 18:08 · Cursor Lead — 开工声明：客户信息查询 KB 档位 B（设计→计划）
 - 开工：18:08。用户选档位 B；成功浅 A；复用 stamp 1315；方案 1 独立新卡+湿测；§1–§3 已口头批准，落 spec
 - 范围：`docs/superpowers/specs/2026-09-05-customer-query-kb-design.md`、随后 `plans/2026-09-05-customer-query-kb.md`、`data/kb/flows/customer_query.json`、`tmp/customer-mgmt/query/**`、本文件、`todo-list.md`
