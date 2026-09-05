@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 12:09 · Cursor Lead — 开工声明：SDD 实施 intermediate 同名升格合入
+- 开工：12:09。用户「按计划实施」+ `/subagent-driven-development`
+- 范围：`src/services/menu-scan-{service,apply,session}.js`、`scripts/characterization/characterize-menu-scan.mjs`、`scripts/maintenance/merge-intermediate-ai-twins.mjs`、api-docs overview、agent-log/todo；MySQL systemId=1 孪生清理
+- 禁入：推送 POST、异名改名升格、改 source 枚举、信贷/KB、`config/.env*`、他线 WIP
+- 方式：主会话 SDD（子智能体实施+评审；**子智能体不 commit**，主会话验收后提交）
+
 ## 2026-09-05 12:06 · Cursor Lead — 设计确认：同名 intermediate 升格合入（source=json_import）
 - 完成：spec `2026-09-05-intermediate-promote-on-scan-design.md` + plan `2026-09-05-intermediate-promote-on-scan.md`；旧 intermediate spec §2/§5/§6 已修订
 - 待：用户审阅 spec 后实施（characterize → plan 升格 → apply → 存量孪生清理）
