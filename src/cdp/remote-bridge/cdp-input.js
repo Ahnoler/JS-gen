@@ -264,6 +264,14 @@ export async function handleInput(payload) {
 
     if (kind === 'navigate') {
       const action = String(payload.action || '');
+      if (action === 'url') {
+        let url = String(payload.url || '').trim();
+        if (!url) return { ok: false, reason: 'missing_url' };
+        // 无协议前缀时补 https://，允许用户直接输域名
+        if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(url)) url = `https://${url}`;
+        await bridge.client.send('Page.navigate', { url });
+        return { ok: true };
+      }
       if (action === 'reload') {
         await bridge.client.send('Page.reload', { ignoreCache: false });
         return { ok: true };
