@@ -9,6 +9,12 @@
 - 方式变更注记：开工声明原写 Playwright MCP，因该浏览器被占用且用户明确「别动别人的浏览器」，改为独立无头实例执行；本收工未改任何 src/scripts 代码
 - commit 开工 `49d616e`
 
+## 2026-09-05 11:54 · Zcode Lead — 开工声明：执行引擎执行子集清单 + 版本化导出方案
+- 开工：11:54。同事（Python 技术栈）要接手执行引擎；用户拍板不做旧组装器复活，改「提供现行 actions 执行子集 + 版本化导出契约」
+- 范围：新建 `docs/superpowers/research/2026-09-05-replay-engine-handover-export.md`（清单+方案）；只读盘点 `scripts/controller/**`、`src/cdp/page-locator-helpers.js`；本文件开工/收工条目
+- 禁入：`src/**`、`scripts/**` 一律不改（characterization 文本 pin 热区）；`config/.env*`、untracked research 文档（他线）；不实施导出脚本（本条目只出方案，实施待用户确认）
+- 方式：主会话读 9-01 回放管线调研底稿 + 逐文件核实现行树依赖（import 链）→ 产出清单与导出契约文档
+
 ## 2026-09-05 10:57 · Zcode Lead — 开工声明：菜单爬取 Xpath 真机验证（同事反馈「定位不到」）
 - 开工：10:57。用户转达同事反馈「项目抓取的菜单路径无法使用/菜单 Xpath 定位不到」（截图示 `//li[@data-id='RES000…']`），附 `tmp/menu_crawl/menu_crawl_no_system.xlsx`，要求真机验证
 - 范围：`tmp/menu_crawl/menu_crawl_no_system.xlsx`（只读）+ `tmp/menu_crawl/` 新增验证脚本与报告（本线 scratch）；SUT test.creditv5p2 只读导航验证（登录+菜单悬停/计数，不提交任何业务单据）；本文件开工/收工条目
