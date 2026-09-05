@@ -1129,6 +1129,7 @@ export const PAGE_LOCATOR_HELPERS = `
         || k === 'form_checkbox' || k === 'form_tree_select') return k;
       if (k === 'menu' || k === 'submenu') return 'menu';
       if (k === 'icon') return 'icon';
+      if (k === 'tree_node') return 'tree_node';
       if (k === 'button' || k === 'adjacent_button' || k === 'link' || k === 'table_row_button'
         || k === 'tab' || k === 'generic') return 'button';
       return '';
@@ -1175,6 +1176,7 @@ export const PAGE_LOCATOR_HELPERS = `
         '.todo-item-action',
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"]',
         '[class*="el-icon"][aria-label], .el-tooltip[class*="el-icon"], a[class*="el-icon"]',
+        '.el-tree-node__content',
       ].join(',');
       const nodes = document.querySelectorAll(sel);
       const out = [];
@@ -1211,7 +1213,7 @@ export const PAGE_LOCATOR_HELPERS = `
       }
       if (a === 'select_option') return { form_select: 1 };
       if (a === 'click_menu_item') return { menu: 1 };
-      if (a === 'click_element_by_index') return { button: 1, icon: 1, menu: 1 };
+      if (a === 'click_element_by_index') return { button: 1, icon: 1, menu: 1, tree_node: 1 };
       return null;
     }
     function filterInventoryByKind(list, action) {

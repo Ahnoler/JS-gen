@@ -154,7 +154,14 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
     // whose descendant text includes want but is not the control.
     if (want) {
       const exact = nodes.filter((el) => norm(el.innerText || el.textContent) === want);
-      if (!exact.length) return null;
+      if (!exact.length) {
+        // Tree-node text drift: element_json.text may be stale (node renamed after
+        // recording). When the recorded xpath targets .el-tree-node__content and hits
+        // exactly one visible node, trust the xpath — don't let the text guard kill it.
+        const treeish = targetKind === 'tree_node' || /el-tree-node__content/.test(String(xp));
+        if (treeish && nodes.length === 1) return clickEl(nodes[0], how + '-tree-text-drift');
+        return null;
+      }
       nodes = exact;
     }
     return clickEl(nodes[nodes.length - 1], how);

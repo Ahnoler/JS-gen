@@ -15,7 +15,10 @@ from .trajectory_store import (
 _REPLAY_ACTION_SIGNATURES = {
     "fill_form_field": {"label_text", "value"},
     "select_option": {"label_text", "option_text"},
-    "click_element_by_index": {"index"},
+    # text/tag_name 等是回放兜底定位的关键线索：白名单丢掉 text 后，
+    # _replay_click_by_index 只能回退 element_json.text（可能过期），导致
+    # _JS_CLICK_DURABLE 文本守卫误杀正确的 xpath 命中（2026-09-06 交易56 树节点案例）。
+    "click_element_by_index": {"index", "text", "tag_name", "menu_text", "parent_text", "target_kind", "icon_class"},
     "click_menu_item": {"menu_text"},
     "click_table_row_button": {"row_text", "button_text"},
     "click_table_row_radio": {"row_text"},
