@@ -14,6 +14,12 @@
 - 验收：service.py/_helpers/replay_* 逐文件 import 实查；browser_context= browser_use 会话、registry 兜底必需、PYTHONUTF8=1 三条硬约束入文；autofill 链 _watcher_mode 抑制实证（_replay.py:544）
 - 遗留移交：①导出脚本 `export_engine_subset.mjs` 未实施（§4 步骤 1，待用户确认后 0.5 天）②同步机制待同事确认是否需回放行为对齐（§3 前提）③menu 线同事侧 data-url 替代方案仍待其反馈
 
+## 2026-09-05 11:58 · Zcode Lead — 开工声明：actions 契约文档（两边引擎接口约定）
+- 开工：11:58。用户指示「我们需要约定 actions」——把回放动作词汇（动作名/参数/语义/结果协议/别名）固化为跨团队契约文档
+- 范围：新建 `docs/engine-actions-contract.md`；只读提取 `_replay.py` 直派表、`replay_names.py` 别名表、controller 注册动作；本文件开工/收工条目
+- 禁入：`src/**`、`scripts/**` 不改；他线 WIP（config/.env*、untracked research）；不写导出脚本（上一条目 §4 待确认项不变）
+- 方式：主会话读源码提取动作词汇 → 契约文档（英文动作名+参数表+结果协议），动作清单以代码为准不凭记忆
+
 ## 2026-09-05 11:54 · Zcode Lead — 开工声明：执行引擎执行子集清单 + 版本化导出方案
 - 开工：11:54。同事（Python 技术栈）要接手执行引擎；用户拍板不做旧组装器复活，改「提供现行 actions 执行子集 + 版本化导出契约」
 - 范围：新建 `docs/superpowers/research/2026-09-05-replay-engine-handover-export.md`（清单+方案）；只读盘点 `scripts/controller/**`、`src/cdp/page-locator-helpers.js`；本文件开工/收工条目
