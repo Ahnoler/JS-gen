@@ -8,7 +8,7 @@
 - 禁入：`config/.env`（他线热区）、`scripts/controller/**`、`src/services/remote-session-service.js`、菜单/KB/引擎线 WIP、对公建档线 tmp/customer-mgmt
 - 方式：主线程直接改（跨文件耦合紧），不改动作协议既有消息名
 ## 2026-09-05 13:25 · Cursor Lead — 收工回报：对公建档复录 #524（回链 13:11 / ba27580）
-- 完成：traj **#524** recorded；stamp **KB测客户-20260905-1315** 列表 hit（cstNo=`26090513160716537`）；**stepCount=9**（P2：新增/选类型/填 stamp+USCC/保存）；卡 source 已挂 #524；`through-report.md` 更新；detach rs=1169
+- 完成：traj **#524** recorded；stamp **KB测客户-20260905-1315** 列表 hit（cstNo=`26090513160716537`）；**stepCount=9**（P2：新增/选类型/填 stamp+USCC/保存）；卡 source 已挂 #524；`through-report.md` 更新；detach rs=1169；commit **`5b588cd`**
 - 验收：`tmp/customer-mgmt/cdp-list-check-524.json` + `_tree524_full.json`；P3/P4 仍 0 步假完成（引擎门闩另案）
 - 遗留移交：phase_done 证据门闩；引入深录；个人/OCR 旁路
 
