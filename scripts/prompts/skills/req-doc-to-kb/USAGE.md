@@ -162,17 +162,25 @@
 全部完成后：agent-log **收工**（完成模块列表 / commit hash / 失败表）并 commit。  
 可选：跑 `node scripts/characterization/characterize-kb-req-modules.mjs`（不依赖业务 chapters）。
 
-### Phase E — 逐模块逐叶湿测（Lead 主线程，2026-09-05 起）
+### Phase E — 逐模块逐叶湿测（A→B→C 团队流水线，2026-09-05 实测定型）
 
-切片验收后的独立任务单元，**按模块推进**，每模块：
+切片验收后的独立任务单元，**一次只推进一个模块**（用户拍板），三角色分工：
 
-1. 从 chapters 的 ZJJK 清单行建 `data/kb/req/<key>/wet-test.md` 判定表（SKILL 湿测节有模板与词表）；存量模块章末缺标准清单行的先回补（SKILL「存量回补条款」）。  
-2. 登录 SUT（见各模块作业区 wet-test.md 头部记录的入口/账号），**主线程串行**操作 Playwright MCP——共享浏览器，模块间也不并行。  
-3. 逐叶判定回填：match/drift/blocked/not-found；写操作黑名单（禁止一切落库动作）。  
-4. drift 回流：按分类学回填 chapters / 引擎 cue（SKILL「drift 分类学」表）。  
-5. 模块收口：commit wet-test.md + 回填；agent-log 阶段回报；blocked 留补测条件。
+- **A 预备代理（文本，可与 B 前段并行）**：从 chapters 的 ZJJK 清单行建 `data/kb/req/<key>/wet-test.md` 判定表（SKILL 湿测节模板与词表）；存量模块章末缺标准清单行的先回补（SKILL「存量回补条款」）。
+- **B 湿测代理（浏览器，全局唯一串行）**：登录 SUT 逐叶判定回填——共享浏览器**一次只放一个 B 进浏览器**；写操作黑名单（禁止一切落库动作）；**每完成一个主链组增量写回**（SKILL 执行规则）；回报必含统计/drift/blocked 清单 + **协议疏漏观察 1-5 条**，回报消息**不带任何截图图片**（防回传丢失）。
+- **C 回填代理（文本，B 收口后）**：按 drift 分类学把 drift 回填 chapters（「> SUT 实测」双源标注）；跨模块观察汇总给 Lead。
 
-节奏：SUT 会话约 50 分钟过期——**一个模块一个登录窗口**；模块推进顺序按业务链（先例：credit-corp → rating → loan-corp → …）。
+**Lead 验收线（每模块 B 收口必做，不过关打回重测）**：
+
+1. 截图存在且 mtime 落在该代理执行窗口内；
+2. 抽 2-3 叶开页面复核判定（match 与 drift 各至少一叶优先）；
+3. blocked 必须有异常原文（console/后端）或补测条件；not-found 必须有导航尝试记录。
+
+模块收口：Lead 验收后代 commit（wet-test.md + chapters 回填，子代理不 commit）；agent-log 阶段回报；**blocked 汇入补测台账**，待引擎线跑流程造出数据后回收补测。
+
+**元演化机制（第 2 轮修订新增）**：B 组回报的「协议疏漏观察」由 Lead 记入观察池，**攒 3 个模块统一做一轮 SKILL 修订**——先例：首轮 7 条疏漏全部来自 rating+customer-corp 两模块实战，契约是被湿测长出来的，不是预先设计的。
+
+节奏：SUT 会话约 50 分钟过期——**一个模块一个登录窗口**；推进顺序按业务链（已收口：credit-corp → rating → customer-corp；后续 customer-common → credit-retail → …）。
 
 ---
 
@@ -230,7 +238,9 @@ sourcePath: <ABS_PATH_TO_DOCX>
 | 超大文档超时 | 先切目录级大纲 chapters，through-chains 只列候选主链标题；note 标明 `partial` |
 | moduleKey 冲突 | 禁止覆盖他模块；换更细 key（见 §3） |
 | API 501/404 | 改直调 service / 手建目录，继续切片 |
-| 湿测叶 blocked | 判定照填 `blocked` + **补测条件**；拦截类必须留后端异常原文（业务规则铁证）；不阻塞其余叶 |
+| 湿测叶 blocked | 判定照填 `blocked` + **补测条件**；拦截类必须留异常原文（后端 BizException 抄全文，前端拦截抄 console 原文）；不阻塞其余叶 |
+| 子代理回传丢失（`mm_items['image'][0]` 类报错） | **先产物考古再重派**：查截图目录 mtime/文件名进度判断实际走到哪（实例：customer-corp 首派走完 55 叶死于回传）；重派提示词加「链组增量写回」+「回报不带图」 |
+| blocked 补测兑现 | Lead 阶段回报汇总各模块 blocked 台账；待引擎线跑流程造出数据（在途审批/已传授权书记录等）后回收补测，不从本线强造 |
 
 ---
 

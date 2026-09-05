@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 23:59 · ZCode Lead — 收工：req-doc-to-kb SKILL 第 2 轮修订（回链 23:55 开工）
+- 完成：SKILL 7 处（wet-test.md 必含段落=跨模块观察/错误族归集；执行规则+链组增量写回+流程推进类 blocked 常态化；drift behavior 行+逐模块对照强制；structure 行+折叠区示例；Phase C 契约+复用页名称清单；drafts sourceRefs 必引湿测叶号）+ USAGE 2 处（Phase E 改写为 A→B→C 团队流水线版含 Lead 验收线三条与元演化观察池机制；§6 失败策略+回传丢失产物考古行+blocked 补测台账行）。观察池 3 条全部随批落地
+- 验收：grep 十处修订标记全在（9 hit 含复现）；characterize-kb-req-modules OK 11（pin 无涉）
+- 决策：引擎 cue 承接契约**不进本 SKILL**（归引擎线）；Lead 工作纪律归 memory 不入契约
+- 遗留：无。下一循环 customer-common 按新版 Phase E 执行
+- 提交：本条 commit（SKILL.md/USAGE.md/本文件）
+
 ## 2026-09-05 23:55 · ZCode Lead — 开工声明：req-doc-to-kb SKILL 第 2 轮修订（两模块实战沉淀）
 - 开工：23:55。把 rating+customer-corp 两个循环的收获按已批准方案落契约：SKILL 4+3 处（跨模块观察段/链组增量写回/drafts sourceRefs 叶号回溯/behavior 逐模块对照/复用页名称清单/流程推进类 blocked 常态化/structure 示例补充）+ USAGE 3 处（Phase E 改团队流水线版+验收线/元演化观察池机制/§6 失败策略两行）
 - 范围：`scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`USAGE.md`、本文件；改后跑 characterize-kb-req-modules 验 pin
