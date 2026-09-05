@@ -1,0 +1,31 @@
+{
+  "flow": "客户信息查询",
+  "aliases": ["查询客户信息", "客户查询", "cstInfQuery"],
+  "menu_path": "客户管理→客户信息查询（functionId=9000000039；menu //li[@data-id='RES28003']；pageId=ZJJK00104552；勿挂对公建档 7 / 勿挂 9000000283）",
+  "hash_markers": ["ZJJK00104552", "RES28003", "UML00091140"],
+  "keywords": ["客户信息查询", "客户名称", "查询", "重置", "证件号码"],
+  "preconditions": [
+    "入口：客户管理→客户信息查询；挂 functionId=9000000039",
+    "查询对象优先 stamp KB测客户-20260905-1315（档位 A 已建）",
+    "OCR/影像/新增建档禁入；成功=列表 stamp 可见",
+    "账号：systemAccountId=2"
+  ],
+  "nodes": [
+    {"id": "qry_home", "page": "客户信息查询主页", "enter": "菜单进入", "buttons": ["查询", "重置"], "fields": ["客户名称"], "note": "筛选项以页面实标为准，湿测回写"},
+    {"id": "qry_filter", "page": "条件查询", "enter": "填 stamp→查询", "note": "成功判据=列表命中 stamp"},
+    {"id": "qry_hit", "page": "列表命中", "enter": "核对行含 stamp", "note": "不强制打开详情/360"}
+  ],
+  "field_deps": [],
+  "state_actions": [],
+  "rules": [
+    {"keyword": "functionId", "rule": "挂 9000000039；禁止 7 / 9000000283"},
+    {"keyword": "成功判据", "rule": "列表查询可见 KB测客户-20260905-1315 即成功"},
+    {"keyword": "OCR", "rule": "OCR识别与影像入口一律禁入"},
+    {"keyword": "召回区分", "rule": "勿因 cstMgt 公共前缀误召 customer_onboarding；优先 RES28003/ZJJK00104552"}
+  ],
+  "exceptions": [
+    {"when": "stamp 客户不可见", "do": "报告阻塞；经 Lead 可改查 #515 stamp 或现场挑一行"},
+    {"when": "AI 过早 phase_done", "do": "CDP 补查询；以列表 stamp 为准"}
+  ],
+  "source": "2026-09-05 档位 B 设计；湿测后回填 traj"
+}
