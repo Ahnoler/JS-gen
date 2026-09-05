@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 02:25 · ZCode Lead — 常驻窗口声明：余量 23 模块湿测连续执行（用户指令：不待指令一直做，遇阻塞再商量）
+- 开工：02:25。A→B→C 流水线滚动推进剩余 23 个模块（loan-corp → loan-retail → disburse → repay → postloan×3 → collection → product-mgmt → archive → smart-ctrl → portal → asset-preserve×2 → digital×2 → limit×2 → meeting-mgmt）；流水线重叠：B(N) 浏览器 + A(N+1)/C(N-1) 文本并行
+- 已顺手清账：rating chapters 三章清单行契约化回补（03/04/05），checker 7/7 模块 ALL GREEN（rating 机械口径更正 35/4/7，以表格为准）
+- 范围（滚动）：各模块 wet-test.md/chapters、双台账、本文件；禁入不变（flows/promote/staging/源 docx/他线 WIP/写操作黑名单）
+- 方式：子代理不 commit 不写日志；Lead 每模块验收（checker→mtime→抽查→blocked 证据）后代提交；每模块一条阶段回报；声明钟点先 date 校时
+
 ## 2026-09-06 02:30 · ZCode Lead — 阶段回报：credit-interbank 逐叶湿测收口 28/28（流水线第六循环，授信域收官）
 - 完成：A 预备 28 叶+6 章清单行回补 → B 湿测 **match 2 / drift 5 / blocked 21 / not-found 0**（6 截图）→ C 回填 5 处 + 台账更新。提交 `a8158ee`/`9b2e0b0`/`2d24773`
 - Lead 验收线：checker 零 FAIL（5 WARN→回填后 ALL GREEN）；抽叶1（match 新增主页按钮/条件/11 列/自动查询）+叶22（drift 抽屉标题「同业变更向导页」——标题在 el-drawer__header 非标准 title class，首次查询选择器太窄导致空读，复核以宽选择器证实）均吻合 ✓
