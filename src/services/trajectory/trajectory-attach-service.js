@@ -161,7 +161,7 @@ async function attachBibBestEffort(tid, sessionId, runtime) {
       attached = await remoteSessionService.attachLive({
         sessionId,
         trajectoryId: tid,
-        quality: 65,
+        // quality unset → remote-bridge falls back to env BIB_STREAM_QUALITY
         viewportW: 1600,
         viewportH: 900,
       });

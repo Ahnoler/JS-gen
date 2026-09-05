@@ -5,14 +5,14 @@
  * - Pack frames into RSCF (Remote ScreenCast Frame)
  * - Send raw binary packets to control-plane WS
  *
- * CDP screencast requires Page.screencastFrameAck before the next frame.
- * Waiting for a dashboard round-trip ack freezes the stream when any frame/
- * ack is dropped under agent load (input still works — Input.* is independent).
- * So we ack Chrome immediately on receive, then optionally forward to clients.
+ * CDP screencast flow-control: while maxFramesInFlight (3) is full without an ack,
+ * Chrome skips capture AND encode. We therefore pace acks to the forward cadence
+ * (createAckPacer) so the producer-side rate is pinned to TARGET_FPS regardless of
+ * display refresh — skipped frames cost zero CPU — then optionally forward to clients.
  */
 import { CdpClient } from '../src/cdp/client.js';
 import { discoverCdpWithRetry } from '../src/cdp/discover.js';
-import { resolveScreencastTiming } from '../src/cdp/screencast-timing.js';
+import { resolveScreencastStreamConfig, createAckPacer } from '../src/cdp/screencast-timing.js';
 import { resolveElementByLabel } from '../src/cdp/resolve-by-label.js';
 import {
   CLIPBOARD_GET_SELECTION_EXPRESSION,
@@ -21,9 +21,6 @@ import {
 
 const MAGIC = Buffer.from('RSCF');
 const DEFAULT_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
-/** Screencast encode cap (optional upscale ceiling; default stream is 1600×900). */
-const STREAM_MAX_W = 1920;
-const STREAM_MAX_H = 1080;
 /** If no CDP frame for this long while attached, restart screencast. */
 const STALL_RESTART_MS = 2500;
 
@@ -63,12 +60,13 @@ export class BibBridge {
     this.client = null;
     this.screencastOn = false;
     this.viewport = { ...DEFAULT_VIEWPORT };
-    this.quality = 65;
+    this.quality = null;
     this._disposed = false;
     this._lastForwardAt = 0;
     this._lastFrameAt = 0;
     this._minForwardMs = 90;
     this._everyNthFrame = 2;
+    this._ackPacer = null;
     this._stallTimer = null;
     this._restarting = false;
     /** @type {string|null} */
@@ -101,7 +99,8 @@ export class BibBridge {
     /** Optional: attach to this CDP target instead of default pick. */
     targetId = null,
   } = {}) {
-    this.quality = Math.min(90, Math.max(50, Number(quality) || 65));
+    // null → stream quality falls back to env config (BIB_STREAM_QUALITY) in startScreencast
+    this.quality = quality == null ? null : Math.min(90, Math.max(50, Number(quality)));
     this.viewport = {
       w: Number.isFinite(Number(viewportW)) && Number(viewportW) > 0 ? Math.round(viewportW) : DEFAULT_VIEWPORT.w,
       h: Number.isFinite(Number(viewportH)) && Number(viewportH) > 0 ? Math.round(viewportH) : DEFAULT_VIEWPORT.h,
@@ -226,18 +225,23 @@ async switchToTarget(targetId) {
    */
   async startScreencast() {
     if (!this.client || this._disposed) return;
-    const timing = resolveScreencastTiming();
-    this._minForwardMs = timing.minForwardMs;
-    this._everyNthFrame = timing.everyNthFrame;
-    // Encode at current viewport; never upscale beyond STREAM_MAX_* (do not floor to 1080p).
-    const maxW = Math.min(Math.max(320, Number(this.viewport.w) || DEFAULT_VIEWPORT.w), STREAM_MAX_W);
-    const maxH = Math.min(Math.max(240, Number(this.viewport.h) || DEFAULT_VIEWPORT.h), STREAM_MAX_H);
+    const stream = resolveScreencastStreamConfig();
+    this._minForwardMs = stream.minForwardMs;
+    this._everyNthFrame = stream.everyNthFrame;
+    // Encode at current viewport; never upscale beyond env caps (do not floor to 1080p).
+    const maxW = Math.min(Math.max(320, Number(this.viewport.w) || DEFAULT_VIEWPORT.w), stream.maxW);
+    const maxH = Math.min(Math.max(240, Number(this.viewport.h) || DEFAULT_VIEWPORT.h), stream.maxH);
     await this.client.send('Page.startScreencast', {
       format: 'jpeg',
-      quality: this.quality,
+      quality: this.quality ?? stream.quality,
       maxWidth: maxW,
       maxHeight: maxH,
       everyNthFrame: this._everyNthFrame,
+    });
+    this._ackPacer?.cancel();
+    this._ackPacer = createAckPacer({
+      minForwardMs: stream.minForwardMs,
+      ack: (id) => { this._ackChrome(id); },
     });
     this.screencastOn = true;
     this._lastFrameAt = Date.now();
@@ -251,6 +255,8 @@ async switchToTarget(targetId) {
   async stopScreencast() {
     if (!this.client) return;
     this._clearStallWatch();
+    this._ackPacer?.cancel();
+    this._ackPacer = null;
     try { await this.client.send('Page.stopScreencast'); } catch {}
     this.screencastOn = false;
   }
@@ -469,7 +475,8 @@ async ack({ frameId, sessionId } = {}) {
   _onScreencastFrame(params = {}) {
     if (!this.screencastOn || !this.remoteSessionUuid) return;
     const cdpSessionId = params.sessionId;
-    this._ackChrome(cdpSessionId);
+    // Pace acks to the forward cadence — Chrome skips capture/encode while in-flight is full.
+    this._ackPacer?.schedule(Number(cdpSessionId));
     this._lastFrameAt = Date.now();
 
     const dataB64 = params.data;

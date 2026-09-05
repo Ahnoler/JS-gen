@@ -435,7 +435,8 @@ export async function attachLive(opts = {}) {
   sendToExecutor(nodeUuid, 'session.attach_bib', {
     sessionId,
     remoteSessionUuid: remoteSession.sessionUuid,
-    quality: opts.quality ?? 65,
+    // Omit when unset → executor falls back to env BIB_STREAM_QUALITY (bib-bridge)
+    ...(opts.quality != null ? { quality: opts.quality } : {}),
     resize: opts.resize === true,
     viewportW: binding.viewportW,
     viewportH: binding.viewportH,

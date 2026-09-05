@@ -16,7 +16,7 @@ import {
   bridge, SESSION_VIEWPORT, getRemoteStatus, broadcastStatus,
 } from './state.js';
 import {
-  startScreencast, onScreencastFrame, clearStallWatch, applyViewportOverride,
+  startScreencast, stopScreencast, onScreencastFrame, clearStallWatch, applyViewportOverride,
   ensureFullSessionViewport,
 } from './screencast.js';
 import { ensureWsHook, resolveBibTarget } from './ws-router.js';
@@ -99,7 +99,8 @@ export async function attachLive(opts = {}) {
   await refreshCdpEndpoints();
   if (!gb.cdpWsUrl) throw new Error('CDP WebSocket URL unavailable (is Session Chrome on 9242/9222?)');
 
-  bridge.quality = Math.min(95, Math.max(40, Number(opts.quality) || 65));
+  // null → startScreencast falls back to env BIB_STREAM_QUALITY
+  bridge.quality = opts.quality == null ? null : Math.min(95, Math.max(40, Number(opts.quality)));
   const wantResize = opts.resize === true;
 
   bridge.client = new CdpClient();
@@ -179,7 +180,7 @@ export async function detachLive({ crashed = false } = {}) {
   clearStallWatch();
   bridge.screencastOn = false;
   if (bridge.client) {
-    try { await bridge.client.send('Page.stopScreencast'); } catch {}
+    await stopScreencast();
     try { await bridge.client.close(); } catch {}
     bridge.client = null;
   }
@@ -193,6 +194,7 @@ export async function detachLive({ crashed = false } = {}) {
   const closedId = bridge.remoteSession?.id ?? null;
   bridge.remoteSession = null;
   bridge.subscribers.clear();
+  bridge.lastPacket = null;
   bridge.lastInspectLabel = '';
   broadcastStatus();
   return { closedId, status: getRemoteStatus() };
