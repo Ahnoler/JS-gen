@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 15:15 · Zcode Lead — 收工回报：链B用信支线全链贯通（回链 10:38）
+- 完成：**链B补债收官**——授信批复 DGSXPF20260905020004 项下发起对公用信申请 **YXPC20260905012041**（贯通验证企业190416 / 政采贷（流动资金贷款）/ 10 万 / 12 月），wf_usecredit_001 全链 001(701994)→002(WN0001)→003(701994)→004(WN0001 同意) 通过，**用信批复 DGYXPF202609050016010 自动生成已生效**。链B至此=客户→评级→授信→授信批复→用信→用信批复 全链与链A等深。
+- 完成：新实证 4 项已沉淀 KB 卡 credit_usage（+4 规则，13→17）：①方案品种产品必须命中授信分项品种（validLmtSubExist，额度四字段自动回填=正向信号）②信用担保死路→保证+引入保证人（弹窗行内先填关系+金额）③tssc-multi-select 的 $emit 不落 model 须直写 form.model（涉农真键 agrirelLoanInd）④DIGT_IDY_CL 列超长 SUT 缺陷（'0' 绕行）+ i18n 崩溃吞 toast 用 formComp.validate() 诊断。
+- 验收：报告 tmp/e2e/p3b_report.md + 截图 4 张（意见步/审批中/002弹窗/批复生效）；plan §8 已补。A7 影像上传继续搁置。
+- 注意：本仓另有他线在途改动（trajectory-meta-service.js、docs 删除）未触碰、未混入提交。
+- 遗留移交：链B可继续向 合同→放款→贷后 深化（配方在合同/贷款 KB 卡）；SUT 缺陷清单又+3（DIGT_IDY_CL 列长/introduceGnrDialog 静默 false/抵押品牌种 i18n 崩溃），待统一提交厂商。
+
 ## 2026-09-05 14:12 · Zcode Lead — 收工回报：画面推流优化两批落地（回链 13:33 / 8ea6719）
 - 完成：第一批 ack 定速产帧（createAckPacer 按转发节奏定速 ack，Chrome in-flight 满时跳过抓取+编码，产帧率钉 ~30fps）+ BIB_STREAM_QUALITY/MAX_W/MAX_H env 化，commit **`20903cd`**；第二批 观众计数下推（0 观众 stopScreencast、首位观众自动恢复、bib_ready 回显、末帧缓存秒开、binarySubscriptions WeakMap→Map+close 清理修泄漏），commit **`97da3ef`**；调研报告 bd6ecd0
 - 范围延伸（超出开工声明，向本线备案）：为让 env 质量配置生效改了 `src/services/remote-session-service.js`（quality 按需下发一行）+ `src/services/trajectory/trajectory-attach-{runner,service}.js`（去硬编码 quality:65 两处）——这三文件开工时自禁入，实际无他线冲突
