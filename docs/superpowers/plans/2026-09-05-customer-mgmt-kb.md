@@ -35,8 +35,8 @@
 
 **Deliverable:** `tmp/customer-mgmt/function-anchors.md`
 
-- [ ] `GET /api/v2/processes/4/functions`：确认对公客户管理 **id=7**、xpath、pageId；记下 intermediate 旧名勿挂。
-- [ ] 可选：`GET .../trajectories?functionId=7` 摘要条数/代表交易名（只读）。
+- [x] `GET /api/v2/processes/4/functions`：确认对公客户管理 **id=7**、xpath、pageId；记下 intermediate 旧名勿挂。
+- [x] 可选：`GET .../trajectories?functionId=7` 摘要条数/代表交易名（只读）。
 
 **Verify:** 文件写明 `functionId=7` 与 `RES000000101` / `ZJJK00066153`。
 
@@ -48,10 +48,10 @@
 
 **Deliverable:** 更新后的 `data/kb/flows/customer_onboarding.json`
 
-- [ ] `menu_path` → `客户管理→对公客户管理（functionId=7；…）`。
-- [ ] 加强 `hash_markers`（含 `cstMgt` 及湿测可得 page/hash 段；避免过短误召）。
-- [ ] preconditions/rules：挂 **7**；OCR 禁入；成功=列表 stamp。
-- [ ] `find_flow_for_task(..., page_hash=...)` 抽查命中本卡。
+- [x] `menu_path` → `客户管理→对公客户管理（functionId=7；…）`。
+- [x] 加强 `hash_markers`（含 `cstMgt` 及湿测可得 page/hash 段；避免过短误召）。
+- [x] preconditions/rules：挂 **7**；OCR 禁入；成功=列表 stamp。
+- [x] `find_flow_for_task(..., page_hash=...)` 抽查命中本卡。
 
 **Verify:** Python 召回命中「对公客户建档」；JSON 可 parse。
 
@@ -63,9 +63,9 @@
 
 **Deliverable:** `tmp/customer-mgmt/task-requirement.md` + 交易 id
 
-- [ ] 定稿编号步骤 + stamp（客户名称 / 证件号策略：测试环境可用假号且不与现网冲突）。
-- [ ] `POST /analyze`（functionId=7）→ 审 phases。
-- [ ] `POST /trajectories`：name 含 stamp、requirement、phases、systemAccountId=2、functionId=7。
+- [x] 定稿编号步骤 + stamp（客户名称 / 证件号策略：测试环境可用假号且不与现网冲突）。
+- [x] `POST /analyze`（functionId=7）→ 审 phases。
+- [x] `POST /trajectories`：name 含 stamp、requirement、phases、systemAccountId=2、functionId=7。
 
 **Verify:** 交易 draft；phaseCount≥1；task 非空。
 
@@ -77,9 +77,9 @@
 
 **Deliverable:** recorded（或明确失败根因）+ `through-report.md`
 
-- [ ] prepare → start（空闲槽；不抢用信）。
-- [ ] 监控阶段；必要时 CDP 核对列表 stamp。
-- [ ] detach；写 through-report（traj id、fid=7、stamp、阶段表）。
+- [x] prepare → start（空闲槽；不抢用信）。
+- [x] 监控阶段；必要时 CDP 核对列表 stamp。
+- [x] detach；写 through-report（traj id、fid=7、stamp、阶段表）。
 
 **Verify:** 列表可见 stamp **或** 报告写明阻塞与下一步。
 
@@ -89,8 +89,8 @@
 
 **Depends:** Task 4
 
-- [ ] `customer_onboarding.json` source 挂湿测 traj。
-- [ ] agent-log 收工；todo 挂「⑦ 客户管理 KB」。
+- [x] `customer_onboarding.json` source 挂湿测 traj。
+- [x] agent-log 收工；todo 挂「⑦ 客户管理 KB」。（收工草稿在 `tmp/customer-mgmt/agent-log-close-draft.md`；**待 Lead commit**）
 - [ ] commit（用户要求时）。
 
 **Verify:** source 含 traj id；收工回链开工。
