@@ -25,19 +25,16 @@
 - API/DAO：`intermediateFlag`  
 - 存量：`0230`/`0231` 等 → `intermediate_flag=1`；若仅因中间层误标 `removed`，可清 `removed_flag`（保留 umlEcd）
 
-## 4. 导入规则（层 1）
+## 4. 导入规则（层 1）— 2026-09-05 回退修订
 
 非顶层叶子子领域（`umlType=2` 且无子 umlType=2）：
 
-- **一律** `intermediateFlag=1`（含仅 1 个 managePage，如「产品要素管理」）  
-  - 保留子领域 `umlEcd`；**不写**导航用 `pd_cmpt_ecd` / `menu_xpath`  
-  - 其下活动的 managePage **全部**写入该节点 `system_page`（目录/对齐素材）  
-  - **不**按活动新建可见导航功能  
-- 可点二级菜单权威来源 = **菜单扫描**  
+- **去重 managePage ≥ 2** → `intermediateFlag=1`，全量 `system_page`，清空导航 pageId/xpath  
+- **= 1 且 umlEcd ∈ `INTERMEDIATE_LEAF_UML_ECDS`**（当前含 `UML00092663` 产品要素管理）→ 同上  
+- **其余 = 1** → **可导航功能**（首个 pageId + umlEcd）；xpath 靠扫描  
+- **禁止**「一律 intermediate」（dry-run：122/232 名与 SUT 可点叶撞名）
 
-顶层模块逻辑不变。
-
-> 修订（2026-09-05）：原「≥2 才 intermediate / =1 可导航」已废止——单页叶子在 SUT 上仍可能是不可点分组标题。
+可点二级菜单补全靠 **扫描 + E2E 覆盖 diff**（见 `plans/2026-09-05-menu-intermediate-e2e.md`）；**不能**仅凭导入规则事先保证全库真菜单。
 
 ## 5. 二级菜单从哪来（层 2 修订）
 
