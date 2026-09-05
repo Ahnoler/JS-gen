@@ -17,26 +17,6 @@ const NODE_TYPE_MODULE = 2;
 const NODE_TYPE_FUNCTION = 3;
 
 /**
- * 单 managePage 但仍是 SUT 不可点分组标题的叶子子领域 umlEcd 白名单。
- * （≥2 个不同 managePage 已自动 intermediate；白名单补「产品要素管理」这类。）
- * 实测发现新分组标题时只增此集合，禁止再改回「一律 intermediate」。
- */
-export const INTERMEDIATE_LEAF_UML_ECDS = new Set([
-  'UML00092663', // 产品管理→产品要素管理（SUT 分组；可点叶为「产品要素库」）
-]);
-
-/**
- * 判定非顶层叶子子领域是否中间菜单。
- * @param {string} umlEcd 子领域建模码
- * @param {number} distinctPageCount 去重后 managePage 数
- * @returns {boolean} true=intermediate
- */
-export function isIntermediateLeafSubdomain(umlEcd, distinctPageCount) {
-  if (Number(distinctPageCount) >= 2) return true;
-  return INTERMEDIATE_LEAF_UML_ECDS.has(String(umlEcd || '').trim());
-}
-
-/**
  * 解析《建模组件关系》JSON，归一化顶层 umlRelInfo 数组。纯函数，不碰 DB。
  * @param {Buffer|string} buffer JSON 文件内容（Buffer 或字符串）
  * @returns {{ roots: object[] }} 顶层数组 roots
@@ -147,16 +127,15 @@ function flattenSubdomains(nodes, ancestorModule, modules) {
       }
       // 无子领域（顶层即叶子）：functions 为空，pages 已挂模块自身，无需再递归
     } else if (isLeafSubdomain(node)) {
-      // 非顶层叶子：≥2 不同 managePage → intermediate；单页仅白名单（如产品要素管理）
-      // 其余单页仍为可导航功能（umlEcd + 首个 pageId），靠扫描补 xpath。
+      // 非顶层叶子子领域 → 一律 intermediate（建模目录，不可导航）。
+      // 可点二级菜单只认扫描；扫描后按同名/pageId 从 intermediate 回填 umlEcd（无白名单）。
       const allPages = collectPages(node, { all: true });
-      const intermediate = isIntermediateLeafSubdomain(umlEcd, allPages.length);
       ancestorModule.functions.push({
         umlEcd,
         name,
         seqNo,
-        pages: intermediate ? allPages : allPages.slice(0, 1),
-        intermediate,
+        pages: allPages,
+        intermediate: true,
       });
     } else {
       // 中间层非叶子：不建节点；自身直属活动页面并入最近已建祖先（模块）

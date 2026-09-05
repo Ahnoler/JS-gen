@@ -306,6 +306,8 @@ function testWiringService() {
   assert.match(service, /insertRows/, 'service references menuChangeLogDao.insertRows');
   assert.match(service, /unmatched_marked/, 'service records unmatched_marked change event');
   assert.match(service, /assignAiUmlEcdFromId/, 'AI creates assign umlEcd from node id');
+  assert.match(service, /adoptModelingUmlEcdUnderSystem|pickUmlEcdFromIntermediates/,
+    'scan adopts modeling umlEcd from intermediate');
 }
 
 function testWiringSessionPageIdFill() {

@@ -4,9 +4,11 @@
  */
 import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
+import * as systemPageDao from '../dao/system-page-dao.js';
 import * as systemMenuSnapshotDao from '../dao/system-menu-snapshot-dao.js';
 import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import { NODE_TYPE } from '../models/hierarchy-constants.js';
+import { pickUmlEcdFromIntermediates } from './menu-scan-uml-adopt.js';
 
 /**
  * AI 新建节点：用自身 DB id 写入 umlEcd。
@@ -24,6 +26,55 @@ async function assignAiUmlEcdFromId(created, trx) {
   const umlEcd = String(id);
   await systemDao.update(id, { umlEcd }, trx);
   return umlEcd;
+}
+
+/**
+ * 同系统下：可导航叶从 intermediate 回填建模 umlEcd（同名或 pageId）。
+ * @param {number} systemNodeId 系统节点
+ * @param {object} trx knex trx
+ * @returns {Promise<number>} 回填条数
+ */
+async function adoptModelingUmlEcdUnderSystem(systemNodeId, trx) {
+  const modules = await systemDao.listByParent(systemNodeId, trx);
+  let adopted = 0;
+  for (const mod of modules) {
+    if (Number(mod.type) !== NODE_TYPE.MODULE) continue;
+    const kids = await systemDao.listByParent(mod.id, trx);
+    const interNodes = kids.filter((k) => Number(k.intermediateFlag) === 1);
+    if (!interNodes.length) continue;
+    const pages = await systemPageDao.listByNodeIds(
+      interNodes.map((i) => Number(i.id)),
+      trx,
+    );
+    const pageIdsByNode = new Map();
+    for (const p of pages) {
+      const nid = Number(p.systemNodeId);
+      if (!pageIdsByNode.has(nid)) pageIdsByNode.set(nid, []);
+      const pid = String(p.pageId || '').trim();
+      if (pid) pageIdsByNode.get(nid).push(pid);
+    }
+    const intermediates = interNodes.map((i) => ({
+      name: String(i.name || ''),
+      umlEcd: String(i.umlEcd || ''),
+      pageIds: pageIdsByNode.get(Number(i.id)) || [],
+    }));
+    for (const nav of kids) {
+      if (Number(nav.intermediateFlag) === 1) continue;
+      if (Number(nav.type) !== NODE_TYPE.FUNCTION) continue;
+      const uml = pickUmlEcdFromIntermediates(
+        {
+          name: nav.name,
+          pageId: nav.pdCmptEcd,
+          umlEcd: nav.umlEcd,
+        },
+        intermediates,
+      );
+      if (!uml) continue;
+      await systemDao.update(Number(nav.id), { umlEcd: uml }, trx);
+      adopted += 1;
+    }
+  }
+  return adopted;
 }
 
 /**
@@ -181,6 +232,7 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
       if (!node) continue;
       if (String(node.menuXpath || '').trim()) continue; // 已有 xpath（被其他路径匹配）
       if (Number(node.removedFlag) === 1) continue; // 已下线节点不再重复置未匹配标（已下线优先）
+      if (Number(node.intermediateFlag) === 1) continue; // 中间菜单不参与未匹配幽灵
       const pageIds = ghostPageIdsById.get(Number(g.nodeId));
       await systemDao.update(g.nodeId, { unmatchedFlag: 1, sortOrder: ghostSort }, trx);
       ghostSort += 1;
@@ -191,6 +243,9 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
         detail: { name: g.name, pageIds: pageIds ? [...pageIds] : [] },
       });
     }
+
+    // 可导航叶从 intermediate 回填建模 umlEcd（无白名单）
+    await adoptModelingUmlEcdUnderSystem(systemNodeId, trx);
 
     // ── 扫描变更事件批量落库（source='scan'，版本用最新快照版本）──
     if (scanChangeRows.length) {
