@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 10:38 · Zcode Lead — 开工声明：链B用信支线（授信批复项下对公用信申请全链）
+- 开工：10:38。用户指示「继续补债，A7 影像上传搁置」——补 P3 遗留债：链B授信批复 DGSXPF20260905020004 项下发起对公用信申请（贯通验证企业190416）并走完 wf_usecredit_001 审批链至批复生效
+- 范围：`tmp/e2e/`（脚本+截图+报告）、`docs/superpowers/agent-log.md`、`docs/superpowers/research/2026-09-05-engine-closure-phase2-plan.md`（§8 补记）、必要时 `data/kb/flows/credit_usage.json`；SUT test.creditv5p2 实机操作（701994/WN0001/135292 账号切换）
+- 禁入：`config/.env*`（他线 WIP）、`data/kb/flows/product_library.json`、菜单/产品线文件、无关 png；不动存量盛达单据
+- 方式：主会话 Playwright MCP 有头浏览器配方实操（r13/batch 报告配方），run 途中只读 CDP 实时监控；子智能体不派发
+
 ## 2026-09-05 10:31 · Cursor Lead — 澄清：要素库无 pageId 预期；systemId=1 需补扫；推送下周一
 - 完成：产品要素库无 pageId 记为预期；推送改下周一；todo/plan 遗留已改
 - 注意：正式 `1` **尚未正确**——误 import 后「对公客户管理」等仅剩 intermediate、无同名可导航叶；产品管理五叶尚可。需对 `1` 全量 scan 才齐
