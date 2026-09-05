@@ -2,6 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode Lead — 收工回报：8 月集中开发安全排查完成（回链本会话开工条目）
+- 完成：报告 `docs/superpowers/security-review-2026-09-05.md`（**`45c1533`**）——四路只读 Explore 并行（API 面/executor-CDP-WS/Python/仓库卫生）+ 主线程抽验四项 P0 全部属实；**本轮只报告未修码**
+- 核心结论：**P0×6**（/ws 无鉴权+0.0.0.0 可看屏可操控 SUT；/api/browser/* 裸奔可透传任意 cdp_action；tree 接口未鉴权回显明文密码；两枚真实 JWT+SSO 验签密钥入库；.env.example 工作区改动回真实值；MinIO/token 轮换仍挂账）+ **P1×6 + P2×10+**；基线 8-31 修复全部在位未回退；SQL/命令注入/JS 注入/反序列化等面确认无问题
+- 遗留移交：修复分三批待用户拍板（见报告「修复路线建议」）；**特别注意 config/.env.example 的工作区未提交改动含真实 SSO_JWT_SECRET，属他线 WIP——任何会话提交该文件前必须还原占位符**
+
 ## 2026-09-05 · Zcode Lead — 开工声明：8 月集中开发安全/漏洞整体排查（只读审查）
 - 开工：本会话。用户要求对 8 月集中开发的潜在漏洞做整体排查，带 agent team
 - 范围：只读审查——A 路 `src/routes/**`+`src/services/**` API 面；B 路 `executor/**`+`src/cdp/**` WS/CDP 通道；C 路 `scripts/**` Python 面+migrations；D 路仓库卫生（secrets/gitignore/tmp/config）；产出 `docs/superpowers/security-review-2026-09-05.md`；基线=docs/superpowers/code-review-2026-08-31.md（已修 P0×7+P1×5+Python×3，不重报已修项）
