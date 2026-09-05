@@ -37,7 +37,7 @@ data/kb/req/<moduleKey>/
 ## 步骤
 
 1. **登记作业区** — `POST /api/v2/kb/req-modules`（或按契约手建目录）。Body：`moduleKey`、`moduleName`、`sourcePath`、可选 `note`。API 不可用时手建目录并注明。
-2. **读源** — officecli 读 `sourcePath`；剥 `RQM_META` 噪声；不改源文件。
+2. **读源** — officecli 读 `sourcePath`；剥 `RQM_META` 噪声；不改源文件。**officecli 全文截断/读失败时按预案降级**（实证：6 批切片 5 批走此路径）：用 browser_use env python（`D:/anaconda3/envs/browser_use/python.exe`）+ python-docx 提取标题/段落/表格、解码 `RQM_MERMAID` base64；临时文件放 `tmp/` 用后清理。
 3. **视图1：章节保真** — 填 `chapters/`：按文档目录拆章；含标题路径、ZJJK（若有）、要点摘要；文档口径与 SUT 差异单列「待湿测」。**强制契约**：
    - 每章末尾必须有**机器可解析的 ZJJK 清单行**，格式 `ZJJK编号（页面名）`、顿号分隔——湿测阶段据此机械提取叶节点清单；
    - 已知 **FS 场景号 / 路由名**（`fcnScnEcd` / `avyEcd`）必须随章记录——湿测与引擎导航的最硬定位证据；

@@ -2,6 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 22:50 · ZCode Lead — 收工：SKILL 步骤2 补 python-docx 降级预案（回链 22:20 开工的补遗）
+- 完成：用户核对想法清单发现 4 号（python-docx 降级一等公民）只落在 USAGE §6（Lead 视角）；已在 SKILL.md 步骤2「读源」补同款降级预案（worker 契约可见）。想法 2（FS 场景号）/3（文档口径标注）核实已完整落地（SKILL.md L43/L44）
+- 验收：grep 双文件凭证齐全；pin 不涉及
+- 提交：本条 commit
+
 ## 2026-09-05 22:35 · ZCode Lead — 收工：req-doc-to-kb SKILL/USAGE 湿测协议化（回链 22:20 开工）
 - 完成：SKILL.md（视图3 wet-test.md 入目录树；ZJJK 清单行/FS 场景号/文档口径标注三强制契约；新增「湿测」节=判定词表+写操作黑名单+drift 分类学与回流+串行与会话窗口规则；drafts 湿测门槛；检查清单+2）；USAGE.md（§1.3 湿测阶段；Phase E 逐模块逐叶编排；Lead 湿测开场指令模板；§6 python-docx 降级详化+blocked 行）
 - 验收：characterize-kb-req-modules OK 11（pin 未动、无脚本 pin skill 文件）；manifest/status 枚举未改（湿测进度以 wet-test.md 为准，规避 pin 风险）
