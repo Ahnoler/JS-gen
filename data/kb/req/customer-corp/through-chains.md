@@ -1,5 +1,7 @@
 # 主链清单（through-chains）— customer-corp 客户管理-对公客户
 
+> 时效声明：本文为需求文档口径提炼，叶级真值以同目录 wet-test.md 湿测判定为准；链级修订由 Lead 在模块收口时统一处理。（2026-09-06 协议 v4）
+
 > 源：`A02天阳信贷管理系统-客户管理需求分册【对公客户管理】.docx`（0824）
 > 风格参考：`tmp/product-mgmt/req-mainchain.md`
 > 说明：本文件为需求侧候选主链，**不**直接 promote 为 KB JSON；RQM_META 噪声已剥除。

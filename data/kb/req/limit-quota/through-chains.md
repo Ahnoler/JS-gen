@@ -1,5 +1,7 @@
 # through-chains · limit-quota（额度-限额）
 
+> 时效声明：本文为需求文档口径提炼，叶级真值以同目录 wet-test.md 湿测判定为准；链级修订由 Lead 在模块收口时统一处理。（2026-09-06 协议 v4）
+
 > 视图2：候选可贯通主链清单。来源：D02 需求分册【限额管理】。
 > 风格参考：tmp/product-mgmt/req-mainchain.md。
 

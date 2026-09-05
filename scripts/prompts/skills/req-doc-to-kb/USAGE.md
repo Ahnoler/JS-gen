@@ -172,11 +172,12 @@
 
 **Lead 验收线（每模块 B 收口必做，不过关打回重测）**：
 
+0. **机械闸门**：`node scripts/kb/wet-test-check.mjs <moduleKey>` 无 FAIL（叶集 diff/判定统计/blocked-drift 证据校验/drift 回填覆盖）；
 1. 截图存在且 mtime 落在该代理执行窗口内；
 2. 抽 2-3 叶开页面复核判定（match 与 drift 各至少一叶优先）；
 3. blocked 必须有异常原文（console/后端）或补测条件；not-found 必须有导航尝试记录。
 
-模块收口：Lead 验收后代 commit（wet-test.md + chapters 回填，子代理不 commit）；agent-log 阶段回报；**blocked 汇入补测台账**，待引擎线跑流程造出数据后回收补测。
+模块收口：Lead 验收后代 commit（wet-test.md + chapters 回填，子代理不 commit）；agent-log 阶段回报；**blocked 汇入 `data/kb/req/_blocked-backlog.md`**，待引擎线跑流程造出数据后回收补测；**跨模块观察汇入 `data/kb/req/_cross-module-observations.md`**（错误族/行为对照/SUT 多出页面/公共组件状态），引擎线接手时按路径取。
 
 **元演化机制（第 2 轮修订新增）**：B 组回报的「协议疏漏观察」由 Lead 记入观察池，**攒 3 个模块统一做一轮 SKILL 修订**——先例：首轮 7 条疏漏全部来自 rating+customer-corp 两模块实战，契约是被湿测长出来的，不是预先设计的。
 
@@ -214,6 +215,30 @@ sourcePath: <ABS_PATH_TO_DOCX>
 目标：manifest.status = sliced；写 chapters/ 与 through-chains.md；不要写 drafts/。
 
 完成后只回报：Status / 章数 / 主链条数 / 文件列表 / 任何失败原因。
+```
+
+### B 湿测代理提示词模板（Phase E，蒸馏卡——派发时逐项保留硬约束）
+
+```text
+你是湿测执行代理，负责 <KEY> 模块逐叶真机湿测。你拥有 Playwright MCP 浏览器（snapshot→click）。
+只许操作浏览器、截图、编辑 data/kb/req/<KEY>/wet-test.md；禁止 git、禁止写 agent-log、
+禁止碰其他模块文件、禁止写 data/kb/flows。
+
+必读：SKILL.md「湿测（视图3）」节；data/kb/req/<KEY>/wet-test.md（判定表，逐行回填）；
+chapters/ 各章（文档口径）。
+
+SUT：http://test.creditv5p2.tansun.com.cn/。会话约 50 分钟过期；若跳 #/login：
+用户名 701994、密码 1，验证码/手机验证码留空，点【登 录】；中途过期就重登继续。
+
+铁律：
+- 写操作黑名单：确定/提交/保存/暂存/删除/作废/撤销/同意等落库动作一律不点；
+  向导/弹窗/抽屉核对结构即止，截图后关闭。
+- 只读入口优先【查看/查看详情】；无可达记录判 blocked+补测条件。
+- 每行判定含日期；blocked 留异常原文（console/后端）；drift 必标类别。
+- 截图 tmp/kb-wet-test/<KEY>/<编号>-<ZJJK>-<slug>.png。
+- **链组增量写回**：每完成一组立即写回 wet-test.md，禁止攒最后。
+- 回报纯文本、不带任何截图图片；必含：统计 / drift 清单 / blocked 清单 /
+  跨模块观察（错误族归集·行为对照·SUT 多出页面）/ 协议疏漏观察 1-5 条。
 ```
 
 ### Lead 湿测开场指令模板（Phase E，给自己/接手会话）
@@ -259,6 +284,9 @@ curl -s http://localhost:4097/api/v2/kb/req-modules
 
 # 服务层 pin（不依赖业务切片）
 node scripts/characterization/characterize-kb-req-modules.mjs
+
+# 湿测产物机械验收（防假完成闸门，模块收口前必跑）
+node scripts/kb/wet-test-check.mjs <moduleKey> [moduleKey2 ...]
 
 # 本批不得改动正式卡
 git status --short data/kb/flows

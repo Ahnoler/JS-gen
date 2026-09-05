@@ -1,12 +1,15 @@
 ---
 name: req-doc-to-kb
 description: >-
-  模块级需求分册导入 KB 作业区：登记 data/kb/req/<moduleKey>、
-  officecli 切片 chapters + through-chains、可选 drafts。
+  模块级需求分册导入 KB 作业区：登记 data/kb/req/<moduleKey>、officecli 切片
+  chapters + through-chains；逐叶真机湿测（wet-test.md 判定表，match/drift/blocked/
+  not-found）；drift 分类回填 chapters；blocked 补测台账；可选 drafts（门槛=match 叶）。
   禁止写 data/kb/flows、禁止 promote。
 ---
 
 # 需求文档 → KB 作业区
+
+> **生命周期一览**：切片（`sliced`）→ 逐叶湿测（`wet-test.md` 判定表）→ drift 回填 chapters → 可选 drafts（门槛=match 叶，sourceRefs 引湿测叶号）。promote 另线。
 
 > **批量 / Agent Team：** 见同目录 [`USAGE.md`](./USAGE.md)（语料优先级、`moduleKey` 表、Lead 派工与并行规则）。单模块仍按本文步骤执行。
 
@@ -43,7 +46,7 @@ data/kb/req/<moduleKey>/
    - 已知 **FS 场景号 / 路由名**（`fcnScnEcd` / `avyEcd`）必须随章记录——湿测与引擎导航的最硬定位证据；
    - 按钮/字段文案写明是**文档口径**（SUT 实际文案可能漂移，如文档「提交流程」vs SUT「流程提交」），不要把文档措辞当成 SUT 事实。
    - 文档以「同××」复用而无独立 ZJJK 的页面（如「五类合作方同评估机构」），章内须列明**各复用页名称清单**（无编号），供湿测逐页核查存在性。
-4. **视图2：主链清单** — 写 `through-chains.md`：候选主链（闭环目标、步骤、前置、章节出处）；旁路/Out 单列；可建议挂载叶子/functionId。
+4. **视图2：主链清单** — 写 `through-chains.md`：候选主链（闭环目标、步骤、前置、章节出处）；旁路/Out 单列；可建议挂载叶子/functionId。**文件头必须带时效声明**（第 3 轮协议）：`> 时效声明：本文为需求文档口径提炼，叶级真值以同目录 wet-test.md 湿测判定为准；链级修订由 Lead 在模块收口时统一处理。`
 5. **可选草稿** — 仅当用户明示「出草稿卡」时写 `drafts/*.json`（`draftFrom: "req"`、`moduleKey`、`sourceRefs`；schema 同正式 flows）。**湿测门槛（2026-09-05 用户拍板）**：草稿卡只允许引用 `wet-test.md` 判定为 `match` 的叶节点；`drift` 叶须先回填 chapters（以 SUT 实测为准）再出卡；`blocked`/`not-found` 叶禁止出卡。**可回溯要求（第 2 轮修订）**：`sourceRefs` 必须引用 `wet-test.md` 叶号——卡上每一步可回溯到湿测证据行。
 6. **收工** — 更新 `manifest.status` → `sliced` 或 `drafted`；列章节数、主链条数、草稿数、建议下一湿测主链；收工汇报。
 
@@ -80,10 +83,15 @@ data/kb/req/<moduleKey>/
 
 | 判定 | 含义 | 要求 |
 |------|------|------|
+| `pending` | 尚未测到（建表初始态） | 不允许跨模块收口残留——收口时必须为 0（checker 强制） |
 | `match` | 与文档一致 | 写关键实证（字段/按钮/列名清单或与文档差异为空） |
 | `drift` | 有差异 | 写明差异类别与明细（见下「drift 分类学」） |
-| `blocked` | 数据/权限条件不足 | **写补测条件**（如「待有在途审批流程」）；拦截类必须留异常原文——后端 BizException 抄全文，前端拦截（console 自定义错误如「调用diabf结果为false」）抄 console 原文，二者视同同级证据 |
+| `blocked` | 数据/权限条件不足，或**写操作黑名单禁止**（提交类叶只读不可达——补测条件=用户明示的单独提交通道/业务端代提交后经已办核验） | **写补测条件**（如「待有在途审批流程」）；拦截类必须留异常原文——后端 BizException 抄全文，前端拦截（console 自定义错误如「调用diabf结果为false」）抄 console 原文，二者视同同级证据 |
 | `not-found` | 菜单/页面在 SUT 不存在 | 写导航尝试路径 |
+
+> **复合叶规则**（2026-09-06 customer-common 叶105 发现）：一个叶号覆盖多个页面/状态（如主页 match 但查看页白屏）时，**按最严重状态判**（match < drift < blocked/not-found），其余状态写进证据列；信息量过大时拆叶。
+
+> **跨视图复用组件口径**（2026-09-06 Lead 拍板）：多视图复用同一 ZJJK（如客户360 头部组件）**一处一行**验证组件本身；某视图表现不同时差异写进该视图分组证据，不另加行。
 
 ### 写操作黑名单（共享测试系统安全约束）
 
@@ -101,16 +109,24 @@ data/kb/req/<moduleKey>/
 
 回填 chapters 时**以 SUT 实测为准**，保留原需求口径并标注两源（不得用需求原文覆盖湿测铁证）。
 
-### 执行规则
+### 执行规则（硬协议）
 
 - **串行**：共享浏览器，模块间也不并行；一次一个模块、一个 SUT 登录窗口（SUT 会话约 50 分钟过期——正好一模块一窗口的节奏）。
 - **链组增量写回**（2026-09-05 customer-corp 实证）：每完成一个主链组**立即**把该组判定行写回 wet-test.md，禁止攒到最后一次性写——子代理回传通道可能故障，增量写回把重派成本从全量重跑降为只补回填。
-- 操作纪律：Playwright MCP `snapshot → click`；Element UI 真点（自带 mousedown）；固定列表格遮挡时优先点行内单元格/固定列内元素。
-- **Element UI 实测坑**（rating 首跑沉淀）：顶栏菜单展开的 mask 会拦截页面按钮点击——先按 Esc 或点空白处收起菜单再操作；el-table 固定列的单选钮在视口外时点不到，改点固定列内可见单选或行内单元格。
-- 弹窗/抽屉**无标题**时，结构证据允许以「heading 为空 + 按钮集/字段集清单」作判定基准（如同业选择抽屉）。
-- **审批侧叶优先走已办**：审批任务页不一定需要新流程——`任务事项→已办任务` 里的历史审批可只读进入审批侧页面（rating 叶17/18 即由此判 match）。
+- 操作纪律：Playwright MCP `snapshot → click` 真点（Element UI 自带 mousedown）；固定列表格遮挡时优先点行内单元格/固定列内元素。
 - 证据：截图存 `tmp/kb-wet-test/<moduleKey>/`（tmp 短寿命，**文字证据为准**，截图路径仅作辅助索引）。
 - 流程推进类规则（wf 分流、多节点审批路由）**无法只读验证属常态**：判 blocked + 补测条件即可，不视为任务失败（customer-corp wf_cust_005/006 先例）。
+- **机械验收**：模块收口前跑 `node scripts/kb/wet-test-check.mjs <moduleKey>`，FAIL 必须清零（人工抽查仍保留）。
+
+### 实测坑清单（situational，随模块滚动补充）
+
+| 坑 | 处置 |
+|----|------|
+| Element UI 顶栏菜单 mask 拦截按钮点击（rating 首跑） | 先按 Esc 或点空白收起菜单再操作 |
+| el-table 固定列单选钮在视口外点不到（rating） | 点固定列内可见单选或行内单元格 |
+| 弹窗/抽屉无标题（rating 同业选择抽屉） | 以「heading 为空 + 按钮集/字段集清单」作结构证据 |
+| 主页返回后行选择丢失，再点操作提示「请选择有效数据」（customer-common） | 返回后重选行再操作；该提示本身可作黑名单行为证据 |
+| 审批任务页无需新流程（rating 叶17/18） | `任务事项→已办任务` 的历史审批可只读进入审批侧页面 |
 
 ## 禁区
 
@@ -129,3 +145,12 @@ data/kb/req/<moduleKey>/
 - [ ] （湿测已开展时）wet-test.md 判定表齐全：无 pending；drift 已分类；blocked 含补测条件与异常原文；写操作零落库
 - [ ] 未触碰正式 flows
 - [ ] 未调用 promote / 未写 staging
+
+---
+
+## 协议版本史
+
+- **v1**（2026-09-05 `9681934`）：切片契约初版（登记/切片/状态机/禁区/检查清单）。
+- **v2**（2026-09-05 `9d02790`+`76642ae`）：湿测协议（视图3 wet-test.md/判定词表/写操作黑名单/drift 分类学/串行）+ 首轮 7 条实战疏漏（存量回补/behavior 无数据可验/blocked 认 console 原文/菜单 mask/fixed 列 radio/无标题弹窗/审批侧走已办）。
+- **v3**（2026-09-05 `1484335`）：第 2 轮修订（跨模块观察段/链组增量写回/drafts sourceRefs 叶号/behavior 逐模块对照/复用页名称清单/流程推进 blocked 常态化/Phase E 团队流水线+元演化/回传丢失产物考古）。
+- **v4**（2026-09-06 本轮）：第 3 轮修订（checker 机械验收 `scripts/kb/wet-test-check.mjs`/B 湿测代理模板/双台账定家/pending 词表行/blocked「黑名单禁止」子类/复合叶规则/跨视图复用口径/through-chains 时效声明/坑清单分层）。

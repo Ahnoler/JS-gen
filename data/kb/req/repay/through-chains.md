@@ -1,5 +1,7 @@
 # repay · 可贯通主链清单（through-chains）
 
+> 时效声明：本文为需求文档口径提炼，叶级真值以同目录 wet-test.md 湿测判定为准；链级修订由 Lead 在模块收口时统一处理。（2026-09-06 协议 v4）
+
 > 源：`H02天阳信贷管理系统-放还款管理需求分册 【还款管理】.docx`（0824 版）
 > 日期：2026-09-05　风格参考：`tmp/product-mgmt/req-mainchain.md`
 > 说明：标题中 `RQM_META*` 噪声已剥除；本文件为切片视图，**不**直接 promote 为 KB JSON。
