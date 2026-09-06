@@ -2,6 +2,16 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 18:21 · Cursor Lead — 收工：UI 录制贯通 Agent 提示词手册落库（回链本条开工）
+- 完成：`docs/superpowers/guides/ui-record-through-line-agent-prompt.md` — UI↔API 心智模型 + 可复制提示词模板 + API 速查 + 实证坑位（#515/#524/#526）+ 证据/收工清单
+- 用途：交给其他 Agent 按「添加交易录制→任务→analyze→prepare/start」标准走；非法代代表人引入深录续作
+
+## 2026-09-06 18:21 · Cursor Lead — 开工声明：UI 录制贯通 Agent 提示词手册落库
+- 开工：18:21。用户确认将贯通流程提示词落库供他 Agent 阅读
+- 范围：`docs/superpowers/guides/ui-record-through-line-agent-prompt.md`、本文件
+- 禁入：代码/KB 卡改写、他线 WIP（大量 png / unify-save / trajectory-meta）、`config/.env*`
+- 方式：主会话直接落文档并 commit
+
 ## 2026-09-06 03:10 · ZCode Lead — 阶段回报：loan-corp + loan-retail 双模块收口（流水线第七/八循环，用信域过半）
 - 完成（常驻窗口首两循环，流水线重叠运行：B(N)+A(N+1) 并行）：**loan-corp 48/48（28 match/7 drift/10 blocked/3 not-found）** + **loan-retail 84/84（43 match/7 drift/34 blocked）**；提交 `e0009f3`/`cafae84`
 - Lead 验收：checker 双模块 0 FAIL（checker 修复 2 处：斜杠组行全编号计数/pending 行豁免日期）；抽 loan-retail 叶1（按钮行+自动加载 18 行）+loan-corp 叶1（38 条自动加载+按钮组）页面复核吻合 ✓
