@@ -187,6 +187,16 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
 
         # ---- Cross-field: cert type -> cert number / customer name ----
         # Only fill gaps — never overwrite user business_data presets (commandValue).
+        # P6: businessEntries 在 store 以平铺键（label→value）存在；重扫的字段 dict 不携带
+        # 上一轮 commandValue，缺此检查会第二轮用默认规则值覆盖用户 stamp。
+        def _biz_preset(label_text):
+            try:
+                v = self.business_data_store.get(label_text)
+                s = str(v or '').strip()
+                return s if s else ''
+            except Exception:
+                return ''
+
         if idx == KIND_ORDER['input']:
             _has_cert_num = any(
                 '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or '')
@@ -201,7 +211,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                 for d in sub:
                     lbl = d.get('label', '') or ''
                     if '证件号码' in lbl or '证件号' in lbl:
-                        if d.get('commandValue') and str(d.get('commandValue')).strip():
+                        if (d.get('commandValue') and str(d.get('commandValue')).strip()) or _biz_preset(lbl):
                             sys.stderr.write(
                                 f'[cert-detect] keep business_data cert_number={d["commandValue"]!r}\n'
                             )
@@ -226,7 +236,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                     for d_name in sub:
                         nlbl = d_name.get('label', '') or ''
                         if '客户名称' in nlbl or '客户姓名' in nlbl:
-                            if d_name.get('commandValue') and str(d_name.get('commandValue')).strip():
+                            if (d_name.get('commandValue') and str(d_name.get('commandValue')).strip()) or _biz_preset(nlbl):
                                 sys.stderr.write(
                                     f'[cert-detect] keep business_data name={d_name["commandValue"]!r}\n'
                                 )

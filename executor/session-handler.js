@@ -134,6 +134,9 @@ export function createSessionHandler(manager) {
 export function relayAgentEvent(send, msg) {
   const event = msg.event;
   if (!event) return;
+  if (event === 'action_log_sync' || event === 'get_action_log_result') {
+    console.log(`[probe-exec] relay ${event} entries=${Array.isArray(msg.data?.entries) ? msg.data.entries.length : '-'}`);
+  }
   // Flat agent events (e.g. cdp_action_result) put fields on the root;
   // nested ones use data{}. Merge both so nothing is dropped.
   const { event: _e, session_id: sid, data, ...rest } = msg;

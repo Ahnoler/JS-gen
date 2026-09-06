@@ -532,8 +532,16 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         if (persisted) {
           runtime._lastPersistByActionId.set(id, persisted);
           session?._lastPersistByActionId?.set(id, persisted);
-          if (Number.isFinite(phaseIdHint)) {
-            runtime.phaseStepCounts.set(phaseIdHint, (runtime.phaseStepCounts.get(phaseIdHint) || 0) + 1);
+          // P6-0/T0.1 计数：persist 返回的 trajectoryPhaseId 是 DB 解析后的真归属，
+          // activePhaseId 仅作兜底（sync 处理时序可能晚于阶段切换，不可靠）。
+          // save_form_snapshot 是 meta 步（产品 stepCount 口径排除），门闩不计数。
+          if (String(entry.action || '') !== 'save_form_snapshot') {
+            const countPhaseId = Number.isFinite(persisted.trajectoryPhaseId)
+              ? persisted.trajectoryPhaseId
+              : phaseIdHint;
+            if (Number.isFinite(countPhaseId)) {
+              runtime.phaseStepCounts.set(countPhaseId, (runtime.phaseStepCounts.get(countPhaseId) || 0) + 1);
+            }
           }
           if (persisted.dbId != null) {
             await flushPendingStepScreenshot(runtime, id, persisted.dbId, tid);
@@ -566,6 +574,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // which focuses on manual/cdp (+ optional agent autoPersist). Both must handle
   // step_screenshot or AI-recording shots would be dropped.
   const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, (type, payload) => {
+    if (type === 'phase_done' || type === 'action_log_sync') {
+      console.log(`[probe] session=${runtime.sessionId} event=${type} entries=${Array.isArray(payload?.entries) ? payload.entries.length : '-'}`);
+    }
     if (type === 'action_log_sync' || type === 'step_screenshot' || type === 'page_level_screenshot') {
       try { phaseActivity?.(); } catch {}
     }
@@ -819,10 +830,41 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       await recordPhaseResult(phase, donePayload);
     }
 
-    // 假成功硬门闩（P6-0/T0.1）：全部阶段 0 落库步 → 不得 recorded，走 failure 路径
-    // （T4 实证 record/start 假成功模式：phase 秒级 done、stepCount=0 仍 recorded）。
+    // 假成功硬门闩（P6-0/T0.1）：以 DB 真值为准判定，0 落库步 → failure 路径。
+    // （T4 实证 record/start 假成功模式：phase 秒级 done、stepCount=0 仍 recorded）
+    // sync 经 executor 缓冲可能迟到/丢弃（588 实证：detach flush 才落 8 步）→
+    // 循环完成后无条件向 Python 强制 resync 全量快照（get_action_log →
+    // action_log_sync 重发，persist 幂等），排空后以 DB 计数判定。
+    let memoryStepCount = 0;
+    for (const n of runtime.phaseStepCounts.values()) memoryStepCount += n;
+    try {
+      execSession.forwardStdin({
+        nodeUuid: runtime.executorNodeUuid,
+        sessionId: runtime.sessionId,
+        event: 'get_action_log',
+        data: {},
+      });
+    } catch (err) {
+      console.warn('[record] fake-success gate resync send failed:', err?.message || err);
+    }
+    try {
+      await Promise.resolve(runtime._persistDrain).catch(() => {});
+      // 实测 sync 端到端延迟可达分钟级（592/593：resync 回包跨过 3s 窗口），给足 10s
+      await new Promise((r) => setTimeout(r, 10000));
+      await Promise.resolve(runtime._persistDrain).catch(() => {});
+    } catch {}
     let totalPersistedSteps = 0;
-    for (const n of runtime.phaseStepCounts.values()) totalPersistedSteps += n;
+    try {
+      const { refreshTrajectoryCounts } = await import('./trajectory-step-service.js');
+      const dbCounts = await refreshTrajectoryCounts(tid);
+      totalPersistedSteps = Number(dbCounts?.steps || 0);
+    } catch (err) {
+      console.warn('[record] fake-success gate db recount failed:', err?.message || err);
+      totalPersistedSteps = memoryStepCount;
+    }
+    console.log(
+      `[record] fake-success gate: memory=${memoryStepCount} db=${totalPersistedSteps} across ${phases.length} phases`,
+    );
     if (totalPersistedSteps === 0) {
       throw new Error(
         `Fake-success gate: 0 persisted steps across ${phases.length} phases — recording marked failure`,
