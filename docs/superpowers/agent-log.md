@@ -1,3 +1,14 @@
+# Agent 协作日志
+
+> **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
+
+## 2026-09-06 22:30 · ZCode Lead — 开工声明：SKILL 第 6 轮修订（T4 贯通素材成文）
+- 开工：22:30（date 校准）。接续点=T3+/SKILL 第 6 轮修订（用户「继续」触发；T1-2批/T2 需等引擎线，不动）
+- 范围：`scripts/prompts/skills/req-doc-to-kb/SKILL.md`（v6→v7）、同目录 `USAGE.md`（Phase G）、本文件；收工时顺带把仓库根目录 T4 证据残留（根目录截图 / cdp-*.json / detach-*.json）归档至 tmp/
+- 禁入：他线 WIP 6 文件（scripts/agent/service.py、scripts/session_runner.py、src/services/trajectory/ 下 4 文件）、`docs/superpowers/plans/2026-09-05-unify-save-action.md`、`config/.env*`、`data/kb/flows/**` 卡内容不改
+- 方式：主线程直接编辑（纯文档，无切片/湿测/浏览器动作）；完成即 commit
+- 注意：本次开工顺带把 19:20/21:20 两条本线 T4 条目从文件绝对顶（标题上方）归位至协议块之下（内容未动，仅位置）
+
 ## 2026-09-06 21:20 · ZCode Lead — 收官：T4 贯通验证全部完成（53 张 pass 卡 100% 覆盖，109b4c8e）
 - 完成：T4 滚动 7 波（wave A~F 双路并行）——**53 张 gate=pass 卡全部经产品管线贯通验证**：analyze→create→prepare→record/start→CDP 补证→detach，54 条轨迹全部 recorded，业务 stamp/结构/报文全 hit（DONE_WITH_CONCERNS 统一口径）
 - 覆盖：授信/用信/客户/放还款/贷后/催收/产品/档案/智控/门户/资产保全/数字化/额度/接口分册/会议（digital-mobile 为 NOT-FOUND 环境卡，排除）；limit-ctrl-api 经 trdlog 六交易码复证（lmtRgst 243/doOcp 186/doOcpRevoke 8/doReverse 16/doOcpCheck 196）
@@ -5,13 +16,11 @@
 - KB 回写：全部 pass 卡 source 已附贯通验证标注（含 2 处卡面数据修正 1163→353/602→266）
 - 提交：622cd941（wave-E）→109b4c8e（wave-F）→本条收官
 - 遗留：T1-2批（partial 121 卡待 T2）；T2 blocked 回收随引擎线；产品 record/start 假成功修复建议上报
+
 ## 2026-09-06 19:20 · ZCode Lead — 开工声明：T4 滚动批验（其余 pass 卡按域分波，连续执行）
 - 开工：19:20。首卡（traj 527 集群客户）DONE_WITH_CONCERNS 后滚动：剩余 pass 卡按域分波，每波 ≤2 并行 record 会话（slot 隔离，不抢同 Chrome）；影像场景按用户指示跳过（写进任务禁入）
 - 范围：各模块 drafts（只读）、tmp/kb-through/<module>/、flows source 回写、本文件；禁入不变
 - 方式：执行 worker 按 guides/ui-record-through-line-agent-prompt.md 模板派发（手册由 Cursor Lead 落库）；Lead 验收=stepCount>0+stamp 报告+KB source 回写
-# Agent 协作日志
-
-> **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
 ## 2026-09-06 19:00 · ZCode Lead — 收工：T4 首卡贯通验证 DONE_WITH_CONCERNS（traj 527）
 - 完成：按 Cursor Lead 手册全流程走通——集群客户管理（functionId 9000000018，intermediateFlag=0 已核）→ 任务文案（customer-group-cluster 草稿卡 13 步链+硬性门闩）→ analyze 拆 3 phases → create traj 527 → prepare（登录 done/CDP ready）→ record/start → detach；**业务门闩满足**：stamp「KB贯通集群-0906-1」落列表（编号 26090618284824138），KB source 已回写（c7fe4a30）
