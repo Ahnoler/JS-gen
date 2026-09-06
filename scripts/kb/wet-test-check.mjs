@@ -73,7 +73,7 @@ function extractChapterLeaves(filePath) {
       for (const g of noCodes) {
         const name = g.slice(2, -1);
         // 排除契约文档自身的格式说明字面量
-        if (name !== '页面名' && name !== '无编号') leaves.push('NOZJJK:' + name.split('·')[0].split(/[（(]/)[0].trim());
+        if (name !== '页面名' && name !== '无编号') leaves.push('NOZJJK:' + name.split('·')[0].split('，')[0].split(/[（(]/)[0].trim());
       }
     }
   }
@@ -166,7 +166,7 @@ function checkModule(key) {
     if (noCodeMode) {
       for (const g of r.line.match(/—（[^）]*）/g) ?? []) {
         const name = g.slice(2, -1);
-        if (name !== '页面名') actual.add('NOZJJK:' + name.split('·')[0].split(/[（(]/)[0].trim());
+        if (name !== '页面名') actual.add('NOZJJK:' + name.split('·')[0].split('，')[0].split(/[（(]/)[0].trim());
       }
     }
     if (r.zjjk === null && codes.length === 0 && r.verdict !== 'pending' && !(r.line.match(/—（[^）]*）/))) {
