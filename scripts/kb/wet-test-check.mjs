@@ -159,6 +159,9 @@ function checkModule(key) {
       for (const im of line.match(/(?:^|[\s|`])((?:\d{1,3}\.){2}\d{1,3})（[^）]*）/g) ?? []) {
         actual.add('IFACE:' + im.trim().match(/(?:\d{1,3}\.){2}\d{1,3}/)[0]);
       }
+      // 判定表形态：接口号独立格（第二列），无括号
+      const cell = line.match(/^\s*\|\s*\d+\s*\|\s*((?:\d{1,3}\.){2}\d{1,3})\s*\|/);
+      if (cell) actual.add('IFACE:' + cell[1]);
     }
     if (noCodeMode) {
       for (const g of r.line.match(/—（[^）]*）/g) ?? []) {
