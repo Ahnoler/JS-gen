@@ -1,0 +1,47 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "postloan-risk-class",
+  "flow": "风险分类-批量认定",
+  "aliases": ["批量认定", "批量合同选择", "批量任务页"],
+  "hash_markers": ["rskClBtchAfmTskPage", "ZJJK00105335", "ZJJK00105571", "FS00004717", "wf_classify_001"],
+  "keywords": ["批量认定", "批量认定编号", "是否损失", "有权审批人", "批量编号"],
+  "menu_path": "贷后管理/风险分类/批量认定",
+  "preconditions": [
+    "所选单笔任务满足：分类类型空、初分=上次结果、待发起且生效、未超时、无批量编号；首次分类合同会被自动移除",
+    "【SUT 实测 2026-09-06】批量认定主页列表自动加载（rskClBtchAfmTskPage 即时 POST）",
+    "【SUT 实测 2026-09-06】批量合同选择弹窗打开时不自动加载，需点查询"
+  ],
+  "steps": [
+    {
+      "name": "批量认定列表主页",
+      "leafRef": "wet-test.md 叶18 (ZJJK00105335)",
+      "verify": "match",
+      "menu_path": "贷后管理/风险分类/批量认定",
+      "query_fields": ["批量编号", "流程发起日期区间", "流程状态（无【更多】折叠）"],
+      "buttons": ["新增", "认定", "查看", "删除"],
+      "columns": ["批量认定编号", "经办人", "经办机构", "流程状态"],
+      "rules": ["进入页面列表自动加载（0 条）"]
+    },
+    {
+      "name": "批量合同选择弹窗向导页",
+      "leafRef": "wet-test.md 叶19 (ZJJK00105571)",
+      "verify": "match",
+      "enter": "批量主页【新增】弹出「批量合同选择弹窗」",
+      "query_fields": ["是否损失(默认否,带*)", "有权审批人(默认网点负责人,带*)"],
+      "columns": ["分类认定编号", "合同编号", "客户编号", "客户名称", "产品名称", "合同余额", "担保方式", "上次认定等级", "系统初分结果", "经办人", "经办机构"],
+      "buttons": ["重置", "查询", "确定"],
+      "rules": ["打开时列表不自动加载，需点查询", "【确定】启动批量任务并自动移除首次分类合同（湿测未点，黑名单）"]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "批量任务页及填报（FS00004717）",
+      "leafRefs": ["wet-test.md 叶20 (ZJJK00105347)", "wet-test.md 叶21 (ZJJK00105341)", "wet-test.md 叶22 (ZJJK00105345)"],
+      "verify": "blocked",
+      "reason": "批量列表与批量合同弹窗均 0 条；【确定】属写操作黑名单不可点，任务页不可达",
+      "retry_condition": "待该账号名下存在满足批量来源条件的单笔任务（分类类型空+初分=上次结果+待发起）"
+    }
+  ],
+  "sourceRefs": [18, 19, 20, 21, 22],
+  "coverage": {"total": 5, "match": 2, "drift": 0, "blocked": 3, "notFound": 0, "gate": "partial"}
+}

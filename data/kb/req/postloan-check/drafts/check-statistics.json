@@ -1,0 +1,26 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "postloan-check",
+  "flow": "贷后检查统计",
+  "aliases": ["贷后检查统计", "客户经理维度", "机构维度"],
+  "hash_markers": ["ZJJK00110609"],
+  "keywords": ["贷后检查统计", "客户经理维度", "机构维度", "超期", "未提交", "审核中"],
+  "menu_path": "贷后管理/贷后检查/贷后检查统计",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】页内 menubar 两维度均自动加载"
+  ],
+  "steps": [
+    {
+      "name": "贷后检查统计主页（两维度）",
+      "leafRef": "wet-test.md 叶60 (ZJJK00110609)",
+      "verify": "match",
+      "menu_path": "贷后管理/贷后检查/贷后检查统计",
+      "left_nav": ["客户经理维度（默认，自动加载 6 条）", "机构维度（自动加载 2 条，去客户经理两列）"],
+      "query_fields": ["经办机构", "客户经理"],
+      "columns": ["机构名称", "客户经理名称", "客户经理编号", "贷后检查任务数", "未完成", "未提交", "审核中", "已完成", "超期"]
+    }
+  ],
+  "pendingSteps": [],
+  "sourceRefs": [60],
+  "coverage": {"total": 1, "match": 1, "drift": 0, "blocked": 0, "notFound": 0, "gate": "full"}
+}
