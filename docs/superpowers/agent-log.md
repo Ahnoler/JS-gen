@@ -1,3 +1,10 @@
+## 2026-09-06 21:20 · ZCode Lead — 收官：T4 贯通验证全部完成（53 张 pass 卡 100% 覆盖，109b4c8e）
+- 完成：T4 滚动 7 波（wave A~F 双路并行）——**53 张 gate=pass 卡全部经产品管线贯通验证**：analyze→create→prepare→record/start→CDP 补证→detach，54 条轨迹全部 recorded，业务 stamp/结构/报文全 hit（DONE_WITH_CONCERNS 统一口径）
+- 覆盖：授信/用信/客户/放还款/贷后/催收/产品/档案/智控/门户/资产保全/数字化/额度/接口分册/会议（digital-mobile 为 NOT-FOUND 环境卡，排除）；limit-ctrl-api 经 trdlog 六交易码复证（lmtRgst 243/doOcp 186/doOcpRevoke 8/doReverse 16/doOcpCheck 196）
+- **产品级发现汇总**：①record/start 假成功模式全波复现（phase 秒级 done、steps 落库时点不一致 0~9 步/detach flush/部分永不落库）——建议 stepCount 硬校验；②analyze 字段实为 description 非 requirement；③menu flyout 编程点击/隐藏 .menu-item [data-url] 直跳等引擎 cue 已入各报告
+- KB 回写：全部 pass 卡 source 已附贯通验证标注（含 2 处卡面数据修正 1163→353/602→266）
+- 提交：622cd941（wave-E）→109b4c8e（wave-F）→本条收官
+- 遗留：T1-2批（partial 121 卡待 T2）；T2 blocked 回收随引擎线；产品 record/start 假成功修复建议上报
 ## 2026-09-06 19:20 · ZCode Lead — 开工声明：T4 滚动批验（其余 pass 卡按域分波，连续执行）
 - 开工：19:20。首卡（traj 527 集群客户）DONE_WITH_CONCERNS 后滚动：剩余 pass 卡按域分波，每波 ≤2 并行 record 会话（slot 隔离，不抢同 Chrome）；影像场景按用户指示跳过（写进任务禁入）
 - 范围：各模块 drafts（只读）、tmp/kb-through/<module>/、flows source 回写、本文件；禁入不变
