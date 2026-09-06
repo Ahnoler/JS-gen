@@ -1,0 +1,136 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "credit-corp",
+  "flow": "对公授信批复查看",
+  "aliases": [
+    "授信批复查看",
+    "批复查看任务页",
+    "批复要素核对",
+    "对公授信批复信息大页面"
+  ],
+  "hash_markers": [
+    "corpCrgReplyPrimPg",
+    "ZJJK16071624",
+    "FS00056643PACP",
+    "ZJJK00180172"
+  ],
+  "keywords": [
+    "对公授信批复",
+    "批复查看",
+    "批复编号",
+    "批复基本信息",
+    "分项批复",
+    "用信批复",
+    "批复状态",
+    "终审意见"
+  ],
+  "menu_path": "授信管理/对公授信管理/对公授信批复（SUT 实测菜单 对公授信管理→对公授信批复，corpCrgReplyPrimPg）",
+  "preconditions": [
+    "存在已生成的授信批复（授信审批链末节点同意后自动生成并生效，无需人工发起；引擎实证批复编号前缀 DGSXPF）",
+    "查看为只读操作（pageReadOnly=readOnly），不受写操作黑名单限制，适合引擎录制回访"
+  ],
+  "steps": [
+    {
+      "name": "对公授信批复主页查询",
+      "leafRef": "wet-test.md 叶38 (ZJJK16071624)",
+      "verify": "match",
+      "menu_path": "授信管理/对公授信管理/对公授信批复",
+      "query_fields": ["授信申请流水号", "客户名称", "客户编号"],
+      "buttons": ["查看", "作废", "重新发起", "下载批复文件", "下载审查报告", "下载调查报告", "下载风险评价报告"],
+      "columns": ["批复编号", "额度", "生效日", "业务发起模式", "批复状态", "数据来源"],
+      "rules": ["点【查询】返回批复列表（湿测实证 11 条）；单选目标批复行后操作钮可用，未选行点操作提示「请选择有效数据」（湿测铁证）"]
+    },
+    {
+      "name": "打开批复查看任务页",
+      "leafRef": "wet-test.md 叶39 (ZJJK00180171)",
+      "verify": "match",
+      "enter": "主页单选批复行点【查看】→ 场景 FS00056643PACP，pageReadOnly=readOnly",
+      "note": "单 tab「批复信息」+【返回】；引擎实证链B自动生成批复（批复编号 DGSXPF20260905020004，贯通验证企业/100万/12月/已生效）经此入口成功打开",
+      "rules": ["查看入口即只读任务页，无保存/提交按钮，引擎可安全录制"]
+    },
+    {
+      "name": "授信批复信息大页面（纵向只读布局）",
+      "leafRef": "wet-test.md 叶40 (ZJJK00180172)",
+      "verify": "match",
+      "note": "纵向只读布局；左侧子导航=查看客户授信基本信息/查看授信批复基本信息/查看分项批复信息（湿测铁证④）；DOM 含 分项批复/用信批复/作废 区块，按数据渲染",
+      "rules": ["区块有无随批复数据动态渲染，引擎断言不应硬编码区块数量"]
+    },
+    {
+      "name": "核对客户授信基本信息",
+      "leafRef": "wet-test.md 叶41 (ZJJK16078567)",
+      "verify": "match",
+      "fields": ["客户名称", "客户编号", "证件类型", "证件号码", "对公客户类型", "所属行业", "企业规模", "认定等级标识"]
+    },
+    {
+      "name": "核对批复基本信息（批复要素）",
+      "leafRef": "wet-test.md 叶42 (ZJJK16074430)",
+      "verify": "match",
+      "fields": ["批复编号", "申请编号", "申请日期", "批复生效日期", "期限+单位", "额度", "币种", "占用余额", "关联额度编号", "批复状态", "终审意见", "业务发起模式", "创建人", "机构", "经办人"],
+      "rules": ["引擎实证链B批复关联额度编号=EDBH20260905080001、批复编号=DGSXPF20260905020004（链B授信申请 DGSX20260905056032 项下，自动生成·已生效）——批复编号/额度/生效日/批复状态为查看链最小核对要素集"]
+    },
+    {
+      "name": "分项批复区块",
+      "leafRef": "wet-test.md 叶43 (ZJJK16078771)",
+      "verify": "match",
+      "note": "区块存在（当前批复无分项明细，按数据渲染）；明细列待有分项批复数据补测（见 pendingSteps）"
+    },
+    {
+      "name": "用信批复信息区块（引用用信分册）",
+      "leafRef": "wet-test.md 叶44 (ZJJK00204430)",
+      "verify": "match",
+      "note": "区块存在（本批复无用信批复明细）；详细字段归 loan-corp/loan-retail 作业区验证"
+    },
+    {
+      "name": "用信批复产品信息区块（引用用信分册）",
+      "leafRef": "wet-test.md 叶45 (ZJJK00204431)",
+      "verify": "match",
+      "note": "同叶44（随用信分册验证）"
+    }
+  ],
+  "rules": [
+    {
+      "keyword": "批复自动生成",
+      "rule": "授信审批链末节点同意后自动生成并生效对公授信批复（编号前缀 DGSXPF，引擎实证 DGSXPF20260905020004/贯通验证企业/100万/12月），无需人工发起；链B授信申请=DGSX20260905056032；查看链以此类批复为标准样本",
+      "source": "phase2-plan §7（引擎实证）；wet-test 叶39"
+    },
+    {
+      "keyword": "查看只读",
+      "rule": "批复查看=只读任务页（FS00056643PACP，pageReadOnly=readOnly，单 tab 批复信息+返回），无保存/提交按钮——引擎安全录制路径，不受写操作黑名单限制",
+      "source": "wet-test 叶39-40"
+    },
+    {
+      "keyword": "区块动态渲染",
+      "rule": "批复信息大页面为纵向只读布局，分项批复/用信批复/作废区块按数据动态渲染（当前链B批复无分项/用信明细）——引擎断言按「区块存在则核对」编写，不硬编码区块数量",
+      "source": "wet-test 叶40/43-45"
+    },
+    {
+      "keyword": "批复要素",
+      "rule": "批复基本信息最小核对要素集=批复编号/申请编号/批复生效日期/期限+额度/币种/占用余额/关联额度编号（引擎实证 EDBH20260905080001）/批复状态/终审意见/业务发起模式",
+      "source": "wet-test 叶42"
+    },
+    {
+      "keyword": "作废不在本卡",
+      "rule": "批复作废链（叶46-48 blocked）已归 credit-corp-reply-invalidate.json 草稿卡、重新发起已归 credit-corp-reply-reinitiate.json；本卡仅覆盖查看链，叶38 为主页共用步骤",
+      "source": "data/kb/req/credit-corp/drafts/ 同域卡分工"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "分项批复明细列",
+      "leafRefs": ["wet-test.md 叶43 (ZJJK16078771)"],
+      "verify": "blocked",
+      "reason": "叶判定=match（区块存在），但当前链B批复无分项明细，明细列字段未实证",
+      "retry_condition": "待有含分项批复数据的批复样本（授信申请含额度分项且审批通过）后补测明细列"
+    },
+    {
+      "name": "用信批复/用信批复产品明细字段",
+      "leafRefs": ["wet-test.md 叶44 (ZJJK00204430)", "wet-test.md 叶45 (ZJJK00204431)"],
+      "verify": "blocked",
+      "reason": "区块存在性已验（match），但本批复无用信批复明细；详细字段归用信分册（loan-corp/loan-retail 作业区）",
+      "retry_condition": "待有用信批复明细数据的批复样本，或以 loan-corp/loan-retail 模块卡核验为准"
+    }
+  ],
+  "sourceRefs": [38, 39, 40, 41, 42, 43, 44, 45],
+  "coverage": { "total": 8, "match": 8, "drift": 0, "blocked": 0, "notFound": 0, "gate": "partial" },
+  "source": "2026-09-07 P6 主链补卡；引擎实证批复编号 DGSXPF20260905020004（链B授信批复，自动生成·已生效；关联额度 EDBH20260905080001；链B授信申请 DGSX20260905056032）；叶依据=data/kb/req/credit-corp/wet-test.md 批复链叶38-45（2026-09-05 湿测全 match）；配方参照 docs/superpowers/research/2026-09-05-engine-closure-phase2-plan.md §7"
+}

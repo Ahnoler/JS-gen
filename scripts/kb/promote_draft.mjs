@@ -53,9 +53,10 @@ function clip(text, max) {
 /**
  * 扫描 data/kb/req/ 下各模块 drafts 目录的草稿卡 JSON，按 gate/steps 过滤并分类。
  * @param {string|null} cardFilter 可选单卡过滤（moduleKey/file.json）
+ * @param {string[]} gateWaive Lead 裁决豁免名单（moduleKey/file.json）——gate 不在白名单但 steps>0 的卡强制可晋升
  * @returns {{eligible: Array<{moduleKey: string, file: string, draft: object}>, skipped: Array<{moduleKey: string, file: string, gate: string, reason: string}>}} 合格与被跳过的草稿卡清单
  */
-function loadDrafts(cardFilter = null) {
+function loadDrafts(cardFilter = null, gateWaive = []) {
   const eligible = [];
   const skipped = [];
   if (!existsSync(REQ_ROOT)) return { eligible, skipped };
@@ -75,7 +76,8 @@ function loadDrafts(cardFilter = null) {
       }
       const gate = draft?.coverage?.gate || '(none)';
       const stepCount = Array.isArray(draft?.steps) ? draft.steps.length : 0;
-      if (ELIGIBLE_GATES.has(gate) && stepCount > 0) {
+      const waived = gateWaive.includes(rel) && stepCount > 0;
+      if ((ELIGIBLE_GATES.has(gate) && stepCount > 0) || waived) {
         eligible.push({ moduleKey, file, draft });
       } else {
         const reason = ELIGIBLE_GATES.has(gate)
@@ -411,19 +413,22 @@ async function main() {
     return 2;
   }
 
-  const { eligible, skipped } = loadDrafts(cardFilter);
-  const flowCards = loadFlowCards();
-  // Lead 裁决覆盖：tmp/promote-curation.json { new: ["module/file.json"] } 强制新建
+  // Lead 裁决覆盖：tmp/promote-curation.json { new: ["module/file.json"] } 强制新建；
+  // include: ["module/file.json"] 豁免 gate 白名单（steps 零 blocked 的 partial 主链卡）
   let forceNew = [];
+  let gateWaive = [];
   const curationPath = 'tmp/promote-curation.json';
   if (existsSync(curationPath)) {
     try {
       const curation = JSON.parse(readFileSync(curationPath, 'utf-8'));
       forceNew = Array.isArray(curation.new) ? curation.new : [];
+      gateWaive = Array.isArray(curation.include) ? curation.include : [];
     } catch {
       console.error('warn: tmp/promote-curation.json 解析失败，忽略覆盖');
     }
   }
+  const { eligible, skipped } = loadDrafts(cardFilter, gateWaive);
+  const flowCards = loadFlowCards();
   const results = eligible.map((item) => {
     const conv = convertDraft(item);
     const action = decideAction(item, conv, flowCards, forceNew);
