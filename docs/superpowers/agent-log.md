@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 19:00 · ZCode Lead — 收工：T4 首卡贯通验证 DONE_WITH_CONCERNS（traj 527）
+- 完成：按 Cursor Lead 手册全流程走通——集群客户管理（functionId 9000000018，intermediateFlag=0 已核）→ 任务文案（customer-group-cluster 草稿卡 13 步链+硬性门闩）→ analyze 拆 3 phases → create traj 527 → prepare（登录 done/CDP ready）→ record/start → detach；**业务门闩满足**：stamp「KB贯通集群-0906-1」落列表（编号 26090618284824138），KB source 已回写（c7fe4a30）
+- **产品级发现（重要）**：record/start 存在**假成功模式**——动作已由执行机 agent 执行但步骤不落库（~10 秒全 phase_done、stepCount=0）；按手册 §4 CDP（19242+slot0）补证后 stepCount=5 落库。建议产品对 start 增加落库步骤数硬校验
+- 证据：tmp/kb-through/customer-group/ 27 文件（anchors/task/analyze/create/traj-id/through-report/cdp 截图×3）
+- 遗留：T4 滚动其余 pass 卡（next=同域卡批验）；首卡经验=手册模板可直接复用（本单按模板执行零偏差）
+- 提交：c7fe4a30（KB 回写）
+
 ## 2026-09-06 18:21 · Cursor Lead — 收工：UI 录制贯通 Agent 提示词手册落库（回链本条开工）
 - 完成：`docs/superpowers/guides/ui-record-through-line-agent-prompt.md` — UI↔API 心智模型 + 可复制提示词模板 + API 速查 + 实证坑位（#515/#524/#526）+ 证据/收工清单
 - 用途：交给其他 Agent 按「添加交易录制→任务→analyze→prepare/start」标准走；非法代代表人引入深录续作
