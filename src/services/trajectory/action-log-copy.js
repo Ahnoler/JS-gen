@@ -33,7 +33,7 @@ export function setActionLogCopy(trajectoryDbId, entries) {
 /**
  * Get the copy snapshot, or null when absent (server restart / never recorded / cleared).
  * @param {number} trajectoryDbId trajectory DB id
- * @returns {{ entries: object[], updatedAt: number }|null}
+ * @returns {{ entries: object[], updatedAt: number }|null} copy snapshot or null when absent
  */
 export function getActionLogCopy(trajectoryDbId) {
   const tid = Number(trajectoryDbId);
@@ -52,7 +52,7 @@ export function getActionLogCopy(trajectoryDbId) {
  * from product stepCount) AND engineering/observation actions (never persisted),
  * matching the product stepCount semantics of refreshTrajectoryCounts.
  * @param {number} trajectoryDbId trajectory DB id
- * @returns {number}
+ * @returns {number} business step count in the copy (0 when absent)
  */
 export function countBusinessSteps(trajectoryDbId) {
   const copy = getActionLogCopy(trajectoryDbId);
