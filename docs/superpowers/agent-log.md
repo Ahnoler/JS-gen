@@ -11,6 +11,12 @@
 - blocked 台账：186（+44）；观察池第 4 轮素材累计 15 条
 - 下一循环：disburse（B 组已派）+ repay（A 组并行）
 
+## 2026-09-06 16:55 · ZCode Lead — 开工声明：T1 drafts→promote 立项准备（长任务编排第一棒）
+- 开工：16:55。用户批准遗留任务编排并启动 T1：草稿卡晋升正式卡管线。本棒=立项准备（只读研究 promote.py/_kb.py 机制 + 对比 draft/正式卡 schema 差异 + 产出执行计划文档），不改产品代码
+- 范围：`scripts/kb/promote.py`、`scripts/kb/_kb.py`（只读）、`docs/superpowers/plans/2026-09-06-drafts-promote-plan.md`（新建）、本文件
+- 禁入：data/kb/flows/**（本轮只读参照）、staging、他线 WIP
+- 后续棒：T1-exec 按 plan 执行（staging→人工审→flows），另开声明
+
 ## 2026-09-06 16:40 · ZCode Lead — 收官：草稿卡阶段 174/174 全产出（C 阶段闭环）
 - 完成：**174 张草稿卡**（draftFrom:"req"）覆盖 30 模块全部主链/业务块，gate 合规 100%（steps 仅 match/drift、blocked→pendingSteps、sourceRefs→wet-test 叶号、coverage 对平）；分 7 波推送（53cbb05/9a4294d/5ae5105a/60845874/fd5105f5/1bf3e1bc/451936f2）
 - 形态扩展：digital-mobile 产 NOT-FOUND 特殊卡（cardType="NOT-FOUND"，环境不可达五层探测）；limit-ctrl-api 按接口闭环产卡（trdlog 映射）；portal/meeting-mgmt/collateral 三模块无编号 leafRef=行号+页面名；纯 blocked 链（loan-retail 主链7/8、credit-retail C2/C7）按级联归并 pendingSteps 不产卡
