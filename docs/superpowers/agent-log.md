@@ -11,6 +11,13 @@
 - blocked 台账：186（+44）；观察池第 4 轮素材累计 15 条
 - 下一循环：disburse（B 组已派）+ repay（A 组并行）
 
+## 2026-09-06 16:40 · ZCode Lead — 收官：草稿卡阶段 174/174 全产出（C 阶段闭环）
+- 完成：**174 张草稿卡**（draftFrom:"req"）覆盖 30 模块全部主链/业务块，gate 合规 100%（steps 仅 match/drift、blocked→pendingSteps、sourceRefs→wet-test 叶号、coverage 对平）；分 7 波推送（53cbb05/9a4294d/5ae5105a/60845874/fd5105f5/1bf3e1bc/451936f2）
+- 形态扩展：digital-mobile 产 NOT-FOUND 特殊卡（cardType="NOT-FOUND"，环境不可达五层探测）；limit-ctrl-api 按接口闭环产卡（trdlog 映射）；portal/meeting-mgmt/collateral 三模块无编号 leafRef=行号+页面名；纯 blocked 链（loan-retail 主链7/8、credit-retail C2/C7）按级联归并 pendingSteps 不产卡
+- 验收：全量 JSON.parse 174/174 通过、steps 零 blocked/not-found 引用、coverage 与 wet-test 判定逐模块对平
+- 遗留：①drafts→正式卡晋升（promote）待用户另立项；②blocked 686 叶补测后可升级对应 pendingSteps→steps 重出卡；③SKILL 第 5 轮素材（NOT-FOUND 特殊卡/IFACE 卡形态契约化）
+- 注意：他线 docs/superpowers 三删除仍未提交（隔离不动）
+
 ## 2026-09-06 15:55 · ZCode Lead — 收工：SKILL 第 4 轮修订（回链 15:38 开工）
 - 完成：SKILL v5——①清单行三形态契约化（标准 ZJJK 斜杠组/无编号分册 `—（页面名）`/接口分册接口号叶，表格≠清单行，FS 缺失显式声明）；②**Step 0 入口可达性预检**入湿测节（digital-mobile 教训）；③blocked 证据三子类（黑名单/前端校验/静默拦截）；④执行规则补：两棒接力、同构批验、接口分册间接痕迹判定+trdlog 映射法、无编号模块 Bearer 菜单树定位法、Lead 预验账号、级联 blocked 引用、会话倒计时实为请求续期；⑤坑清单扩至 11 条（已办路径修正/残留 mask JS 强清/树下拉三连真点/图标 tooltip/无确认框删除禁触发/盘库点击即建流程/look 态步进）。USAGE：Phase E 增 Step 0+两棒接力+B 模板蒸馏卡全面升级
 - 验收：checker 7 代表模块回归 0 FAIL；eslint 干净
