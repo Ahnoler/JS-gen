@@ -156,5 +156,5 @@
       "source": "req-promote 2026-09-06"
     }
   ],
-  "source": "req-promote 2026-09-06（湿测叶 13 张，match 13/drift 0）"
+  "source": "req-promote 2026-09-06（湿测叶 13 张，match 13/drift 0）；贯通验证 2026-09-06 traj 527（KB贯通集群-0906-1 stamp 实证，stepCount=5，DONE_WITH_CONCERNS：record/start 假成功经 CDP 补证）"
 }

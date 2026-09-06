@@ -109,3 +109,5 @@
 ### 截图索引（tmp/kb-wet-test/customer-group/）
 
 01 主页 / 02 新增向导 / 03 任务页 / 06 成员弹窗 / 07 查看关系 / 08 图谱 / 10-12 其他信息 / 13 导入弹窗 / 14~25 总集团组 / 26~28 集团主页+向导+放大镜 / 29-31 维护任务页 / 33 集团成员弹窗 / 34 财务 / 35 影像 / 36 持股 / 37-40 其他信息 / 41-45 查看任务页。共 20 张。
+
+- **贯通验证 2026-09-06（traj 527，状态 DONE_WITH_CONCERNS）**：以本卡集群新增链为任务经产品管线（analyze→create→prepare→record/start→CDP 补证→detach）真实执行——stamp「KB贯通集群-0906-1」落列表（编号 26090618284824138），stepCount=5 落库；**产品级发现：record/start 存在假成功模式（动作已执行但步骤不落库，10 秒全 phase_done）**，按贯通手册 §4 CDP 补证后闭环；证据 tmp/kb-through/customer-group/（27 文件）。
