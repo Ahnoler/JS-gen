@@ -1,0 +1,65 @@
+{
+  "flow": "合同实占闭环（额度创建→占用→释放→冲正）",
+  "aliases": [
+    "额度创建",
+    "额度占用",
+    "额度释放",
+    "额度冲正",
+    "lmtRgst",
+    "doOcp",
+    "doOcpRevoke",
+    "doReverse"
+  ],
+  "hash_markers": [
+    "lmtRgst",
+    "doOcp",
+    "doOcpRevoke",
+    "doReverse",
+    "tansun-tcp-ulm",
+    "1.1.1",
+    "1.1.3",
+    "1.1.4",
+    "1.1.5"
+  ],
+  "keywords": [
+    "额度创建",
+    "额度占用",
+    "额度释放",
+    "额度冲正",
+    "交易码",
+    "trdlog",
+    "报文",
+    "业务流水号",
+    "原业务流水号",
+    "释放原因"
+  ],
+  "menu_path": "额度管控/额度查询统计/查询交易信息（trdlog，报文实证通道）",
+  "preconditions": [
+    "接口分册：判定对象=接口在 SUT 的间接业务痕迹（历史报文/额度台账落账）；报文实证通道=「查询交易信息」TCP 交易日志（1031 笔历史报文含请求/响应/错误栈全文）",
+    "【SUT 实测 2026-09-06】交易码映射（9 交易码实证，见各步）：lmtRgst=1.1.1(242/1)、doOcp=1.1.3(178/8)、doOcpRevoke=1.1.4(2/6)、doReverse=1.1.5(11/5)",
+    "【SUT 实测 2026-09-06】wording：释放接口 SUT 交易码名为 doOcpRevoke（「Revoke」实为释放语义），冲正另有其码 doReverse"
+  ],
+  "nodes": [
+    {
+      "id": "额度创建-lmtrgst",
+      "page": "额度创建（lmtRgst）",
+      "enter": "菜单 额度管控/额度查询统计/查询交易信息（trdlog，报文实证通道）"
+    },
+    {
+      "id": "额度占用-doocp",
+      "page": "额度占用（doOcp）",
+      "enter": "菜单 额度管控/额度查询统计/查询交易信息（trdlog，报文实证通道）"
+    },
+    {
+      "id": "额度释放-doocprevoke",
+      "page": "额度释放（doOcpRevoke）",
+      "enter": "菜单 额度管控/额度查询统计/查询交易信息（trdlog，报文实证通道）"
+    },
+    {
+      "id": "额度冲正-doreverse",
+      "page": "额度冲正（doReverse）",
+      "enter": "菜单 额度管控/额度查询统计/查询交易信息（trdlog，报文实证通道）"
+    }
+  ],
+  "source": "req-promote 2026-09-06（湿测叶 4 张，match 4/drift 0）"
+}
