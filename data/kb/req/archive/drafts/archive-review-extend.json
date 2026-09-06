@@ -93,9 +93,9 @@
     },
     {
       "name": "选择调阅申请单抽屉（延期发起）",
-      "leafRef": "wet-test.md 叶23 (ZJJK00136578)",
-      "verify": "drift",
-      "drift": "structure：文档口径「选择调阅档案单向导页」SUT 实为抽屉「选择调阅申请单」（el-drawer，heading 可读）",
+  "leafRef": "wet-test.md 叶23 (ZJJK00136578)",
+  "verify": "match",
+  "note": "structure 观察（湿测判 match）：文档口径「选择调阅档案单向导页」SUT 实为抽屉「选择调阅申请单」（el-drawer，heading 可读）",
       "enter": "延期主页【发起】；URL fcnScnEcd=FS00028694",
       "query_fields": ["档案调阅申请编号", "申请日期", "调阅到期日期"],
       "buttons": ["发起延期申请", "返回", "行内查看申请单"],
