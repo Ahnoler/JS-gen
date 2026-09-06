@@ -4,12 +4,12 @@ description: >-
   模块级需求分册导入 KB 作业区：登记 data/kb/req/<moduleKey>、officecli 切片
   chapters + through-chains；逐叶真机湿测（wet-test.md 判定表，match/drift/blocked/
   not-found）；drift 分类回填 chapters；blocked 补测台账；可选 drafts（门槛=match 叶）。
-  禁止写 data/kb/flows、禁止 promote。
+  禁止写 data/kb/flows、禁止 promote；晋升与贯通验证为 Lead 另线任务（见文末两节）。
 ---
 
 # 需求文档 → KB 作业区
 
-> **生命周期一览**：切片（`sliced`）→ 逐叶湿测（`wet-test.md` 判定表）→ drift 回填 chapters → 可选 drafts（门槛=match 叶，sourceRefs 引湿测叶号）。promote 另线。
+> **生命周期一览**：切片（`sliced`）→ 逐叶湿测（`wet-test.md` 判定表）→ drift 回填 chapters → 可选 drafts（门槛=match 叶，sourceRefs 引湿测叶号）→ 晋升 flows → 贯通验证。晋升与贯通验证为 Lead 驱动的后置阶段，契约见文末两节。
 
 > **批量 / Agent Team：** 见同目录 [`USAGE.md`](./USAGE.md)（语料优先级、`moduleKey` 表、Lead 派工与并行规则）。单模块仍按本文步骤执行。
 
@@ -152,6 +152,19 @@ data/kb/req/<moduleKey>/
 4. **验证**：flows 全量 JSON.parse；`bash scripts/refactor/verify-all.sh`；新卡 recall 抽样（flow/aliases/keywords/hash_markers 至少一条可命中）。
 - **坑**：`git add` 带 gitignore 路径（tmp/）会整条失败且被 `2>/dev/null` 吞错——commit 前查 ignore 名单、不吞错（2026-09-06 首笔晋升 commit 实证）。
 
+### 贯通验证（promotion 后置阶段，第 6 轮修订成文；T4 实证 2026-09-06：53/53 pass 卡 100% 贯通）
+
+晋升入 `flows/` 的 pass 卡经产品管线真实走一遍（新增交易录制→任务→AI 拆阶段→按阶段执行录制），验证流程卡在真实录制链路有效。**操作手册唯一真源**：`docs/superpowers/guides/ui-record-through-line-agent-prompt.md`（UI↔API 心智模型/可复制提示词模板/API 速查/实证坑位/状态口径）——本节只记协议口径与实证修正，操作细节看手册。
+
+**管线顺序**（手册 §1）：功能锚点（fid 必核叶子 `intermediateFlag=0`，禁挂 intermediate/孪生 id）→ 任务文案（**硬性成功门闩**+禁入写进任务全文）→ analyze → create → prepare → record/start → detach → 验收。
+
+- **analyze 契约（第 6 轮实证修正，源码核实 `trajectory-meta-service.js`）**：入参 `{description, functionId?, model?}`——任务文本字段是 **`description`** 非 `requirement`（functionId 可选，用于特殊元素候选富化）；响应直接 `{phases:[…], businessEntries:[…]}`，不包 code/data 壳（手册「若包一层从 data 取」为防御性说法，现行实现不包）。拆分规则为服务端 prompt 硬约束：**阶段数严格跟编号步骤数走**；每阶段必含「预期结果：…」硬标记；【硬性成功门闩/禁止…】行与「关键数据」段**不计入 phases**（执行端另发）——任务文案按「编号步骤 + 门闩块 + 关键数据段」三段式写，analyze 即按此设计消化。
+- **create 漏挂补阶段**：`POST /api/v2/trajectories` 带 `phases` 数组；若 phaseCount=0 用 `PUT /api/v2/trajectories/{id}/phases` 补挂。
+- **验收铁律——业务证据，不认「全 phase_done」**：record/start **假成功模式**（T4 全波复现）：动作已执行但步骤不落库（~10 秒全 phase_done、stepCount=0；落库时点不一致——detach flush 或部分永不落库）。验收看 `stepCount`>0 + SUT 业务 stamp/字段/报文 hit；不满足时 CDP（19242+slotIndex）补证并如实写报告——业务 hit=true 但有假完成/0 步 phase → **DONE_WITH_CONCERNS**，不得记 DONE。产品级上报：建议 record/start 返回前做 stepCount 硬校验（agent-log 2026-09-06 已记，待转产品组）。
+- **状态口径**：DONE / DONE_WITH_CONCERNS / BLOCKED（手册 §6 三态定义）。
+- **卡面回写**：贯通发现的卡面事实错误当场修正并在卡内 source 注明 traj 证据号（T4 实证 2 处行数计数修正 1163→353 / 602→266 + portal 卡2 drift 反转）。上方「禁写 flows」禁区指切片/湿测/出卡 worker；贯通验证与晋升同为 Lead 驱动的另线任务。
+- **编排骨（Lead）**：按业务域分波（T4 先例 wave A~F，每波 4-13 卡）、一卡一交易（命名 `KB贯通-{模块}-{YYYYMMDD-HHMM}`）、每波 ≤2 并行 record 会话（slot 隔离不抢同 Chrome，先 `GET /api/v2/executors` 查空闲）、prepare timeout≥600s / start timeout≥1200s、一波一 commit、证据落 `tmp/kb-through/<module>/`；查询类卡先重置残留查询条件（残留致 stamp 0 条，traj #526 实证）；**影像/文件上传类场景一律禁入**（产品裁定 2026-09-05）。
+
 ### 实测坑清单（situational，随模块滚动补充）
 
 | 坑 | 处置 |
@@ -170,7 +183,7 @@ data/kb/req/<moduleKey>/
 
 ## 禁区
 
-- **禁止**写 `data/kb/flows/**`
+- **禁止**写 `data/kb/flows/**`（指切片/湿测/出卡 worker；晋升与贯通验证的 Lead 回写为另线任务，见文末两节）
 - **禁止**调用 `promote.py` / **禁止**写 `staging`
 - **禁止**一次多模块；**禁止**做手册/接口/案例/计划导入（见 spec §3.1）
 - 不改 `_kb.py` / `promote.py` / 正式 `flows/` / `staged_flows.jsonl`（除非另开任务且声明）
@@ -183,6 +196,7 @@ data/kb/req/<moduleKey>/
 - [ ] 每章末尾 ZJJK 清单行机器可解析（湿测/出卡依赖此接口）
 - [ ] through-chains 有候选或「无闭环主链」
 - [ ] （湿测已开展时）wet-test.md 判定表齐全：无 pending；drift 已分类；blocked 含补测条件与异常原文；写操作零落库
+- [ ] （贯通验证已开展时）pass 卡逐卡有 traj 证据号与业务 stamp 记录；假成功/0 步 phase 如实标注 DONE_WITH_CONCERNS
 - [ ] 未触碰正式 flows
 - [ ] 未调用 promote / 未写 staging
 
@@ -196,3 +210,4 @@ data/kb/req/<moduleKey>/
 - **v4**（2026-09-06 `5916e49`→`8aacebb`）：第 3 轮修订（checker 机械验收 `scripts/kb/wet-test-check.mjs`/B 湿测代理模板/双台账定家/pending 词表行/blocked「黑名单禁止」子类/复合叶规则/跨视图复用口径/through-chains 时效声明/坑清单分层）+ checker 能力增强（relCmpts 括注剥离/判定格宽容/斜杠组/JLCP）。
 - **v5**（2026-09-06 本轮）：第 4 轮修订（清单行三形态契约化：无编号分册 `—（页面名）` 与接口分册接口号叶；表格≠清单行；**Step 0 入口可达性预检**；blocked 证据三子类含静默拦截；同构页批量核验；大模块两棒接力；接口分册间接痕迹判定+trdlog 报文映射法；无编号模块 Bearer 菜单树定位法；Lead 预验账号；坑清单扩至 11 条含已办路径修正/残留 mask/无确认框删除）。checker 30/30 模块 ALL GREEN 实证。
 - **v6**（2026-09-06 本轮）：第 5 轮修订——**草稿卡产出契约**（门槛/steps 零 blocked/pendingSteps 结构/coverage 对平/NOT-FOUND 环境卡/接口分册卡/同构归并/级联引用/无编号 leafRef=行号+页面名）+ **晋升管线契约**（promote_draft.mjs dry-run→Lead curation 裁决→apply→verify-all+recall 抽样；同域 merge 裁决口径=同菜单二级组+同业务对象，一级同不算同域；2026-09-06 实证 63 卡晋升 new 52/merge 11，flows 29→82）+ USAGE Phase F（F1 产出/F2 晋升）。至此全链：切片→湿测→回填→草稿卡→晋升均成文。
+- **v7**（2026-09-06 本轮）：第 6 轮修订——**贯通验证契约**成文：管线顺序（fid 核叶子/门闩入任务/三段式任务文案）；**analyze 契约实证修正**（入参 `description` 非 `requirement`、响应直接 `{phases,businessEntries}` 不包壳、阶段数跟编号走+「预期结果」硬标记+门闩与关键数据段不入 phases）；create 漏挂 PUT 补阶段；**验收铁律=业务证据不认「全 phase_done」**（record/start 假成功模式全波复现 + CDP 19242+slot 补证 + DONE/DONE_WITH_CONCERNS/BLOCKED 三态）；卡面回写带 traj 证据（2 处行数修正实证）；Lead 分波编排骨（每波 ≤2 并行 slot/一波一 commit/影像禁入）。T4 实证：53/53 pass 卡 100% 贯通（54 轨迹 recorded，agent-log 2026-09-06 21:20 收官条）。操作手册：`docs/superpowers/guides/ui-record-through-line-agent-prompt.md`。至此全链六段：切片→湿测→回填→草稿卡→晋升→贯通验证均成文。

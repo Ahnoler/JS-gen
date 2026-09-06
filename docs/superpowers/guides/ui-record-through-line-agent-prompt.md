@@ -64,7 +64,8 @@ Python：D:/anaconda3/python.exe。子代理禁止 git commit（由 Lead 提交�
 1. 先确认 functionId：GET /api/v2/processes/{processId}/functions，核对 name、intermediateFlag=0、pageId、menuXpath。写 function-anchors.md。
 2. 任务文案必须编号分步 +【硬性成功门闩】：门闩未满足不得 done / 不得提前结束阶段。
 3. 管线顺序固定：
-   a) POST /api/v2/trajectories/analyze  body含 functionId + requirement全文
+   a) POST /api/v2/trajectories/analyze  body={description:任务全文, functionId}
+      → 字段是 **description** 非 requirement（T4 实证）；响应直接 {phases,businessEntries} 不包壳
       → 若响应是 {code,data}，phases 从 data 取，勿把整包当 phases
    b) POST /api/v2/trajectories  name/task/requirement/phases/functionId/systemAccountId
       → 若 phaseCount=0，用 PUT .../trajectories/{id}/phases 补挂

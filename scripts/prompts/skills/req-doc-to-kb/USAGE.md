@@ -217,6 +217,18 @@
 
 晋升范围：gate=pass/full/match 且 steps>0（动态扫描）；partial 卡待 T2 blocked 回收后二批。
 
+### Phase G — 贯通验证（v7 新增；T4 实证 2026-09-06：53/53 pass 卡 100% 贯通）
+
+晋升后的 pass 卡经产品管线真实走一遍，验证流程卡在真实录制链路有效。契约见 SKILL「贯通验证」节；**操作手册唯一真源**：`docs/superpowers/guides/ui-record-through-line-agent-prompt.md`（UI↔API 心智模型/可复制提示词模板/API 速查/坑位/状态口径），执行 worker 直接复用手册 §2 模板。
+
+Lead 编排骨：
+
+1. **分波**：按业务域分波（T4 先例 wave A~F，每波 4-13 卡），一卡一交易（`KB贯通-{模块}-{YYYYMMDD-HHMM}`）；每波 ≤2 并行 record 会话（slot 隔离不抢同 Chrome，先 `GET /api/v2/executors` 查空闲）。
+2. **派发**：按手册 §2 模板填 {功能叶子/fid/processId/systemAccountId/成功门闩/禁入}；fid 必核 `GET /api/v2/processes/{pid}/functions` 且 `intermediateFlag=0`（禁挂 intermediate/孪生 id）；影像/文件上传场景一律禁入（产品裁定 2026-09-05）。
+3. **验收（每卡）**：`stepCount`>0 + SUT 业务 stamp/字段/报文 hit——**不认「全 phase_done」**（record/start 假成功模式：秒级 done、steps 落库时点不一致，必要时 CDP 19242+slot 补证）；不满足即按手册 §4 坑位排查。
+4. **收口（每波）**：KB 卡 source 回写贯通标注，卡面事实错误当场修正并注明 traj 证据号 → 一波一 commit；证据落 `tmp/kb-through/<module>/`（anchors/task/analyze/create/traj-id/through-report）。
+5. **状态口径**：DONE / DONE_WITH_CONCERNS / BLOCKED（手册 §6）；全波收官后 agent-log 收官条（产品级发现汇总 + 遗留）。
+
 ### Worker 提示词模板
 
 ```text
