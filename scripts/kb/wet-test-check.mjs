@@ -48,7 +48,7 @@ function extractChapterLeaves(filePath) {
   const text = readFileSync(filePath, 'utf-8');
   const leaves = [];
   let hasContractLine = false;
-  const leafGroupRe = /ZJJK\d+(?:PDCP|PACP)?(?:\s*\/\s*ZJJK\d+(?:PDCP|PACP)?)*（[^）]*）/g;
+  const leafGroupRe = /ZJJK\d+(?:PDCP|PACP|JLCP)?(?:\s*\/\s*ZJJK\d+(?:PDCP|PACP|JLCP)?)*（[^）]*）/g;
   // 无编号模块占行：`—（页面名）`（源册全册无 ZJJK/FS 时按契约以此占行）
   const noCodeRe = /—（[^）]*）/g;
   for (const line of text.split(/\r?\n/)) {
@@ -57,7 +57,7 @@ function extractChapterLeaves(filePath) {
       hasContractLine = true;
       for (const g of groups) {
         // 仅取括号前的前导编号（可含斜杠组）；括号内为 relCmpts 等注释性编号，不计叶
-        const head = g.match(/^ZJJK\d+(?:PDCP|PACP)?(?:\s*\/\s*ZJJK\d+(?:PDCP|PACP)?)*/);
+        const head = g.match(/^ZJJK\d+(?:PDCP|PACP|JLCP)?(?:\s*\/\s*ZJJK\d+(?:PDCP|PACP|JLCP)?)*/);
         for (const m of head?.[0]?.match(/ZJJK\d+/g) ?? []) leaves.push(m);
       }
     }
