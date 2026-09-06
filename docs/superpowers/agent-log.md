@@ -2,6 +2,15 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 01:16 · ZCode Lead — 阶段回报：P6-0 修路完成（三 commits）+ R1 跑车 8 轮实证，sync 管道产品级缺陷定性，收口待用户定夺
+- **P6-0 交付（aab83b68/795be5ee/f178411a，已推送）**：①假成功硬门闩三版迭代——最终形态=异步终局化（start 立即 recorded，后台 90s 二次 resync+DB 复核，0 业务步降级 failed+广播 fake_success_detected，594 实证全链工作）；②每阶段步数计数（persisted.trajectoryPhaseId 真归属）；③落库失败重试+step_persist_failed 广播；④填充校验对称（false_ok actual=空 时 label 回读升级 ok:label-readback）；⑤零动作 done 门禁（首次拒绝+二次放行，recorder_emitters._guard_done_reject_zero_actions）；⑥auto-fill stamp 跨轮保持（businessEntries 平铺键防 cert-detect 默认值覆盖——590 实证 stamp 被覆盖为「测试科技发展有限公司」）
+- **P6-1 交付（9037f514）**：3 张主链卡晋升 flows 82→84（批复查看 new/审批任务页 new/评级申请链 merge rating.json+14 节点）；promote_draft.mjs 加 curation.include gate 豁免（Steps 零 blocked 的 partial 主链卡）
+- **产品级发现（新）**：**action_log_sync 端到端延迟可达分钟级**（588 detach flush +8 步、592/593 resync 回包跨窗、594 复核 0 步）——逐环节排查（Python emit 有 flush/executor 转发无过滤/ws OPEN 直发/hub 无缓冲，探针脚本全在库）均无显式缓冲，端到端却分钟级——**结构性修复（Python 直推 HTTP/DB）超出 P6-0 范围，建议上报产品组**； tonight 修复是在此约束下的最大达成：门闩永不误放假绿（宁可 failed+事后可回滚）
+- **R1 客户新增（8 轮 583-593）**：业务侧**客户确实建成**（589/590：客户编号 26090700580316743，traj 588 stepCount=10）——但三证未齐：stamp 被覆盖（已修待复验）+sync 延迟致步骤不全（产品级）。**R1=DONE_WITH_CONCERNS**。R2-R7 未开始（等 sync 缺陷裁决：修通道 or 带缺陷验收）
+- **环境**：控制面+executor 带日志重启流水化（tmp/logs/server-*.log、executor-*.log）；分析/创建/录制脚本模式 tmp/kb-mainchain/R1-customer/
+- **遗留移交**：①sync 管道修复方案（Python HTTP 直推）待拍板；②R1 复验（stamp 修复+新门闩）一轮即收；③R2-R7 全量待跑；④T3.1 heal live 验收未动；⑤测试数据残留：SUT 多笔测试客户（KB测客户系列/测试科技发展有限公司/KB主链R1-*）待清理清单
+- 提交：b3d4b974→f178411a 7 commits 已推送
+
 ## 2026-09-07 00:02 · ZCode Lead — 开工声明：P6 连续执行启动（用户已批准计划+六项拍板）
 - 用户拍板（2026-09-07 00:00 前后）：①R4 审批=分段录制+单号衔接，接受主链轨迹非单条；②P6-0 直接动他线热文件；③合同止于已保存态 OK；④多角色账号暂无法提供，R4 按已实证配方（701994/WN0001/黄亮）跑，缺角色再回报；⑤上传封死维持绕行；⑥假成功本仓先修+方案同步产品组
 - 范围：P6-0 代码修复（src/services/trajectory/trajectory-recording-runner.js、form-snapshot-append.js 等+Python scripts/agent/recorder_emitters.py、填充回读侧——动手前先查 characterization pin）；P6-1 KB 补卡（data/kb/req/credit-corp/drafts/ 新草稿卡×2+rating 增强，由 general-purpose 子代理产出、Lead 晋升）；随后 P6-2 R1-R7 跑车（tmp/kb-mainchain/、flows 卡 source 回写）+P6-3 容错+P6-4 终验
