@@ -61,6 +61,12 @@ function extractChapterLeaves(filePath) {
         for (const m of head?.[0]?.match(/ZJJK\d+/g) ?? []) leaves.push(m);
       }
     }
+    const ifaceMatches = line.match(/(?:^|[\s|、`])((?:\d{1,3}\.){2}\d{1,3})（[^）]*）/g) ?? [];
+    for (const im of ifaceMatches) {
+      hasContractLine = true;
+      const id = im.trim().match(/(?:\d{1,3}\.){2}\d{1,3}/)[0];
+      leaves.push('IFACE:' + id);
+    }
     const noCodes = line.match(noCodeRe);
     if (noCodes) {
       hasContractLine = true;
@@ -130,6 +136,9 @@ function checkModule(key) {
   const noCodeExpected = allExpected.filter((k) => k.startsWith('NOZJJK:'));
   const expected = zjzkExpected.length ? zjzkExpected : noCodeExpected;
   const noCodeMode = zjzkExpected.length === 0 && noCodeExpected.length > 0;
+  const ifaceExpected = allExpected.filter((k) => k.startsWith('IFACE:'));
+  const ifaceMode = zjzkExpected.length === 0 && noCodeExpected.length === 0 && ifaceExpected.length > 0;
+  const effExpected = ifaceMode ? ifaceExpected : expected;
   if (allExpected.length === 0) {
     fails.push('chapters 无任何契约格式清单行（ZJJK 或 —（页面名）占行）——先按 SKILL「存量回补条款」回补再验收');
   }
@@ -146,6 +155,11 @@ function checkModule(key) {
     stats[r.verdict] += 1;
     const codes = r.line.match(/ZJJK\d+/g) ?? [];
     for (const c of codes) actual.add(c);
+    if (ifaceMode) {
+      for (const im of line.match(/(?:^|[\s|`])((?:\d{1,3}\.){2}\d{1,3})（[^）]*）/g) ?? []) {
+        actual.add('IFACE:' + im.trim().match(/(?:\d{1,3}\.){2}\d{1,3}/)[0]);
+      }
+    }
     if (noCodeMode) {
       for (const g of r.line.match(/—（[^）]*）/g) ?? []) {
         const name = g.slice(2, -1);
@@ -170,8 +184,8 @@ function checkModule(key) {
   }
 
   // 叶集 diff
-  const missing = expected.filter((z) => !actual.has(z));
-  const extra = [...actual].filter((z) => !expected.includes(z));
+  const missing = effExpected.filter((z) => !actual.has(z));
+  const extra = [...actual].filter((z) => !effExpected.includes(z));
   for (const z of missing) fails.push(`期望叶未在判定表: ${z}`);
   for (const z of extra) warns.push(`判定表有而清单行无（人工确认是否正文叶）: ${z}`);
 
