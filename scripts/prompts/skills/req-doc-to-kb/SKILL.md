@@ -128,6 +128,30 @@ data/kb/req/<moduleKey>/
 - 流程推进类规则（wf 分流、多节点审批路由）**无法只读验证属常态**：判 blocked + 补测条件即可，不视为任务失败（customer-corp wf_cust_005/006 先例）。主链 blocked 时后续链允许**级联引用**（「同叶N」，meeting-mgmt 实证）。
 - **机械验收**：模块收口前跑 `node scripts/kb/wet-test-check.mjs <moduleKey>`，FAIL 必须清零（人工抽查仍保留）。checker 支持三形态叶（ZJJK/NOZJJK 占行/IFACE 接口号，按模块门控自动启用）与判定格宽容解析（判定词+子类+日期同格）。
 
+### 草稿卡产出契约（drafts，第 5 轮修订成文；产出前提=用户明示「出草稿卡」）
+
+草稿卡 = 从湿测证据凝练的候选流程卡（`drafts/*.json`，schema 同正式 flows + draft 专有字段）。**门槛**（步骤 5）：steps[] 只允许引用 match/drift 叶（drift 须已回填 chapters）；blocked/not-found 叶**禁止进 steps**，改放 `pendingSteps[]`（每条含 leafRef + reason + retry_condition）。
+
+每张卡必带：
+- 顶层：`draftFrom:"req"`、`moduleKey`、`flow`、`aliases`、`menu_path`、`sourceRefs`（wet-test.md 叶号数组）、`coverage:{total,match,drift,blocked,notFound,gate}`；
+- `gate` 取值：全 match/drift = `pass`/`full`/`match`；混 blocked = `partial`；**纯 blocked 主链/业务块不产卡**，列名回报并按级联归并；
+- 特殊形态①**NOT-FOUND 环境卡**（2026-09-06 digital-mobile 实证）：模块级环境不可达（入口五层探测实证）时，不建 pending 表逐行空判，产单张 `cardType:"NOT-FOUND"` 卡（notFoundReason=探测摘要、retest=环境条件、coverage.gate="not-found-env"）；
+- 特殊形态②**接口分册卡**（limit-ctrl-api 实证）：无页面叶，steps 以接口号叶（match=trdlog 报文映射实证）承载，查询类接口无前端入口判 blocked（补测=API 调用通道）不判 not-found；
+- 同构 blocked 组归并进 pendingSteps 单条；级联 blocked 用「同叶N」引用；
+- 无编号模块 leafRef = wet-test 行号 + 页面名（不用 ZJJK）；
+- 产出后自检：逐文件 JSON.parse + steps 零 blocked/not-found 引用 + coverage 计数与判定表对平。
+
+### 晋升管线（drafts → data/kb/flows/，第 5 轮修订成文）
+
+工具：`node scripts/kb/promote_draft.mjs`（默认 dry-run 产出审查表 `tmp/promote-review.md`；`--apply` 写 flows；`--card` 过滤单卡；`tmp/promote-curation.json` = `{new:["module/file.json"]}` 为 Lead 裁决覆盖）。
+
+流程与裁决口径：
+1. **dry-run**：gate 白名单（pass/full/match）动态扫描 → 审查表（动作 new/merge、目标文件、nodes/rules 数、同域建议）。
+2. **Lead 过表裁决**：同域 merge 仅限**同菜单二级组 + 同业务对象**（一级菜单同 ≠ 同域——2026-09-06 实证 6 条误配降级：委托贷款/社团×2/对私用信×2/提醒配置按「每流程一卡」粒度独立新建）。
+3. **--apply**：new 写新卡（文件名冲突加模块前缀）；merge 向既有卡 append nodes/rules/exceptions（page+keyword 去重）。apply 不删 drafts/（存档）。
+4. **验证**：flows 全量 JSON.parse；`bash scripts/refactor/verify-all.sh`；新卡 recall 抽样（flow/aliases/keywords/hash_markers 至少一条可命中）。
+- **坑**：`git add` 带 gitignore 路径（tmp/）会整条失败且被 `2>/dev/null` 吞错——commit 前查 ignore 名单、不吞错（2026-09-06 首笔晋升 commit 实证）。
+
 ### 实测坑清单（situational，随模块滚动补充）
 
 | 坑 | 处置 |
@@ -171,3 +195,4 @@ data/kb/req/<moduleKey>/
 - **v3**（2026-09-05 `1484335`）：第 2 轮修订（跨模块观察段/链组增量写回/drafts sourceRefs 叶号/behavior 逐模块对照/复用页名称清单/流程推进 blocked 常态化/Phase E 团队流水线+元演化/回传丢失产物考古）。
 - **v4**（2026-09-06 `5916e49`→`8aacebb`）：第 3 轮修订（checker 机械验收 `scripts/kb/wet-test-check.mjs`/B 湿测代理模板/双台账定家/pending 词表行/blocked「黑名单禁止」子类/复合叶规则/跨视图复用口径/through-chains 时效声明/坑清单分层）+ checker 能力增强（relCmpts 括注剥离/判定格宽容/斜杠组/JLCP）。
 - **v5**（2026-09-06 本轮）：第 4 轮修订（清单行三形态契约化：无编号分册 `—（页面名）` 与接口分册接口号叶；表格≠清单行；**Step 0 入口可达性预检**；blocked 证据三子类含静默拦截；同构页批量核验；大模块两棒接力；接口分册间接痕迹判定+trdlog 报文映射法；无编号模块 Bearer 菜单树定位法；Lead 预验账号；坑清单扩至 11 条含已办路径修正/残留 mask/无确认框删除）。checker 30/30 模块 ALL GREEN 实证。
+- **v6**（2026-09-06 本轮）：第 5 轮修订——**草稿卡产出契约**（门槛/steps 零 blocked/pendingSteps 结构/coverage 对平/NOT-FOUND 环境卡/接口分册卡/同构归并/级联引用/无编号 leafRef=行号+页面名）+ **晋升管线契约**（promote_draft.mjs dry-run→Lead curation 裁决→apply→verify-all+recall 抽样；同域 merge 裁决口径=同菜单二级组+同业务对象，一级同不算同域；2026-09-06 实证 63 卡晋升 new 52/merge 11，flows 29→82）+ USAGE Phase F（F1 产出/F2 晋升）。至此全链：切片→湿测→回填→草稿卡→晋升均成文。

@@ -205,6 +205,18 @@
 先做 Phase A 盘点，产出进度表后，再 Phase B 派工。不要一次派超过 5 个并行 worker。
 ```
 
+### Phase F — 草稿卡产出与晋升（v6 新增；产出前提=用户明示「出草稿卡」）
+
+**F1 产出（D 组文本代理，每模块一棒，可多路并行）**：按各模块 wet-test.md 判定表凝练草稿卡——门槛与格式见 SKILL「草稿卡产出契约」（steps 零 blocked、pendingSteps 结构、NOT-FOUND/接口分册特殊卡、coverage 对平、自检 JSON.parse）。纯 blocked 主链不产卡列名。schema 样例：`data/kb/flows/<同域卡>` + `data/kb/req/credit-corp/drafts/`。
+
+**F2 晋升（Lead 主导，写入 data/kb/flows/ 前须用户项目授权）**：
+1. `node scripts/kb/promote_draft.mjs`（dry-run）→ 审查表 `tmp/promote-review.md`；
+2. Lead 过表：同域 merge 仅限**同菜单二级组+同业务对象**，存疑降级 new 写 `tmp/promote-curation.json`；
+3. `--apply` → flows 全量 JSON.parse → `verify-all` → 新卡 recall 抽样；
+4. commit + push（**勿把 tmp/ 加进 git add**）。
+
+晋升范围：gate=pass/full/match 且 steps>0（动态扫描）；partial 卡待 T2 blocked 回收后二批。
+
 ### Worker 提示词模板
 
 ```text
