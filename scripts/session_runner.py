@@ -408,6 +408,14 @@ async def run_session(args):
         except (TypeError, ValueError):
             phase_num = step_idx
         set_current_phase(phase_num)
+        # P6-0 假成功防线：记录本阶段动作基线（recorder done 门禁的零动作检查用）；
+        # 并清零零动作拒绝计数（每阶段重新获得一次 0 动作拒绝额度）。
+        try:
+            from .state import _ACTION_LOG
+            business_data_store['_phase_start_action_len'] = len(_ACTION_LOG)
+            business_data_store.pop('_zero_action_rejects', None)
+        except Exception:
+            pass
         # 新阶段第一步（agent 运行前）：上报当前状态键 → 控制面开组采集第一张。
         global _last_phase_state_key_phase
         if _last_phase_state_key_phase != phase_num:

@@ -508,13 +508,33 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       if (src === 'manual' || src === 'cdp') continue;
       try {
         runtime.persistedActionIds.add(id);
-        const persisted = await appendRecordedStep(tid, entry, {
+        const persistArgs = {
           source: src === 'special_element' ? 'special_element' : 'agent',
           trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
-        }).catch(() => null);
+        };
+        // P6-0/T0.2 落库丢失治理：失败重试一次，仍失败则广播告警（不再静默丢弃）
+        let persisted = await appendRecordedStep(tid, entry, persistArgs).catch((err1) => {
+          console.warn(`[record] step persist retry: trajectoryDbId=${tid} actionId=${id}:`, err1?.message || err1);
+          return null;
+        });
+        if (!persisted) {
+          persisted = await appendRecordedStep(tid, entry, persistArgs).catch((err2) => {
+            console.error(`[record] step persist FAILED twice: trajectoryDbId=${tid} actionId=${id}:`, err2?.message || err2);
+            broadcast('step_persist_failed', {
+              trajectoryDbId: tid,
+              sessionId: runtime.sessionId,
+              actionId: id,
+              error: String(err2?.message || err2 || 'persist failed'),
+            });
+            return null;
+          });
+        }
         if (persisted) {
           runtime._lastPersistByActionId.set(id, persisted);
           session?._lastPersistByActionId?.set(id, persisted);
+          if (Number.isFinite(phaseIdHint)) {
+            runtime.phaseStepCounts.set(phaseIdHint, (runtime.phaseStepCounts.get(phaseIdHint) || 0) + 1);
+          }
           if (persisted.dbId != null) {
             await flushPendingStepScreenshot(runtime, id, persisted.dbId, tid);
             bindPersistedStepToGroup(runtime, id, Number(persisted.dbId));
@@ -615,6 +635,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     description: p.description || '',
   }));
   runtime.phaseOutcomes = {};
+  // 假成功防线（P6-0/T0.1）：每阶段落库步数计数，recordPhaseResult 与收尾门闩消费
+  runtime.phaseStepCounts = new Map();
 
   /**
    * 阶段空闲看门狗：超过 PHASE_IDLE_TIMEOUT_MS 无 agent 活动（action_log_sync 等）
@@ -656,19 +678,37 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       || donePayload?.success === false
       ? donePayload.success
       : null;
+    // 假成功防线（P6-0/T0.1）：0 落库步阶段不得自报成功（success=true 强制降级 unknown）
+    const phaseStepCount = runtime.phaseStepCounts.get(phase.id) || 0;
+    const zeroStepPhase = phaseStepCount === 0;
+    if (zeroStepPhase && explicitSuccess === true) {
+      console.warn(
+        `[record] phase #${phase.phaseNumber} self-reported success with 0 persisted steps — downgraded to unknown`,
+      );
+    }
     const textFromDone = String(donePayload?.text || donePayload?.summary || '').trim();
     const phaseOutcome = {
       // Only explicit true/false; missing success on phase_done → unknown (null).
-      success: explicitSuccess,
-      text: textFromDone
-        || (explicitSuccess == null ? '见页面当前状态' : String(donePayload?.name || '').trim())
-        || '见页面当前状态',
+      success: zeroStepPhase && explicitSuccess === true ? null : explicitSuccess,
+      text: zeroStepPhase
+        ? `[0步完成] ${(textFromDone
+          || (explicitSuccess == null ? '见页面当前状态' : String(donePayload?.name || '').trim())
+          || '见页面当前状态')}`
+        : (textFromDone
+          || (explicitSuccess == null ? '见页面当前状态' : String(donePayload?.name || '').trim())
+          || '见页面当前状态'),
     };
     runtime.phaseOutcomes[phase.id] = phaseOutcome;
     runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;
     const rawDoneText = String(donePayload?.text || '').trim();
     if (rawDoneText) {
       await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
+    }
+    if (zeroStepPhase) {
+      await appendPhaseDoneLog(phase.id, {
+        text: `[0步完成] 本阶段无任何落库步骤${explicitSuccess === true ? '；已自报 success 但被降级' : ''}`,
+        source: 'gate',
+      }).catch(() => {});
     }
     await trajectoryPhaseDao.updateStatus(phase.id, 'completed');
     await notifyBatchProgressForTrajectory(tid);
@@ -779,6 +819,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       await recordPhaseResult(phase, donePayload);
     }
 
+    // 假成功硬门闩（P6-0/T0.1）：全部阶段 0 落库步 → 不得 recorded，走 failure 路径
+    // （T4 实证 record/start 假成功模式：phase 秒级 done、stepCount=0 仍 recorded）。
+    let totalPersistedSteps = 0;
+    for (const n of runtime.phaseStepCounts.values()) totalPersistedSteps += n;
+    if (totalPersistedSteps === 0) {
+      throw new Error(
+        `Fake-success gate: 0 persisted steps across ${phases.length} phases — recording marked failure`,
+      );
+    }
     // 录制成功（V3）：无论持久基线为何，显式结束成功 → 待确认(recorded)。
     finalStatus = await trajectoryDao.finishTransientRecording(tid, 'success');
     await trajectoryDao.updateMeta(tid, {

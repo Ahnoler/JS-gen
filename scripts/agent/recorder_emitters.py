@@ -408,6 +408,43 @@ def _guard_done_derive_flags(business_data_store, done_success, cur_url):
         navigated_ok = False  # introduce uses confirm token only
     return save_ok, introduce_ok, navigated_ok, contract
 
+def _guard_done_reject_zero_actions(agent, business_data_store) -> bool:
+    """done 拦截-零动作门禁（P6-0 假成功防线，session_runner 记基线、此处比对）。
+
+    本阶段尚无任何已记录动作时拒绝 done()：防「进页即秒 done」假成功（T4 全波复现
+    的 record/start 0 步 recorded 模式的引擎侧闸门）。首次拒绝注入提示让 agent 继续
+    执行；二次 0 动作 done 放行（阶段可能确无动作，防 max_steps 死循环）。
+    返回 True 表示已拒绝，调用方应中止后续门禁。
+    """
+    try:
+        store = business_data_store if isinstance(business_data_store, dict) else {}
+        baseline = store.get('_phase_start_action_len')
+        if baseline is None:
+            return False
+        from ..state import _ACTION_LOG
+        if len(_ACTION_LOG) > baseline:
+            return False
+        if store.get('_zero_action_rejects', 0) >= 1:
+            return False
+        store['_zero_action_rejects'] = store.get('_zero_action_rejects', 0) + 1
+        try:
+            msg = HumanMessage(content=(
+                '【done 拒绝：本阶段 0 动作】尚未执行任何页面操作。请按阶段任务执行'
+                '（导航/查询/点击/填表等），完成后再 done()。若该阶段确实无需任何动作，'
+                '再次 done() 即可通过。'
+            ))
+            agent._message_manager._add_message_with_tokens(msg)
+        except Exception:
+            pass
+        sys.stderr.write('[recorder] done rejected: zero actions in phase\n')
+        sys.stderr.flush()
+        return True
+    except Exception as e:
+        sys.stderr.write(f"[recorder] zero-action gate error: {e}\n")
+        sys.stderr.flush()
+        return False
+
+
 def _guard_done_reject_pending_write(agent, business_data_store, contract) -> bool:
     """done 拦截-空写门禁（原 318-353 段逐字搬移）。
 
@@ -757,7 +794,7 @@ def _guard_done_persist_outcome(business_data_store, done_success, done_text):
 async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> bool:
     """done() 拦截总闸（原 420 行单函数拆分后的编排层，门禁逻辑见各 _guard_* 子函数）。
 
-    拆分保持对外行为不变：heal 直通；录制路径按 空写门禁 → 成功令牌门禁 →
+    拆分保持对外行为不变：heal 直通；录制路径按 零动作门禁 → 空写门禁 → 成功令牌门禁 →
     旧路径声称 → overlay 门禁 → 错误门禁 逐个拦截，任一拒绝即提前返回（调用方
     recorder.on_step_end 停止后续步骤处理）。异常统一走外层分类：记
     ``[recorder] done-check error`` 后放行（返回 False）。
@@ -782,6 +819,8 @@ async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> b
             save_ok, introduce_ok, navigated_ok, contract = _guard_done_derive_flags(
                 business_data_store, done_success, cur_url,
             )
+            if _guard_done_reject_zero_actions(agent, business_data_store):
+                return
             if _guard_done_reject_pending_write(agent, business_data_store, contract):
                 return
             done_text, claims_save_ok = _guard_done_claims(_last_result, done_success)

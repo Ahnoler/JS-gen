@@ -319,6 +319,16 @@ class LoginEngine(_FormActionEngineBase):
         return _ok('ok-login | ' + summary + ' | probe:' + probe_sig, include_in_memory=True)
 
 
+def _false_ok_empty_actual(result) -> str | None:
+    """false_ok 且 actual 为空时返回 expected 值，否则 None（P6-0/T0.3 兜底回读触发条件）。
+
+    JS_FILL_BY_XPATH 片段回读只按 fill xpath——填充经 label/placeholder 兜底分支落到
+    别的节点时，xpath 回读为空、误报 ``false_ok:expected=X,actual=``。
+    """
+    m = re.match(r'^false_ok:expected=(.*),actual=$', str(result or '').strip())
+    return m.group(1) if m else None
+
+
 
 
 class FillEngine(_FormActionEngineBase):
@@ -476,6 +486,31 @@ class FillEngine(_FormActionEngineBase):
         result = await page.evaluate(JS_FILL_BY_XPATH, [resolved.xpath_smart, value, resolved.label])
         if is_absent_field_result(result):
             return _absent_skip(resolved.label or label_text)
+        # P6-0/T0.3 填充校验对称：镜像回放 _try_xpath_fill 的兜底回读——JS 片段回读只按
+        # xpath，填充经 label/placeholder 兜底落到别的节点时回读空、误报 false_ok actual=空
+        # （录制弱通过/误败的根源）。按 label 复核真值，等值（field_values_equivalent 口径）
+        # 则升级为 ok 继续记录；仍不等才保持 false_ok。
+        expected_empty = _false_ok_empty_actual(result)
+        if expected_empty is not None:
+            try:
+                raw = await page.evaluate(
+                    JS_CHECK_SINGLE_FIELD,
+                    [resolved.label or label_text, self._button_keywords()],
+                )
+                info = raw if isinstance(raw, dict) else _as_dict(raw)
+                current = str((info or {}).get('currentValue') or '').strip()
+                from scripts.controller.actions.form_scan_utils import field_values_equivalent
+                if current and field_values_equivalent(current, expected_empty):
+                    sys.stderr.write(
+                        '[fill] false_ok(actual=empty) upgraded by label readback: label='
+                        + repr(resolved.label or label_text)
+                        + ' current=' + repr(current[:40]) + '\n'
+                    )
+                    sys.stderr.flush()
+                    result = 'ok:label-readback'
+            except Exception as _rb_exc:
+                sys.stderr.write(f'[fill] label readback skipped: {_rb_exc}\n')
+                sys.stderr.flush()
         if _is_ok_result(result) and should_record_result(result):
             xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
