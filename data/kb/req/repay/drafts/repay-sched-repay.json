@@ -1,0 +1,158 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "repay",
+  "flow": "预约还款申请（发起→审批→到期扣款）",
+  "aliases": [
+    "预约还款",
+    "预约还款申请管理",
+    "客户经理发起预约还款申请",
+    "预约还款取消"
+  ],
+  "hash_markers": [
+    "FS00036689PDCP",
+    "schedRepayApplication",
+    "ZJJK00148880PDCP",
+    "ZJJK00149020PDCP",
+    "YYHKSQ"
+  ],
+  "keywords": [
+    "预约还款",
+    "预约还款申请",
+    "选择借据",
+    "风险探测",
+    "预约还款日",
+    "提前还款金额",
+    "审批通过",
+    "还款结果",
+    "已取消",
+    "请选择借据提交预约申请",
+    "当前日期不能发起预约还款"
+  ],
+  "menu_path": "放还款管理/还款管理/预约还款",
+  "biz_key_prefix": ["YYHKSQ"],
+  "preconditions": [
+    "登录角色=客户经理；借据状态=生效或逾期；当前日期非借据到期日；预约还款日晚于当日；还款账户状态正常且可用余额充足（C502089）",
+    "【SUT 实测·behavior】进入主页列表自动加载——repay 域三主页（对公/对私/预约）均自动加载，与授信/评级「需手动查询」相反，勿当普适规则",
+    "【SUT 实测·拦截族】向导空选【下一步】走 console「调用beforeRskIntcpt结果为false」+ 气泡双通道（预约文案「请选择借据提交预约申请」，与文档一致，与放款分册 beforeRskIntcpt 同族拦截层）",
+    "【SUT 实测·复用差异（引擎 cue）】本视图向导步骤1「客户编号」为普通输入框，无客户放大镜入口（ZJJK00109101 组件本体 credit-retail 已验 match，本视图为复用差异态）",
+    "到期日当日禁发「当前日期不能发起预约还款！」；独有【取消】旁路：流程状态=审批通过的记录确认后还款结果→已取消（均为文档口径，本轮未触达）"
+  ],
+  "steps": [
+    {
+      "name": "预约还款申请管理主页",
+      "page": "预约还款申请管理主页",
+      "leafRef": "wet-test.md 叶29 (ZJJK00148880PDCP)",
+      "verify": "match",
+      "enter": "菜单链：放还款管理→还款管理→预约还款",
+      "query_fields_default": ["预约还款申请编号", "流程发起日期起", "流程发起日期止"],
+      "query_fields_more": ["流程状态"],
+      "columns": ["预约还款申请编号", "借据编号", "客户编号", "客户名称", "提前还款金额", "流程状态", "预约还款日", "还款结果", "流程创建时间", "经办人", "经办机构"],
+      "buttons": ["新增", "修改", "撤销", "查看", "取消"],
+      "note": "【SUT 实测】进入页面列表自动加载（共 0 条）；查询条件与文档 aplyNo/起止日期/pcsSt 一致；11 列全齐；按钮含文档特有【取消】；默认查未删除+预约还款类型（文档口径）"
+    },
+    {
+      "name": "客户经理发起预约还款申请（dialog 两步向导）",
+      "page": "dialog「选择借据」（两步：1 基本信息 / 2 风险探测）",
+      "leafRef": "wet-test.md 叶30 (ZJJK00149020PDCP)",
+      "verify": "match",
+      "enter": "主页点【新增】",
+      "buttons": ["下一步", "返回"],
+      "validation": "未选借据点【下一步】提示「请选择借据提交预约申请」（与文档逐字一致）",
+      "note": "【SUT 实测】dialog 弹窗两步向导与文档一致；dialog aria-name 误挂「消息列表」（无标题弹窗坑变体，以 heading 实文取证）"
+    },
+    {
+      "name": "选择借据信息（向导步骤1）",
+      "page": "向导步骤1·基本信息（借据选择区）",
+      "leafRef": "wet-test.md 叶31 (ZJJK00148882PDCP)",
+      "verify": "match",
+      "query_fields_default": ["客户编号", "客户名称", "纸质合同编号"],
+      "query_fields_more": ["借据编号", "贷款管户人", "贷款管户机构"],
+      "columns": ["纸质合同编号", "借据编号", "产品名称", "客户编号", "客户名称", "借据状态", "借据金额（元）", "借据余额", "借据起始日期", "借据到期日期"],
+      "note": "【SUT 实测】自动加载共 2 条且借据状态均为「生效」（文档「仅查 生效或逾期」口径，逾期样例未见，生效过滤实证）；未传管户人默认当前用户过滤无法直接证伪（结果集即本用户经办借据）"
+    },
+    {
+      "name": "客户编号输入（客户放大镜复用差异态）",
+      "page": "向导步骤1·客户编号字段（普通输入框）",
+      "leafRef": "wet-test.md 叶32 (ZJJK00109101)",
+      "verify": "drift",
+      "drift": [
+        "structure：本视图「客户编号」为普通输入框（无 el-input 后缀放大镜图标，suffix/icon 计数=0），并非文档「经客户放大镜选择器带入」——ZJJK00109101 组件本体 credit-retail 已验 match，本视图为复用差异态（跨视图复用口径，记本组证据）"
+      ],
+      "note": "chapters/04 已按两源回填；引擎自动化时勿在此字段等待放大镜弹窗"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "客户经理发起预约还款申请任务页",
+      "leafRef": "wet-test.md 叶33 (ZJJK00148901PDCP)",
+      "verify": "blocked",
+      "reason": "风险探测步骤已实证（总校验结果=「通过」、规则表8列同对私、重试/刷新、上一步/下一步/返回），但向导完成会创建申请并启动审批流 schedRepayApplication（FS00036689PDCP，落库），黑名单禁止——任务页不可只读到达；任务事项三页签无还款类目（同对公叶5）",
+      "retest_condition": "业务端代发起预约还款申请后以客户经理角色核验任务页五标签+影像+意见结构"
+    },
+    {
+      "name": "查询客户信息（任务页标签1）",
+      "leafRef": "wet-test.md 叶34 (ZJJK00148883PDCP)",
+      "verify": "blocked",
+      "reason": "依赖叶33 任务页（无在途/历史 schedRepayApplication 任务）",
+      "retest_condition": "同叶33"
+    },
+    {
+      "name": "查询合同信息（任务页标签2）",
+      "leafRef": "wet-test.md 叶35 (ZJJK00148884PDCP)",
+      "verify": "blocked",
+      "reason": "同叶33（无任务数据）",
+      "retest_condition": "同叶33"
+    },
+    {
+      "name": "查询借据信息（任务页标签3）",
+      "leafRef": "wet-test.md 叶36 (ZJJK00148886PDCP)",
+      "verify": "blocked",
+      "reason": "同叶33（无任务数据）",
+      "retest_condition": "同叶33"
+    },
+    {
+      "name": "维护预约还款申请信息（任务页标签4）",
+      "leafRef": "wet-test.md 叶37 (ZJJK00148892PDCP)",
+      "verify": "blocked",
+      "reason": "同叶33（无任务数据）；【下一步】校验=预约还款日>当日、0<还本金额<借据余额、账户状态正常（C502089）、可用余额≥还款金额+实还违约金（文档口径）",
+      "retest_condition": "同叶33"
+    },
+    {
+      "name": "查询经办人信息（任务页标签5）",
+      "leafRef": "wet-test.md 叶38 (ZJJK00148898PDCP)",
+      "verify": "blocked",
+      "reason": "同叶33（无任务数据）",
+      "retest_condition": "同叶33"
+    },
+    {
+      "name": "维护文件列表主页（影像信息）",
+      "leafRef": "wet-test.md 叶39 (ZJJK00148899PDCP)",
+      "verify": "blocked",
+      "reason": "同叶33（无任务数据）",
+      "retest_condition": "同叶33"
+    },
+    {
+      "name": "维护审批意见（意见）",
+      "leafRef": "wet-test.md 叶40 (ZJJK00148900PDCP)",
+      "verify": "blocked",
+      "reason": "同叶33（无任务数据）；提交为黑名单动作；按客户类型路由审批场景（文档口径）",
+      "retest_condition": "同叶33"
+    },
+    {
+      "name": "有权审批人审批任务页（七标签页）",
+      "leafRef": "wet-test.md 叶41 (ZJJK00148905PDCP)",
+      "verify": "blocked",
+      "reason": "已查 任务事项→已办（已办未结/已办已结）：任务分类树无还款类目、无 schedRepayApplication 历史任务；账号 701994 为客户经理角色",
+      "retest_condition": "以部门负责人/有权审批人角色重试（名下需有 FS00036689PDCP 已办任务）"
+    }
+  ],
+  "sourceRefs": [29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41],
+  "coverage": {
+    "total": 13,
+    "match": 3,
+    "drift": 1,
+    "blocked": 9,
+    "notFound": 0,
+    "gate": "partial"
+  }
+}

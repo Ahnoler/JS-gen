@@ -1,0 +1,142 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "repay",
+  "flow": "对私提前还款申请（发起→审批→记账）",
+  "aliases": [
+    "对私提前还款",
+    "对私还款",
+    "客户经理发起提前还款申请",
+    "手动推送信贷核算"
+  ],
+  "hash_markers": [
+    "FS00036679PDCP",
+    "FS00032603",
+    "perLoanEarlyRepApplication",
+    "ZJJK00148777PDCP",
+    "ZJJK00149019PDCP",
+    "TQHKSQ"
+  ],
+  "keywords": [
+    "对私提前还款",
+    "提前还款申请",
+    "选择对私借据信息",
+    "风险探测",
+    "还款计划",
+    "还款试算",
+    "审批通过",
+    "还款结果",
+    "手动推送信贷核算",
+    "请选择借据"
+  ],
+  "menu_path": "放还款管理/还款管理/对私提前还款",
+  "biz_key_prefix": ["TQHKSQ"],
+  "preconditions": [
+    "登录角色=客户经理且为借据经办人；借据状态=生效；借款日期非当日；还款账户状态正常",
+    "【SUT 实测·behavior】进入主页列表自动加载——repay 域三主页（对公/对私/预约）均自动加载，与授信/评级「需手动查询」相反，勿当普适规则",
+    "【SUT 实测·wording】按钮实名「手动推送信贷核算」（文档口径【手动推动信贷核算】），见 chapters/03 回填",
+    "【SUT 实测·查询条件 drift】文档称比对公多「合同编号、还款类型」两条件——SUT 实测【更多】展开=客户编号/证件号码/申请起始日期/申请结束日期/合同编号，多出「合同编号」属实但无「还款类型」查询条件（还款类型=提前还款为初始化内置过滤，不在查询区）",
+    "【SUT 实测·拦截族】向导空选【下一步】走 console「调用beforeRskIntcpt结果为false」+ 气泡双通道（对私文案「请选择借据」，与放款分册 beforeRskIntcpt 同族拦截层）"
+  ],
+  "steps": [
+    {
+      "name": "对私提前还款申请管理主页",
+      "page": "对私提前还款申请管理主页",
+      "leafRef": "wet-test.md 叶18 (ZJJK00148777PDCP)",
+      "verify": "drift",
+      "enter": "菜单链：放还款管理→还款管理→对私提前还款",
+      "drift": [
+        "wording：文档【手动推动信贷核算】SUT 实为「手动推送信贷核算」（chapters/03 已回填两源）",
+        "查询条件：多出「合同编号」符合文档，但无「还款类型」查询条件（内置过滤不在查询区）"
+      ],
+      "query_fields_more": ["客户编号", "证件号码", "申请起始日期", "申请结束日期", "合同编号"],
+      "columns": ["还款申请编号", "客户编号", "客户名称", "合同编号", "证件类型", "证件号码", "借据编号", "产品编号", "产品名称", "申请时间", "流程状态", "还款结果", "来源渠道"],
+      "buttons": ["新增", "查看", "修改", "手动推送信贷核算", "撤销", "流程跟踪"],
+      "note": "【SUT 实测】进入页面列表自动加载（共 0 条）；数据权限=本人经办业务（文档口径）"
+    },
+    {
+      "name": "客户经理发起提前还款申请（抽屉两步向导）",
+      "page": "抽屉/dialog「选择对私借据信息」（两步：1 基本信息 / 2 风险探测）",
+      "leafRef": "wet-test.md 叶19 (ZJJK00149019PDCP)",
+      "verify": "match",
+      "enter": "主页点【新增】（抽屉）",
+      "buttons": ["下一步", "返回"],
+      "note": "【SUT 实测】抽屉形态与两步向导结构与文档一致（dialog 标题「选择对私借据信息」与文档措辞有差，非结构性差异）；步骤2 按钮集=上一步/下一步/返回；dialog aria-name 误挂「消息列表」（无标题弹窗坑变体，以 heading 实文取证）"
+    },
+    {
+      "name": "选择对私借据信息（向导步骤1）",
+      "page": "向导步骤1·基本信息（借据选择区）",
+      "leafRef": "wet-test.md 叶20 (ZJJK00148781PDCP)",
+      "verify": "match",
+      "query_fields": ["客户编号", "客户名称", "证件号码", "借据编号"],
+      "columns": ["客户编号", "客户类型", "客户名称", "证件类型", "证件号码", "合同编号", "借据编号", "还款方式", "借据金额", "借据余额", "产品编号", "产品名称"],
+      "note": "【SUT 实测】自动加载共 2 条生效对私借据（何柳/李四，客户类型=对私客户）；步骤1 仅有 下一步/返回，无【保存】（文档待湿测项实证）；未见【确认/取消】符合「确认/取消不展示」复用口径；首列 radio 在固定列内需 force 点可见 radio（Element UI 固定列单选坑）"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "客户经理发起提前还款申请任务页",
+      "leafRef": "wet-test.md 叶21 (ZJJK00148810PDCP)",
+      "verify": "blocked",
+      "reason": "写操作黑名单：向导步骤2 风险探测已实证（总校验结果=「通过」只读回显、规则表8列 规则大类/规则名称/预警规则编号/规则校验结果/风控措施/风险解除状态/规则提示信息/相关制度要求、重试/刷新、ZJJK00067996 组件本体可达），但步骤2→完成会创建申请并启动审批流 perLoanEarlyRepApplication（FS00036679PDCP，落库），黑名单禁止；任务事项三页签无还款类目（同对公叶5）",
+      "retest_condition": "业务端代发起对私提前还款申请后以客户经理角色核验任务页三步结构"
+    },
+    {
+      "name": "维护借据基本信息",
+      "leafRef": "wet-test.md 叶22 (ZJJK00148784PDCP)",
+      "verify": "blocked",
+      "reason": "依赖叶21 任务页（无在途/历史对私还款任务）",
+      "retest_condition": "同叶21"
+    },
+    {
+      "name": "维护还款计划",
+      "leafRef": "wet-test.md 叶23 (ZJJK00148789PDCP)",
+      "verify": "blocked",
+      "reason": "同叶21（无任务数据）",
+      "retest_condition": "同叶21"
+    },
+    {
+      "name": "维护还款信息",
+      "leafRef": "wet-test.md 叶24 (ZJJK00148790PDCP)",
+      "verify": "blocked",
+      "reason": "同叶21（无任务数据）",
+      "retest_condition": "同叶21"
+    },
+    {
+      "name": "维护还款计划试算信息",
+      "leafRef": "wet-test.md 叶25 (ZJJK00148802PDCP)",
+      "verify": "blocked",
+      "reason": "同叶21（无任务数据）",
+      "retest_condition": "同叶21"
+    },
+    {
+      "name": "维护文件列表主页",
+      "leafRef": "wet-test.md 叶26 (ZJJK00148806PDCP)",
+      "verify": "blocked",
+      "reason": "同叶21（无任务数据）",
+      "retest_condition": "同叶21"
+    },
+    {
+      "name": "维护审批意见",
+      "leafRef": "wet-test.md 叶27 (ZJJK00148809PDCP)",
+      "verify": "blocked",
+      "reason": "同叶21（无任务数据）；提交为黑名单动作",
+      "retest_condition": "同叶21"
+    },
+    {
+      "name": "有权审批人审批任务页",
+      "leafRef": "wet-test.md 叶28 (ZJJK00148811PDCP)",
+      "verify": "blocked",
+      "reason": "已查 任务事项→已办（已办未结/已办已结）：任务分类树无还款类目、无 perLoanEarlyRepApplication 历史任务；账号 701994 为客户经理角色",
+      "retest_condition": "以部门负责人/有权审批人角色重试（名下需有 FS00036679PDCP 已办任务）"
+    }
+  ],
+  "sourceRefs": [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28],
+  "coverage": {
+    "total": 11,
+    "match": 2,
+    "drift": 1,
+    "blocked": 8,
+    "notFound": 0,
+    "gate": "partial"
+  }
+}
