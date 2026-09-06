@@ -1,0 +1,216 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "asset-preserve-ops",
+  "flow": "不良资产转让管理（备选库/组包/尽调/单笔转让/批量转让/执行登记）",
+  "aliases": ["批转备选库", "组包管理", "尽调管理", "转让申请", "转让登记"],
+  "hash_markers": [
+    "ZJJK00210771",
+    "FS00084821PDCP",
+    "AP_TRANS_ALTER",
+    "FS00084888PDCP",
+    "FS00084889PDCP",
+    "AP_TRANS_DUEDIL",
+    "FS00084882PDCP",
+    "AP_TRANS_TRANSAPLY",
+    "FS00084884PDCP",
+    "AP_TRANS_BATCHAPLY",
+    "FS00084886PDCP"
+  ],
+  "keywords": [
+    "批转备选库", "备选库申请", "资产组包", "下发尽调任务", "尽职调查",
+    "单笔转让", "批量转让", "转让方案", "尽调报告", "执行结果登记", "反委托标识"
+  ],
+  "menu_path": "资产保全/资产转让（SUT 实测：批转备选库/组包管理/尽调管理/转让申请/转让登记）",
+  "preconditions": [
+    "备选库/资产包操作权限=总行/一级支行批转业务岗；资产包未下发尽调任务才能修改/删除",
+    "【SUT 实测 2026-09-06】批转备选库/组包管理/尽调管理/转让登记主页均默认不自动加载，需点【查询】",
+    "【SUT 实测 2026-09-06】编号前缀实测：备选库 BXK…、资产包 ZCB…、转让方案 ZCZR…、批量转让 PLZR…",
+    "【SUT 实测 2026-09-06】前端拦截族：已下发尽调任务的资产包点【修改】console 报「调用updateData结果为false」（无 toast，静默拦截）——黑名单按钮点了只 console false 不弹窗，自动化 cue",
+    "【SUT 实测 2026-09-06】FS 双套按节点取号：申请侧与审批侧 fcnScnEcd 不同（如业务上收申请 FS00108608 vs 审批 FS00084866；执行登记详情 FS00084886PDCP 独立于转让申请 FS00084882）",
+    "【SUT 实测 2026-09-06】三步骤向导全模块同构：步骤条(基本信息/影像信息/签署意见)+暂存/保存/下一步/返回"
+  ],
+  "steps": [
+    {
+      "name": "批转备选库主页查询",
+      "leafRef": "wet-test.md 叶45 (ZJJK00210771)",
+      "verify": "match",
+      "menu_path": "资产保全/批转备选库",
+      "behavior": "默认不自动加载，查询后 6 条",
+      "query_fields": ["备选库名称", "合同编号", "借据编号", "客户编号", "客户名称", "流程状态"],
+      "buttons": ["新增", "修改", "收回", "取消申请", "详情"]
+    },
+    {
+      "name": "备选库申请任务页",
+      "leafRef": "wet-test.md 叶46 (ZJJK00211130)",
+      "verify": "match",
+      "enter": "备选库【新增】，URL fcnScnEcd=FS00084821PDCP&flowCode=AP_TRANS_ALTER（14节点）",
+      "wizard_steps": ["基本信息", "影像信息", "签署意见"],
+      "sections": ["方案基本信息", "借据信息", "担保合同信息", "抵质押物信息", "尽职调查报告"],
+      "buttons": ["暂存", "保存"]
+    },
+    {
+      "name": "备选库方案基本信息",
+      "leafRef": "wet-test.md 叶47 (ZJJK00210759)",
+      "verify": "match",
+      "fields": ["备选库项目编号(dis,实测 BXK988120353408)", "备选库名称", "可行性分析", "申请人", "机构", "日期"]
+    },
+    {
+      "name": "备选库借据信息",
+      "leafRef": "wet-test.md 叶48 (ZJJK00210758)",
+      "verify": "match",
+      "columns": ["借据列表 25 列（客户编号…备选库标识）"],
+      "buttons": ["新增", "删除", "客户详情", "合同详情", "借据详情"]
+    },
+    {
+      "name": "备选库新增借据弹窗",
+      "leafRef": "wet-test.md 叶49 (ZJJK00211390)",
+      "verify": "match",
+      "note": "备选库/资产转让/以资抵债共用弹窗组件；无标题",
+      "query_fields": ["客户编号", "客户名称", "证件类型", "证件号码", "合同编号", "借据编号"],
+      "buttons": ["查询", "重置", "取消", "确认"],
+      "rules": ["实证查询返回 16 条"]
+    },
+    {
+      "name": "尽职调查报告组件（撰写）",
+      "leafRef": "wet-test.md 叶52 (ZJJK00248158)",
+      "verify": "match",
+      "enter": "撰写 打开电子文档编辑页 #/edoc/doc-form",
+      "note": "完整模板（一、基本信息/二、借款人基本情况 对公+自然人/三、债权情况/…）+ 暂存/保存/导出Word；复用于备选库与尽调任务两处"
+    },
+    {
+      "name": "资产组包主页查询",
+      "leafRef": "wet-test.md 叶54 (ZJJK00210755)",
+      "verify": "match",
+      "menu_path": "资产保全/组包管理",
+      "behavior": "默认不自动加载，查询后 6 条",
+      "query_fields": ["资产包名称", "已下发任务标志", "组包日期"],
+      "buttons": ["新增", "修改", "删除", "详情", "下发尽调任务"]
+    },
+    {
+      "name": "组包任务页",
+      "leafRef": "wet-test.md 叶55 (ZJJK00210766)",
+      "verify": "match",
+      "enter": "组包【新增】，URL fcnScnEcd=FS00084888PDCP",
+      "sections": ["基本信息", "借据信息", "影像资料"]
+    },
+    {
+      "name": "组包基本信息",
+      "leafRef": "wet-test.md 叶56 (ZJJK00210769)",
+      "verify": "match",
+      "fields": ["资产包编号(dis,实测 ZCB988195135128)", "资产包名称", "转让基准日", "债权总额", "资产包内户数", "借据数", "组包说明"]
+    },
+    {
+      "name": "尽调管理主页查询",
+      "leafRef": "wet-test.md 叶61 (ZJJK00210749)",
+      "verify": "match",
+      "menu_path": "资产保全/尽调管理",
+      "behavior": "默认不自动加载，查询后 8 条",
+      "query_fields": ["资产包编号", "资产包名称", "流程状态", "主办资产保全经理", "下发机构", "下发日期"],
+      "buttons": ["处理", "详情", "撤销"]
+    },
+    {
+      "name": "尽调处理任务页",
+      "leafRef": "wet-test.md 叶62 (ZJJK00211204)",
+      "verify": "match",
+      "enter": "尽调主页【处理】，URL fcnScnEcd=FS00084889PDCP&flowCode=AP_TRANS_DUEDIL",
+      "wizard_steps": ["基本信息(只读)", "借据信息", "尽职调查报告"]
+    },
+    {
+      "name": "尽调基本信息（只读）",
+      "leafRef": "wet-test.md 叶63 (ZJJK00210748)",
+      "verify": "match",
+      "fields": ["任务流水号(dis,JDGL988188605368)", "资产包编号(dis)", "资产包名称(dis)", "转让基准日(dis)"]
+    },
+    {
+      "name": "尽调修改借据弹窗",
+      "leafRef": "wet-test.md 叶65 (ZJJK00211423)",
+      "verify": "match",
+      "enter": "尽调任务页借据行点【修改】",
+      "fields": ["剩余本金", "正常利息", "逾期利息", "三类罚息", "评估机构", "评估日期", "评估价格", "认定价值", "预计收回剩余本金", "预计收回逾期利息", "预计收回三类罚息（其中：…）16 字段"],
+      "buttons": ["保存"]
+    },
+    {
+      "name": "转让方案申请主页（单笔/批量）",
+      "leafRef": "wet-test.md 叶69 (ZJJK00210923)",
+      "verify": "match",
+      "menu_path": "资产保全/转让申请",
+      "query_fields": ["业务类型列=单笔转让/批量转让"],
+      "columns": ["12 条数据；SUT 术语「单笔转让」≠文档「一般转让」（wording）"],
+      "note": "详情打开 URL fcnScnEcd=FS00084882PDCP&flowCode=AP_TRANS_TRANSAPLY（16节点）"
+    },
+    {
+      "name": "转让新增基本信息",
+      "leafRef": "wet-test.md 叶70 (ZJJK00210745)",
+      "verify": "match",
+      "fields": ["方案编号(ZCZR 前缀)", "方案名称", "处置类型(dis,displTp=14 转让)", "业务类型", "转让基准日", "债权总额及分项", "第三方评估值", "债权定价", "预计收回金额分项", "本息损失额", "预计回收率", "处置方式", "转让方式", "方案内容", "可行性分析", "反委托标识"],
+      "rules": ["反委托标识=是时须选反委托客户经理（放大镜弹窗，编辑态可达性见 pendingSteps）"]
+    },
+    {
+      "name": "转让借据信息",
+      "leafRef": "wet-test.md 叶72 (ZJJK00210743)",
+      "verify": "match",
+      "buttons": ["修改", "查看", "下载", "删除", "客户详情", "合同详情", "借据详情", "押品详情"],
+      "note": "列表结构同组包借据"
+    },
+    {
+      "name": "批量转让任务页",
+      "leafRef": "wet-test.md 叶84 (ZJJK00211045)",
+      "verify": "match",
+      "enter": "主页业务类型=批量转让行详情，URL fcnScnEcd=FS00084884PDCP&flowCode=AP_TRANS_BATCHAPLY",
+      "fields": ["方案编号(PLZR 前缀)", "资产包编号", "资产包名称（按资产包归集 ✓）"],
+      "sections": ["基本信息", "借据信息", "担保合同信息", "抵质押物信息", "尽职调查报告"]
+    },
+    {
+      "name": "执行结果登记主页（转让登记）",
+      "leafRef": "wet-test.md 叶85 (ZJJK00210570)",
+      "verify": "match",
+      "menu_path": "资产保全/转让登记（文档「执行结果登记」，wording 微差）",
+      "behavior": "默认不自动加载，查询后 7 条",
+      "buttons": ["执行登记", "详情"],
+      "note": "详情（FS00084886PDCP）页签 新增基本信息/新增借据信息/新增影像资料 三页签"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "组包编辑态操作（借据页签/新增借据弹窗/Excel导入）",
+      "leafRefs": ["wet-test.md 叶57 (ZJJK00210750)", "wet-test.md 叶58 (ZJJK00211434)", "wet-test.md 叶59 (ZJJK00211433)"],
+      "verify": "blocked",
+      "reason": "全部 6 个资产包已下发尽调任务：详情（look）可看借据列表，但【修改】被静默拦截（console「调用updateData结果为false」，无 toast）——已下发不可修改校验实证；编辑态借据页签/借据弹窗/导入模板按钮未达",
+      "retry_condition": "存在未下发尽调任务的资产包时进入编辑态核验"
+    },
+    {
+      "name": "反委托客户经理放大镜弹窗",
+      "leafRefs": ["wet-test.md 叶71 (ZJJK00211329)"],
+      "verify": "blocked",
+      "reason": "详情为 look 态且既有数据反委托标识非「是」，放大镜弹窗不可触发（触发需编辑态+标识选是）",
+      "retry_condition": "反委托标识=是的编辑态转让方案"
+    },
+    {
+      "name": "转让审批链（秘书岗/有权审批人/批复/最终审批/决议/中间节点）",
+      "leafRefs": [
+        "wet-test.md 叶75 (ZJJK00210510)", "wet-test.md 叶76 (ZJJK00210544)",
+        "wet-test.md 叶77 (ZJJK00210509)", "wet-test.md 叶78 (ZJJK00156148)", "wet-test.md 叶79 (ZJJK00164003)",
+        "wet-test.md 叶80 (ZJJK00210508)", "wet-test.md 叶81 (ZJJK00210543)", "wet-test.md 叶82 (ZJJK00211337)",
+        "wet-test.md 叶83 (ZJJK00210497)"
+      ],
+      "verify": "blocked",
+      "reason": "该账号待办/已办无转让审批链在途任务（风险委员会秘书岗/有权审批人/最终有权审批人/中间节点均不可达）；新增批复/新增决议兼属写操作黑名单；「审批按钮仅查看」已在业务上收链（叶19 flowDisabled=true）同类实证",
+      "retry_condition": "业务端推进转让流程至秘书岗/审批人节点后经待办核验（审议结果只读表、批复弹窗=电子档案编号、决议弹窗 AUTH_INST 字典、中间节点审批仅查看）"
+    },
+    {
+      "name": "备选库/组包/尽调/一般转让链「正文未命名」链路编号（结构核到但未命名，not-found 中间态）",
+      "leafRefs": [
+        "wet-test.md 叶50 (ZJJK00244018, blocked：备选库链首节点审批页已核到 viewType=edit 同任务页组件，暂挂)",
+        "wet-test.md 叶51 (ZJJK00210760)", "wet-test.md 叶53 (ZJJK00244413)",
+        "wet-test.md 叶60 (ZJJK00228002)",
+        "wet-test.md 叶64 (ZJJK00210747)", "wet-test.md 叶66 (ZJJK00224000)", "wet-test.md 叶68 (ZJJK00248136)",
+        "wet-test.md 叶73 (ZJJK00244391)", "wet-test.md 叶74 (ZJJK00210741)"
+      ],
+      "verify": "not-found",
+      "reason": "正文未命名编号（备选库链 3 枚/组包链 1 枚/尽调链 3 枚/一般转让链 2 枚）：链节点任务页为同一组件按节点参数化，正文无页面名，无法从 SUT 独立定位唯一页面；影像/签署意见步骤结构已在叶46/62 核到",
+      "retry_condition": "Lead 定名后复测；组包/尽调/转让链另需在途流程（下发尽调任务/流程推进属黑名单）"
+    }
+  ],
+  "sourceRefs": [45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85],
+  "coverage": {"total": 41, "match": 18, "drift": 0, "blocked": 15, "notFound": 8, "gate": "partial"}
+}

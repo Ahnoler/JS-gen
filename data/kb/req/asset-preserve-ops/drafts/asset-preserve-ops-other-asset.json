@@ -1,0 +1,82 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "asset-preserve-ops",
+  "flow": "其他资产（非标业务清单/其他资产清单/非标等资产处置）",
+  "aliases": ["非标业务清单", "其他资产清单", "非标等资产处置"],
+  "hash_markers": [
+    "ZJJK00210567",
+    "FS00084836PDCP",
+    "AP_OTAST_OTAST",
+    "AP_OTAST_OTHER",
+    "AP_OTAST_DISAPLY",
+    "bsnListTp"
+  ],
+  "keywords": [
+    "非标业务", "其他资产", "交易对手信息", "实际用款人", "融资情况", "担保及押品情况",
+    "风险状况", "处置化解措施", "非标等资产处置", "现金清收"
+  ],
+  "menu_path": "资产保全/其他资产/…",
+  "preconditions": [
+    "角色数据权限（保全经理/三农岗/其他）；多角色审批人可选",
+    "【SUT 实测 2026-09-06】其他资产清单【新增】实际复用非标任务页组件（URL fcnScnEcd=FS00084836PDCP&flowCode=AP_OTAST_OTAST&bsnListTp=2），非文档口径的独立任务页 ZJJK00210559/FS00084820（AP_OTAST_OTHER）——组件参数化代际共存，引擎按参数理解更稳",
+    "【SUT 实测 2026-09-06】文档「融资信息」在 SUT 为「融资情况」（wording）",
+    "【SUT 实测 2026-09-06】三步骤向导同构：基本信息(10 子页签)/影像信息/签署意见"
+  ],
+  "steps": [
+    {
+      "name": "非标业务清单主页查询",
+      "leafRef": "wet-test.md 叶178 (ZJJK00210567)",
+      "verify": "match",
+      "menu_path": "资产保全/其他资产/非标业务清单",
+      "behavior": "自动加载 1 条（QTZC20260708008001，生效状态 失效/流程状态 待处理）",
+      "query_fields": ["机构名称(树)", "实际用款人全称", "证件号码"],
+      "buttons": ["新增", "修改", "收回", "取消申请", "详情", "分配保全经理", "变更记录", "下载"],
+      "columns": ["24 列（业务流水号…备注，含预计 1/2/3/3+ 年本金处置金额、抵质押物评估价值列）"]
+    },
+    {
+      "name": "非标业务清单任务页（10 子页签）",
+      "leafRef": "wet-test.md 叶179 (ZJJK00210776)",
+      "verify": "match",
+      "enter": "非标清单【新增】，URL fcnScnEcd=FS00084836PDCP&flowCode=AP_OTAST_OTAST",
+      "wizard_steps": ["基本信息", "影像信息", "签署意见"],
+      "tabs": ["基本信息", "交易对手信息", "实际用款人信息", "融资情况（含通道情况+收回记录表）", "担保及押品情况（含抵押/质押明细表）", "风险状况（含展期业务+潜在风险表）", "简要描述风险成因 0/2000", "处置化解措施及计划", "抵质押物评估价值", "备注 0/4000"],
+      "buttons": ["暂存", "保存", "下一步", "返回"]
+    },
+    {
+      "name": "其他资产清单任务页（复用非标组件）",
+      "leafRef": "wet-test.md 叶180 (ZJJK00210559)",
+      "verify": "drift",
+      "drift": "api-contract：其他资产清单【新增】实际复用非标任务页组件（URL …FS00084836PDCP&flowCode=AP_OTAST_OTAST&bsnListTp=2），非文档口径的独立任务页 ZJJK00210559/FS00084820（AP_OTAST_OTHER）；页签结构与非标任务页相同；流程节点表（23 节点会签）无页面级证据，维持文档口径待流程数据核验",
+      "tabs": ["同叶179 十子页签+影像+签署意见"]
+    },
+    {
+      "name": "非标等资产处置主页",
+      "leafRef": "wet-test.md 叶181 (ZJJK00210554)",
+      "verify": "match",
+      "menu_path": "资产保全/其他资产/非标等资产处置",
+      "behavior": "自动加载 1 条（QTZC20260708008026，处置类型 现金清收，流程状态 待处理）",
+      "query_fields": ["方案编号", "方案名称", "处置类型"],
+      "buttons": ["新增", "修改", "收回", "取消申请", "详情"],
+      "columns": ["11 列（含业务类型/处置类型）"],
+      "rules": ["【详情】look 态：方案编号/名称/处置类型 disabled + 非标等资产信息页签（业务流水号/业务号借据编号/业务类型/交易对手全称/实际用款人全称/证件号码列）+下一步/返回；URL flowCode=AP_OTAST_DISAPLY"]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "批复信息/有权机构决议/员工查询弹窗（复用组件依赖审批链）",
+      "leafRefs": ["wet-test.md 叶100/104/105 同因（章08 复用组件运行记录）", "wet-test.md 叶163 同因（分配保全经理员工查询弹窗）"],
+      "verify": "blocked",
+      "reason": "批复信息（ZJJK00210542/00211336）与有权机构决议（ZJJK00210543/00211337）依赖在途审批任务（无在途任务）；分配保全经理员工查询弹窗入口存在但需选中记录（列表已选中场景未达）",
+      "retry_condition": "非标/其他资产处置流程推进至审批节点后经待办核验；存在清单记录后核员工查询弹窗"
+    },
+    {
+      "name": "其他资产清单独立任务页（AP_OTAST_OTHER/FS00084820）",
+      "leafRefs": ["wet-test.md 叶180 复合证据（23 节点会签流程节点表）"],
+      "verify": "blocked",
+      "reason": "流程节点表（23 节点会签）无页面级证据；SUT 实际以 bsnListTp=2 复用非标组件",
+      "retry_condition": "Lead 定名/确认组件归并口径后，有其他资产在途流程时核审批节点页"
+    }
+  ],
+  "sourceRefs": [178, 179, 180, 181],
+  "coverage": {"total": 4, "match": 3, "drift": 1, "blocked": 0, "notFound": 0, "gate": "partial"}
+}
