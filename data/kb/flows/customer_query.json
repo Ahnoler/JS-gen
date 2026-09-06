@@ -128,5 +128,5 @@
     },
     "【SUT 实测 2026-09-06】文档自述「已知缺陷：同业台账客户名称筛选未生效」在当前版本不复现——输入「交通」精确过滤为 1 条，筛选已生效；勿按旧缺陷写降级逻辑"
   ],
-  "source": "湿测 traj#526（recorded，stepCount=4，functionId=9000000039）；stamp KB测客户-20260905-1315；列表 hit=true（hash=#/cstMgt/csinfEnqr/cstEnqr）；cstNo=26090513160716537；req-promote 2026-09-06"
+  "source": "湿测 traj#526（recorded，stepCount=4，functionId=9000000039）；stamp KB测客户-20260905-1315；列表 hit=true（hash=#/cstMgt/csinfEnqr/cstEnqr）；cstNo=26090513160716537；req-promote 2026-09-06；贯通验证 2026-09-06 traj 530（业务 stamp/结构 CDP 实证，DONE_WITH_CONCERNS）"
 }
