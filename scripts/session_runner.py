@@ -519,6 +519,15 @@ async def run_session(args):
                     f"Business scenario text ready ({len(business_data_block.strip())} chars)\n"
                 )
                 sys.stderr.flush()
+
+            # 全局硬性成功门闩（用户需求中的【硬性成功门闩/门槛——…】块）；未编写则不下发
+            success_gates_block = data.get("success_gates_block") or data.get("successGatesBlock")
+            if isinstance(success_gates_block, str) and success_gates_block.strip():
+                business_data_store['_success_gates_text'] = success_gates_block.strip()
+                sys.stderr.write(
+                    f"Success gates text ready ({len(success_gates_block.strip())} chars)\n"
+                )
+                sys.stderr.flush()
             if not business_data_loaded and (business_data_inline or business_data_file):
                 try:
                     imported = {}

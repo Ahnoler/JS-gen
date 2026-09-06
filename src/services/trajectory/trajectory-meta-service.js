@@ -19,6 +19,7 @@ export {
   stripBusinessDataBlock,
   phaseNeedsBusinessData,
   extractBusinessDataBlock,
+  extractSuccessGatesBlock,
   extractBusinessEntriesFromRequirement,
 } from './trajectory-text-extract.js';
 
@@ -148,7 +149,7 @@ export async function analyzeRequirementToPhases({
     '2. 识别编号格式如「1、」「1.」「1)」「（1）」等；每条编号对应 phases 中的一项。',
     '3. 若用户未编号、只是连贯段落，再按自然操作边界拆分；有编号时禁止改写条数。',
     '4. 「业务数据 / 关键数据 / 测试数据」等段落不是操作步骤，不要计入 phases、不要拆成键值对。',
-    '5. 「硬性成功门槛」「禁止…」等约束性规则行（如【硬性成功门槛——…】、【禁止点击…】）是全局约束，不是操作步骤：既不计入 phases，也不要把这类文字复制进任何 phase 字符串（系统与执行端会另行处理这些约束）。',
+    '5. 「硬性成功门闩/门槛」「禁止…」等约束性规则行（如【硬性成功门闩——…】、【禁止点击…】）是全局约束，不是操作步骤：既不计入 phases，也不要把这类文字复制进任何 phase 字符串（系统会在录制时作为全局约束另行下发给执行端）。',
     '6. 每个阶段必须是简短、可执行的中文操作描述，避免“分析/思考/总结”等元话术。',
     '7. 不要在 phases 字符串里复制任何业务数据（业务数据由系统在录制时统一注入到任务上下文，不写入阶段描述）。',
     '',
@@ -192,8 +193,8 @@ export async function analyzeRequirementToPhases({
   let phases = (parsed.phases || [])
     .filter((p) => !BUSINESS_DATA_SECTION_RE.test(p))
     .filter((p) => !/^(案例数据|关键数据)/.test(p))
-    // 门槛/禁止类约束行不是操作步骤（执行侧由 boundary gates 处理），LLM 漏带时兜底剔除
-    .filter((p) => !/^【?\s*(硬性成功门槛|禁止|不得|严禁)/.test(p));
+    // 门槛/门闩/禁止类约束行不是操作步骤（执行侧由 boundary gates + success_gates_block 处理），兜底剔除
+    .filter((p) => !/^【?\s*(硬性成功门[槛闩]|禁止|不得|严禁)/.test(p));
 
   // 业务数据不再逐条追加进 phase.description（落库保持干净目标文本）；
   // 录制时由执行机 format_business_data_hint 在需要的阶段的任务文本后统一注入一次。

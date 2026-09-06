@@ -170,3 +170,22 @@ export function appendBusinessDataToPhases(phases, caseBlock) {
     return text + suffix;
   });
 }
+
+/**
+ * Extract the global hard-success-gate block (【硬性成功门闩/门槛——…】) from a
+ * requirement text. The block starts at the gate header line and ends before the
+ * first numbered step or a business-data section header. Empty when absent —
+ * users who skip writing gates simply get no injection downstream.
+ * @param {string} text requirement original text (trajectory.task)
+ * @returns {string} gate block text (header + bullets), '' when not present
+ */
+export function extractSuccessGatesBlock(text) {
+  const m = String(text || '').match(
+    // 门闩块 = 头行 + 若干「-」条目行；遇编号步骤行即止（编号属于操作步骤）
+    /^[ \t]*【?\s*硬性成功门[槛闩][^\n]*】?[^\n]*\n(?:[ \t]*[-*•][^\n]*\n?)*/m,
+  );
+  if (!m) return '';
+  const block = m[0].trim();
+  // 至少要有头行之外的一行内容才算有效块，避免只截到孤零零的标题
+  return block.includes('\n') ? block : '';
+}

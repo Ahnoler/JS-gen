@@ -185,12 +185,15 @@ export async function prepareBusinessDataInjection(trajectoryId) {
     const {
       extractBusinessEntriesFromRequirement,
       extractBusinessDataBlock,
+      extractSuccessGatesBlock,
     } = await import('./trajectory-meta-service.js');
 
     const trajDao = await import('../../dao/trajectory-dao.js');
     const traj = await trajDao.getById(tid);
     const taskText = traj?.task || '';
     const businessDataBlock = extractBusinessDataBlock(taskText) || '';
+    // 全局硬性成功门闩（用户未编写则为空串，下游不注入）
+    const successGatesBlock = extractSuccessGatesBlock(taskText);
 
     // 扁平 KV：有则用；空则从 task 兜底解析并落库（记忆摄取仍可用）
     let flat = await loadFlatDictByTrajectory(tid);
@@ -215,15 +218,19 @@ export async function prepareBusinessDataInjection(trajectoryId) {
     if (businessDataBlock) {
       console.log(`[record] business-data block ready (${businessDataBlock.length} chars) for AI context`);
     }
+    if (successGatesBlock) {
+      console.log(`[record] success-gates block ready (${successGatesBlock.length} chars)`);
+    }
     return {
       businessDataFile: null,
       businessData: flat && Object.keys(flat).length ? flat : null,
       businessDataBlock,
+      successGatesBlock,
     };
   } catch (err) {
     console.warn('[record] business-data injection skipped:', err?.message || err);
   }
-  return { businessDataFile: null, businessData: null, businessDataBlock: '' };
+  return { businessDataFile: null, businessData: null, businessDataBlock: '', successGatesBlock: '' };
 }
 
 

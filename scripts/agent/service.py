@@ -449,6 +449,18 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
     if not max_steps_resolved:
         ceiling, max_steps = _resolve_phase_budget(max_steps, contract, heal_mode)
     try:
+        # 全局硬性成功门闩：用户在需求中编写了【硬性成功门闩/门槛——…】块时，
+        # 每个阶段的任务文本后统一追加一次（全局约束，与阶段类型无关）。
+        if business_data_ref and not heal_mode:
+            gates_text = str(business_data_ref.get('_success_gates_text') or '').strip()
+            if gates_text:
+                agent_task = agent_task + '\n\n' + gates_text
+                sys.stderr.write(f"Appended success gates ({len(gates_text)} chars)\n")
+                sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"success gates append skipped: {e}\n")
+        sys.stderr.flush()
+    try:
         from ..controller.actions._business_data import format_business_data_hint, iter_user_business_entries
         if want_biz:
             entries = iter_user_business_entries(business_data_ref)

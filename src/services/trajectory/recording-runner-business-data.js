@@ -22,7 +22,8 @@ import { prepareBusinessDataInjection } from './trajectory-record-lifecycle.js';
  */
 export async function prepareRecordingBusinessContext(tid) {
   // 业务数据：仅填表/引入类阶段注入；导航/登录/查询不挂，避免「填写」污染分类。
-  const { businessDataFile, businessData, businessDataBlock } = await prepareBusinessDataInjection(tid);
+  const { businessDataFile, businessData, businessDataBlock, successGatesBlock } =
+    await prepareBusinessDataInjection(tid);
   const {
     phaseNeedsBusinessData,
     stripBusinessDataBlock,
@@ -36,6 +37,7 @@ export async function prepareRecordingBusinessContext(tid) {
     businessDataFile,
     businessData,
     businessDataBlock,
+    successGatesBlock,
     caseBlockSuffix,
     CASE_BLOCK_MARK,
     CASE_BLOCK_MARK_LEGACY,
@@ -59,6 +61,10 @@ export function applyBusinessDataToStep(stepData, instruction, ctx) {
   // 历史 trajectory 的 description 可能已内嵌块，这里统一剥离避免同文重复。
   instruction = ctx.stripBusinessDataBlock(instruction);
   stepData.instruction = instruction;
+  // 全局硬性成功门闩：每个阶段都下发（与阶段类型无关），用户未编写时为空不挂
+  if (ctx.successGatesBlock) {
+    stepData.success_gates_block = ctx.successGatesBlock;
+  }
   if (wantBiz && ctx.businessDataBlock) {
     stepData.business_data_block = ctx.businessDataBlock;
   }
