@@ -47,5 +47,5 @@
       ]
     }
   ],
-  "source": "req-promote 2026-09-06（湿测叶 1 张，match 1/drift 0）"
+  "source": "req-promote 2026-09-06（湿测叶 1 张，match 1/drift 0）；贯通验证 2026-09-06 traj 544（0步只读）（业务 stamp/结构 CDP 实证，DONE/DONE_WITH_CONCERNS）"
 }

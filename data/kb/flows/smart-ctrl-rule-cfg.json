@@ -202,5 +202,5 @@
       "source": "req-promote 2026-09-06"
     }
   ],
-  "source": "req-promote 2026-09-06（湿测叶 13 张，match 10/drift 3）"
+  "source": "req-promote 2026-09-06（湿测叶 13 张，match 10/drift 3）；贯通验证 2026-09-06 traj 542（0步只读，CDP 截图链实证；修正列表行数 1163→353）（业务 stamp/结构 CDP 实证，DONE/DONE_WITH_CONCERNS）"
 }

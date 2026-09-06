@@ -130,5 +130,5 @@
       "note": "（SUT 实测修正）"
     }
   ],
-  "source": "req-promote 2026-09-06（湿测叶 6 张，match 3/drift 3）"
+  "source": "req-promote 2026-09-06（湿测叶 6 张，match 3/drift 3）；贯通验证 2026-09-06 traj 543（0步只读；修正行数 602→266）（业务 stamp/结构 CDP 实证，DONE/DONE_WITH_CONCERNS）"
 }

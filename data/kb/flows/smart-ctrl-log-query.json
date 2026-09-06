@@ -100,5 +100,5 @@
   "exceptions": [
     "【SUT 实测 2026-09-06】应用场景列同解除查询出现裸码\"5\"（字典未翻译，SUT 数据级缺陷，取值需容忍裸码混排）"
   ],
-  "source": "req-promote 2026-09-06（湿测叶 3 张，match 3/drift 0）"
+  "source": "req-promote 2026-09-06（湿测叶 3 张，match 3/drift 0）；贯通验证 2026-09-06 traj 547/548（业务 stamp/结构 CDP 实证，DONE/DONE_WITH_CONCERNS）"
 }
