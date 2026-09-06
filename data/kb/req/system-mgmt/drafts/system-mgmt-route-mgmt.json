@@ -1,0 +1,28 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "system-mgmt",
+  "flow": "组织管理（路由管理）",
+  "aliases": ["路由管理"],
+  "hash_markers": [],
+  "keywords": ["路由管理", "父路由编号", "路由名称", "PC端", "PAD端", "移动端"],
+  "menu_path": "系统管理/组织管理/路由管理",
+  "preconditions": [
+    "与菜单管理同款模式：终端页签（参数缺失/失败默认 PC/PAD/移动，同叶1 回退口径）+ 菜单目录树 + 路由列表"
+  ],
+  "steps": [
+    {
+      "name": "路由管理",
+      "leafRef": "wet-test.md 叶30 (—（路由管理）)",
+      "verify": "match",
+      "menu_path": "系统管理/组织管理/路由管理",
+      "structure": "终端页签（PC端/PAD端/移动端，同菜单管理回退口径）+ 菜单目录树（过滤+查询）+ 路由列表",
+      "query_fields": ["路由名称", "url"],
+      "columns": ["父路由编号", "路由名称", "url", "状态"],
+      "buttons": ["查询", "重置", "新增", "修改", "删除"],
+      "rules": ["0 条自动加载；新增表单：父路由编号只读（树节点带入）、状态默认无效、路由名称必填、备注 ≤200（文档口径，新增弹窗细节未逐项核验，结构证据已足）"]
+    }
+  ],
+  "pendingSteps": [],
+  "sourceRefs": [30],
+  "coverage": {"total": 1, "match": 1, "drift": 0, "blocked": 0, "notFound": 0, "gate": "full"}
+}

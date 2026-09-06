@@ -1,0 +1,24 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "digital-loan-desk",
+  "flow": "签约授权（授权书查阅）",
+  "aliases": ["授权书管理", "查看授权书列表"],
+  "hash_markers": ["ZJJK00248304PDCP"],
+  "keywords": ["签约授权", "授权书", "授权准入记录", "协议编号", "预览", "下载"],
+  "menu_path": "签约授权/授权书管理/查看授权书列表（文档口径）",
+  "preconditions": [
+    "【湿测铁证 2026-09-06】账号 701994 菜单树无此入口：顶部导航逐组展开实测 + POST /tansun-tcp-sys/menu（Bearer 取自 localStorage）全量授权菜单树检索均无「签约授权」「授权书」字样（Bearer 菜单树实证，同预授信名单块叶1 证据）"
+  ],
+  "steps": [],
+  "pendingSteps": [
+    {
+      "name": "查看授权书列表主页（检索→展开→预览/下载 全链）",
+      "leafRefs": ["wet-test.md 叶84 (ZJJK00248304PDCP)"],
+      "verify": "not-found",
+      "reason": "「签约授权→授权书管理」菜单在 SUT 菜单树不存在（API 全量菜单树+顶部导航双实证），授权书查阅链（按客户名称/产品名称查询→按签约时间倒序展开→查看预览/下载）不可达",
+      "retry_condition": "需具备「签约授权→授权书管理」菜单权限的账号"
+    }
+  ],
+  "sourceRefs": [84],
+  "coverage": {"total": 1, "match": 0, "drift": 0, "blocked": 0, "notFound": 1, "gate": "not-found-env"}
+}

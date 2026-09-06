@@ -1,0 +1,39 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "digital-loan-desk",
+  "flow": "预授信名单管理（对公/个人维护+批量导入）",
+  "aliases": ["对公预授信名单管理", "个人预授信名单管理", "预授信名单批量导入"],
+  "hash_markers": ["ZJJK00248303PDCP", "ZJJK00248239PDCP", "FS00108621PDCP", "FS00108620PDCP", "ZJJK00128013"],
+  "keywords": ["预授信名单", "对公预授信", "个人预授信", "授信额度测算", "文件导入", "模板下载"],
+  "menu_path": "数字信贷/预授信名单管理（文档口径）",
+  "preconditions": [
+    "【湿测铁证 2026-09-06】账号 701994（黄某某，X0023）无法到达本业务块：顶部导航逐组展开仅「数字信贷」下 5 组管理页（业务授权配置/数据指标管理/营销产品管理/对私进件分配·受理/对公进件分配·受理），无「预授信名单管理」",
+    "【湿测铁证 2026-09-06】POST /tansun-tcp-sys/menu（Bearer 取自 localStorage）返回的全量授权菜单树全文检索无「预授信」字样；任务事项→待办任务 142 条亦无预授信名单类任务——Bearer 菜单树实证整块 not-found"
+  ],
+  "steps": [],
+  "pendingSteps": [
+    {
+      "name": "对公预授信名单链（主页→新增任务页→维护客户信息→上传影像→额度测算→查看侧）",
+      "leafRefs": ["wet-test.md 叶1 (ZJJK00248303PDCP)", "wet-test.md 叶2 (ZJJK00248296PDCP)", "wet-test.md 叶3 (ZJJK00248293PDCP)", "wet-test.md 叶4 (ZJJK00125149)", "wet-test.md 叶5 (ZJJK00248295PDCP)", "wet-test.md 叶6 (ZJJK00248298PDCP)", "wet-test.md 叶7 (ZJJK00248239PDCP)"],
+      "verify": "not-found",
+      "reason": "菜单树（API 全量）与顶部导航实测均无「预授信名单管理」入口，主页 not-found 级联全链不可达",
+      "retry_condition": "需具备「预授信名单管理」菜单权限的账号"
+    },
+    {
+      "name": "个人预授信名单链（主页→新增任务页→维护个人信息→额度测算→查看侧）",
+      "leafRefs": ["wet-test.md 叶8 (ZJJK00248239PDCP)", "wet-test.md 叶9 (ZJJK00248255PDCP)", "wet-test.md 叶10 (ZJJK00248251PDCP)", "wet-test.md 叶11 (ZJJK00248253PDCP)", "wet-test.md 叶12 (ZJJK00248275PDCP)", "wet-test.md 叶13 (ZJJK00248274PDCP)", "wet-test.md 叶14 (ZJJK00248273PDCP)"],
+      "verify": "not-found",
+      "reason": "同叶1：入口不可达，个人链级联 not-found",
+      "retry_condition": "同上（预授信名单管理菜单权限）"
+    },
+    {
+      "name": "预授信名单批量导入（文件导入弹窗，对公/个人共用组件）",
+      "leafRefs": ["wet-test.md 叶15 (ZJJK00128013)"],
+      "verify": "not-found",
+      "reason": "主页不可达，导入弹窗无从打开",
+      "retry_condition": "同上"
+    }
+  ],
+  "sourceRefs": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  "coverage": {"total": 15, "match": 0, "drift": 0, "blocked": 0, "notFound": 15, "gate": "not-found-env"}
+}

@@ -1,0 +1,25 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "collateral-info",
+  "flow": "修改押品基本信息（任务页 12 折叠区）",
+  "aliases": ["客户经理修改押品基本信息任务页", "押品修改"],
+  "hash_markers": ["FS00005721", "UML00085198", "CstmgrModCltlBscInf", "getPermission"],
+  "keywords": ["修改押品", "12折叠区", "基本信息", "共有权人信息", "价值信息", "权证信息", "保险信息", "影像信息", "押品团队管理", "权限移交信息", "违约损失信息", "股权类模板"],
+  "menu_path": "押品管理/押品信息管理/押品信息管理【修改】",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】场景号补录（文档零 FS 号，URL 暴露）：fcnScnEcd=FS00005721 / avyEcd=UML00085198（CstmgrModCltlBscInf）——修改/查看同容器路由",
+    "【SUT 实测 2026-09-06】仅经办人（创建人）可改：非本人经办记录点【修改】被前端拦截「调用getPermission结果为false」×5"
+  ],
+  "steps": [],
+  "pendingSteps": [
+    {
+      "name": "客户经理修改押品基本信息任务页",
+      "leafRefs": ["wet-test.md 叶5 (—（客户经理修改押品基本信息任务页）)"],
+      "verify": "blocked",
+      "reason": "blocked-权限拦截：选中暂存记录点【修改】无跳转，console 前端拦截原文「调用getPermission结果为false」（×5）——非本人经办记录被拦（账号 701994 非该押品创建人）。结构证据已经【查看】（同族任务页 FS00005721，viewType=look）证得 12 折叠区：基本信息/其他信息/共有权人信息/价值信息/权证信息/保险信息/补充信息/影像信息/关联贷款信息/押品团队管理/权限移交信息/违约损失信息——SUT 实为折叠区（collapse）非文档「标签页」措辞；股权类模板字段 24 项（股票代码/警戒线/平仓线等）；过程表暂存、审批通过前不回写正式表（文档口径）",
+      "retry_condition": "以创建人账号（如 NN0005）登录走【修改】核编辑态"
+    }
+  ],
+  "sourceRefs": [5],
+  "coverage": {"total": 1, "match": 0, "drift": 0, "blocked": 1, "notFound": 0, "gate": "partial"}
+}

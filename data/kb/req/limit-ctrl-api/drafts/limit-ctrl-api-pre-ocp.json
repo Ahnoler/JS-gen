@@ -1,0 +1,32 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "limit-ctrl-api",
+  "flow": "额度预占用生命周期（预占用→预占转实占）",
+  "aliases": ["额度预占用", "额度预占转实占", "预占闭环"],
+  "hash_markers": ["1.1.6", "1.1.7", "preOcp"],
+  "keywords": ["额度预占用", "预占转实占", "预占用流水号", "释放剩余额度标志", "预占金额"],
+  "menu_path": "（纯接口，无页面；实证通道=查询交易信息 trdlog）",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】写操作黑名单禁止主动调用；间接通道核查：查询交易信息全量 1031 笔历史报文（2026-08~09 窗口）交易码分布为 doOcpCheck/doQotOccupyCheck/lmtRgst/doOcp/lmtRgstAndOcp/synGrpMemberRel/doOcpRevoke/batchQotRecalculationTrans/doReverse 九种——无任何预占用交易码（无 doPreOcp/preOcp 类）；查询占用信息页 0 条亦无预占痕迹",
+    "1.1.6 按「已用金额」累计 vs 1.1.7「已用不变」的记账口径矛盾仍未解，为补测最需验证项"
+  ],
+  "steps": [],
+  "pendingSteps": [
+    {
+      "name": "额度预占用（1.1.6）",
+      "leafRefs": ["wet-test.md 叶5 (接口 1.1.6，chapters/06)"],
+      "verify": "blocked",
+      "reason": "黑名单禁止主动调用；trdlog 1031 笔历史窗口无预占用交易码，业务页面亦无预占痕迹——接口存在性仅能由文档单源背书",
+      "retry_condition": "发生预占业务（外部系统调用预占用接口或经预占流程的业务单据）后经查询交易信息/额度台账核对记账口径（重点：已用金额 vs 预占金额归属，1.1.6/1.1.7 口径矛盾）；补测=API 通道"
+    },
+    {
+      "name": "额度预占转实占（1.1.7）",
+      "leafRefs": ["wet-test.md 叶6 (接口 1.1.7，chapters/07)"],
+      "verify": "blocked",
+      "reason": "同叶5：历史窗口无预占转实占交易码，占用侧只有直接实占 doOcp 与授用一体 lmtRgstAndOcp",
+      "retry_condition": "先完成叶5 预占用补测，再经业务流程转实占，核对「预占金额减少/实占金额增加/已用不变」与「释放剩余额度标志」行为；补测=API 通道"
+    }
+  ],
+  "sourceRefs": [5, 6],
+  "coverage": {"total": 2, "match": 0, "drift": 0, "blocked": 2, "notFound": 0, "gate": "blocked-pending"}
+}

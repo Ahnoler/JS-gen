@@ -1,0 +1,11 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "digital-mobile",
+  "cardType": "NOT-FOUND",
+  "flow": "面客移动端（数字化信贷-移动端分册）——整模块不可达特殊说明卡",
+  "aliases": ["数字化信贷面客移动端", "移动端H5", "对公/对私进件移动端"],
+  "notFoundReason": "整模块 93 叶全部判 not-found（2026-09-06）：面客移动端为手机 H5/小程序形态 C 端应用，与 PC 门户是两个独立前端交付物；当前测试环境仅部署/暴露 PC 门户。五层探测实证（≤10 分钟窗口，详见 wet-test.md 运行记录·探测报告与入口裁定）：①PC 端「数字信贷」一级菜单仅 5 组管理端页面，无移动端预览/模拟器/H5 入口；②主 bundle 提取 22 条 SPA 路由均为 PC 门户路由，mobile-credit-application 仅为菜单图标资源名；③常见 H5 路径（/mobile /h5 /m /app /wap）均回源同一 PC index.html（SPA history fallback），无独立移动端 bundle；④微前端子应用注册表 17 个子应用全为 PC 端，无任何移动端/H5 子应用注册（注册地址为内网 IP 不可达）；⑤移动视口 390×844 复验，SPA 仍渲染 PC 门户并重定向 #/home，无按 UA/视口切换的移动形态。",
+  "coverage": {"total": 93, "notFound": 93, "gate": "not-found-env"},
+  "retest": "需银行方提供移动端环境/独立 H5 URL（或 H5 域名/二维码）后整模块重测；复用页存在性核查（ZJJK00204359/00204007/00196098/00180005/00204020/00204004、章9 斜杠组、ZJJK00204103、章8 查看股决结果主页）随全表一并留待补测",
+  "sourceRefs": ["wet-test.md 运行记录·探测报告与入口裁定（2026-09-06）", "wet-test.md 判定表叶1~93（not-found 2026-09-06）"]
+}

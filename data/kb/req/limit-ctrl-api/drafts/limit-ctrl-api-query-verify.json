@@ -1,0 +1,61 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "limit-ctrl-api",
+  "flow": "额度查询核对闭环（占用校验试算 + 集团成员同步 + 单笔/列表/节点查询）",
+  "aliases": ["额度占用校验", "集团成员关系同步", "额度查询单笔", "额度列表查询", "节点列表查询", "doOcpCheck", "synGrpMemberRel"],
+  "hash_markers": ["doOcpCheck", "synGrpMemberRel", "1.1.2", "1.1.8", "1.1.9", "1.1.10", "1.1.11", "lmtUseQuery", "stmInf"],
+  "keywords": ["占用校验", "试算", "集团成员", "幂等", "额度查询", "节点列表", "额度体系"],
+  "menu_path": "额度管控/额度查询统计/查询额度信息、查询额度体系（间接等价通道）",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】doOcpCheck 成功 191/失败 5（窗口最高频之一）；synGrpMemberRel 44 笔全成功",
+    "【SUT 实测 2026-09-06】行为对照：查询额度信息/查询交易信息默认自动加载（145 条/1031 条），查询占用信息默认不加载需手动查询——同模块内两种行为并存，不可下钻为普适规则",
+    "【SUT 实测 2026-09-06】查询额度体系页 4 个 tab（对公/零售/同业/集团）可视化面板渲染为空（API stmInf/list 有数据，前端 graph 未绘制）——疑似前端缺陷"
+  ],
+  "steps": [
+    {
+      "name": "额度占用校验（doOcpCheck，试算不改数据）",
+      "leafRef": "wet-test.md 叶16 (接口 1.1.2，chapters/02)",
+      "verify": "match",
+      "match_rule": "接口叶：交易码 doOcpCheck",
+      "req_fields": ["cstNo", "cstTp", "nodeNo", "bsnJrnlNo", "abvqtOcpInd:\"0\"", "bsnInf{ctrNo, ctrAmt, esrAmt, exrt, oriCcy, ctrSt, ctrStdt, ctrexpdt, pdNo}", "multOcpList[]"],
+      "rules": [
+        "与文档规则1必填集对应；多占客户列表字段名实测为 multOcpList",
+        "成功响应 rspData=`[]`=校验通过（规则3实测吻合）；不改数据语义由「校验通过后额度台账 usedAmt 不变」间接成立",
+        "失败原文：`客户编号260610093437282160节点编号CP03988120251146的额度信息为空`=规则4按客户编号+节点编号查询未找到拒绝；规则5/6/8/9 无对应用例未验证"
+      ]
+    },
+    {
+      "name": "集团成员关系同步（synGrpMemberRel，幂等）",
+      "leafRef": "wet-test.md 叶17 (接口 1.1.8，chapters/08)",
+      "verify": "match",
+      "match_rule": "接口叶：交易码 synGrpMemberRel，44 笔全成功",
+      "req_fields": ["grpcstNo(集团客户编号)", "cstNo(成员客户编号)", "chgTp:\"01\"(变更类型)", "totGrpNo", "totGrpMbrInd", "tenantId"],
+      "rules": ["与文档规则1必填对应；chgTp 实测 \"01\"（加入，推测，退出码未见样本）；幂等规则无重复提交样本，但 44 笔连续成功无 DuplicateKey（对照 lmtRgst 有 1 笔）与幂等设计相容"]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "额度查询（单笔，1.1.9）",
+      "leafRefs": ["wet-test.md 叶13 (接口 1.1.9，chapters/09)"],
+      "verify": "blocked",
+      "reason": "Lead 裁定：查询类接口无前端对外入口，判 blocked。间接能力存在：内部查询链 tansun-tcp-ulm/ulm/lmtUseQuery/getCoreInfByIdTree（按客户返回单额度体系全部节点含主节点/prnLmtNo 父额度编号/lmtAmt/avlAmt/usedAmt/frzAmt/rvlInd/st）+ 额度详情页（FS00001644）单节点全字段——查询语义内部通道等价可得，但对外单笔接口（按额度编号、未找到返回「数据不存在」）无法只读触发",
+      "retry_condition": "开放 API 调用通道；补测=API 通道"
+    },
+    {
+      "name": "额度列表查询（1.1.10）",
+      "leafRefs": ["wet-test.md 叶14 (接口 1.1.10，chapters/10)"],
+      "verify": "blocked",
+      "reason": "Lead 裁定 blocked。间接能力存在：查询额度信息页（FS00001644 列表页）即等价分页额度列表，自动加载 145 条，后端 lmtUseQuery/findCoreInfGroup 返回 PageHelper 分页结构，行字段 cstNo/cstNm/cstTp/lmtAmt/avlAmt/usedAmt；对外接口查询条件组合（客户编号列表/批复编号/产品编号/查询类型）与「三者均空拒绝」规则不可只读验证",
+      "retry_condition": "开放 API 调用通道；补测=API 通道"
+    },
+    {
+      "name": "节点列表查询（1.1.11）",
+      "leafRefs": ["wet-test.md 叶15 (接口 1.1.11，chapters/11)"],
+      "verify": "blocked",
+      "reason": "Lead 裁定 blocked。间接能力存在：①查询额度体系页 4 tab（对公/零售/同业/集团）+ ulm/stmInf/list 返回体系节点树（对公授信额度汇总节点+15 子节点各带 scnId）；②额度详情页 getCoreInfByIdTree 返回节点属性（lmtNodeNo/nodeNm/prnLmtNo/rvlInd/st）——「从额度体系节点表查询节点清单」语义成立；对外接口过滤条件（末级节点标志/节点编号列表）不可只读验证",
+      "retry_condition": "开放 API 调用通道；补测=API 通道"
+    }
+  ],
+  "sourceRefs": [13, 14, 15, 16, 17],
+  "coverage": {"total": 5, "match": 2, "drift": 0, "blocked": 3, "notFound": 0, "gate": "partial"}
+}

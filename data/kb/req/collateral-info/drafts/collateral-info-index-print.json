@@ -1,0 +1,33 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "collateral-info",
+  "flow": "工具支撑（价格指数 + 存单质押归还打印）",
+  "aliases": ["价格指数", "打印存单质押归还", "存单质押归还打印页"],
+  "hash_markers": ["prtLoadDtlTmp"],
+  "keywords": ["价格指数", "省-市-区县三级联动", "存单质押归还", "押品信息下载和打印", "归还本金", "借据选择", "prtLoadDtlTmp"],
+  "menu_path": "押品管理/押品估值管理/价格指数（not-found） · 押品管理/押品信息管理【押品信息下载和打印】",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】押品估值管理子菜单实测 5 项（汽车估值计算器/房产估值计算器/押品估值数据查询/押品内部评估流程管理/押品外部评估流程管理），无「价格指数」——文档 6 项多写「价格指数」",
+    "【SUT 实测 2026-09-06】SUT「押品信息管理」子菜单仅「押品信息管理」一项，无独立「打印存单质押归还」菜单；主页打印入口为【押品信息下载和打印】",
+    "【SUT 实测 2026-09-06】存单过滤规则（文档口径）：本行存单 + 状态=在库；借据状态 ∈ {生效, 逾期, 已核销, 已置换, 已冲正, 已转让}；归还本金必填"
+  ],
+  "steps": [],
+  "pendingSteps": [
+    {
+      "name": "价格指数维护（新增/修改/查看复合）",
+      "leafRefs": ["wet-test.md 叶38 (—（价格指数维护·新增/修改/查看复合叶）)"],
+      "verify": "not-found",
+      "reason": "导航尝试：①押品估值管理子菜单全量 5 项无「价格指数」；②押品参数管理 5 子项亦无；账号角色原因不排除（X0023 检查管理组组长视角，菜单按角色渲染）",
+      "retry_condition": "以押品参数维护岗账号（如客户经理或参数管理员）重登核对；若仍无则为 SUT 未上线该菜单"
+    },
+    {
+      "name": "存单质押归还打印页",
+      "leafRefs": ["wet-test.md 叶39 (—（存单质押归还打印页）)"],
+      "verify": "blocked",
+      "reason": "blocked-环境缺陷（菜单缺失+接口异常）：主页打印入口【押品信息下载和打印】选中记录点击后，console 报后端 504「Failed to load resource: 504 @ …/collateral/colBaseInfo/prtLoadDtlTmp」+前端「Gateway Time-out」异常弹窗（axios 504 ×2）——打印模板加载服务超时；正式打印/下载属凭证输出黑名单禁止",
+      "retry_condition": "SUT 恢复 prtLoadDtlTmp 服务后，以有本行存单类在库押品的账号核打印页结构（借据选择/归还本金必填/打印按钮）"
+    }
+  ],
+  "sourceRefs": [38, 39],
+  "coverage": {"total": 2, "match": 0, "drift": 0, "blocked": 1, "notFound": 1, "gate": "partial"}
+}

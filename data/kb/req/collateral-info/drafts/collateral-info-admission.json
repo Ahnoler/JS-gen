@@ -1,0 +1,25 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "collateral-info",
+  "flow": "押品准入校验（暂存→已准入）",
+  "aliases": ["准入押品基本信息", "准入校验"],
+  "hash_markers": ["CltlInfMgtServiceImpl", "admit"],
+  "keywords": ["准入校验", "暂存", "已准入", "管户客户经理", "admit", "8段校验链"],
+  "menu_path": "押品管理/押品信息管理/押品信息管理【准入校验】",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】按钮实名漂移：SUT「准入校验」≠文档「准入」",
+    "【SUT 实测 2026-09-06】准入校验 8 段规则链（文档口径）：①押品状态=暂存且经办人=登录人 ②信贷正式客户 ③信息完整性 ④共有权人权益比例≤100% ⑤保险信息 ⑥明细模板必填 ⑦农合机构股权试算 ⑧不动产联动；失败按提示定位到具体页签"
+  ],
+  "steps": [],
+  "pendingSteps": [
+    {
+      "name": "准入押品基本信息（主页【准入校验】动作链）",
+      "leafRefs": ["wet-test.md 叶9 (—（准入押品基本信息·主页【准入】动作链）)"],
+      "verify": "blocked",
+      "reason": "blocked-校验行为实证（行为正确）+黑名单：选中他人暂存记录触发，后端 BizException 原文（console）：「操作失败：请联系管户客户经理操作，异常栈信息：com.tansun.tcp.standard.exception.BizException…CltlInfMgtServiceImpl.admit(CltlInfMgtServiceImpl.java:304)」——实证「押品状态=暂存 且 经办人=登录人」前置校验存在于 admit 服务内；对本人押品正式准入属写操作黑名单禁止",
+      "retry_condition": "以押品创建人账号登录执行准入后核状态 暂存→已准入"
+    }
+  ],
+  "sourceRefs": [9],
+  "coverage": {"total": 1, "match": 0, "drift": 0, "blocked": 1, "notFound": 0, "gate": "partial"}
+}

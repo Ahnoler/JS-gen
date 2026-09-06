@@ -1,0 +1,67 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "digital-loan-desk",
+  "flow": "进件分配（待分配→分配到人→分配记录查看）",
+  "aliases": ["对私进件分配", "对公进件分配", "受理进件分配", "查看进件分配记录"],
+  "hash_markers": ["ZJJK00207165PDCP", "ZJJK00207164PDCP", "ZJJK00207207PDCP", "FS00100608PDCP", "FS00100607PDCP"],
+  "keywords": ["进件分配", "分配人员", "分配机构", "已分配", "不允许再分配", "静默拦截", "分配记录"],
+  "menu_path": "数字信贷/对私进件/对私进件分配、数字信贷/对公进件/对公进件分配（SUT 实名）",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】behavior：个人/对公进件分配列表进入页面自动加载（个人 total=0；对公 1 条 APL260710052117 宁德时代·税E贷（全行）·已分配）",
+    "【SUT 实测 2026-09-06】静默拦截实证：唯一对公记录状态=已分配，选中后点【分配】无弹窗、无 toast、console 无新错误——「已分配的进件不允许再分配」规则成立但 SUT 未给出提示（blocked 三子类之静默拦截证据）",
+    "【SUT 实测 2026-09-06】editBefore 拦截族同现：对公进件分配页 1×调用editBefore结果为false"
+  ],
+  "steps": [
+    {
+      "name": "个人进件分配列表查询",
+      "leafRef": "wet-test.md 叶68 (ZJJK00207165PDCP)",
+      "verify": "match",
+      "menu_path": "数字信贷/对私进件/对私进件分配",
+      "query_fields": ["客户名称", "证件号码", "产品名称"],
+      "columns": ["进件申请编号", "客户名称", "证件类型", "证件号码", "申请产品", "状态", "操作"],
+      "rules": ["进入页面自动加载（total=0）；分页 10 条/页"]
+    },
+    {
+      "name": "对公进件分配列表查询",
+      "leafRef": "wet-test.md 叶69 (ZJJK00207164PDCP)",
+      "verify": "match",
+      "menu_path": "数字信贷/对公进件/对公进件分配",
+      "rules": ["列同个人侧但客户列=「企业名称」；自动加载 1 条；操作列=分配/查看 两行内按钮"]
+    },
+    {
+      "name": "对公查看任务页（分配记录页签）",
+      "leafRef": "wet-test.md 叶79 (ZJJK00244026PDCP)；辅叶78 (ZJJK00244035PDCP)、叶80/81 (ZJJK00244021/244022PDCP)",
+      "verify": "drift",
+      "drift": "structure：文档「分配详情五页签」（客户基本信息/产品信息/进件详情/风控结果/分配记录），SUT 仅 2 页签=基本信息+分配记录；客户信息与产品信息合并为「基本信息」页签内两个分区，「进件详情」「风控结果」页签不存在（该记录 aplTp=1 预授信）",
+      "rules": [
+        "基本信息页签：客户信息分区（客户编号/名称/手机号/证件/法人四项，全只读）+ 产品信息分区（营销产品名称/编号、可售产品名称/编号、最高可贷金额）",
+        "分配记录页签列=序号/分配人员/分配机构编号/分配状态/分配意见/创建时间——文档「分配机构/分配客户经理/分配时间/分配原因/备注/操作人」6 列名称不同（wording drift 在证据列）"
+      ]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "受理对私/对公进件分配弹窗",
+      "leafRefs": ["wet-test.md 叶70 (ZJJK00207206PDCP)", "wet-test.md 叶71 (ZJJK00207207PDCP)"],
+      "verify": "blocked",
+      "reason": "对私分配列表 0 条【分配】无从触发；对公唯一记录已分配，点【分配】静默拦截（无弹窗无 toast 无 console）；分配=落库动作黑名单禁止",
+      "retry_condition": "退回/新进件产生待分配记录后打开弹窗核对（分配机构树+分配人员选择器+意见详情）"
+    },
+    {
+      "name": "对私查看任务页五页签（客户/产品/进件详情/风控结果/分配记录）",
+      "leafRefs": ["wet-test.md 叶72 (ZJJK00244034PDCP)", "wet-test.md 叶73~叶77 (ZJJK00244030~244033/244037PDCP)"],
+      "verify": "blocked",
+      "reason": "对私分配列表无记录，查看任务页不可达",
+      "retry_condition": "同分配弹窗补测条件（待对私待分配数据）"
+    },
+    {
+      "name": "对公「进件详情」「风控结果」页签级验证",
+      "leafRefs": ["wet-test.md 叶82 (ZJJK00244023PDCP)", "wet-test.md 叶83 (ZJJK00244024PDCP)"],
+      "verify": "blocked",
+      "reason": "SUT 对公查看任务页无该两页签（叶79 structure drift）；该记录 aplTp=1（预授信）",
+      "retry_condition": "授信/贷款等类型进件的分配记录，验证是否存在进件详情页签及数标渲染"
+    }
+  ],
+  "sourceRefs": [68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83],
+  "coverage": {"total": 16, "match": 5, "drift": 1, "blocked": 10, "notFound": 0, "gate": "partial"}
+}

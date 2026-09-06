@@ -1,0 +1,50 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "digital-loan-desk",
+  "flow": "进件受理（个人/对公列表→受理→六类查看详情）",
+  "aliases": ["对私进件受理", "对公进件受理", "进件受理弹窗", "查看风控结果"],
+  "hash_markers": ["ZJJK00204625PDCP", "ZJJK00204618PDCP", "ZJJK00244001PDCP", "FS00100602PDCP", "FS00100601PDCP", "FS00080659", "FS00080664"],
+  "keywords": ["进件受理", "进件申请编号", "数据来源", "进件类型", "查看客户基本信息", "查看产品信息", "查看相关文档", "查看风控结果", "数据查看组件", "数标"],
+  "menu_path": "数字信贷/对私进件/对私进件受理、数字信贷/对公进件/对公进件受理（SUT 实名）",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】behavior：个人/对公进件受理列表进入页面自动加载（intakeMgt/pageBscInf total=0 空列表，无需点查询）——自动加载族与文档「数据权限：客户经理仅本人经办」一致",
+    "【SUT 实测 2026-09-06】对公受理列表无【新增】【删除】按钮（仅查询/重置）——文档「对公进件列表提到新增/删除」在 SUT 不存在（structure drift，文档多余入口，回填 chapters）",
+    "数据权限=仅本人经办；受理/退回为业务落库动作（写操作黑名单）"
+  ],
+  "steps": [
+    {
+      "name": "个人进件受理列表查询",
+      "leafRef": "wet-test.md 叶42 (ZJJK00204625PDCP)",
+      "verify": "match",
+      "menu_path": "数字信贷/对私进件/对私进件受理",
+      "query_fields": ["客户名称", "进件申请编号", "产品名称"],
+      "columns": ["进件申请编号", "申请编号", "客户名称", "证件类型", "证件号码", "申请产品", "数据来源", "进件类型", "状态", "操作"],
+      "rules": ["进入页面自动加载（本账号 total=0 空列表）"]
+    },
+    {
+      "name": "对公进件受理列表查询",
+      "leafRef": "wet-test.md 叶43 (ZJJK00204618PDCP)",
+      "verify": "match",
+      "menu_path": "数字信贷/对公进件/对公进件受理",
+      "rules": ["列同个人侧但客户列=「企业名称」；自动加载 total=0；列表区无新增/删除按钮（文档多余入口）"]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "进件受理弹窗（个人/对公共用）+ 退回",
+      "leafRefs": ["wet-test.md 叶44 (ZJJK00244001PDCP)"],
+      "verify": "blocked",
+      "reason": "个人/对公受理列表均 0 条（接口证据 intakeMgt/pageBscInf total=0），无「待受理」行可选，受理弹窗无从打开；受理/退回亦属落库黑名单",
+      "retry_condition": "渠道端产生待受理进件且经办人=701994 后，经主页选行【受理】验证（受理=落库，只到弹窗结构核对）"
+    },
+    {
+      "name": "进件六类查看详情（个人/对公：客户基本信息/产品信息/相关文档/风控结果/进件详情/任务页）",
+      "leafRefs": ["wet-test.md 叶45 (ZJJK00204528PDCP)", "wet-test.md 叶46 (ZJJK00204529PDCP)", "wet-test.md 叶47 (ZJJK00204584PDCP)", "wet-test.md 叶48 (ZJJK00204599PDCP)", "wet-test.md 叶49 (ZJJK00204600PDCP)", "wet-test.md 叶50 (ZJJK00204602PDCP)", "wet-test.md 叶51 (ZJJK00244003PDCP)", "wet-test.md 叶52 (ZJJK00244002PDCP)", "wet-test.md 叶53 (ZJJK00207091PDCP)", "wet-test.md 叶54 (ZJJK00204601PDCP)", "wet-test.md 叶56~叶61 (个人详情任务页泛称组)", "wet-test.md 叶62~叶67 (对公详情任务页泛称组)"],
+      "verify": "blocked",
+      "reason": "受理列表无数据，六类详情场景（预授信/授信/贷款/提款/提额）宿主不可达；数标动态渲染组件（叶55 ZJJK00204644PDCP）随宿主同源 blocked；12 个「正文未逐一命名」任务页按同源合并引用（协议第 4 轮允许）",
+      "retry_condition": "待有对私/对公进件受理记录（进件受理产生数据）后经【查看】复测"
+    }
+  ],
+  "sourceRefs": [42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67],
+  "coverage": {"total": 26, "match": 2, "drift": 0, "blocked": 24, "notFound": 0, "gate": "partial"}
+}
