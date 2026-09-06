@@ -11,6 +11,13 @@
 - blocked 台账：186（+44）；观察池第 4 轮素材累计 15 条
 - 下一循环：disburse（B 组已派）+ repay（A 组并行）
 
+## 2026-09-06 17:40 · ZCode Lead — 收工：T1-exec 首批晋升 63 卡入正式 flows（回链 17:10 开工）
+- 完成：promote_draft.mjs（含 Lead 裁决覆盖 tmp/promote-curation.json 机制）；**63 张 gate=pass 卡全部晋升**——52 新建卡 + 11 张合并进 KB v1 既有卡（collateral_info/valuation、collection_strategy、credit_application、customer_360/query、loan）；flows 29→82
+- Lead 过表裁决：17 条自动 merge 建议 → 保留 11 条（同菜单组+同业务对象），**6 条降级 new**（委托贷款/社团牵头/参与/对私用信×2/提醒配置——独立流程卡语义，按 KB v1 每流程一卡粒度）
+- 验收：82 张 flows 全 JSON.parse 通过；verify-all ALL GREEN；3 张新卡 recall 抽样（词条/hash_markers 齐）
+- 事故记录：首笔晋升 commit 因 git add 带 gitignore 的 tmp 路径整条失败且被 2>/dev/null 吞掉，推送后对账发现——重做提交（50ea36dd）。教训：commit 勿吞错、add 前查 ignore 名单
+- 遗留：121 张 partial 卡待 T2 blocked 回收后二批晋升；promote_draft.mjs 已入库（--card 过滤/--apply/dry-run 审查表）
+
 ## 2026-09-06 17:10 · ZCode Lead — 开工声明：T1-exec B1 晋升转换器 + dry-run 审查表
 - 开工：17:10。按 `docs/superpowers/plans/2026-09-06-drafts-promote-plan.md` 执行 B1 棒：新建 `scripts/kb/promote_draft.mjs`（gate=pass 卡→formal schema 转换+同域合并建议）并产出 dry-run 审查表 `tmp/promote-review.md`（53 张 pass 卡）
 - 范围：`scripts/kb/promote_draft.mjs`（新建）、`tmp/promote-review.md`（新建）、本文件；**本棒不写 data/kb/flows/**（B2 应用棒另声明）
