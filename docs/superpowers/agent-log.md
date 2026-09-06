@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 00:02 · ZCode Lead — 开工声明：P6 连续执行启动（用户已批准计划+六项拍板）
+- 用户拍板（2026-09-07 00:00 前后）：①R4 审批=分段录制+单号衔接，接受主链轨迹非单条；②P6-0 直接动他线热文件；③合同止于已保存态 OK；④多角色账号暂无法提供，R4 按已实证配方（701994/WN0001/黄亮）跑，缺角色再回报；⑤上传封死维持绕行；⑥假成功本仓先修+方案同步产品组
+- 范围：P6-0 代码修复（src/services/trajectory/trajectory-recording-runner.js、form-snapshot-append.js 等+Python scripts/agent/recorder_emitters.py、填充回读侧——动手前先查 characterization pin）；P6-1 KB 补卡（data/kb/req/credit-corp/drafts/ 新草稿卡×2+rating 增强，由 general-purpose 子代理产出、Lead 晋升）；随后 P6-2 R1-R7 跑车（tmp/kb-mainchain/、flows 卡 source 回写）+P6-3 容错+P6-4 终验
+- 方式：**连续执行模式**（用户明示授权：一直做、遇阻塞再问）；P6-1 子代理代声明（不 commit 不写 flows，产出 drafts 由 Lead 验收晋升）；P6-0 主线程亲自改（行为变更非机械改，每步 verify-all+特征化回归）
+- 禁入：`config/.env*`、影像/OCR/文件上传场景、删除 SUT 既有数据；他线 gates 链（b5399d63）代码语义不改只叠加
+- 计划文本：`docs/superpowers/research/2026-09-06-mainchain-p6-plan.md`（b3d4b974）
+
 ## 2026-09-06 23:5x · ZCode Lead — 收工：主链能力差盘点完成 + P6 计划产出待用户批准（回链 23:32 开工）
 - 完成：`docs/superpowers/research/2026-09-06-mainchain-p6-plan.md`——三路只读 Explore 并行盘点汇总（A=KB 资产与 T4 证据：七环节矩阵，批复环节缺卡是 82 卡最大空洞、产品管线贯通只打穿客户新增一环；B=录制回放链路：假成功根因定位 recorder_emitters.py:757+recording-runner:654/783、落库丢步 :511、填充校验不对称；C=heal-locate：代码+单测全绿（39+9 断言入门禁）但 live 冒烟从未跑、回放内无就地重定位、heal 成功不回写 locator）。P6 计划=P6-0 修路（假成功门闩/丢步/校验对称）+P6-1 补卡（批复/审批/评级+单据号结构化）∥→P6-2 逐环节跑车 R1-R7（每棒三证）→P6-3 容错分级（heal live 验收/就地重定位/locator 回写/断点续跑）→P6-4 全链终验；粗估 6-9 工作日。**六个风险/开放问题待用户拍板（R4 跨账号方案/他线热文件协调/合同终点/C 类账号/上传封死/假成功本仓先修）**。
 - 子代理：3 个 Explore 只读完成，未写文件未 commit（代声明在 23:32 开工条目）
