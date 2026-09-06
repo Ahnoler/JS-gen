@@ -1,0 +1,72 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "rating",
+  "flow": "对公客户评级重评",
+  "aliases": [
+    "评级重评",
+    "对公客户重评",
+    "重新评级"
+  ],
+  "hash_markers": [
+    "ZJJK00109551",
+    "ZJJK00109548",
+    "wf_rating_003",
+    "FS00005854"
+  ],
+  "keywords": [
+    "评级重评",
+    "重新评级",
+    "模板名称",
+    "生效评级",
+    "风险阻断"
+  ],
+  "menu_path": "评级管理/对公客户评级",
+  "preconditions": [
+    "原记录非在途状态（草稿/审批中/打回提示在途中断）且客户有「生效」评级结果",
+    "当月评级次数上限 300 次；无其他在途流程",
+    "评级发生类型=重新评级；客户名称带入只读、模板自动匹配",
+    "【SUT 实测 2026-09-05】重评向导 label 为「模板名称」，新增向导为「模型名称」——同为禁用自动匹配值（内部措辞不统一）",
+    "确定后校验链与后续任务页/提交/审批/生效流程同主链「对公客户评级新增」（见 rating-corp-apply.json）"
+  ],
+  "steps": [
+    {
+      "name": "对公客户评级申请主页（选中记录）",
+      "leafRef": "wet-test.md 叶1 (ZJJK00070599)",
+      "verify": "match",
+      "note": "选中「通过」状态记录后点【评级重评】；列表默认不加载需先查询"
+    },
+    {
+      "name": "发起重评向导页",
+      "leafRef": "wet-test.md 叶20 (ZJJK00109551)",
+      "verify": "match",
+      "wizard_steps": ["1 基本信息", "2 风险阻断"],
+      "fields": [{"客户名称": "带入禁用"}, {"模板名称": "自动匹配（SUT label=「模板名称」，新增向导为「模型名称」）"}],
+      "buttons": ["下一步", "取消"]
+    },
+    {
+      "name": "选择客户及模板（重评）",
+      "leafRef": "wet-test.md 叶21 (ZJJK00109548)",
+      "verify": "match",
+      "fields": [{"模板名称": "自动=国营评分模型（禁用）"}],
+      "note": "客户只读不可改；湿测到此步即止，未点下一步之后动作"
+    },
+    {
+      "name": "风险阻断及后续流程（复用新增链）",
+      "leafRef": "wet-test.md 叶4 (ZJJK00067996)；辅叶5 (ZJJK00109206)、叶16 (ZJJK00090562)、叶17 (ZJJK00109208)",
+      "verify": "drift",
+      "drift": "叶4 结构 drift 见 rating-corp-apply.json：风险阻断结果表 SUT 实测 8 列与文档口径差异较大",
+      "note": "风险阻断→【确定】（校验链同新增）→评级申请大页面→流程提交→分社审查岗审批→结果生效，步骤明细同 rating-corp-apply.json"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "查看征信报告（复用新增链 blocked 叶）",
+      "leafRefs": ["wet-test.md 叶7 (ZJJK00117419)"],
+      "verify": "blocked",
+      "reason": "同 rating-corp-apply.json pendingSteps：无已上传授权书+已有征信报告的记录，console 报「调用diabf结果为false」",
+      "retry_condition": "同主链1（待有已上传授权书且已获取征信报告的评级记录）"
+    }
+  ],
+  "sourceRefs": [1, 4, 5, 7, 16, 17, 20, 21],
+  "coverage": {"total": 8, "match": 7, "drift": 1, "blocked": 0, "notFound": 0, "gate": "pass"}
+}
