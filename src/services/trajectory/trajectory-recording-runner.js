@@ -27,6 +27,7 @@ import {
   attachSpecialElementCandidates,
 } from './recording-runner-step-context.js';
 import { appendPhaseDoneLog } from './trajectory-phase-service.js';
+import { setActionLogCopy, countBusinessSteps, clearActionLogCopy } from './action-log-copy.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { capturePhaseBuffer, buildMetadata } from './phase-highlight-screenshot.js';
@@ -459,6 +460,11 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   const handleActionLogSync = async (payload) => {
     const entries = Array.isArray(payload?.entries) ? payload.entries : [];
     const removedIds = Array.isArray(payload?.removedIds) ? payload.removedIds : [];
+    // 服务器端 action_log 副本（2026-09-07 用户设计）：sync 是全量快照，直接覆盖副本；
+    // 前端展示与门闩判定读副本（即时），DB persist 降级为异步持久化。
+    try {
+      setActionLogCopy(tid, entries);
+    } catch {}
     if (!runtime._lastPersistByActionId) runtime._lastPersistByActionId = new Map();
     if (session && !session._lastPersistByActionId) {
       session._lastPersistByActionId = runtime._lastPersistByActionId;
@@ -877,17 +883,27 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         });
       } catch {}
       await Promise.resolve(runtime._persistDrain).catch(() => {});
+      // 判定源=服务器端副本计数（即时、与 Python _ACTION_LOG 一致）；DB 复核仍跑，
+      // 用于 counts 刷新与持久化最终一致（sync 端到端延迟实测可达分钟级）。
+      let copySteps = 0;
+      try {
+        copySteps = countBusinessSteps(tid);
+      } catch {}
       let dbSteps = 0;
       try {
         const { refreshTrajectoryCounts } = await import('./trajectory-step-service.js');
         // 注意返回键是 stepCount（业务步，已排除 save_form_snapshot 等 meta）
-        dbSteps = Number((await refreshTrajectoryCounts(tid))?.stepCount || 0);
+        const counts = await refreshTrajectoryCounts(tid);
+        dbSteps = Number(counts?.stepCount || 0);
+        await trajectoryDao.updateMeta(tid, {
+          stepCount: counts.stepCount,
+          phaseCount: counts.phaseCount,
+        });
       } catch (err) {
         console.warn('[record] async gate recount failed:', err?.message || err);
-        return;
       }
-      console.log(`[record] async gate finalize traj=${tid}: db business steps=${dbSteps}`);
-      if (dbSteps === 0) {
+      console.log(`[record] async gate finalize traj=${tid}: copy=${copySteps} db=${dbSteps}`);
+      if (copySteps === 0 && dbSteps === 0) {
         try {
           await trajectoryDao.finishTransientRecording(tid, 'failure');
           await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
@@ -899,6 +915,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
           console.warn('[record] async gate downgrade failed:', err?.message || err);
         }
       }
+      try {
+        clearActionLogCopy(tid);
+      } catch {}
     }, 90000);
     if (typeof finalizeGate.unref === 'function') finalizeGate.unref();
     // 录制成功（V3）：无论持久基线为何，显式结束成功 → 待确认(recorded)。

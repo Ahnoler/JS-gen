@@ -7,6 +7,7 @@ import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import * as businessDataDao from '../../dao/business-data-dao.js';
 import * as screenshotDao from '../../dao/screenshot-dao.js';
 import { filterMetaSteps, isMetaStep } from '../../models/meta-step-actions.js';
+import { countBusinessSteps } from './action-log-copy.js';
 
 function safeJson(str) {
   try { return JSON.parse(str); } catch { return {}; }
@@ -176,6 +177,16 @@ export async function getTrajectoryWithPhases(id) {
   if (!traj) return null;
   traj.phases = await trajectoryPhaseDao.listByTrajectory(traj.id);
   traj.businessEntries = await businessDataDao.listEntriesByTrajectory(traj.id);
+  // 服务器端 action_log 副本（2026-09-07 用户设计）：录制中/刚结束（副本存在）时
+  // stepCount 以副本即时计数为准——DB 的 step_count 经异步持久化有分钟级延迟。
+  // 副本缺席（server 重启/超时/已清理）自然回退 DB 值。
+  try {
+    const copySteps = countBusinessSteps(traj.id);
+    if (copySteps > 0) {
+      traj.stepCount = copySteps;
+      traj.stepCountSource = 'action-log-copy';
+    }
+  } catch {}
   return traj;
 }
 
