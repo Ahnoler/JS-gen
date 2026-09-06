@@ -830,13 +830,10 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       await recordPhaseResult(phase, donePayload);
     }
 
-    // 假成功硬门闩（P6-0/T0.1）：以 DB 真值为准判定，0 落库步 → failure 路径。
-    // （T4 实证 record/start 假成功模式：phase 秒级 done、stepCount=0 仍 recorded）
-    // sync 经 executor 缓冲可能迟到/丢弃（588 实证：detach flush 才落 8 步）→
-    // 循环完成后无条件向 Python 强制 resync 全量快照（get_action_log →
-    // action_log_sync 重发，persist 幂等），排空后以 DB 计数判定。
-    let memoryStepCount = 0;
-    for (const n of runtime.phaseStepCounts.values()) memoryStepCount += n;
+    // 假成功硬门闩（P6-0/T0.1，v3 异步终局化）：sync 端到端延迟实测可达分钟级
+    // （588-593 实证：detach flush 模式），同步判定必然误杀或漏放——改为：
+    // 立即 resync → recorded（recordStatus 本有「待确认」语义），后台 90s 二次
+    // resync 复核 DB 业务步，仍 0 步则降级 failed 并广播。
     try {
       execSession.forwardStdin({
         nodeUuid: runtime.executorNodeUuid,
@@ -847,29 +844,39 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     } catch (err) {
       console.warn('[record] fake-success gate resync send failed:', err?.message || err);
     }
-    try {
+    const finalizeGate = setTimeout(async () => {
+      try {
+        execSession.forwardStdin({
+          nodeUuid: runtime.executorNodeUuid,
+          sessionId: runtime.sessionId,
+          event: 'get_action_log',
+          data: {},
+        });
+      } catch {}
       await Promise.resolve(runtime._persistDrain).catch(() => {});
-      // 实测 sync 端到端延迟可达分钟级（592/593：resync 回包跨过 3s 窗口），给足 10s
-      await new Promise((r) => setTimeout(r, 10000));
-      await Promise.resolve(runtime._persistDrain).catch(() => {});
-    } catch {}
-    let totalPersistedSteps = 0;
-    try {
-      const { refreshTrajectoryCounts } = await import('./trajectory-step-service.js');
-      const dbCounts = await refreshTrajectoryCounts(tid);
-      totalPersistedSteps = Number(dbCounts?.steps || 0);
-    } catch (err) {
-      console.warn('[record] fake-success gate db recount failed:', err?.message || err);
-      totalPersistedSteps = memoryStepCount;
-    }
-    console.log(
-      `[record] fake-success gate: memory=${memoryStepCount} db=${totalPersistedSteps} across ${phases.length} phases`,
-    );
-    if (totalPersistedSteps === 0) {
-      throw new Error(
-        `Fake-success gate: 0 persisted steps across ${phases.length} phases — recording marked failure`,
-      );
-    }
+      let dbSteps = 0;
+      try {
+        const { refreshTrajectoryCounts } = await import('./trajectory-step-service.js');
+        dbSteps = Number((await refreshTrajectoryCounts(tid))?.steps || 0);
+      } catch (err) {
+        console.warn('[record] async gate recount failed:', err?.message || err);
+        return;
+      }
+      console.log(`[record] async gate finalize traj=${tid}: db business steps=${dbSteps}`);
+      if (dbSteps === 0) {
+        try {
+          await trajectoryDao.finishTransientRecording(tid, 'failure');
+          await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
+          broadcast('fake_success_detected', { trajectoryDbId: tid });
+          console.warn(
+            `[record] traj #${tid} downgraded recorded→failure: 0 persisted business steps after finalization window`,
+          );
+        } catch (err) {
+          console.warn('[record] async gate downgrade failed:', err?.message || err);
+        }
+      }
+    }, 90000);
+    if (typeof finalizeGate.unref === 'function') finalizeGate.unref();
     // 录制成功（V3）：无论持久基线为何，显式结束成功 → 待确认(recorded)。
     finalStatus = await trajectoryDao.finishTransientRecording(tid, 'success');
     await trajectoryDao.updateMeta(tid, {
