@@ -1,3 +1,6 @@
+/**
+ * DAO for `system_ref_data` / `system_ref_entry` — system reference KV data with verification status and trajectory binding.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
@@ -12,6 +15,11 @@ const VERIFY_STATUSES = new Set(['raw', 'verified', 'rejected']);
 /**
  * Normalize API payloads to { fieldKey, fieldValue, source?, verificationStatus? }.
  * Accepts `{ fieldKey, fieldValue }` or `{ key, value }`.
+ * @param {Array} raw raw entry payloads
+ * @param {object} [defaults] default source/verificationStatus
+ * @param {string} [defaults.source] default source
+ * @param {string} [defaults.verificationStatus] default verification status
+ * @returns {{ fieldKey: string, fieldValue: string|null, source: string, verificationStatus: string }[]} deduped entries
  */
 export function normalizeSystemRefEntries(raw, defaults = {}) {
   if (!Array.isArray(raw)) return [];
@@ -41,6 +49,11 @@ export function normalizeSystemRefEntries(raw, defaults = {}) {
   return out;
 }
 
+/**
+ * Flat label→value dict for system_ref entries.
+ * @param {Array} entries raw entry payloads
+ * @returns {Record<string, string>} flat dict keyed by fieldKey
+ */
 export function entriesToFlatDict(entries) {
   const dict = {};
   for (const e of normalizeSystemRefEntries(entries)) {
@@ -59,6 +72,7 @@ function makeRecordId() {
 
 /**
  * Insert a header + optional entries.
+ * @param {object} record camelCase record with entries array
  * @returns {Promise<number>} system_ref_data.id
  */
 export async function save(record) {
@@ -99,6 +113,11 @@ export async function save(record) {
   });
 }
 
+/**
+ * Fetch a system_ref_data record by id, including its entries.
+ * @param {number} id 主键
+ * @returns {Promise<object|null>} record entity with entries, or null when not found
+ */
 export async function getById(id) {
   const db = getDB();
   const row = await db(TABLE).where({ id: Number(id) }).first();
@@ -110,6 +129,11 @@ export async function getById(id) {
   return entity;
 }
 
+/**
+ * Fetch a system_ref_data record by its external record_id.
+ * @param {string} recordId external record id
+ * @returns {Promise<object|null>} record entity with entries, or null when not found
+ */
 export async function getByRecordId(recordId) {
   const db = getDB();
   const row = await db(TABLE).where({ record_id: recordId }).first();
@@ -119,7 +143,12 @@ export async function getByRecordId(recordId) {
 
 /**
  * List headers (optional filters).
- * @param {{ page?: number, pageSize?: number, trajectoryId?: number, verificationStatus?: string }} opts
+ * @param {object} opts 筛选与分页选项
+ * @param {number} [opts.page] 页码（1 起）
+ * @param {number} [opts.pageSize] 每页条数
+ * @param {number} [opts.trajectoryId] filter by trajectory
+ * @param {string} [opts.verificationStatus] filter by verification status
+ * @returns {Promise<{ rows: object[], total: number, page: number, pageSize: number }>} 分页结果
  */
 export async function list({
   page = 1,
@@ -145,12 +174,21 @@ export async function list({
   return { rows: fromDbRows(rows), total: Number(total) || 0, page, pageSize };
 }
 
+/**
+ * Delete a system_ref_data record by id (cascades to entries).
+ * @param {number} id 主键
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(id) {
   return getDB()(TABLE).where({ id: Number(id) }).del();
 }
 
 /**
  * List KV entries bound to a trajectory (optionally filter by verification_status).
+ * @param {number} trajectoryId 轨迹 id
+ * @param {object} [opts] 选项
+ * @param {string} [opts.verificationStatus] filter by verification status
+ * @returns {Promise<object[]>} entry entities
  */
 export async function listEntriesByTrajectory(trajectoryId, { verificationStatus = null } = {}) {
   const tid = Number(trajectoryId);
@@ -165,10 +203,14 @@ export async function listEntriesByTrajectory(trajectoryId, { verificationStatus
 /**
  * Replace all system_ref entries for a trajectory (delete header+entries, re-insert).
  * Creates one header row bound to the trajectory.
- *
- * @param {number} trajectoryId
- * @param {Array} entries
- * @param {{ source?: string, verificationStatus?: string, description?: string, sessionId?: string }} [opts]
+ * @param {number} trajectoryId 轨迹 id
+ * @param {Array} entries 条目列表
+ * @param {object} [opts] 选项
+ * @param {string} [opts.source] default source for entries
+ * @param {string} [opts.verificationStatus] default verification status
+ * @param {string} [opts.description] header description
+ * @param {string} [opts.sessionId] session id
+ * @returns {Promise<object[]>} resulting entry entities bound to the trajectory
  */
 export async function replaceEntriesForTrajectory(trajectoryId, entries, opts = {}) {
   const tid = Number(trajectoryId);
@@ -215,13 +257,24 @@ export async function replaceEntriesForTrajectory(trajectoryId, entries, opts = 
   });
 }
 
-/** Delete all system_ref headers (and cascaded entries) for a trajectory. */
+/**
+ * Delete all system_ref headers (and cascaded entries) for a trajectory.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<number>} number of deleted header rows
+ */
 export async function removeByTrajectory(trajectoryId) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) return 0;
   return getDB()(TABLE).where({ trajectory_id: tid }).del();
 }
 
+/**
+ * Load trajectory system_ref entries as a flat dict, optionally filtered by verification status.
+ * @param {number} trajectoryId 轨迹 id
+ * @param {object} [opts] 选项
+ * @param {string} [opts.verificationStatus] filter by verification status
+ * @returns {Promise<Record<string, string>>} flat label→value dict
+ */
 export async function loadFlatDictByTrajectory(trajectoryId, { verificationStatus = null } = {}) {
   const entries = await listEntriesByTrajectory(trajectoryId, { verificationStatus });
   return entriesToFlatDict(entries);

@@ -21,7 +21,7 @@ export {
   maybeFinalizeJob,
 } from './trajectory-batch-service.js';
 export {
-  prepareCaseDataInjection,
+  prepareBusinessDataInjection,
   runDefaultLogin,
   startTrajectoryRecording,
   stopTrajectoryRecording,
@@ -51,11 +51,11 @@ export {
 export {
   stripBusinessDataBlock,
   phaseNeedsBusinessData,
-  extractCaseDataBlock,
-  extractCaseEntriesFromRequirement,
+  extractBusinessDataBlock,
+  extractBusinessEntriesFromRequirement,
   analyzeRequirementToPhases,
   createEmptyTrajectory,
   createTransactionWithPhases,
-  setTrajectoryCaseEntries,
+  setTrajectoryBusinessEntries,
   confirmTrajectory,
 } from './trajectory-meta-service.js';

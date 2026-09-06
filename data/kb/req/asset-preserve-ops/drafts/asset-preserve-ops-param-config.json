@@ -1,0 +1,41 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "asset-preserve-ops",
+  "flow": "参数管理（时效配置）",
+  "aliases": ["时效配置", "时效配置管理"],
+  "hash_markers": [
+    "ZJJK00248277",
+    "ZJJK00248279",
+    "astPsvbsnTp"
+  ],
+  "keywords": [
+    "时效配置", "提醒指标", "指标类型", "指标二级分类", "指标参数", "到期前X天", "开启关闭"
+  ],
+  "menu_path": "资产保全/参数管理/时效配置",
+  "preconditions": [
+    "纯参数维护（增删改查/启停），无业务闭环",
+    "【SUT 实测 2026-09-06】列表 0 条不自动加载"
+  ],
+  "steps": [
+    {
+      "name": "时效配置管理主页查询",
+      "leafRef": "wet-test.md 叶182 (ZJJK00248277)",
+      "verify": "match",
+      "menu_path": "资产保全/参数管理/时效配置",
+      "behavior": "0 条（不自动加载）",
+      "query_fields": ["提醒指标编号", "生效状态（文档还载「提醒指标名称」，SUT 无该条件，轻微缺失不升级）"],
+      "buttons": ["新增", "修改", "删除", "详情", "开启关闭（文档口径开启/关闭为两操作，SUT 合并为一个按钮）"],
+      "columns": ["提醒指标编号", "生效状态", "指标类型", "指标二级分类", "指标参数", "到期前X天"]
+    },
+    {
+      "name": "选择指标类型弹窗",
+      "leafRef": "wet-test.md 叶183 (ZJJK00248279)",
+      "verify": "drift",
+      "drift": "wording/structure：【新增】弹「*指标类型」必选下拉+取消/确认，结构一致；但字典（astPsvbsnTp 分组 14）实测 3 项——抵债资产时效提醒/诉讼时效提醒/各分支核销限额控制；SUT 把「诉讼时效提醒」提升为独立一级类型而非挂在文档「其他时效提醒」的指标二级分类下（待 Lead 复核字典）",
+      "options": ["抵债资产时效提醒", "诉讼时效提醒", "各分支核销限额控制"]
+    }
+  ],
+  "pendingSteps": [],
+  "sourceRefs": [182, 183],
+  "coverage": {"total": 2, "match": 1, "drift": 1, "blocked": 0, "notFound": 0, "gate": "partial"}
+}

@@ -17,6 +17,7 @@ from ._js_snippets import (
     JS_RESET_SELECT_UI,
 )
 from ...models import ScannedField
+from .replay_timing import WAIT_800_MS
 
 _SELECT_OPTION_PLACEHOLDERS = frozenset({'请选择', '请选择…', '请选择...', ''})
 
@@ -77,16 +78,16 @@ def normalize_select_options(raw) -> list[str]:
     return out
 
 
-def options_from_scan_store(case_data_store: dict | None, label: str) -> list[str]:
-    """Pull previously scanned options for a label from case_data_store."""
-    if not case_data_store or not label:
+def options_from_scan_store(business_data_store: dict | None, label: str) -> list[str]:
+    """Pull previously scanned options for a label from business_data_store."""
+    if not business_data_store or not label:
         return []
-    for f in case_data_store.get('_scan_fields') or []:
+    for f in business_data_store.get('_scan_fields') or []:
         if isinstance(f, dict) and f.get('label') == label:
             opts = normalize_select_options(f.get('options') or [])
             if opts:
                 return opts
-    tl = case_data_store.get('task_list') or {}
+    tl = business_data_store.get('task_list') or {}
     if isinstance(tl, dict):
         for bucket in ('pending', 'done'):
             for item in tl.get(bucket) or []:
@@ -283,7 +284,7 @@ async def dismiss_https_first_interstitial(page) -> str:
           return isHttpsFirst || isChromeError ? 'no-proceed' : 'none';
         }''')
         if result and str(result).startswith('proceeded'):
-            await page.wait_for_timeout(800)
+            await page.wait_for_timeout(WAIT_800_MS)
         return str(result or 'none')
     except Exception as e:
         return f'error:{e}'
@@ -325,6 +326,12 @@ async def _capture_element(page, label_text, *, xpath_smart: str = "", target_ki
             "candidates": info.get("candidates") if isinstance(info.get("candidates"), list) else [],
             "formLabel": info.get("formLabel") or label_text or "",
             "target_kind": info.get("target_kind") or target_kind or "",
+            "region_id": info.get("region_id") or "",
+            "region_label": info.get("region_label") or "",
+            "layers": info.get("layers") if isinstance(info.get("layers"), list) else [],
+            "bbox": info.get("bbox") if isinstance(info.get("bbox"), dict) else None,
+            "page_bbox": info.get("page_bbox") if isinstance(info.get("page_bbox"), dict) else None,
+            "attr": info.get("attr") if isinstance(info.get("attr"), dict) else None,
         }
     except Exception:
         return None
@@ -351,6 +358,7 @@ async def _enrich_click_element(
         'text': (text or '').strip()[:80],
         'target_kind': target_kind or '',
         'formLabel': form_label or '',
+        'row_text': '',
     }
     try:
         raw = await page.evaluate(
@@ -377,6 +385,13 @@ async def _enrich_click_element(
             'candidates': info.get('candidates') if isinstance(info.get('candidates'), list) else [],
             'formLabel': info.get('formLabel') or form_label or '',
             'target_kind': info.get('target_kind') or target_kind or '',
+            'row_text': (info.get('row_text') or '').strip()[:80],
+            'region_id': info.get('region_id') or '',
+            'region_label': info.get('region_label') or '',
+            'layers': info.get('layers') if isinstance(info.get('layers'), list) else [],
+            'bbox': info.get('bbox') if isinstance(info.get('bbox'), dict) else None,
+            'page_bbox': info.get('page_bbox') if isinstance(info.get('page_bbox'), dict) else None,
+            'attr': info.get('attr') if isinstance(info.get('attr'), dict) else None,
             'locator_scope': info.get('locator_scope') or '',
             'locator_occurrence': info.get('locator_occurrence') or 0,
             'locator_verified': bool(info.get('locator_verified')),

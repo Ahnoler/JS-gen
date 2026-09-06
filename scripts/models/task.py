@@ -80,6 +80,10 @@ class TaskItem(BaseModel):
             "disabled+button introduce fields are omitted from assistant pending."
         ),
     )
+    use: str = Field(
+        default="",
+        description="Recommended controller action for this kind (agent guidance)",
+    )
 
     # ── Status checks ────────────────────────────────────────────────────
 
@@ -137,13 +141,14 @@ class TaskItem(BaseModel):
             hasButton=has_button,
             xpath_smart=field.get("xpath_smart", ""),
             needs_intervention=False,
+            use=field.get("use", ""),
             **cls._region_fields(field),
         )
 
 
 # ── Task list ───────────────────────────────────────────────────────────────
 class TaskList(BaseModel):
-    """The complete task list stored in case_data_store['task_list'].
+    """The complete task list stored in business_data_store['task_list'].
 
     Maintains two lists:
     - pending: fields still needing to be filled
@@ -362,6 +367,7 @@ class TaskList(BaseModel):
                     required=f.get("required", False),
                     hasButton="",
                     xpath_smart=f.get("xpath_smart", ""),
+                    use=f.get("use", ""),
                     **TaskItem._region_fields(f),
                 ))
                 continue
@@ -376,6 +382,7 @@ class TaskList(BaseModel):
                     required=f.get("required", False),
                     hasButton=has_button,
                     xpath_smart=f.get("xpath_smart", ""),
+                    use=f.get("use", ""),
                     **TaskItem._region_fields(f),
                 ))
             else:
@@ -396,6 +403,7 @@ class TaskList(BaseModel):
                         hasButton=has_button,
                         xpath_smart=f.get("xpath_smart", ""),
                         needs_intervention=False,
+                        use=f.get("use", ""),
                         **TaskItem._region_fields(f),
                     )
                 if item is not None:
@@ -404,7 +412,7 @@ class TaskList(BaseModel):
 
     @classmethod
     def from_store(cls, data: dict | None) -> "TaskList":
-        """Deserialize from the case_data_store dict format."""
+        """Deserialize from the business_data_store dict format."""
         if not data:
             return cls()
         return cls(
@@ -413,7 +421,7 @@ class TaskList(BaseModel):
         )
 
     def to_store(self) -> dict:
-        """Serialize to the case_data_store dict format."""
+        """Serialize to the business_data_store dict format."""
         return {
             "pending": [item.model_dump() for item in self.pending],
             "done": [item.model_dump() for item in self.done],

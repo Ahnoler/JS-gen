@@ -25,8 +25,8 @@ const CLICK_ACTIONS = new Set([
 ]);
 
 /**
- * @param {unknown} v
- * @returns {string}
+ * @param {unknown} v raw value
+ * @returns {string} trimmed, single-spaced string
  */
 export function normalizeSemanticText(v) {
   if (v == null) return '';
@@ -34,8 +34,8 @@ export function normalizeSemanticText(v) {
 }
 
 /**
- * @param {Record<string, unknown>|null|undefined} params
- * @returns {string[]}
+ * @param {Record<string, unknown>|null|undefined} params params object
+ * @returns {string[]} sorted param keys (empty for non-objects)
  */
 export function sortedParamKeys(params) {
   if (!params || typeof params !== 'object' || Array.isArray(params)) return [];
@@ -43,9 +43,9 @@ export function sortedParamKeys(params) {
 }
 
 /**
- * @param {string} actionType
- * @param {Record<string, unknown>|null|undefined} params
- * @returns {Record<string, string>}
+ * @param {string} actionType normalized action name
+ * @param {Record<string, unknown>|null|undefined} params params object
+ * @returns {Record<string, string>} stable semantic key→value map
  */
 export function extractStableSemantics(actionType, params) {
   const at = String(actionType || '').trim();
@@ -87,7 +87,8 @@ export function extractStableSemantics(actionType, params) {
 
 /**
  * Build one step's signature fragment (deterministic JSON-serializable).
- * @param {{ actionType?: string, action?: string, params?: Record<string, unknown>|null, paramsJson?: Record<string, unknown>|null }} step
+ * @param {{ actionType?: string, action?: string, params?: Record<string, unknown>|null, paramsJson?: Record<string, unknown>|null }} step step row
+ * @returns {{ actionType: string, paramKeys: string[], semantics: Record<string, string> }} signature fragment
  */
 export function stepSignatureFragment(step) {
   const actionType = String(step.actionType ?? step.action ?? '').trim();
@@ -100,8 +101,8 @@ export function stepSignatureFragment(step) {
 }
 
 /**
- * @param {Array<{ actionType?: string, action?: string, params?: object|null, paramsJson?: object|null, stepNumber?: number }>} steps
- * @returns {{ signature: string, fragments: object[] }}
+ * @param {Array<{ actionType?: string, action?: string, params?: object|null, paramsJson?: object|null, stepNumber?: number }>} steps step rows
+ * @returns {{ signature: string, fragments: object[] }} sha256 signature + fragments
  */
 export function computePhaseSignature(steps) {
   const list = Array.isArray(steps) ? steps : [];
@@ -120,8 +121,8 @@ export function computePhaseSignature(steps) {
 
 /**
  * Normalize DB / API step rows into steps_json snapshot items.
- * @param {Array<object>} steps
- * @returns {Array<{ actionType: string, params: object|null, elementJson: object|null }>}
+ * @param {Array<object>} steps step rows
+ * @returns {Array<{ actionType: string, params: object|null, elementJson: object|null }>} normalized snapshot items
  */
 export function stepsToSnapshot(steps) {
   const list = Array.isArray(steps) ? steps : [];
@@ -147,8 +148,8 @@ export function stepsToSnapshot(steps) {
 
 /**
  * Parse LLM JSON with the same fallback ladder as analyzeRequirementToPhases.
- * @param {string} raw
- * @returns {object|null}
+ * @param {string} raw LLM text output
+ * @returns {object|null} parsed object, or null if no JSON found
  */
 export function parseLlmJsonObject(raw) {
   const text = String(raw || '').trim();

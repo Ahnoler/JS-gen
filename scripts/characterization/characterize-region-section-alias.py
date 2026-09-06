@@ -107,7 +107,11 @@ def main() -> int:
         "legacy requires_section_declaration alias",
     )
 
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_actions.py").read_text(encoding="utf-8")
+    )
     assert_true("pending_by_region" in form, "get_pending dual-writes pending_by_region")
     assert_true("err-region-required" in form, "err-region-required primary")
     assert_true("auto region=" in form, "auto region log")

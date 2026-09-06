@@ -1,0 +1,77 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "collection",
+  "flow": "客户合同评分及策略查询",
+  "aliases": [
+    "评分策略查询",
+    "合同评分查询"
+  ],
+  "hash_markers": [
+    "ZJJK00097368",
+    "FS00003389",
+    "ZJJK00149014PDCP"
+  ],
+  "keywords": [
+    "客户合同评分及策略查询",
+    "评分",
+    "策略匹配",
+    "评分区间",
+    "催收策略信息"
+  ],
+  "menu_path": "催收管理/催收管理/客户合同评分及策略查询",
+  "preconditions": [
+    "纯只读查询场景；数据权限=本人经办；详情页 6 标签页，无编辑无审批流转",
+    "【SUT 实测 2026-09-06】进入页面自动查询（0 条）——催收管理 7 个列表页全部自动加载（模块级一致），与授信/评级「需手动查询」相反",
+    "【SUT 实测 2026-09-06】本账号 701994 经办合同 HT20260710024037 有借据无评分记录，精确查询仍 0 条——测试环境催收流程从未提交过、无评分数据（blocked 叶占比根因之一）"
+  ],
+  "steps": [
+    {
+      "name": "客户合同评分及策略查询列表主页",
+      "leafRef": "wet-test.md 叶37 (ZJJK00097368)",
+      "verify": "match",
+      "query_fields": ["客户名称(带放大镜引入)", "合同编号", "产品类别"],
+      "buttons": ["查看"],
+      "columns": ["客户编号", "客户名称", "客户类型", "合同编号", "产品类别", "评分"],
+      "rules": ["进入页面自动查询（0 条）；按评分从低到高排序（排序无从验证——无数据）；仅查本人经办"]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "查看客户合同评分及策略任务页（6 标签页）",
+      "leafRefs": ["wet-test.md 叶38 (ZJJK00149014PDCP)"],
+      "verify": "blocked",
+      "reason": "无数据——列表 0 条（本账号 701994 经办合同无评分数据），无可选记录，【查看】不可达",
+      "retry_condition": "存在本人经办且已评分的合同后经【查看】进入核 6 标签页结构与【返回】"
+    },
+    {
+      "name": "查看客户基本信息（任务页标签页）",
+      "leafRefs": ["wet-test.md 叶39 (ZJJK00116267)"],
+      "verify": "blocked",
+      "reason": "无数据（同叶38，详情页不可达）",
+      "retry_condition": "同叶38"
+    },
+    {
+      "name": "查看借据信息（任务页标签页）",
+      "leafRefs": ["wet-test.md 叶40 (ZJJK00097377)"],
+      "verify": "blocked",
+      "reason": "无数据（同叶38）",
+      "retry_condition": "同叶38"
+    },
+    {
+      "name": "查看评分信息（任务页标签页）",
+      "leafRefs": ["wet-test.md 叶41 (ZJJK00097378)"],
+      "verify": "blocked",
+      "reason": "无数据（同叶38）",
+      "retry_condition": "同叶38"
+    },
+    {
+      "name": "查看催收策略信息（任务页标签页，策略匹配规则）",
+      "leafRefs": ["wet-test.md 叶42 (ZJJK00097379)"],
+      "verify": "blocked",
+      "reason": "无数据（同叶38）",
+      "retry_condition": "同叶38；策略匹配规则（按评分卡编号匹配且合同评分∈[策略评分下限,上限]）需生效策略+已评分合同同时存在"
+    }
+  ],
+  "sourceRefs": [37, 38, 39, 40, 41, 42],
+  "coverage": {"total": 6, "match": 1, "drift": 0, "blocked": 5, "notFound": 0, "gate": "partial"}
+}

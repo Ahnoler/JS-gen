@@ -1,0 +1,138 @@
+{
+  "flow": "产品阶段管理（树维护）",
+  "aliases": [
+    "产品阶段管理",
+    "维护产品阶段",
+    "产品阶段",
+    "新增阶段",
+    "新增子阶段",
+    "阶段树"
+  ],
+  "menu_path": "产品管理→产品阶段管理（functionId=9000000811；menu //li[@data-id='RES24008']；pageId=ZJJK00095902；#511 hash=#/pdMgt/pdInfMgt/mntPdStg；菜单 intermediate 修复后独立叶子，勿再挂 intermediate 目录 0230）",
+  "biz_key_prefix": [],
+  "hash_markers": [
+    "mntPdStg",
+    "pdMgtpdInfMgtmntPdStg",
+    "ZJJK00095902",
+    "RES24008",
+    "pdInfMgt",
+    "pdMgt"
+  ],
+  "keywords": [
+    "产品阶段",
+    "新增阶段",
+    "新增子阶段",
+    "阶段编号",
+    "阶段名称",
+    "刷新产品阶段",
+    "设置阶段",
+    "设置管控要素",
+    "mntPdStg"
+  ],
+  "preconditions": [
+    "入口：产品管理→产品阶段管理（#511）；新建交易挂 functionId=9000000811（勿挂 intermediate 目录 0230，勿挂 0740 产品库）",
+    "左树右编；工具栏图标：folder-add=「新增阶段」、document-add=「新增子阶段」、delete=「删除」（#511 CDP）",
+    "子阶段：先选中父阶段再点「新增子阶段」；名称用 stamp",
+    "删除前校验产品引用；与产品库交叉见 product_library（设置阶段/管控要素）",
+    "账号：systemAccountId=2"
+  ],
+  "nodes": [
+    {
+      "id": "stg_home",
+      "page": "产品阶段管理主页",
+      "enter": "菜单 产品管理→产品阶段管理",
+      "buttons": ["新增阶段", "新增子阶段", "删除", "保存", "保 存", "确定", "确 定"],
+      "note": "hash mntPdStg；#511/#56 左树右编"
+    },
+    {
+      "id": "stg_add",
+      "page": "新增阶段",
+      "enter": "click_button/click_icon_button「新增阶段」(a.el-icon-folder-add)",
+      "fields": ["阶段编号(系统生成)", "阶段名称*"],
+      "buttons": ["保存", "保 存", "确定", "确 定", "取消"],
+      "note": "#511：stamp KB测阶段-* 落树"
+    },
+    {
+      "id": "stg_add_child",
+      "page": "新增子阶段",
+      "enter": "选中父→「新增子阶段」(a.el-icon-document-add)",
+      "fields": ["阶段编号(系统)", "父阶段(回填)", "阶段名称*"],
+      "buttons": ["保存", "保 存", "确定", "确 定", "取消"],
+      "note": "#511：KB测子阶段-* 在父下"
+    },
+    {
+      "id": "stg_edit",
+      "page": "阶段详情编辑",
+      "enter": "选中树节点",
+      "fields": ["阶段编号", "阶段名称"],
+      "buttons": ["保存", "保 存"],
+      "note": "#56 P4"
+    },
+    {
+      "id": "stg_search",
+      "page": "阶段树搜索",
+      "enter": "输入关键字",
+      "fields": ["搜索关键字"],
+      "buttons": [],
+      "note": "#56 P5"
+    },
+    {
+      "id": "prod_set_stage",
+      "page": "产品侧设置阶段（交叉）",
+      "enter": "产品详情/个性化→设置阶段",
+      "buttons": ["设置阶段", "设置管控要素", "保存"],
+      "note": "ZJJK00094364；旁路"
+    }
+  ],
+  "field_deps": [],
+  "state_actions": [
+    {
+      "entity": "阶段根/空白",
+      "status": "—",
+      "allow": ["新增阶段", "搜索"]
+    },
+    {
+      "entity": "阶段节点",
+      "status": "无产品引用",
+      "allow": ["新增子阶段", "改名保存", "删除"]
+    },
+    {
+      "entity": "阶段节点",
+      "status": "已被产品引用",
+      "allow": ["查看", "改名(视规则)", "新增子阶段"],
+      "deny": ["直接删除(须确认/可能失败)"]
+    }
+  ],
+  "rules": [
+    {
+      "keyword": "入口",
+      "rule": "菜单=产品管理→产品阶段管理（RES24008）；URL 含 mntPdStg；挂载 9000000811"
+    },
+    {
+      "keyword": "新增阶段",
+      "rule": "图标 a.el-icon-folder-add tooltip=新增阶段；填名称 stamp→保存；#511 实证"
+    },
+    {
+      "keyword": "新增子阶段",
+      "rule": "图标 a.el-icon-document-add tooltip=新增子阶段；先选父；#511 实证父子同树"
+    },
+    {
+      "keyword": "删除",
+      "rule": "a.el-icon-delete；校验产品关联后确认（#56 P6）"
+    },
+    {
+      "keyword": "图标",
+      "rule": "与产品库不同：本页 folder-add=新增阶段（非一级分类）、document-add=新增子阶段（非新增产品）——必须用 tooltip 全文，禁止按 class 臆测文案"
+    },
+    {
+      "keyword": "与产品库",
+      "rule": "阶段主数据在此；产品库启用可不配阶段；完整产品需设置阶段+管控要素"
+    }
+  ],
+  "exceptions": [
+    "历史曾挂 intermediate 目录 0230；菜单修复后正式挂 9000000811（#46/#56/#511 已迁）",
+    "湿测前草稿 hash 缺 mntPdStg 时阶段页曾误注入产品库卡（#511）；回填后靠命中 markers 计分压制",
+    "保存/确定空格双候选"
+  ],
+  "source": "R1 #56/#46 + R2 §3.2；I8 #511 recorded（mntPdStg）；菜单 intermediate 修复后 functionId=9000000811（RES24008 / ZJJK00095902）；folder-add=新增阶段 / document-add=新增子阶段"
+}

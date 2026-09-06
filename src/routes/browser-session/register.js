@@ -1,11 +1,19 @@
 import { existsSync, readFileSync } from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-import { PROJECT_DIR, USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import { state } from '../../state.js';
-import { saveCaseDataRecord } from '../../case-data-store.js';
+
+/**
+ * Browser-session route registration — create/step/continue/rerun/delete
+ * sessions, trajectory + business-data persist, watcher/CDP quick actions, and
+ * WebSocket event wiring for both local shared-browser and remote executor
+ * modes.
+ *
+ * Prefix: /api/browser/*
+ */
+import { saveBusinessDataRecord } from '../../business-data-store.js';
 import { getTrajectoryActionFlow } from '../../services/trajectory-service.js';
-import { persistSessionCaseData } from '../../services/case-data-service.js';
+import { persistSessionBusinessData } from '../../services/business-data-service.js';
 import {
   getRemoteStatus, initRemoteBridgeWs, notifyManualRecordingChanged,
 } from '../../cdp/remote-bridge.js';
@@ -22,13 +30,19 @@ import { bindExecutorSessionEvents } from './executor-events.js';
 import { ensureGlobalBrowser, teardownRemoteBridge } from './global-browser.js';
 import { writeAgentEvent, sessionRuntimeReady, waitForAgentEvent } from './agent-io.js';
 import { executeAgentStep } from './step-execution.js';
-import { buildRerunResumeInstruction } from './heal-instruction.js';
+import { rerunReplay } from '../../services/rerun-replay-service.js';
 import { persistTrajectory } from './trajectory-persist.js';
 import { handleWatcherAction, registerWatcherWsHandler } from './watcher-actions.js';
 
+/**
+ * Execute one agent step for a session, streaming events as SSE.
+ * @param {import('express').Request} req Express request
+ * @param {import('express').Response} res Express response
+ * @returns {Promise<void>}
+ */
 export async function runSessionStep(req, res) {
   const { id } = req.params;
-  const { task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId } = req.body || {};
+  const { task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId } = req.body || {};
   if (!task) return res.status(400).json({ error: 'task is required' });
 
   const session = state.sessions.get(id);
@@ -36,10 +50,15 @@ export async function runSessionStep(req, res) {
 
   const channel = createPushChannel(null, res);
   setupSSE(res);  // sets headers
-  executeAgentStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel });
+  executeAgentStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel });
 }
 
+/**
+ * Register all browser-session routes and WebSocket handlers on the Express app.
+ * @param {import('express').Application} app Express application
+ */
 export default function registerBrowserSessionRoutes(app) {
+  /** Create a browser session (executor slot or local shared browser) -> { sessionId, model }. */
   app.post('/api/browser/session', async (req, res) => {
     const { model } = req.body || {};
     const sessionId = crypto.randomUUID();
@@ -56,7 +75,7 @@ export default function registerBrowserSessionRoutes(app) {
           model: modelId,
           lastTask: null,
           lastMaxSteps: null,
-          caseDataFile: null,
+          businessDataFile: null,
           useExecutor: true,
           executorNodeUuid: opened.nodeUuid,
           executorSlotIndex: opened.slotIndex,
@@ -84,15 +103,17 @@ export default function registerBrowserSessionRoutes(app) {
     try { await ensureGlobalBrowser(modelId); } catch (err) { return res.status(500).json({ error: err.message }); }
 
     const gb = state.globalBrowser;
-    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null, caseDataFile: null });
+    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null, businessDataFile: null });
     console.log(`[browser-session] Created session ${sessionId} (shared browser)`);
     broadcastSessions();
     broadcastWatcherStatus();
     res.json({ sessionId, model: gb.model });
   });
 
+  /** Execute one agent step (SSE stream). */
   app.post('/api/browser/session/:id/step', runSessionStep);
 
+  /** Re-run the last task with the previous maxSteps (SSE stream). */
   app.post('/api/browser/session/:id/continue', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
@@ -103,91 +124,23 @@ export default function registerBrowserSessionRoutes(app) {
   });
 
   // Self-healing: construct resume instruction, send as step to global agent.
+  /** Re-run from a failed step: replay prior actions, then send a heal instruction (SSE stream). */
   app.post('/api/browser/session/:id/rerun', async (req, res) => {
     const { id } = req.params;
     const { action_file, failedStep, maxSteps, log_file, form_changes } = req.body || {};
 
     const session = state.sessions.get(id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    if (!action_file) return res.status(400).json({ error: 'action_file is required' });
-    if (!failedStep || failedStep <= 0) return res.status(400).json({ error: 'failedStep (> 0) is required' });
 
-    const absActionPath = path.resolve(PROJECT_DIR, action_file);
-    if (!existsSync(absActionPath)) return res.status(404).json({ error: 'Action file not found' });
+    const result = await rerunReplay({ session, action_file, failedStep, maxSteps, log_file, form_changes });
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
 
-    let replayedCount = 0;
-    let resumeInstruction;
-    try {
-      const actionData = JSON.parse(readFileSync(absActionPath, 'utf-8'));
-      const url = actionData.url || '';
-      const commands = actionData?.tests?.[0]?.commands || actionData?.actions || [];
-
-      // ── Reproduce failure scene via scripts/controller/actions/_replay.py ──
-      // Replay failedStep 之前的操作（必要时先 go_to_url），重建页面状态后再交给 Agent 修复。
-      const SKIP_REPLAY = new Set([
-        'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
-        'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
-        'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
-        'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree', 'task_done',
-        'task_retry', 'save_form_snapshot',
-      ]);
-      const preFailure = commands.filter(
-        (c, i) => (i + 1) < failedStep && !SKIP_REPLAY.has(c.action),
-      );
-      const replayActions = preFailure.map((c) => ({ ...c }));
-      const hasGoto = replayActions.some((c) => c.action === 'go_to_url');
-      if (url && !String(url).includes('unknown') && !hasGoto) {
-        replayActions.unshift({ action: 'go_to_url', params: { url } });
-      }
-
-      if (replayActions.length > 0) {
-        if (!sessionRuntimeReady(session)) {
-          console.log('[rerun] Session runtime not ready — skipping _replay reproduce');
-        } else {
-          try {
-            const replayPayload = {
-              actions: replayActions,
-              seed_action_log: true,
-              is_replay: true,
-            };
-            let replayResult;
-            if (session.useExecutor && session.executorNodeUuid) {
-              const doneP = execSession.waitForSessionEvent(session.sessionId, 'replay_done', 180000);
-              writeAgentEvent(session, 'replay_actions', replayPayload);
-              replayResult = await doneP;
-            } else {
-              const doneP = waitForAgentEvent('replay_done', 180000);
-              writeAgentEvent(session, 'replay_actions', replayPayload);
-              replayResult = await doneP;
-            }
-            replayedCount = replayResult.count || 0;
-            console.log(
-              `[rerun] _replay done: ${replayedCount} actions `
-              + `(ok=${replayResult.ok ?? '?'} failed=${replayResult.failed ?? '?'})`,
-            );
-          } catch (e) {
-            console.log(`[rerun] _replay error (continuing with heal): ${e.message}`);
-          }
-        }
-      }
-
-      ({ resumeInstruction } = buildRerunResumeInstruction({
-        actionData,
-        failedStep,
-        log_file,
-        form_changes,
-        replayedCount,
-        PROJECT_DIR,
-      }));
-    } catch (e) {
-      resumeInstruction = 'Continue recording from step ' + failedStep + '. See action file for details.';
-    }
-
-    req.body = { task: resumeInstruction, maxSteps: maxSteps || 40 };
+    req.body = { task: result.task, maxSteps: result.maxSteps };
     return runSessionStep(req, res);
   });
 
   // Human intervention retired — use manual recording instead
+  /** 410 Gone — intervene is retired; use manual recording for human correction. */
   app.post('/api/browser/session/:id/intervene', (req, res) => {
     res.status(410).json({
       error: 'Gone',
@@ -195,6 +148,7 @@ export default function registerBrowserSessionRoutes(app) {
     });
   });
 
+  /** Delete a session: close executor slot / clean local browser, archive record. */
   app.delete('/api/browser/session/:id', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
@@ -224,6 +178,7 @@ export default function registerBrowserSessionRoutes(app) {
     res.json({ status: 'archived', sessionId: id });
   });
 
+  /** Close the shared global browser process and clear all sessions. */
   app.delete('/api/browser/browser', async (req, res) => {
     const gb = state.globalBrowser;
     const proc = gb.process;
@@ -233,49 +188,38 @@ export default function registerBrowserSessionRoutes(app) {
       try { gb.stdin.write(JSON.stringify({ event: 'close' }) + '\n'); } catch {}
     }
 
-    if (proc && !proc.killed) {
-      const forceKillTimer = setTimeout(() => {
-        killTree(proc.pid);
-        setTimeout(() => killOrphans(), 2000);
-        gb.process = null;
-        gb.stdin = null;
-        gb.ready = false;
-        gb.busy = false;
-        gb.stepIndex = 0;
-        state.sessions.clear();
-        console.log('[browser-global] Browser close timeout, force killed');
-        broadcastSessions();
-        broadcastWatcherStatus();
-        res.json({ status: 'closed (force killed)' });
-      }, 30000);
-
-      proc.on('exit', () => {
-        clearTimeout(forceKillTimer);
-        gb.process = null;
-        gb.stdin = null;
-        gb.ready = false;
-        gb.busy = false;
-        gb.stepIndex = 0;
-        state.sessions.clear();
-        console.log('[browser-global] Browser closed gracefully');
-        broadcastSessions();
-        broadcastWatcherStatus();
-        res.json({ status: 'closed' });
-      });
-    } else {
+    const cleanupGlobals = (message) => {
       gb.process = null;
       gb.stdin = null;
       gb.ready = false;
       gb.busy = false;
       gb.stepIndex = 0;
       state.sessions.clear();
-      console.log('[browser-global] No browser process, cleaned up');
+      console.log(message);
       broadcastSessions();
       broadcastWatcherStatus();
+    };
+
+    if (proc && !proc.killed) {
+      const forceKillTimer = setTimeout(() => {
+        killTree(proc.pid);
+        setTimeout(() => killOrphans(), 2000);
+        cleanupGlobals('[browser-global] Browser close timeout, force killed');
+        if (!res.writableEnded) res.json({ status: 'closed (force killed)' });
+      }, 30000);
+
+      proc.on('exit', () => {
+        clearTimeout(forceKillTimer);
+        cleanupGlobals('[browser-global] Browser closed gracefully');
+        if (!res.writableEnded) res.json({ status: 'closed' });
+      });
+    } else {
+      cleanupGlobals('[browser-global] No browser process, cleaned up');
       res.json({ status: 'closed' });
     }
   });
 
+  /** List a session's recorded trajectory steps (step, path, time). */
   app.get('/api/browser/session/:id/trajectories', (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
@@ -283,6 +227,7 @@ export default function registerBrowserSessionRoutes(app) {
     res.json({ sessionId: id, stepIndex: session.stepIndex, busy: state.globalBrowser.busy, steps: session.trajectories.map(t => ({ step: t.step, path: t.path, time: t.time })) });
   });
 
+  /** Reset the session's cumulative trajectory files (returns new file paths). */
   app.post('/api/browser/session/:id/reset-trajectory', async (req, res) => {
     const gb = state.globalBrowser;
     if (!gb.stdin || !gb.ready) return res.status(503).json({ error: 'Browser not ready' });
@@ -302,7 +247,7 @@ export default function registerBrowserSessionRoutes(app) {
           if (msg.event === 'reset_trajectory_ready') {
             clearTimeout(timeout);
             gb.process.stdout.removeListener('data', onData);
-            return res.json({ status: 'reset', cumulative_file: msg.data.cumulative_file, case_data_file: msg.data.case_data_file });
+            return res.json({ status: 'reset', cumulative_file: msg.data.cumulative_file, business_data_file: msg.data.business_data_file });
           }
         } catch {}
       }
@@ -408,9 +353,11 @@ export default function registerBrowserSessionRoutes(app) {
     }
   });
 
+  /** Persist the session's accumulated trajectory to the DB. */
   app.post('/api/browser/session/:id/trajectory', persistTrajectory);
 
-  app.post('/api/browser/session/:id/save-case-data', async (req, res) => {
+  /** Save business data captured during the session to file + DB. */
+  app.post('/api/browser/session/:id/save-business-data', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
     const gb = state.globalBrowser;
@@ -418,12 +365,12 @@ export default function registerBrowserSessionRoutes(app) {
     if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
 
     try {
-      gb.stdin.write(JSON.stringify({ event: 'save_case_data' }) + '\n');
+      gb.stdin.write(JSON.stringify({ event: 'save_business_data' }) + '\n');
     } catch (writeErr) {
-      return res.status(500).json({ error: `Failed to send save_case_data: ${writeErr.message}` });
+      return res.status(500).json({ error: `Failed to send save_business_data: ${writeErr.message}` });
     }
 
-    const timeout = setTimeout(() => { cleanupListener(); if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for case data' }); }, 15000);
+    const timeout = setTimeout(() => { cleanupListener(); if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for business data' }); }, 15000);
     let pendingBuffer = '';
 
     const onStdout = async (chunk) => {
@@ -434,41 +381,41 @@ export default function registerBrowserSessionRoutes(app) {
         if (!line.trim()) continue;
         try {
           const msg = JSON.parse(line);
-          if (msg.event === 'save_case_data_result') {
+          if (msg.event === 'save_business_data_result') {
             clearTimeout(timeout);
             cleanupListener();
-            if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save case data' });
+            if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save business data' });
             try {
               let data = null;
-              if (msg.data.case_data_file && existsSync(msg.data.case_data_file)) {
+              if (msg.data.business_data_file && existsSync(msg.data.business_data_file)) {
                 try {
-                  data = JSON.parse(readFileSync(msg.data.case_data_file, 'utf-8'));
+                  data = JSON.parse(readFileSync(msg.data.business_data_file, 'utf-8'));
                 } catch (e) {
-                  return res.status(500).json({ error: `Failed to read case data file: ${e.message}` });
+                  return res.status(500).json({ error: `Failed to read business data file: ${e.message}` });
                 }
               }
               if (!data || typeof data !== 'object') {
-                return res.status(500).json({ error: 'Empty case data' });
+                return res.status(500).json({ error: 'Empty business data' });
               }
 
               // Optional legacy JSON index — never blocks DB path
               let recordId = null;
               try {
-                const { record } = saveCaseDataRecord({
-                  caseDataPath: msg.data.case_data_file,
+                const { record } = saveBusinessDataRecord({
+                  businessDataPath: msg.data.business_data_file,
                   sessionId: id,
                   model: session.model,
                   description: session.lastTask ? session.lastTask.slice(0, 100) : '',
                 });
                 recordId = record?.recordId || null;
               } catch (jsonErr) {
-                console.warn('[save-case-data] legacy JSON store skipped:', jsonErr.message);
+                console.warn('[save-business-data] legacy JSON store skipped:', jsonErr.message);
               }
               if (!recordId) {
                 recordId = 'cdata_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
               }
 
-              const dbId = await persistSessionCaseData({
+              const dbId = await persistSessionBusinessData({
                 record: {
                   recordId,
                   sessionId: id,
@@ -480,14 +427,14 @@ export default function registerBrowserSessionRoutes(app) {
               });
 
               return res.json({
-                caseDataFile: msg.data.case_data_file,
+                businessDataFile: msg.data.business_data_file,
                 recordId,
                 dbId,
                 keys: msg.data.keys,
                 storage: 'db',
               });
             } catch (err) {
-              return res.status(500).json({ error: err.message, caseDataFile: msg.data.case_data_file, keys: msg.data.keys });
+              return res.status(500).json({ error: err.message, businessDataFile: msg.data.business_data_file, keys: msg.data.keys });
             }
           }
         } catch {}
@@ -498,6 +445,7 @@ export default function registerBrowserSessionRoutes(app) {
     gb.process.stdout.on('data', onStdout);
   });
 
+  /** List all active sessions (id, model, stepIndex, busy, createdAt, stepCount). */
   app.get('/api/browser/sessions', (req, res) => {
     const gb = state.globalBrowser;
     const list = [];
@@ -512,6 +460,7 @@ export default function registerBrowserSessionRoutes(app) {
   // Register remote:* WS handlers (screencast / input)
   initRemoteBridgeWs();
 
+  /** Watcher/CDP/remote connection + busy status for the dashboard. */
   app.get('/api/browser/watcher/status', async (req, res) => {
     const gb = state.globalBrowser;
     const session = [...state.sessions.values()][0];
@@ -632,6 +581,7 @@ export default function registerBrowserSessionRoutes(app) {
     });
   });
 
+  /** Execute a CDP watcher quick action (click/fill/etc.) on the live page. */
   app.post('/api/browser/watcher/action', handleWatcherAction);
 
   // ── WebSocket 消息处理（通过 ws-server 的 onWsMessage 注册） ──

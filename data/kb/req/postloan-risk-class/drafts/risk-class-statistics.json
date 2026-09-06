@@ -1,0 +1,35 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "postloan-risk-class",
+  "flow": "风险分类统计（客户经理维度）",
+  "aliases": ["风险分类统计"],
+  "hash_markers": ["riskClassification/page", "ZJJK00097287", "ZJJK00097289"],
+  "keywords": ["风险分类统计", "客户经理维度", "任务总数", "超出期限数"],
+  "menu_path": "贷后管理/风险分类/风险分类统计",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】统计主页与维度子页进入即自动查询（riskClassification/page POST）"
+  ],
+  "steps": [
+    {
+      "name": "风险分类统计主页（维度菜单）",
+      "leafRef": "wet-test.md 叶24 (ZJJK00097287)",
+      "verify": "match",
+      "menu_path": "贷后管理/风险分类/风险分类统计",
+      "left_nav": ["客户经理维度（SUT 仅此一项，默认展开选中）"],
+      "rules": ["文档功能说明提及「机构维度等」未在 SUT 出现，菜单口径=默认客户经理维度"]
+    },
+    {
+      "name": "客户经理维度子页",
+      "leafRef": "wet-test.md 叶25 (ZJJK00097289)",
+      "verify": "match",
+      "enter": "统计主页点【客户经理维度】菜单项",
+      "query_fields": ["经办机构(disabled=9881银行)", "客户经理(disabled=黄某某)", "资产类型"],
+      "buttons": ["查询", "重置", "导出"],
+      "columns": ["机构名称", "资产类型", "客户经理名称", "客户经理编号", "任务总数", "待办任务数(合同)", "超出期限数(合同)"],
+      "rules": ["进入即自动查询；点菜单项会重新加载"]
+    }
+  ],
+  "pendingSteps": [],
+  "sourceRefs": [24, 25],
+  "coverage": {"total": 2, "match": 2, "drift": 0, "blocked": 0, "notFound": 0, "gate": "full"}
+}

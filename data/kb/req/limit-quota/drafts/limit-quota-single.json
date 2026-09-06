@@ -1,0 +1,78 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "limit-quota",
+  "flow": "新增单户限额（创建→流程启动→审批→生效）",
+  "aliases": ["单户限额设置", "单户限额管理", "维护单户限额信息", "注销单户限额", "流程轨迹"],
+  "hash_markers": ["ZJJK00070857", "ZJJK00090489", "ZJJK00070898", "ZJJK00091084", "ZJJK00090412", "FS00001634", "FS00001734", "qotAply", "UML00012531", "saccQotSetList"],
+  "keywords": ["单户限额", "限额编号", "限额总额", "管控措施", "控制方式", "限额维度", "流程启动", "流程轨迹", "qotAply"],
+  "menu_path": "额度管控/限额管理/单户限额设置（SUT 实名；文档「单户限额管理」）",
+  "preconditions": [
+    "角色=额度管控人员/额度复核人员；进入 额度管控→限额管理→单户限额设置",
+    "【SUT 实测 2026-09-06】behavior：单户限额设置列表进入页面自动加载（3 条/1 页，无需点查询）——与对公主页自动加载同向",
+    "【SUT 实测 2026-09-06】副作用对照：单户点【新增】生成 QOT202609066002，取消返回后列表无该记录（未落库或被回收）——与组合限额「新增即落库」行为相反（见组合卡）"
+  ],
+  "steps": [
+    {
+      "name": "单户限额设置列表查询",
+      "leafRef": "wet-test.md 叶1 (ZJJK00070857)",
+      "verify": "match",
+      "menu_path": "额度管控/限额管理/单户限额设置",
+      "query_fields": ["限额编号", "限额名称", "限额状态"],
+      "buttons": ["查询", "重置", "新增", "修改", "查看", "删除", "复制", "失效", "流程轨迹"],
+      "columns": ["限额编号", "限额名称", "限额起始日期", "管控措施", "控制方式", "限额总额", "限额状态", "流程状态", "操作用户", "登记时间"],
+      "rules": ["列表自动加载；列结构与文档 qotNo/qotNm/qotStdt/mgtandcntlMsr/ctrlMod/qotTrgtAmt/qotSt/pcsSt/crtUsrNm/createTime 一致"]
+    },
+    {
+      "name": "发起单户限额申请向导",
+      "leafRef": "wet-test.md 叶2 (ZJJK00090489)",
+      "verify": "match",
+      "enter": "主页【新增】（FS00001634，flowCode=qotAply，avyEcd=UML00012531）",
+      "wizard_steps": ["1 基本信息", "2 签署意见"],
+      "rules": ["新增即生成限额编号 QOT+yyyyMMdd+4 位序号（QOT202609066002 实证）；按钮 下一步/上一步/返回"]
+    },
+    {
+      "name": "维护/查看/注销单户限额信息（复合叶三态）",
+      "leafRef": "wet-test.md 叶3 (ZJJK00070898)",
+      "verify": "drift",
+      "drift": "behavior/wording 三项：①管控措施默认显示「提示」≠文档预设「默认=预警」（SUT 字典=提示/禁止族，文档「预警」措辞 SUT 未出现，章2 待湿测项核验）；②修改态回显不全：QOT202607212002 仅回显编号/操作人/登记日期，限额名称/目标金额/起始日期空白；③文档预设「已用/可用金额=0」表单无此二字段（仅 URL 携带）",
+      "fields": ["限额编号(dis)", "控制方式(dis=余额)", "限额状态(默认待生效)", "维度字段：贷款用途/担保方式/客户类型/币种/投向行业/所属行业/期限/限额维度类型(机构+产品复选)"],
+      "rules": ["新增/修改态有 保存/取消；查看态全字段 disabled 无操作权限（dialogType=look）"]
+    },
+    {
+      "name": "提交流程（签署意见步骤）",
+      "leafRef": "wet-test.md 叶4 (ZJJK00091084)",
+      "verify": "drift",
+      "drift": "wording：SUT 提交按钮文案「流程启动」≠文档「提交」（pcsMnpltNm 代码仍为提交）",
+      "fields": ["意见详情(textarea,0/500)"],
+      "buttons": ["流程启动", "上一步", "返回"],
+      "rules": ["查看态意见详情 disabled 无流程按钮；单户向导空必填可直接进签署意见步——与组合侧第一步强校验相反（见组合卡叶11）"]
+    },
+    {
+      "name": "注销单户限额（失效）",
+      "leafRef": "wet-test.md 叶6 (ZJJK00090412)",
+      "verify": "match",
+      "enter": "选待提交记录点【失效】（FS00001734，avyEcd=UML00012540）",
+      "buttons": ["注销", "取消"],
+      "rules": ["注销任务页复用 ZJJK00070898 查看态，表单全字段 disabled；二次确认弹窗「将限额设为失效后无法恢复，确认修改？」未验（注销落库黑名单）"]
+    },
+    {
+      "name": "流程跟踪信息弹窗（公共组件）",
+      "leafRef": "wet-test.md 叶7 (ZJJK00124779)",
+      "verify": "drift",
+      "drift": "wording：单户侧弹窗标题渲染为「l流程轨迹」（多余前缀字符 l，疑模板串 bug）——组合侧标题正常「流程轨迹」，同组件两处标题不一致",
+      "columns": ["节点名称", "处理日期", "处理人", "处理机构", "处理状态", "审批耗时", "操作", "审批意见"],
+      "rules": ["与文档 tskNodeNm/tskEdtm/aprvPsnUsrNm/aprvPsnInstNm/apvopn 一致；单户该记录轨迹数据为空，耗时「X天X小时X分钟」规则未核（补测=有审批流转记录）"]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "额度复核人员审批单户限额任务页",
+      "leafRefs": ["wet-test.md 叶5 (ZJDK00090491→ZJJK00090491)"],
+      "verify": "blocked",
+      "reason": "无数据：待办（额度管理 8 条均冻结/解冻/节点管理类）与已办已结→额度管理→限额管理均无单户限额（qotTp=02）审批任务，唯一限额已办为组合限额",
+      "retry_condition": "①单户限额提交进审批后经待办进入复核页核验 同意/否决；②或以已办组合任务类推（同 qotAply 模板：两步向导+全字段只读，审批按钮仅流程有效时可见）"
+    }
+  ],
+  "sourceRefs": [1, 2, 3, 4, 5, 6, 7],
+  "coverage": {"total": 7, "match": 3, "drift": 3, "blocked": 1, "notFound": 0, "gate": "partial"}
+}

@@ -8,14 +8,14 @@
  * - Type B: save_form_snapshot checkpoint → verifyFormStructure → delete missing /
  *   AI-fill adding + structured insert (confirmed=0, next batch) — healType=form_structure
  */
-import { getDB } from '../../../config/database.js';
+import { getDB } from '#config/database.js';
 import * as execSession from '../../executor-session-client.js';
 import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import {
   getTrajectoryRuntime,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import { runReplayBatch } from './replay-batch-runner.js';
 
 function fromDbRowCompat(row) {
@@ -44,6 +44,11 @@ function toNumericStepId(id) {
 
 /**
  * Validate + accept replay, return 202 payload; run batch in background.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root0] options
+ * @param {Array<number>} [root0.stepIds] step DB ids to replay
+ * @param {boolean} [root0.isReplay] whether to suppress step persist (default true)
+ * @returns {Promise<{ trajectoryId: number, trajectoryDbId: number, accepted: boolean, stepIds: Array<number> }>} 202 acceptance payload
  */
 export async function acceptTrajectoryStepsReplay(trajectoryId, {
   stepIds = [],
@@ -97,6 +102,14 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
   return accepted;
 }
 
+/**
+ * Replay selected steps synchronously (await batch completion).
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root0] options
+ * @param {Array<number>} [root0.stepIds] step DB ids to replay
+ * @param {boolean} [root0.isReplay] whether to suppress step persist (default true)
+ * @returns {Promise<object>} replay batch result
+ */
 export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isReplay = true } = {}) {
   const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
   const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
@@ -125,6 +138,8 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
 /**
  * Stop an in-flight steps/replay batch (including Type A/B heal).
  * Does not change recordStatus. Idempotent if no batch is running.
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<{ trajectoryId: number, trajectoryDbId: number, stopped: boolean }>} stop result
  */
 export async function stopTrajectoryStepsReplay(trajectoryId) {
   const tid = Number(trajectoryId);

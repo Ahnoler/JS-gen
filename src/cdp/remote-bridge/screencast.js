@@ -4,13 +4,14 @@
  */
 import { broadcastBinary } from '../../ws-server.js';
 import * as remoteSessionService from '../../services/remote-session-service.js';
+import { resolveScreencastStreamConfig, createAckPacer } from '../screencast-timing.js';
 import {
   bridge, MAGIC, MIN_FORWARD_MS, STALL_RESTART_MS, SESSION_VIEWPORT,
-  STREAM_MAX_W, STREAM_MAX_H, resolveScreencastTiming,
 } from './state.js';
 
 /**
  * Read live CSS viewport from the page (do not invent dashboard canvas sizes).
+ * @returns {Promise<{ w: number, h: number, dpr: number }>} Updated bridge.viewport.
  */
 export async function syncViewportFromPage() {
   if (!bridge.client) return bridge.viewport;
@@ -32,6 +33,8 @@ export async function syncViewportFromPage() {
 /**
  * Restore Session full viewport (1600×900). Clears leftover Emulation crops
  * from earlier dashboard-sized overrides; does NOT shrink to the Dashboard.
+ * @param {string} targetId Page target id for window bounds lookup.
+ * @returns {Promise<void>}
  */
 export async function ensureFullSessionViewport(targetId) {
   if (!bridge.client) return;
@@ -65,6 +68,10 @@ export async function ensureFullSessionViewport(targetId) {
   console.log(`[remote-bridge] session viewport ${bridge.viewport.w}×${bridge.viewport.h}`);
 }
 
+/**
+ * Apply the current bridge.viewport as a CDP device-metrics override and persist it.
+ * @returns {Promise<void>}
+ */
 export async function applyViewportOverride() {
   if (!bridge.client) return;
   await bridge.client.send('Emulation.setDeviceMetricsOverride', {
@@ -82,6 +89,10 @@ export async function applyViewportOverride() {
   }
 }
 
+/**
+ * Persist the current viewport to the remote-session record.
+ * @returns {Promise<void>}
+ */
 export async function persistViewport() {
   if (!bridge.remoteSession?.id) return;
   try {
@@ -93,6 +104,10 @@ export async function persistViewport() {
   } catch {}
 }
 
+/**
+ * Clear the screencast stall watchdog timer.
+ * @returns {void}
+ */
 export function clearStallWatch() {
   if (bridge.stallTimer) {
     clearInterval(bridge.stallTimer);
@@ -110,12 +125,15 @@ function armStallWatch() {
   }, 1000);
 }
 
+/**
+ * Stop and restart screencast (used by the stall watchdog).
+ * @returns {Promise<void>}
+ */
 export async function restartScreencast() {
   if (!bridge.client || bridge.restartingCast) return;
   bridge.restartingCast = true;
   try {
-    try { await bridge.client.send('Page.stopScreencast'); } catch {}
-    bridge.screencastOn = false;
+    await stopScreencast();
     await startScreencast();
   } catch (e) {
     console.warn('[remote-bridge] restartScreencast failed:', e.message);
@@ -124,32 +142,59 @@ export async function restartScreencast() {
   }
 }
 
+/**
+ * Stop CDP screencast and cancel the ack pacer (safe if already stopped).
+ * @returns {Promise<void>}
+ */
+export async function stopScreencast() {
+  bridge.ackPacer?.cancel();
+  bridge.ackPacer = null;
+  if (!bridge.client) return;
+  try { await bridge.client.send('Page.stopScreencast'); } catch {}
+  bridge.screencastOn = false;
+}
+
+/**
+ * Start CDP Page.startScreencast with resolved timing + viewport caps.
+ * @returns {Promise<void>}
+ */
 export async function startScreencast() {
   if (!bridge.client) return;
-  const timing = resolveScreencastTiming();
-  bridge.minForwardMs = timing.minForwardMs;
-  bridge.everyNthFrame = timing.everyNthFrame;
-  // Encode at current viewport; never upscale beyond STREAM_MAX_* (do not floor to 1080p).
-  const maxW = Math.min(Math.max(320, Number(bridge.viewport.w) || SESSION_VIEWPORT.w), STREAM_MAX_W);
-  const maxH = Math.min(Math.max(240, Number(bridge.viewport.h) || SESSION_VIEWPORT.h), STREAM_MAX_H);
+  const stream = resolveScreencastStreamConfig();
+  bridge.minForwardMs = stream.minForwardMs;
+  bridge.everyNthFrame = stream.everyNthFrame;
+  // Encode at current viewport; never upscale beyond env caps (do not floor to 1080p).
+  const maxW = Math.min(Math.max(320, Number(bridge.viewport.w) || SESSION_VIEWPORT.w), stream.maxW);
+  const maxH = Math.min(Math.max(240, Number(bridge.viewport.h) || SESSION_VIEWPORT.h), stream.maxH);
   await bridge.client.send('Page.startScreencast', {
     format: 'jpeg',
-    quality: bridge.quality,
+    quality: bridge.quality ?? stream.quality,
     maxWidth: maxW,
     maxHeight: maxH,
-    everyNthFrame: timing.everyNthFrame,
+    everyNthFrame: stream.everyNthFrame,
+  });
+  bridge.ackPacer?.cancel();
+  bridge.ackPacer = createAckPacer({
+    minForwardMs: stream.minForwardMs,
+    ack: (id) => { bridge.client?.send('Page.screencastFrameAck', { sessionId: id }).catch(() => {}); },
   });
   bridge.screencastOn = true;
   bridge.lastFrameAt = Date.now();
   armStallWatch();
 }
 
+/**
+ * Handle an incoming CDP screencast frame: ack, throttle-forward to subscribers.
+ * @param {{ sessionId?: number, data?: string, metadata?: object }} params CDP screencast frame params.
+ * @returns {void}
+ */
 export function onScreencastFrame(params) {
   if (!bridge.screencastOn || !bridge.remoteSession) return;
   const sessionId = params.sessionId;
-  // Ack Chrome immediately — never wait for dashboard round-trip (stalls video while input still works).
+  // Pace acks to the forward cadence — Chrome skips capture/encode while in-flight is
+  // full; waiting for dashboard round-trip would stall the stream, so ack locally.
   if (sessionId != null) {
-    bridge.client?.send('Page.screencastFrameAck', { sessionId: Number(sessionId) }).catch(() => {});
+    bridge.ackPacer?.schedule(Number(sessionId));
   }
   bridge.lastFrameAt = Date.now();
 
@@ -176,6 +221,7 @@ export function onScreencastFrame(params) {
     header.writeUInt16BE(uuidBuf.length, 8);
     uuidBuf.copy(header, 10);
     const packet = Buffer.concat([header, jpeg]);
+    bridge.lastPacket = packet;
 
     if (bridge.subscribers.size) {
       for (const ws of bridge.subscribers) {

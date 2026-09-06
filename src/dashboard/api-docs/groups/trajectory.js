@@ -2,6 +2,11 @@
  * API group(s): trajectory, batch-import — extracted from catalog.js.
  * Keep in sync with src/routes/v2/*.js
  */
+
+/** @typedef {{ name: string, type: string, required?: boolean, in?: 'path'|'query'|'body', desc: string, example?: string }} Param */
+/** @typedef {{ method: string, path: string, summary: string, desc?: string, params?: Param[], reqExample?: string, respExample?: string, notes?: string[], deprecated?: boolean, tryable?: boolean }} Endpoint */
+/** @typedef {{ id: string, name: string, description: string, endpoints: Endpoint[] }} TagGroup */
+
 import { J } from './_j.js';
 
 /** @type {TagGroup[]} */
@@ -14,7 +19,7 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'POST', path: '/api/v2/trajectories/analyze',
         summary: 'AI 需求拆解为阶段（不落库）',
-        desc: '将需求拆成 phases（条数跟用户编号分步）。需求中的「关键数据/案例数据」段落语义上是**业务数据**（用户希望使用的值，≠ 本项目落库的系统回写案例数据）：原文附加到每个 phase 描述末尾供 LLM 理解填表；其余字段仍可由 autofill 随机补。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。',
+        desc: '将需求拆成 phases（条数跟用户编号分步）。需求中的「关键数据/业务数据」段落语义上是**业务数据**（用户希望使用的值）：原文附加到每个 phase 描述末尾供 LLM 理解填表；其余字段仍可由 autofill 随机补。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。',
         reqExample: J({
           description:
             '1、点击客户管理，点击对公客户管理。\n'
@@ -23,19 +28,19 @@ export const GROUP_TRAJECTORY = [
             + '对公客户基本信息：\n'
             + '法定责任人的客户名称：朱桂武\n'
             + '客户标签：',
-          model: 'deepseek-v4-flash',
+          model: 'Qwen/Qwen3.5-35B-A3B',
           functionId: 3,
         }),
         respExample: J({
           phases: [
             '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理。\n\n'
-            + '【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n'
+            + '【业务数据 — 来自用户需求；填表时参考理解，按场景填写关键字段】\n'
             + '关键数据\n对公客户基本信息：\n法定责任人的客户名称：朱桂武\n客户标签：',
             '新增一个对公潜在客户。预期结果：打开对公潜在客户新增表单。\n\n'
-            + '【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n'
+            + '【业务数据 — 来自用户需求；填表时参考理解，按场景填写关键字段】\n'
             + '关键数据\n对公客户基本信息：\n法定责任人的客户名称：朱桂武\n客户标签：',
           ],
-          caseEntries: [],
+          businessEntries: [],
         }),
       },
       {
@@ -48,57 +53,60 @@ export const GROUP_TRAJECTORY = [
           { name: 'keyword', type: 'string', in: 'query', desc: '名称模糊' },
           {
             name: 'recordStatus', type: 'string', in: 'query',
-            desc: '按录制状态筛选；支持单个或逗号分隔多值：draft | live | recording | recorded | completed。别名 status',
+            desc: '按录制状态筛选；支持单个或逗号分隔多值：draft | recording | failed | recorded | completed。别名 status。stats 统计与行查询同基准（含本筛选：选中某状态时其余状态计数为 0，total=当前筛选行数）。',
             example: 'draft,recorded',
           },
           { name: 'sortBy', type: 'string', in: 'query', desc: 'created_at | name | step_count | record_status' },
           { name: 'order', type: 'string', in: 'query', desc: 'asc | desc' },
+          { name: 'batchTaskName', type: 'string', in: 'query', desc: '按所属批量导入任务名模糊筛选（空=不过滤；LIKE %值%）', example: '批量录制导入模板' },
         ],
         respExample: J({
           rows: [{
             id: 42, name: '开户交易', task: '需求描述',
             recordStatus: 'draft', isExport: 0, stepCount: 0, phaseCount: 3,
-            functionId: 3, systemAccountId: 10, model: 'deepseek-v4-flash',
+            functionId: 3, systemAccountId: 10, model: 'Qwen/Qwen3.5-35B-A3B',
+            batchTaskName: '批量录制导入模板_0814-1251',
           }],
-          total: 1, page: 1, pageSize: 20,
+          total: 42, page: 1, pageSize: 20,
+          stats: { total: 42, draft: 8, recording: 7, failed: 0, recorded: 20, completed: 7 },
         }),
       },
       {
         method: 'POST', path: '/api/v2/trajectories',
         summary: '创建交易',
-        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 caseEntries 写入 legacy case_data_entry（勿与业务数据、system_ref 混用）。录制填表优先参考 phase 内【业务数据】（用户需求原文）。系统回写参考值见 PUT …/system-ref-entries。',
+        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 businessEntries 写入 legacy business_data_entry（勿与业务数据、system_ref 混用）。录制填表优先参考 phase 内【业务数据】（用户需求原文）。系统回写参考值见 PUT …/system-ref-entries。',
         reqExample: J({
           functionId: 3,
           name: '开户交易',
           requirement: '登录、查询、修改',
           phases: ['登录系统', '查询客户', '修改信息'],
-          caseEntries: [
+          businessEntries: [
             { fieldKey: '姓名', fieldValue: '张三' },
             { fieldKey: '证件号码', fieldValue: '110101199001011234' },
           ],
-          model: 'deepseek-v4-flash',
+          model: 'Qwen/Qwen3.5-35B-A3B',
           systemAccountId: 10,
         }),
         respExample: J({
           id: 42, name: '开户交易', recordStatus: 'draft', phaseCount: 3,
           phases: [],
-          caseEntries: [{ id: 1, fieldKey: '姓名', fieldValue: '张三', trajectoryId: 42 }],
+          businessEntries: [{ id: 1, fieldKey: '姓名', fieldValue: '张三', trajectoryId: 42 }],
         }),
       },
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
-        summary: '交易详情（含 phases、caseEntries）',
-        desc: 'caseEntries 为交易级 legacy KV（case_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。',
+        summary: '交易详情（含 phases、businessEntries）',
+        desc: 'businessEntries 为交易级 legacy KV（business_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
         method: 'PATCH', path: '/api/v2/trajectories/{id}',
-        summary: '更新元数据 / 绑定账号 / 案例数据',
-        desc: '录制前须绑定 systemAccountId。账号须属于该交易所属系统。可同时传 caseEntries 替换案例 KV。',
+        summary: '更新元数据 / 绑定账号 / 业务数据',
+        desc: '录制前须绑定 systemAccountId。账号须属于该交易所属系统。可同时传 businessEntries 替换业务 KV。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           systemAccountId: 10,
-          caseEntries: [{ fieldKey: '姓名', fieldValue: '李四' }],
+          businessEntries: [{ fieldKey: '姓名', fieldValue: '李四' }],
         }),
         respExample: J({
           trajectory: { id: 42, systemAccountId: 10 },
@@ -106,18 +114,18 @@ export const GROUP_TRAJECTORY = [
         }),
       },
       {
-        method: 'PUT', path: '/api/v2/trajectories/{id}/case-data',
-        summary: '替换交易案例数据',
-        desc: '按 trajectory_id 全量替换 legacy case_data_entry（先删后插）。不是 system_ref；系统参考值请用 PUT …/system-ref-entries。本期仅持久化，不参与录制注入。',
+        method: 'PUT', path: '/api/v2/trajectories/{id}/business-data',
+        summary: '替换交易业务数据',
+        desc: '按 trajectory_id 全量替换 legacy business_data_entry（先删后插）。不是 system_ref；系统参考值请用 PUT …/system-ref-entries。本期仅持久化，不参与录制注入。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
-          caseEntries: [
+          businessEntries: [
             { fieldKey: '姓名', fieldValue: '张三' },
             { fieldKey: '手机号', fieldValue: '13800138000' },
           ],
         }),
         respExample: J({
-          id: 42, caseEntries: [{ id: 2, fieldKey: '姓名', fieldValue: '张三', trajectoryId: 42 }],
+          id: 42, businessEntries: [{ id: 2, fieldKey: '姓名', fieldValue: '张三', trajectoryId: 42 }],
         }),
       },
       {
@@ -128,22 +136,26 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/tree',
         summary: '阶段 + 步骤二级树',
-        desc: '含 caseEntries（交易级案例 KV）。默认隐藏内部 meta 步骤（如 save_form_snapshot）；`includeMeta=1` 返回全部。步骤带 `isMeta`。',
+        desc: '含 businessEntries（交易级业务 KV）。默认隐藏内部 meta 步骤（如 save_form_snapshot）；`includeMeta=1` 返回全部。步骤带 `isMeta`。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
           { name: 'includeMeta', type: 'boolean', in: 'query', desc: 'true/1 时包含 save_form_snapshot 等内部步骤', example: 'false' },
         ],
         respExample: J({
           trajectoryId: 42, name: '...', recordStatus: 'draft',
-          caseEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
+          businessEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
           phases: [{
             id: 101, phaseNumber: 1, description: '登录系统', status: 'pending',
             stitchScreenshotId: 88,
             stitchScreenshotUrl: '/api/v2/screenshots/88/image',
+            groupShots: [{
+              id: 900, stateGroup: 'page:https://demo.example.com/#/customer/manage',
+              imageUrl: '/api/v2/screenshots/900/image',
+            }],
             steps: [{
               id: 501, stepNumber: 1, actionType: 'click_element_by_index',
               source: 'agent', confirmed: true, isMeta: false,
-              params: {}, trajectoryPhaseId: 101,
+              params: {}, trajectoryPhaseId: 101, groupShotId: 900,
             }],
           }],
           orphanSteps: [],
@@ -153,6 +165,7 @@ export const GROUP_TRAJECTORY = [
           'stepCount 亦只计业务步骤；meta 仍入库供 Type B 回放',
           'steps/replay 会在选中业务步区间自动补入 meta 检查点',
           '阶段 `stitchScreenshotUrl` 指向 AI 阶段结束长图（`kind=phase_highlight`）',
+          '阶段 `groupShots` 为状态组截图（`kind=phase_group`，按 phase×stateGroup 唯一，按 id 升序）；步骤 `groupShotId` 指向其动作发生前所属状态组的截图（无则 null）',
         ],
       },
       {
@@ -169,7 +182,7 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'PUT', path: '/api/v2/trajectories/{id}/phases',
         summary: '按 id 同步阶段（删缺补新并重排 phase_number）',
-        desc: '可选同时传 caseEntries，一并替换交易案例数据。',
+        desc: '可选同时传 businessEntries，一并替换交易业务数据。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           phases: [
@@ -177,7 +190,7 @@ export const GROUP_TRAJECTORY = [
             { description: '新阶段' },
             { id: 103, description: '提交' },
           ],
-          caseEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
+          businessEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
         }),
       },
       {
@@ -286,15 +299,32 @@ export const GROUP_TRAJECTORY = [
         ],
       },
       {
+        method: 'GET', path: '/api/v2/trajectories/batch/names',
+        summary: '任务名候选（搜索下拉）',
+        desc: '按 functionId + 关键字模糊去重返回最近创建的任务名列表（交易列表页「按任务名筛选」下拉选项源）。',
+        params: [
+          { name: 'functionId', type: 'number', in: 'query', desc: '功能 id；缺省不过滤' },
+          { name: 'keyword', type: 'string', in: 'query', desc: '任务名模糊关键字（LIKE %值%）' },
+          { name: 'limit', type: 'number', in: 'query', desc: '上限，默认 20，最大 100' },
+        ],
+        respExample: J({ names: ['批量录制导入模板_0814-1251', '批量录制导入模板_0813-1709'] }),
+        notes: [
+          '按 paasUserId 隔离（与列表同语义：空 paas_user_id=全可见）',
+          '仅返回已产生交易轨迹的任务名（EXISTS trajectory.batch_job_id）——空任务不出现在下拉',
+          '注册在 batch/:batchId 之前，避免被 :batchId 捕获',
+        ],
+      },
+      {
         method: 'POST', path: '/api/v2/trajectories/batch/import',
         summary: '批量导入 Excel 并自动录制（一站式）',
         desc: 'multipart 上传 .xlsx；mode=record 时对每行自动执行 analyze → 保存草稿 → prepare → record/start → detach；'
           + 'mode=draft 时仅 analyze 并保存草稿（itemStatus=drafted，不占执行机）。'
           + ' 立即返回 HTTP 202；record 模式后台并行录制（全局 FIFO，受执行机槽位限制）。'
           + ' 须带 Idempotency-Key。functionId / systemAccountId 由页面上下文随表单提交。',
-        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=deepseek-v4-flash; mode=draft|record\nHeader: Idempotency-Key: <uuid>',
+        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=Qwen/Qwen3.5-35B-A3B; mode=draft|record; name=<任务名>\nHeader: Idempotency-Key: <uuid>',
         respExample: J({
           batchId: 'uuid',
+          name: '批量录制导入模板_0814-1251',
           status: 'accepted',
           mode: 'draft',
           functionId: 3,
@@ -305,6 +335,7 @@ export const GROUP_TRAJECTORY = [
         notes: [
           'HTTP 202 Accepted；v2 信封 body.code 仍为 200',
           'mode 默认 record；可选 draft（仅 analyze+草稿，跳过 prepare/record/detach）',
+          'name 可选，缺省按 文件名_MMDD-HHmm 生成；创建后不可改',
           'mode=draft 不要求 USE_EXECUTOR；mode=record 且 USE_EXECUTOR=false → 503',
           'mode 非法（非 record|draft）→ 400',
           'requestHash / 幂等校验包含 mode（同 Key 不同 mode → 409）',
@@ -323,6 +354,7 @@ export const GROUP_TRAJECTORY = [
         ],
         respExample: J({
           batchId: 'uuid',
+          name: '批量录制导入模板_0814-1251',
           status: 'running',
           mode: 'record',
           jobStatus: 'running',

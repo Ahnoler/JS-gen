@@ -1,15 +1,23 @@
-import { LLM_BASE_URL, LLM_API_KEY } from '../config/config.js';
+/**
+ * Standalone LLM client (no OpenCode SDK): chat-completions fetch wrapper.
+ */
+import { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT_MS } from '#config/config.js';
+
+const DEFAULT_MODEL = LLM_MODEL;
 
 function resolveModelId(model) {
-  if (!model) return 'deepseek-v4-flash';
+  if (!model) return DEFAULT_MODEL;
   if (typeof model === 'object' && model.modelID) return model.modelID;
-  if (typeof model === 'string') {
-    const parts = model.split('/');
-    return parts.length >= 2 ? parts.slice(1).join('/') : parts[0];
-  }
-  return 'deepseek-v4-flash';
+  if (typeof model === 'string') return model;
+  return DEFAULT_MODEL;
 }
 
+/**
+ * Call the LLM chat-completions endpoint and return the assistant message content.
+ * @param {string} text user prompt text
+ * @param {string|object} [model] model id or model object; falls back to LLM_MODEL
+ * @returns {Promise<string>} assistant message content (empty string if none)
+ */
 export async function callLLM(text, model) {
   if (!LLM_BASE_URL || !LLM_API_KEY) {
     throw new Error('LLM_BASE_URL and LLM_API_KEY env vars are required in standalone mode');
@@ -19,6 +27,7 @@ export async function callLLM(text, model) {
 
   const resp = await fetch(`${LLM_BASE_URL}/chat/completions`, {
     method: 'POST',
+    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${LLM_API_KEY}`,

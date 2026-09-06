@@ -1,3 +1,6 @@
+/**
+ * DAO for the `operation_component_occurrence` table — records where a component appears in a trajectory phase.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow } from './helpers.js';
 
@@ -10,6 +13,11 @@ function shape(row) {
   return obj;
 }
 
+/**
+ * Insert an occurrence; idempotent on duplicate (component_id, trajectory_phase_id).
+ * @param {object} data camelCase occurrence fields
+ * @returns {Promise<object|null>} created or existing occurrence entity
+ */
 export async function create(data) {
   const row = toDbRow({
     componentId: data.componentId,
@@ -37,11 +45,21 @@ export async function create(data) {
   }
 }
 
+/**
+ * Fetch a single occurrence by id.
+ * @param {number} id 主键
+ * @returns {Promise<object|null>} occurrence entity or null when not found
+ */
 export async function getById(id) {
   const row = await getDB()(TABLE).where({ id }).first();
   return shape(row);
 }
 
+/**
+ * List occurrences for a component ordered by id.
+ * @param {number} componentId 组件 id
+ * @returns {Promise<object[]>} occurrence entities
+ */
 export async function listByComponent(componentId) {
   const rows = await getDB()(TABLE)
     .where({ component_id: componentId })
@@ -49,6 +67,11 @@ export async function listByComponent(componentId) {
   return rows.map(shape);
 }
 
+/**
+ * Count occurrences for a component.
+ * @param {number} componentId 组件 id
+ * @returns {Promise<number>} occurrence count
+ */
 export async function countByComponent(componentId) {
   const row = await getDB()(TABLE)
     .where({ component_id: componentId })
@@ -57,6 +80,11 @@ export async function countByComponent(componentId) {
   return Number(row?.total) || 0;
 }
 
+/**
+ * List occurrences for a component joined with phase/trajectory metadata.
+ * @param {number} componentId 组件 id
+ * @returns {Promise<object[]>} occurrence entities with phaseNumber/phaseDescription/trajectoryName
+ */
 export async function listByComponentWithPhaseMeta(componentId) {
   const rows = await getDB()(TABLE)
     .leftJoin('trajectory_phase', `${TABLE}.trajectory_phase_id`, 'trajectory_phase.id')
@@ -81,6 +109,11 @@ export async function listByComponentWithPhaseMeta(componentId) {
   });
 }
 
+/**
+ * Delete all occurrences for a component.
+ * @param {number} componentId 组件 id
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function removeByComponent(componentId) {
   return getDB()(TABLE).where({ component_id: componentId }).del();
 }

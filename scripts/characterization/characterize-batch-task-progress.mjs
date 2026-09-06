@@ -17,7 +17,7 @@ import {
 } from '../../src/services/trajectory/batch-item-progress.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const phaseSvc = readFileSync(join(ROOT, 'src/services/trajectory-phase-service.js'), 'utf-8');
+const phaseSvc = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-phase-service.js'), 'utf-8');
 assert.match(phaseSvc, /export async function appendPhaseDoneLog/);
 assert.match(phaseSvc, /done_logs: JSON\.stringify\(\[\]\)/);
 
@@ -69,6 +69,36 @@ assert.equal(sum.phaseTotal, 4);
 assert.equal(sum.phaseName, '填写客户信息');
 assert.equal(sum.lastDoneText, '进了列表');
 
+// Later phases often complete without done().text — do not keep showing phase 1.
+const laterDone = summarizePhases([
+  phases[0],
+  {
+    phaseNumber: 2, status: 'completed', description: '新增潜在客户',
+    doneLogs: [],
+  },
+  {
+    phaseNumber: 3, status: 'running', description: '填写信贷潜在客户的基本信息，点击保存。',
+    doneLogs: [],
+  },
+  phases[3],
+]);
+assert.equal(laterDone.phaseCompleted, 2);
+assert.equal(laterDone.phaseName, '填写信贷潜在客户的基本信息，点击保存。');
+assert.equal(laterDone.lastDoneText, '阶段2已完成');
+assert.notEqual(laterDone.lastDoneText, '进了列表');
+
+const laterWithOwnLog = summarizePhases([
+  {
+    ...phases[0],
+    doneLogs: [{ text: '阶段1完成：进了列表', at: '2026-08-13T09:00:00.000Z', source: 'agent' }],
+  },
+  {
+    phaseNumber: 2, status: 'completed', description: '新增潜在客户',
+    doneLogs: [{ text: '阶段2完成：已保存潜在客户', at: '2026-08-13T08:00:00.000Z', source: 'agent' }],
+  },
+]);
+assert.equal(laterWithOwnLog.lastDoneText, '阶段2完成：已保存潜在客户');
+
 function pct(partial) {
   return computeBatchItemProgress(partial).progressPercent;
 }
@@ -99,8 +129,20 @@ assert.ok(pct({
 const runner = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf-8');
 assert.match(runner, /appendPhaseDoneLog/);
 assert.match(runner, /donePayload\?\.text/);
+assert.match(runner, /lockAiRecording/);
+assert.match(runner, /session\.aiRecording = true/);
+assert.match(runner, /doneP\.cancel/);
 assert.doesNotMatch(runner.slice(runner.indexOf('export async function runDefaultLogin')), /appendPhaseDoneLog/);
 const sess = readFileSync(join(ROOT, 'src/routes/browser-session/session-message.js'), 'utf-8');
 assert.match(sess, /appendPhaseDoneLog/);
+assert.match(sess, /session\.aiRecording/);
+const attach = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-attach-runner.js'), 'utf-8');
+// 4145e23 校准：prepare（开浏览器/推流）≠ 录制——attach-runner 不得把持久状态覆盖为 recording，
+// 也不得依赖瞬态 record_status；本地路径保留 single-live 409 门禁。
+assert.doesNotMatch(attach, /recordStatus: 'recording'/);
+assert.doesNotMatch(attach, /isAiRecordingActive/);
+assert.match(attach, /single-live|Local \(non-executor\) mode only supports one live/);
+const hub = readFileSync(join(ROOT, 'src/executor-event-hub.js'), 'utf-8');
+assert.match(hub, /promise\.cancel = cancel/);
 
 console.log('characterize-batch-task-progress: OK');

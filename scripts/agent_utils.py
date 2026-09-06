@@ -34,6 +34,47 @@ def extract_first_url(task):
     urls = re.findall(r'https?://[^\s\n]+', task)
     return urls[0] if urls else None
 
+
+# 批量动作预算：contract 模式 → 单步最大动作数（browser_use max_actions_per_step）
+# 填表/维护/引入阶段字段多为独立输入，允许 5 个连续动作；导航/查询/登录等
+# DOM 结构易变阶段收敛到 3，控制批内定位过期与整轮重试成本。
+_MODE_MAX_ACTIONS = {
+    'create': 5,
+    'modify': 5,
+    'introduce_pick': 5,
+    'navigate': 3,
+    'query': 3,
+    'login': 3,
+}
+
+_DEFAULT_MAX_ACTIONS = 3
+
+
+def resolve_max_actions_per_step(instruction_value, contract_mode=None):
+    """解析单步最大动作数（browser_use max_actions_per_step）。
+
+    规则（与 Node 配置链一致）：
+    1. instruction_value 非空（Node 显式传 MAX_ACTIONS_PER_STEP）→ 用之；
+       0 / 空串 / None 视为未显式指定，不覆盖，继续走模式映射；
+    2. 否则按 contract 模式映射：create/modify/introduce_pick → 5，
+       navigate/query/login → 3，其它模式 → 默认 3；
+    3. 结果 clamp 到 [1, 10]（框架默认 10 封顶）。
+
+    Returns: (value, source) — source ∈ {'config', 'mode', 'default'}。
+    """
+    if instruction_value not in (None, ''):
+        try:
+            explicit = int(instruction_value)
+        except (TypeError, ValueError):
+            explicit = 0
+        if explicit:
+            return max(1, min(10, explicit)), 'config'
+    mode_default = _MODE_MAX_ACTIONS.get(contract_mode)
+    if mode_default is not None:
+        return mode_default, 'mode'
+    return _DEFAULT_MAX_ACTIONS, 'default'
+
+
 async def do_navigate(page, url):
     from . import controller as ctrl_mod
     from .controller.actions._helpers import dismiss_https_first_interstitial
@@ -91,28 +132,32 @@ def build_agent_system_message(contract: dict | None = None) -> str:
 
     packs = ['agent-core.md', 'agent-tools-common.md']
 
-    # Table tools for navigate/query/introduce (row selection, icon buttons)
-    # and create/modify (row edit/delete, toolbar icons)
-    if mode in ('navigate', 'query', 'introduce_pick', 'login', 'create', 'modify', None):
-        packs.append('agent-tools-table.md')
+    # Heal mode: recovery rules only — no form/table/tree recording packs.
+    if mode == 'heal':
+        packs.append('agent-tools-heal.md')
+    else:
+        # Table tools for navigate/query/introduce (row selection, icon buttons)
+        # and create/modify (row edit/delete, toolbar icons)
+        if mode in ('navigate', 'query', 'introduce_pick', 'login', 'create', 'modify', None):
+            packs.append('agent-tools-table.md')
 
-    # Form pack for introduce_pick and create/modify
-    if mode in ('introduce_pick', 'create', 'modify') or allow_assistant:
-        packs.append('agent-tools-form.md')
+        # Form pack for introduce_pick and create/modify
+        if mode in ('introduce_pick', 'create', 'modify') or allow_assistant:
+            packs.append('agent-tools-form.md')
 
-    # Tree pack for create/modify (default)
-    if mode in ('create', 'modify'):
-        packs.append('agent-tools-tree.md')
+        # Tree pack for create/modify (default)
+        if mode in ('create', 'modify'):
+            packs.append('agent-tools-tree.md')
 
-    # Full fallback: unknown mode or None contract
-    if mode not in ('login', 'navigate', 'query', 'introduce_pick', 'create', 'modify'):
-        packs = [
-            'agent-core.md',
-            'agent-tools-common.md',
-            'agent-tools-form.md',
-            'agent-tools-table.md',
-            'agent-tools-tree.md',
-        ]
+        # Full fallback: unknown mode or None contract
+        if mode not in ('login', 'navigate', 'query', 'introduce_pick', 'create', 'modify'):
+            packs = [
+                'agent-core.md',
+                'agent-tools-common.md',
+                'agent-tools-form.md',
+                'agent-tools-table.md',
+                'agent-tools-tree.md',
+            ]
 
     parts = [_read_pack(p) for p in packs]
     return '\n\n'.join(parts)
@@ -322,7 +367,7 @@ def patch_icon_tooltip_labels():
     BrowserContext.get_state = _patched_get_state
 
 
-def create_llm(model, base_url, api_key=None):
+def create_llm(model, base_url, api_key=None, timeout=None):
     from langchain_openai import ChatOpenAI
     effective_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
     if not base_url:
@@ -331,7 +376,10 @@ def create_llm(model, base_url, api_key=None):
     if not effective_key:
         print("Error: --api-key, OPENAI_API_KEY, or LLM_API_KEY env is required", file=sys.stderr)
         sys.exit(1)
-    return ChatOpenAI(model=model, base_url=base_url, api_key=effective_key, temperature=0.2)
+    kwargs = dict(model=model, base_url=base_url, api_key=effective_key, temperature=0.2)
+    if timeout is not None:
+        kwargs['timeout'] = timeout
+    return ChatOpenAI(**kwargs)
 
 
 def make_step_callback(phase_offset=0):
@@ -346,18 +394,26 @@ def make_step_callback(phase_offset=0):
             actions = getattr(agent_output, 'action', None) or []
             action_names = [list(a.keys())[0] if isinstance(a, dict) else str(a) for a in actions]
             emit_json({"event": "step", "data": {"step": phase_offset + step_num, "url": getattr(browser_state, 'url', '') if browser_state else '', "next_goal": next_goal[:200], "actions": action_names}})
-        except:
-            pass
+        except Exception as e:
+            sys.stderr.write(f'[step-callback] on_step_end emit failed: {type(e).__name__}: {e}\n')
+            sys.stderr.flush()
     return on_step_end
 
 
-def make_done_callback(output_path):
-    """Create a done callback that saves trajectory and emits JSON event."""
+def make_done_callback(output_path, business_data_store=None):
+    """Create a done callback that saves trajectory and emits JSON event.
+
+    When business_data_store is provided, sets business_data_store['_done_fired'] = True
+    so the quality gate can detect whether done() was triggered.
+    """
     def on_done(history_list):
         try:
+            if business_data_store is not None:
+                business_data_store['_done_fired'] = True
             output_path.parent.mkdir(parents=True, exist_ok=True)
             history_list.save_to_file(str(output_path))
             emit_json({"event": "done", "data": {"output_file": str(output_path), "steps": len(history_list.history), "is_done": history_list.is_done(), "is_successful": history_list.is_successful(), "final_result": history_list.final_result(), "errors": history_list.errors()}})
-        except:
-            pass
+        except Exception as e:
+            sys.stderr.write(f'[done-callback] on_done emit failed: {type(e).__name__}: {e}\n')
+            sys.stderr.flush()
     return on_done

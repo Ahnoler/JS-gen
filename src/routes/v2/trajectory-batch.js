@@ -3,10 +3,11 @@
  * Registered BEFORE /api/v2/trajectories/:id so "batch" is not captured as id.
  */
 import { uploadXlsxSingle, multerHttpStatus, XLSX_MIME } from '../../http/upload-xlsx.js';
-import { BATCH_TEMPLATE_FILENAME } from '../../services/trajectory-batch-excel.js';
+import { decodeUploadFilename } from '../../http/decode-upload-filename.js';
+import { BATCH_TEMPLATE_FILENAME } from '../../services/trajectory/trajectory-batch-excel.js';
 import * as batchService from '../../services/trajectory/trajectory-batch-service.js';
 import { BATCH_JOB_TERMINAL } from '../../models/constants.js';
-import { sendErr, asyncHandler } from './trajectory-shared.js';
+import { asyncHandler, respondError, AppError } from '../../http/app-error.js';
 
 function sendExcel(res, buffer, filename) {
   const encoded = encodeURIComponent(filename);
@@ -20,11 +21,26 @@ function sendExcel(res, buffer, filename) {
   res.send(buffer);
 }
 
+/**
+ * Register batch Excel import + auto-recording routes (template, names, import, poll, cancel).
+ * @param {import('express').Application} app Express application
+ */
 export default function registerTrajectoryBatch(app) {
   /** Template download (binary, no JSON envelope). */
   app.get('/api/v2/trajectories/batch/template', asyncHandler(async (_req, res) => {
     const buf = await batchService.buildTemplateBuffer();
     sendExcel(res, buf, BATCH_TEMPLATE_FILENAME);
+  }));
+
+  /** 任务名候选（搜索下拉）：functionId + keyword 模糊去重，按 paasUserId 隔离（空=全可见）。注册在 :batchId 之前。 */
+  app.get('/api/v2/trajectories/batch/names', asyncHandler(async (req, res) => {
+    const names = await batchService.listBatchTaskNames({
+      functionId: req.query.functionId,
+      keyword: req.query.keyword,
+      paasUserId: req.paasUserId ?? null,
+      limit: req.query.limit,
+    });
+    res.json({ names });
   }));
 
   /**
@@ -40,26 +56,38 @@ export default function registerTrajectoryBatch(app) {
       }
       try {
         if (!req.file?.buffer?.length) {
-          return res.status(400).json({ error: '请上传 Excel 文件' });
+          throw new AppError('请上传 Excel 文件', { code: 'VALIDATION' });
         }
         const idempotencyKey = req.get('Idempotency-Key')
           || req.get('idempotency-key')
           || req.body?.idempotencyKey;
         const result = await batchService.importBatchFromExcel({
           fileBuffer: req.file.buffer,
-          originalFilename: req.file.originalname || '',
+          originalFilename: decodeUploadFilename(req.file.originalname || ''),
           functionId: req.body?.functionId,
           systemAccountId: req.body?.systemAccountId ?? req.body?.accountId,
           model: req.body?.model || '',
           idempotencyKey,
           mode: req.body?.mode,
+          name: req.body?.name,
+          paasUserId: req.paasUserId ?? null,
         });
         const httpStatus = result._httpStatus || 202;
         delete result._httpStatus;
         delete result._idempotentReplay;
         res.status(httpStatus).json(result);
       } catch (e) {
-        sendErr(res, e, e.statusCode || 500);
+        if (e instanceof AppError) {
+          respondError(res, e);
+        } else {
+          respondError(res, e, {
+            body: {
+              error: e.message,
+              ...(e.code ? { code: e.code } : {}),
+              ...(e.rejected ? { rejected: e.rejected } : {}),
+            },
+          });
+        }
       }
     });
   });
@@ -68,7 +96,11 @@ export default function registerTrajectoryBatch(app) {
   app.get('/api/v2/trajectories/batch/:batchId', asyncHandler(async (req, res) => {
     const page = +req.query.page || 1;
     const pageSize = Math.min(200, +req.query.pageSize || 50);
-    const view = await batchService.getBatchJobView(req.params.batchId, { page, pageSize });
+    const view = await batchService.getBatchJobView(req.params.batchId, {
+      page,
+      pageSize,
+      paasUserId: req.paasUserId ?? null,
+    });
     const httpStatus = BATCH_JOB_TERMINAL.includes(view.status) ? 200 : 202;
     res.status(httpStatus).json(view);
   }));

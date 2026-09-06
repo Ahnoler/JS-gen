@@ -78,7 +78,11 @@ def test_reset_persistent_false_after_both_attempts() -> None:
 
 
 def test_direct_persistent_reset_gates_before_resolve() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     direct = form.split("async def select_option(", 1)[1].split(
         "async def click_adjacent_button", 1
     )[0]
@@ -121,7 +125,13 @@ def test_direct_persistent_reset_gates_before_resolve() -> None:
 
 
 def test_replay_persistent_reset_gates_before_pick_validation() -> None:
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
         "return f'unknown-form-action", 1
     )[0]
@@ -163,7 +173,13 @@ def test_replay_persistent_reset_gates_before_pick_validation() -> None:
 
 
 def test_replay_branch_reset_before_pick_validation() -> None:
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
         "return f'unknown-form-action", 1
     )[0]
@@ -207,7 +223,11 @@ def test_replay_branch_reset_before_pick_validation() -> None:
 
 
 def test_direct_reset_before_resolve_and_gates_trigger() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     direct = form.split("async def select_option(", 1)[1].split(
         "async def click_adjacent_button", 1
     )[0]
@@ -239,10 +259,25 @@ def test_direct_reset_before_resolve_and_gates_trigger() -> None:
 
 
 def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
+    autofill_src = (
+        (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
+    )
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
 
-    autofill = form.split("async def _select_by_xpath", 1)[1].split("KIND_ORDER", 1)[0]
+    autofill = autofill_src.split("async def _select_by_xpath", 1)[1].split("KIND_ORDER", 1)[0]
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
         "return f'unknown-form-action", 1
     )[0]
@@ -251,7 +286,9 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
         ("autofill xpath", autofill, "JS_SELECT_TRIGGER_BY_XPATH"),
         (
             "autofill label",
-            form.split("async def _select_by_label_autofill", 1)[1].split("KIND_ORDER", 1)[0],
+            autofill_src.split("async def _select_by_label_autofill", 1)[1].split(
+                "KIND_ORDER", 1
+            )[0],
             "JS_FIND_LABELED_SELECT",
         ),
         (
@@ -275,13 +312,28 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
 
 
 def test_recording_and_replay_use_reset_boundary() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
+    autofill_src = (
+        (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
+    )
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
 
     direct = form.split("async def select_option(", 1)[1].split(
         "async def click_adjacent_button", 1
     )[0]
-    autofill = form.split("async def _select_by_xpath", 1)[1].split(
+    autofill = autofill_src.split("async def _select_by_xpath", 1)[1].split(
         "KIND_ORDER", 1
     )[0]
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
@@ -359,7 +411,11 @@ def test_prompt_serializes_select_and_forbids_invented_xpath() -> None:
 
 
 def test_direct_select_wires_runtime_fallback_only() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     utils = (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(
         encoding="utf-8"
     )

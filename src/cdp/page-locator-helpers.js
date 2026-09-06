@@ -70,7 +70,7 @@ export const PAGE_LOCATOR_HELPERS = `
     if (node.id && !isGeneratedId(node.id)) return '//*[@id="' + node.id + '"]';
     const parts = [];
     let cur = node;
-    while (cur && cur.nodeType === 1 && cur !== document.body) {
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement) {
       let ix = 1;
       let sib = cur.previousElementSibling;
       while (sib) {
@@ -80,7 +80,7 @@ export const PAGE_LOCATOR_HELPERS = `
       parts.unshift(cur.tagName.toLowerCase() + '[' + ix + ']');
       cur = cur.parentElement;
     }
-    return '/' + parts.join('/');
+    return '/html' + (parts.length ? '/' + parts.join('/') : '');
   }
   function isVisible(el) {
     if (!el || el.nodeType !== 1) return false;
@@ -308,15 +308,30 @@ export const PAGE_LOCATOR_HELPERS = `
     return 'generic';
   }
   function formFieldXpathSmartOf(node, formLabel) {
-    const lbl = normalizeFormLabel(formLabel);
+    const lbl0 = normalizeFormLabel(formLabel);
+    // Corrupt formLabel that is actually an XPath fragment must be ignored.
+    const lbl = (lbl0 && !/^\\\/[^\\s]*\\\[/.test(lbl0)) ? lbl0 : '';
     const scope = scopeOf(node);
     const scopeKind = (scope === 'drawer' || scope === 'dialog') ? scope : '';
-    if ((!lbl || !node) && node) {
+    // A form item without a real <label> element cannot use a label-based
+    // xpath, regardless of the formLabel hint (login/placeholder-only forms).
+    const realLabel = (() => {
+      if (!node || !node.closest) return '';
+      const item = node.closest('.el-form-item');
+      const l = item && item.querySelector('.el-form-item__label, label');
+      return l ? normalizeControlText(l.textContent) : '';
+    })();
+    if ((!lbl || !realLabel || !node) && node) {
+      const tagL0 = (node.tagName || '').toLowerCase();
       const ph = normalizeControlText((node.getAttribute && node.getAttribute('placeholder')) || '');
       if (ph) {
-        const tagL0 = (node.tagName || '').toLowerCase();
         const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
         return scopedXPath(leaf0 + '[contains(@placeholder,' + xpathLiteral(ph) + ')]', scopeKind);
+      }
+      const name = (node.getAttribute && node.getAttribute('name')) || '';
+      if (name) {
+        const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
+        return scopedXPath(leaf0 + '[@name=' + xpathLiteral(name) + ']', scopeKind);
       }
     }
     if (!lbl || !node) return '';
@@ -381,6 +396,27 @@ export const PAGE_LOCATOR_HELPERS = `
     } catch (e) {
       return [];
     }
+  }
+  /* preferVisibleXpath — el-table 固定列克隆消歧：同一锚文本多命中时，若 host
+   * 自身可交互（offsetParent 非空或 getClientRects 非空）且不在固定列克隆容器内，
+   * 在叶子步骤追加 not(ancestor::div[...el-table__fixed...]) 排除主表外的克隆副本；
+   * 仅当过滤后命中数严格减少且仍命中 host 时才采用，单命中输出不变。 */
+  function preferVisibleXpath(expr, node) {
+    const xp = String(expr || '');
+    if (!xp || !node || node.nodeType !== 1) return xp;
+    try {
+      const hits = evalXpathAll(xp);
+      if (hits.length < 2) return xp;
+      if (node.closest && node.closest('.el-table__fixed, .el-table__fixed-right')) return xp;
+      const interactable = node.offsetParent !== null
+        || (node.getClientRects && node.getClientRects().length > 0);
+      if (!interactable) return xp;
+      const filtered = xp
+        + "[not(ancestor::div[contains(@class,'el-table__fixed') or contains(@class,'el-table__fixed-right')])]";
+      const fh = evalXpathAll(filtered);
+      if (fh.length > 0 && fh.length < hits.length && fh.indexOf(node) >= 0) return filtered;
+    } catch (e) { /* ignore */ }
+    return xp;
   }
   /* regionAnchor* — xpath 消歧：为同名 leaf 加 titled host 前缀，导出唯一相对 xpath。
    * 不是产品「分块/section=」；产品区域请用 region_* / L1。 */
@@ -459,15 +495,67 @@ export const PAGE_LOCATOR_HELPERS = `
       if (role === 'overlay') return t || '弹层';
       if (role === 'table') return t || '表格';
       if (role === 'section') return t || '区块';
+      if (role === 'tab') return t || '页签';
+      if (role === 'wizard') return t || '向导';
+      if (role === 'todo') return t || '待办';
       if (role === 'shell-aside') return '侧栏';
       if (role === 'shell-header') return '顶栏';
       if (role === 'main') return '主区';
       if (role === 'page') return '页面';
       return t || '其他';
     }
+    function layerLabel(s) {
+      return String(s || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+    }
+    function buildRegionLayers(region) {
+      if (!region) return [];
+      const role = String(region.region_role || '');
+      const label = layerLabel(region.region_label);
+      if (role === 'overlay') {
+        return label ? [{ role: 'overlay', label: label }] : [];
+      }
+      if (role === 'table') {
+        return [{ role: 'table', label: label || '表格' }];
+      }
+      if (role === 'todo') {
+        return label ? [{ role: 'todo', label: label }] : [];
+      }
+      const out = [];
+      const card = layerLabel(region.region_card);
+      if (card) out.push({ role: 'card', label: card });
+      const chrome = region.region_chrome;
+      if (chrome && chrome.label && (chrome.role === 'tab' || chrome.role === 'wizard')) {
+        const cl = layerLabel(chrome.label);
+        if (cl) out.push({ role: chrome.role, label: cl });
+      }
+      const section = layerLabel(region.region_section);
+      if (section) out.push({ role: 'section', label: section });
+      const block = layerLabel(region.region_block);
+      if (block) out.push({ role: 'titlebox', label: block });
+      return out;
+    }
+    function prependPageLayer(layers, pageLabel) {
+      const src = Array.isArray(layers) ? layers.slice() : [];
+      let existingPage = '';
+      if (src[0] && src[0].role === 'page') existingPage = layerLabel(src[0].label);
+      const cleaned = [];
+      for (let i = 0; i < src.length; i++) {
+        if (src[i] && src[i].role === 'page') continue;
+        cleaned.push(src[i]);
+      }
+      const incoming = layerLabel(pageLabel);
+      const page = existingPage || incoming;
+      if (page) cleaned.unshift({ role: 'page', label: page });
+      return cleaned;
+    }
+    function withLayers(region) {
+      if (!region) return region;
+      region.layers = buildRegionLayers(region);
+      return region;
+    }
     function assignRegion(el) {
       if (!el || !el.closest) {
-        return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
+        return withLayers({ region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') });
       }
       if (el.closest('.el-dialog, .el-drawer, .el-message-box')) {
         const o = el.closest('.el-dialog, .el-drawer, .el-message-box');
@@ -475,22 +563,10 @@ export const PAGE_LOCATOR_HELPERS = `
           && (o.querySelector('.el-dialog__title, .el-drawer__title').textContent || ''))
           || o.getAttribute('aria-label') || '';
         const id = 'overlay:' + String(title || 'overlay').replace(/\\s+/g, ' ').trim().slice(0, 40);
-        return { region_role: 'overlay', region_id: id, region_label: regionLabelOf('overlay', title) };
+        return withLayers({ region_role: 'overlay', region_id: id, region_label: regionLabelOf('overlay', title) });
       }
       if (el.closest('.el-table, .tssc-multiple-table-content, .myTable')) {
-        return { region_role: 'table', region_id: 'table', region_label: regionLabelOf('table') };
-      }
-      if (el.closest('.el-collapse-item')) {
-        const it = el.closest('.el-collapse-item');
-        const t = (it.querySelector('.el-collapse-item__header')
-          && (it.querySelector('.el-collapse-item__header').innerText || ''))
-          || '';
-        const title = String(t).replace(/\\s+/g, ' ').trim().slice(0, 40);
-        return {
-          region_role: 'section',
-          region_id: 'section:' + (title || 'section'),
-          region_label: regionLabelOf('section', title),
-        };
+        return withLayers({ region_role: 'table', region_id: 'table', region_label: regionLabelOf('table') });
       }
       if (el.closest('.todo-item')) {
         const todo = el.closest('.todo-item');
@@ -516,37 +592,87 @@ export const PAGE_LOCATOR_HELPERS = `
         const label = (human || ht || bizKey || firstLine || 'todo').slice(0, 40);
         // Stable id prefers biz key so same Chinese title across cards still collide-refine cleanly.
         const idKey = bizKey || label || 'todo';
-        return {
-          region_role: 'section',
+        return withLayers({
+          region_role: 'todo',
           region_id: 'section:' + idKey,
-          region_label: regionLabelOf('section', label),
-        };
+          region_label: regionLabelOf('todo', label),
+        });
       }
       if (el.closest('.el-aside, .sidebar, aside, .el-menu')) {
-        return { region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') };
+        return withLayers({ region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') });
       }
       if (el.closest('.el-header, .navbar, header, .tags-view-container')) {
-        return { region_role: 'shell-header', region_id: 'shell-header', region_label: regionLabelOf('shell-header') };
+        return withLayers({ region_role: 'shell-header', region_id: 'shell-header', region_label: regionLabelOf('shell-header') });
       }
+      const composed = composeContentRegion(el);
+      if (composed && composed.region_id) return withLayers(composed);
       if (el.closest('.el-main, .app-main, .plugin-content, main')) {
-        return { region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') };
+        return withLayers({ region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') });
       }
-      return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
+      return withLayers({ region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') });
+    }
+    function pickScrollRoot() {
+      const cands = document.querySelectorAll('.el-main, .app-main');
+      for (let k = 0; k < cands.length; k++) {
+        const el = cands[k];
+        const s = getComputedStyle(el);
+        const oy = s.overflowY || s.overflow;
+        if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 8) return el;
+      }
+      let best = null;
+      const all = document.querySelectorAll('div, main, section, article');
+      for (let k = 0; k < all.length; k++) {
+        const el = all[k];
+        if (el.clientHeight < 100) continue;
+        const s = getComputedStyle(el);
+        const oy = s.overflowY || s.overflow;
+        if (oy !== 'auto' && oy !== 'scroll') continue;
+        if (el.scrollHeight <= el.clientHeight + 8) continue;
+        if (!best || el.scrollHeight > best.scrollHeight) best = el;
+      }
+      if (best) return best;
+      return document.scrollingElement || document.documentElement;
+    }
+    function stepBBoxOf(el) {
+      if (!el || !el.getBoundingClientRect) return null;
+      const root = pickScrollRoot();
+      const isDoc = root === document.scrollingElement || root === document.documentElement;
+      const box = isDoc ? { x: 0, y: 0 } : root.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      return {
+        x1: Math.round(r.left - box.x),
+        y1: Math.round(r.top + root.scrollTop - box.y),
+        x2: Math.round(r.right - box.x),
+        y2: Math.round(r.bottom + root.scrollTop - box.y),
+      };
+    }
+    function documentBBoxOf(el) {
+      if (!el || !el.getBoundingClientRect) return null;
+      const doc = document.scrollingElement || document.documentElement;
+      const sx = doc ? (doc.scrollLeft || 0) : 0;
+      const sy = doc ? (doc.scrollTop || 0) : 0;
+      const r = el.getBoundingClientRect();
+      return {
+        x1: Math.round(r.left + sx),
+        y1: Math.round(r.top + sy),
+        x2: Math.round(r.right + sx),
+        y2: Math.round(r.bottom + sy),
+      };
     }
     function buildFeatureCard(el, regionHint) {
       var region = regionHint || assignRegion(el);
       var cls = String((el && el.getAttribute && el.getAttribute('class')) || '').trim();
-      var classTokens = cls.split(/\s+/).filter(Boolean).slice(0, 12);
+      var classTokens = cls.split(/\\s+/).filter(Boolean).slice(0, 12);
       var title = '';
       if (el && el.getAttribute) {
         var rawTitle = el.getAttribute('aria-label') || el.getAttribute('title') || '';
-        title = String(rawTitle || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        title = String(rawTitle || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
       }
       if (!title && el && el.closest) {
         var card = el.closest('.el-card');
         if (card) {
           var h = card.querySelector('.el-card__header');
-          title = String((h && (h.innerText || h.textContent)) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+          title = String((h && (h.innerText || h.textContent)) || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
         }
         // Prefer nearer titlebox over outer collapse — coarse assignRegion stays
         // collapse-first; feature_card / L1c should reflect finer panel when present.
@@ -558,11 +684,11 @@ export const PAGE_LOCATOR_HELPERS = `
           var collapse = el.closest('.el-collapse-item');
           if (collapse) {
             var ch = collapse.querySelector('.el-collapse-item__header');
-            title = String((ch && (ch.innerText || ch.textContent)) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+            title = String((ch && (ch.innerText || ch.textContent)) || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
           }
         }
         if (!title && region && region.region_label) {
-          var rl = String(region.region_label || '').replace(/\s+/g, ' ').trim();
+          var rl = String(region.region_label || '').replace(/\\s+/g, ' ').trim();
           // Skip taxonomy tokens (section/main/…) — keep readable card keys only.
           if (rl && rl !== '区块' && rl !== '主区' && rl !== '其他' && rl !== '弹层' && rl !== '表格'
             && rl !== '侧栏' && rl !== '顶栏' && rl !== '页面') {
@@ -653,6 +779,247 @@ export const PAGE_LOCATOR_HELPERS = `
       }
       return bestAbove || bestDist || boxes[0];
     }
+    function isShellChromeNode(node) {
+      if (!node || !node.closest) return false;
+      return !!node.closest('.tags-view-container, header, .el-header, .navbar');
+    }
+    function nearestContentTabs(el) {
+      let n = el;
+      while (n && n.closest) {
+        const tabs = n.closest('.el-tabs');
+        if (!tabs) break;
+        if (!isShellChromeNode(tabs)) return tabs;
+        n = tabs.parentElement;
+      }
+      return null;
+    }
+    function activeTabLabel(tabs) {
+      if (!tabs || !tabs.querySelector) return '';
+      const item = tabs.querySelector('.el-tabs__item.is-active');
+      return String((item && (item.innerText || item.textContent)) || '')
+        .replace(/\\s+/g, ' ').trim().slice(0, 40);
+    }
+    function nearestPageSteps(el) {
+      if (!el) return null;
+      if (el.closest) {
+        const inside = el.closest('.el-steps');
+        if (inside && !isShellChromeNode(inside)) return inside;
+      }
+      let n = el.parentElement;
+      while (n && n !== document.body && n !== document.documentElement) {
+        if (n.matches && n.matches('.el-steps') && !isShellChromeNode(n)) return n;
+        if (n.querySelector) {
+          const direct = n.querySelectorAll(':scope > .el-steps');
+          for (let i = 0; i < direct.length; i++) {
+            if (!isShellChromeNode(direct[i])) return direct[i];
+          }
+          const nested = n.querySelectorAll(
+            ':scope > * > .el-steps, :scope > * > * > .el-steps, :scope > * > * > * > .el-steps'
+          );
+          for (let i = 0; i < nested.length; i++) {
+            if (isShellChromeNode(nested[i])) continue;
+            const wrap = nested[i].parentElement;
+            if (!/step/i.test(String((wrap && wrap.className) || ''))) continue;
+            return nested[i];
+          }
+        }
+        n = n.parentElement;
+      }
+      return null;
+    }
+    function stepTitle(step) {
+      if (!step) return '';
+      const t = step.querySelector && (
+        step.querySelector('.el-step__title') || step.querySelector('.el-step__head')
+      );
+      return String((t && (t.innerText || t.textContent)) || step.innerText || '')
+        .replace(/\\s+/g, ' ').trim().slice(0, 40);
+    }
+    function stepStatusClass(step) {
+      const bits = [String((step && step.className) || '')];
+      if (step && step.querySelector) {
+        const head = step.querySelector('.el-step__head');
+        const title = step.querySelector('.el-step__title');
+        if (head) bits.push(String(head.className || ''));
+        if (title) bits.push(String(title.className || ''));
+      }
+      return bits.join(' ');
+    }
+    function currentStepLabel(steps) {
+      if (!steps || !steps.querySelectorAll) return '';
+      const items = Array.from(steps.querySelectorAll('.el-step'));
+      if (!items.length) return '';
+      for (let i = 0; i < items.length; i++) {
+        const cls = stepStatusClass(items[i]);
+        if (/\\bis-process\\b|\\bprocess\\b/.test(cls)
+          && !/\\bis-wait\\b/.test(cls)
+          && !/\\bis-finish\\b/.test(cls)) {
+          const t = stepTitle(items[i]);
+          if (t) return t;
+        }
+      }
+      let lastFinish = -1;
+      for (let i = 0; i < items.length; i++) {
+        if (/\\bis-finish\\b|\\bis-success\\b/.test(stepStatusClass(items[i]))) {
+          lastFinish = i;
+        }
+      }
+      if (lastFinish >= 0 && lastFinish + 1 < items.length) {
+        const t = stepTitle(items[lastFinish + 1]);
+        if (t) return t;
+      }
+      for (let i = 0; i < items.length; i++) {
+        const t = stepTitle(items[i]);
+        if (t) return t;
+      }
+      return '';
+    }
+    function readChrome(el) {
+      const tabs = nearestContentTabs(el);
+      if (tabs) {
+        const label = activeTabLabel(tabs);
+        if (label) return { role: 'tab', label: label };
+      }
+      const steps = nearestPageSteps(el);
+      if (steps) {
+        const label = currentStepLabel(steps);
+        if (label) return { role: 'wizard', label: label };
+      }
+      return null;
+    }
+    function stripActionTail(title) {
+      let s = String(title || '').replace(/\\s+/g, ' ').trim();
+      s = s.replace(/\\s+(新增|修改|查看|删除|保存|\\+\\s*新增)$/g, '').trim();
+      return s.slice(0, 40);
+    }
+    function collapseSectionTitle(el) {
+      if (!el || !el.closest) return '';
+      const it = el.closest('.el-collapse-item');
+      if (!it) return '';
+      const h = it.querySelector && it.querySelector('.el-collapse-item__header');
+      return stripActionTail((h && (h.innerText || h.textContent)) || '');
+    }
+    function cardTitleOf(el) {
+      if (!el || !el.closest) return '';
+      const card = el.closest('.el-card');
+      if (!card) return '';
+      const h = card.querySelector && card.querySelector('.el-card__header');
+      return normalizeControlText((h && (h.innerText || h.textContent)) || '');
+    }
+    function titleboxAnchorOf(el, scope) {
+      if (!el || !scope) return null;
+      const inside = el.closest && el.closest('.titlebox');
+      if (inside && (!scope.contains || scope.contains(inside))) {
+        const t = titleboxTitleText(inside);
+        if (t && !isActionOnlyTitle(t)) return inside;
+      }
+      const nodeList = scope.querySelectorAll ? scope.querySelectorAll('.titlebox') : [];
+      const boxes = [];
+      for (let i = 0; i < nodeList.length; i++) boxes.push(nodeList[i]);
+      return pickNearestTitlebox(boxes, el) || null;
+    }
+    function isBareActionButton(el) {
+      if (!el || !el.closest) return false;
+      const isBtn = el.tagName === 'BUTTON'
+        || (el.classList && typeof el.classList.contains === 'function'
+          && el.classList.contains('el-button'));
+      if (!isBtn) return false;
+      // Page-level action buttons (e.g. fixed wizard/tab bottom bars) are not
+      // part of any content block — never inherit a titlebox by geometry.
+      return !el.closest('.el-collapse-item, .titlebox, .el-table');
+    }
+    function composeTitleboxTitle(el, scope) {
+      if (!el || !scope) return '';
+      if (isBareActionButton(el)) return '';
+      const want = String((el.innerText || el.textContent || '')).replace(/\\s+/g, ' ').trim().slice(0, 40);
+      const anchor = titleboxAnchorOf(el, scope);
+      if (!anchor) return '';
+      const title = titleboxTitleText(anchor);
+      if (!title || isActionOnlyTitle(title) || title === want) return '';
+      return title;
+    }
+    function finishCompose(card, chrome, section, block) {
+      const parts = [];
+      const ids = [];
+      if (card) {
+        parts.push(card);
+        ids.push('card:' + card);
+      }
+      if (chrome && chrome.label) {
+        parts.push(chrome.label);
+        ids.push((chrome.role === 'wizard' ? 'wizard:' : 'tab:') + chrome.label);
+      }
+      if (section) {
+        parts.push(section);
+        ids.push('section:' + section);
+      }
+      if (block) {
+        parts.push(block);
+        ids.push('titlebox:' + block);
+      }
+      if (!parts.length) return null;
+      let role = 'section';
+      if (block || section) role = 'section';
+      else if (chrome && chrome.role === 'wizard') role = 'wizard';
+      else if (chrome && chrome.role === 'tab') role = 'tab';
+      else if (card) role = 'card';
+      const out = {
+        region_role: role,
+        region_id: ids.join('|'),
+        region_label: parts.join(' / '),
+      };
+      if (card) out.region_card = card;
+      if (chrome && chrome.label) out.region_chrome = { role: chrome.role, label: chrome.label };
+      if (section) out.region_section = section;
+      if (block) {
+        out.region_block = block;
+        out.title = block;
+      }
+      return out;
+    }
+    function composeContentRegion(el) {
+      if (!el || !el.closest) return null;
+      let chrome = readChrome(el);
+      let section = collapseSectionTitle(el);
+      let card = cardTitleOf(el);
+      let scope = null;
+      if (el.closest('.el-collapse-item')) scope = el.closest('.el-collapse-item');
+      else if (el.closest('.el-tab-pane')) scope = el.closest('.el-tab-pane');
+      else if (el.closest('.el-main, .app-main, .plugin-content, main')) {
+        scope = el.closest('.el-main, .app-main, .plugin-content, main');
+      } else {
+        scope = (typeof document !== 'undefined' && document.body) ? document.body : el;
+      }
+      const block = composeTitleboxTitle(el, scope);
+      // Floating/fixed bars outside tab panes (e.g. bottom action bar): the
+      // element itself has no chrome/section, but its nearest titlebox lives
+      // inside the pane. Inherit that titlebox's own context so the full
+      // region path (tab | section | titlebox) survives for such controls.
+      if (block && !chrome && !section && !(el.closest && el.closest('.titlebox'))) {
+        const anchor = titleboxAnchorOf(el, scope);
+        if (anchor) {
+          chrome = readChrome(anchor);
+          section = collapseSectionTitle(anchor);
+          if (!card) card = cardTitleOf(anchor);
+        }
+      }
+      try {
+        return finishCompose(card, chrome, section, block);
+      } catch (e) {
+        return finishCompose(card, chrome, section, '');
+      }
+    }
+    function mergeTitleboxIntoRegion(region, finer) {
+      const title = finer && (finer.title || finer.region_label);
+      if (!title) return region;
+      const rid = String((region && region.region_id) || '');
+      if (rid.indexOf('titlebox:') >= 0) return region;
+      const chrome = region && region.region_chrome ? region.region_chrome : null;
+      const section = (region && region.region_section) || '';
+      const card = (region && region.region_card) || '';
+      const next = finishCompose(card, chrome, section, String(title));
+      return next || region;
+    }
     function findTitleboxRegion(host, needle) {
       if (!host || !host.closest) return null;
       const want = String(needle || '').replace(/\\s+/g, ' ').trim();
@@ -735,8 +1102,11 @@ export const PAGE_LOCATOR_HELPERS = `
         if (idxs.length < 2) continue;
         for (let j = 0; j < idxs.length; j++) {
           const it = items[idxs[j]];
+          const role = String((it.region && it.region.region_role) || '');
+          if (role === 'overlay' || role === 'table' || role === 'todo'
+            || role === 'shell-aside' || role === 'shell-header') continue;
           const finer = findTitleboxRegion(it.el, needle);
-          if (finer) it.region = finer;
+          if (finer) it.region = withLayers(mergeTitleboxIntoRegion(it.region, finer));
         }
       }
     }
@@ -759,6 +1129,7 @@ export const PAGE_LOCATOR_HELPERS = `
         || k === 'form_checkbox' || k === 'form_tree_select') return k;
       if (k === 'menu' || k === 'submenu') return 'menu';
       if (k === 'icon') return 'icon';
+      if (k === 'tree_node') return 'tree_node';
       if (k === 'button' || k === 'adjacent_button' || k === 'link' || k === 'table_row_button'
         || k === 'tab' || k === 'generic') return 'button';
       return '';
@@ -805,6 +1176,7 @@ export const PAGE_LOCATOR_HELPERS = `
         '.todo-item-action',
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"]',
         '[class*="el-icon"][aria-label], .el-tooltip[class*="el-icon"], a[class*="el-icon"]',
+        '.el-tree-node__content',
       ].join(',');
       const nodes = document.querySelectorAll(sel);
       const out = [];
@@ -841,7 +1213,7 @@ export const PAGE_LOCATOR_HELPERS = `
       }
       if (a === 'select_option') return { form_select: 1 };
       if (a === 'click_menu_item') return { menu: 1 };
-      if (a === 'click_element_by_index') return { button: 1, icon: 1, menu: 1 };
+      if (a === 'click_element_by_index') return { button: 1, icon: 1, menu: 1, tree_node: 1 };
       return null;
     }
     function filterInventoryByKind(list, action) {
@@ -1018,27 +1390,36 @@ export const PAGE_LOCATOR_HELPERS = `
       let rowT = '';
       if (rowEl) {
         const cells = rowEl.querySelectorAll('td, .el-table__cell');
+        // Unique-key column priority: prefer a customer-number (14-18 digits) or
+        // unified social-credit code (18 uppercase alphanumerics) so same-named
+        // rows disambiguate by unique key instead of pinning [N].
         for (let i = 0; i < cells.length; i++) {
-          const cell = cells[i];
-          const ct = normalizeControlText(cell.innerText || cell.textContent || '');
-          const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
-          if (hasSelect && !ct) continue;
-          if (ct && ct.length >= 2 && ct.length <= 48) { rowT = ct; break; }
+          const ct = normalizeControlText(cells[i].innerText || cells[i].textContent || '');
+          if (ct && (/^\\d{14,18}$/.test(ct) || /^[0-9A-Z]{18}$/.test(ct))) { rowT = ct; break; }
+        }
+        if (!rowT) {
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            const ct = normalizeControlText(cell.innerText || cell.textContent || '');
+            const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
+            if (hasSelect && !ct) continue;
+            if (ct && ct.length >= 2 && ct.length <= 48) { rowT = ct; break; }
+          }
         }
       }
       const btnT = normalizeControlText(text) || cleanVisibleText(node);
       if (rowT && btnT) {
-        return scopedXPath(
+        return preferVisibleXpath(scopedXPath(
           "tr[.//*[normalize-space()=" + xpathLiteral(rowT) + "]]"
             + "//*[self::button or self::a or " + classTokenPred('el-button') + "][normalize-space()=" + xpathLiteral(btnT) + "]",
           scopeKind
-        );
+        ), node);
       }
       if (btnT) {
-        return scopedXPath(
+        return preferVisibleXpath(scopedXPath(
           "*[self::button or self::a or " + classTokenPred('el-button') + "][normalize-space()=" + xpathLiteral(btnT) + "]",
           scopeKind
-        );
+        ), node);
       }
     }
     if (kind === 'table_row_radio') {
@@ -1046,20 +1427,27 @@ export const PAGE_LOCATOR_HELPERS = `
       let rowT = '';
       if (rowEl) {
         const cells = rowEl.querySelectorAll('td, .el-table__cell');
+        // Unique-key column priority (same as table_row_button).
         for (let i = 0; i < cells.length; i++) {
-          const cell = cells[i];
-          const ct = normalizeControlText(cell.innerText || cell.textContent || '');
-          const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
-          if (hasSelect && !ct) continue;
-          if (ct && ct.length >= 2 && ct.length <= 48) { rowT = ct; break; }
+          const ct = normalizeControlText(cells[i].innerText || cells[i].textContent || '');
+          if (ct && (/^\\d{14,18}$/.test(ct) || /^[0-9A-Z]{18}$/.test(ct))) { rowT = ct; break; }
+        }
+        if (!rowT) {
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            const ct = normalizeControlText(cell.innerText || cell.textContent || '');
+            const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
+            if (hasSelect && !ct) continue;
+            if (ct && ct.length >= 2 && ct.length <= 48) { rowT = ct; break; }
+          }
         }
       }
       if (rowT) {
-        return scopedXPath(
+        return preferVisibleXpath(scopedXPath(
           "tr[.//*[normalize-space()=" + xpathLiteral(rowT) + "]]"
             + "//*[" + classTokenPred('el-radio') + " or " + classTokenPred('el-radio-button') + " or " + classTokenPred('el-checkbox') + "]",
           scopeKind
-        );
+        ), node);
       }
     }
     if (kind === 'icon') {
@@ -1127,7 +1515,7 @@ export const PAGE_LOCATOR_HELPERS = `
       : (/(^| )el-button( |$)/.test(cls) && tagL !== 'button'
         ? '*[' + classTokenPred('el-button') + ' and normalize-space()=' + lit + ']'
         : 'button[normalize-space()=' + lit + ']');
-    return scopedXPath(local, scopeKind);
+    return preferVisibleXpath(scopedXPath(local, scopeKind), node);
   }
   function collectAttrs(el) {
     const a = {};
@@ -1141,6 +1529,17 @@ export const PAGE_LOCATOR_HELPERS = `
     }
     return a;
   }
+  // 结构化布尔属性（录制插件格式对齐）：HTML 布尔属性（disabled/readonly/required）
+  // 属性值为空串，collectAttrs 的 !at.value 过滤会丢弃它们，这里显式采集。
+  // 非 form 控件（div/span）无这些 DOM 属性，统一输出 false。
+  function collectAttrFlags(el) {
+    if (!el) return { disabled: false, required: false, readonly: false };
+    return {
+      disabled: el.disabled === true,
+      required: el.required === true,
+      readonly: el.readOnly === true,
+    };
+  }
   function buildLocatorSnap(node, text, xpathFull, formLabel, opts) {
     opts = opts || {};
     const host = normalizeTargetRoot(node) || node;
@@ -1151,6 +1550,16 @@ export const PAGE_LOCATOR_HELPERS = `
     const t = normalizeControlText(text) || cleanVisibleText(host);
     const abs = String(xpathFull || absXPath(host) || '');
     let formLbl = normalizeFormLabel(formLabel || '');
+    // For adjacent_button the formLabel hint is the recorded label_text, which
+    // may name a button-less prefix sibling (实际控制人客户编号 vs 实际控制人
+    // 配偶客户编号). The button's real owning form-item is the host's own, so
+    // prefer its label over the hint to keep xpath_smart on the right field.
+    if (kind === 'adjacent_button' && host && host.closest) {
+      const ownItem = host.closest('.el-form-item');
+      const ownLbl = ownItem && ownItem.querySelector('.el-form-item__label, label');
+      const derived = normalizeFormLabel(ownLbl && (ownLbl.innerText || ownLbl.textContent));
+      if (derived) formLbl = derived;
+    }
     if (!formLbl && host && host.closest) {
       const item = host.closest('.el-form-item');
       const lbl = item && item.querySelector('.el-form-item__label, label');
@@ -1211,8 +1620,9 @@ export const PAGE_LOCATOR_HELPERS = `
           }
         }
       }
-      if ((!verified || nodesMulti) && region && region.title) {
-        const tbXp = titleboxAnchorXPath(host, region.title, leafForAnchor || localLeaf);
+      if ((!verified || nodesMulti) && region && (region.title || region.region_block)) {
+        const tbTitle = region.title || region.region_block;
+        const tbXp = titleboxAnchorXPath(host, tbTitle, leafForAnchor || localLeaf);
         if (tbXp) {
           const tnodes = evalXpathAll(tbXp);
           let tidx = -1;
@@ -1243,7 +1653,7 @@ export const PAGE_LOCATOR_HELPERS = `
         occurrence = pinned.occurrence;
         verified = pinned.verified;
         // Do not export global [n] when section/titlebox anchor exists but uniqueness failed.
-        if (occurrence >= 1 && (regionAnchorOf(host) || (opts.region && opts.region.title))) {
+        if (occurrence >= 1 && (regionAnchorOf(host) || (region && (region.title || region.region_block)))) {
           smart = '';
           verified = false;
           occurrence = 0;
@@ -1282,6 +1692,7 @@ export const PAGE_LOCATOR_HELPERS = `
       formLabel: formLbl,
       tag: (host.tagName || '').toLowerCase(),
       attributes: collectAttrs(host),
+      attr: collectAttrFlags(host),
       candidates: candidates,
       target_kind: kind,
       parent_text: parentText || undefined,
@@ -1297,7 +1708,105 @@ export const PAGE_LOCATOR_HELPERS = `
       region_role: region.region_role,
       region_id: region.region_id,
       region_label: region.region_label,
+      region_chrome: region.region_chrome,
+      region_section: region.region_section,
+      region_block: region.region_block,
+      layers: region.layers || [],
       feature_card: buildFeatureCard(host, region),
+      page_bbox: documentBBoxOf(host) || undefined,
     };
   }
+  /* resolveLocatorStrict — Z2 严格解析器（只读增量，不改动任何既有函数）：
+   * resolve 必须返回 count + 可见性，歧义可判定。求值方式与 evalXpathAll
+   * 同构（document.evaluate + ORDERED_NODE_SNAPSHOT_TYPE）；可见性判定与
+   * preferVisibleXpath 的 interactable 判定保持同构
+   * （offsetParent !== null 或 getClientRects().length > 0）。 */
+  function resolveLocatorStrict(expr, opts) {
+    const o = opts || {};
+    const visibleOnly = o.visibleOnly === true;
+    const loc = String(expr === undefined || expr === null ? '' : expr);
+    const fail = function (msg) {
+      return {
+        found: false, count: 0, visibleCount: 0, effectiveCount: 0,
+        ambiguous: false, locator: loc, error: msg,
+      };
+    };
+    if (!loc) return fail('empty expression');
+    let snap = null;
+    try {
+      snap = document.evaluate(loc, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    } catch (e) {
+      return fail(String((e && e.message) || e));
+    }
+    const nodes = [];
+    try {
+      for (let i = 0; i < snap.snapshotLength; i++) nodes.push(snap.snapshotItem(i));
+    } catch (e2) {
+      return fail(String((e2 && e2.message) || e2));
+    }
+    const isVisibleHit = function (n) {
+      if (!n || n.nodeType !== 1) return false;
+      return n.offsetParent !== null || (n.getClientRects && n.getClientRects().length > 0);
+    };
+    let visibleCount = 0;
+    for (let v = 0; v < nodes.length; v++) {
+      if (isVisibleHit(nodes[v])) visibleCount++;
+    }
+    const count = nodes.length;
+    const effectiveCount = visibleOnly ? visibleCount : count;
+    const samples = [];
+    for (let s = 0; s < nodes.length && samples.length < 3; s++) {
+      const n = nodes[s];
+      if (!n || n.nodeType !== 1 || typeof n.outerHTML !== 'string') continue;
+      samples.push(n.outerHTML.slice(0, 120));
+    }
+    return {
+      found: count > 0,
+      count: count,
+      visibleCount: visibleCount,
+      effectiveCount: effectiveCount,
+      ambiguous: effectiveCount > 1,
+      locator: loc,
+      samples: samples,
+    };
+  }
+`;
+
+/**
+ * JS_POLL_UTIL — 浏览器内轮询/延时/弹层查找共享片段（sleep / pollUntil /
+ * wrapVisible / lastVisibleDialog / lastVisibleDrawer）。
+ * 与 PAGE_LOCATOR_HELPERS 一同注入 async 箭头体使用；经 node scripts/_gen_locator_helpers_py.mjs
+ * 同步到 Python 端 scripts/controller/actions/js_snippets/_locator_helpers_js.py。
+ */
+export const JS_POLL_UTIL = `
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const pollUntil = async (fn, timeout = 8000, interval = 200) => {
+    const deadline = Date.now() + Number(timeout);
+    while (Date.now() < deadline) {
+      if (await fn()) return true;
+      await sleep(Number(interval));
+    }
+    return false;
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    const st = getComputedStyle(d);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const lastVisibleDialog = () => {
+    const all = [...document.querySelectorAll('.el-dialog, .el-message-box')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const lastVisibleDrawer = () => {
+    const all = [...document.querySelectorAll('.el-drawer')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
 `;

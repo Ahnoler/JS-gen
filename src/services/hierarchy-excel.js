@@ -17,7 +17,10 @@ import { getTree } from './hierarchy-service.js';
 
 const EXPORT_VERSION = 1;
 
-/** Export tree as portable JSON (no DB ids; uses uid). */
+/**
+ * Export tree as portable JSON (no DB ids; uses uid).
+ * @returns {Promise<{ version: number, exportedAt: string, typeMap: object, nodes: object[] }>} portable tree export
+ */
 export async function exportTree() {
   const systems = await systemDao.list();
   const nodes = [];
@@ -60,7 +63,10 @@ export async function exportTree() {
   };
 }
 
-/** Empty / sample template for import (legacy JSON shape; prefer Excel endpoints). */
+/**
+ * Empty / sample template for import (legacy JSON shape; prefer Excel endpoints).
+ * @returns {{ version: number, typeMap: object, description: string, nodes: object[] }} sample import template
+ */
 export function getTreeTemplate() {
   return {
     version: EXPORT_VERSION,
@@ -98,12 +104,18 @@ export function getTreeTemplate() {
   };
 }
 
-/** Excel template (.xlsx Buffer). */
+/**
+ * Excel template (.xlsx Buffer).
+ * @returns {Promise<Buffer>} xlsx buffer of the sample template
+ */
 export async function getTreeTemplateExcel() {
   return systemMgmtExcel.buildExcelBuffer(systemMgmtExcel.sampleTemplateRows());
 }
 
-/** Export whole tree as Excel (.xlsx Buffer). */
+/**
+ * Export whole tree as Excel (.xlsx Buffer).
+ * @returns {Promise<Buffer>} xlsx buffer of the whole tree
+ */
 export async function exportTreeExcel() {
   const data = await exportTree();
   const rows = systemMgmtExcel.flattenNodesToRows(data.nodes || []);
@@ -112,8 +124,9 @@ export async function exportTreeExcel() {
 
 /**
  * Import tree from Excel buffer (flat rows with parent path).
- * @param {Buffer|ArrayBuffer|Uint8Array} buffer
- * @param {{ mode?: 'merge'|'append' }} [opts]
+ * @param {Buffer|ArrayBuffer|Uint8Array} buffer xlsx file buffer
+ * @param {{ mode?: 'merge'|'append' }} [opts] import mode
+ * @returns {Promise<{ mode: string, created: number, updated: number, skipped: number, tree: object[] }>} import stats + rebuilt tree
  */
 export async function importTreeExcel(buffer, { mode: modeOpt } = {}) {
   const mode = modeOpt === 'append' ? 'append' : 'merge';

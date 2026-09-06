@@ -5,9 +5,11 @@ Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER
 from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
+from .fill_date import JS_COMMIT_DATE_VUE_BODY
 
 JS_FILL_FORM_FIELD = '''([label, val]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
+''' + JS_COMMIT_DATE_VUE_BODY + '''
     const setFn = (t, v) => {
         const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
         const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -37,7 +39,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         )) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
             target.focus();
-            try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
+            commitDateVue(target, val);
             setFn(target, val);
             target.blur();
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
@@ -62,7 +64,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         )) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
             target.focus();
-            try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
+            commitDateVue(target, val);
             setFn(target, val);
             target.blur();
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
@@ -88,6 +90,54 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
             return 'ok-type';
         }
     }
+    // KB-I5 run5: 容器放宽 —— container 内零命中（含 JS_GET_CONTAINER 停在陈旧
+    // 弹层 / 目标在可见 main 或其他可见弹层内）时，补扫可见 `main` 与可见
+    // .el-dialog/.el-drawer 内的 .el-form-item__label（与 select_tree.py 弹窗补丁
+    // 同型）。成功路径零改动：仅在前述全部 pass 未命中时执行。
+    const scopeVis = (el) => {
+        if (el.offsetParent !== null) return true;
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+    };
+    const fillInScope = (item) => {
+        item.scrollIntoView({ block: 'center', behavior: 'instant' });
+        const input = item.querySelector('input:not([type="hidden"])');
+        const textarea = item.querySelector('textarea');
+        const target = input || textarea;
+        if (!target) return '';
+        if (isDisabled(target, item.querySelector('.el-select .el-input__inner'), item)) return '';
+        if (target.closest('.el-date-editor, .tsscdatepicker')) {
+            target.focus();
+            commitDateVue(target, val);
+            setFn(target, val);
+            target.blur();
+            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+            return 'ok-date';
+        }
+        setFn(target, val);
+        return 'ok';
+    };
+    const scopeList = [];
+    const mainEl = [...document.querySelectorAll('main')].find(scopeVis);
+    if (mainEl) scopeList.push(mainEl);
+    for (const d of document.querySelectorAll('.el-dialog, .el-drawer')) {
+        if (scopeVis(d)) scopeList.push(d);
+    }
+    if (container !== document) scopeList.push(document);
+    for (const sc of scopeList) {
+        // exact first, then partial — same priority as pass1/pass2
+        for (const want of [label, null]) {
+            for (const item of sc.querySelectorAll('.el-form-item')) {
+                const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                if (!lbl) continue;
+                if (want !== null ? lbl !== want : !lbl.includes(label)) continue;
+                const r = fillInScope(item);
+                if (r) return r === 'ok' ? ('ok-scope:' + lbl) : r;
+            }
+        }
+    }
     return 'label-not-found';
 }'''
 
@@ -95,6 +145,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
 # Handles el-table fixed columns (offsetParent null) and dialog/drawer [last()] scopes.
 
 JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
+''' + JS_COMMIT_DATE_VUE_BODY + r'''
   const setFn = (t, v) => {
     const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
     const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -104,6 +155,7 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
     t.dispatchEvent(new Event('change', { bubbles: true }));
     t.dispatchEvent(new Event('blur', { bubbles: true }));
   };
+  const scrollFillTarget = (el) => { try { const item = el && el.closest && el.closest('.el-form-item'); (item || el).scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (e) {} };
   const isVis = (el) => {
     if (!el || el.nodeType !== 1) return false;
     if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
@@ -192,7 +244,15 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
   if (!target && labelHint) {
     const want = labelHint;
     if (want) {
-      const scopes = [lastVisibleDrawer(), lastVisibleDialog(), document].filter(Boolean);
+      // Scope placeholder fallback to the active overlay only; fall back to
+      // document solely when no drawer/dialog is visible (main-page forms).
+      // This prevents filling a same-placeholder field on the underlying page
+      // when the xpath miss occurs inside a drawer/dialog.
+      const drawer = lastVisibleDrawer();
+      const dialog = lastVisibleDialog();
+      const scopes = (drawer || dialog)
+        ? [drawer, dialog].filter(Boolean)
+        : [document];
       for (const scope of scopes) {
         const inputs = scope.querySelectorAll('input:not([type="hidden"]), textarea');
         for (const inp of inputs) {
@@ -209,12 +269,29 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
       }
     }
     if (target) {
+      scrollFillTarget(target);
       setFn(target, val == null ? '' : String(val));
       return 'ok-placeholder';
     }
   }
   if (!target) return xpath ? 'xpath-not-found' : 'xpath-empty';
-  if (target.disabled || target.readOnly) return 'field-disabled';
+  scrollFillTarget(target);
+  const isDate = !!(target.closest && target.closest('.el-date-editor, .tsscdatepicker'));
+  if (target.disabled || (target.readOnly && !isDate)) return 'field-disabled';
+  if (isDate) {
+    if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+      const inp = target.querySelector && target.querySelector('input:not([type="hidden"])');
+      if (inp) target = inp;
+    }
+    commitDateVue(target, val);
+    setFn(target, val == null ? '' : String(val));
+    try { target.blur(); } catch (e) {}
+    document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach((x) => {
+      x.style.display = 'none';
+      x.classList.add('is-hidden');
+    });
+    return 'ok-date';
+  }
   if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return 'xpath-not-input';
   setFn(target, val == null ? '' : String(val));
   return 'ok-xpath-smart';
@@ -334,6 +411,7 @@ JS_CAPTURE_FROM_XPATH = (
   const attrs = {};
   for (const a of host.attributes || []) attrs[a.name] = a.value;
   const text = (host.innerText || host.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  const reg = assignRegion(host);
   return {
     xpath: primary,
     xpath_smart: smart,
@@ -341,9 +419,15 @@ JS_CAPTURE_FROM_XPATH = (
     css_sel: '',
     tag,
     attrs,
+    attr: collectAttrFlags(host),
     text,
     formLabel: formLbl || String(label || ''),
     target_kind: String(target_kind || ''),
+    region_id: reg.region_id || '',
+    region_label: reg.region_label || '',
+    layers: Array.isArray(reg.layers) ? reg.layers : [],
+    bbox: stepBBoxOf(host),
+    page_bbox: documentBBoxOf(host),
     candidates: [
       ...(smart ? [{ type: 'xpath_smart', value: smart }] : []),
       ...(abs ? [{ type: 'xpath_full', value: abs }] : []),
@@ -352,4 +436,25 @@ JS_CAPTURE_FROM_XPATH = (
 }'''
 )
 
-# Fill date picker resolved by relative xpath (native setter + ElDatePicker Vue sync).
+# Fill date picker resolved by relative xpath (native setter + date Vue commit).
+
+
+# Clear a labeled field's input via native setter so Vue reacts.
+JS_CLEAR_FIELD_VALUE = '''(label) => {
+            const items = document.querySelectorAll('.el-form-item');
+            for (const item of items) {
+                const lbl = item.querySelector('.el-form-item__label');
+                if (!lbl || !lbl.textContent.trim().includes(label)) continue;
+                const trigger = item.querySelector('input, .el-input__inner, textarea');
+                if (!trigger) continue;
+                // Clear via native setter so Vue reacts
+                Object.getOwnPropertyDescriptor(
+                    HTMLInputElement.prototype, 'value'
+                ).set.call(trigger, '');
+                trigger.dispatchEvent(new Event('input', { bubbles: true }));
+                trigger.dispatchEvent(new Event('change', { bubbles: true }));
+                trigger.setAttribute('value', '');
+                return 'cleared';
+            }
+            return 'not-found';
+        }'''

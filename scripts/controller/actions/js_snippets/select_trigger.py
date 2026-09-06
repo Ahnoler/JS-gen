@@ -3,6 +3,7 @@ JS snippet constants: JS_FIND_LABELED_SELECT, JS_FIND_VISIBLE_DROPDOWN, JS_SELEC
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .base import JS_FIELD_DISABLED
+from ._locator_helpers_js import JS_POLL_UTIL
 
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
@@ -216,8 +217,8 @@ JS_FIND_VISIBLE_DROPDOWN = '''(() => {
     return document;
 })()'''
 
-JS_RESET_SELECT_UI = r'''async () => {
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+JS_RESET_SELECT_UI = '''async () => {
+''' + JS_POLL_UTIL + '''
   const visibleDropdowns = () => [...document.querySelectorAll('.el-select-dropdown')]
     .filter((dd) => {
       if (dd.classList.contains('is-hidden')) return false;
@@ -458,6 +459,12 @@ JS_SELECT_VALUE_BY_XPATH = r'''([xpath, labelHint]) => {
   if (!node) return 'xpath-miss';
   const select = findSelectHost(node);
   if (!select) return 'no-select-found';
+  // Scroll the form-item (or select) into view so Element UI renders correctly
+  // even when the field already has a value (ok-already skip path).
+  try {
+    const item = select.closest && select.closest('.el-form-item');
+    (item || select).scrollIntoView({ block: 'center', behavior: 'instant' });
+  } catch (e) {}
   const cur = readSelected(select);
   if (cur) return 'ok-already:' + cur;
   return 'empty';

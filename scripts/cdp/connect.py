@@ -41,8 +41,8 @@ async def scan_pending(browser):
         return ctx.pages[-1] if ctx.pages else None
     ctx.get_current_page = get_page
 
-    case_data = {}
-    ctrl = build_controller(ctx, case_data_store=case_data)
+    business_data = {}
+    ctrl = build_controller(ctx, business_data_store=business_data)
     actions = ctrl.registry.registry.actions
 
     sf = actions.get('scan_form_fields')
@@ -159,8 +159,8 @@ async def main():
 
             if args.scan:
                 os.environ.setdefault('OPENAI_API_KEY', os.environ.get('FORM_LLM_API_KEY', ''))
-                os.environ.setdefault('FORM_LLM_MODEL', 'deepseek-v4-flash')
-                os.environ.setdefault('FORM_LLM_BASE_URL', 'https://api.deepseek.com')
+                os.environ.setdefault('FORM_LLM_MODEL', 'Qwen/Qwen3.5-35B-A3B')
+                os.environ.setdefault('FORM_LLM_BASE_URL', 'http://218.77.58.156:3000/v1')
                 await scan_pending(browser)
             elif args.monitor:
                 await quick_snapshot(browser)

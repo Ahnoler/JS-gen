@@ -133,6 +133,34 @@ JS_COLLECT_ICON_BUTTONS = r'''() => {
 JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
 ''' + _JS_ICON_BUTTON_HELPERS + r'''
   if (!buttonText) return 'button-text-empty';
+  // ══ KB-I5 run5: 精确文本优先（原为 icon 宿主优先、文本兜底）══
+  // 意见页「流程提交」「下一步」等是普通可见文本按钮——先在 button/文本元素中
+  // 找归一化 innerText === 目标的元素（同文本取最内层 = document 顺序最后一个），
+  // 命中即点；未命中再走 icon 宿主 → 包含式文本兜底（原路径，顺序后移）。
+  const want0 = _iconNormText(buttonText);
+  const isOverlay = (el) => !!el.closest('.el-dialog, .el-drawer, .el-message-box');
+  const exact = [];
+  const seenExact = new Set();
+  for (const b of document.querySelectorAll(
+      'button, .el-button, a, [role="button"], span, div')) {
+    if (!_iconIsVisible(b)) continue;
+    if (b.closest('.el-table__body-wrapper')) continue;
+    const t = _iconNormText(b.innerText || b.textContent);
+    if (!t || t.length > 40 || t !== want0) continue;
+    const cls = typeof b.className === 'string' ? b.className.slice(0, 60) : '';
+    const key = t + '|' + cls + '|' + b.tagName;
+    if (seenExact.has(key)) continue;
+    seenExact.add(key);
+    exact.push({ el: b, text: t });
+    if (exact.length >= 24) break;
+  }
+  if (exact.length) {
+    // document order: ancestors precede descendants → last = innermost.
+    const m = exact[exact.length - 1];
+    m.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+    m.el.click();
+    return 'ok-text:' + m.text;
+  }
   for (const el of _iconCandidates(document)) {
     if (!_iconIsVisible(el)) continue;
     const label = _iconResolveLabel(el);
@@ -142,7 +170,52 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
       return 'ok';
     }
   }
-  return 'not-found';
+  // Generalized fallback: click a visible PLAIN text button sharing the label.
+  // Toolbar buttons like 查询/修改/新增 are ordinary <button>s, not tooltip
+  // icons — after an icon miss, clicking them here succeeds in one step
+  // instead of looping the agent through retries (2026-08-27 toolbar incident).
+  const want = _iconNormText(buttonText);
+  const seenB = new Set();
+  const matches = [];
+  for (const b of document.querySelectorAll('button, .el-button, a')) {
+    if (!_iconIsVisible(b)) continue;
+    if (b.closest('.el-table__body-wrapper')) continue; // row affordances → table tools
+    const t = _iconNormText(b.innerText || b.textContent);
+    if (!t || t.length > 40) continue;
+    let hit = false;
+    if (t === want) hit = true;
+    else if (want && t.includes(want) && !want.includes(t)) hit = true;
+    if (!hit) continue;
+    const cls = typeof b.className === 'string' ? b.className.slice(0, 60) : '';
+    const key = t + '|' + cls;
+    if (seenB.has(key)) continue;
+    seenB.add(key);
+    matches.push({ el: b, text: t });
+    if (matches.length >= 8) break;
+  }
+  if (matches.length) {
+    // Prefer exact-label over contains; page-level (non-overlay) over overlay,
+    // so a named toolbar button wins while a dialog is open.
+    let pool = matches.filter((m) => m.text === want);
+    if (pool.length === 0) {
+      pool = matches.filter((m) => !want.includes(m.text));
+    }
+    if (pool.length === 0) pool = matches;
+    const pageLevel = pool.filter((m) => !isOverlay(m.el));
+    if (pageLevel.length >= 1) pool = pageLevel;
+    if (pool.length === 1) {
+      const m = pool[0];
+      m.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      m.el.click();
+      return 'ok-text:' + m.text;
+    }
+    return 'err-icon-label-ambiguous:' + JSON.stringify({
+      wanted: buttonText,
+      reason: 'ambiguous',
+      textButtons: pool.map((m) => ({ text: m.text, tag: m.el.tagName.toLowerCase() })),
+    });
+  }
+  return 'err-icon-label-miss';
 }'''
 
 # Lightweight page snapshot for scenario describer (no iconButtons / no side effects).

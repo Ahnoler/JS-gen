@@ -9,6 +9,10 @@ import { resolve } from './config.js';
 
 let knexInstance;
 
+/**
+ * 获取 knex 单例实例（首次调用时按 config/.env 创建连接池）。
+ * @returns {import('knex').Knex} knex 实例（mysql2 client）
+ */
 export function getDB() {
   if (!knexInstance) {
     knexInstance = knexLib({
@@ -20,6 +24,9 @@ export function getDB() {
         password: resolve('DB_PASS', ''),
         database: resolve('DB_NAME', 'js_gen'),
         charset: 'utf8mb4',
+        // mysql2 压缩协议：库在远程公网（RTT ~65ms），大 JSON 载荷（如轨迹步骤 element_json
+        // 单轨迹 ~430KB）传输占大头，实测压缩后 465~914ms → ~105ms。对端 MySQL 5.7 支持。
+        compress: true,
       },
       pool: {
         min: parseInt(resolve('DB_POOL_MIN', '2'), 10),
@@ -32,6 +39,10 @@ export function getDB() {
   return knexInstance;
 }
 
+/**
+ * 关闭并释放 knex 连接池（服务停机时调用）。
+ * @returns {Promise<void>}
+ */
 export async function closeDB() {
   if (knexInstance) {
     await knexInstance.destroy();

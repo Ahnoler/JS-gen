@@ -1,0 +1,61 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "rating",
+  "flow": "同业客户评级重评",
+  "aliases": [
+    "同业评级重评",
+    "同业客户重评"
+  ],
+  "hash_markers": [
+    "ZJJK00070833",
+    "ZJJK00070838",
+    "wf_rating_004",
+    "FS00001414"
+  ],
+  "keywords": [
+    "评级重评",
+    "选择同业客户",
+    "重新评级",
+    "已有评级流程在进行中"
+  ],
+  "menu_path": "评级管理/同业客户评级",
+  "preconditions": [
+    "同业客户有「生效」评级结果且非在途状态；草稿/审批中/打回状态点【评级重评】提示「已有评级流程在进行中」并中断",
+    "当月评级次数上限 300 次；无其他在途流程",
+    "默认评级性质=重评，客户名称/编号带入不可编辑，自动匹配模板",
+    "确认后校验链与后续流程同主链「同业客户评级新增」（见 rating-interbank-apply.json）；有效期 12 个月"
+  ],
+  "steps": [
+    {
+      "name": "同业客户评级申请主页（选中记录）",
+      "leafRef": "wet-test.md 叶23 (ZJJK00070833)",
+      "verify": "match",
+      "note": "选中「通过」记录点【评级重评】；列表默认不加载需先查询；重评与新增共用【评级申请】/【评级重评】抽屉入口"
+    },
+    {
+      "name": "选择同业客户主页（重评模式）",
+      "leafRef": "wet-test.md 叶24 (ZJJK00070838)",
+      "verify": "match",
+      "fields": [{"*客户名称": "带入不可改（重评模式）"}, {"模板名称": "自动匹配，禁用"}],
+      "buttons": ["确认"],
+      "rules": "确认后校验链同新增（风险阻断通过/300次上限/一单生效/无在途）→待发起、有效期12月、启动 wf_rating_004（湿测打开即止未点确认）"
+    },
+    {
+      "name": "任务页及后续流程（复用同业新增链）",
+      "leafRef": "wet-test.md 叶25 (ZJJK00090577)；辅叶26 (ZJJK00066496)、叶27 (ZJJK00136085)、叶28 (ZJJK00066529)、叶29 (ZJJK00096259)、叶30 (ZJJK00106497)",
+      "verify": "match",
+      "note": "三步任务页（基本信息/影像信息/签署意见）+ 5 只读标签，明细同 rating-interbank-apply.json；提交/审批/生效流程同链"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "提交流程/区行调查员审批（复用同业新增链 blocked 叶）",
+      "leafRefs": ["wet-test.md 叶31 (ZJJK00132727)", "wet-test.md 叶32 (ZJJK00090576)", "wet-test.md 叶33 (ZJJK00109967)"],
+      "verify": "blocked",
+      "reason": "同 rating-interbank-apply.json pendingSteps：只读任务页无提交按钮；无第二节点在途审批任务",
+      "retry_condition": "同主链2（待同业草稿修改进入签署意见步；待同业流程推进到区行调查员审批节点）"
+    }
+  ],
+  "sourceRefs": [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
+  "coverage": {"total": 11, "match": 8, "drift": 0, "blocked": 3, "notFound": 0, "gate": "partial"}
+}

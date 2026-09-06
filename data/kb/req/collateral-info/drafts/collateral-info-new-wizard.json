@@ -1,0 +1,46 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "collateral-info",
+  "flow": "新增押品向导（种类选择→12 标签页配置→暂存）",
+  "aliases": ["押品新增向导页", "客户经理配置押品公共信息页面", "押品种类明细模板"],
+  "hash_markers": ["FS00005721", "CheckClgMgtInfoServiceImpl", "checkWrntTxNumb"],
+  "keywords": ["押品新增向导页", "押品种类名称", "是否电子押品", "权证类型", "权证文本编号", "保证金账户", "12标签页", "明细模板", "影像信息", "押品管理团队"],
+  "menu_path": "押品管理/押品信息管理/押品信息管理【新增】",
+  "preconditions": [
+    "操作角色=客户经理（X0018）；押品种类须已配置明细模板（模板缺失拒绝）",
+    "【SUT 实测 2026-09-06】环境级后端缺陷：法人行最高抵质押率参数缺失 → 新增向导【下一步】即被后端拦截（BizException checkWrntTxNumb），新增链整条 blocked（连坐叶3/4）",
+    "种类树全量约 80 明细类（> 文档「约60类」口径，属文档低估非 SUT 缺失）"
+  ],
+  "steps": [
+    {
+      "name": "押品新增向导页",
+      "leafRef": "wet-test.md 叶2 (—（新增押品向导页）)",
+      "verify": "match",
+      "enter": "主页【新增】弹出 el-dialog「押品新增向导页」",
+      "fields": ["押品种类名称(树选择,必填)", "押品名称(随种类自动带出大类名,禁用)", "是否电子押品"],
+      "rules": [
+        "种类树四级：金融质押品/应收账款/房地产类押品/其他类押品 大类，~80 明细类含 房屋/存单/银行承兑汇票/股票 等",
+        "选「公寓房-国有出让」后动态追加必填 权证类型（购买合同/不动产权证/抵押登记证明/房屋所有权证/预告抵押登记证明）+权证文本编号——与文档「权证文本编号唯一性校验/模板缺失校验」口径一致",
+        "保证金账户类押品拒绝新增（文档口径）；保存为「暂存」态（文档口径）"
+      ]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "客户经理配置押品公共信息页面（12 标签页）",
+      "leafRefs": ["wet-test.md 叶3 (—（客户经理配置押品公共信息页面·12标签页）)"],
+      "verify": "blocked",
+      "reason": "blocked-黑名单+校验拦截：向导【下一步】触发后端校验失败，异常原文（console）：「操作失败：获取法人行最高抵质押率失败，异常栈信息：com.tansun.tcp.standard.exception.BizException…CheckClgMgtInfoServiceImpl.checkWrntTxNumb(CheckClgMgtInfoServiceImpl.java:357)」——配置页不可达；写操作黑名单禁止构造完整数据落库",
+      "retry_condition": "测试环境修复法人行抵质押率参数配置（或业务端完成一笔真实新增）后重走向导核 12 标签页结构；替代性结构证据见 modify 卡（查看页 12 折叠区）"
+    },
+    {
+      "name": "押品种类明细模板子页（约60类抽样核）",
+      "leafRefs": ["wet-test.md 叶4 (—（押品种类明细模板子页·约60类抽样核）)"],
+      "verify": "blocked",
+      "reason": "blocked-同叶3 后端拦截不可经新增向导到达；种类树全量已核（~80 明细类）；暂押品列表内种类回显（公寓房-国有出让/沪A股/店铺-国有划拨）证明模板按二级种类区分存在",
+      "retry_condition": "条件同叶3；建议抽样 房屋/汽车/存单/银行承兑汇票 4 类核明细模板字段集"
+    }
+  ],
+  "sourceRefs": [2, 3, 4],
+  "coverage": {"total": 3, "match": 1, "drift": 0, "blocked": 2, "notFound": 0, "gate": "partial"}
+}

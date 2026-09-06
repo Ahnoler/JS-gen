@@ -3,6 +3,19 @@
  * Data: GET /api/v2/executors + GET /api/v2/recording/agent-stderr/active
  * Actions: stream/detach · hard detach · paste-export stderr
  */
+
+/**
+ * A DOM element or document used as query scope.
+ * @typedef {object} DomRoot
+ * @property {string} [tagName] element tag name (document has none)
+ */
+
+/**
+ * Query a single element within a root scope (document by default).
+ * @param {string} sel CSS selector
+ * @param {DomRoot} [el] root scope to query within (defaults to document)
+ * @returns {DomRoot|null} first matching element or null
+ */
 const $ = (sel, el = document) => el.querySelector(sel);
 
 function escapeHtml(str) {
@@ -13,7 +26,12 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-/** Unwrap v2 envelope { code, message, data }. */
+/**
+ * Unwrap v2 envelope { code, message, data }.
+ * @param {string} url fetch target
+ * @param {object} [options] fetch options (defaults to {})
+ * @returns {Promise<object|null>} unwrapped data (envelope data, or parsed body)
+ */
 async function apiJson(url, options = {}) {
   const res = await fetch(url, options);
   const text = await res.text();
@@ -45,7 +63,9 @@ function shortUuid(u) {
 
 /**
  * Merge executor node slots with /active stderr rows (+ live CDP ports).
- * @returns {{ nodes: object[], freeCount: number, occupiedCount: number }}
+ * @param {object} executorsPayload raw response from GET /api/v2/executors
+ * @param {object} activePayload raw response from GET /api/v2/recording/agent-stderr/active
+ * @returns {{ nodes: object[], freeCount: number, occupiedCount: number, activeRows: object[] }} enriched slot view model
  */
 function buildViewModel(executorsPayload, activePayload) {
   const nodes = Array.isArray(executorsPayload?.nodes) ? executorsPayload.nodes : [];
@@ -196,6 +216,7 @@ function renderSlotRow(node, slot) {
   const actions = slot.occupied && slot.trajectoryId != null
     ? `
       <button type="button" class="btn mon-btn" data-act="stream-detach" data-tid="${slot.trajectoryId}">断开画面</button>
+      <button type="button" class="btn mon-btn" data-act="stream-attach" data-tid="${slot.trajectoryId}">推流画面</button>
       <button type="button" class="btn mon-btn mon-btn-danger" data-act="detach" data-tid="${slot.trajectoryId}">释放浏览器</button>
       <button type="button" class="btn mon-btn" data-act="stderr" data-tid="${slot.trajectoryId}"
         data-session="${escapeHtml(slot.sessionId || '')}"
@@ -206,7 +227,9 @@ function renderSlotRow(node, slot) {
         data-sid="${escapeHtml(slot.sid || '')}"
         title="仅清空该 session 的控面 stderr 文件">清空日志</button>
     `
-    : '<span class="mon-muted">—</span>';
+    : (slot.occupied && slot.sessionId
+        ? `<button type="button" class="btn mon-btn mon-btn-danger" data-act="orphan-close" data-node="${escapeHtml(node.nodeUuid)}" data-session="${escapeHtml(slot.sessionId)}">关闭会话</button>`
+        : '<span class="mon-muted">—</span>');
 
   return `
     <tr class="${slot.occupied ? 'mon-row-occ' : 'mon-row-free'}" data-node="${escapeHtml(node.nodeUuid)}" data-slot="${slot.slotIndex}">
@@ -266,7 +289,9 @@ function renderNodeCard(node, filter) {
 }
 
 /**
- * @param {HTMLElement} wrap
+ * Mount the slot-monitor panel into the given wrapper element.
+ * @param {DomRoot} wrap container element to render the monitor into
+ * @returns {void}
  */
 export function mountSlotMonitor(wrap) {
   wrap.innerHTML = `
@@ -405,6 +430,41 @@ export function mountSlotMonitor(wrap) {
     }
   }
 
+  async function callAttach(trajectoryId) {
+    const label = '推流画面（重新挂载 BiB 流）';
+    setStatus(`${label}中…`);
+    try {
+      await apiJson(`/api/v2/trajectories/${trajectoryId}/attach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      setStatus(`${label}成功`);
+      await refresh();
+    } catch (err) {
+      setStatus(`${label}失败：${err.message}`, true);
+    }
+  }
+
+  async function closeOrphanSession(btn) {
+    const nodeUuid = btn.dataset.node || '';
+    const sessionId = btn.dataset.session || '';
+    if (!nodeUuid || !sessionId) return;
+    if (!window.confirm(`确认关闭孤儿会话？\n节点：${nodeUuid}\n会话：${sessionId}\n（保留 Chrome 为可复用孤儿 CDP）`)) return;
+    setStatus('关闭会话…');
+    try {
+      await apiJson(`/api/v2/executors/${encodeURIComponent(nodeUuid)}/sessions/${encodeURIComponent(sessionId)}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      setStatus('关闭会话成功');
+      await refresh();
+    } catch (err) {
+      setStatus(`关闭会话失败：${err.message}`, true);
+    }
+  }
+
   async function fetchStderr(btn) {
     const sessionId = btn.dataset.session || '';
     const sid = btn.dataset.sid || '';
@@ -497,9 +557,11 @@ export function mountSlotMonitor(wrap) {
     const act = btn.dataset.act;
     const tid = Number(btn.dataset.tid);
     if (act === 'stream-detach' && Number.isFinite(tid)) callDetach(tid, false);
+    if (act === 'stream-attach' && Number.isFinite(tid)) callAttach(tid);
     if (act === 'detach' && Number.isFinite(tid)) callDetach(tid, true);
     if (act === 'stderr') fetchStderr(btn);
     if (act === 'clear-log') clearStderr(btn);
+    if (act === 'orphan-close') closeOrphanSession(btn);
   });
 
   $('.mon-refresh', wrap)?.addEventListener('click', () => refresh());

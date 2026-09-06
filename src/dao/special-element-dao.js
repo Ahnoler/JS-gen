@@ -1,3 +1,6 @@
+/**
+ * DAO for the `special_element` table — reusable element templates with embedding search support.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
@@ -21,12 +24,35 @@ function shape(row) {
   return obj;
 }
 
+/**
+ * Fetch a single special element by id.
+ * @param {number} id 主键
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<object|null>} element entity or null when not found
+ */
 export async function getById(id, trx = null) {
   const db = trx || getDB();
   const row = await db(TABLE).where({ id }).first();
   return shape(row);
 }
 
+/**
+ * Paginated list of special elements with multi-field filters and keyword search.
+ * @param {object} [opts] 筛选与分页选项
+ * @param {number} [opts.systemId] 系统节点 id
+ * @param {number} [opts.functionId] 功能节点 id
+ * @param {number[]} [opts.functionIds] alternative to functionId (whereIn)
+ * @param {number} [opts.tagDictCode] 标签字典编码
+ * @param {string} [opts.keyword] LIKE search across name/phase_description/remark/search_text
+ * @param {string} [opts.stepDesc] LIKE search on step action_type/params_json
+ * @param {string} [opts.createdBy] 创建人
+ * @param {boolean|number|string} [opts.enabled] 启用状态
+ * @param {string} [opts.startTime] created_at >= start
+ * @param {string} [opts.endTime] created_at <= end
+ * @param {number} [opts.page] 页码（1 起）
+ * @param {number} [opts.pageSize] 每页条数
+ * @returns {Promise<{ items: object[], total: number, page: number, pageSize: number }>} 分页结果
+ */
 export async function list({
   systemId,
   functionId,
@@ -101,6 +127,12 @@ export async function list({
   };
 }
 
+/**
+ * Create a new special element and return the created entity.
+ * @param {object} data camelCase element fields
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<object|null>} created element entity
+ */
 export async function create(data, trx = null) {
   const db = trx || getDB();
   const row = toDbRow({
@@ -125,6 +157,13 @@ export async function create(data, trx = null) {
   return getById(id, trx);
 }
 
+/**
+ * Update a special element by id (system_id is immutable) and return the updated entity.
+ * @param {number} id 主键
+ * @param {object} fields partial camelCase element fields
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<object|null>} updated element entity
+ */
 export async function update(id, fields, trx = null) {
   const db = trx || getDB();
   const patch = toDbRow(fields);
@@ -136,12 +175,22 @@ export async function update(id, fields, trx = null) {
   return getById(id, trx);
 }
 
+/**
+ * Delete a special element by id.
+ * @param {number} id 主键
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(id, trx = null) {
   const db = trx || getDB();
   return db(TABLE).where({ id }).del();
 }
 
-/** Candidates for hybrid search within a system (enabled only). */
+/**
+ * Candidates for hybrid search within a system (enabled only).
+ * @param {number} systemId 系统节点 id
+ * @returns {Promise<object[]>} enabled element entities for the system
+ */
 export async function listEnabledBySystem(systemId) {
   const rows = await getDB()(TABLE)
     .where({ system_id: Number(systemId), enabled: 1 })

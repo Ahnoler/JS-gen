@@ -48,7 +48,11 @@ def test_field_values_equivalent_amount() -> None:
 
 
 def test_verify_uses_field_values_equivalent() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def verify_field_value", 1)[1].split(
         "async def scan_form_fields", 1
     )[0]
@@ -60,7 +64,11 @@ def test_verify_uses_field_values_equivalent() -> None:
 
 def test_check_field_enriches_match_hint() -> None:
     """check_field_value JSON should help agent when display is amount-formatted."""
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def check_field_value", 1)[1].split(
         "async def verify_field_value", 1
     )[0]

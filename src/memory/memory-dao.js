@@ -14,7 +14,10 @@ function tableExists(db, name) {
   return db.schema.hasTable(name);
 }
 
-/** 写入前确认表已存在（schema 未迁移时返回 false，调用方决定降级）。 */
+/**
+ * 写入前确认表已存在（schema 未迁移时返回 false，调用方决定降级）。
+ * @returns {Promise<boolean>} True if all four memory tables exist.
+ */
 export async function isReady() {
   try {
     const db = getDB();
@@ -29,7 +32,12 @@ export async function isReady() {
   }
 }
 
-/** 批量插入事件，返回 id 列表。 */
+/**
+ * 批量插入事件，返回 id 列表。
+ * @param {object[]} events Event rows to insert.
+ * @param {object} [trx] Optional transaction handle.
+ * @returns {Promise<number[]>} Inserted event ids.
+ */
 export async function insertEvents(events, trx = null) {
   if (!Array.isArray(events) || !events.length) return [];
   const db = trx || getDB();
@@ -38,7 +46,12 @@ export async function insertEvents(events, trx = null) {
   return ids.map((x) => Number(x));
 }
 
-/** 批量插入事实（含权重默认值已在 service 计算）。 */
+/**
+ * 批量插入事实（含权重默认值已在 service 计算）。
+ * @param {object[]} facts Fact rows to insert.
+ * @param {object} [trx] Optional transaction handle.
+ * @returns {Promise<number[]>} Inserted fact ids.
+ */
 export async function insertFacts(facts, trx = null) {
   if (!Array.isArray(facts) || !facts.length) return [];
   const db = trx || getDB();
@@ -47,7 +60,15 @@ export async function insertFacts(facts, trx = null) {
   return ids.map((x) => Number(x));
 }
 
-/** 当前版本事实（superseded_by IS NULL）按实体+属性查找（冲突版本化用）。 */
+/**
+ * 当前版本事实（superseded_by IS NULL）按实体+属性查找（冲突版本化用）。
+ * @param {number} trajectoryId Trajectory id.
+ * @param {string} entity Fact entity.
+ * @param {string} attribute Fact attribute.
+ * @param {object} [trx] Optional transaction handle.
+ * @param {number} [excludeEventId] Exclude facts from this event id.
+ * @returns {Promise<object|null>} Latest current-version fact row, or null.
+ */
 export async function currentFactByEntity(trajectoryId, entity, attribute, trx = null, excludeEventId = null) {
   const db = trx || getDB();
   const q = db(FACT_TABLE)
@@ -57,7 +78,13 @@ export async function currentFactByEntity(trajectoryId, entity, attribute, trx =
   return q.orderBy('id', 'desc').first();
 }
 
-/** 标记旧事实被新版本取代：superseded_by + disputed stance + 按 disputed 重算存储权重。 */
+/**
+ * 标记旧事实被新版本取代：superseded_by + disputed stance + 按 disputed 重算存储权重。
+ * @param {number} id Fact id to supersede.
+ * @param {number} newId New version fact id.
+ * @param {object} [trx] Optional transaction handle.
+ * @returns {Promise<boolean>} True if the fact was found and updated.
+ */
 export async function markFactSuperseded(id, newId, trx = null) {
   const db = trx || getDB();
   const row = await db(FACT_TABLE).where({ id: Number(id) }).first();
@@ -71,14 +98,27 @@ export async function markFactSuperseded(id, newId, trx = null) {
   return true;
 }
 
-/** 设置事实版本号（新版本在旧版本基础上 +1）。 */
+/**
+ * 设置事实版本号（新版本在旧版本基础上 +1）。
+ * @param {number} id Fact id.
+ * @param {number} version Version number to set.
+ * @param {object} [trx] Optional transaction handle.
+ * @returns {Promise<boolean>} True on success.
+ */
 export async function setFactVersion(id, version, trx = null) {
   const db = trx || getDB();
   await db(FACT_TABLE).where({ id: Number(id) }).update({ version: Number(version) });
   return true;
 }
 
-/** 按阶段+属性查当前版本事实（fill_before_save 建模用）。 */
+/**
+ * 按阶段+属性查当前版本事实（fill_before_save 建模用）。
+ * @param {number} trajectoryId Trajectory id.
+ * @param {number} phaseNumber Phase number.
+ * @param {string} attribute Fact attribute.
+ * @param {object} [trx] Optional transaction handle.
+ * @returns {Promise<object[]>} Current-version facts matching the phase + attribute.
+ */
 export async function factsByPhaseAttribute(trajectoryId, phaseNumber, attribute, trx = null) {
   const db = trx || getDB();
   const rows = await db(FACT_TABLE)
@@ -92,7 +132,12 @@ export async function factsByPhaseAttribute(trajectoryId, phaseNumber, attribute
   return fromDbRows(rows);
 }
 
-/** 按来源事件取回事实 id 列表（多行 INSERT 仅返回单 insertId，需按 event_id 回查）。 */
+/**
+ * 按来源事件取回事实 id 列表（多行 INSERT 仅返回单 insertId，需按 event_id 回查）。
+ * @param {number} eventId Source event id.
+ * @param {object} [trx] Optional transaction handle.
+ * @returns {Promise<number[]>} Fact ids created by the event.
+ */
 export async function factIdsByEvent(eventId, trx = null) {
   const db = trx || getDB();
   const rows = await db(FACT_TABLE)
@@ -102,7 +147,12 @@ export async function factIdsByEvent(eventId, trx = null) {
   return rows.map((r) => Number(r.id));
 }
 
-/** 批量插入/更新关系（冲突则提升 strength）。 */
+/**
+ * 批量插入/更新关系（冲突则提升 strength）。
+ * @param {object[]} relations Relation rows to upsert.
+ * @param {object} [trx] Optional transaction handle.
+ * @returns {Promise<number>} Number of relations upserted.
+ */
 export async function upsertRelations(relations, trx = null) {
   if (!Array.isArray(relations) || !relations.length) return 0;
   const db = trx || getDB();
@@ -129,7 +179,12 @@ export async function upsertRelations(relations, trx = null) {
   return n;
 }
 
-/** 插入一条决策记录。 */
+/**
+ * 插入一条决策记录。
+ * @param {object} decision Decision row to insert.
+ * @param {object} [trx] Optional transaction handle.
+ * @returns {Promise<number|null>} Inserted decision id, or null when input empty.
+ */
 export async function insertDecision(decision, trx = null) {
   if (!decision) return null;
   const db = trx || getDB();
@@ -137,7 +192,12 @@ export async function insertDecision(decision, trx = null) {
   return Number(id);
 }
 
-/** 更新决策审计状态。 */
+/**
+ * 更新决策审计状态。
+ * @param {number} id Decision id.
+ * @param {{ auditStatus?: string }} [opts] Audit status payload.
+ * @returns {Promise<boolean>} True if a row was updated.
+ */
 export async function updateDecisionAudit(id, { auditStatus } = {}) {
   if (!Number.isFinite(Number(id))) return false;
   const n = await getDB()(DECISION_TABLE)
@@ -146,7 +206,17 @@ export async function updateDecisionAudit(id, { auditStatus } = {}) {
   return n > 0;
 }
 
-/** 事件列表（按交易/会话/阶段/类型过滤）。 */
+/**
+ * 事件列表（按交易/会话/阶段/类型过滤）。
+ * @param {object} [opts] Query options.
+ * @param {number} [opts.trajectoryId] Trajectory id filter.
+ * @param {string} [opts.sessionId] Session id filter (used when trajectoryId absent).
+ * @param {number} [opts.phaseNumber] Phase number filter.
+ * @param {string} [opts.eventType] Event type filter.
+ * @param {number} [opts.limit] Max rows (capped at 500).
+ * @param {number} [opts.offset] Row offset.
+ * @returns {Promise<object[]>} Matching event rows (newest first).
+ */
 export async function listEvents({
   trajectoryId = null,
   sessionId = '',
@@ -165,7 +235,17 @@ export async function listEvents({
   return fromDbRows(rows);
 }
 
-/** 事实列表（默认只取当前版本 superseded_by IS NULL）。 */
+/**
+ * 事实列表（默认只取当前版本 superseded_by IS NULL）。
+ * @param {object} opts Query options.
+ * @param {number} opts.trajectoryId Trajectory id (required).
+ * @param {number} [opts.phaseNumber] Phase number filter (also matches NULL phase).
+ * @param {string} [opts.entity] Entity substring filter.
+ * @param {string} [opts.attribute] Exact attribute filter.
+ * @param {number} [opts.limit] Max rows (capped at 200).
+ * @param {boolean} [opts.currentOnly] True to exclude superseded facts (default true).
+ * @returns {Promise<object[]>} Matching fact rows (weight desc, then created_at desc).
+ */
 export async function listFacts({
   trajectoryId,
   phaseNumber = null,
@@ -192,7 +272,17 @@ export async function listFacts({
   return fromDbRows(rows);
 }
 
-/** 决策列表。 */
+/**
+ * 决策列表。
+ * @param {object} [opts] Query options.
+ * @param {number} [opts.trajectoryId] Trajectory id filter.
+ * @param {number} [opts.phaseNumber] Phase number filter.
+ * @param {string} [opts.decisionType] Decision type filter.
+ * @param {string} [opts.auditStatus] Audit status filter.
+ * @param {number} [opts.limit] Max rows (capped at 500).
+ * @param {number} [opts.offset] Row offset.
+ * @returns {Promise<object[]>} Matching decision rows (newest first).
+ */
 export async function listDecisions({
   trajectoryId = null,
   phaseNumber = null,
@@ -211,13 +301,21 @@ export async function listDecisions({
   return fromDbRows(rows);
 }
 
-/** 决策详情。 */
+/**
+ * 决策详情。
+ * @param {number} id Decision id.
+ * @returns {Promise<object|null>} Decision row, or null when not found.
+ */
 export async function getDecision(id) {
   const row = await getDB()(DECISION_TABLE).where({ id: Number(id) }).first();
   return row ? fromDbRow(row) : null;
 }
 
-/** 按 id 批量查事实（含被 supersede 的版本，用于审计复现）。 */
+/**
+ * 按 id 批量查事实（含被 supersede 的版本，用于审计复现）。
+ * @param {number[]} ids Fact ids (order preserved in output).
+ * @returns {Promise<object[]>} Fact rows in the requested order (missing ids dropped).
+ */
 export async function listFactsByIds(ids) {
   const nums = Array.from(
     new Set((Array.isArray(ids) ? ids : [])
@@ -234,6 +332,10 @@ export async function listFactsByIds(ids) {
  * P2-2：同 function 历史成功交易的当前版本事实（跨交易复用）。
  * 仅取 is_successful=1 的其它交易；返回时打上 source='history' + stance='inferred'
  * + weight ×0.5，绝不参与本交易冲突 supersede（调用方负责排序靠后）。
+ * @param {number} functionId Function id to reuse history from.
+ * @param {number} excludeTrajectoryId Current trajectory id to exclude.
+ * @param {{ limit?: number }} [opts] Query options.
+ * @returns {Promise<object[]>} History-sourced facts (re-tagged source/stance/weight).
  */
 export async function listFactsByFunctionHistory(functionId, excludeTrajectoryId, { limit = 20 } = {}) {
   const fid = Number(functionId);
@@ -262,7 +364,11 @@ export async function listFactsByFunctionHistory(functionId, excludeTrajectoryId
   }));
 }
 
-/** P2-4：按 id 批量取交易基础字段（对比报告用）。 */
+/**
+ * P2-4：按 id 批量取交易基础字段（对比报告用）。
+ * @param {number[]} ids Trajectory ids (capped at 10, order preserved).
+ * @returns {Promise<object[]>} Trajectory rows in the requested order.
+ */
 export async function listTrajectoriesByIds(ids) {
   const nums = Array.from(
     new Set((Array.isArray(ids) ? ids : [])
@@ -290,6 +396,8 @@ export async function listTrajectoriesByIds(ids) {
 /**
  * P2-4：多交易当前版本 value 事实（formValues 原料）。
  * 调用方再按 source 白名单过滤；同 (trajectory, entity) 多条由调用方按 weight 取最高。
+ * @param {number[]} ids Trajectory ids.
+ * @returns {Promise<object[]>} Current-version value facts across the trajectories.
  */
 export async function listCurrentValueFactsByTrajectories(ids) {
   const nums = Array.from(
@@ -307,7 +415,11 @@ export async function listCurrentValueFactsByTrajectories(ids) {
   return fromDbRows(rows);
 }
 
-/** 交易审计汇总。 */
+/**
+ * 交易审计汇总。
+ * @param {number} trajectoryId Trajectory id.
+ * @returns {Promise<{ trajectoryId: number|null, total: number, byStatus: Record<string, number>, overridden: number, topReferencedFacts: Array<{ id: number, refs: number, entity: string|null, attribute: string|null, value: string|null }> }>} Audit summary.
+ */
 export async function auditSummary(trajectoryId) {
   const tid = Number(trajectoryId);
   const db = getDB();
@@ -357,7 +469,10 @@ export async function auditSummary(trajectoryId) {
   return { trajectoryId: tid, total: rows.length, byStatus, overridden, topReferencedFacts };
 }
 
-/** 全局统计（P0 简单计数，P1 扩展延迟/命中率）。 */
+/**
+ * 全局统计（P0 简单计数，P1 扩展延迟/命中率）。
+ * @returns {Promise<{ tables: Record<string, number>, recentEventTypes: Array<{ eventType: string, count: number }> }>} Global memory stats.
+ */
 export async function stats() {
   const db = getDB();
   const [events] = await db(EVENT_TABLE).count('* as n');
@@ -381,7 +496,11 @@ export async function stats() {
   };
 }
 
-/** 交易记忆时间线：事件 + 事实 + 决策。 */
+/**
+ * 交易记忆时间线：事件 + 事实 + 决策。
+ * @param {number} trajectoryId Trajectory id.
+ * @returns {Promise<{ trajectoryId: number|null, events: object[], facts: object[], decisions: object[] }>} Timeline bundle.
+ */
 export async function timeline(trajectoryId) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) {
@@ -395,7 +514,11 @@ export async function timeline(trajectoryId) {
   return { trajectoryId: tid, events, facts, decisions };
 }
 
-/** 删除某交易的全部记忆（测试/维护用；不常用）。 */
+/**
+ * 删除某交易的全部记忆（测试/维护用；不常用）。
+ * @param {number} trajectoryId Trajectory id.
+ * @returns {Promise<number>} Total rows removed.
+ */
 export async function deleteByTrajectory(trajectoryId) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) return 0;

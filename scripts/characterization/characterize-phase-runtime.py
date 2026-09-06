@@ -42,6 +42,8 @@ def test_clear_phase_intent_clears_section() -> None:
 def test_form_wires_remember() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_actions.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     assert_true("remember_phase_section" in form, "form remembers section")
@@ -51,6 +53,7 @@ def test_submit_ready_hint_uses_resolve_phase_section() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/task_completion.py").read_text(encoding="utf-8")
     )
     hint = form.find("def _submit_ready_hint")
     assert_true(hint >= 0, "_submit_ready_hint present")
@@ -59,14 +62,18 @@ def test_submit_ready_hint_uses_resolve_phase_section() -> None:
 
 
 def test_click_save_section_order_in_source() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    # form_save 在前：确保 find("async def click_save") 命中实现体而非 _form.py 薄委托
+    form = (
+        (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     cs = form.find("async def click_save")
     assert_true(cs >= 0, "click_save present")
     body = form[cs : cs + 5000]
     assert_true("same_label_section_keys" in body, "multi-section gate")
     assert_true("unique_button_section" in body, "unique path kept")
     multi_pos = body.find("same_label_section_keys")
-    mem_pos = body.find("_phase_section")
+    mem_pos = body.find('get("_phase_section")')
     uniq_pos = body.find("unique_button_section")
     assert_true(multi_pos < mem_pos, "multi check before sticky")
     assert_true(mem_pos < uniq_pos or uniq_pos > multi_pos, "unique still after gate")

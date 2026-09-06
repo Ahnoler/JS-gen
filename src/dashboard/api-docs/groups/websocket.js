@@ -2,6 +2,11 @@
  * API group(s): websocket — extracted from catalog.js.
  * Keep in sync with src/routes/v2/*.js
  */
+
+/** @typedef {{ name: string, type: string, required?: boolean, in?: 'path'|'query'|'body', desc: string, example?: string }} Param */
+/** @typedef {{ method: string, path: string, summary: string, desc?: string, params?: Param[], reqExample?: string, respExample?: string, notes?: string[], deprecated?: boolean, tryable?: boolean }} Endpoint */
+/** @typedef {{ id: string, name: string, description: string, endpoints: Endpoint[] }} TagGroup */
+
 import { J } from './_j.js';
 
 /** @type {TagGroup[]} */
@@ -14,12 +19,11 @@ export const GROUP_WEBSOCKET = [
       {
         method: 'WS', path: '/ws',
         summary: '产品前端通道',
-        desc: '连接后可收 recording:*、replay:*、remote:*（含标签页列表）、二进制投屏帧。客户端可发 ws:ping、replay:start、remote:tabs、remote:switch_tab 等。',
+        desc: '连接后可收 recording:*、remote:*（含标签页列表）、二进制投屏帧，以及 live replay 的 replay:form_structure 等。客户端可发 ws:ping、remote:tabs、remote:switch_tab 等。',
         tryable: false,
         respExample: J({ type: 'server:init', payload: { /* 会话快照 */ } }),
         notes: [
           '客户端 → { type: "ws:ping", payload: {} } → 收到 ws:pong',
-          '客户端 → { type: "replay:start", payload: { trajectoryId, replayPlanId? } }',
           '客户端 → { type: "remote:input", payload: { kind, ... } }（画布键鼠/文本透传，见 remote:input）',
           '客户端 → { type: "remote:tabs" | "remote:switch_tab", payload: {...} }（见下方条目）',
           '二进制帧：RSCF 投屏（产品前端画布）',
@@ -207,24 +211,6 @@ export const GROUP_WEBSOCKET = [
         ],
       },
       {
-        method: 'WS', path: 'replay:status',
-        summary: '回放状态',
-        tryable: false,
-        respExample: J({ type: 'replay:status', payload: { replayId: 'uuid', trajectoryId: 42, phase: 'running' } }),
-      },
-      {
-        method: 'WS', path: 'replay:step',
-        summary: '回放单步进度（可含 healType）',
-        tryable: false,
-        respExample: J({
-          type: 'replay:step',
-          payload: {
-            trajectoryId: 42, trajectoryDbId: 42, stepId: 501,
-            status: 'failed', error: '…', healType: 'step',
-          },
-        }),
-      },
-      {
         method: 'WS', path: 'replay:form_structure',
         summary: '表单结构变化检测报告（Type B / healType=form_structure）',
         tryable: false,
@@ -249,33 +235,6 @@ export const GROUP_WEBSOCKET = [
           '仅在 save_form_snapshot 检查点校验发现 diff 时发出',
           '随后可能删库 missing 步骤、AI 补填 adding，并结构化插入 confirmed=0 新步',
         ],
-      },
-      {
-        method: 'WS', path: 'replay:screenshot',
-        summary: '回放截图（before/after 各一次，含 kind）',
-        tryable: false,
-        respExample: J({
-          type: 'replay:screenshot',
-          payload: {
-            replayId: 'uuid', trajectoryId: 42, stepId: 501,
-            kind: 'after', fileName: 'step-1-after-….png', url: '/api/test/screenshots/...',
-          },
-        }),
-      },
-      {
-        method: 'WS', path: 'replay:result',
-        summary: '回放结果汇总',
-        tryable: false,
-        respExample: J({
-          type: 'replay:result',
-          payload: { replayId: 'uuid', trajectoryId: 42, success: true, completedStepIds: [501], exitCode: 0 },
-        }),
-      },
-      {
-        method: 'WS', path: 'replay:done',
-        summary: '回放结束',
-        tryable: false,
-        respExample: J({ type: 'replay:done', payload: { replayId: 'uuid', trajectoryId: 42 } }),
       },
     ],
   },

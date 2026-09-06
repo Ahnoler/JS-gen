@@ -95,7 +95,11 @@ def test_submit_ready_hint_dual_save() -> None:
 
 def test_click_save_wiring() -> None:
     """Source: click_save must count same-label sections before applying sticky memory."""
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    # form_save 在前：确保 find("async def click_save") 命中实现体而非 _form.py 薄委托
+    form = (
+        (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     cs = form.find("async def click_save")
     assert_true(cs >= 0, "click_save present")
     body = form[cs : cs + 5000]
@@ -108,7 +112,11 @@ def test_click_save_wiring() -> None:
 
 def test_click_save_records_section() -> None:
     """Source: successful click_save must persist section in recorded params."""
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    # form_save 在前：确保 find("async def click_save") 命中实现体而非 _form.py 薄委托
+    form = (
+        (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     cs = form.find("async def click_save")
     assert_true(cs >= 0, "click_save present")
     end = form.find("    @controller.action", cs + 1)

@@ -11,6 +11,7 @@
 
 import { GROUP_OVERVIEW } from './groups/overview.js';
 import { GROUP_HIERARCHY } from './groups/hierarchy.js';
+import { GROUP_MESSAGES } from './groups/messages.js';
 import { GROUP_COMPONENTS } from './groups/components.js';
 import { GROUP_TRAJECTORY } from './groups/trajectory.js';
 import { GROUP_RECORDING } from './groups/recording.js';
@@ -19,6 +20,9 @@ import { GROUP_REMOTE } from './groups/remote.js';
 import { GROUP_WEBSOCKET } from './groups/websocket.js';
 import { GROUP_EXPORT } from './groups/export-mgmt.js';
 import { GROUP_REGIONS } from './groups/regions.js';
+import { GROUP_KB } from './groups/kb.js';
+import { GROUP_AUTH } from './groups/auth.js';
+import { GROUP_LLM } from './groups/llm.js';
 
 /** Live slot occupancy board (not an HTTP endpoint group). */
 export const GROUP_SLOT_MONITOR = [{
@@ -29,24 +33,38 @@ export const GROUP_SLOT_MONITOR = [{
   monitor: true,
 }];
 
+/** Live pending-screenshots board (not an HTTP endpoint group). */
+export const GROUP_PENDING_SCREENSHOTS = [{
+  id: 'pending-screenshots',
+  name: '待上传截图',
+  description: '本地暂存、尚未上传 MinIO 的截图；一键上传 / 单行上传 / 删除',
+  endpoints: [],
+  monitor: true,
+}];
+
 /** @type {TagGroup[]} */
 export const API_GROUPS = [
   GROUP_OVERVIEW[0], // 概览
   ...GROUP_SLOT_MONITOR,
+  ...GROUP_PENDING_SCREENSHOTS,
   ...GROUP_OVERVIEW.slice(1), // 系统管理 …
+  ...GROUP_AUTH, // 登录鉴权（SSO）
+  ...GROUP_LLM, // LLM 配置
   ...GROUP_HIERARCHY,
+  ...GROUP_MESSAGES,
   ...GROUP_COMPONENTS,
   ...GROUP_TRAJECTORY,
   ...GROUP_RECORDING,
   ...GROUP_REGIONS,
   ...GROUP_MEMORY,
+  ...GROUP_KB,
   ...GROUP_REMOTE,
   ...GROUP_WEBSOCKET,
   ...GROUP_EXPORT,
 ];
 
 export const ENUMS = [
-  { name: 'recordStatus', values: 'draft / live / recording / recorded / completed' },
+  { name: 'recordStatus', values: 'draft(未录制) / recording(录制中) / failed(录制异常) / recorded(待确认) / completed(已确认)' },
   { name: 'remote_session.status', values: 'active（推流中）/ idle（断开画面浏览器仍在）/ closed / crashed' },
   { name: 'phase.status', values: 'pending / running / completed / failed' },
   { name: 'step.source', values: 'agent / manual' },
@@ -64,7 +82,7 @@ export const RECORDING_FLOW = [
   'POST .../record/prepare（复用空闲资源 / 占槽 + 登录，幂等）',
   'POST .../record/start（可选 phaseIds；可关页后台继续）',
   'POST .../record/stop（不释放槽位）',
-  'POST .../confirm（人工确认 → completed；取消 → draft）',
+  'POST .../confirm（人工确认 → completed；取消 → recorded）',
   'POST .../resolve-element（可选：按 label 抓定位器写入步骤 element_json）',
   'POST .../stream/detach（断开画面；或 .../detach 释放执行资源关浏览器）',
 ];

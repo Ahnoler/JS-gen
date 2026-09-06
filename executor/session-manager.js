@@ -7,11 +7,15 @@ import { BibBridge } from './bib-bridge.js';
 import { discoverAllCdpInRange } from '../src/cdp/discover.js';
 import { isProcessAlive } from './spawn-agent.js';
 
+/**
+ * Manages executor session slots: allocation, CDP port binding, BiB screencast bridges,
+ * and lifecycle (open/close/detach) for browser-automation sessions.
+ */
 export class SessionManager {
   /**
-   * @param {number} capacity
-   * @param {(msg: object) => void} emitToControlPlane
-   * @param {(packet: Buffer) => void} sendBinary
+   * @param {number} capacity maximum number of concurrent slots
+   * @param {(msg: object) => void} emitToControlPlane emit to control plane
+   * @param {(packet: Buffer) => void} sendBinary send binary
    */
   constructor(capacity, emitToControlPlane, sendBinary) {
     this.capacity = capacity;
@@ -21,7 +25,22 @@ export class SessionManager {
     this.slots = Array.from({ length: capacity }, (_, i) => new SessionSlot(i, (msg) => {
       // Drop crashed sessions from the map so leases/list stay consistent with free slots.
       if (msg?.event === 'session.process_exit' && msg.session_id) {
-        this.sessions.delete(msg.session_id);
+        const sessionId = msg.session_id;
+        // Detach the BiB before dropping the session: the crash path used to
+        // delete only the sessions entry, leaking the bib entry, its 1s stall
+        // timer and the CDP client. detachBib is async (never throws
+        // synchronously) — the extra .catch() covers late rejections so the
+        // sessions delete below always runs.
+        if (this.bibs.has(sessionId)) {
+          try {
+            this.detachBib(sessionId, { crashed: true }).catch((err) => {
+              console.warn('[session-manager] process_exit detachBib failed:', err?.message || err);
+            });
+          } catch (err) {
+            console.warn('[session-manager] process_exit detachBib failed:', err?.message || err);
+          }
+        }
+        this.sessions.delete(sessionId);
       }
       emitToControlPlane(msg);
     }));
@@ -30,11 +49,15 @@ export class SessionManager {
 
     /** @type {Map<string, BibBridge>} */
     this.bibs = new Map();
-    /** Serialize attachBib per sessionId to avoid orphan screencast producers. */
+    /** Serialize attachBib/close per sessionId to avoid orphan screencast producers. */
     /** @type {Map<string, Promise<unknown>>} */
     this._attachLocks = new Map();
   }
 
+  /**
+   * Find a free slot, reclaiming ghost slots whose process already died.
+   * @returns {SessionSlot|null} free slot or null if no slots available
+   */
   _findFreeSlot() {
     for (const slot of this.slots) {
       if (!slot.sessionId) return slot;
@@ -52,11 +75,19 @@ export class SessionManager {
     return null;
   }
 
+  /**
+   * Get the SessionSlot for a session id (or null).
+   * @param {string} sessionId session id
+   * @returns {SessionSlot|null} the slot for the session, or null if not found
+   */
   getSession(sessionId) {
     return this.sessions.get(sessionId) || null;
   }
 
-  /** CDP ports currently claimed by live slots. */
+  /**
+   * CDP ports currently claimed by live slots.
+   * @returns {Set<number>} set of CDP port numbers occupied by active sessions
+   */
   occupiedCdpPorts() {
     const ports = new Set();
     for (const slot of this.slots) {
@@ -67,7 +98,7 @@ export class SessionManager {
 
   /**
    * List live CDP Chromes on this host; exclude ports already bound to a live slot.
-   * @returns {Promise<{ browsers: object[], occupiedPorts: number[] }>}
+   * @returns {Promise<{ browsers: object[], occupiedPorts: number[] }>} discovered browsers and occupied ports
    */
   async listCdp() {
     const occupied = this.occupiedCdpPorts();
@@ -90,11 +121,13 @@ export class SessionManager {
   }
 
   /**
-   * @param {object} payload
-   * @param {string} payload.sessionId
-   * @param {string} [payload.model]
-   * @param {string} [payload.cdpUrl]
-   * @param {number} [payload.cdpPort]
+   * Open (or reuse) a session on a free slot and emit session.ready to the control plane.
+   * @param {object} payload payload
+   * @param {string} payload.sessionId payload.session id
+   * @param {string} [payload.model] model
+   * @param {string} [payload.cdpUrl] cdp url
+   * @param {number} [payload.cdpPort] cdp port
+   * @returns {Promise<{ sessionId: string, slotIndex: number, cdpPort: number|null, cdpReady: boolean, reused?: boolean }>} session open result
    */
   async open(payload) {
     if (this.sessions.has(payload.sessionId)) {
@@ -130,9 +163,10 @@ export class SessionManager {
 
   /**
    * Forward stdin event to session subprocess.
-   * @param {string} sessionId
+   * @param {string} sessionId session id
    * @param {string} stdinEvent e.g. step, manual_record_start
-   * @param {object} data
+   * @param {object} data data
+   * @returns {{ sessionId: string, slotIndex: number }} acknowledgement with sessionId and slotIndex
    */
   forward(sessionId, stdinEvent, data = {}) {
     const slot = this.sessions.get(sessionId);
@@ -142,12 +176,47 @@ export class SessionManager {
   }
 
   /**
-   * @param {string} sessionId
-   * @param {{ keepBrowser?: boolean }} [opts]
+   * Close a session, detach BiB, and free the slot.
+   * Serialized against in-flight/concurrent attachBib via the per-session attach
+   * lock, so a BiB cannot be attached back onto a closing/closed session.
+   * @param {string} sessionId session id
+   * @param {{ keepBrowser?: boolean }} [opts] close options
    * keepBrowser=false (default): kill Chrome — 「释放执行资源」
    * keepBrowser=true: leave Chrome on CDP — rare soft close
+   * @returns {Promise<{ sessionId: string, slotIndex: number, closed: boolean, keepBrowser: boolean, cdpPort: number|null }>} close result
    */
   async close(sessionId, { keepBrowser = false } = {}) {
+    // Same per-session chain as attachBib: wait out any in-flight attach, then
+    // hold the chain ourselves so an attach that starts during close runs only
+    // after close finished (and then fails the sessions.has check). Chain-tail
+    // await, not a re-entrant mutex — attachBib/_attachBibLocked never call
+    // close, so this wait cannot form a deadlock cycle.
+    const prev = this._attachLocks.get(sessionId) || Promise.resolve();
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const tail = prev.then(() => gate);
+    this._attachLocks.set(sessionId, tail);
+    await prev.catch(() => {});
+
+    try {
+      return await this._closeLocked(sessionId, { keepBrowser: !!keepBrowser });
+    } finally {
+      release();
+      if (this._attachLocks.get(sessionId) === tail) {
+        // Last lock holder gone — drop the entry so it does not leak.
+        this._attachLocks.delete(sessionId);
+      }
+    }
+  }
+
+  /**
+   * Internal: close body while holding the per-session attach lock (called by close).
+   * @param {string} sessionId session id
+   * @param {{ keepBrowser?: boolean }} [opts] close options
+   * @param {boolean} [opts.keepBrowser] whether to keep the browser alive
+   * @returns {Promise<{ sessionId: string, slotIndex: number, closed: boolean, keepBrowser: boolean, cdpPort: number|null }>} close result
+   */
+  async _closeLocked(sessionId, { keepBrowser = false } = {}) {
     const slot = this.sessions.get(sessionId);
     if (!slot) return { sessionId, closed: false };
     await this.detachBib(sessionId, { crashed: false }).catch(() => {});
@@ -173,8 +242,8 @@ export class SessionManager {
   }
 
   /**
-   * All capacity slots (free + occupied) with current CDP port.
-   * Free slots still report preferred/base port (`EXECUTOR_CDP_PORT_BASE + slotIndex`).
+   * List all capacity slots (free + occupied) with current CDP port.
+   * @returns {{ sessionId: string|null, slotIndex: number, ready: boolean, busy: boolean, cdpPort: number|null }[]} array of slot status objects
    */
   list() {
     return this.slots.map((slot) => ({
@@ -186,6 +255,19 @@ export class SessionManager {
     }));
   }
 
+  /**
+   * Attach a BiB (browser-in-browser) screencast bridge to a session.
+   * Serialized per session to avoid orphan screencast producers.
+   * @param {object} opts opts
+   * @param {string} opts.sessionId opts.session id
+   * @param {string} opts.remoteSessionUuid opts.remote session uuid
+   * @param {number} [opts.quality] quality
+   * @param {number} [opts.viewportW] viewport w
+   * @param {number} [opts.viewportH] viewport h
+   * @param {number} [opts.deviceScaleFactor] device scale factor
+   * @param {boolean} [opts.resize] resize
+   * @returns {Promise<{ attached: boolean, tabs: object[], activeTargetId: string|null }>} attach result with tabs and active target
+   */
   async attachBib({
     sessionId,
     remoteSessionUuid,
@@ -198,7 +280,8 @@ export class SessionManager {
     const prev = this._attachLocks.get(sessionId) || Promise.resolve();
     let release;
     const gate = new Promise((r) => { release = r; });
-    this._attachLocks.set(sessionId, prev.then(() => gate));
+    const tail = prev.then(() => gate);
+    this._attachLocks.set(sessionId, tail);
     await prev.catch(() => {});
 
     try {
@@ -213,12 +296,25 @@ export class SessionManager {
       });
     } finally {
       release();
-      if (this._attachLocks.get(sessionId) === gate) {
-        // chain continues via next waiter; clear if we are tail
+      if (this._attachLocks.get(sessionId) === tail) {
+        // No newer waiter appended while we ran — drop the entry so it does not leak.
+        this._attachLocks.delete(sessionId);
       }
     }
   }
 
+  /**
+   * Internal: attach BiB while holding the per-session lock (called by attachBib).
+   * @param {object} opts attach options
+   * @param {string} opts.sessionId session id
+   * @param {string} opts.remoteSessionUuid remote session uuid
+   * @param {number} [opts.quality] screencast quality
+   * @param {number} [opts.viewportW] viewport width
+   * @param {number} [opts.viewportH] viewport height
+   * @param {number} [opts.deviceScaleFactor] device scale factor
+   * @param {boolean} [opts.resize] whether to resize
+   * @returns {Promise<{ attached: boolean, tabs: object[], activeTargetId: string|null }>} attach result
+   */
   async _attachBibLocked({
     sessionId,
     remoteSessionUuid,
@@ -295,6 +391,11 @@ export class SessionManager {
     return { attached: true, tabs: tabsPayload.tabs, activeTargetId: bib.activeTargetId };
   }
 
+  /**
+   * List open page tabs for the BiB attached to a session.
+   * @param {string} sessionId session id
+   * @returns {Promise<{ tabs: object[], activeTargetId: string|null }>} tab list and active target
+   */
   async bibListTabs(sessionId) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return { tabs: [], activeTargetId: null };
@@ -302,7 +403,28 @@ export class SessionManager {
   }
 
   /**
+   * Push viewer count for a remote session uuid to its BiB (zero → pause screencast).
+   * @param {string} remoteSessionUuid remote session uuid
+   * @param {number} viewers dashboard subscriber count
+   * @returns {Promise<{ ok: boolean, matched: number }>} result
+   */
+  async bibSetStreamViewers(remoteSessionUuid, viewers) {
+    const uuid = String(remoteSessionUuid || '');
+    let matched = 0;
+    for (const bib of this.bibs.values()) {
+      if (bib.remoteSessionUuid === uuid) {
+        matched++;
+        await bib.setStreamViewers(viewers).catch(() => {});
+      }
+    }
+    return { ok: true, matched };
+  }
+
+  /**
    * Switch BiB screencast to targetId and ask Agent to switch_to_tab by url/pageId.
+   * @param {string} sessionId session id
+   * @param {{ targetId?: string, url?: string, pageId?: string }} [opts] tab switch options
+   * @returns {Promise<{ ok: boolean, tabs: object[], activeTargetId: string|null }>} switch result with updated tabs
    */
   async bibSwitchTab(sessionId, { targetId, url, pageId } = {}) {
     const bib = this.bibs.get(sessionId);
@@ -344,6 +466,13 @@ export class SessionManager {
     };
   }
 
+  /**
+   * Detach the BiB bridge for a session (stops screencast, emits session.bib_detached).
+   * @param {string} sessionId session id
+   * @param {{ crashed?: boolean }} [opts] detach options
+   * @param {boolean} [opts.crashed] whether the session crashed
+   * @returns {Promise<{ closed: boolean }>} detach result
+   */
   async detachBib(sessionId, { crashed = false } = {}) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return { closed: false };
@@ -357,6 +486,12 @@ export class SessionManager {
     return { closed: true };
   }
 
+  /**
+   * (Re)start the BiB screencast for a session.
+   * @param {string} sessionId session id
+   * @param {object} [opts] screencast start options
+   * @returns {Promise<void>}
+   */
   async bibStart(sessionId, opts = {}) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return;
@@ -368,6 +503,11 @@ export class SessionManager {
     }
   }
 
+  /**
+   * Stop the BiB screencast for a session.
+   * @param {string} sessionId session id
+   * @returns {Promise<void>}
+   */
   async bibStop(sessionId) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return;
@@ -376,10 +516,11 @@ export class SessionManager {
 
   /**
    * Resolve form element by label / actionType+params on the attached BiB page.
-   * @param {string} sessionId
-   * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string, requestId?: string }} [opts]
+   * @param {string} sessionId session id
+   * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string, pageLabel?: string, requestId?: string }} [opts] element resolution options
+   * @returns {Promise<{ requestId: string|null, sessionId: string, element: object|null, matchedLabel: string|null, ambiguous: boolean, matches: object[]|null, error: string|null }>} resolution result with element or error
    */
-  async bibResolveElement(sessionId, { labelText, actionType, params, mode, requestId } = {}) {
+  async bibResolveElement(sessionId, { labelText, actionType, params, mode, pageLabel, requestId } = {}) {
     try {
       const bib = this.bibs.get(sessionId);
       if (!bib) {
@@ -393,7 +534,7 @@ export class SessionManager {
           error: 'BiB not attached - call record/prepare (stream) first',
         };
       }
-      const resolved = await bib.resolveByLabel(labelText, { actionType, params, mode });
+      const resolved = await bib.resolveByLabel(labelText, { actionType, params, mode, pageLabel });
       if (resolved?.ambiguous) {
         return {
           requestId: requestId || null,
@@ -428,7 +569,13 @@ export class SessionManager {
     }
   }
 
-  async bibPhaseHighlightCapture(sessionId, { targets, requestId } = {}) {
+  /**
+   * Capture a phase-highlight screenshot via the attached BiB.
+   * @param {string} sessionId session id
+   * @param {{ requestId?: string }} [opts] capture options
+   * @returns {Promise<{ requestId: string|null, sessionId: string, pngBase64: string|null, meta: object|null, error: string|null }>} capture result
+   */
+  async bibPhaseHighlightCapture(sessionId, { requestId } = {}) {
     try {
       const bib = this.bibs.get(sessionId);
       if (!bib) {
@@ -436,16 +583,16 @@ export class SessionManager {
           requestId: requestId || null,
           sessionId,
           pngBase64: null,
-          hitCount: 0,
+          meta: null,
           error: 'BiB not attached - call record/prepare (stream) first',
         };
       }
-      const captured = await bib.capturePhaseHighlight(targets || []);
+      const captured = await bib.capturePhaseHighlight();
       return {
         requestId: requestId || null,
         sessionId,
         pngBase64: captured.pngBase64,
-        hitCount: captured.hitCount,
+        meta: captured.meta || null,
         error: null,
       };
     } catch (err) {
@@ -453,18 +600,30 @@ export class SessionManager {
         requestId: requestId || null,
         sessionId,
         pngBase64: null,
-        hitCount: 0,
+        meta: null,
         error: err?.message || String(err),
       };
     }
   }
 
+  /**
+   * Forward an optional client ack to the BiB screencast (kept for compatibility).
+   * @param {string} sessionId session id
+   * @param {object} [payload] ack payload
+   * @returns {Promise<void>}
+   */
   async bibAck(sessionId, payload = {}) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return;
     await bib.ack(payload).catch(() => {});
   }
 
+  /**
+   * Handle a remote input event (mouse/key/text/navigate/clipboard) via the attached BiB.
+   * @param {string} sessionId session id
+   * @param {object} [payload] input event payload
+   * @returns {Promise<object|void>} input handling result or void when no BiB is attached
+   */
   async bibInput(sessionId, payload = {}) {
     const bib = this.bibs.get(sessionId);
     if (!bib) {
@@ -483,7 +642,12 @@ export class SessionManager {
   }
 }
 
-/** @param {(msg: object) => void} emit */
+/**
+ * Factory: create a SessionManager with the configured EXECUTOR_CAPACITY.
+ * @param {(msg: object) => void} emit emit
+ * @param {(packet: Buffer) => void} sendBinary send binary
+ * @returns {SessionManager} a new SessionManager instance
+ */
 export function createSessionManager(emit, sendBinary) {
   return new SessionManager(EXECUTOR_CAPACITY, emit, sendBinary);
 }

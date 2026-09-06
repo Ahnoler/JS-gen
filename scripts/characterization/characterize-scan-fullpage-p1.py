@@ -10,6 +10,17 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 FORM_PY = ROOT / "scripts/controller/actions/_form.py"
+FORM_SCAN_ACTIONS_PY = ROOT / 'scripts/controller/actions/form_scan_actions.py'
+
+
+def _form_src() -> str:
+    # form_scan_actions 在前：marker 切片（如 scan_editable_summary body）命中实现体而非 _form.py 薄委托
+    return (
+        FORM_SCAN_ACTIONS_PY.read_text(encoding='utf-8')
+        + FORM_PY.read_text(encoding='utf-8')
+        + (ROOT / 'scripts/controller/actions/form_scan_utils.py').read_text(encoding='utf-8')
+    )
+
 
 
 def assert_true(cond: bool, msg: str) -> None:
@@ -37,7 +48,7 @@ def test_filter_fillable_excludes_shell() -> None:
 
 
 def test_form_scan_callers_use_fullpage_mode() -> None:
-    form = FORM_PY.read_text(encoding="utf-8")
+    form = _form_src()
     norm = _norm(form)
     # Product paths: scan_editable_summary + scan_form_fields + rebuild/assistant
     # Match evaluate(JS_SCAN_FORM_FIELDS, [..., {'mode':'fullpage'}]) style
@@ -80,7 +91,7 @@ def test_form_scan_callers_use_fullpage_mode() -> None:
 
 def test_rebuild_or_assistant_uses_fullpage() -> None:
     form = (
-        FORM_PY.read_text(encoding="utf-8")
+        _form_src()
         + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
     )
     assert_true(

@@ -1,7 +1,7 @@
 /**
  * System-mgmt Excel template / export / import helpers.
  * Columns match product template:
- *   *父节点 | *类型 | *名称 | 地址（系统下填写） | 备注
+ *   父节点 | 类型 | 名称 | 地址（系统下填写） | 备注
  * Parent path uses '/' separators (empty = under root).
  */
 import ExcelJS from 'exceljs';
@@ -31,8 +31,9 @@ const TYPE_BY_LABEL = Object.freeze({
 });
 
 /**
- * @param {string|number} raw
- * @returns {number|null}
+ * Parse a type cell (label/number) into a NODE_TYPE constant.
+ * @param {string|number} raw raw cell value
+ * @returns {number|null} NODE_TYPE constant, or null if unparseable
  */
 export function parseTypeCell(raw) {
   const s = String(raw ?? '').trim();
@@ -44,8 +45,9 @@ export function parseTypeCell(raw) {
 }
 
 /**
- * @param {string} raw
- * @returns {string[]}
+ * Split a parent path string into trimmed segments (empty/根 → []).
+ * @param {string} raw raw parent path cell value
+ * @returns {string[]} path segments
  */
 export function splitParentPath(raw) {
   const s = String(raw ?? '').trim().replace(/^\/+|\/+$/g, '');
@@ -54,7 +56,9 @@ export function splitParentPath(raw) {
 }
 
 /**
- * @param {string[]} parts
+ * Join path segments back into a '/'-separated parent path string.
+ * @param {string[]} [parts] path segments
+ * @returns {string} joined parent path
  */
 export function joinParentPath(parts = []) {
   return parts.filter(Boolean).join('/');
@@ -66,7 +70,7 @@ export function joinParentPath(parts = []) {
 
 /**
  * Sample rows for empty template download.
- * @returns {ExcelRow[]}
+ * @returns {ExcelRow[]} sample template rows
  */
 export function sampleTemplateRows() {
   return [
@@ -99,8 +103,8 @@ export function sampleTemplateRows() {
 
 /**
  * Flatten nested export nodes → Excel rows.
- * @param {Array<{ type:number, name:string, url?:string, description?:string, children?:any[] }>} nodes
- * @returns {ExcelRow[]}
+ * @param {Array<{ type:number, name:string, url?:string, description?:string, children?:unknown[] }>} nodes nested system tree nodes
+ * @returns {ExcelRow[]} flattened Excel rows
  */
 export function flattenNodesToRows(nodes = []) {
   /** @type {ExcelRow[]} */
@@ -131,9 +135,9 @@ export function flattenNodesToRows(nodes = []) {
 
 /**
  * Build .xlsx buffer.
- * @param {ExcelRow[]} rows
- * @param {{ sheetName?: string }} [opts]
- * @returns {Promise<Buffer>}
+ * @param {ExcelRow[]} rows flattened Excel rows
+ * @param {{ sheetName?: string }} [opts] workbook options
+ * @returns {Promise<Buffer>} xlsx file buffer
  */
 export async function buildExcelBuffer(rows = [], { sheetName = '系统树' } = {}) {
   const wb = new ExcelJS.Workbook();
@@ -187,8 +191,8 @@ export async function buildExcelBuffer(rows = [], { sheetName = '系统树' } = 
 
 /**
  * Parse uploaded workbook buffer → normalized rows.
- * @param {Buffer|ArrayBuffer|Uint8Array} buffer
- * @returns {Promise<ExcelRow[]>}
+ * @param {Buffer|ArrayBuffer|Uint8Array} buffer xlsx file buffer
+ * @returns {Promise<ExcelRow[]>} normalized Excel rows (parents before children)
  */
 export async function parseExcelBuffer(buffer) {
   const wb = new ExcelJS.Workbook();

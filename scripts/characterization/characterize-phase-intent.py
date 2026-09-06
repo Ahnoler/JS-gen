@@ -256,6 +256,50 @@ def main() -> int:
         'NEXT_ACTION: click_save()' in next_action_hint(store_save),
         'save phase still nudges click_save',
     )
+    # KB-I5 S3 (2026-09-02): watcher-mode seeded-intent exemption for the
+    # form-assistant gate. Positive: seeded intent (no contract compile) with
+    # mode create/modify + _phase_intent_flag_locked=True → allowed.
+    store_seed: dict = {
+        '_phase_intent': {'mode': 'create'},
+        '_phase_intent_flag_locked': True,
+    }
+    assert_true(
+        contract_allows_form_assistant(store_seed) is True,
+        'seeded create intent with locked flag allows assistant',
+    )
+    store_seed_modify: dict = {
+        '_phase_intent': {'mode': 'modify'},
+        '_phase_intent_flag_locked': True,
+    }
+    assert_true(
+        contract_allows_form_assistant(store_seed_modify) is True,
+        'seeded modify intent with locked flag allows assistant',
+    )
+    # Negative: seeded mode but no locked flag → denied.
+    store_seed_nolock: dict = {'_phase_intent': {'mode': 'create'}}
+    assert_true(
+        contract_allows_form_assistant(store_seed_nolock) is False,
+        'seeded create intent without locked flag denied',
+    )
+    # Negative: locked flag but no mode → denied.
+    store_seed_nomode: dict = {
+        '_phase_intent': {},
+        '_phase_intent_flag_locked': True,
+    }
+    assert_true(
+        contract_allows_form_assistant(store_seed_nomode) is False,
+        'seeded locked flag without mode denied',
+    )
+    # Negative: locked flag + non-phase mode (watcher never compiled intent) → denied.
+    store_seed_query: dict = {
+        '_phase_intent': {'mode': 'query'},
+        '_phase_intent_flag_locked': True,
+    }
+    assert_true(
+        contract_allows_form_assistant(store_seed_query) is False,
+        'seeded query mode denied',
+    )
+
     print('characterize-phase-intent: OK')
     return 0
 

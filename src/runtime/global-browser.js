@@ -6,26 +6,26 @@ import { isProcessAlive } from './agent-process.js';
 
 /**
  * @typedef {object} GlobalBrowserState
- * @property {import('child_process').ChildProcess|null} process
- * @property {NodeJS.WritableStream|null} stdin
- * @property {boolean} ready
- * @property {boolean} busy
- * @property {string|null} model
- * @property {number} stepIndex
- * @property {string|null} cdpHttp
- * @property {string|null} cdpWsUrl
- * @property {number|null} cdpPort
- * @property {boolean} autoPersist
- * @property {boolean} manualRecording
- * @property {object[]} lastActionLog
- * @property {(opts?: { clearCdp?: boolean }) => void} reset
- * @property {() => boolean} isAlive
- * @property {() => boolean} isReady
+ * @property {import('child_process').ChildProcess|null} process - Child process for the browser agent
+ * @property {import('stream').Writable|null} stdin - Standard input stream for the agent process
+ * @property {boolean} ready - Whether the browser is ready for commands
+ * @property {boolean} busy - Whether the browser is currently executing actions
+ * @property {string|null} model - Current model being used by the browser
+ * @property {number} stepIndex - Current step index in trajectory execution
+ * @property {string|null} cdpHttp - Chrome DevTools HTTP base URL
+ * @property {string|null} cdpWsUrl - Chrome DevTools WebSocket debugger URL
+ * @property {number|null} cdpPort - Chrome DevTools port number
+ * @property {boolean} autoPersist - Whether to automatically persist trajectory data
+ * @property {boolean} manualRecording - Whether manual recording is enabled
+ * @property {object[]} lastActionLog - Log of the last executed actions
+ * @property {(opts?: { clearCdp?: boolean }) => void} reset - Reset browser state
+ * @property {() => boolean} isAlive - Check if agent process is still running
+ * @property {() => boolean} isReady - Check if browser is ready for commands
  */
 
 /**
  * Create a property-compatible GlobalBrowser bag with helpers.
- * @returns {GlobalBrowserState}
+ * @returns {GlobalBrowserState} result
  */
 export function createGlobalBrowserState() {
   return {
@@ -44,10 +44,10 @@ export function createGlobalBrowserState() {
     manualRecording: false,
     lastActionLog: [],
 
-    /**
-     * Clear process / readiness fields (and optionally CDP endpoints).
-     * @param {{ clearCdp?: boolean }} [opts]
-     */
+/**
+ * Clear process / readiness fields (and optionally CDP endpoints).
+ * @param {{ clearCdp?: boolean }} [opts] - Options for resetting the browser state
+ */
     reset({ clearCdp = true } = {}) {
       this.process = null;
       this.stdin = null;
@@ -61,13 +61,19 @@ export function createGlobalBrowserState() {
       }
     },
 
-    /** True when the local agent child process is still running. */
-    isAlive() {
+  /**
+   * True when the local agent child process is still running.
+   * @returns {boolean} Whether the agent process is alive
+   */
+  isAlive() {
       return isProcessAlive(this.process);
     },
 
-    /** True when the agent has signaled ready and stdin is writable. */
-    isReady() {
+  /**
+   * True when the agent has signaled ready and stdin is writable.
+   * @returns {boolean} Whether the browser is ready for commands
+   */
+  isReady() {
       return !!(this.ready && this.stdin);
     },
   };

@@ -2,6 +2,11 @@
  * API group(s): special-element, component-library — extracted from catalog.js.
  * Keep in sync with src/routes/v2/*.js
  */
+
+/** @typedef {{ name: string, type: string, required?: boolean, in?: 'path'|'query'|'body', desc: string, example?: string }} Param */
+/** @typedef {{ method: string, path: string, summary: string, desc?: string, params?: Param[], reqExample?: string, respExample?: string, notes?: string[], deprecated?: boolean, tryable?: boolean }} Endpoint */
+/** @typedef {{ id: string, name: string, description: string, endpoints: Endpoint[] }} TagGroup */
+
 import { J } from './_j.js';
 
 /** @type {TagGroup[]} */
@@ -97,7 +102,7 @@ export const GROUP_COMPONENTS = [
         method: 'POST', path: '/api/v2/operation-components/mine',
         summary: '离线扫描沉淀（LLM 命名新簇）',
         desc: 'scope 三选一：systemId | functionId | trajectoryIds。同 system+signature 已存在则只加 occurrence，不改文案。簇内 phase≥2 才沉淀。',
-        reqExample: J({ systemId: 1, model: 'deepseek-v4-flash' }),
+        reqExample: J({ systemId: 1, model: 'Qwen/Qwen3.5-35B-A3B' }),
         respExample: J({
           created: [{ id: 1, name: '查询并引入', status: 'draft', occurrenceCount: 3 }],
           updated: [],

@@ -1,0 +1,52 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "postloan-risk-class",
+  "flow": "法人机构分类配置",
+  "aliases": ["法人机构分类配置", "是否允许分类上调"],
+  "hash_markers": ["ZJJK00105242", "ZJJK00105243", "ZJJK00105246", "ZJJK00105244", "FS00004677"],
+  "keywords": ["法人机构分类配置", "是否允许分类上调", "法人资本净额"],
+  "menu_path": "贷后管理/风险分类/法人机构分类配置",
+  "preconditions": [
+    "总行级管理员修改；限制人工认定可选上调范围",
+    "【SUT 实测 2026-09-06】列表自动加载 93 条"
+  ],
+  "steps": [
+    {
+      "name": "法人机构分类配置列表主页",
+      "leafRef": "wet-test.md 叶33 (ZJJK00105242)",
+      "verify": "match",
+      "menu_path": "贷后管理/风险分类/法人机构分类配置",
+      "query_fields": ["法人机构(下拉)", "机构名称", "是否允许分类上调"],
+      "buttons": ["修改", "查看"],
+      "columns": ["法人机构", "机构名称", "是否允许分类上调", "修改人", "修改时间"],
+      "rules": ["按钮仅 修改/查看（与文档一致）；文档提及的【查询法人资本净额】按钮未出现——wording/待证"]
+    },
+    {
+      "name": "修改法人机构分类配置弹窗",
+      "leafRef": "wet-test.md 叶34 (ZJJK00105243)",
+      "verify": "match",
+      "enter": "选中行点【修改】",
+      "fields": ["是否允许分类上调*(默认带出=是)"],
+      "buttons": ["关闭", "确认"],
+      "rules": ["弹窗仅一个字段，与文档一致"]
+    },
+    {
+      "name": "查看场景任务页（FS00004677）",
+      "leafRef": "wet-test.md 叶35 (ZJJK00105246)",
+      "verify": "match",
+      "enter": "选中行点【查看】整页跳转",
+      "buttons": ["返回"],
+      "rules": ["URL fcnScnEcd=FS00004677、avyEcd=UML00066217 与文档 FS 号一致"]
+    },
+    {
+      "name": "查看法人机构分类配置信息",
+      "leafRef": "wet-test.md 叶36 (ZJJK00105244)",
+      "verify": "match",
+      "enter": "查看场景只读详情",
+      "fields": ["法人机构(disabled)", "机构名称(disabled)", "是否允许分类上调(disabled)", "修改人(disabled)", "修改时间(disabled)"]
+    }
+  ],
+  "pendingSteps": [],
+  "sourceRefs": [33, 34, 35, 36],
+  "coverage": {"total": 4, "match": 4, "drift": 0, "blocked": 0, "notFound": 0, "gate": "full"}
+}

@@ -19,7 +19,6 @@ import { trajectoryStepToActionEntry } from '../models/element.js';
  */
 export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   fill_form_field: 'input',
-  fill_date_field: 'date',
   select_option: 'select:click',
   select_tree_option: 'select:tree',
   click_element_by_index: 'click',
@@ -27,7 +26,7 @@ export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   click_table_row_button: 'click',
   click_table_row_radio: 'radio',
   click_adjacent_button: 'click',
-  click_icon_button: 'click',
+  click_button: 'click',
   click_radio: 'radio',
   switch_tab: 'click',
   close_dialog: 'click',
@@ -36,7 +35,7 @@ export const ACTION_TO_ENGINE_TYPE = Object.freeze({
 
 /** Types we emit today (derived from ACTION_TO_ENGINE_TYPE). */
 export const LEGACY_ENGINE_EMITTED_TYPES = Object.freeze(
-  [...new Set(Object.values(ACTION_TO_ENGINE_TYPE))].sort(),
+  [...new Set([...Object.values(ACTION_TO_ENGINE_TYPE), 'date'])].sort(),
 );
 
 /** Meta / scan / memory / non-recorded-UI actions — not exported */
@@ -50,8 +49,8 @@ export const SKIP_ACTIONS = new Set([
   'verify_field_value',
   'take_screenshot',
   'save_trajectory',
-  'save_case_data',
-  'read_case_data',
+  'save_business_data',
+  'read_business_data',
   'match_form_rule',
   'init_task_list',
   'get_pending_tasks',
@@ -103,7 +102,7 @@ export const LEGACY_ENGINE_FIELD_SCHEMA = Object.freeze([
  * Prefer relative xpath_smart; fall back to absolute when smart is unavailable.
  * Some controls genuinely have no stable relative xpath — still export a locator.
  * @param {object} entry — from trajectoryStepToActionEntry
- * @returns {{ target: string, source: 'xpath_smart'|'xpath_full'|'' }}
+ * @returns {{ target: string, source: 'xpath_smart'|'xpath_full'|'' }} chosen locator + source
  */
 export function pickExportTarget(entry) {
   const el = entry?.element || {};
@@ -140,15 +139,21 @@ export function pickExportTarget(entry) {
   return { target: '', source: '' };
 }
 
-/** @deprecated use pickExportTarget — kept for callers expecting a string */
+/**
+ * @deprecated use pickExportTarget — kept for callers expecting a string
+ * @param {object} entry action entry
+ * @returns {string} chosen target xpath
+ */
 export function pickRelativeTarget(entry) {
   return pickExportTarget(entry).target;
 }
 
 /**
- * @param {string} action
- * @param {object} params
- * @param {object} element
+ * Build a human-readable operation name from action + params + element.
+ * @param {string} action normalized action name
+ * @param {object} [params] action params
+ * @param {object} [element] element info
+ * @returns {string} localized operation name
  */
 export function buildOperationName(action, params = {}, element = {}) {
   const p = params || {};
@@ -161,7 +166,6 @@ export function buildOperationName(action, params = {}, element = {}) {
 
   switch (action) {
     case 'fill_form_field':
-    case 'fill_date_field':
       return label ? `填写:${label}` : `填写:${action}`;
     case 'select_option':
     case 'select_tree_option':
@@ -176,7 +180,7 @@ export function buildOperationName(action, params = {}, element = {}) {
       return row ? `表格单选:${row}` : '表格单选';
     case 'click_adjacent_button':
       return label ? `邻钮:${label}` : '邻钮';
-    case 'click_icon_button':
+    case 'click_button':
       return text ? `图标:${text}` : '图标按钮';
     case 'click_element_by_index':
       return text ? `点击:${text}` : '点击';
@@ -196,14 +200,15 @@ export function buildOperationName(action, params = {}, element = {}) {
 }
 
 /**
- * @param {string} action
- * @param {object} params
+ * Pick the value field for the engine op (fill value / option / url).
+ * @param {string} action normalized action name
+ * @param {object} [params] action params
+ * @returns {string} value string (empty when not applicable)
  */
 export function pickOperationValue(action, params = {}) {
   const p = params || {};
   switch (action) {
     case 'fill_form_field':
-    case 'fill_date_field':
       return String(p.value ?? p.option_text ?? p.text ?? '');
     case 'select_option':
     case 'select_tree_option':
@@ -216,10 +221,26 @@ export function pickOperationValue(action, params = {}) {
   }
 }
 
+function resolveEngineType(action, element = {}) {
+  const mapped = ACTION_TO_ENGINE_TYPE[action];
+  if (!mapped) return null;
+  if (action !== 'fill_form_field') return mapped;
+  const blob = [
+    element.target_kind,
+    element.xpath_smart,
+    element.xpath,
+    element.xpath_full,
+    element.cssSelector,
+    JSON.stringify(element.attributes || {}),
+  ].join(' ');
+  if (/el-date-editor|tsscdatepicker|form_date|DatePicker/i.test(blob)) return 'date';
+  return mapped;
+}
+
 /**
  * Map one DB / action-entry step to the 5-field engine op (+ metadata).
  * @param {object} step — trajectory_step DAO shape or action entry
- * @returns {object|null} null if action is not exportable
+ * @returns {object|null} engine op (5 fields + meta), or null if action is not exportable
  */
 export function mapStepToLegacyEngineOp(step) {
   const entry = step?.action && step?.element !== undefined && !step?.actionType
@@ -228,7 +249,7 @@ export function mapStepToLegacyEngineOp(step) {
   const action = normalizeActionName(entry.action || step?.actionType || '');
   if (!action || SKIP_ACTIONS.has(action)) return null;
 
-  const engineType = ACTION_TO_ENGINE_TYPE[action];
+  const engineType = resolveEngineType(action, entry.element || {});
   if (!engineType) return null;
   const params = entry.params || {};
   const element = entry.element || {};
@@ -259,8 +280,9 @@ export function mapStepToLegacyEngineOp(step) {
 }
 
 /**
- * @param {object[]} steps
- * @param {{ stepIds?: Array<number|string>, phaseIds?: Array<number|string>, includeMeta?: boolean }} [opts]
+ * @param {object[]} steps trajectory steps
+ * @param {{ stepIds?: Array<number|string>, phaseIds?: Array<number|string>, includeMeta?: boolean }} [opts] filter + meta options
+ * @returns {{ schemaVersion: number, fields: object[], count: number, skipped: object, stats: object, operations: object[] }} engine export payload
  */
 export function exportStepsToLegacyEngine(steps, opts = {}) {
   const includeMeta = opts.includeMeta !== false;

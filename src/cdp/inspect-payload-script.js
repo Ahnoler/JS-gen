@@ -10,10 +10,10 @@ export const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
 
   function xpathOf(node) {
     if (!node || node.nodeType !== 1) return '';
-    if (node.id) return '//*[@id="' + node.id + '"]';
+    if (node.id && !isGeneratedId(node.id)) return '//*[@id="' + node.id + '"]';
     const parts = [];
     let cur = node;
-    while (cur && cur.nodeType === 1 && cur !== document.body) {
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement) {
       let ix = 1;
       let sib = cur.previousElementSibling;
       while (sib) {
@@ -23,7 +23,7 @@ export const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
       parts.unshift(cur.tagName.toLowerCase() + '[' + ix + ']');
       cur = cur.parentElement;
     }
-    return '/' + parts.join('/');
+    return '/html' + (parts.length ? '/' + parts.join('/') : '');
   }
 
   function buElementPosition(currentElement) {
@@ -98,6 +98,11 @@ ${PAGE_LOCATOR_HELPERS}
       if (!raw || raw === 'radio' || raw === 'checkbox') return '';
       return raw.slice(0, 80);
     }
+    // Unique-key column priority: prefer a customer-number (14-18 digits) or
+    // unified social-credit code (18 uppercase alphanumerics) over an easily
+    // duplicated name cell so same-named rows disambiguate by unique key.
+    const uniqueKey = parts.find((p) => /^\\d{14,18}$/.test(p) || /^[0-9A-Z]{18}$/.test(p));
+    if (uniqueKey) return String(uniqueKey).slice(0, 80);
     const best = parts.find((p) => p.length >= 2 && !/^(操作|编辑|删除|修改|查看|详情)$/.test(p)) || parts[0];
     return String(best || '').slice(0, 80);
   }
@@ -117,11 +122,17 @@ ${PAGE_LOCATOR_HELPERS}
     return t.split(/[\\n\\r]/)[0].trim().slice(0, 40);
   }
 
+  function placeholderLabel(node) {
+    const ph = (node && node.getAttribute && node.getAttribute('placeholder')) || '';
+    return (ph || '').replace(/^请输入/, '').replace(/[：:*\\s]+$/g, '').trim();
+  }
+
   function formItemLabel(node) {
     const item = node.closest && node.closest('.el-form-item');
     if (!item) return '';
     const lbl = item.querySelector('.el-form-item__label');
-    return (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+    const t = (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+    return t || placeholderLabel(node);
   }
 
   function openDateEditorMeta() {
@@ -193,12 +204,14 @@ ${PAGE_LOCATOR_HELPERS}
     return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
   }
 
-  function elMeta(node, textOverride) {
+  function elMeta(node, textOverride, kindHint) {
     const t = textOverride != null ? String(textOverride) : shortLabel(node);
     const bu = buXPathOf(node);
     const abs = xpathOf(node);
     const formLbl = formItemLabel(node);
-    const loc = buildLocatorSnap(node, t, abs, formLbl);
+    const loc = buildLocatorSnap(node, t, abs, formLbl, {
+      targetKind: kindHint || undefined,
+    });
     return {
       xpath: loc.xpath || bu || abs,
       bu_xpath: bu,
@@ -211,7 +224,7 @@ ${PAGE_LOCATOR_HELPERS}
       attributes: loc.attributes || attrs(node),
       text: loc.text || t,
       formLabel: loc.formLabel || formLbl || '',
-      target_kind: loc.target_kind || '',
+      target_kind: loc.target_kind || kindHint || '',
       parent_text: loc.parent_text || '',
       icon_class: loc.icon_class || '',
       placeholder: loc.placeholder || '',
@@ -220,6 +233,15 @@ ${PAGE_LOCATOR_HELPERS}
       locator_verified: loc.locator_verified === true,
       locator_strategy: loc.locator_strategy || '',
       locator_fallback_reason: loc.locator_fallback_reason || undefined,
+      region_role: loc.region_role || '',
+      region_id: loc.region_id || '',
+      region_label: loc.region_label || '',
+      region_chrome: loc.region_chrome || '',
+      region_section: loc.region_section || '',
+      region_block: loc.region_block || '',
+      layers: Array.isArray(loc.layers) ? loc.layers : [],
+      feature_card: loc.feature_card || undefined,
+      page_bbox: loc.page_bbox || undefined,
     };
   }
 
@@ -343,7 +365,7 @@ ${PAGE_LOCATOR_HELPERS}
       label_text: open ? formItemLabel(open) : '',
       option_text: optionText,
       source_channel: 'cdp_bib',
-    }, elMeta(opt, optionText));
+    }, elMeta(opt, optionText, 'form_select'));
   }
 
   // Date picker day cell → fill_date (user picks from calendar, does not type)
@@ -358,7 +380,7 @@ ${PAGE_LOCATOR_HELPERS}
         label_text: meta.label,
         value: value,
         source_channel: 'cdp_bib',
-      }, elMeta(meta.input || dateTd, value));
+      }, elMeta(meta.input || dateTd, value, 'form_date'));
     }
     // Incomplete at press-time (no label / header parse) → bridge confirms after click commits
     return {
@@ -400,7 +422,7 @@ ${PAGE_LOCATOR_HELPERS}
         kind: 'click_menu_item',
         menu_text: menuText,
         source_channel: 'cdp_bib',
-      }, elMeta(menu, menuText));
+      }, elMeta(menu, menuText, 'menu'));
     }
   }
 
@@ -415,7 +437,7 @@ ${PAGE_LOCATOR_HELPERS}
         kind: 'click_menu_item',
         menu_text: menuText,
         source_channel: 'cdp_bib',
-      }, elMeta(item, menuText));
+      }, elMeta(item, menuText, 'menu'));
     }
   }
 
@@ -427,7 +449,7 @@ ${PAGE_LOCATOR_HELPERS}
       row_text: tableRowIdentityText(rowBtn).slice(0, 40),
       button_text: buttonText,
       source_channel: 'cdp_bib',
-    }, elMeta(rowBtn, buttonText));
+    }, elMeta(rowBtn, buttonText, 'table_row_button'));
   }
 
   const tableRadio = el.closest && el.closest(
@@ -441,7 +463,7 @@ ${PAGE_LOCATOR_HELPERS}
       kind: 'click_table_row_radio',
       row_text: rowText,
       source_channel: 'cdp_bib',
-    }, elMeta(tableRadio, rowText));
+    }, elMeta(tableRadio, rowText, 'table_row_button'));
   }
 
   const radio = el.closest && el.closest('.el-radio, .el-radio-button');
@@ -452,7 +474,7 @@ ${PAGE_LOCATOR_HELPERS}
       label_text: formItemLabel(radio),
       option_text: optionText,
       source_channel: 'cdp_bib',
-    }, elMeta(radio, optionText));
+    }, elMeta(radio, optionText, 'form_radio'));
   }
 
   const tab = el.closest && el.closest('.el-tabs__item');
@@ -462,12 +484,12 @@ ${PAGE_LOCATOR_HELPERS}
       kind: 'switch_tab',
       tab_name: tabName,
       source_channel: 'cdp_bib',
-    }, elMeta(tab, tabName));
+    }, elMeta(tab, tabName, 'tab'));
   }
 
   const closeBtn = el.closest && el.closest('.el-dialog__headerbtn, .el-message-box__headerbtn, .el-drawer__close-btn');
   if (closeBtn) {
-    return Object.assign({ kind: 'close_dialog', source_channel: 'cdp_bib' }, elMeta(closeBtn, 'close'));
+    return Object.assign({ kind: 'close_dialog', source_channel: 'cdp_bib' }, elMeta(closeBtn, 'close', 'dialog_close'));
   }
 
   const btn = el.closest && el.closest('button, .el-button, a, [role="button"]');

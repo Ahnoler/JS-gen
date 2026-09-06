@@ -131,8 +131,8 @@ def test_fullpage_l1_includes_todo_item_region() -> None:
         encoding="utf-8"
     )
     assert_true(
-        "{ sel: '.todo-item', role: 'section' }" in scan
-        or '{ sel: ".todo-item", role: "section" }' in scan,
+        "{ sel: '.todo-item', role: 'todo' }" in scan
+        or '{ sel: ".todo-item", role: "todo" }' in scan,
         "fullpage L1 candSels must include .todo-item cards",
     )
     assert_true(

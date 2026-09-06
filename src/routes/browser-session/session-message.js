@@ -1,6 +1,21 @@
 import { markPhaseStatus, appendPhaseDoneLog } from '../../services/trajectory-service.js';
 import { broadcastSessions, broadcastWatcherStatus } from './broadcasts.js';
 
+/**
+ * Session agent-message dispatcher — maps agent stdout/executor events
+ * (step / phase_start / phase_done / phase_error / error / nav_step / …) to
+ * SSE channel sends and phase-status DB updates.
+ */
+
+/**
+ * Build the per-step message handler that forwards agent events to the SSE
+ * channel and updates phase status / done-log in the DB.
+ * @param {{ send: (event: string, data: unknown) => void, end: () => void }} channel SSE/WS push channel
+ * @param {object} session target session state
+ * @param {number} stepIndex current step index
+ * @param {() => void} cleanupListener cleanup callback on completion
+ * @returns {(msg: object) => void} per-step message handler
+ */
 export function handleSessionMessage(channel, session, stepIndex, cleanupListener) {
   return (msg) => {
     const send = channel.send;
@@ -41,6 +56,8 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
         appendFromEvent('agent', data?.text);
         send('phase_done', data);
         send('status', { phase: 'step_done', label: `Step ${session.stepIndex} completed` });
+        // Product AI record holds busy across phases; one phase_done is not session idle.
+        if (session.aiRecording) break;
         session.busy = false;
         broadcastSessions();
         broadcastWatcherStatus();
@@ -54,6 +71,7 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
         appendFromEvent('fail', data?.message);
         send('status', { phase: 'error', label: `Step failed: ${data.message}` });
         send('phase_error', data);
+        if (session.aiRecording) break;
         session.busy = false;
         broadcastWatcherStatus();
         send('done', { stepIndex, success: false, error: data.message });
@@ -64,6 +82,7 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
         finalizePhaseStatus('failed');
         appendFromEvent('fail', data?.message);
         send('error', data);
+        if (session.aiRecording) break;
         session.busy = false;
         broadcastWatcherStatus();
         send('done', { stepIndex, success: false, error: data.message || 'Agent error' });

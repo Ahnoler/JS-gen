@@ -1,0 +1,39 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "postloan-risk-class",
+  "flow": "分类认定理由配置",
+  "aliases": ["认定理由配置"],
+  "hash_markers": ["ZJJK00105269", "ZJJK00105273", "FS00004683"],
+  "keywords": ["分类认定理由配置", "理由类型", "上调理由", "形态理由", "认定结果"],
+  "menu_path": "贷后管理/风险分类/分类认定理由配置",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】列表自动加载 1491 条；理由类型值实证「上调理由/形态理由」"
+  ],
+  "steps": [
+    {
+      "name": "分类认定理由配置列表主页",
+      "leafRef": "wet-test.md 叶40 (ZJJK00105269)",
+      "verify": "match",
+      "menu_path": "贷后管理/风险分类/分类认定理由配置",
+      "query_fields": ["分类类型", "资产类型", "认定结果+展开钮"],
+      "buttons": ["新增", "修改", "失效", "查看"],
+      "columns": ["分类类型", "资产类型", "认定结果", "理由类型", "分类认定理由", "修改人", "修改日期", "规则状态"],
+      "rules": ["列表自动加载 1491 条"]
+    },
+    {
+      "name": "查看分类认定理由配置（独立页面）",
+      "leafRef": "wet-test.md 叶41 (ZJJK00105273)",
+      "verify": "match",
+      "enter": "选中生效行【查看】整页跳转",
+      "fields": ["分类类型*", "资产类型*", "理由类型*", "认定结果*", "分类认定理由*(文本域)", "规则状态*", "创建人", "创建日期", "修改人", "更新日期（全 disabled）"],
+      "buttons": ["返回"],
+      "rules": [
+        "结构差异：SUT 查看为独立页面（fcnScnEcd=FS00004683、avyEcd=UML00066239，FS 号 SUT 补录），非文档「新增/修改弹窗」口径",
+        "规则编号实证「FL+yyyyMMdd+6 位序号」（FL20260811032009）"
+      ]
+    }
+  ],
+  "pendingSteps": [],
+  "sourceRefs": [40, 41],
+  "coverage": {"total": 2, "match": 2, "drift": 0, "blocked": 0, "notFound": 0, "gate": "full"}
+}

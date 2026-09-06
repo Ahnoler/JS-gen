@@ -3,13 +3,13 @@
  *
  * Product path contract:
  *   analyze → POST /trajectories (name, requirement, phases[])
- *   → POST /trajectories/:id/record/prepare   (idempotent attach + phases + live status)
+ *   → POST /trajectories/:id/record/prepare   (idempotent attach + phases + recording status)
  *   → POST /trajectories/:id/record/start     ({ phaseIds? })  // login already in prepare
  *   → POST /trajectories/:id/steps/replay     ({ stepIds, isReplay })
  *   → POST /trajectories/:id/clear
  *   → PATCH /trajectories/:id                 ({ systemAccountId })
  *   → POST /trajectories/:id/manual-record    ({ enabled, phaseId? } empty phaseId = last phase)
- *   → POST /trajectories/:id/record/stop      ({ success? } → recorded|draft; does not detach)
+ *   → POST /trajectories/:id/record/stop      ({ success? } → recorded|failed; does not detach)
  *   → POST /trajectories/:id/stream/detach    (disconnect BiB only; browser idle)
  *   → PATCH /trajectory-steps/:id/confirm
  *   → GET /trajectories/:id/tree
@@ -235,8 +235,8 @@ async function main() {
     const { getDB, closeDB } = await import('../config/database.js');
     const knex = getDB();
 
-    // R5/R8: recording 门控 409
-    await knex('trajectory').where({ id: trajId }).update({ record_status: 'recording' });
+    // R5/R8: AI 录制中门控 409（活跃判定=phase.status='running'）
+    await knex('trajectory_phase').where({ trajectory_id: trajId }).update({ status: 'running' });
     const manual409 = await req('POST', `/api/v2/trajectories/${trajId}/manual-record`, {
       enabled: true,
       phaseId: phaseIds[0],
@@ -246,7 +246,7 @@ async function main() {
     } else {
       fail('manual-record 409 门控', `status=${manual409.status}`);
     }
-    await knex('trajectory').where({ id: trajId }).update({ record_status: 'draft' });
+    await knex('trajectory_phase').where({ trajectory_id: trajId }).update({ status: 'pending' });
 
     // R8: manual with phaseId
     const targetPhase = phaseIds[1] || phaseIds[0];
@@ -282,15 +282,15 @@ async function main() {
     } else {
       fail('POST record/stop', `status=${stopOk.status}`);
     }
-    await knex('trajectory').where({ id: trajId }).update({ record_status: 'draft' });
-
     // R10: record/start uses bound systemAccountId; login already done in prepare
     console.log('  … record/start phaseIds（最多 60s；登录在 prepare）');
     const noAcct = await req('POST', `/api/v2/trajectories/${trajId}/record/start`, {
       phaseIds: phaseIds[0] != null ? [phaseIds[0]] : [],
     });
     // Without bind → 400; with bind → may run or fail in executor (not 400 for missing account)
-    if (noAcct.status === 400 && /systemAccountId|account/i.test(noAcct.json?.error || '')) {
+    if (noAcct.status === 409 && /already recorded/i.test(noAcct.json?.error || '')) {
+      pass('POST record/start（已录制 → 409，v2 闸门）');
+    } else if (noAcct.status === 400 && /systemAccountId|account/i.test(noAcct.json?.error || '')) {
       pass('POST record/start 缺绑定账号 → 400');
     } else if (noAcct.status === 200 || noAcct.status === 500 || noAcct.status === 400) {
       pass('POST record/start（已绑定或执行失败）', `status=${noAcct.status}`);
@@ -332,6 +332,8 @@ async function main() {
         pass('POST record/start + phaseIds 完成', `phaseIds=${JSON.stringify(recordJson.phaseIds)}`);
       } else if (recordRes.status === 500) {
         pass('POST record/start + phaseIds 接口可达', `执行中失败(预期): ${String(recordJson.error || '').slice(0, 80)}`);
+      } else if (recordRes.status === 409) {
+        pass('POST record/start + phaseIds 已录制 → 409（v2 闸门）', String(recordJson.error || '').slice(0, 60));
       } else if (recordRes.status === 400) {
         fail('POST record/start + phaseIds', recordJson.error || '400');
       } else {
@@ -343,8 +345,8 @@ async function main() {
         if (trajRow?.record_status === 'recording') {
           pass('POST record/start + phaseIds 已进入 recording', '超时 → record/stop');
           const stopAbort = await req('POST', `/api/v2/trajectories/${trajId}/record/stop`, { success: false });
-          if (stopAbort.status === 200 && stopAbort.json?.recordStatus === 'draft') {
-            pass('POST record/stop 取消 AI', 'recordStatus=draft');
+          if (stopAbort.status === 200 && stopAbort.json?.recordStatus === 'failed') {
+            pass('POST record/stop 取消 AI', 'recordStatus=failed');
           } else {
             fail('POST record/stop 取消', `status=${stopAbort.status}`);
           }

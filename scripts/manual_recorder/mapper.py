@@ -73,12 +73,29 @@ def _offline_xpath_smart_fallback(
     form_label: str = '',
     target_kind: str = '',
     locator_scope: str = '',
+    placeholder: str = '',
 ) -> str:
-    """Safe offline rebuild from supplied cues only (no menu inference from /ul/li/)."""
+    """Safe offline rebuild from supplied cues only (no menu inference from /ul/li/).
+
+    Priority aligns with the auto-capture algorithm (formFieldXpathSmartOf):
+    1. full DOM placeholder (label-less login fields) → input[contains(@placeholder,…)]
+    2. real form label → el-form-item/label …//input  (only when placeholder absent)
+    """
     form_lbl = re.sub(r'\s+', ' ', str(form_label or '')).strip()
     form_lbl = re.sub(r'[：:*\s]+$', '', form_lbl)[:40]
+    ph = re.sub(r'\s+', ' ', str(placeholder or '')).strip()
+    ph = ph[:80]
     kind = str(target_kind or '').strip()
     overlay = _overlay_scope_kind(xpath_abs, class_name, locator_scope)
+
+    # Placeholder path first — mirror of auto-capture for label-less forms (login).
+    # Full placeholder (incl. 请输入… prefix) is the DOM truth; a stripped label
+    # derived from it must never win.
+    if ph and (kind.startswith('form_') or kind in ('', 'generic') or not kind):
+        lit = _xpath_literal(ph)
+        leaf = 'textarea' if (tag or '').lower() == 'textarea' or re.search(r'el-textarea', class_name, re.I) else 'input'
+        local = f"{leaf}[contains(@placeholder,{lit})]"
+        return _with_overlay_scope(f'//{local}', overlay) if overlay else f'//{local}'
 
     if form_lbl and (kind.startswith('form_') or kind in ('', 'generic', 'adjacent_button') or not kind):
         lit = _xpath_literal(form_lbl)
@@ -153,12 +170,14 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
     smart = payload.get('xpath_smart') or ''
     tag = payload.get('tag') or ''
     cls = str(attrs.get('class') or attrs.get('className') or '')
-    form_label = (payload.get('label_text') or payload.get('formLabel') or '').strip()
+    # formLabel (real DOM label from live snap) takes precedence over label_text —
+    # label_text may be a placeholder-derived hint (login fields). See below.
+    form_label = (payload.get('formLabel') or '').strip() or (payload.get('label_text') or '').strip()
     target_kind = str(payload.get('target_kind') or '').strip()
     locator_scope = str(payload.get('locator_scope') or '').strip()
     overlay = _overlay_scope_kind(abs_xp or str(payload.get('xpath') or ''), cls, locator_scope)
 
-    # Trust DOM snapshot; offline rebuild only when smart missing
+    # Trust DOM snapshot; offline rebuild only when smart missing.
     if not smart:
         smart = _offline_xpath_smart_fallback(
             tag,
@@ -169,13 +188,14 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
             target_kind=target_kind or (
                 'form_input' if kind in ('fill', 'fill_date', 'select_option') else
                 'adjacent_button' if kind == 'click_adjacent_button' else
-                'icon' if kind == 'click_icon_button' else
+                'icon' if kind == 'click_button' else
                 'menu' if kind == 'click_menu_item' else
                 'tab' if kind == 'switch_tab' else
                 'dialog_close' if kind == 'close_dialog' else
                 ''
             ),
             locator_scope=locator_scope,
+            placeholder=str(attrs.get('placeholder') or ''),
         )
     elif overlay:
         # Align with auto-capture: keep label xpath but add dialog/drawer scope
@@ -234,6 +254,23 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
     parent_text = re.sub(r'\s+', ' ', str(payload.get('parent_text') or '')).strip()
     if parent_text:
         element['parent_text'] = parent_text[:80]
+    region_fields = {
+        'region_role': 'region_role',
+        'region_id': 'region_id',
+        'region_label': 'region_label',
+        'region_chrome': 'region_chrome',
+        'region_section': 'region_section',
+        'region_block': 'region_block',
+    }
+    for dest, src in region_fields.items():
+        v = payload.get(src)
+        if v:
+            element[dest] = v
+    if isinstance(payload.get('layers'), list) and payload['layers']:
+        element['layers'] = payload['layers']
+    fc = payload.get('feature_card')
+    if isinstance(fc, dict) and fc:
+        element['feature_card'] = fc
 
     def _stamp_params(params: dict) -> dict:
         """Params must not carry xpath_smart; element snap holds the locator."""
@@ -255,7 +292,7 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         value = (payload.get('value') or '').strip()
         if not label or not value:
             return None
-        return 'fill_date_field', _stamp_params({'label_text': label, 'value': value}), element
+        return 'fill_form_field', _stamp_params({'label_text': label, 'value': value}), element
 
     if kind == 'select_option':
         label = (payload.get('label_text') or '').strip()
@@ -328,12 +365,12 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
     if kind == 'click_adjacent_button':
         return _as_click_by_index(payload.get('text') or payload.get('label_text') or '')
 
-    if kind == 'click_icon_button':
+    if kind == 'click_button':
         text = (payload.get('button_text') or payload.get('text') or '').strip()
         if not text:
             return None
         element['target_kind'] = 'icon'
-        return 'click_icon_button', {'button_text': text}, element
+        return 'click_button', {'button_text': text}, element
 
     if kind == 'click':
         return _as_click_by_index(payload.get('text') or '')

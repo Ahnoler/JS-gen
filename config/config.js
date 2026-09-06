@@ -32,7 +32,13 @@ if (existsSync(_envPath)) {
   } catch {}
 }
 
-// Resolver: process.env → .env file → default (env vars override file for deployment/tests)
+/**
+ * 配置解析器：按 process.env → .env 文件值 → 默认值 顺序取值
+ * （环境变量优先于文件，便于部署/测试覆盖）。
+ * @param {string} key - 配置键名
+ * @param {string} [defaultValue] - 未命中时的默认值
+ * @returns {string} 解析得到的配置值
+ */
 export function resolve(key, defaultValue = '') {
   return process.env[key] || _env[key] || defaultValue;
 }
@@ -42,14 +48,15 @@ const _resolve = resolve;
 
 // ── Exports ───────────────────────────────────────────────────────────
 export const PORT = parseInt(_resolve('PORT', '4097'), 10);
-export const HOST = _resolve('HOST', '0.0.0.0');
+/** 监听地址：默认仅本机（远程执行机/前端需访问时显式设 HOST=0.0.0.0） */
+export const HOST = _resolve('HOST', '127.0.0.1');
 export const PROJECT_DIR = _resolve('PROJECT_DIR') || PROJECT_ROOT;
 export const SKILL_DIR = path.join(PROJECT_ROOT, 'src', 'playwright-runner');
 export const TMP_DIR = process.env.TMPDIR || process.env.TMP || process.env.TEMP || os.tmpdir();
 export const DASHBOARD_DIR = PROJECT_ROOT;
 export const GENERATED_DIR = path.join(PROJECT_ROOT, 'scripts', 'generated');
 export const TRAJECTORIES_DIR = path.join(PROJECT_ROOT, 'scripts', 'trajectories');
-export const CASE_DATA_DIR = path.join(PROJECT_ROOT, 'scripts', 'case_data');
+export const BUSINESS_DATA_DIR = path.join(PROJECT_ROOT, 'scripts', 'case_data');
 export const BROWSER_DIR = path.join(PROJECT_ROOT, 'browser');
 
 // Redirect Playwright browsers to project-local directory (portable)
@@ -58,9 +65,73 @@ process.env.PLAYWRIGHT_BROWSERS_PATH = BROWSER_DIR;
 // LLM
 export const LLM_BASE_URL = _resolve('LLM_BASE_URL');
 export const LLM_API_KEY = _resolve('LLM_API_KEY');
-export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', 'deepseek-v4-flash');
-export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'https://api.deepseek.com');
+/** 默认模型（唯一真源：config/.env LLM_MODEL；代码内不再散落硬编码默认） */
+export const LLM_MODEL = _resolve('LLM_MODEL', 'Qwen/Qwen3.5-35B-A3B');
+/** LLM 请求超时（毫秒）：上游通道挂起时快速失败，避免 agent 长时间无活动被判 idle timeout */
+export const LLM_TIMEOUT_MS = Math.max(
+  5000,
+  parseInt(_resolve('LLM_TIMEOUT_MS', '120000'), 10) || 120000,
+);
+export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', LLM_MODEL);
+export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
 export const FORM_LLM_API_KEY = _resolve('FORM_LLM_API_KEY', LLM_API_KEY);
+/** 表单 LLM 请求超时（毫秒；缺省回落 LLM_TIMEOUT_MS） */
+export const FORM_LLM_TIMEOUT_MS = Number(_resolve('FORM_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
+
+// ── 角色级 LLM 配置（未设置则回落主 LLM_*，不产生独立实例）──
+/** Phase Reviewer LLM（缺省回落主 LLM） */
+export const REVIEWER_LLM_MODEL = _resolve('REVIEWER_LLM_MODEL', LLM_MODEL);
+export const REVIEWER_LLM_BASE_URL = _resolve('REVIEWER_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
+export const REVIEWER_LLM_API_KEY = _resolve('REVIEWER_LLM_API_KEY', LLM_API_KEY);
+/**
+ * Reviewer LLM 请求超时（毫秒）。
+ * 未设置时不注入（空串），Python 端 _get_reviewer_llm 跟随 AI_PHASE_REVIEWER_TIMEOUT_S
+ * （评审外层 asyncio.wait_for 硬上限，默认 20s），再回落 LLM_TIMEOUT_MS。
+ * 仅当显式设置且 >0 时才作为 JS 侧超时语义（当前 JS 侧无直接消费者）。
+ */
+export const REVIEWER_LLM_TIMEOUT_MS = _resolve('REVIEWER_LLM_TIMEOUT_MS', '');
+
+/** Scenario Describer LLM（缺省回落主 LLM） */
+export const SCENARIO_LLM_MODEL = _resolve('SCENARIO_LLM_MODEL', LLM_MODEL);
+export const SCENARIO_LLM_BASE_URL = _resolve('SCENARIO_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
+export const SCENARIO_LLM_API_KEY = _resolve('SCENARIO_LLM_API_KEY', LLM_API_KEY);
+/** Scenario LLM 请求超时（毫秒；缺省回落 LLM_TIMEOUT_MS） */
+export const SCENARIO_LLM_TIMEOUT_MS = Number(_resolve('SCENARIO_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
+
+/** L1C 低置信区域分类模型（可选；缺省沿用 LLM_MODEL） */
+export const L1C_LLM_MODEL = _resolve('L1C_LLM_MODEL', LLM_MODEL);
+
+/** 批量动作预算（browser_use max_actions_per_step）：全局默认；0/空 = 不覆盖，走框架默认 10 */
+export const MAX_ACTIONS_PER_STEP = _resolve('MAX_ACTIONS_PER_STEP', '');
+
+// MinIO — screenshot / image object storage
+const MINIO_HOST_DEFAULT = _resolve('MINIO_HOST', '');
+let _minioUrl = null;
+try { _minioUrl = new URL(MINIO_HOST_DEFAULT); } catch { _minioUrl = null; }
+export const MINIO_ENDPOINT = _resolve('MINIO_ENDPOINT', _minioUrl?.hostname || '');
+export const MINIO_PORT = parseInt(_resolve('MINIO_PORT', _minioUrl?.port || '9001'), 10);
+export const MINIO_USE_SSL = _resolve('MINIO_USE_SSL', _minioUrl?.protocol === 'https:' ? 'true' : 'false').toLowerCase() === 'true';
+export const MINIO_ACCESS_KEY = _resolve('MINIO_ACCESS_KEY', '');
+export const MINIO_SECRET_KEY = _resolve('MINIO_SECRET_KEY', '');
+export const MINIO_BUCKET = _resolve('MINIO_BUCKET', 'js-gen');
+/** Optional public base URL used to build direct MinIO URLs, e.g. http://172.19.87.169:9001 */
+export const MINIO_PUBLIC_URL = _resolve('MINIO_PUBLIC_URL', '');
+
+// Screenshot local pending upload (fallback when MinIO is unavailable)
+export const SCREENSHOT_PENDING_DIR = _resolve('SCREENSHOT_PENDING_DIR')
+  || path.join(PROJECT_DIR, 'tmp', 'pending-screenshots');
+export const SCREENSHOT_RETRY_INTERVAL_MS = Math.max(
+  1000,
+  parseInt(_resolve('SCREENSHOT_RETRY_INTERVAL_MS', '180000'), 10) || 180000,
+);
+export const SCREENSHOT_MAX_RETRY = Math.max(
+  1,
+  parseInt(_resolve('SCREENSHOT_MAX_RETRY', '3'), 10) || 3,
+);
+export const SCREENSHOT_PENDING_TTL_MS = Math.max(
+  60000,
+  parseInt(_resolve('SCREENSHOT_PENDING_TTL_MS', '604800000'), 10) || 604800000,
+);
 
 // Python — detection chain: explicit env → embedded in install dir → system PATH
 function _findPython() {
@@ -91,6 +162,35 @@ export const REMOTE_SESSION_GRACE_MS = parseInt(
   _resolve('REMOTE_SESSION_GRACE_MS', '900000'),
   10,
 );
+export const TRAJ_LOCK_WAIT_TIMEOUT_MS = parseInt(
+  _resolve('TRAJ_LOCK_WAIT_TIMEOUT_MS', '30000'),
+  10,
+);
+
+// ── Replay 会话编排超时（runReplayActions 各调用方；毫秒）──
+/** rerun 前置动作复演（go_to_url + login 场景重建）的 replay_done 等待超时。 */
+export const REPLAY_LOGIN_TIMEOUT_MS = parseInt(_resolve('REPLAY_LOGIN_TIMEOUT_MS', '180000'), 10) || 180000;
+/** 单步/整段 replay_done 等待超时（replay-batch-runner 每步、form-structure-heal Type B、special-element 手动回放）。 */
+export const REPLAY_STEP_TIMEOUT_MS = parseInt(_resolve('REPLAY_STEP_TIMEOUT_MS', '300000'), 10) || 300000;
+/** 交易执行前菜单导航 replay 超时（menu-navigation）。 */
+export const REPLAY_NAV_TIMEOUT_MS = parseInt(_resolve('REPLAY_NAV_TIMEOUT_MS', '120000'), 10) || 120000;
+/** 读起点页面组件编号 replay 超时（recording-page-bind read_page_component_code）。 */
+export const REPLAY_READ_PAGE_TIMEOUT_MS = parseInt(_resolve('REPLAY_READ_PAGE_TIMEOUT_MS', '90000'), 10) || 90000;
+/** 菜单扫描阶段二组件编号合并读取 replay 超时（menu-scan-service phase2）。 */
+export const REPLAY_PHASE2_TIMEOUT_MS = parseInt(_resolve('REPLAY_PHASE2_TIMEOUT_MS', '25000'), 10) || 25000;
+
+// ── SSO / 账号中心（产品登录 + 用户隔离）──
+export const SSO_APP_KEY = _resolve('SSO_APP_KEY', '1920710182837141505');
+export const SSO_BASE_URL = _resolve('SSO_BASE_URL', 'http://test.paas.tansun.com.cn');
+/** 仅 /api/v2/* 强制鉴权；关闭时 req.paasUserId=null（全可见，向后兼容） */
+export const SSO_AUTH_REQUIRED = _resolve('SSO_AUTH_REQUIRED', 'false').toLowerCase() === 'true';
+/**
+ * Dashboard 访问令牌：/ws 升级与 /api/browser/* 的鉴权凭据（query ?token= 或 access_token 头）。
+ * 已设置时要求常数时间匹配；未设置且 SSO_AUTH_REQUIRED=false 时放行（向后兼容，进程打一次 warn）。
+ */
+export const DASHBOARD_WS_TOKEN = _resolve('DASHBOARD_WS_TOKEN', '');
+/** 可选：直接配置账号中心 JWT 验签密钥（query_jwt_secret 返回的字符串）；未配置时自动调接口获取并缓存 1h */
+export const SSO_JWT_SECRET = _resolve('SSO_JWT_SECRET', '');
 
 /** Route browser sessions to online executor agent instead of local globalBrowser */
 export const USE_EXECUTOR = _resolve('USE_EXECUTOR', 'false').toLowerCase() === 'true';
@@ -122,6 +222,12 @@ export const BATCH_ITEM_LEASE_MS = Math.max(
   parseInt(_resolve('BATCH_ITEM_LEASE_MS', '600000'), 10) || 600000,
 );
 
+/** 单阶段 AI 录制最大步数上限（长表单如 120 字段需要 >30；短阶段由 reviewer 估算下压，不受影响） */
+export const PHASE_MAX_STEPS = Math.max(
+  1,
+  parseInt(_resolve('PHASE_MAX_STEPS', '300'), 10) || 300,
+);
+
 // 鈹€鈹€ AI 璁板繂绯荤粺锛圥0 鏃佽矾鎽勫彇锛氫簨浠跺啓榛樿寮€銆佷簨瀹炲寘璇婚粯璁ゅ叧锛夆攢鈹€
 
 // ── AI 记忆系统（P0 旁路摄取：事件写默认开、事实包读默认关）──
@@ -137,3 +243,8 @@ export const L1C_LLM_TIMEOUT_MS = Number(_resolve('L1C_LLM_TIMEOUT_MS', '8000'))
 
 export const AGENT_STDERR_LOG_DIR = _resolve('AGENT_STDERR_LOG_DIR')
   || path.join(PROJECT_DIR, 'logs', 'agent-stderr');
+
+// ── 伙伴平台 section 节点 type 适配 ──
+// 默认 'section'：伙伴 V3 契约接受 type='section' 中间节点。
+// fallback 'object'：伙伴不接受 'section' 时，section 节点改用 type='object'+elementType='partition'。
+export const PARTNER_SECTION_TYPE = _resolve('PARTNER_SECTION_TYPE', 'section');

@@ -1,34 +1,44 @@
 """JS_MANUAL_RECORDER part B (injected page script, second half)."""
 
 JS_MANUAL_PART_B = r'''
-  function elMeta(el, textOverride) {
+  function elMeta(el, textOverride, kindHint, regionOverride) {
     const t = textOverride != null ? String(textOverride) : shortLabel(el);
     const hi = highlightIndexOf(el);
     const bu = buXPathOf(el);
     const abs = xpathOf(el);
-    const formLbl = (function () {
-      const item = el.closest && el.closest('.el-form-item');
-      if (!item) return '';
-      const lbl = item.querySelector('.el-form-item__label');
-      return normalizeFormLabel(lbl && lbl.textContent);
-    })();
-    const loc = buildLocatorSnap(el, t, abs, formLbl);
+    const formLbl = formItemLabel(el);
+    const loc = buildLocatorSnap(el, t, abs, formLbl, {
+      targetKind: kindHint || undefined,
+      region: regionOverride || undefined,
+    });
     const meta = {
       xpath: loc.xpath || bu || abs,
       bu_xpath: bu,
       xpath_abs: abs,
       xpath_full: loc.xpath_full || abs,
       xpath_smart: loc.xpath_smart || '',
+      cssSelector: loc.cssSelector || '',
       candidates: loc.candidates || [],
       tag: loc.tag || (el.tagName || '').toLowerCase(),
       attributes: loc.attributes || attrs(el),
       text: loc.text || t,
       formLabel: loc.formLabel || formLbl || '',
-      target_kind: loc.target_kind || '',
+      target_kind: loc.target_kind || kindHint || '',
+      parent_text: loc.parent_text || '',
+      icon_class: loc.icon_class || '',
+      placeholder: loc.placeholder || '',
       locator_scope: loc.locator_scope || '',
       locator_occurrence: loc.locator_occurrence || 0,
       locator_verified: loc.locator_verified === true,
       locator_strategy: loc.locator_strategy || '',
+      region_role: loc.region_role || '',
+      region_id: loc.region_id || '',
+      region_label: loc.region_label || '',
+      region_chrome: loc.region_chrome || '',
+      region_section: loc.region_section || '',
+      region_block: loc.region_block || '',
+      layers: Array.isArray(loc.layers) ? loc.layers : [],
+      feature_card: loc.feature_card || undefined,
     };
     if (loc.locator_fallback_reason) meta.locator_fallback_reason = loc.locator_fallback_reason;
     if (hi != null) meta.highlight_index = hi;
@@ -49,7 +59,7 @@ JS_MANUAL_PART_B = r'''
   function emitMenu(menuEl) {
     const menuText = shortLabel(menuEl);
     if (!menuText) return false;
-    emit(Object.assign({ kind: 'click_menu_item', menu_text: menuText }, elMeta(menuEl, menuText)));
+    emit(Object.assign({ kind: 'click_menu_item', menu_text: menuText }, elMeta(menuEl, menuText, 'menu')));
     return true;
   }
 
@@ -151,16 +161,12 @@ JS_MANUAL_PART_B = r'''
           ingest(vm.$data && vm.$data.options);
         }
       } catch (e) {}
-      emit({
+      emit(Object.assign({
         kind: 'select_option',
         label_text: label,
         option_text: optionText,
         options: options,
-        xpath: xpathOf(opt),
-        tag: 'li',
-        attributes: attrs(opt),
-        text: optionText,
-      });
+      }, elMeta(opt, optionText, 'form_select')));
       return;
     }
 
@@ -197,7 +203,7 @@ JS_MANUAL_PART_B = r'''
           kind: 'fill_date',
           label_text: pick.label,
           value: pick.value,
-        }, elMeta(pick.input || dateTd, pick.value)));
+        }, elMeta(pick.input || dateTd, pick.value, 'form_date')));
       }, 80);
       return;
     }
@@ -250,7 +256,7 @@ JS_MANUAL_PART_B = r'''
         kind: 'click_table_row_button',
         row_text: rowText,
         button_text: buttonText,
-      }, elMeta(rowBtn, buttonText)));
+      }, elMeta(rowBtn, buttonText, 'table_row_button')));
       return;
     }
 
@@ -277,7 +283,7 @@ JS_MANUAL_PART_B = r'''
         emit(Object.assign({
           kind: 'click_table_row_radio',
           row_text: rowText,
-        }, elMeta(tableRadio, rowText)));
+        }, elMeta(tableRadio, rowText, 'table_row_button')));
         return;
       }
       // Still no identity — fall through to enriched click rather than drop the step
@@ -288,41 +294,32 @@ JS_MANUAL_PART_B = r'''
     if (radio) {
       const label = formItemLabel(radio);
       const optionText = visibleText(radio);
-      emit({
+      emit(Object.assign({
         kind: 'click_radio',
         label_text: label,
         option_text: optionText,
-        xpath: xpathOf(radio),
-        tag: radio.tagName.toLowerCase(),
-        attributes: attrs(radio),
-        text: optionText,
-      });
+      }, elMeta(radio, optionText, 'form_radio')));
       return;
     }
 
     // tab
     const tab = el.closest('.el-tabs__item');
     if (tab) {
-      emit({
+      const tabText = visibleText(tab);
+      emit(Object.assign({
         kind: 'switch_tab',
-        tab_name: visibleText(tab),
-        xpath: xpathOf(tab),
-        tag: tab.tagName.toLowerCase(),
-        attributes: attrs(tab),
-        text: visibleText(tab),
-      });
+        tab_name: tabText,
+      }, elMeta(tab, tabText, 'tab')));
       return;
     }
 
-    // dialog close
-    if (el.closest('.el-dialog__headerbtn, .el-drawer__close-btn')) {
-      emit({
+    // dialog close — pass the headerbtn/drawer-close container (not the inner <i>) to elMeta,
+    // aligning with AI-side src/cdp/inspect-payload-script.js
+    const closeBtn = el.closest('.el-dialog__headerbtn, .el-drawer__close-btn');
+    if (closeBtn) {
+      emit(Object.assign({
         kind: 'close_dialog',
-        xpath: xpathOf(el),
-        tag: el.tagName.toLowerCase(),
-        attributes: attrs(el),
-        text: '',
-      });
+      }, elMeta(closeBtn, 'close', 'dialog_close')));
       return;
     }
 
@@ -334,7 +331,7 @@ JS_MANUAL_PART_B = r'''
         emit(Object.assign({
           kind: 'click_adjacent_button',
           label_text: label,
-        }, elMeta(adjBtn, visibleText(adjBtn))));
+        }, elMeta(adjBtn, visibleText(adjBtn), 'adjacent_button')));
         return;
       }
     }
@@ -346,9 +343,9 @@ JS_MANUAL_PART_B = r'''
         const btnText = _iconResolveLabel(iconHost);
         if (btnText) {
           emit(Object.assign({
-            kind: 'click_icon_button',
+            kind: 'click_button',
             button_text: btnText,
-          }, elMeta(iconHost, btnText)));
+          }, elMeta(iconHost, btnText, 'icon')));
           return;
         }
       }
@@ -393,7 +390,7 @@ JS_MANUAL_PART_B = r'''
             kind: 'select_tree_option',
             label_text: labelText,
             option_text: optionText,
-          }, elMeta(formHost, optionText)));
+          }, elMeta(formHost, optionText, 'form_tree_select')));
           return;
         }
       }
@@ -425,7 +422,7 @@ JS_MANUAL_PART_B = r'''
       if (host) {
         const text = shortLabel(host);
         if (text && text.length <= 20) {
-          emit(Object.assign({ kind: 'click_menu_item', menu_text: text }, elMeta(host, text)));
+          emit(Object.assign({ kind: 'click_menu_item', menu_text: text }, elMeta(host, text, 'menu')));
         }
       }
     }
@@ -447,15 +444,21 @@ JS_MANUAL_PART_B = r'''
     const value = el.value || '';
     if (!String(value).trim()) return;
     const kind = isDate ? 'fill_date' : 'fill';
-    emit({
+    // 统一：xpath 抓取复用自动算法（elMeta → buildLocatorSnap → formFieldXpathSmartOf，与
+    // JS_CAPTURE_FROM_XPATH 同源）。label_text 用完整 placeholder（不剥「请输入」前缀），
+    // 回放时 JS_FILL_FORM_FIELD / JS_FILL_BY_XPATH 的 placeholder 分支按完整文本精确命中。
+    const fullPh = (el.getAttribute && el.getAttribute('placeholder') || '').trim();
+    // formItemLabel 在无真实 label 时回退 placeholderLabel（剥「请输入」前缀）——
+    // 若所得 label 是完整 placeholder 的子串，说明是剥离产物，改回完整 placeholder。
+    const labelText = (label && fullPh && fullPh.includes(label) && label !== fullPh)
+      ? fullPh : (label || fullPh);
+    const meta = elMeta(el, value, 'form_input');
+    emit(Object.assign({
       kind: kind,
-      label_text: label,
+      label_text: labelText,
       value: value,
-      xpath: xpathOf(el),
-      tag: tag,
-      attributes: attrs(el),
       text: value.slice(0, 80),
-    });
+    }, meta));
   }
 
   window.__jsgenManualOnChange = (ev) => {

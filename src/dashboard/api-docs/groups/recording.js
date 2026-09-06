@@ -2,6 +2,11 @@
  * API group(s): recording, replay, executor — extracted from catalog.js.
  * Keep in sync with src/routes/v2/*.js
  */
+
+/** @typedef {{ name: string, type: string, required?: boolean, in?: 'path'|'query'|'body', desc: string, example?: string }} Param */
+/** @typedef {{ method: string, path: string, summary: string, desc?: string, params?: Param[], reqExample?: string, respExample?: string, notes?: string[], deprecated?: boolean, tryable?: boolean }} Endpoint */
+/** @typedef {{ id: string, name: string, description: string, endpoints: Endpoint[] }} TagGroup */
+
 import { J } from './_j.js';
 
 /** @type {TagGroup[]} */
@@ -18,19 +23,19 @@ export const GROUP_RECORDING = [
         respExample: J({
           trajectoryId: 42, functionId: 3, systemAccountId: 10,
           system: { id: 1, name: '核心系统' },
-          accounts: [{ id: 10, name: '测试员', loginUrl: '...', username: 'u', password: 'p' }],
+          accounts: [{ id: 10, name: '测试员', loginUrl: '...', account: 'u', password: 'p' }],
         }),
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/prepare',
         summary: '一键准备（占槽 + 登录 + 推流）',
-        desc: '幂等。① 复用本交易已存活 session（含「断开画面」后空闲浏览器）；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录为硬编码 go_to_url + login（不启动 Agent），不写入 trajectory_step。画面推流成功时将 recordStatus 置为 live（占用，非 AI 录制）。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
+        desc: '幂等。① 复用本交易已存活 session（含「断开画面」后空闲浏览器）；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录为硬编码 go_to_url + login（不启动 Agent），不写入 trajectory_step。prepare 仅打开浏览器/推流，不等于录制：不再把 record_status 改为 recording，保持当前持久状态（未录制/待确认/已确认/录制异常）。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
           trajectoryId: 42, sessionId: 'uuid', executorNodeUuid: 'node-uuid',
           remoteSessionId: 7, ready: true, attached: true, reused: false, reusedChrome: true,
-          recordStatus: 'live',
+          recordStatus: 'completed',
           login: { skipped: false, done: true, accountId: 10 },
           stream: { ok: true, remoteSessionId: 7 },
           stages: {
@@ -43,14 +48,14 @@ export const GROUP_RECORDING = [
           '409 `grace_owned`：宽限期内他交易 idle Chrome 仍归属原 traj — body 含 `code`、`ownerTrajectoryId`、`graceUntil`（见 attach / attach-live）',
           '503：会话/执行机其它不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
-          'stream.ok=true → recordStatus=live（列表可见占用中；人工录制可用）',
-          'record/start → recording；stop → recorded；stream/detach(live) → draft；detach(live|recording) → draft',
+          '状态模型（V3）：draft/recording/failed/recorded/completed，其中 recording 是临时态，持久态为 draft/failed/recorded/completed；非终结性释放（关浏览器/断开/回收/重启）恢复到持久基线，不降级。',
+          'prepare（启动浏览器/占用执行资源成功）→ recording（临时态）；record/start(draft|failed|recorded|completed) → recording（临时态）；stop(success) → recorded（待确认）；stop(!success)/失败 → failed（录制异常）；detach/stream-detach/回收/清理 → 恢复到录制前持久状态基线（不降级为未录制）。',
         ],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/start',
         summary: '开始 AI 录制',
-        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。填表靠 phase 内【业务数据】（用户需求希望使用的值）+ LLM 理解对齐；业务数据 ≠ 系统回写并落库的案例数据（autofill 可随机补其余字段）。',
+        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。填表靠 phase 内【业务数据】（用户需求希望使用的值）+ LLM 理解对齐（autofill 可随机补其余字段）。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ phaseIds: [101, 102], accountId: 10 }),
         respExample: J({
@@ -74,19 +79,19 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/stop',
         summary: '结束录制（不 detach）',
-        desc: 'success=true → recordStatus=recorded；false → draft。会向执行机会话发送 cancel_step，当前 Agent 立即停止后续步骤（当前正在执行的一步结束后不再继续）。响应含 detached:false。',
+        desc: '结束录制（不 detach）。状态流转 V3：success → recordStatus=recorded(待确认)；success=false → recordStatus=failed(录制异常)。会向执行机会话发送 cancel_step，当前 Agent 立即停止后续步骤（当前正在执行的一步结束后不再继续）。响应含 detached:false。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ success: true }),
         respExample: J({
           trajectoryId: 42, recordStatus: 'recorded', detached: false,
           tree: { phases: [], orphanSteps: [] },
         }),
-        notes: ['不释放执行机槽位；释放请 detach', 'busy 时也会发送 cancel_step；Agent 收到后置 stopped，不再开下一步'],
+        notes: ['不释放执行机槽位；释放请 detach', 'busy 时也会发送 cancel_step；Agent 收到后置 stopped，不再开下一步', '已确认(completed) 交易再次录制 stop(success) → 待确认(recorded)，需再次人工确认回已确认'],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/confirm',
         summary: '人工确认 / 取消确认（交易级）',
-        desc: 'confirmed=true → recordStatus=completed；false → draft。不修改 trajectory_step.confirmed。live/recording 时 409。',
+        desc: 'confirmed=true → recordStatus=completed；false → recorded。不修改 trajectory_step.confirmed。recording/failed 时 409。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ confirmed: true }),
         respExample: J({
@@ -101,6 +106,7 @@ export const GROUP_RECORDING = [
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           mode: 'inventory',
+          pageLabel: '客户管理',
           labelText: '客户名称',
           actionType: 'fill_form_field',
           params: { label_text: '客户名称' },
@@ -128,11 +134,12 @@ export const GROUP_RECORDING = [
         }),
         notes: [
           '默认 mode=inventory：全页可操作控件池；可选 labelText / actionType+params 过滤',
+          '可选 pageLabel / page_label：当 layers[0] 尚未为 page 时，在 layers 头插 { role:\'page\', label }；无 schema',
           '无 labelText 且命中 ≥1：inventory 始终 { ambiguous:true, matches }；0 命中 → 404',
           'mode=needle：旧版按 label 针搜；无 label/action 时 400',
           '可选 actionType + params（menu_text / tab_name / row_text+button_text / …）做动作感知解析',
-          '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }], truncated? } — 不静默择一',
-          '分区在后端完成：SPA 按 `preview.display_group` 原样分组展示（空则回退 `region_label`）；禁止用 `region_role` 或从 xpath 再推导分区；待办 `region_label` 为中文标题，业务主键在 `region_id`，同标题撞车时 display_group 带主键后缀',
+          '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }], truncated? } — 不静默择一；`preview.layers` 为 `{ role, label }[]`（外→内），缺省时回退 `display_group`，不要拆 `region_id`',
+          '分区在后端完成：SPA 按 `preview.display_group` 原样分组展示（空则回退 `region_label`）；`display_group` 可以是 tab / collapse / titlebox 用 ` / ` 连接的中文路径，SPA 仍原样展示、不要拆 `region_id`；禁止用 `region_role` 或从 xpath 再推导分区；待办 `region_label` 为中文标题，业务主键在 `region_id`，同标题撞车时 display_group 带主键后缀',
           'truncated:true 表示命中 INVENTORY_CAP（120）上限，列表可能被截断',
           '菜单示例：客户管理优先稳定 data-id；否则 class-token + 文案 + occurrence',
           '表单字段：xpath / xpath_smart 为 label 锚定相对 xpath（无 label 时用 placeholder）；xpath_full 绝对兜底',
@@ -144,7 +151,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/manual-record',
         summary: '开关人工录制',
-        desc: 'AI 录制中（recordStatus=recording）时开启会 409。live（推流占用）下可开人工录制。phaseId 省略则追加到最后阶段。',
+        desc: 'AI 录制活跃时开启会 409。recording（纯推流占用，非 AI 录制）下可开人工录制。phaseId 省略则追加到最后阶段。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ enabled: true, phaseId: 102 }),
         respExample: J({ trajectoryId: 42, enabled: true, phaseId: 102 }),
@@ -221,22 +228,22 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/stream/detach',
         summary: '断开画面（只停推流）',
-        desc: 'remote_session → idle 并设 `grace_until`（默认 15min，env `REMOTE_SESSION_GRACE_MS`）；清 `trajectory.remote_session_id` 缓存但 grace 内保留 `remote_session.trajectory_id`；若 recordStatus=live 则改回 draft。Agent 会话与 Chrome 仍存活；宽限内原 traj 可再附着，他交易认领同 Chrome → 409 `grace_owned`。与 detach（释放执行资源）不同。广播 recording:stream_detached + remote:status。',
+        desc: 'remote_session → idle 并设 `grace_until`（默认 15min，env `REMOTE_SESSION_GRACE_MS`）；清 `trajectory.remote_session_id` 缓存但 grace 内保留 `remote_session.trajectory_id`；若 recordStatus=recording 则恢复到录制前持久状态基线（已确认/待确认/录制异常保持，首次未录制→未录制，不降级）。Agent 会话与 Chrome 仍存活；宽限内原 traj 可再附着，他交易认领同 Chrome → 409 `grace_owned`。与 detach（释放执行资源）不同。广播 recording:stream_detached + remote:status。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
           trajectoryId: 42, streamDetached: true, sessionKept: true,
-          recordStatus: 'draft', remoteSessionId: 7,
+          recordStatus: 'completed', remoteSessionId: 7,
         }),
         notes: ['幂等；不影响其他交易的推流', '再附着：prepare 或 attach-live + remote:subscribe({trajectoryId})'],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/detach',
         summary: '释放执行资源（关闭浏览器）',
-        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 2 小时会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
+        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 recording（含浏览器占用中或 AI 录制中）：按 V3 属于非终结性释放，恢复到录制前持久状态基线，不降级 recorded/completed/failed 为未录制，也不自动标记为录制异常。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 2 小时会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
-        respExample: J({ trajectoryId: 42, detached: true, recordStatus: 'draft' }),
+        respExample: J({ trajectoryId: 42, detached: true, recordStatus: 'completed' }),
       },
       {
         method: 'GET', path: '/api/v2/recording/agent-stderr/active',
@@ -249,7 +256,7 @@ export const GROUP_RECORDING = [
             sessionId: '72d5d9b4-9fad-4d96-956f-af44e9f7b4ee',
             trajectoryId: 33,
             trajectoryName: '1对公客户转正',
-            recordStatus: 'live',
+            recordStatus: 'recording',
             remoteSessionId: 632,
             remoteStatus: 'active',
             executorNodeId: 2,
@@ -282,7 +289,7 @@ export const GROUP_RECORDING = [
           sessionId: '72d5d9b4-9fad-4d96-956f-af44e9f7b4ee',
           trajectoryId: 33,
           trajectoryName: '1对公客户转正',
-          recordStatus: 'live',
+          recordStatus: 'recording',
           remoteSessionId: 632,
           remoteStatus: 'active',
           executorNodeId: 2,
@@ -352,54 +359,6 @@ export const GROUP_RECORDING = [
           '导出剥掉 `[slot:N sid:…]` 前缀',
           'trajectory 无占用且无 sessionId → 可能 200 空；优先 POST 粘贴行',
         ],
-      },
-    ],
-  },
-  {
-    id: 'replay',
-    name: '回放（已弃用：组装 Playwright 全量）',
-    description: 'DEPRECATED。产品请用 POST .../steps/replay（live replay_actions / _replay.py）。本路径仍可跑：服务端组装脚本，不向客户端返回 JS 源码；进度走 WS replay:*。',
-    endpoints: [
-      {
-        method: 'POST', path: '/api/v2/trajectories/{id}/replay/prepare',
-        summary: '[DEPRECATED] 组装回放计划',
-        desc: '已弃用。recordStatus 为 live 或 recording 时 409。脚本不返回给客户端。产品请改用 /steps/replay。',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        reqExample: J({}),
-        respExample: J({
-          replayPlanId: 'uuid', trajectoryId: 42, ready: true, stepCount: 15,
-          steps: [{ stepId: 501, phaseId: 101, phaseNumber: 1, actionType: '...', confirmed: true }],
-          stepMap: [{ assemblerStep: 1, stepId: 501, phaseId: 101, actionType: 'click_element_by_index' }],
-        }),
-        notes: ['DEPRECATED — 工程资产保留，非产品支持路径'],
-      },
-      {
-        method: 'POST', path: '/api/v2/trajectories/{id}/replay/start',
-        summary: '启动 Playwright 回放',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        reqExample: J({ replayPlanId: 'uuid' }),
-        respExample: J({ replayId: 'uuid', trajectoryId: 42, replayPlanId: 'uuid' }),
-        notes: ['进度通过 WS：replay:status / replay:step / replay:screenshot / replay:result / replay:done'],
-      },
-      {
-        method: 'POST', path: '/api/v2/trajectories/{id}/replay/stop',
-        summary: '中止回放',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        respExample: J({ trajectoryId: 42, replayId: 'uuid', stopped: true }),
-      },
-      {
-        method: 'GET', path: '/api/v2/trajectories/{id}/replay/latest',
-        summary: '最近一次回放状态',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        respExample: J({
-          replayId: 'uuid', trajectoryId: 42, status: 'running',
-          completedStepIds: [501, 502], screenshots: [], failedStep: null, success: true,
-        }),
-      },
-      {
-        method: 'GET', path: '/api/v2/replays/{replayId}',
-        summary: '按 replayId 查询',
-        params: [{ name: 'replayId', type: 'string', required: true, in: 'path', example: 'uuid' }],
       },
     ],
   },

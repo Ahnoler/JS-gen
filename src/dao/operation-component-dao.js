@@ -1,3 +1,6 @@
+/**
+ * DAO for the `operation_component` table — reusable operation components with param schema and signature.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow } from './helpers.js';
 
@@ -22,6 +25,11 @@ function shape(row) {
   return obj;
 }
 
+/**
+ * Create a new operation component and return the created entity.
+ * @param {object} data camelCase component fields (name/signature/systemId required)
+ * @returns {Promise<object|null>} created component entity
+ */
 export async function create(data) {
   const row = toDbRow({
     name: data.name,
@@ -43,11 +51,22 @@ export async function create(data) {
   return getById(id);
 }
 
+/**
+ * Fetch a single operation component by id.
+ * @param {number} id 主键
+ * @returns {Promise<object|null>} component entity or null when not found
+ */
 export async function getById(id) {
   const row = await getDB()(TABLE).where({ id }).first();
   return shape(row);
 }
 
+/**
+ * Fetch a component by (systemId, signature) unique key.
+ * @param {number} systemId 系统节点 id
+ * @param {string} signature component signature
+ * @returns {Promise<object|null>} component entity or null when not found
+ */
 export async function getBySystemAndSignature(systemId, signature) {
   const row = await getDB()(TABLE)
     .where({ system_id: systemId, signature })
@@ -55,6 +74,21 @@ export async function getBySystemAndSignature(systemId, signature) {
   return shape(row);
 }
 
+/**
+ * Paginated list of operation components with filters and function-scope matching.
+ * @param {object} [opts] 筛选与分页选项
+ * @param {number} [opts.page] 页码（1 起）
+ * @param {number} [opts.pageSize] 每页条数
+ * @param {number} [opts.systemId] 系统节点 id
+ * @param {string} [opts.status] 状态过滤
+ * @param {string} [opts.grain] 粒度过滤
+ * @param {string} [opts.q] LIKE search across name/description/key
+ * @param {number} [opts.functionId] single function scope
+ * @param {number[]} [opts.functionIds] multiple function scope
+ * @param {string} [opts.startTime] created_at >= start
+ * @param {string} [opts.endTime] created_at <= end
+ * @returns {Promise<{ rows: object[], total: number, page: number, pageSize: number }>} 分页结果
+ */
 export async function list({
   page = 1,
   pageSize = 20,
@@ -126,6 +160,12 @@ export async function list({
   };
 }
 
+/**
+ * Update an operation component by id and return the updated entity.
+ * @param {number} id 主键
+ * @param {object} fields partial camelCase component fields
+ * @returns {Promise<object|null>} updated component entity
+ */
 export async function update(id, fields) {
   const patch = {};
   if (fields.name !== undefined) patch.name = fields.name;
@@ -150,6 +190,12 @@ export async function update(id, fields) {
   return getById(id);
 }
 
+/**
+ * Set the occurrence_count for a component and return the updated entity.
+ * @param {number} id 主键
+ * @param {number} count new occurrence count
+ * @returns {Promise<object|null>} updated component entity
+ */
 export async function setOccurrenceCount(id, count) {
   await getDB()(TABLE).where({ id }).update({
     occurrence_count: Number(count) || 0,
@@ -158,6 +204,11 @@ export async function setOccurrenceCount(id, count) {
   return getById(id);
 }
 
+/**
+ * Delete an operation component by id.
+ * @param {number} id 主键
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(id) {
   return getDB()(TABLE).where({ id }).del();
 }

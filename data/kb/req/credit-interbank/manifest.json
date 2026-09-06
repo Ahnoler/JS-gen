@@ -1,0 +1,11 @@
+{
+  "moduleKey": "credit-interbank",
+  "moduleName": "授信-同业",
+  "sourcePath": "D:/dev/JS-gen/docs/天阳信贷系统需求文档/A_v5.2需求文档0824/C04天阳信贷管理系统-授信管理需求分册【同业授信】.docx",
+  "sourceKind": "req",
+  "status": "sliced",
+  "warnings": [],
+  "createdAt": "2026-09-05T12:23:35.689Z",
+  "updatedAt": "2026-09-05T12:34:31.911Z",
+  "note": "batch 0824"
+}

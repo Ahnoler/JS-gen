@@ -122,3 +122,16 @@ def form_batch_heartbeat_enabled() -> bool:
     从源头降低 WS 空闲回收触发概率。
     """
     return _env_flag('AI_FORM_BATCH_HEARTBEAT', True)
+
+def duplicate_failure_cue_enabled() -> bool:
+    """AI_DUP_FAILURE_CUE — inject [纠偏] cue on repeated identical failed actions (default off)."""
+    return _env_flag('AI_DUP_FAILURE_CUE', False)
+
+def kb_flow_inject_enabled() -> bool:
+    """AI_KB_FLOW_INJECT — phase 开始自动注入 kb_flow 流程卡摘要（默认开）。"""
+    return _env_flag('AI_KB_FLOW_INJECT', True)
+
+
+def click_nav_cue_enabled() -> bool:
+    """AI_CLICK_NAV_CUE — inject [导航] cue when an index click navigated to a new page (default on)."""
+    return _env_flag('AI_CLICK_NAV_CUE', True)

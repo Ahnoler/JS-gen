@@ -31,10 +31,17 @@ from typing import Callable, Optional
 
 from ..state import (
     _ACTION_LOG,
+    _is_overlay_region,
     _record_action,
+    capture_dialog_png_b64,
+    capture_page_dims_from_page,
     capture_page_png_b64,
     capture_screenshots_enabled,
+    current_page_level,
     emit_step_screenshot,
+    register_page_screenshot_if_changed,
+    register_popup_screenshot,
+    set_current_page_key,
     set_current_source,
 )
 from ..agent_utils import emit_json
@@ -54,6 +61,7 @@ class ManualRecorder:
         self._nav_hooks: set[int] = set()
         self._handle_lock = None  # asyncio.Lock, created lazily
         self._pending_before_b64: str | None = None
+        self._pending_before_dims: dict = {}
 
     async def start(self) -> dict:
         self.enabled = True
@@ -330,14 +338,25 @@ class ManualRecorder:
 
     async def _record_mapped_async(self, mapped) -> Optional[dict]:
         """Record + optional before/after screenshots (manual path)."""
+        before_key = ''
+        before_name = ''
         before_b64 = self._pending_before_b64
         self._pending_before_b64 = None
 
-        if capture_screenshots_enabled() and before_b64 is None:
+        if capture_screenshots_enabled():
             try:
-                before_b64 = await capture_page_png_b64(self.browser_context)
+                before_key, before_name = await current_page_level(self.browser_context)
             except Exception:
-                before_b64 = None
+                before_key, before_name = '', ''
+            set_current_page_key(before_key)
+            if before_b64 is None:
+                try:
+                    before_b64 = await capture_page_png_b64(self.browser_context)
+                    _page = await self.browser_context.get_current_page()
+                    if _page is not None:
+                        self._pending_before_dims = await capture_page_dims_from_page(_page)
+                except Exception:
+                    before_b64 = None
 
         entry = self._record_mapped(mapped)
         if not entry:
@@ -351,9 +370,30 @@ class ManualRecorder:
                 after_b64 = await capture_page_png_b64(self.browser_context)
             except Exception:
                 after_b64 = None
+            after_key, after_name = await register_page_screenshot_if_changed(
+                self.browser_context,
+                before_key=before_key,
+                before_name=before_name,
+                before_b64=before_b64,
+                before_dims=self._pending_before_dims,
+            )
+            self._pending_before_dims = {}
             eid = entry.get('id') if isinstance(entry, dict) else None
             if eid:
-                emit_step_screenshot(str(eid), before_b64, after_b64)
+                el = (entry.get('element') or {}) if isinstance(entry, dict) else {}
+                dialog_b64 = None
+                dialog_meta = None
+                if _is_overlay_region(el.get('region_id')):
+                    dialog_b64, dialog_meta = await capture_dialog_png_b64(self.browser_context)
+                    await register_popup_screenshot(
+                        self.browser_context,
+                        page_key=after_key or before_key,
+                        dialog_title=(dialog_meta or {}).get('dialogTitle') or '',
+                        anchor_xpath=(dialog_meta or {}).get('anchorXpath') or '',
+                        dialog_b64=dialog_b64,
+                        dialog_meta=dialog_meta,
+                    )
+                emit_step_screenshot(str(eid), before_b64, after_b64, dialog_b64, dialog_meta)
         return entry
 
     async def _handle_payload_async(self, payload: dict) -> None:
@@ -361,12 +401,17 @@ class ManualRecorder:
         async with lock:
             # before: first thing under the lock (user action already happened)
             before_b64 = None
+            before_dims: dict = {}
             if capture_screenshots_enabled():
                 try:
                     before_b64 = await capture_page_png_b64(self.browser_context)
+                    _page = await self.browser_context.get_current_page()
+                    if _page is not None:
+                        before_dims = await capture_page_dims_from_page(_page)
                 except Exception:
                     before_b64 = None
             self._pending_before_b64 = before_b64
+            self._pending_before_dims = before_dims
 
             mapped = _map_dom_event_to_action(payload)
             if not mapped:

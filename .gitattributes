@@ -1,0 +1,19 @@
+# Normalize text files to LF in the repository.
+* text=auto
+
+# Explicitly keep shell scripts and Windows batch scripts with their expected EOL.
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files must not be touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

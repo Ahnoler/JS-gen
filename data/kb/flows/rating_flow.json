@@ -1,0 +1,67 @@
+{
+ "flow": "对公客户评级流程",
+ "aliases": [
+  "评级新增",
+  "评级审批",
+  "评分模型"
+ ],
+ "menu_path": "评级管理/对公客户评级/新增",
+ "biz_key_prefix": [
+  "PJ"
+ ],
+ "hash_markers": [],
+ "keywords": [
+  "对公客户评级",
+  "评分模型",
+  "系统评级结论",
+  "startProcess",
+  "在途评级"
+ ],
+ "preconditions": [
+  "评级对象须为系统内已有客户；同一客户已有在途评级时拒绝再次发起"
+ ],
+ "nodes": [
+  {
+   "id": "new_rating",
+   "page": "对公客户评级新增页",
+   "enter": "菜单 评级管理→对公客户评级→新增",
+   "buttons": [
+    "保存"
+   ],
+   "note": "选客户→评分模型→保存：保存触发 startProcess（HTTP 200）并生成 PJ 编号（如 PJ20260901016003）"
+  },
+  {
+   "id": "approval_chain",
+   "page": "评级审批链",
+   "enter": "保存后流程流转",
+   "note": "评级审批链含二次调查节点（张某某 135292 处理 PJ20260901016003 实证）"
+  }
+ ],
+ "field_deps": [
+  {
+   "if": "选定客户",
+   "then": [
+    "评分模型"
+   ]
+  }
+ ],
+ "state_actions": [],
+ "rules": [
+  {
+   "keyword": "在途评级",
+   "rule": "同一客户已有在途评级则拒绝再次发起（业务规则）"
+  },
+  {
+   "keyword": "PJ 编号",
+   "rule": "保存成功即 startProcess 200，生成 PJ 前缀业务编号"
+  }
+ ],
+ "exceptions": [
+  {
+   "symptom": "「系统评级结论」保存触发前端报错 `i18n is not defined`",
+   "cause": "前端缺陷（未定义 i18n 引用）",
+   "workaround": "已知前端缺陷记录，非环境/脚本问题；绕过该字段或后端直发"
+  }
+ ],
+ "source": "run9-21 湿测沉淀（PJ20260901016003 实证）"
+}

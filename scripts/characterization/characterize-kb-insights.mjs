@@ -1,0 +1,239 @@
+/**
+ * characterize-kb-insights: KB Insights 纯函数 pin（matcher/cards-loader/rollup/影响推导）。
+ * 全部 fixture 驱动（临时目录/内存数组），不依赖真实 data/kb 与 DB。
+ */
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const ROOT = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+let passed = 0;
+/** 单例断言包装：通过计数，失败抛出。 */
+function run(name, fn) {
+  try { fn(); passed += 1; console.log(`  ✓ ${name}`); }
+  catch (e) { console.error(`  ✗ ${name}\n${e.message}`); throw e; }
+}
+
+// ── 段 1：menu-path matcher ──
+async function testMatcher() {
+  const m = await import(pathToFileURL(join(ROOT, 'src/services/menu-path-matcher.js')).href);
+  const nodes = [
+    { id: 1, parentId: 0, name: '信贷系统', type: 1 },
+    { id: 11, parentId: 1, name: '授信管理', type: 2 },
+    { id: 111, parentId: 11, name: '对公授信管理', type: 2 },
+    { id: 1111, parentId: 111, name: '新增对公授信管理', type: 3 },
+    { id: 12, parentId: 1, name: '押品管理', type: 2 },
+    { id: 121, parentId: 12, name: ' 押品信息管理 ', type: 2 }, // 名字带空格
+  ];
+  run('matcher: 三级路径解析到功能节点', () => {
+    const r = m.resolveMenuPath('授信管理/对公授信管理/新增对公授信管理', nodes);
+    assert.equal(r.matchStatus, 'matched');
+    assert.equal(r.matchedNodeId, 1111);
+    assert.equal(r.matchedNodeType, 3);
+  });
+  run('matcher: 段名与节点名空白规范化后相等', () => {
+    const r = m.resolveMenuPath('押品管理/押品信息管理', nodes);
+    assert.equal(r.matchStatus, 'matched');
+    assert.equal(r.matchedNodeId, 121);
+  });
+  run('matcher: 卡停在模块层也算 matched', () => {
+    const r = m.resolveMenuPath('信贷系统/授信管理', nodes);
+    assert.equal(r.matchStatus, 'matched');
+    assert.equal(r.matchedNodeId, 11);
+  });
+  run('matcher: 中段缺失 → possibly-stale 带缺失段名与前缀', () => {
+    const r = m.resolveMenuPath('授信管理/已删除菜单/新增对公授信管理', nodes);
+    assert.equal(r.matchStatus, 'possibly-stale');
+    assert.equal(r.missingSegment, '已删除菜单');
+    assert.equal(r.resolvedPrefix, '授信管理');
+  });
+  run('matcher: 首段就缺失 → possibly-stale 空前缀', () => {
+    const r = m.resolveMenuPath('不存在系统/某菜单', nodes);
+    assert.equal(r.matchStatus, 'possibly-stale');
+    assert.equal(r.missingSegment, '不存在系统');
+  });
+  run('matcher: 自由文本（含括号说明）→ unparsed', () => {
+    const r = m.resolveMenuPath('未采到（押品管理菜单树普查未发现专属子菜单）', nodes);
+    assert.equal(r.matchStatus, 'unparsed');
+  });
+  run('matcher: 单段路径 → unparsed', () => {
+    assert.equal(m.resolveMenuPath('首页', nodes).matchStatus, 'unparsed');
+  });
+  run('matcher: 同级同名兄弟 → matched 且 ambiguous', () => {
+    const dup = [...nodes, { id: 999, parentId: 1, name: '授信管理', type: 2 }];
+    const r = m.resolveMenuPath('信贷系统/授信管理', dup);
+    assert.equal(r.matchStatus, 'matched');
+    assert.equal(r.ambiguous, true);
+  });
+  run('matcher: isFreeTextMenuPath 括号/「未采到」判定', () => {
+    assert.equal(m.isFreeTextMenuPath('未采到（xxx）'), true);
+    assert.equal(m.isFreeTextMenuPath('工作台/任务事项/待办任务'), false);
+  });
+}
+// ── 段 2：KB 卡只读器（临时目录 fixture）──
+async function testCardsLoader() {
+  const { listFlowCards } = await import(pathToFileURL(join(ROOT, 'src/services/kb-flow-cards.js')).href);
+  const dir = mkdtempSync(join(tmpdir(), 'kb-cards-'));
+  writeFileSync(join(dir, 'b.json'), JSON.stringify({ flow: '卡片B', menu_path: '授信管理/对公授信管理', source: 'K1 笔记', source_refs: { trajectory_ids: ['26081317115618826'] } }));
+  writeFileSync(join(dir, 'a.json'), JSON.stringify({ flow: '卡片A', menu_path: '押品管理/押品信息管理' }));
+  writeFileSync(join(dir, 'broken.json'), '{ not json');
+  writeFileSync(join(dir, 'nocard.json'), JSON.stringify({ menu_path: 'x/y' })); // 缺 flow 键
+  try {
+    const cards = await listFlowCards({ dir });
+    run('cards: 按文件名排序且透传字段', () => {
+      assert.equal(cards.length, 2);
+      assert.equal(cards[0].flow, '卡片A');
+      assert.equal(cards[1].source_refs.trajectory_ids[0], '26081317115618826');
+    });
+    run('cards: 损坏/缺 flow 键跳过', () => {
+      assert.ok(!cards.some((c) => c.flow == null));
+    });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+await testCardsLoader();
+await testMatcher();
+// ── 段 3：dao 聚合方法源码 pin ──
+async function testDaoPins() {
+  const { readFileSync } = await import('node:fs');
+  const tj = readFileSync(join(ROOT, 'src/dao/trajectory-dao.js'), 'utf-8');
+  run('dao pin: statsByFunctionIds 按 function_id 分组且取 MAX(updated_at)', () => {
+    const i = tj.indexOf('export async function statsByFunctionIds');
+    assert.ok(i > 0, 'statsByFunctionIds 存在');
+    const body = tj.slice(i, i + 1200);
+    assert.match(body, /whereIn\('function_id'/);
+    assert.match(body, /MAX\(updated_at\) as last_at/);
+    assert.match(body, /groupBy\('function_id'\)/);
+  });
+  const bd = readFileSync(join(ROOT, 'src/dao/batch-recording-dao.js'), 'utf-8');
+  run('dao pin: statsByFunctionId join batch_id 且 success 计数', () => {
+    const i = bd.indexOf('export async function statsByFunctionId');
+    assert.ok(i > 0, 'statsByFunctionId 存在');
+    const body = bd.slice(i, i + 1600);
+    assert.match(body, /batch_recording_item/);
+    assert.match(body, /batch_id/);
+    assert.match(body, /'recorded'/);
+    assert.match(body, /groupBy\('function_id'\)|groupBy\('j\.function_id'\)/);
+  });
+}
+await testDaoPins();
+// ── 段 4：coverage rollup ──
+async function testRollup() {
+  const { rollupCoverage } = await import(pathToFileURL(join(ROOT, 'src/services/coverage-service.js')).href);
+  const nodes = [
+    { id: 1, parentId: 0, name: '信贷系统', type: 1 },
+    { id: 11, parentId: 1, name: '授信管理', type: 2 },
+    { id: 111, parentId: 11, name: '新增对公授信', type: 3 },
+    { id: 112, parentId: 11, name: '授信查询', type: 3 },
+  ];
+  const trajStats = new Map([[111, { trajCount: 4, lastExecutedAt: '2026-09-01T10:00:00.000Z' }]]);
+  const batchStats = new Map([[112, { batchTotal: 12, batchSuccess: 10 }]]);
+  const kbCardsByNode = new Map([[111, 1]]);
+  run('rollup: 行覆盖判定与明细列', () => {
+    const { rows, summary } = rollupCoverage(nodes, { trajStats, batchStats, kbCardsByNode });
+    const r111 = rows.find((r) => r.nodeId === 111);
+    assert.equal(r111.covered, true);
+    assert.equal(r111.trajCount, 4);
+    assert.equal(r111.lastExecutedAt, '2026-09-01T10:00:00.000Z');
+    assert.equal(r111.batchTotal, 0);
+    assert.equal(r111.kbCards, 1);
+    assert.equal(r111.path, '信贷系统/授信管理/新增对公授信');
+    const r112 = rows.find((r) => r.nodeId === 112);
+    assert.equal(r112.covered, false); // 只有批量成功、无绑定轨迹 → 未覆盖（存在性判定）
+    assert.equal(r112.batchSuccess, 10);
+    assert.equal(summary.totalFunctions, 2);
+    assert.equal(summary.coveredFunctions, 1);
+    assert.equal(summary.coverageRate, 0.5);
+  });
+  run('rollup: lastExecutedAt Date 归一化为 ISO 字符串', () => {
+    const trajStatsDate = new Map([[111, { trajCount: 2, lastExecutedAt: new Date('2026-09-01T10:00:00Z') }]]);
+    const { rows } = rollupCoverage(nodes, { trajStats: trajStatsDate, batchStats, kbCardsByNode });
+    const r111 = rows.find((r) => r.nodeId === 111);
+    assert.equal(r111.lastExecutedAt, '2026-09-01T10:00:00.000Z');
+    assert.equal(r111.covered, true);
+  });
+  run('rollup: 空树空统计', () => {
+    const { rows, summary } = rollupCoverage([], { trajStats: new Map(), batchStats: new Map(), kbCardsByNode: new Map() });
+    assert.equal(rows.length, 0);
+    assert.equal(summary.coverageRate, 0);
+  });
+}
+await testRollup();
+
+// ── 段 5：change impact 推导 ──
+async function testImpact() {
+  const { deriveChangeImpacts } = await import(pathToFileURL(join(ROOT, 'src/services/change-impact-service.js')).href);
+  const nodes = [
+    { id: 1, parentId: 0, name: '信贷系统', type: 1 },
+    { id: 11, parentId: 1, name: '授信管理', type: 2 },
+    { id: 111, parentId: 11, name: '新增对公授信管理', type: 3 },
+  ];
+  const cards = [
+    { flow: '授信卡', menu_path: '授信管理/新增对公授信管理' },
+    { flow: '押品卡', menu_path: '押品管理/押品信息管理' },
+  ];
+  const trajByFunc = new Map([[111, [{ id: 9001, name: 'traj-A' }]]]);
+  run('impact: nodeId 命中轨迹 + oldName 命中卡片', () => {
+    const { changes, summary } = deriveChangeImpacts(
+      [{ id: 1, changeType: 'renamed', nodeId: 111, detail: { oldName: '新增对公授信管理', name: '新增对公授信' } }],
+      { flatNodes: nodes, trajectoriesByFunction: trajByFunc, cards },
+    );
+    assert.equal(changes[0].affectedTrajectories.length, 1);
+    assert.equal(changes[0].affectedTrajectories[0].id, 9001);
+    assert.deepEqual(changes[0].affectedKbCards, ['授信卡']);
+    assert.equal(summary.affectedKbCardCount, 1);
+  });
+  run('impact: nodeId 空时轨迹侧跳过、名字侧仍匹配', () => {
+    const { changes } = deriveChangeImpacts(
+      [{ id: 2, changeType: 'created', nodeId: null, detail: { name: '新菜单' } }],
+      { flatNodes: nodes, trajectoriesByFunction: trajByFunc, cards },
+    );
+    assert.equal(changes[0].affectedTrajectories.length, 0);
+    assert.equal(changes[0].affectedKbCards.length, 0);
+  });
+  run('impact: 空变更流水', () => {
+    const { changes, summary } = deriveChangeImpacts([], { flatNodes: nodes, trajectoriesByFunction: new Map(), cards: [] });
+    assert.equal(changes.length, 0);
+    assert.equal(summary.changes, 0);
+  });
+}
+await testImpact();
+
+// ── 段 6：stale 检测组装 ──
+async function testStale() {
+  const { detectStaleCards } = await import(pathToFileURL(join(ROOT, 'src/services/change-impact-service.js')).href);
+  const nodes = [
+    { id: 1, parentId: 0, name: '信贷系统', type: 1 },
+    { id: 11, parentId: 1, name: '授信管理', type: 2 },
+  ];
+  const cards = [
+    { flow: '好卡', menu_path: '信贷系统/授信管理' },
+    { flow: '疑失效卡', menu_path: '信贷系统/已删菜单' },
+    { flow: '自由文本卡', menu_path: '未采到（说明）' },
+  ];
+  run('stale: 三态分布', () => {
+    const { cards: out, summary } = detectStaleCards(cards, nodes);
+    const by = Object.fromEntries(out.map((c) => [c.flow, c.matchStatus]));
+    assert.equal(by['好卡'], 'matched');
+    assert.equal(by['疑失效卡'], 'possibly-stale');
+    assert.equal(by['自由文本卡'], 'unparsed');
+    assert.equal(summary.possiblyStale, 1);
+    assert.equal(summary.unparsed, 1);
+  });
+}
+await testStale();
+
+// ── 段 7：source 解析器 ──
+const { parseSourceRefs } = await import(pathToFileURL(join(ROOT, 'migrations/backfill-kb-source-refs.mjs')).href);
+run('source 解析: 轨迹号/交易号/日期', () => {
+  const r = parseSourceRefs('K1 2026-08-31 + 交易 203-206 + 轨迹 26081317115618826 与 26081400000000001');
+  assert.deepEqual(r.trajectory_ids, ['26081317115618826', '26081400000000001']);
+  assert.deepEqual(r.tx_nos, ['203', '206']);
+  assert.deepEqual(r.dates, ['2026-08-31']);
+});
+run('source 解析: 无模式 → 全空数组（低置信跳过）', () => {
+  const r = parseSourceRefs('K5 computer-use 调研 + A6 全链实证');
+  assert.equal(r.trajectory_ids.length + r.tx_nos.length + r.dates.length, 0);
+});
+console.log(`characterize-kb-insights(matcher+cards+dao+rollup+impact+stale+source): OK (${passed} checks)`);

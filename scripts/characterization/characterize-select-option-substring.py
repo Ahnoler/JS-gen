@@ -66,13 +66,25 @@ def test_already_matched_requires_exact_or_sentinel() -> None:
 
 
 def test_form_select_uses_helpers() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    assert_true("select_option_already_matched" in form, "select_option uses already-matched helper")
-    assert_true("match_select_option_candidate" in form, "fuzzy path uses match helper")
+    engines = (
+        ROOT / "scripts/controller/actions/form_action_engines.py"
+    ).read_text(encoding="utf-8")
+    class_idx = engines.find("class SelectEngine")
+    assert_true(class_idx >= 0, "SelectEngine class present")
+    idx = engines.find("async def select_option(", class_idx)
+    assert_true(idx >= 0, "select_option present in SelectEngine")
+    end = engines.find("class RadioEngine", idx)
+    assert_true(end > idx, "RadioEngine boundary present after select_option")
+    body = engines[idx:end]
+    assert_true(
+        "select_option_already_matched" in body,
+        "select_option uses already-matched helper",
+    )
+    assert_true(
+        "match_select_option_candidate" in body,
+        "fuzzy path uses match helper",
+    )
     # Must not keep bare substring already-matched in select_option body
-    idx = form.find("async def select_option(")
-    end = form.find("async def click_adjacent_button", idx)
-    body = form[idx:end]
     assert_true(
         "cur_val in option_text" not in body and "option_text in cur_val" not in body,
         "select_option must not use substring already-matched",

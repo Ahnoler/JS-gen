@@ -2,11 +2,20 @@
  * One executor slot = one Python session subprocess + stdin/stdout bridge.
  */
 import { spawnAgent, waitForReady, isProcessAlive, killTree, killProcessOnly, killListenerOnPort } from './spawn-agent.js';
-import { createStderrLineBuffer } from './stderr-prefix.js';
-import { LLM_API_KEY, LLM_BASE_URL, CONTROL_PLANE_HTTP, EXECUTOR_CDP_PORT_BASE } from './config.js';
+import { createStderrLineBuffer } from '../src/utils/stderr-prefix.js';
+import {
+  LLM_API_KEY, LLM_BASE_URL, LLM_MODEL,
+  FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY, FORM_LLM_TIMEOUT_MS,
+  REVIEWER_LLM_MODEL, REVIEWER_LLM_BASE_URL, REVIEWER_LLM_API_KEY,
+  SCENARIO_LLM_MODEL, SCENARIO_LLM_BASE_URL, SCENARIO_LLM_API_KEY, SCENARIO_LLM_TIMEOUT_MS,
+  CONTROL_PLANE_HTTP, EXECUTOR_CDP_PORT_BASE,
+} from './config.js';
 import net from 'net';
 
-/** @returns {Promise<boolean>} true if port is free to bind */
+/**
+ * @param {number} port TCP port to probe
+ * @returns {Promise<boolean>} true if port is free to bind
+ */
 function isPortFree(port) {
   return new Promise((resolve) => {
     const srv = net.createServer();
@@ -18,7 +27,11 @@ function isPortFree(port) {
   });
 }
 
-/** Pick first free port at or above preferred (scan a short range). */
+/**
+ * Pick first free port at or above preferred (scan a short range).
+ * @param {number} preferred preferred starting port
+ * @returns {Promise<number>} a free port number (falls back to preferred if none free)
+ */
 async function allocateCdpPort(preferred) {
   for (let p = preferred; p < preferred + 20; p++) {
     if (await isPortFree(p)) return p;
@@ -26,10 +39,14 @@ async function allocateCdpPort(preferred) {
   return preferred;
 }
 
+/**
+ * Represents one executor slot: a Python session subprocess with stdin/stdout bridge,
+ * CDP port allocation, and stderr buffering.
+ */
 export class SessionSlot {
   /**
-   * @param {number} slotIndex
-   * @param {(msg: { event: string, data?: object, session_id?: string }) => void} onAgentEvent
+   * @param {number} slotIndex slot index
+   * @param {(msg: { event: string, data?: object, session_id?: string }) => void} onAgentEvent callback invoked for each agent event
    */
   constructor(slotIndex, onAgentEvent) {
     this.slotIndex = slotIndex;
@@ -46,13 +63,15 @@ export class SessionSlot {
   }
 
   /**
-   * @param {object} opts
-   * @param {string} opts.sessionId
-   * @param {string} [opts.model]
-   * @param {string} [opts.baseUrl]
-   * @param {string} [opts.apiKey]
+   * Spawn and wait for the Python session subprocess to become ready.
+   * @param {object} opts opts
+   * @param {string} opts.sessionId opts.session id
+   * @param {string} [opts.model] model
+   * @param {string} [opts.baseUrl] base url
+   * @param {string} [opts.apiKey] api key
    * @param {string} [opts.cdpUrl] Connect to existing Chrome via CDP (reuse orphan)
    * @param {number} [opts.cdpPort] Explicit CDP port when launching or reusing
+   * @returns {Promise<{ sessionId: string, slotIndex: number, cdpPort: number, cdpReady: boolean }>} session open result with CDP port and readiness
    */
   async open(opts) {
     if (this.process && isProcessAlive(this.process)) {
@@ -60,7 +79,7 @@ export class SessionSlot {
     }
 
     const sessionId = opts.sessionId;
-    const model = opts.model || 'deepseek/deepseek-v4-flash';
+    const model = opts.model || LLM_MODEL;
     const baseUrl = opts.baseUrl || `${CONTROL_PLANE_HTTP}/v1`;
     const apiKey = opts.apiKey || LLM_API_KEY;
     const cdpUrl = opts.cdpUrl || opts.cdp_url || null;
@@ -91,7 +110,16 @@ export class SessionSlot {
       agentArgs.push('--cdp-port', String(this.cdpPort));
     }
 
-    const child = spawnAgent(agentArgs, { OPENAI_API_KEY: apiKey });
+    const child = spawnAgent(agentArgs, {
+      OPENAI_API_KEY: apiKey,
+      // Python 表单 LLM（_llm_values.py）直接读这些 env；缺省回落 agent LLM
+      FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY: FORM_LLM_API_KEY || apiKey,
+      FORM_LLM_TIMEOUT_MS: String(FORM_LLM_TIMEOUT_MS),
+      // 角色级 LLM 覆盖（Python 端 os.getenv 直接读取；未设则 Python 回落主 LLM_*）
+      REVIEWER_LLM_MODEL, REVIEWER_LLM_BASE_URL, REVIEWER_LLM_API_KEY: REVIEWER_LLM_API_KEY || apiKey,
+      SCENARIO_LLM_MODEL, SCENARIO_LLM_BASE_URL, SCENARIO_LLM_API_KEY: SCENARIO_LLM_API_KEY || apiKey,
+      SCENARIO_LLM_TIMEOUT_MS: String(SCENARIO_LLM_TIMEOUT_MS),
+    });
 
     this.sessionId = sessionId;
     this.process = child;
@@ -171,6 +199,11 @@ export class SessionSlot {
     }
   }
 
+  /**
+   * Buffer and line-split stdout from the subprocess, parsing each non-empty line as JSON.
+   * @param {Buffer} chunk raw stdout chunk
+   * @returns {void}
+   */
   _onStdout(chunk) {
     this._stdoutBuf += chunk.toString();
     const lines = this._stdoutBuf.split('\n');
@@ -184,6 +217,11 @@ export class SessionSlot {
     }
   }
 
+  /**
+   * Dispatch a parsed agent message: update busy state and forward to onAgentEvent.
+   * @param {object} msg parsed JSON message from the subprocess
+   * @returns {void}
+   */
   _handleAgentMessage(msg) {
     const event = msg.event;
     if (!event) return;
@@ -202,7 +240,12 @@ export class SessionSlot {
     });
   }
 
-  /** @param {string} event @param {object} [data] */
+  /**
+   * Write a JSON stdin event to the session subprocess.
+   * @param {string} event event
+   * @param {object} [data] data
+   * @returns {void} result
+   */
   writeEvent(event, data = {}) {
     if (!this.process?.stdin || !this.ready) {
       throw new Error('Session subprocess not ready');
@@ -211,9 +254,11 @@ export class SessionSlot {
   }
 
   /**
+   * Close the session subprocess (graceful stdin close, then force kill if needed).
    * @param {{ keepBrowser?: boolean }} [opts]
    * keepBrowser=false (default): kill Chrome for「释放执行资源」.
    * keepBrowser=true: leave Chrome on CDP (soft close).
+   * @returns {Promise<{ sessionId: string|null, slotIndex: number, keepBrowser: boolean, cdpPort: number|null }>} close result with slot info and cdpPort
    */
   async close({ keepBrowser = false } = {}) {
     const sessionId = this.sessionId;
@@ -227,7 +272,19 @@ export class SessionSlot {
         }) + '\n');
       } catch {}
     }
-    await new Promise((r) => setTimeout(r, keepBrowser ? 2500 : 2000));
+    // Graceful close: the agent's exit path runs the session-end final screenshot
+    // (capturedAt='session-end'), flushes the memory writer and closes the browser —
+    // wait for natural exit before force-killing (a fixed 2s let taskkill /F
+    // interrupt the shot; 20s cap keeps worst-case detach bounded).
+    const closeSent = this.process?.stdin && this.ready;
+    await new Promise((resolve) => {
+      if (!closeSent || !this.process || !isProcessAlive(this.process)) {
+        setTimeout(resolve, keepBrowser ? 2500 : 2000);
+        return;
+      }
+      const timer = setTimeout(resolve, 20000);
+      this.process.once('exit', () => { clearTimeout(timer); resolve(); });
+    });
     if (this.process && isProcessAlive(this.process)) {
       if (keepBrowser) {
         // Soft close: do not kill process tree — Chromium is often a child of the agent.

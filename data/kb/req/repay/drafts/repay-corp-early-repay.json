@@ -1,0 +1,188 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "repay",
+  "flow": "对公提前还款申请（发起→审批→记账）",
+  "aliases": [
+    "对公提前还款",
+    "主动还款申请",
+    "对公提前还款申请管理",
+    "手动推动信贷核算"
+  ],
+  "hash_markers": [
+    "FS00028713",
+    "repayAplyTstPcs",
+    "FS00032603",
+    "ZJJK00136653",
+    "ZJJK00148993PDCP",
+    "TQHKSQ"
+  ],
+  "keywords": [
+    "对公提前还款",
+    "主动还款申请",
+    "借据选择",
+    "风险探测",
+    "还款计划",
+    "还款试算",
+    "审批通过",
+    "还款结果",
+    "待入账",
+    "手动推动信贷核算",
+    "请选择借据进行还款"
+  ],
+  "menu_path": "放还款管理/还款管理/对公提前还款",
+  "biz_key_prefix": ["TQHKSQ"],
+  "preconditions": [
+    "登录角色=客户经理（经办人），列表仅展示本人经办申请",
+    "存在本人经办、状态生效的对公借据；借据起息日非当日；还款账户状态正常（C502089 查账户状态）",
+    "【SUT 实测·behavior】进入主页列表自动加载（页脚「已加载全部内容，共 N 条 / 1 页」）——repay 域三主页（对公/对私/预约）均自动加载，与授信/评级「需手动查询」相反，勿当普适规则",
+    "【SUT 实测·引擎 cue·拦截族】向导【下一步(基本信息)】校验失败走 console error「调用beforeRskIntcpt结果为false」+ 气泡提示双通道（对公文案「请选择借据进行还款」，与文档一致）——beforeRskIntcpt 为放款分册同族前端拦截层新成员",
+    "【SUT 实测·structure 定谳】主页【新增】为 dialog 弹窗两步向导（标题「主动还款申请-借据列表」），非页面跳转——文档「向导页」/「抽屉」两说并存，以 SUT 实测 dialog 为准"
+  ],
+  "steps": [
+    {
+      "name": "对公提前还款申请管理主页",
+      "page": "对公提前还款申请管理主页",
+      "leafRef": "wet-test.md 叶1 (ZJJK00136653)",
+      "verify": "match",
+      "enter": "菜单链：放还款管理→还款管理→对公提前还款（面包屑一致）",
+      "query_fields_default": ["还款申请编号", "客户编号", "借据编号"],
+      "query_fields_more": ["客户名称", "合同编号", "证件号码", "申请起始日期", "申请结束日期"],
+      "columns": ["还款申请编号", "客户编号", "客户名称", "合同编号", "证件类型", "证件号码", "借据编号", "申请时间", "产品编号", "产品名称", "流程状态", "还款结果", "来源渠道"],
+      "buttons": ["查询", "重置", "更多", "新增", "查看", "修改", "手动推动信贷核算", "撤销", "流程跟踪"],
+      "note": "【SUT 实测】进入页面列表自动加载（本账号 0 条但自动查询已执行）；【更多】条件与文档 aplyNo/cstNo/iouNo/cstNm/ctrNo/crdtNo/aplyStdt~aplyEddt 一致；流程状态/还款结果/来源渠道 三列文档口径齐；未选中点【查看】提示「请选择有效数据」"
+    },
+    {
+      "name": "发起主动还款申请（dialog 两步向导）",
+      "page": "dialog「主动还款申请-借据列表」（两步：1 基本信息 / 2 风险探测）",
+      "leafRef": "wet-test.md 叶2 (ZJJK00148993PDCP)",
+      "verify": "drift",
+      "enter": "主页点【新增】",
+      "drift": [
+        "structure：文档「进入借据选择向导页」与「抽屉组件」两说并存，SUT 定谳为 dialog 弹窗组件（标题「主动还款申请-借据列表」），非页面跳转",
+        "dialog aria-name 误挂「消息列表 close 消息列表」（heading 有值但 dialog 名错挂——无标题弹窗坑变体，取证以 heading 实文+按钮/字段集为准）"
+      ],
+      "buttons": ["下一步", "返回"],
+      "note": "两步向导条「1 基本信息 / 2 风险探测」与文档一致；弹窗内列表初始自动加载（共 0 条）"
+    },
+    {
+      "name": "选择对公借据信息（向导步骤1）",
+      "page": "向导步骤1·基本信息（借据选择区）",
+      "leafRef": "wet-test.md 叶3 (ZJJK00098437)",
+      "verify": "match",
+      "query_fields": ["客户编号", "客户名称", "借据编号"],
+      "buttons": ["查询", "重置", "下一步", "返回"],
+      "columns": ["客户编号", "客户类型", "客户名称", "证件类型", "证件号码", "合同编号", "借据编号", "还款方式", "借据金额", "借据余额", "产品编号", "产品名称"],
+      "validation": "未选借据点【下一步】提示「请选择借据进行还款」（与文档逐字一致；同时 console「调用beforeRskIntcpt结果为false」）",
+      "note": "【确认/取消】按钮始终不展示（符合文档）；列表自动加载；排除失效借据/经办人=当前用户为文档口径"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "风险拦截（向导步骤2·公共组件）",
+      "leafRef": "wet-test.md 叶4 (ZJJK00067996)",
+      "verify": "blocked",
+      "reason": "写操作黑名单+无借据数据：步骤2 须先有生效借据并走完步骤1（会创建还款申请落库），只读不可达；console 拦截原文「调用beforeRskIntcpt结果为false」（与放款分册同族前端拦截层）",
+      "retest_condition": "存在生效对公借据且有可用的发起通道/业务端代发起后经任务页核验风险探测结果"
+    },
+    {
+      "name": "客户经理发起主动还款申请任务页",
+      "leafRef": "wet-test.md 叶5 (ZJJK00136666)",
+      "verify": "blocked",
+      "reason": "向导步骤1 即被「请选择借据进行还款」拦截（本账号无生效对公借据）；任务事项→待办/已办未结/已办已结 三页签任务分类树均无还款类目，账号 701994 名下无 repayAplyTstPcs 在途或历史任务（FS00028713）",
+      "retest_condition": "业务端代发起一笔对公提前还款申请（FS00028713）后以客户经理角色在待办核验任务页三步结构"
+    },
+    {
+      "name": "维护借据基本信息",
+      "leafRef": "wet-test.md 叶6 (ZJJK00066404)",
+      "verify": "blocked",
+      "reason": "依赖叶5 任务页，无在途/历史任务数据",
+      "retest_condition": "同叶5"
+    },
+    {
+      "name": "维护还款计划",
+      "leafRef": "wet-test.md 叶7 (ZJJK00098869)",
+      "verify": "blocked",
+      "reason": "同叶5（无任务数据）",
+      "retest_condition": "同叶5"
+    },
+    {
+      "name": "维护还款信息",
+      "leafRef": "wet-test.md 叶8 (ZJJK00098871)",
+      "verify": "blocked",
+      "reason": "同叶5（无任务数据）；试算/保存按钮均为黑名单动作，核验字段只读结构即可",
+      "retest_condition": "同叶5"
+    },
+    {
+      "name": "维护还款计划试算信息",
+      "leafRef": "wet-test.md 叶9 (ZJJK00100850)",
+      "verify": "blocked",
+      "reason": "同叶5（无任务数据）",
+      "retest_condition": "同叶5"
+    },
+    {
+      "name": "维护文件列表主页",
+      "leafRef": "wet-test.md 叶10 (ZJJK00136662)",
+      "verify": "blocked",
+      "reason": "同叶5（无任务数据）",
+      "retest_condition": "同叶5"
+    },
+    {
+      "name": "公共影像组件（任务页内嵌，章3/章4 复用）",
+      "leafRef": "wet-test.md 叶11 (ZJJK00100615)",
+      "verify": "blocked",
+      "reason": "同叶5（无任务数据）；组件本体在放款分册任务页已验（跨视图复用口径），本模块仅剩任务页内嵌表现待核",
+      "retest_condition": "同叶5"
+    },
+    {
+      "name": "维护审批意见（客户经理）",
+      "leafRef": "wet-test.md 叶12 (ZJJK00148812PDCP)",
+      "verify": "blocked",
+      "reason": "同叶5（无任务数据）；提交为黑名单动作",
+      "retest_condition": "同叶5"
+    },
+    {
+      "name": "有权审批人审批任务页",
+      "leafRef": "wet-test.md 叶13 (ZJJK00136665)",
+      "verify": "blocked",
+      "reason": "已按坑清单走 任务事项→已办（已办未结/已办已结 两页签均查）：任务分类树无还款类目、无 repayAplyTstPcs 历史任务；账号 701994 为客户经理角色",
+      "retest_condition": "以部门负责人/有权审批人角色重试（该角色名下需有 FS00028713 已办审批任务）"
+    },
+    {
+      "name": "维护审批意见（审批人）",
+      "leafRef": "wet-test.md 叶14 (ZJJK00164421PDCP)",
+      "verify": "blocked",
+      "reason": "同叶13（无审批侧历史任务）；同意/否决为黑名单动作",
+      "retest_condition": "同叶13"
+    },
+    {
+      "name": "查询还款试算任务页（手动推动核算，FS00032603）",
+      "leafRef": "wet-test.md 叶15 (ZJJK00140025)",
+      "verify": "blocked",
+      "reason": "主页列表自动加载共 0 条，无「流程状态=通过且还款结果=待入账」记录可选中，按钮前置条件只读不可达（文档校验文案「需选择流程状态为通过 且 还款结果为待入账的数据!」未获实证）",
+      "retest_condition": "存在还款结果=待入账的已通过对公还款记录"
+    },
+    {
+      "name": "还款计划试算（原）",
+      "leafRef": "wet-test.md 叶16 (ZJJK00101038)",
+      "verify": "blocked",
+      "reason": "依赖叶15 试算任务页，无数据入口",
+      "retest_condition": "同叶15"
+    },
+    {
+      "name": "获取还款试算（新）",
+      "leafRef": "wet-test.md 叶17 (ZJJK00101039)",
+      "verify": "blocked",
+      "reason": "依赖叶15 试算任务页，无数据入口",
+      "retest_condition": "同叶15"
+    }
+  ],
+  "sourceRefs": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  "coverage": {
+    "total": 17,
+    "match": 2,
+    "drift": 1,
+    "blocked": 14,
+    "notFound": 0,
+    "gate": "partial"
+  }
+}

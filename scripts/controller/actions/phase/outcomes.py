@@ -22,30 +22,30 @@ def truncate_text(text: str, max_len: int) -> str:
     return t[: max_len - 1].rstrip() + '…'
 
 
-def record_phase_outcome(case_data_store: dict | None, phase_number: int, *, success: bool, text: str) -> None:
+def record_phase_outcome(business_data_store: dict | None, phase_number: int, *, success: bool, text: str) -> None:
     """Persist done() outcome for later preamble (overwrites on phase retry)."""
-    if case_data_store is None:
+    if business_data_store is None:
         return
     try:
         phase = int(phase_number)
     except (TypeError, ValueError):
         return
-    store = case_data_store.setdefault('_phase_outcomes', {})
+    store = business_data_store.setdefault('_phase_outcomes', {})
     store[phase] = {
         'success': bool(success),
         'text': truncate_text(text or '', _OUTCOME_TEXT_MAX),
     }
 
 
-def clear_phase_outcomes(case_data_store: dict | None) -> None:
-    if case_data_store is not None:
-        case_data_store.pop('_phase_outcomes', None)
+def clear_phase_outcomes(business_data_store: dict | None) -> None:
+    if business_data_store is not None:
+        business_data_store.pop('_phase_outcomes', None)
 
 
-def _outcome_for(case_data_store: dict | None, phase_number: int) -> dict | None:
-    if not case_data_store:
+def _outcome_for(business_data_store: dict | None, phase_number: int) -> dict | None:
+    if not business_data_store:
         return None
-    store = case_data_store.get('_phase_outcomes') or {}
+    store = business_data_store.get('_phase_outcomes') or {}
     hit = store.get(phase_number)
     if hit is None:
         # JSON keys may be strings after round-trip
@@ -70,7 +70,7 @@ def _looks_like_truncated_echo(text: str) -> bool:
 def merge_prior_outcome(
     prior_outcome: dict | None,
     *,
-    case_data_store: dict | None,
+    business_data_store: dict | None,
     current_phase: int,
 ) -> dict | None:
     """Prefer richer local _phase_outcomes when control-plane text is a weak echo."""
@@ -78,7 +78,7 @@ def merge_prior_outcome(
         pn = current_phase - 1
         if pn < 1:
             return prior_outcome
-        local = _outcome_for(case_data_store, pn)
+        local = _outcome_for(business_data_store, pn)
         if not local:
             return prior_outcome
         return {
@@ -94,7 +94,7 @@ def merge_prior_outcome(
         pn = 0
     if pn < 1:
         pn = current_phase - 1
-    local = _outcome_for(case_data_store, pn) if pn >= 1 else None
+    local = _outcome_for(business_data_store, pn) if pn >= 1 else None
     if not local:
         return merged
 
@@ -115,7 +115,7 @@ def _build_prior_entries(
     *,
     current_phase: int,
     prior_phases: list | None,
-    case_data_store: dict | None,
+    business_data_store: dict | None,
 ) -> list[dict[str, Any]]:
     """Build up to 2 prior phase entries (exclude current phase)."""
     entries: list[dict[str, Any]] = []
@@ -131,7 +131,7 @@ def _build_prior_entries(
             if pn == current_phase:
                 continue
             desc = (item.get('description') or '').strip()
-            outcome = _outcome_for(case_data_store, pn)
+            outcome = _outcome_for(business_data_store, pn)
             entries.append({
                 'phaseNumber': pn,
                 'description': desc,
@@ -145,7 +145,7 @@ def _build_prior_entries(
     for pn in (current_phase - 1, current_phase - 2):
         if pn < 1 or pn == current_phase:
             continue
-        outcome = _outcome_for(case_data_store, pn)
+        outcome = _outcome_for(business_data_store, pn)
         if outcome is None:
             continue
         entries.append({
@@ -199,13 +199,13 @@ def _legacy_prior_outcome_line(
     *,
     current_phase: int,
     prior_phases: list | None,
-    case_data_store: dict | None,
+    business_data_store: dict | None,
 ) -> str:
     """One-line prior from last prior entry outcome only (no description dump)."""
     priors = _build_prior_entries(
         current_phase=current_phase,
         prior_phases=prior_phases,
-        case_data_store=case_data_store,
+        business_data_store=business_data_store,
     )
     if not priors:
         return ''
@@ -225,13 +225,13 @@ def format_phase_preamble(
     current_phase: int,
     current_task: str,
     prior_phases: list | None,
-    case_data_store: dict | None,
+    business_data_store: dict | None,
     all_phases: list | None = None,
     prior_outcome: dict | None = None,
 ) -> str:
     """Return short catalog + one-line prior + 【当前任务】, or just task if disabled / empty.
 
-    Does NOT append case-data hint — caller still uses format_case_data_hint.
+    Does NOT append business-data hint — caller still uses format_business_data_hint.
     """
     task = (current_task or '').strip()
     if not phase_preamble_enabled():
@@ -252,7 +252,7 @@ def format_phase_preamble(
         prior_line = format_prior_outcome_line(
             merge_prior_outcome(
                 prior_outcome,
-                case_data_store=case_data_store,
+                business_data_store=business_data_store,
                 current_phase=cur,
             )
         )
@@ -260,7 +260,7 @@ def format_phase_preamble(
             prior_line = _legacy_prior_outcome_line(
                 current_phase=cur,
                 prior_phases=prior_phases,
-                case_data_store=case_data_store,
+                business_data_store=business_data_store,
             )
         if prior_line:
             blocks.append(prior_line)
@@ -268,7 +268,7 @@ def format_phase_preamble(
         prior_line = format_prior_outcome_line(
             merge_prior_outcome(
                 prior_outcome,
-                case_data_store=case_data_store,
+                business_data_store=business_data_store,
                 current_phase=cur,
             )
         )
@@ -276,7 +276,7 @@ def format_phase_preamble(
             prior_line = _legacy_prior_outcome_line(
                 current_phase=cur,
                 prior_phases=prior_phases,
-                case_data_store=case_data_store,
+                business_data_store=business_data_store,
             )
         if prior_line:
             blocks.append(prior_line)

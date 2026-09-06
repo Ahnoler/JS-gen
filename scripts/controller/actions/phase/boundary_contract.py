@@ -49,16 +49,16 @@ _CONFIRM_BTN_RE = re.compile(r'^(确认|确定)')
 
 
 
-def phase_boundary_active(case_data_store: dict | None) -> bool:
-    if not case_data_store:
+def phase_boundary_active(business_data_store: dict | None) -> bool:
+    if not business_data_store:
         return False
-    if case_data_store.get('_phase_boundary_flag_locked') is False:
+    if business_data_store.get('_phase_boundary_flag_locked') is False:
         return False
-    return isinstance(case_data_store.get('_phase_boundary'), dict)
+    return isinstance(business_data_store.get('_phase_boundary'), dict)
 
 
-def clear_phase_boundary(case_data_store: dict | None) -> None:
-    if not case_data_store:
+def clear_phase_boundary(business_data_store: dict | None) -> None:
+    if not business_data_store:
         return
     for key in (
         '_phase_boundary',
@@ -69,13 +69,13 @@ def clear_phase_boundary(case_data_store: dict | None) -> None:
         '_active_container',
         '_parent_container_before_picker',
     ):
-        case_data_store.pop(key, None)
+        business_data_store.pop(key, None)
 
 
-def get_phase_boundary(case_data_store: dict | None) -> dict[str, Any] | None:
-    if not case_data_store:
+def get_phase_boundary(business_data_store: dict | None) -> dict[str, Any] | None:
+    if not business_data_store:
         return None
-    raw = case_data_store.get('_phase_boundary')
+    raw = business_data_store.get('_phase_boundary')
     return raw if isinstance(raw, dict) else None
 
 
@@ -189,19 +189,19 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
     }
 
 
-def apply_phase_boundary(case_data_store: dict | None, task_text: str) -> dict[str, Any] | None:
+def apply_phase_boundary(business_data_store: dict | None, task_text: str) -> dict[str, Any] | None:
     """Clear + compile boundary when flag on. Returns boundary or None."""
-    clear_phase_boundary(case_data_store)
-    if case_data_store is None:
+    clear_phase_boundary(business_data_store)
+    if business_data_store is None:
         return None
     enabled = phase_boundary_enabled()
-    case_data_store['_phase_boundary_flag_locked'] = enabled
+    business_data_store['_phase_boundary_flag_locked'] = enabled
     if not enabled:
         return None
     boundary = compile_boundary(task_text)
-    case_data_store['_phase_boundary'] = boundary
-    case_data_store['_evidence_observed'] = []
-    case_data_store['_force_refill_all'] = bool(boundary.get('requires_write_all_editable'))
+    business_data_store['_phase_boundary'] = boundary
+    business_data_store['_evidence_observed'] = []
+    business_data_store['_force_refill_all'] = bool(boundary.get('requires_write_all_editable'))
     return boundary
 
 

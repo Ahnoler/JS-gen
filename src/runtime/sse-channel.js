@@ -2,6 +2,11 @@
  * Dual push channel: WebSocket and/or SSE for session / execution streams.
  */
 
+/**
+ * Set up SSE response headers and return a sender function.
+ * @param {import('express').Response} res Express response object
+ * @returns {(event: string, data: unknown) => void} sender that writes `event:` / `data:` frames
+ */
 export function setupSSE(res) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
@@ -24,8 +29,8 @@ export function setupSSE(res) {
  * When WS is available, events go via WS; SSE is used as fallback.
  * @param {object|null} ws - WebSocket client (or null)
  * @param {object|null} res - Express response (or null)
- * @param {string} [ns='session'] - WS event namespace prefix
- * @returns {{ send: Function, end: Function, onAbort: Function, ended: boolean }}
+ * @param {string} [ns] - WS event namespace prefix
+ * @returns {{ send: (event: string, data: unknown) => void, end: () => void, onAbort: (handler: () => void) => void, ended: boolean }} push channel API
  */
 export function createPushChannel(ws, res, ns = 'session') {
   const channel = { ended: false };

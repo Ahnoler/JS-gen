@@ -6,7 +6,10 @@ import { EventEmitter } from 'events';
 /** @type {Map<string, EventEmitter>} */
 const hubs = new Map();
 
-/** @param {string} sessionId */
+/**
+ * @param {string} sessionId session id
+ * @returns {import('events').EventEmitter} result
+ */
 export function getSessionHub(sessionId) {
   if (!hubs.has(sessionId)) {
     hubs.set(sessionId, new EventEmitter());
@@ -14,13 +17,21 @@ export function getSessionHub(sessionId) {
   return hubs.get(sessionId);
 }
 
-/** @param {string} sessionId @param {string} type @param {object} payload */
+/**
+ * @param {string} sessionId session id
+ * @param {string} type type
+ * @param {object} payload payload
+ * @returns {void} result
+ */
 export function emitSessionEvent(sessionId, type, payload) {
   getSessionHub(sessionId).emit(type, payload);
   getSessionHub(sessionId).emit('*', { type, payload });
 }
 
-/** @param {{ type: string, payload?: object }} msg */
+/**
+ * @param {{ type: string, payload?: object }} msg inbound executor message with optional sessionId in payload
+ * @returns {void}
+ */
 export function routeExecutorInbound(msg) {
   const { type, payload = {} } = msg;
   const sessionId = payload.sessionId;
@@ -29,7 +40,10 @@ export function routeExecutorInbound(msg) {
   }
 }
 
-/** @param {string} sessionId */
+/**
+ * @param {string} sessionId session id
+ * @returns {void} result
+ */
 export function removeSessionHub(sessionId) {
   const hub = hubs.get(sessionId);
   if (hub) {
@@ -39,10 +53,10 @@ export function removeSessionHub(sessionId) {
 }
 
 /**
- * @param {string} sessionId
- * @param {string} type
- * @param {(payload: object) => void} handler
- * @returns {() => void}
+ * @param {string} sessionId session id
+ * @param {string} type type
+ * @param {(payload: object) => void} handler handler
+ * @returns {() => void} unsubscribe function
  */
 export function onSessionEvent(sessionId, type, handler) {
   const hub = getSessionHub(sessionId);
@@ -52,21 +66,40 @@ export function onSessionEvent(sessionId, type, handler) {
 
 /**
  * Wait for one event on a session hub.
- * @param {string} sessionId
- * @param {string} type
- * @param {number} [timeoutMs]
+ * @param {string} sessionId session id
+ * @param {string} type type
+ * @param {number|null} [timeoutMs] pass null to wait indefinitely.
+ * @returns {Promise<object>} the event payload
  */
 export function waitForSessionEvent(sessionId, type, timeoutMs = 120000) {
-  return new Promise((resolve, reject) => {
+  let cancel = () => {};
+  const promise = new Promise((resolve, reject) => {
     const hub = getSessionHub(sessionId);
-    const timer = setTimeout(() => {
+    let settled = false;
+    let timer = null;
+    function finish(fn) {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
       hub.off(type, onEvent);
-      reject(new Error(`Timeout waiting for ${type}`));
-    }, timeoutMs);
+      fn();
+    }
     function onEvent(payload) {
-      clearTimeout(timer);
-      resolve(payload);
+      finish(() => resolve(payload));
+    }
+    if (timeoutMs != null && Number.isFinite(Number(timeoutMs))) {
+      timer = setTimeout(() => {
+        finish(() => reject(new Error(`Timeout waiting for ${type}`)));
+      }, Number(timeoutMs));
     }
     hub.once(type, onEvent);
+    // Drop the loser of Promise.race without rejecting (avoids unhandled timeout).
+    cancel = () => finish(() => {});
   });
+  promise.cancel = cancel;
+  // 预挂 no-op：调用方在 send 同步抛错时可能永远不 await 本 promise，
+  // 超时 rejection 不能成为 unhandledRejection 打崩进程（2026-08-29 事故根因）。
+  // 不影响后续正常 await（多消费者各自独立处理）。
+  promise.catch(() => {});
+  return promise;
 }

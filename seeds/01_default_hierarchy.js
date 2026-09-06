@@ -2,6 +2,12 @@
  * Seed: sentinel root (id=0) + default 未分类 hierarchy.
  * type 0/1/2/3 = 根/系统/模块/功能. Idempotent.
  */
+/**
+ * 幂等种子：插入哨兵根节点（id=0）+ 默认「未分类」系统/模块/功能三级层级。
+ * 已存在则跳过，重复执行安全。
+ * @param {import('knex').Knex} knex - knex 实例
+ * @returns {Promise<void>}
+ */
 export async function seed(knex) {
   const rootExisting = await knex('system').where({ id: 0 }).first();
   if (!rootExisting) {

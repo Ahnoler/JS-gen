@@ -2,7 +2,7 @@
 
 Regex constants + NL task classification: login / query / open-page / wizard /
 modify / fill → TaskMode. ``apply_task_mode`` writes the compat flags into
-case_data_store. Feature-flag re-exports kept here for facade parity.
+business_data_store. Feature-flag re-exports kept here for facade parity.
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ def classification_task_text(task_text: str) -> str:
 
 def needs_business_data_context(
     task_text: str,
-    case_data_store: dict | None = None,
+    business_data_store: dict | None = None,
 ) -> bool:
     """Whether to show 【业务数据】to the model for this phase.
 
@@ -91,14 +91,14 @@ def needs_business_data_context(
     t = classification_task_text(task_text)
     if not t:
         return False
-    if case_data_store:
-        contract = case_data_store.get('_phase_intent') or {}
+    if business_data_store:
+        contract = business_data_store.get('_phase_intent') or {}
         mode = contract.get('mode')
         if mode in ('navigate', 'login', 'query'):
             return False
         if mode in ('create', 'modify', 'introduce_pick'):
             return True
-        boundary = case_data_store.get('_phase_boundary') or {}
+        boundary = business_data_store.get('_phase_boundary') or {}
         if boundary.get('role') == 'navigate':
             return False
         if boundary.get('role') in ('maintain', 'introduce'):
@@ -106,11 +106,11 @@ def needs_business_data_context(
     mode = classify_task_mode(t)
     if mode in ('form_fill', 'form_modify'):
         return True
-    if case_data_store:
-        boundary = case_data_store.get('_phase_boundary') or {}
+    if business_data_store:
+        boundary = business_data_store.get('_phase_boundary') or {}
         if boundary.get('role') == 'introduce' or boundary.get('requires_introduce_then_save'):
             return True
-        contract = case_data_store.get('_phase_intent') or {}
+        contract = business_data_store.get('_phase_intent') or {}
         if contract.get('mode') == 'introduce_pick':
             return True
     if mode in ('login', 'query'):
@@ -208,24 +208,24 @@ def classify_task_mode(task_text: str) -> TaskMode:
     return 'other'
 
 
-def apply_task_mode(case_data_store: dict | None, task_text: str) -> TaskMode:
-    """Write ``_task_mode`` / compat flags into case_data_store. Returns mode."""
+def apply_task_mode(business_data_store: dict | None, task_text: str) -> TaskMode:
+    """Write ``_task_mode`` / compat flags into business_data_store. Returns mode."""
     mode = classify_task_mode(task_text)
-    if case_data_store is None:
+    if business_data_store is None:
         return mode
-    case_data_store['_task_mode'] = mode
-    case_data_store['_query_task'] = mode == 'query'
+    business_data_store['_task_mode'] = mode
+    business_data_store['_query_task'] = mode == 'query'
     # Legacy default; PhaseIntentContract may override via apply_phase_intent().
-    case_data_store['_force_refill_all'] = (
+    business_data_store['_force_refill_all'] = (
         mode == 'form_fill'
         or (mode == 'form_modify' and force_refill_all_required(task_text))
     )
-    case_data_store.pop('_query_ui', None)
-    case_data_store.pop('_query_ready', None)
-    case_data_store.pop('_submit_ready', None)
+    business_data_store.pop('_query_ui', None)
+    business_data_store.pop('_query_ready', None)
+    business_data_store.pop('_submit_ready', None)
     if mode in ('query', 'login', 'other'):
-        case_data_store.pop('task_list', None)
-        case_data_store.pop('_scan_fields', None)
-        case_data_store.pop('_autofill_summary', None)
+        business_data_store.pop('task_list', None)
+        business_data_store.pop('_scan_fields', None)
+        business_data_store.pop('_autofill_summary', None)
     return mode
 

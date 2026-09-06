@@ -4,7 +4,7 @@
  * Covers:
  *   - facade module surface (query / step / account / recording / persist / phase / meta re-exports)
  *   - focused modules loadable directly (persist / phase / meta)
- *   - recordStatus enum + stop → recorded|draft, detached:false (≠ detach)
+ *   - recordStatus enum + stop → recorded|failed, detached:false (≠ detach)
  *   - action log → stepFromActionLog → element xpath_smart preference
  *   - stepsToActionEntries / trajectoryStepToActionEntry for assemble/replay
  *   - buildLoginInstruction / buildStepsFromFlow / buildStepsFromActionFile
@@ -14,7 +14,7 @@
  *
  * Live HTTP path remains: node scripts/smoke/accept-recording-apis.mjs [baseUrl]
  */
-import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -50,7 +50,7 @@ function assert(cond, msg) {
 }
 
 function testStatusEnums() {
-  for (const s of ['draft', 'live', 'recording', 'recorded', 'completed']) {
+  for (const s of ['draft', 'recording', 'failed', 'recorded', 'completed']) {
     assert(TRAJECTORY_RECORD_STATUSES.includes(s), `missing recordStatus: ${s}`);
   }
   for (const s of ['pending', 'running', 'completed', 'failed']) {
@@ -84,11 +84,11 @@ function testFacadeSurface() {
 
 async function testFocusedModules() {
   const persist = await import('../../src/services/trajectory/trajectory-persist-service.js');
-  const phase = await import('../../src/services/trajectory-phase-service.js');
+  const phase = await import('../../src/services/trajectory/trajectory-phase-service.js');
   const meta = await import('../../src/services/trajectory/trajectory-meta-service.js');
-  const recording = await import('../../src/services/trajectory-recording-service.js');
+  const recording = await import('../../src/services/trajectory/trajectory-recording-service.js');
   const lifecycle = await import('../../src/services/trajectory/trajectory-record-lifecycle.js');
-  const runtime = await import('../../src/services/trajectory-runtime.js');
+  const runtime = await import('../../src/services/trajectory/trajectory-runtime.js');
   const attach = await import('../../src/services/trajectory/trajectory-attach-service.js');
   for (const name of [
     'buildStepsFromActionFile',
@@ -164,9 +164,9 @@ function testStopDoesNotDetach() {
     'stopTrajectoryRecording must return detached: false',
   );
   assert(
-    /recordStatus\s*=\s*success\s*\?\s*'recorded'\s*:\s*'draft'/.test(src)
-      || (src.includes("'recorded'") && src.includes("'draft'")),
-    'stop must map success→recorded / !success→draft',
+    /finishTransientRecording\s*\(\s*tid,\s*success\s*\?\s*'success'\s*:\s*'failure'/.test(src)
+      || (src.includes("finishTransientRecording") && src.includes("'success'") && src.includes("'failure'")),
+    'stop must map success→success / !success→failure via finishTransientRecording',
   );
   assert(
     !/\bdetachTrajectoryLive\b/.test(src),
@@ -181,6 +181,8 @@ function testStopDoesNotDetach() {
 function testNormalizeActionName() {
   assert(normalizeActionName('clickElementByIndex') === 'click_element_by_index');
   assert(normalizeActionName('fillFormField') === 'fill_form_field');
+  assert(normalizeActionName('fill_date_field') === 'fill_form_field');
+  assert(normalizeActionName('fillDateField') === 'fill_form_field');
   assert(normalizeActionName('clickMenuItem') === 'click_menu_item');
   assert(normalizeActionName('select_option') === 'select_option');
 }
@@ -301,7 +303,7 @@ function testTrajectoryStepToActionEntry() {
 function testBuildLoginInstruction() {
   let threw = false;
   try {
-    buildLoginInstruction({ username: 'u' }, {});
+    buildLoginInstruction({ account: 'u' }, {});
   } catch (err) {
     threw = true;
     assert(err.statusCode === 400, 'empty url → 400');
@@ -309,7 +311,7 @@ function testBuildLoginInstruction() {
   assert(threw, 'buildLoginInstruction must require url');
 
   const task = buildLoginInstruction(
-    { username: 'admin', password: 'secret' },
+    { account: 'admin', password: 'secret' },
     { url: 'https://example.com/login' },
   );
   assert(task.includes('Navigate to https://example.com/login'));
@@ -320,12 +322,18 @@ function testBuildLoginInstruction() {
 
 function testRunDefaultLoginHardcoded() {
   const body = Function.prototype.toString.call(runDefaultLogin);
-  assert(/replay_actions/.test(body), 'runDefaultLogin sends replay_actions');
+  // replay 会话编排已统一到 runReplayActions helper（字面量样板移入 helper），
+  // 此处断言调用关系与语义保持：委托调用 + 动作数组 + 超时 + 抑制持久化仍在本函数。
+  assert(/runReplayActions/.test(body), 'runDefaultLogin delegates to runReplayActions');
   assert(/go_to_url/.test(body), 'runDefaultLogin includes go_to_url');
   assert(/['"]login['"]/.test(body), 'runDefaultLogin includes login action');
-  assert(/replay_done/.test(body), 'runDefaultLogin waits for replay_done');
   assert(/180000/.test(body), 'login replay timeout is 180000ms');
-  assert(/stop_on_fail:\s*true/.test(body), 'login replay stop_on_fail');
+  assert(/stopOnFail:\s*true/.test(body), 'login replay stopOnFail');
+  // helper 契约：replay_actions/waitForSessionEvent/no-op 免疫由 helper 统一承载
+  const helper = readFileSync(new URL('../../src/services/replay-actions.js', import.meta.url), 'utf8');
+  assert(/replay_actions/.test(helper), 'helper sends replay_actions');
+  assert(/replay_done/.test(helper), 'helper waits for replay_done');
+  assert(/stop_on_fail/.test(helper), 'helper forwards stop_on_fail');
   assert(!/event:\s*['"]step['"]/.test(body), 'must not send Agent step event');
   assert(!/max_steps:\s*10/.test(body), 'must not start Agent with max_steps 10');
   assert(!/phase_done/.test(body), 'must not wait phase_done');

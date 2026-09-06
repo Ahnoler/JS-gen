@@ -1,8 +1,46 @@
 import crypto from 'crypto';
-import { LLM_BASE_URL, LLM_API_KEY } from '../../config/config.js';
+import { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT_MS } from '#config/config.js';
 
+/**
+ * OpenAI-compatible LLM gateway proxy — forwards model-list and chat
+ * completion requests to the configured upstream, plus a product-facing
+ * model discovery endpoint.
+ *
+ * Prefix: /api/v2/llm/*, /v1/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
 
+  // Product-facing: list models available on the configured gateway.
+  // Use this to discover usable model ids when a configured model 404s
+  // (gateway requires full prefixed names, e.g. "Qwen/Qwen3.5-35B-A3B").
+  /** Product-facing model discovery against the configured LLM gateway. */
+  app.get('/api/v2/llm/models', async (req, res) => {
+    if (!LLM_BASE_URL || !LLM_API_KEY) {
+      return res.status(500).json({ ok: false, error: 'LLM_BASE_URL and LLM_API_KEY env vars are required' });
+    }
+    try {
+      const resp = await fetch(`${LLM_BASE_URL}/models`, {
+        headers: { 'Authorization': `Bearer ${LLM_API_KEY}` },
+      });
+      const text = await resp.text();
+      if (!resp.ok) {
+        return res.status(502).json({ ok: false, baseUrl: LLM_BASE_URL, error: text || resp.statusText });
+      }
+      let ids = [];
+      try {
+        const data = JSON.parse(text);
+        ids = (data.data || []).map((m) => m.id).filter(Boolean).sort();
+      } catch {
+        return res.status(502).json({ ok: false, baseUrl: LLM_BASE_URL, error: 'gateway returned non-JSON model list' });
+      }
+      return res.json({ ok: true, baseUrl: LLM_BASE_URL, defaultModel: LLM_MODEL, models: ids });
+    } catch (err) {
+      return res.status(502).json({ ok: false, baseUrl: LLM_BASE_URL, error: err.message });
+    }
+  });
+
+  /** OpenAI-compatible /v1/models passthrough to the upstream gateway. */
   app.get('/v1/models', async (req, res) => {
     if (!LLM_BASE_URL || !LLM_API_KEY) {
       return res.status(500).json({ error: { message: 'LLM_BASE_URL and LLM_API_KEY env vars are required', type: 'server_error' } });
@@ -18,6 +56,7 @@ export default function (app) {
     }
   });
 
+  /** OpenAI-compatible /v1/chat/completions passthrough (no streaming). */
   app.post('/v1/chat/completions', async (req, res) => {
     const { model: modelId, messages, temperature, tools, tool_choice, stream } = req.body || {};
 
@@ -36,6 +75,7 @@ export default function (app) {
     try {
       const resp = await fetch(`${LLM_BASE_URL}/chat/completions`, {
         method: 'POST',
+        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${LLM_API_KEY}`,
@@ -51,7 +91,16 @@ export default function (app) {
       const data = await resp.json();
       return res.json({ ...data, id: completionId, created: now });
     } catch (err) {
-      return res.status(500).json({ error: { message: err.message, type: 'server_error' } });
+      // 上游挂起（通道宕机时不返回错误体，只能靠超时切断）→ 504 让调用方快速失败
+      const timedOut = err.name === 'TimeoutError' || err.name === 'AbortError';
+      return res.status(timedOut ? 504 : 500).json({
+        error: {
+          message: timedOut
+            ? `upstream timeout after ${LLM_TIMEOUT_MS}ms (model=${modelId}) — LLM 通道疑似挂起，可 GET /api/v2/llm/models 排查`
+            : err.message,
+          type: timedOut ? 'upstream_timeout' : 'server_error',
+        },
+      });
     }
   });
 }

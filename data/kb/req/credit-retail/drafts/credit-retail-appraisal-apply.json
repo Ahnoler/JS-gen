@@ -1,0 +1,143 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "credit-retail",
+  "flow": "新增评估机构授信申请（短流程）",
+  "aliases": [
+    "评估机构授信申请",
+    "评估机构申请",
+    "担保/评估短流程"
+  ],
+  "hash_markers": [
+    "ZJJK00105165",
+    "ZJJK00105170",
+    "wf_credit_006",
+    "FS00004729",
+    "UML00066786",
+    "beforeSavetCheck"
+  ],
+  "keywords": [
+    "评估机构申请",
+    "评估公司",
+    "资质信息",
+    "准入信息",
+    "风险阻断",
+    "共享范围",
+    "合作期限",
+    "流程提交"
+  ],
+  "menu_path": "授信管理/合作方授信管理/新增合作额度管理",
+  "preconditions": [
+    "登录客户经理；评估公司合作方客户状态=生效；无在途申请",
+    "【SUT 实测 2026-09-06】选「评估公司」类别联动项目类别=评估公司项目并显出共享范围（叶19 实证）",
+    "【SUT 实测 2026-09-06】任务页步骤条第3步措辞为「风险阻断」（FS00004729/wf_credit_006 侧），长流程侧同组件显「风险拦截」——两措辞并存，回填候选",
+    "【湿测铁证】beforeSavetCheck 前端拦截族：console 原文「调用beforeSavetCheck结果为false」"
+  ],
+  "steps": [
+    {
+      "name": "新增合作额度管理主页查询（共用入口）",
+      "leafRef": "wet-test.md 叶16 (ZJJK00106834)",
+      "verify": "match",
+      "menu_path": "授信管理/合作方授信管理/新增合作额度管理",
+      "rules": ["列表默认不自动加载；评估 44003（已撤销）经【查看】直达任务页视图"]
+    },
+    {
+      "name": "新增向导-业务主体选择/风险拦截",
+      "leafRef": "wet-test.md 叶17 (ZJJK00107305)",
+      "verify": "drift",
+      "drift": "behavior+structure：无标题全屏抽屉向导，2 步「业务主体选择→风险拦截」；无数据点【下一步】被拦截，console 原文「调用beforeSavetCheck结果为false」（已回填 chapters/03 SUT 实测）"
+    },
+    {
+      "name": "选择合作方信息（选评估公司）",
+      "leafRef": "wet-test.md 叶19 (ZJJK00107497)",
+      "verify": "match",
+      "rules": ["类别选「评估公司」→项目类别联动=评估公司项目，显出共享范围", "未选类别点【选择客户】弹「请选择合作方类型!」"]
+    },
+    {
+      "name": "合作方选择器（客户放大镜）",
+      "leafRef": "wet-test.md 叶20 (ZJJK00109101)",
+      "verify": "match",
+      "rules": ["合作方维度选择器，34 条分页 10条/页；取消/确认底部按钮"]
+    },
+    {
+      "name": "评估机构授信申请任务页（短流程 wf_credit_006）",
+      "leafRef": "wet-test.md 叶44 (ZJJK00105165)",
+      "verify": "match",
+      "note": "查看 44003（已撤销，评估公司）直达任务页视图 URL fcnScnEcd=FS00004729 flowCode=wf_credit_006 avyEcd=UML00066786",
+      "steppers": ["授信方案", "影像信息", "风险阻断", "意见"],
+      "rules": ["「风险阻断」措辞与文档 3.6.1 一致；长流程侧同组件显「风险拦截」，同组件两措辞并存（回填候选）"]
+    },
+    {
+      "name": "评估机构信息主页（任务页承载）",
+      "leafRef": "wet-test.md 叶45 (ZJJK00105170)",
+      "verify": "match",
+      "note": "章4/章5 复用",
+      "tabs": ["评估机构申请（基本信息/资质信息/准入信息/登记信息 4 子页）"],
+      "rules": ["查看态无合作机构页签（共享范围为空）"]
+    },
+    {
+      "name": "评估机构基本信息",
+      "leafRef": "wet-test.md 叶46 (ZJJK00107410)",
+      "verify": "match",
+      "fields": ["合作方申请编号", "客户编号", "名称", "类别=评估公司", "项目类别", "组织形式=公司形式", "注册资本 50,000,000", "实收资本", "成立日期", "从业人数", "连续从事评估年限", "近两年年均评估笔数/金额"]
+    },
+    {
+      "name": "评估机构资质信息",
+      "leafRef": "wet-test.md 叶47 (ZJJK00107411)",
+      "verify": "match",
+      "columns": ["评估机构资质类型", "资质证书名称", "证书编号", "资质等级", "发证日期", "到期日期"],
+      "rules": ["查看态无新增/修改/删除按钮（与文档「非查看且未签约时可用」一致）"]
+    },
+    {
+      "name": "评估机构准入信息",
+      "leafRef": "wet-test.md 叶49 (ZJJK00107413)",
+      "verify": "match",
+      "fields": ["共享范围", "合作期限（月）", "准入类型(多选5项：土地/房地产/矿产业（采矿权、探矿权）/资产/价格评估)"]
+    },
+    {
+      "name": "评估机构登记信息",
+      "leafRef": "wet-test.md 叶50 (ZJJK00107414)",
+      "verify": "match",
+      "fields": ["经办人/机构/创建日期/客户经理/审批状态=已撤销/业务管户机构(只读)"],
+      "rules": ["查看态无【签订】，与文档签订规则场景一致"]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "新增资质信息（同类型查重）",
+      "leafRefs": ["wet-test.md 叶48 (ZJJK00107412)"],
+      "verify": "blocked",
+      "reason": "查看态无【新增】入口（写操作黑名单亦禁保存）",
+      "retry_condition": "编辑态（待发起/打回）评估申请打开资质信息页签"
+    },
+    {
+      "name": "风险拦截（向导步骤2）",
+      "leafRefs": ["wet-test.md 叶18 (ZJJK00180228PDCP)"],
+      "verify": "blocked",
+      "reason": "需先过步骤1选客户，无有效客户号未进入",
+      "retry_condition": "有效新客户走通步骤1"
+    },
+    {
+      "name": "影像信息步骤（公共组件）",
+      "leafRefs": ["wet-test.md 叶15 (ZJJK00100615)"],
+      "verify": "blocked",
+      "reason": "beforeSavetCheck 拦截族，组件界面未达",
+      "retry_condition": "有可推进的审批任务"
+    },
+    {
+      "name": "流程提交（短流程意见步骤）",
+      "leafRefs": ["wet-test.md 叶43 (ZJJK00110621)"],
+      "verify": "blocked",
+      "reason": "短流程意见步骤不可达（beforeSavetCheck 拦截 + 评估 44003 已撤销无在途任务）；按钮属写操作黑名单",
+      "retry_condition": "短流程（担保/评估）可推进到意见环节的任务"
+    },
+    {
+      "name": "审批通过→签订→准入信息更新→额度注册（流程收口）",
+      "leafRefs": [],
+      "verify": "blocked",
+      "reason": "流程推进类规则只读不可达；签订/保存均属写操作黑名单",
+      "retry_condition": "用户明示的单独提交通道或业务端代提交后经已办核验"
+    }
+  ],
+  "sourceRefs": [15, 16, 17, 18, 19, 20, 43, 44, 45, 46, 47, 48, 49, 50],
+  "coverage": {"total": 11, "match": 7, "drift": 1, "blocked": 3, "notFound": 0, "gate": "partial"}
+}

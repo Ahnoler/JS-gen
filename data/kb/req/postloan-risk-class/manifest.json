@@ -1,0 +1,11 @@
+{
+  "moduleKey": "postloan-risk-class",
+  "moduleName": "贷后-风险分类",
+  "sourcePath": "D:/dev/JS-gen/docs/天阳信贷系统需求文档/A_v5.2需求文档0824/I01天阳信贷管理系统-贷后管理需求分册【风险分类】.docx",
+  "sourceKind": "req",
+  "status": "sliced",
+  "warnings": [],
+  "createdAt": "2026-09-05T12:23:35.728Z",
+  "updatedAt": "2026-09-05T13:05:00.000Z",
+  "note": "batch 0824"
+}

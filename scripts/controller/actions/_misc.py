@@ -14,13 +14,17 @@ from datetime import datetime
 
 from scripts import state as _state
 from ._helpers import _ok, _err, _enrich_click_element, _is_ok_result, _wait_if_loading
+from .result_protocol import err_with
 from ._js_snippets import (
     JS_CHECK_LOADING,
     JS_COLLECT_ICON_BUTTONS,
     JS_CLICK_ICON_BUTTON,
     JS_STAMP_ICON_ARIA_LABELS,
+    JS_STRIP_STALE_WRAPPERS,
 )
+from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from ...models import ActionFile, FormSnapshot, FormSnapshotCollection
+from .replay_timing import WAIT_300_MS, WAIT_400_MS, WAIT_450_MS, WAIT_500_MS
 
 # Path helper: __file__ is scripts/controller/actions/_misc.py, so go up 3 levels
 _SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,14 +42,7 @@ def _is_form_submit_label(text: str) -> bool:
 
 
 _JS_VISIBLE_FORM_OVERLAY = '''() => {
-    const isVisible = (el) => {
-        if (!el) return false;
-        const style = getComputedStyle(el);
-        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0)
-            return false;
-        const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-    };
+''' + PAGE_LOCATOR_HELPERS + '''
     for (const d of document.querySelectorAll('.el-dialog')) {
         const wrap = d.closest('.el-dialog__wrapper') || d;
         if (isVisible(wrap) && isVisible(d) && d.querySelector('.el-form')) return true;
@@ -58,7 +55,193 @@ _JS_VISIBLE_FORM_OVERLAY = '''() => {
 }'''
 
 
-def _register_misc_actions(controller, browser_context, case_data_store=None):
+# G1 container-scope-first click: when a visible drawer/dialog/message-box is
+# open, try to click a matching button INSIDE that overlay before falling back
+# to the page-level JS_CLICK_ICON_BUTTON (which prefers page-level over
+# overlays and can hit a same-label toolbar button on the main list page,
+# e.g. 查询 in a drawer shadowed by 查询 on the main page). Returns 'miss'
+# when no visible overlay or no in-overlay match — callers then run the
+# original page-level path unchanged (no-container diff is invisible).
+# Counterpart of JS_IDENTIFY_CONTAINER (base.py): that one names the active
+# container for scan/fill; this one clicks within the overlay scope first.
+_JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
+    const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    const want = norm(buttonText);
+    if (!want) return 'miss';
+    const overlays = [...document.querySelectorAll('.el-dialog, .el-drawer, .el-message-box')]
+        .filter((d) => d.offsetParent !== null && d.getClientRects().length > 0);
+    // Topmost visible overlay wins (highest z-index, like _misc overlay scan).
+    let scope = null;
+    let bestZ = -1;
+    for (const o of overlays) {
+        const z = parseInt(getComputedStyle(o).zIndex || '0', 10) || 0;
+        if (z >= bestZ) { bestZ = z; scope = o; }
+    }
+    // KB-I5 r6: generic click resolver — with no visible overlay the scope is
+    // the whole document, so non-button affordances on plain pages (todo-card
+    // 处理 = div.todo-item-action) are reachable via click_button too.
+    const inContainer = !!scope;
+    if (!scope) scope = document;
+    const candidates = inContainer
+        ? 'button, .el-button, a, label.el-radio, .el-radio, label.el-checkbox, .el-checkbox, .el-tree-node__content'
+        : 'button, .el-button, [role="button"], div.todo-item-action, .el-radio, .el-checkbox, .el-tree-node__content';
+    // KB-I5 r4: clickable candidates are not only buttons — Element UI radios
+    // (el-select options / el-table radio columns / radio labels) also carry
+    // actionable text and only respond to the full mousedown event chain.
+    const scan = (root, loose) => {
+        const ms = [];
+        for (const b of root.querySelectorAll(candidates)) {
+            if (b.offsetParent === null || b.disabled) continue;
+            if (b.closest('.el-table__body-wrapper')) continue;
+            const t = norm(b.innerText || b.textContent);
+            if (!t || t.length > 40) continue;
+            if (loose) {
+                // container branch keeps its historical loose match (includes)
+                if (t === want || (t.includes(want) && !want.includes(t))) ms.push({ el: b, text: t });
+            } else if (t === want) {
+                // page-level branch: exact text match only
+                ms.push({ el: b, text: t });
+            }
+        }
+        return ms;
+    };
+    let matches = scan(scope, inContainer);
+    // KB-I5 r6: TsscMultiTree / el-select pickers render their option panel in a
+    // body-attached popover OUTSIDE the dialog DOM — scan visible poppers too
+    // when the dialog itself has no match.
+    if (!matches.length) {
+        const poppers = [...document.querySelectorAll(
+            '.el-popover, .el-popper, .el-select-dropdown, .tree-popover')]
+            .filter((p) => p.offsetParent !== null && p.getClientRects().length > 0);
+        for (const pop of poppers) {
+            matches = scan(pop, inContainer);
+            if (matches.length) break;
+        }
+    }
+    // KB-I5 r6: click_button('<字段label>') with no button/option match opens the
+    // labelled field's picker trigger (tree-select / el-select) so the popover
+    // stays open for a follow-up click_button('<option>').
+    if (!matches.length) {
+        const labels = scope.querySelectorAll('.el-form-item__label');
+        for (const l of labels) {
+            if (norm(l.textContent) !== want) continue;
+            const item = l.closest('.el-form-item');
+            // KB-I5 r6b: TsscMultiTree renders a hidden search input BEFORE the
+            // visible display input — the first input has offsetParent===null, so
+            // only choosing item.querySelector('input') skips the field entirely.
+            // Prefer the el-select trigger, then the first VISIBLE non-hidden input.
+            const trigger = item && (item.querySelector('.el-select .el-input__inner')
+                || [...item.querySelectorAll('input')].find(
+                    (i) => i.type !== 'hidden' && i.offsetParent !== null)
+                || item.querySelector('input'));
+            if (trigger && (trigger.offsetParent !== null || trigger.getClientRects().length > 0)) {
+                trigger.scrollIntoView({ block: 'center', behavior: 'instant' });
+                const fireT = (type) => trigger.dispatchEvent(
+                    new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+                );
+                fireT('mousedown');
+                await new Promise((r) => setTimeout(r, 40));
+                fireT('mouseup');
+                await new Promise((r) => setTimeout(r, 40));
+                fireT('click');
+                return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+            }
+        }
+    }
+    // KB-I5 r6c: tree node matched inside a CLOSED tree-popover (trigger never
+    // opened / popover re-hidden by a race). Open the owning field's visible
+    // trigger, wait for the popover to render, then toggle the node's checkbox.
+    // TsscMultiTree list (nextNodeAprvPsnList) is only written by the real
+    // check event — handleCheckClick — never by $emit('input').
+    if (!matches.length) {
+        const hiddenNodes = [...scope.querySelectorAll('.el-tree-node')]
+            .filter((n) => n.offsetParent === null);
+        const hn = hiddenNodes.find((n) => {
+            const c = n.querySelector('.el-tree-node__content');
+            return c && norm(c.textContent) === want;
+        });
+        if (hn) {
+            const popper = hn.closest('.el-popover, .el-popper, .tree-popover');
+            const item = popper && popper.closest('.el-form-item');
+            const trigger = item && [...item.querySelectorAll('input')].find(
+                (i) => i.type !== 'hidden' && i.offsetParent !== null);
+            if (trigger) {
+                const wasChecked = hn.classList.contains('is-checked');
+                const ft = (el, type) => el.dispatchEvent(
+                    new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+                );
+                trigger.scrollIntoView({ block: 'center', behavior: 'instant' });
+                ft(trigger, 'mousedown');
+                await new Promise((r) => setTimeout(r, 40));
+                ft(trigger, 'mouseup');
+                await new Promise((r) => setTimeout(r, 40));
+                ft(trigger, 'click');
+                await new Promise((r) => setTimeout(r, 300));
+                const treeNow = hn.closest('.el-tree');
+                const nodeNow = treeNow && [...treeNow.querySelectorAll('.el-tree-node')].find((n) => {
+                    const c = n.querySelector('.el-tree-node__content');
+                    return c && norm(c.textContent) === want;
+                });
+                if (nodeNow) {
+                    const cb = nodeNow.querySelector('.el-checkbox');
+                    const tgt = cb || nodeNow.querySelector('.el-tree-node__content') || nodeNow;
+                    const fire2 = (type) => tgt.dispatchEvent(
+                        new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+                    );
+                    fire2('mousedown');
+                    await new Promise((r) => setTimeout(r, 40));
+                    fire2('mouseup');
+                    await new Promise((r) => setTimeout(r, 40));
+                    fire2('click');
+                    if (wasChecked) {
+                        // preset-checked node: first click toggled OFF — click again
+                        // so the node ends checked and the check event carries it.
+                        await new Promise((r) => setTimeout(r, 150));
+                        fire2('mousedown');
+                        await new Promise((r) => setTimeout(r, 40));
+                        fire2('mouseup');
+                        await new Promise((r) => setTimeout(r, 40));
+                        fire2('click');
+                    }
+                    return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+                }
+                return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+            }
+        }
+    }
+    if (!matches.length) return 'miss';
+    const exact = matches.filter((m) => m.text === want);
+    const pool = exact.length ? exact : matches;
+    let hit = pool[0];
+    let target = hit.el;
+    // KB-I5 r6: el-tree nodes with show-checkbox — clicking the label span only
+    // highlights; the node's checkbox is what registers the selection. Prefer
+    // the checkbox inside the matched .el-tree-node__content.
+    if (target.classList.contains('el-tree-node__content')) {
+        const cb = target.querySelector('.el-checkbox')
+            || (target.parentElement && target.parentElement.querySelector(':scope > .el-checkbox'));
+        const lbl = target.querySelector('.el-tree-node__label');
+        if (cb) target = cb;
+        else if (lbl) target = lbl;
+    }
+    target.scrollIntoView({ block: 'center', behavior: 'instant' });
+    // Element UI widgets (el-select, el-table radios, drawer confirm buttons,
+    // todo-card action divs) need the real mousedown -> mouseup -> click
+    // sequence; a synthetic single click() leaves Vue models un-updated.
+    // KB-I5 r6: gaps widened 30ms -> 40ms per pin spec.
+    const fire = (type) => target.dispatchEvent(
+        new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+    );
+    fire('mousedown');
+    await new Promise((r) => setTimeout(r, 40));
+    fire('mouseup');
+    await new Promise((r) => setTimeout(r, 40));
+    fire('click');
+    return inContainer ? ('ok-container:' + hit.text) : ('ok-click:' + hit.text);
+}'''
+
+
+def _register_misc_actions(controller, browser_context, business_data_store=None):
     @controller.action('Wait for Element UI loading mask to disappear.')
     async def wait_for_loading():
         page = await browser_context.get_current_page()
@@ -92,12 +275,16 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             if await page.evaluate(JS_CHECK_LOADING):
                 await _wait_if_loading(page)
         except Exception:
+            sys.stderr.write("[get-page-state] JS_CHECK_LOADING wait probe failed" + '\n')
+            sys.stderr.flush()
             pass
 
         still_loading = False
         try:
             still_loading = bool(await page.evaluate(JS_CHECK_LOADING))
         except Exception:
+            sys.stderr.write("[get-page-state] JS_CHECK_LOADING recheck failed" + '\n')
+            sys.stderr.flush()
             still_loading = False
 
         if still_loading:
@@ -107,7 +294,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 return _err(
                     'page-loading-spin-blocked | loading mask still visible after wait. '
                     'Do NOT call get_page_state again. Call wait_for_loading() once, then '
-                    'click_icon_button / click_element_by_index / scan_visible_fields — '
+                    'click_button / click_element_by_index / scan_visible_fields — '
                     'not another get_page_state.',
                     include_in_memory=True,
                 )
@@ -115,7 +302,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 'page-still-loading | waited for loading mask but it is still present. '
                 'Do NOT call get_page_state again while loading. '
                 'NEXT_ACTION: wait_for_loading() once, then a UI action '
-                '(click_icon_button / click_element / scan) — not get_page_state.',
+                '(click_button / click_element / scan) — not get_page_state.',
                 include_in_memory=True,
             )
 
@@ -164,7 +351,11 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 openDropdown,
                 formErrors,
                 messages: [...document.querySelectorAll('.el-message')].map(e => e.textContent.trim()).filter(Boolean),
-                notifications: [...document.querySelectorAll('.el-notification')].filter(e => e.offsetParent !== null).map(e => e.textContent.trim()).filter(Boolean),
+                notifications: [...document.querySelectorAll('.el-notification')].filter(e => {
+                    const r = e.getBoundingClientRect();
+                    const cs = getComputedStyle(e);
+                    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+                }).map(e => e.textContent.trim()).filter(Boolean),
                 activeTab: document.querySelector('.el-tabs__item.is-active')?.textContent?.trim() || null,
                 treeNodes: document.querySelectorAll('.el-tree-node').length || 0,
                 tableRows: document.querySelectorAll('.el-table__body-wrapper .el-table__row').length || 0,
@@ -178,38 +369,96 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             icon_buttons = await page.evaluate(JS_COLLECT_ICON_BUTTONS)
             state['iconButtons'] = icon_buttons if isinstance(icon_buttons, list) else []
         except Exception:
+            sys.stderr.write("[get-page-state] iconButtons stamp/collect failed" + '\n')
+            sys.stderr.flush()
             state['iconButtons'] = []
         _state._TRAJECTORY_URL = state.get('url', '')
         return json.dumps(state, ensure_ascii=False)
 
     @controller.action(
-        'Click an icon-only button by its tooltip / ElTooltip content / aria-label text '
-        '(e.g. el-tooltip + el-icon-*). Prefer this over click_element on empty-text icons. '
-        'Use get_page_state().iconButtons or aria-label on indexed elements to discover labels. '
-        'If the task names a toolbar icon (e.g. 新增一级分类), call this directly.'
+        'Click a button by its label. Handles TWO kinds: (a) icon-only buttons '
+        'whose text lives in el-tooltip / aria-label (e.g. el-tooltip + el-icon-*), '
+        '(b) plain visible text buttons like toolbar 查询/重置/新增/修改/查看 — '
+        'if no icon matches, a same-label visible text button is clicked directly '
+        "(table-row affordances excluded; page-level preferred over overlays; returns "
+        "'ok-text:<label>'). Only fails when the label is absent or ambiguous "
+        "('err-icon-label-ambiguous:{candidates}' / 'err-icon-label-miss'). "
+        'Use get_page_state().iconButtons to discover true icon labels.'
     )
-    async def click_icon_button(button_text: str):
+    async def click_button(button_text: str):
+        bt = str(button_text or '').strip()
+        if _is_form_submit_label(bt):
+            # 统一保存入口：保存/提交类一律走 click_save（outcome 校验 + 可导出落库）
+            return (
+                f'err-use-click-save:{bt} | '
+                f'"保存/提交/确认"类按钮请改用 click_save(button_text="{bt}")；'
+                f'分区保存用 click_save(button_text="{bt}", region="<分区标题>")'
+            )
         page = await browser_context.get_current_page()
+        # Pre-strip stale dialog wrappers (tsscMutilDialog 关闭残留) so real
+        # clicks reach the target; idempotent, <10ms.
+        try:
+            await page.evaluate(JS_STRIP_STALE_WRAPPERS)
+        except Exception:
+            pass
         try:
             await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
         except Exception:
+            sys.stderr.write("[click-button] JS_STAMP_ICON_ARIA_LABELS failed button={button_text!r}" + '\n')
+            sys.stderr.flush()
             pass
         element = await _enrich_click_element(
             page, text=button_text, target_kind='icon',
         )
-        result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
-        await page.wait_for_timeout(400)
+        # G1 container-scope-first: if a visible drawer/dialog is open and a
+        # matching button exists inside it, click the in-overlay one; only fall
+        # back to the page-level JS_CLICK_ICON_BUTTON on miss (original
+        # page-level behavior fully unchanged when no container matches).
+        container_result = ''
+        try:
+            container_result = await page.evaluate(
+                _JS_CLICK_BUTTON_IN_CONTAINER, [button_text]
+            )
+        except Exception as _container_exc:
+            sys.stderr.write(
+                "[click-button] container-scope probe failed: " + repr(_container_exc) + '\n'
+            )
+            sys.stderr.flush()
+            container_result = ''
+        if isinstance(container_result, str) and (
+            container_result.startswith('ok-container:')
+            or container_result.startswith('ok-click:')
+        ):
+            result = container_result
+        else:
+            result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
+        await page.wait_for_timeout(WAIT_400_MS)
         if _is_ok_result(result):
             _state._record_action(
-                'click_icon_button',
+                'click_button',
                 {'button_text': button_text},
                 result,
                 element=element,
             )
-            if case_data_store is not None:
+            if business_data_store is not None:
                 from scripts.controller.actions.container_naming import remember_trigger_button
-                remember_trigger_button(case_data_store, button_text)
+                remember_trigger_button(business_data_store, button_text)
             return _ok(result)
+        if str(result).startswith('err-icon-label-ambiguous:'):
+            # Generalized fallback found same-label buttons but could not pick
+            # one safely (ambiguous) — hand the candidates to the agent.
+            return err_with(
+                "icon-label-ambiguous",
+                "同名或相近文字按钮有多个，无法唯一选择",
+                observed=result.split(':', 1)[1],
+                next_action="从 现场/textButtons 取完整按钮文字后用 click_element_by_index，或提供更精确 button_text 重试本动作",
+            )
+        if str(result).startswith('err-icon-label-miss'):
+            return err_with(
+                "icon-label-miss",
+                f"页面未找到标签含「{button_text}」的图标宿主或文字按钮",
+                next_action='核对 get_page_state().iconButtons 清单；确认目标可见；行内目标请用 click_table_row_button',
+            )
         return result
 
     @controller.action('Save the accumulated trajectory in atp-record import-compatible JSON format.')
@@ -232,7 +481,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             action_json = action_file.model_dump()
 
             # Write form structure snapshots if available (prefer array, fall back to single)
-            coll = FormSnapshotCollection.from_store(case_data_store)
+            coll = FormSnapshotCollection.from_store(business_data_store)
             snapshots = coll.to_dicts()
             if snapshots:
                 forms_dir = os.path.join(_SCRIPTS_DIR, 'forms')
@@ -274,6 +523,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 close_btn = page.locator('.el-notification__closeBtn').locator('visible=true').first
                 await close_btn.click(timeout=3000)
             except Exception:
+                sys.stderr.write("[close-notification] close button click failed (DOM dispatch fallback)" + '\n')
+                sys.stderr.flush()
                 await page.evaluate('''() => {
                     for (const el of document.querySelectorAll('.el-notification')) {
                         const r = el.getBoundingClientRect();
@@ -284,7 +535,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         }
                     }
                 }''')
-            await page.wait_for_timeout(300)
+            await page.wait_for_timeout(WAIT_300_MS)
             return _ok(f'ok-notification: {notif_text[:200]}', include_in_memory=True)
         return 'no-notification'
 
@@ -327,12 +578,12 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             }
             return 'no-overlay-open';
         }''')
-        await page.wait_for_timeout(500)
+        await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
             _state._record_action('close_dialog', {}, result, element=element)
-            if case_data_store is not None:
+            if business_data_store is not None:
                 from scripts.controller.actions.container_naming import clear_trigger_button
-                clear_trigger_button(case_data_store)
+                clear_trigger_button(business_data_store)
             try:
                 from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
                 from ._js_snippets import JS_IS_QUERY_TOOLBAR
@@ -340,12 +591,16 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 try:
                     still = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
                 except Exception:
+                    sys.stderr.write("[close-dialog] JS_IS_QUERY_TOOLBAR recheck failed" + '\n')
+                    sys.stderr.flush()
                     still = False
-                parent = (case_data_store or {}).get('_parent_container_before_picker') or 'main'
+                parent = (business_data_store or {}).get('_parent_container_before_picker') or 'main'
                 maybe_record_picker_closed(
-                    case_data_store, still_query_ui=still, parent_container=parent,
+                    business_data_store, still_query_ui=still, parent_container=parent,
                 )
             except Exception:
+                sys.stderr.write("[close-dialog] maybe_record_picker_closed helper failed" + '\n')
+                sys.stderr.flush()
                 pass
             return _ok(result)
         return result
@@ -375,6 +630,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     elem_text = element_node.get_all_text_till_next_clickable_element() or ''
                     elem_text = elem_text.strip()[:80]
                 except Exception:
+                    sys.stderr.write("[click] capture element text failed index={index!r}" + '\n')
+                    sys.stderr.flush()
                     elem_text = ''
                 tag_name = element_node.tag_name or ''
                 element_info = await _enrich_click_element(
@@ -428,6 +685,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         include_in_memory=True,
                     )
             except Exception:
+                sys.stderr.write("[click] el-select dropdown gate check failed index={index!r}" + '\n')
+                sys.stderr.flush()
                 pass
 
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
@@ -441,13 +700,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 is_picker_ui = False
                 try:
                     overlay_info = await page.evaluate('''() => {
-                        const isVisible = (el) => {
-                            if (!el) return false;
-                            const style = getComputedStyle(el);
-                            if (style.display === 'none' || style.visibility === 'hidden') return false;
-                            const r = el.getBoundingClientRect();
-                            return r.width > 0 && r.height > 0;
-                        };
+''' + PAGE_LOCATOR_HELPERS + '''
                         // Prefer topmost visible dialog by z-index
                         let best = null;
                         let bestZ = -1;
@@ -485,16 +738,20 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                             overlay_info.get('hasQuery') and not overlay_info.get('hasSave')
                         )
                 except Exception:
+                    sys.stderr.write("[click] overlay scan failed (fallback _JS_VISIBLE_FORM_OVERLAY)" + '\n')
+                    sys.stderr.flush()
                     in_form_overlay = bool(await page.evaluate(_JS_VISIBLE_FORM_OVERLAY))
 
                 # Authoritative: page-level query toolbar / sticky flag (overlay scan can miss)
                 if compact.startswith(('确认', '确定')):
                     try:
                         from ._js_snippets import JS_IS_QUERY_TOOLBAR
-                        if (case_data_store or {}).get('_query_ui') or await page.evaluate(JS_IS_QUERY_TOOLBAR):
+                        if (business_data_store or {}).get('_query_ui') or await page.evaluate(JS_IS_QUERY_TOOLBAR):
                             is_picker_ui = True
                     except Exception:
-                        if (case_data_store or {}).get('_query_ui'):
+                        sys.stderr.write("[click] JS_IS_QUERY_TOOLBAR picker-ui check failed" + '\n')
+                        sys.stderr.flush()
+                        if (business_data_store or {}).get('_query_ui'):
                             is_picker_ui = True
 
                 try:
@@ -502,8 +759,10 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         get_phase_intent,
                         should_block_index_submit,
                     )
-                    contract = get_phase_intent(case_data_store)
+                    contract = get_phase_intent(business_data_store)
                 except Exception:
+                    sys.stderr.write("[click] get_phase_intent failed (submit-block fallback)" + '\n')
+                    sys.stderr.flush()
                     contract = None
                     should_block_index_submit = None  # type: ignore
 
@@ -516,8 +775,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         dialog_title=dialog_title,
                         is_picker_ui=is_picker_ui,
                         container_id='',
-                        query_ui=is_picker_ui or bool((case_data_store or {}).get('_query_ui')),
-                        case_data_store=case_data_store,
+                        query_ui=is_picker_ui or bool((business_data_store or {}).get('_query_ui')),
+                        business_data_store=business_data_store,
                     )
                 elif compact.startswith(('保存', '提交')) or (in_form_overlay and not is_picker_ui):
                     block = True
@@ -557,9 +816,34 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         include_in_memory=True,
                     )
 
+            if btn_label and re.sub(r'\s+', '', btn_label).startswith(('确认', '确定')):
+                try:
+                    from ._js_snippets import JS_WATCH_SAVE_NOTIFICATIONS
+                    await page.evaluate(JS_WATCH_SAVE_NOTIFICATIONS)
+                except Exception:
+                    sys.stderr.write("[click] JS_WATCH_SAVE_NOTIFICATIONS failed" + '\n')
+                    sys.stderr.flush()
+                    pass
+            url_before = getattr(page, 'url', '') or ''
             download_path = await browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')
+            # Navigation detection for page-transitioning clicks (e.g. 客户转正 → new page).
+            # If URL changed after the click, record a flag that recorder_emitters turns
+            # into a [导航] HumanMessage cue — recorded step stays ok-clicked-N.
+            try:
+                await _wait_if_loading(page)
+                url_after = getattr(page, 'url', '') or ''
+                if url_before and url_after and url_before != url_after:
+                    if business_data_store is not None:
+                        business_data_store['_last_click_navigated'] = {
+                            'from': url_before,
+                            'to': url_after,
+                        }
+            except Exception:
+                sys.stderr.write("[click] post-click navigation detection failed" + '\n')
+                sys.stderr.flush()
+                pass
             if element_node:
                 raw_xp = str(getattr(element_node, 'xpath', None) or '')
                 raw_cls = str((element_node.attributes or {}).get('class')
@@ -595,10 +879,10 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         'tag_name': element_info.get('tag_name') if element_info else tag_name,
                         'text': (element_info or {}).get('text') or elem_text or '',
                     }, f'ok-clicked-{index}', element=element_info)
-                if case_data_store is not None:
+                if business_data_store is not None:
                     from scripts.controller.actions.container_naming import remember_trigger_button
                     remember_trigger_button(
-                        case_data_store,
+                        business_data_store,
                         (element_info or {}).get('text') or elem_text or '',
                     )
                 try:
@@ -606,34 +890,92 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
                     compact2 = re.sub(r'\s+', '', btn_label)
                     if compact2.startswith(('确认', '确定')):
-                        record_success_token(case_data_store, 'confirm_click', btn_label)
-                        await page.wait_for_timeout(400)
+                        await page.wait_for_timeout(WAIT_450_MS)
+                        # Classify notifications: success texts (状态更新成功 etc.) → toast_ok;
+                        # real errors → err-notification. Never treat success as failure.
+                        note = await page.evaluate(
+                            r'''() => {
+                                const w = window.__saveWatch || { errorNotifs: [], successNotifs: [] };
+                                const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
+                                const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功|状态更新成功|更新成功|启用成功|禁用成功|克隆成功/;
+                                const errors = [];
+                                const successes = [];
+                                const seen = new Set();
+                                const take = (raw, hint) => {
+                                    const s = String(raw || '').replace(/\s+/g, ' ').trim();
+                                    if (!s || seen.has(s)) return;
+                                    seen.add(s);
+                                    if (hint === 'error' || failRe.test(s)) errors.push(s.slice(0, 160));
+                                    else if (hint === 'success' || successRe.test(s)) successes.push(s.slice(0, 160));
+                                };
+                                for (const t of (w.errorNotifs || [])) take(t, 'error');
+                                for (const t of (w.successNotifs || [])) take(t, 'success');
+                                for (const el of document.querySelectorAll('.el-notification')) {
+                                    const r = el.getBoundingClientRect();
+                                    if (r.width <= 0 || r.height <= 0) continue;
+                                    const cls = String(el.className || '');
+                                    const text = (el.textContent || '').trim();
+                                    if (/el-notification--error/.test(cls)) take(text, 'error');
+                                    else take(text, 'live');
+                                }
+                                return { errors, successes };
+                            }'''
+                        )
+                        errors = (note or {}).get('errors') if isinstance(note, dict) else None
+                        successes = (note or {}).get('successes') if isinstance(note, dict) else None
+                        if isinstance(errors, list) and errors:
+                            err_text = str(errors[0])[:200]
+                            sys.stderr.write(f'[click] confirm error notification: {err_text}\n')
+                            sys.stderr.flush()
+                            return _err(
+                                f'err-notification:{err_text} | 系统报错，本次确认未成功。'
+                                '先按报错修正选择（如更换或清除已选人）再继续，'
+                                '禁止原样重复点击确认。',
+                                include_in_memory=True,
+                            )
+                        if isinstance(successes, list) and successes:
+                            ok_text = str(successes[0])[:200]
+                            record_success_token(business_data_store, 'toast_ok', ok_text)
+                            sys.stderr.write(
+                                f'[click] confirm success notification → toast_ok: {ok_text[:80]}\n'
+                            )
+                            sys.stderr.flush()
+                        record_success_token(business_data_store, 'confirm_click', btn_label)
+                        await page.wait_for_timeout(WAIT_400_MS)
                         still = False
                         try:
                             from ._js_snippets import JS_IS_QUERY_TOOLBAR
                             still = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
                         except Exception:
+                            sys.stderr.write("[click] confirm JS_IS_QUERY_TOOLBAR recheck failed" + '\n')
+                            sys.stderr.flush()
                             still = False
-                        parent = (case_data_store or {}).get('_parent_container_before_picker') or 'main'
+                        parent = (business_data_store or {}).get('_parent_container_before_picker') or 'main'
                         maybe_record_picker_closed(
-                            case_data_store, still_query_ui=still, parent_container=parent,
+                            business_data_store, still_query_ui=still, parent_container=parent,
                         )
                         if not still:
                             # Parent maintain form still needs toast_ok via click_save.
-                            case_data_store['_submit_ready'] = True
-                            case_data_store.pop('_query_ui', None)
+                            business_data_store['_submit_ready'] = True
+                            business_data_store.pop('_query_ui', None)
                             sys.stderr.write(
                                 '[click] picker confirm closed → submit-ready for parent save\n'
                             )
                             sys.stderr.flush()
                 except Exception:
+                    sys.stderr.write("[click] picker confirm record/close helper failed" + '\n')
+                    sys.stderr.flush()
                     pass
             return _ok(f'ok-clicked-{index}')
         except Exception as e:
+            import traceback as _tb
+            sys.stderr.write(f'[click] click_element_by_index index={index} exception: {e}\n{_tb.format_exc()}\n')
+            sys.stderr.flush()
             return _err(f'click-failed:{e}')
 
     @controller.action('Scroll down the page by pixel amount. Scrolls the main content container or window.')
     async def scroll_down(amount: int = 300):
+        amount = int(amount)
         page = await browser_context.get_current_page()
         await page.evaluate(f'''() => {{
             const targets = document.querySelectorAll(
@@ -654,6 +996,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
 
     @controller.action('Scroll up the page by pixel amount. Scrolls the main content container or window.')
     async def scroll_up(amount: int = 300):
+        amount = int(amount)
         page = await browser_context.get_current_page()
         await page.evaluate(f'''() => {{
             const targets = document.querySelectorAll(

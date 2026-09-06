@@ -2,6 +2,11 @@
  * API group(s): export-mgmt (V1 legacy-engine) + batch-push (V2 partner transaction).
  * Keep in sync with src/routes/v2/export-mgmt.js
  */
+
+/** @typedef {{ name: string, type: string, required?: boolean, in?: 'path'|'query'|'body', desc: string, example?: string }} Param */
+/** @typedef {{ method: string, path: string, summary: string, desc?: string, params?: Param[], reqExample?: string, respExample?: string, notes?: string[], deprecated?: boolean, tryable?: boolean }} Endpoint */
+/** @typedef {{ id: string, name: string, description: string, endpoints: Endpoint[] }} TagGroup */
+
 import { J } from './_j.js';
 
 /** @type {TagGroup[]} */
@@ -30,7 +35,6 @@ export const GROUP_EXPORT = [
             types: ['click', 'date', 'input', 'radio', 'select:click', 'select:tree'],
             actionTypeMap: {
               fill_form_field: 'input',
-              fill_date_field: 'date',
               select_option: 'select:click',
               select_tree_option: 'select:tree',
               click_radio: 'radio',
@@ -112,53 +116,73 @@ export const GROUP_EXPORT = [
       },
       {
         method: 'GET', path: '/api/v2/export/partner/systems',
-        summary: '对方系统树（按项目，代理）',
-        desc: '转发对方 lazySystemTree；项目变更后前端应清空已选系统再调本接口。',
+        summary: '对方系统树（按项目，代理，返回完整嵌套树）',
+        desc: '转发对方 lazySystemTree；默认（无 parentId）自根向下递归展开非叶节点组成完整树一次性返回（同层并发、isLeaf 剪枝、maxDepth=8 防环）；传 parentId 时保持旧懒加载行为只取该层。项目变更后前端应清空已选系统再调本接口。count 为全树节点总数。',
         params: [
           { name: 'projectId', type: 'string', required: true, in: 'query', desc: '对方项目 id', example: '31' },
-          { name: 'parentId', type: 'string', in: 'query', desc: '可选，懒加载子节点' },
+          { name: 'parentId', type: 'string', in: 'query', desc: '可选；传入则退化为懒加载单层（直接子节点）' },
         ],
         respExample: J({
           projectId: '31',
-          systems: [{ id: 98, name: '李淼一测试系统' }],
-          count: 1,
+          systems: [
+            {
+              id: 1, name: '存量核心业务系统',
+              children: [{ id: 34, name: '1' }, { id: 35, name: '2' }],
+            },
+            { id: 98, name: '李淼一测试系统' },
+          ],
+          count: 3,
         }),
+      },
+      {
+        method: 'GET', path: '/api/v2/export/partner/menu-push/systems',
+        summary: '菜单推送：伙伴系统列表（代理 getSystemNodeLevel）',
+        desc: '转发伙伴 POST /system/system/getSystemNodeLevel（PARTNER_MENU_PUSH_BASE，默认 172.20.101.63:11002/api）。推送菜单弹窗「所属系统」下拉数据源；选中项 id 作为 push-menu body.systemNodeId。',
+        params: [
+          { name: 'access_token', type: 'string', required: true, in: 'query', desc: '通常放请求头 access_token' },
+        ],
+        respExample: J({
+          systems: [{ id: 51, name: '系统1', parentId: '-1' }, { id: 29, name: '核心系统', parentId: '-1' }],
+          count: 2,
+        }),
+        notes: ['与批量推送 partner/systems（按项目懒加载树）不同，本接口为菜单推送专用扁平列表'],
       },
       {
         method: 'GET', path: '/api/v2/export/transaction/schema',
         summary: 'Partner transaction 字段契约',
         desc: '返回导入体字段说明（外层 transcationEventTypeList；轨内 transcationProperties 等）。',
         respExample: J({
-          schemaVersion: 1,
+          schemaVersion: 2,
           fields: [
             { key: 'transcationEventTypeList', zh: '交易列表（单轨也包一层数组）' },
             { key: 'transcationProperties', zh: '事件步骤数组' },
             { key: 'testFrame', zh: '框架（默认 playwright）' },
           ],
+          notes: 'V2 精简版（2026-08-18）：不再携带 phases（阶段截图/全量元素 metadata）与 regionId/parentRegionId——控件点亮能力由 V3.0 result.groups 承担',
         }),
       },
       {
         method: 'GET', path: '/api/v2/export/trajectories/{id}/transaction',
-        summary: '导出/可选推送单轨',
-        desc: '默认只组装并 markExported；push=true 时代调 importDemand（成功才 mark）。仅 recordStatus=recorded|completed（录制完成/已确认）可推送；draft/live/recording → 409 not_pushable_status。raw/forImport 返回裸 envelope。systemId/projectId 缺省 98/31。',
+        summary: '导出/可选推送单轨（V2 精简）',
+        desc: '默认只组装并 markExported；push=true 时代调 importDemand（成功才 mark）。仅 recordStatus=completed（已确认）可推送；draft/recording/failed → 409 not_pushable_status。raw/forImport 返回裸 envelope。systemId/projectId 缺省 98/31。V2 精简版不含 phases/regionId。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', desc: '轨迹 id', example: '36' },
           { name: 'systemId', type: 'string', in: 'query', desc: '缺省 98', example: '98' },
           { name: 'projectId', type: 'string', in: 'query', desc: '缺省 31', example: '31' },
-          { name: 'push', type: 'boolean', in: 'query', desc: 'true 时代推 importDemand（需录制完成）', example: 'false' },
+          { name: 'push', type: 'boolean', in: 'query', desc: 'true 时代推 importDemand（需已确认 completed）', example: 'false' },
           { name: 'raw', type: 'boolean', in: 'query', desc: '仅返回 envelope', example: 'true' },
         ],
       },
       {
         method: 'POST', path: '/api/v2/export/trajectories/{id}/transaction',
         summary: '导出/可选推送单轨（body）',
-        desc: '与 GET 相同；参数可写 body。push=true 时草稿等非录制完成状态 → 409。',
+        desc: '与 GET 相同；参数可写 body。push=true 时非已确认（draft/recording/failed）→ 409。',
         reqExample: J({ systemId: '98', projectId: '31', push: true }),
       },
       {
         method: 'POST', path: '/api/v2/export/transactions',
         summary: '批量推送（组装 + 代调 importDemand）',
-        desc: '产品确认推送入口。逐条组装后合并为一条 importDemand body；对方成功后才 markExported。真实推送时跳过 draft/live/recording（item.code=not_pushable_status）；raw/dryRun 只组装不代推、不按状态拦截。缺 systemId/projectId 时默认 98/31。',
+        desc: '产品确认推送入口。逐条组装后合并为一条 importDemand body；对方成功后才 markExported。真实推送时跳过 draft/recording/failed（item.code=not_pushable_status）；raw/dryRun 只组装不代推、不按状态拦截。缺 systemId/projectId 时默认 98/31。',
         params: [
           { name: 'trajectoryIds', type: 'number[]', required: true, in: 'body', desc: '勾选的轨迹 id', example: '[36]' },
           { name: 'systemId', type: 'string', in: 'body', desc: '对方系统 id（弹窗选择；缺省 98）', example: '98' },
@@ -169,7 +193,7 @@ export const GROUP_EXPORT = [
         ],
         reqExample: J({ trajectoryIds: [36], systemId: '98', projectId: '31' }),
         respExample: J({
-          schemaVersion: 1,
+          schemaVersion: 2,
           systemId: '98',
           projectId: '31',
           pushed: true,
@@ -181,7 +205,50 @@ export const GROUP_EXPORT = [
           '前端：先 GET partner/projects，再按项目 GET partner/systems；项目变更清空系统',
           '无 access_token（头/body/env）→ 400',
           '对方业务失败 → 502，不翻转 isExport',
-          '仅 recorded/completed 可推送；draft 等 → item 失败 code=not_pushable_status（单轨 push → 409）',
+          '仅 completed（已确认）可推送；draft/recording/failed 等 → item 失败 code=not_pushable_status（单轨 push → 409）',
+          'V2 精简版不含 phases（阶段截图/全量元素由 V3 优化版 transcationProperties 承担，截图已合并进 transcationProperties）',
+        ],
+      },
+      {
+        method: 'GET', path: '/api/v2/export/trajectories/{id}/transaction-v3',
+        summary: '导出/可选推送单轨（V3 优化版）',
+        desc: 'V3 优化版：截图合并进 transcationProperties（截图条目与控件步骤条目同构，消费方单表存储）。payload 只含 transcationEventTypeList。transcationProperties 统一 schema：截图条目（type=page/popup，eventTypeValue=click，screenshot=[MinIO 永久直链]，elementType/mothed 空）+ 中间节点（type=section/tab/wizard/card，按 §8 层级类型映射，无截图/action）+ 控件步骤条目（type=object，elementType=xpath，mothed=By.XPATH，screenshot=[]）；propertiesID/propertiesPID 均为字符串顺序号，控件 propertiesPID 指向所属截图条目或中间节点的 propertiesID，realLabel 承接原 label。',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path', desc: '轨迹 id', example: '38' },
+          { name: 'systemId', type: 'string', in: 'query', desc: '缺省 98', example: '98' },
+          { name: 'projectId', type: 'string', in: 'query', desc: '缺省 31', example: '31' },
+          { name: 'push', type: 'boolean', in: 'query', desc: 'true 时代推 importDemand（需已确认 completed）', example: 'false' },
+          { name: 'raw', type: 'boolean', in: 'query', desc: '仅返回 envelope', example: 'true' },
+        ],
+      },
+      {
+        method: 'POST', path: '/api/v2/export/trajectories/{id}/transaction-v3',
+        summary: '导出/可选推送单轨（V3 优化版，body）',
+        desc: '与 GET transaction-v3 相同；参数可写 body。',
+        reqExample: J({ systemId: '98', projectId: '31', push: true }),
+      },
+      {
+        method: 'POST', path: '/api/v2/export/transactions-v3',
+        summary: '批量推送（V3 优化版）',
+        desc: '同 V2.0 批量语义（组装/代推/dryRun/raw）。发给 partner 的 payload 只含 transcationEventTypeList（顶层无 screenshots，截图已合并进每个 entry 的 transcationProperties，消费方单表存储）。',
+        params: [
+          { name: 'trajectoryIds', type: 'number[]', required: true, in: 'body', desc: '勾选的轨迹 id', example: '[38]' },
+          { name: 'systemId', type: 'string', in: 'body', desc: '对方系统 id（缺省 98）', example: '98' },
+          { name: 'projectId', type: 'string', in: 'body', desc: '对方项目 id（缺省 31）', example: '31' },
+          { name: 'dryRun', type: 'boolean', in: 'body', desc: 'true 时不代推' },
+          { name: 'raw', type: 'boolean', in: 'body', desc: 'true 时仅返回合并 envelope' },
+        ],
+        reqExample: J({ trajectoryIds: [38], systemId: '98', projectId: '31' }),
+        notes: [
+          'payload 只含 transcationEventTypeList（顶层无 screenshots）',
+          'transcationProperties 统一 schema，截图条目与控件步骤条目同构；用 type 字段区分条目种类（§8 层级类型）：page=页面截图、popup=弹窗截图、tab=tab页签、collapse=折叠面板、section=区块/分区、wizard=步骤向导面板、card=卡片、object=业务对象',
+          '中间节点：type=section/tab/wizard/card/collapse（按 region_id 段 role 映射），用 propertiesID/propertiesPID 表达分区父子层级（同页同名控件可区分）；无截图/坐标/action 字段（screenshot=[]、rect=""、elementType/eventTypeValue 空）；main/shell-header/shell-aside/other 等结构性 role 跳过不建节点',
+          '截图条目现在按页面级（page/popup）输出：page.regionId=pageKey，popup.regionId=popupKey，popup.propertiesPID 指向所属 page 截图条目；不再按 phase 输出 goal 长图',
+          '截图条目：eventTypeValue=click、eventTypeName=点击、elementType="、"mothed=空、type=page/popup、screenshot=[MinIO 永久直链]数组；page.rect=""，popup.rect=弹窗在页面长图上的位置（JSON 字符串，可选，有值才用于前端叠加展示）',
+          '控件步骤条目：eventTypeValue=click/input/...、elementType=xpath、mothed=By.XPATH、type=object、screenshot=[]空数组、rect=坐标 JSON 字符串或""、attr={disabled,required,readonly} 布尔结构（新录制恒有，旧数据/非控件为 {}）；弹窗内控件 rect 相对弹窗截图',
+          'propertiesID 为字符串顺序号（截图先占 "1".."N"，中间节点与控件续接 "N+1"..）；propertiesPID=所属截图条目或中间节点的 id（字符串，控件→截图关联键）；page 截图 propertiesPID="0"（无父），popup 截图 propertiesPID=所属 page 截图 id',
+          'rect 为 JSON 字符串（四值坐标，如 \'{"x1":0.46,"y1":0.11,"x2":0.66,"y2":0.12}\'，无值给 ""），realLabel/regionId/regionLabel/screenshot 统一恒有（无值给 ""/[]）；无 scanIndex、无 id/pid/label（改 propertiesID/propertiesPID/realLabel，均为字符串）',
+          '页面级截图覆盖校验：可定位的 object（有 elementType/regionId/rect/realLabel）必须有父截图条目；无 element_json 的可导出步骤不参与覆盖校验；仅 stats.coverageMode=page_level（新录制）时缺失阻断推送——单条 push 409 code=page_level_screenshot_missing、批量该项 build failed；legacy_phase_fallback（存量旧数据）缺失不阻断，缺失数/键见 stats.missingPageLevelScreenshots / missingPageLevelKeys（消费方据此识别存量兼容风险）',
         ],
       },
     ],

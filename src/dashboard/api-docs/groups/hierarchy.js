@@ -2,6 +2,11 @@
  * API group(s): hierarchy, sys-dict — extracted from catalog.js.
  * Keep in sync with src/routes/v2/*.js
  */
+
+/** @typedef {{ name: string, type: string, required?: boolean, in?: 'path'|'query'|'body', desc: string, example?: string }} Param */
+/** @typedef {{ method: string, path: string, summary: string, desc?: string, params?: Param[], reqExample?: string, respExample?: string, notes?: string[], deprecated?: boolean, tryable?: boolean }} Endpoint */
+/** @typedef {{ id: string, name: string, description: string, endpoints: Endpoint[] }} TagGroup */
+
 import { J } from './_j.js';
 
 /** @type {TagGroup[]} */
@@ -52,14 +57,14 @@ export const GROUP_HIERARCHY = [
         method: 'GET', path: '/api/v2/systems/{systemId}/accounts',
         summary: '系统下账号列表',
         params: [{ name: 'systemId', type: 'number', required: true, in: 'path', example: '1' }],
-        respExample: J([{ id: 10, systemId: 1, name: '测试员', loginUrl: 'https://...', username: 'u' }]),
+        respExample: J([{ id: 10, systemId: 1, name: '测试员', loginUrl: 'https://...', account: 'u' }]),
       },
       {
         method: 'POST', path: '/api/v2/systems/{systemId}/accounts',
         summary: '创建系统账号',
         params: [{ name: 'systemId', type: 'number', required: true, in: 'path', example: '1' }],
-        reqExample: J({ name: '测试员', loginUrl: 'https://example.com/login', username: 'u', password: 'p' }),
-        respExample: J({ id: 10, systemId: 1, name: '测试员', loginUrl: 'https://...', username: 'u', password: 'p' }),
+        reqExample: J({ name: '测试员', loginUrl: 'https://example.com/login', account: 'u', password: 'p' }),
+        respExample: J({ id: 10, systemId: 1, name: '测试员', loginUrl: 'https://...', account: 'u', password: 'p' }),
       },
       {
         method: 'GET', path: '/api/v2/system-accounts/{id}',
@@ -70,7 +75,7 @@ export const GROUP_HIERARCHY = [
         method: 'PUT', path: '/api/v2/system-accounts/{id}',
         summary: '更新账号',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '10' }],
-        reqExample: J({ name: '测试员', loginUrl: 'https://...', username: 'u', password: 'p' }),
+        reqExample: J({ name: '测试员', loginUrl: 'https://...', account: 'u', password: 'p' }),
       },
       {
         method: 'DELETE', path: '/api/v2/system-accounts/{id}',
@@ -121,12 +126,28 @@ export const GROUP_HIERARCHY = [
         summary: '删除功能',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '3' }],
       },
+      {
+        method: 'GET', path: '/api/v2/hierarchy/coverage',
+        summary: '功能执行覆盖报表（覆盖=有绑定轨迹；含最近执行/批量成功率/KB卡数明细）',
+        params: [
+          { name: 'systemId', type: 'number', required: false, in: 'query', desc: '限定系统子树' },
+          { name: 'type', type: 'string', required: false, in: 'query', desc: 'function(默认,仅功能节点)|all(含系统/模块聚合行)' },
+        ],
+        respExample: J({
+          rows: [{
+            nodeId: 111, type: 3, name: '新增对公授信管理', path: '信贷系统/授信管理/新增对公授信管理',
+            trajCount: 4, lastExecutedAt: '2026-09-01T10:00:00.000Z',
+            batchTotal: 12, batchSuccess: 10, kbCards: 1, covered: true,
+          }],
+          summary: { totalFunctions: 386, coveredFunctions: 57, coverageRate: 0.148 },
+        }),
+      },
     ],
   },
   {
     id: 'sys-dict',
     name: '字典管理',
-    description: '通用字典类型与数据（sys_dict_type / sys_dict_data）；特殊元素分类用 dict_type=special_element_tag',
+    description: '通用字典类型与数据（sys_dict_type / sys_dict_data）；特殊元素分类用 dict_type=special_element_tag；消息类型 dict_type=sys_msg_type（1=批量导入任务）',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/system/dict/type',

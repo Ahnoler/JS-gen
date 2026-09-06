@@ -1,0 +1,68 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "rating",
+  "flow": "集团客户评级重评",
+  "aliases": [
+    "集团评级重评",
+    "集团客户重评"
+  ],
+  "hash_markers": [
+    "ZJJK00096269",
+    "ZJJK00110065",
+    "ZJJK00132711",
+    "wf_rating_005",
+    "FS00020695"
+  ],
+  "keywords": [
+    "评级重评",
+    "发起风险阻断",
+    "重新评级",
+    "民营评分模型"
+  ],
+  "menu_path": "评级管理/集团客户评级",
+  "preconditions": [
+    "集团客户有「生效」评级结果且非在途状态；无其他在途流程；当月评级次数上限 300 次",
+    "默认评级发生类型=重新评级；客户名称/编号自动填充且名称不可编辑；模板自动匹配",
+    "确定后校验链与后续流程同主链「集团客户评级新增」（见 rating-group-apply.json）"
+  ],
+  "steps": [
+    {
+      "name": "集团客户评级申请主页（选中记录）",
+      "leafRef": "wet-test.md 叶34 (ZJJK00096269)",
+      "verify": "match",
+      "note": "选中「通过」记录点【评级重评】；列表默认不加载需先查询"
+    },
+    {
+      "name": "发起风险阻断主页（重评向导）",
+      "leafRef": "wet-test.md 叶35 (ZJJK00110065)",
+      "verify": "match",
+      "wizard_steps": ["1 基本信息", "2 风险阻断"],
+      "buttons": ["下一步", "上一步", "确定", "返回"],
+      "note": "新增/重评共用「发起风险阻断主页」；湿测走到风险阻断步总校验结果=通过即止，未点确定"
+    },
+    {
+      "name": "选择客户及模板（集团重评，只读）",
+      "leafRef": "wet-test.md 叶36 (ZJJK00132711)",
+      "verify": "match",
+      "fields": [{"客户名称": "自动填充，不可编辑"}, {"模型名称": "自动匹配（如民营评分模型），禁用"}],
+      "note": "重评场景自动填充并自动匹配模板"
+    },
+    {
+      "name": "任务页及后续流程（复用集团新增链）",
+      "leafRef": "wet-test.md 叶37 (ZJJK00096280)；辅叶38 (ZJJK00096272)、叶39 (ZJJK00096358)、叶40 (ZJJK00096273)、叶41 (ZJJK00096275)、叶42 (ZJJK00132710)",
+      "verify": "match",
+      "note": "四步任务页（基本信息/影像资料/风险阻断/意见信息）+ 7 标签，明细同 rating-group-apply.json；提交/审批/生效流程同链"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "提交流程/分社审查岗审批（复用集团新增链 blocked 叶）",
+      "leafRefs": ["wet-test.md 叶43 (ZJJK00132717)", "wet-test.md 叶44 (ZJJK00132721)", "wet-test.md 叶45 (ZJJK00110163)"],
+      "verify": "blocked",
+      "reason": "同 rating-group-apply.json pendingSteps：只读任务页无提交按钮；无第二节点在途审批任务",
+      "retry_condition": "同主链3（待集团草稿修改进入意见信息步；待集团流程推进到分社审查岗审批节点）"
+    }
+  ],
+  "sourceRefs": [34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45],
+  "coverage": {"total": 12, "match": 9, "drift": 0, "blocked": 3, "notFound": 0, "gate": "partial"}
+}

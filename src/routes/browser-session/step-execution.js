@@ -4,15 +4,34 @@ import os from 'os';
 import { state } from '../../state.js';
 import { upsertPhaseDescription } from '../../services/trajectory-service.js';
 import * as execSession from '../../executor-session-client.js';
+import * as slotLease from '../../executor-slot-lease.js';
 import { broadcastWatcherStatus } from './broadcasts.js';
 import { bindExecutorSessionEvents } from './executor-events.js';
 import { handleSessionMessage } from './session-message.js';
 
-async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel }) {
+/**
+ * Single-step agent execution for both executor (remote WS) and local
+ * shared-browser (Python stdin/stdout) modes. Wires phase description upsert,
+ * cancellation, and session-message dispatch.
+ */
+
+/**
+ * Execute one agent step on a remote executor session (WS fan-out).
+ * @param {object} opts step options
+ * @param {object} opts.session target session state
+ * @param {string} opts.task agent instruction text
+ * @param {number} [opts.maxSteps] max steps for the agent
+ * @param {string} [opts.businessDataFile] path to business data file
+ * @param {number} [opts.phaseNumber] UI phase number
+ * @param {number|string} [opts.trajectoryDbId] bound trajectory DB id
+ * @param {{ send: (event: string, data: unknown) => void, end: () => void, onAbort: (cb: () => void) => void }} opts.channel SSE/WS push channel
+ * @returns {Promise<void>}
+ */
+async function executeExecutorStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel }) {
   if (session.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
   if (!session.executorNodeUuid) return channel.send('error', { message: 'Executor session not bound' });
 
-  if (caseDataFile) session.caseDataFile = caseDataFile;
+  if (businessDataFile) session.businessDataFile = businessDataFile;
   session.busy = true;
   broadcastWatcherStatus();
 
@@ -76,6 +95,14 @@ async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phas
       channel.send('error', { message: `Executor agent process exited (code ${payload.code})` });
       channel.end();
       cleanupListeners();
+      // Crash path: release the executor slot lease and drop the session hub
+      // immediately instead of waiting for the idle-reaper to reclaim them.
+      try {
+        slotLease.releaseBySession?.(session.sessionId);
+      } catch {}
+      try {
+        execSession.removeSessionHub(session.sessionId);
+      } catch {}
       return;
     }
     handleMsg({ type, data: payload });
@@ -90,7 +117,7 @@ async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phas
         instruction: task,
         max_steps: maxSteps || 40,
         phase_number: Number.isFinite(pn) ? pn : stepIndex,
-        case_data_file: session.caseDataFile,
+        business_data_file: session.businessDataFile,
       },
     });
   } catch (writeErr) {
@@ -103,16 +130,28 @@ async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phas
 
 // ── Shared: execute a single step on the global browser agent ──
 // Callers: HTTP+SSE handler (POST /step) and WebSocket handler
-export async function executeAgentStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel }) {
+/**
+ * Execute one agent step — dispatches to executor or local shared-browser path.
+ * @param {object} opts step options
+ * @param {object} opts.session target session state
+ * @param {string} opts.task agent instruction text
+ * @param {number} [opts.maxSteps] max steps for the agent
+ * @param {string} [opts.businessDataFile] path to business data file
+ * @param {number} [opts.phaseNumber] UI phase number
+ * @param {number|string} [opts.trajectoryDbId] bound trajectory DB id
+ * @param {{ send: (event: string, data: unknown) => void, end: () => void, onAbort: (cb: () => void) => void }} opts.channel SSE/WS push channel
+ * @returns {Promise<void>}
+ */
+export async function executeAgentStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel }) {
   if (session.useExecutor) {
-    return executeExecutorStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel });
+    return executeExecutorStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel });
   }
 
   const gb = state.globalBrowser;
   if (gb.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
   if (!gb.ready || !gb.stdin) return channel.send('error', { message: 'Browser not ready' });
 
-  if (caseDataFile) session.caseDataFile = caseDataFile;
+  if (businessDataFile) session.businessDataFile = businessDataFile;
   gb.busy = true;
   broadcastWatcherStatus();
 
@@ -160,7 +199,7 @@ export async function executeAgentStep({ session, task, maxSteps, caseDataFile, 
 
   try {
     const stepData = { instruction: task, max_steps: maxSteps || 30 };
-    if (session.caseDataFile) stepData.case_data_file = session.caseDataFile;
+    if (session.businessDataFile) stepData.business_data_file = session.businessDataFile;
     // Prefer UI phase number so _ACTION_LOG.phase matches 【阶段N】 and DB trajectory_phase
     if (Number.isFinite(pn)) stepData.phase_number = pn;
     gb.stdin.write(JSON.stringify({ event: 'step', data: stepData }) + '\n');

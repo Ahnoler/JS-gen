@@ -1,0 +1,64 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "limit-ctrl-api",
+  "flow": "限额闭环（占用校验→占用→释放→冲正→重算）",
+  "aliases": ["限额占用校验", "限额占用", "限额释放", "限额冲正", "限额重算", "doQotOccupyCheck", "batchQotRecalculationTrans"],
+  "hash_markers": ["doQotOccupyCheck", "batchQotRecalculationTrans", "1.1.13", "1.1.14", "1.1.15", "1.1.16", "1.1.17"],
+  "keywords": ["限额占用", "限额释放", "限额冲正", "限额重算", "业务对象编号", "担保方式", "贷款用途", "维度命中"],
+  "menu_path": "（纯接口，无页面；实证通道=查询交易信息 trdlog）",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】trdlog 1031 笔历史窗口中限额族仅有 doQotOccupyCheck（校验，270/0，最高频）与 batchQotRecalculationTrans（重算，4/0），无限额占用正式交易码（doQotOccupy 类缺位）——限额占用/释放/冲正在测试环境完全无业务发生",
+    "【SUT 实测 2026-09-06】doQotOccupyCheck 与 doOcpCheck 成对同时刻出现（14:37:39/40）=同一业务动作先限额校验再额度校验的编排痕迹",
+    "【SUT 实测 2026-09-06】限额重算与前笔 doOcpRevoke 同时刻成对（13:53:02/03）=「先释放原占用再重算」编排痕迹（规则2 恢复原占用语义）"
+  ],
+  "steps": [
+    {
+      "name": "限额占用校验（doQotOccupyCheck，试算不改数据）",
+      "leafRef": "wet-test.md 叶7 (接口 1.1.13，chapters/13)",
+      "verify": "match",
+      "match_rule": "接口叶：交易码 doQotOccupyCheck，成功 270/失败 0（窗口内最高频）",
+      "req_fields": ["txnsrlno(交易流水号)", "bsnObjNo(业务对象编号=合同号)", "bsnJrnlNo", "cstNo", "cstTp", "ccy", "txnamt(交易金额)", "exrt", "pdNo(产品)", "wrntMod(担保方式\"3\")", "ddln(期限)", "instNo(机构)"],
+      "rules": [
+        "维度字段（机构/产品/期限/担保方式）与文档规则3命中维度对应",
+        "成功 rspData=\"[]\" 空=校验通过（规则3实测吻合；无强/弱明细样本，规则6未验证）；exrt 直接传值（规则2默认1未直接验证）"
+      ]
+    },
+    {
+      "name": "限额重算（batchQotRecalculationTrans）",
+      "leafRef": "wet-test.md 叶11 (接口 1.1.17，chapters/17)",
+      "verify": "match",
+      "match_rule": "接口叶：交易码 batchQotRecalculationTrans，成功 4/失败 0",
+      "req_fields": ["list[{bsnObjNo(业务对象编号)", "cstNo", "txnamt(重算交易金额)", "pdNo", "wrntMod(\"4\")", "ddln", "loanUseTp(贷款用途)}]"],
+      "rules": [
+        "与文档规则1必填对应，且携带新维度字段（pdNo/wrntMod/ddln/loanUseTp）=规则2「按新传入维度重新命中」报文实证",
+        "【SUT 实测 2026-09-06】api-contract：loanUseTp（贷款用途）为文档规则3维度清单中未列的字段（文档 1.1.13/14/17 维度清单均未列）；list[] 批量结构文档未明示（接口名为 batch，观察记录）",
+        "金额回退公式不可只读验证"
+      ]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "限额占用（1.1.14）",
+      "leafRefs": ["wet-test.md 叶8 (接口 1.1.14，chapters/14)"],
+      "verify": "blocked",
+      "reason": "黑名单禁止主动调用；历史窗口无限额占用正式交易码（doQotOccupy 类缺位），业务侧无已发生的限额占用落账可查",
+      "retry_condition": "开放 API 调用通道或发生触发限额占用的业务（如放款），经交易日志与限额台账核对组合/单户限额已用金额公式；补测=API 通道"
+    },
+    {
+      "name": "限额释放（1.1.15）",
+      "leafRefs": ["wet-test.md 叶9 (接口 1.1.15，chapters/15)"],
+      "verify": "blocked",
+      "reason": "同叶8：历史窗口无限额释放交易码（限额占用本身无样本，释放无从发生）；额度侧释放为 doOcpRevoke，限额侧无对应码",
+      "retry_condition": "先发生限额占用（叶8 补测），再释放并核对「按业务对象编号逐限额编号释放」与流水生成；补测=API 通道"
+    },
+    {
+      "name": "限额冲正（1.1.16）",
+      "leafRefs": ["wet-test.md 叶10 (接口 1.1.16，chapters/16)"],
+      "verify": "blocked",
+      "reason": "历史窗口冲正类仅 doReverse（额度冲正），无限额冲正码样本；且限额占用/释放均无发生，冲正前置不成立",
+      "retry_condition": "限额占用→释放链路打通后再验冲正；补测=API 通道"
+    }
+  ],
+  "sourceRefs": [7, 8, 9, 10, 11],
+  "coverage": {"total": 5, "match": 2, "drift": 0, "blocked": 3, "notFound": 0, "gate": "partial"}
+}

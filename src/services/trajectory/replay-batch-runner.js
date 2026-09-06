@@ -10,8 +10,9 @@
  *   AI-fill adding + structured insert (confirmed=0, next batch) — healType=form_structure
  */
 import * as execSession from '../../executor-session-client.js';
+import { runReplayActions } from '../replay-actions.js';
+import { REPLAY_STEP_TIMEOUT_MS } from '#config/config.js';
 import {
-  REPLAY_TIMEOUT_MS,
   HEAL_MAX_STEPS,
   USER_ABORT_CODE,
   isUserAbort,
@@ -23,15 +24,19 @@ import {
 import {
   buildStepHealInstruction,
 } from '../../routes/browser-session/heal-instruction.js';
+import { buildHealContract } from './heal-contract.js';
+import { healDecisionEnabled, routeSuggestedAction } from './heal-decision.js';
 import { broadcast } from '../../ws-server.js';
 import {
   markConsumedActionLog,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import {
   markStepReplayFailed,
   markStepReplayOk,
-} from '../trajectory-step-service.js';
+} from './trajectory-step-service.js';
 import { handleFormStructureCheckpoint } from './form-structure-heal.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import { navigateToFunctionMenu } from './menu-navigation.js';
 
 function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
   const uniqueFailed = [...new Set(failedStepIds)];
@@ -45,6 +50,31 @@ function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
   });
 }
 
+async function forwardReplayEntry(runtime, entry, doSuppress) {
+  return runReplayActions({
+    execSession,
+    sessionId: runtime.sessionId,
+    nodeUuid: runtime.executorNodeUuid,
+    actions: [entry],
+    timeoutMs: REPLAY_STEP_TIMEOUT_MS,
+    stopOnFail: true,
+    isReplay: doSuppress,
+  });
+}
+
+/**
+ * Run the full replay batch: execute each step, handle Type A heal and Type B form-structure.
+ * @param {object} root0 replay batch context
+ * @param {number} root0.tid trajectory DB id
+ * @param {Array<number>} root0.orderedStepIds ordered step DB ids
+ * @param {boolean} root0.doSuppress whether to suppress step persist
+ * @param {object} root0.runtime trajectory runtime object
+ * @param {object} root0.session executor session state
+ * @param {Array<object>} root0.actions action entries to replay
+ * @param {Array<object>} root0.rows DB step rows
+ * @param {Map<number, object>} root0.snapshotsByTrigger form snapshots keyed by trigger step id
+ * @returns {Promise<object>} replay batch result with success/failed counts
+ */
 export async function runReplayBatch({
   tid,
   orderedStepIds,
@@ -63,6 +93,17 @@ export async function runReplayBatch({
   const skippedIds = new Set();
 
   emitReplay('replay:started', tid, { stepIds: orderedStepIds });
+
+  // ── 执行前菜单导航（同菜单跳过/空菜单直接执行/失败不阻断）──
+  try {
+    const trajRow = await trajectoryDao.getById(tid);
+    if (trajRow?.functionId) {
+      const nav = await navigateToFunctionMenu({ runtime, functionId: Number(trajRow.functionId), execSession });
+      if (!nav.navigated) console.log(`[menu-nav] skip: ${nav.reason}`);
+    }
+  } catch (navErr) {
+    console.warn(`[menu-nav] unexpected: ${navErr?.message || navErr}`);
+  }
 
   try {
     for (let i = 0; i < actions.length; i += 1) {
@@ -147,18 +188,15 @@ export async function runReplayBatch({
 
       let result;
       try {
-        const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', REPLAY_TIMEOUT_MS);
-        execSession.forwardStdin({
-          nodeUuid: runtime.executorNodeUuid,
+        result = await runReplayActions({
+          execSession,
           sessionId: runtime.sessionId,
-          event: 'replay_actions',
-          data: {
-            actions: [entry],
-            is_replay: doSuppress,
-            stop_on_fail: true,
-          },
+          nodeUuid: runtime.executorNodeUuid,
+          actions: [entry],
+          timeoutMs: REPLAY_STEP_TIMEOUT_MS,
+          stopOnFail: true,
+          isReplay: doSuppress,
         });
-        result = await doneP;
         await markConsumedActionLog(runtime);
       } catch (e) {
         const msg = e?.message || String(e);
@@ -270,8 +308,131 @@ export async function runReplayBatch({
       });
 
       try {
-        const instruction = buildStepHealInstruction(entry, failResult);
-        await runHealStep(runtime, instruction, HEAL_MAX_STEPS, 'step');
+        const previousAction = i > 0 ? actions[i - 1]?.action || '' : '';
+        const contract = buildHealContract({
+          failedEntry: entry,
+          errorResult: failResult,
+          healType: 'step',
+          maxSteps: HEAL_MAX_STEPS,
+          retryCount: 1,
+          context: { previousAction },
+        });
+        const instruction = buildStepHealInstruction(entry, failResult, { contract });
+        const route = routeSuggestedAction({
+          suggestedAction: contract.reason.suggestedAction,
+          enabled: healDecisionEnabled(),
+        });
+
+        if (route === 'skip') {
+          broadcast('recording:replay_heal', {
+            ...trajScope(tid),
+            stepId,
+            phase: 'done',
+            action: entry.action,
+            message: `skip-by-decision (was: ${failResult})`,
+            confirmed: false,
+            healType: 'step',
+            decision: 'skip',
+          });
+          const last = allResults[allResults.length - 1];
+          if (last) {
+            last.decision = 'skip';
+            last.result = `skipped-by-decision (was: ${failResult})`;
+          }
+          continue;
+        }
+
+        if (route === 'fail') {
+          const msg = `heal decision: fail (${contract.reason.category}) for step ${stepNum} (${entry.action})`;
+          broadcast('recording:replay_heal', {
+            ...trajScope(tid),
+            stepId,
+            phase: 'error',
+            action: entry.action,
+            message: msg,
+            confirmed: false,
+            healType: 'step',
+            decision: 'fail',
+          });
+          emitReplay('replay:finished', tid, {
+            successCount,
+            failedCount: failedStepIds.length,
+            failedStepIds: [...new Set(failedStepIds)],
+            error: msg,
+            healType: 'step',
+          });
+          return buildPayload(tid, doSuppress, rows, allResults, healed, msg, {
+            successCount,
+            failedCount: failedStepIds.length,
+            failedStepIds: [...new Set(failedStepIds)],
+          });
+        }
+
+        if (route === 'retry') {
+          const retryLimit = Math.max(1, Math.min(Number(contract.runtime?.retry_count) || 1, 3));
+          let retriedOk = false;
+          let retryResultText = String(failResult);
+          for (let attempt = 0; attempt < retryLimit; attempt += 1) {
+            if (runtime.abortReplay) break;
+            try {
+              const retryDone = await forwardReplayEntry(runtime, entry, doSuppress);
+              await markConsumedActionLog(runtime);
+              const retryResults = Array.isArray(retryDone?.results) ? retryDone.results : [];
+              const retryRow = retryResults[0] || null;
+              retriedOk = Number(retryDone?.failed || 0) === 0
+                && (retryRow ? !!retryRow.ok : Number(retryDone?.ok || 0) > 0);
+              retryResultText = retryRow?.result || retryDone?.error || String(failResult);
+              if (retriedOk) break;
+            } catch (retryErr) {
+              retriedOk = false;
+              retryResultText = retryErr?.message || String(retryErr);
+            }
+          }
+
+          if (retriedOk) {
+            if (stepId != null) {
+              try { await markStepReplayOk(stepId); } catch { /* ignore */ }
+              const failedIndex = failedStepIds.indexOf(stepId);
+              if (failedIndex !== -1) failedStepIds.splice(failedIndex, 1);
+            }
+            successCount += 1;
+            emitReplay('replay:step', tid, {
+              stepId,
+              status: 'success',
+              index: stepNum,
+              total: actions.length,
+              action: entry.action,
+              decision: 'retry',
+            });
+            const last = allResults[allResults.length - 1];
+            if (last) {
+              last.ok = true;
+              last.confirmed = true;
+              last.decision = 'retry';
+              last.result = `retried-ok (was: ${failResult})`;
+            }
+            broadcast('recording:replay_heal', {
+              ...trajScope(tid),
+              stepId,
+              phase: 'done',
+              action: entry.action,
+              confirmed: false,
+              healType: 'step',
+              decision: 'retry',
+            });
+            continue;
+          }
+
+          if (!runtime.abortReplay) {
+            const last = allResults[allResults.length - 1];
+            if (last) {
+              last.retried = true;
+              last.result = `retry-failed (was: ${failResult}; last: ${retryResultText})`;
+            }
+          }
+        }
+
+        await runHealStep(runtime, instruction, HEAL_MAX_STEPS, 'step', contract);
         await markConsumedActionLog(runtime);
         if (runtime.abortReplay) {
           broadcast('recording:replay_heal', {

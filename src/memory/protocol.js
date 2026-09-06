@@ -8,7 +8,7 @@
 export const KNOWN_EVENT_TYPES = new Set([
   'action',
   'phase_done',
-  'case_saved',
+  'business_saved',
   'case_read',
   'contract',
   'summary',
@@ -24,7 +24,7 @@ export const KNOWN_EVENT_TYPES = new Set([
 
 /** 事实来源（reliability 基准见 weight-engine.js）。 */
 export const FACT_SOURCES = new Set([
-  'requirement', // 需求/案例数据（base_weight 1.0，不可被 LLM 覆盖）
+  'requirement', // 需求/业务数据（base_weight 1.0，不可被 LLM 覆盖）
   'user',
   'page',
   'rule',
@@ -53,7 +53,7 @@ export const AUDIT_STATUSES = new Set(['pending', 'passed', 'failed']);
 
 /** 事件来源（Node 侧接收时允许的取值）。 */
 export const EVENT_SOURCES = new Set([
-  'requirement', // 需求/案例数据摄取（权威）
+  'requirement', // 需求/业务数据摄取（权威）
   'agent',
   'cdp',
   'manual',
@@ -64,21 +64,33 @@ export const EVENT_SOURCES = new Set([
   'history', // P2-2 历史交易复用
 ]);
 
-/** 规范化事件类型：空/超长回退 'system'，其余原样保留（允许未来新增类型）。 */
+/**
+ * 规范化事件类型：空/超长回退 'system'，其余原样保留（允许未来新增类型）。
+ * @param {string} raw Raw event type.
+ * @returns {string} Normalized event type.
+ */
 export function normalizeEventType(raw) {
   const v = String(raw ?? '').trim();
   if (!v || v.length > 64) return 'system';
   return v;
 }
 
-/** 规范化来源。 */
+/**
+ * 规范化来源。
+ * @param {string} raw Raw source string.
+ * @returns {string} Normalized source (falls back to 'agent').
+ */
 export function normalizeSource(raw) {
   const v = String(raw ?? '').trim();
   if (!v || v.length > 32) return 'agent';
   return EVENT_SOURCES.has(v) ? v : 'agent';
 }
 
-/** 规范化立场。 */
+/**
+ * 规范化立场。
+ * @param {string} raw Raw stance string.
+ * @returns {string} Normalized stance (falls back to 'neutral').
+ */
 export function normalizeStance(raw) {
   const v = String(raw ?? '').trim();
   return STANCES.has(v) ? v : 'neutral';

@@ -1,0 +1,35 @@
+{
+  "flow": "授用一体（额度注册并占用一步闭环，lmtRgstAndOcp）",
+  "aliases": [
+    "额度注册并占用",
+    "lmtRgstAndOcp",
+    "授用一体"
+  ],
+  "hash_markers": [
+    "lmtRgstAndOcp",
+    "verfInd",
+    "1.1.12"
+  ],
+  "keywords": [
+    "注册并占用",
+    "校验模式",
+    "lmtRgst",
+    "lmtOcp",
+    "创建机构",
+    "创建人员",
+    "回滚",
+    "verfInd"
+  ],
+  "menu_path": "（纯接口，无页面；实证通道=查询交易信息 trdlog）",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】交易码 lmtRgstAndOcp（成功 52/失败 12）；失败原文 `hdlUser经办人为空`=规则1 创建机构/创建人员必传强校验"
+  ],
+  "nodes": [
+    {
+      "id": "额度注册并占用-lmtrgstandocp-授用一体",
+      "page": "额度注册并占用（lmtRgstAndOcp，授用一体）",
+      "enter": "菜单 （纯接口，无页面；实证通道=查询交易信息 trdlog）"
+    }
+  ],
+  "source": "req-promote 2026-09-06（湿测叶 1 张，match 1/drift 0）"
+}

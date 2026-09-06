@@ -1,3 +1,6 @@
+/**
+ * DAO for the `system` table — hierarchical system/module/function node tree with UUID ids.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow } from './helpers.js';
 import {
@@ -35,7 +38,11 @@ function assertType(type) {
   return t;
 }
 
-/** Raw camelCase row without API aliases (for ancestry maps). */
+/**
+ * Raw camelCase row without API aliases (for ancestry maps).
+ * @param {object} row DB row
+ * @returns {object|null} normalized raw node, or null when row is null
+ */
 export function fromRaw(row) {
   if (!row) return null;
   const n = fromDbRow(row);
@@ -55,10 +62,26 @@ export function fromRaw(row) {
     sortOrder: n.sortOrder ?? 0,
     createdAt: n.createdAt,
     updatedAt: n.updatedAt,
+    umlEcd: n.umlEcd || '',
+    pdCmptEcd: n.pdCmptEcd || '',
+    source: n.source || '',
+    menuXpath: n.menuXpath || '',
+    unmatchedFlag: n.unmatchedFlag ?? 0,
+    removedFlag: n.removedFlag ?? 0,
+    intermediateFlag: n.intermediateFlag ?? 0,
+    menuPushStatus: n.menuPushStatus || '',
+    menuPushVersion: Number(n.menuPushVersion) || 0,
+    menuPushAt: n.menuPushAt ?? null,
+    menuPushSyncedAt: n.menuPushSyncedAt ?? null,
+    menuPushError: n.menuPushError || '',
   };
 }
 
-/** Map DB row → API-shaped node (keeps processId/functionId/moduleId aliases for UI). */
+/**
+ * Map DB row → API-shaped node (keeps processId/functionId/moduleId aliases for UI).
+ * @param {object} row DB row
+ * @returns {object|null} API-shaped node, or null when row is null
+ */
 export function shapeNode(row) {
   if (!row) return null;
   const n = fromRaw(row);
@@ -86,6 +109,13 @@ function shapeNodes(rows) {
   return rows.map(shapeNode);
 }
 
+/**
+ * List nodes of a given type, optionally filtered by parent, ordered by sort_order then id.
+ * @param {number} type node type (1=system, 2=module, 3=function)
+ * @param {object} [opts] 选项
+ * @param {number} [opts.parentId] parent node id (0/ROOT for system roots)
+ * @returns {Promise<object[]>} API-shaped node entities
+ */
 export async function listByType(type, { parentId } = {}) {
   assertType(type);
   let q = getDB()(TABLE).where({ type });
@@ -106,11 +136,18 @@ export async function listByType(type, { parentId } = {}) {
   return shapeNodes(rows);
 }
 
-/** List root systems (type=1, parent_id=0). */
+/**
+ * List root systems (type=1, parent_id=0).
+ * @returns {Promise<object[]>} API-shaped root system nodes
+ */
 export async function list() {
   return listByType(NODE_TYPE.SYSTEM, { parentId: ROOT_NODE_ID });
 }
 
+/**
+ * List all nodes as raw camelCase rows ordered by type/sort_order/id.
+ * @returns {Promise<object[]>} raw node entities
+ */
 export async function listAllRaw() {
   const rows = await getDB()(TABLE).orderBy([
     { column: 'type', order: 'asc' },
@@ -120,14 +157,21 @@ export async function listAllRaw() {
   return rows.map(fromRaw);
 }
 
-/** All hierarchy nodes as API-shaped flat list (parentId links). */
+/**
+ * All hierarchy nodes as API-shaped flat list (parentId links).
+ * @returns {Promise<object[]>} API-shaped node entities
+ */
 export async function listAll() {
   return listFiltered({});
 }
 
 /**
  * Flat list with optional filters.
- * @param {{ type?: number|string, keyword?: string, limit?: number }} [opts]
+ * @param {object} [opts] 筛选选项
+ * @param {number|string} [opts.type] filter by node type
+ * @param {string} [opts.keyword] LIKE search on name
+ * @param {number} [opts.limit] max rows (clamped 1..500)
+ * @returns {Promise<object[]>} API-shaped node entities
  */
 export async function listFiltered({ type, keyword, limit } = {}) {
   let q = getDB()(TABLE);
@@ -150,8 +194,14 @@ export async function listFiltered({ type, keyword, limit } = {}) {
   return shapeNodes(rows);
 }
 
-export async function listByParent(parentId) {
-  let q = getDB()(TABLE);
+/**
+ * List child nodes of a parent ordered by sort_order then id.
+ * @param {number} parentId parent node id (0/ROOT for top level)
+ * @param {object|null} [db] optional knex instance（事务内传 trx）
+ * @returns {Promise<object[]>} API-shaped node entities
+ */
+export async function listByParent(parentId, db = null) {
+  let q = (db || getDB())(TABLE);
   if (isRootParentId(parentId)) {
     q = q.andWhere(function rootParent() {
       this.where({ parent_id: ROOT_NODE_ID }).orWhereNull('parent_id');
@@ -163,34 +213,74 @@ export async function listByParent(parentId) {
   return shapeNodes(rows);
 }
 
+/**
+ * List modules (processes) under a system.
+ * @param {number} systemId parent system id
+ * @returns {Promise<object[]>} API-shaped module nodes
+ */
 export async function listProcesses(systemId) {
   return listByType(NODE_TYPE.MODULE, { parentId: systemId });
 }
 
+/**
+ * Alias for listProcesses — modules under a system.
+ * @param {number} systemId parent system id
+ * @returns {Promise<object[]>} API-shaped module nodes
+ */
 export async function listModules(systemId) {
   return listProcesses(systemId);
 }
 
+/**
+ * List functions under a module.
+ * @param {number} moduleId parent module id
+ * @returns {Promise<object[]>} API-shaped function nodes
+ */
 export async function listFunctions(moduleId) {
   return listByType(NODE_TYPE.FUNCTION, { parentId: moduleId });
 }
 
-export async function getById(id) {
-  const row = await getDB()(TABLE).where({ id }).first();
+/**
+ * Fetch a single node by id (API-shaped).
+ * @param {number} id 主键
+ * @param {object|null} [db] optional knex instance
+ * @returns {Promise<object|null>} API-shaped node or null when not found
+ */
+export async function getById(id, db = null) {
+  const client = db || getDB();
+  const row = await client(TABLE).where({ id }).first();
   return shapeNode(row);
 }
 
-export async function getRawById(id) {
-  const row = await getDB()(TABLE).where({ id }).first();
+/**
+ * Fetch a single node by id (raw, no API aliases).
+ * @param {number} id 主键
+ * @param {object|null} [db] optional knex instance
+ * @returns {Promise<object|null>} raw node entity or null when not found
+ */
+export async function getRawById(id, db = null) {
+  const client = db || getDB();
+  const row = await client(TABLE).where({ id }).first();
   return fromRaw(row);
 }
 
+/**
+ * Fetch a node by its system_id (UUID).
+ * @param {string} systemId UUID
+ * @returns {Promise<object|null>} API-shaped node or null when not found
+ */
 export async function getByUuid(systemId) {
   const row = await getDB()(TABLE).where({ system_id: systemId }).first();
   return shapeNode(row);
 }
 
-/** Fuzzy match on name; returns shaped nodes. */
+/**
+ * Fuzzy match on name; returns shaped nodes.
+ * @param {string} keyword name search term
+ * @param {object} [opts] 选项
+ * @param {number} [opts.limit] max rows (clamped 1..200)
+ * @returns {Promise<object[]>} API-shaped node entities
+ */
 export async function searchByName(keyword, { limit = 50 } = {}) {
   const q = String(keyword || '').trim();
   if (!q) return [];
@@ -201,7 +291,14 @@ export async function searchByName(keyword, { limit = 50 } = {}) {
   return shapeNodes(rows);
 }
 
-export async function create(data) {
+/**
+ * Create a node (system/module/function) with parent validation and return the created entity.
+ * @param {object} data camelCase node fields (type/name/parentId required)
+ * @param {object|null} [db] optional knex instance
+ * @returns {Promise<object|null>} created API-shaped node entity
+ */
+export async function create(data, db = null) {
+  const client = db || getDB();
   const type = assertType(data.type ?? NODE_TYPE.SYSTEM);
   let parentId = data.parentId;
 
@@ -215,7 +312,7 @@ export async function create(data) {
       throw Object.assign(new Error('模块/功能必须指定有效 parentId'), { code: 'VALIDATION' });
     }
     parentId = +parentId;
-    const parent = await getRawById(parentId);
+    const parent = await getRawById(parentId, client);
     if (!parent) throw Object.assign(new Error('父节点不存在'), { code: 'NOT_FOUND' });
     if (type === NODE_TYPE.MODULE && parent.type !== NODE_TYPE.SYSTEM) {
       throw Object.assign(new Error('模块的父节点必须是系统（type=1）'), { code: 'VALIDATION' });
@@ -236,20 +333,44 @@ export async function create(data) {
     description: data.description ?? null,
     url: type === NODE_TYPE.SYSTEM ? String(data.url ?? '').trim() : '',
     sortOrder: data.sortOrder ?? 0,
+    umlEcd: String(data.umlEcd ?? '').trim(),
+    pdCmptEcd: String(data.pdCmptEcd ?? '').trim(),
+    source: String(data.source ?? '').trim(),
+    menuXpath: String(data.menuXpath ?? '').trim(),
+    unmatchedFlag: data.unmatchedFlag ? 1 : 0,
+    removedFlag: data.removedFlag ? 1 : 0,
+    intermediateFlag: data.intermediateFlag ? 1 : 0,
+    menuPushStatus: data.menuPushStatus || '',
+    menuPushVersion: data.menuPushVersion ?? 0,
+    menuPushAt: data.menuPushAt ?? null,
+    menuPushSyncedAt: data.menuPushSyncedAt ?? null,
+    menuPushError: data.menuPushError || '',
   };
   if (!insert.systemId) {
     const { randomUUID } = await import('crypto');
     insert.systemId = randomUUID();
   }
-  const [id] = await getDB()(TABLE).insert(toDbRow(insert));
-  return getById(id);
+  const [id] = await client(TABLE).insert(toDbRow(insert));
+  return getById(id, client);
 }
 
-export async function update(id, data) {
-  const existing = await getRawById(id);
+/**
+ * Update a node by id (name/description/sortOrder; url only for systems) and return the updated entity.
+ * @param {number} id 主键
+ * @param {object} data partial camelCase node fields
+ * @param {object|null} [db] optional knex instance
+ * @returns {Promise<object|null>} updated API-shaped node entity
+ */
+export async function update(id, data, db = null) {
+  const client = db || getDB();
+  const existing = await getRawById(id, client);
   if (!existing) return null;
 
   const allowed = ['name', 'description', 'sortOrder'];
+  allowed.push('umlEcd', 'pdCmptEcd', 'source', 'menuXpath', 'unmatchedFlag');
+  allowed.push('removedFlag');
+  allowed.push('intermediateFlag');
+  allowed.push('menuPushStatus', 'menuPushVersion', 'menuPushAt', 'menuPushSyncedAt', 'menuPushError');
   if (existing.type === NODE_TYPE.SYSTEM) allowed.push('url');
 
   const patch = {};
@@ -260,14 +381,22 @@ export async function update(id, data) {
       else patch[key] = data[key];
     }
   }
+  if (patch.unmatchedFlag !== undefined) patch.unmatchedFlag = patch.unmatchedFlag ? 1 : 0;
+  if (patch.removedFlag !== undefined) patch.removedFlag = patch.removedFlag ? 1 : 0;
+  if (patch.intermediateFlag !== undefined) patch.intermediateFlag = patch.intermediateFlag ? 1 : 0;
   if (patch.name !== undefined && !patch.name) {
     throw Object.assign(new Error('name is required'), { code: 'VALIDATION' });
   }
-  if (!Object.keys(patch).length) return getById(id);
-  await getDB()(TABLE).where({ id }).update(toDbRow(patch));
-  return getById(id);
+  if (!Object.keys(patch).length) return getById(id, client);
+  await client(TABLE).where({ id }).update(toDbRow(patch));
+  return getById(id, client);
 }
 
+/**
+ * Delete a node by id; protects root and seed nodes.
+ * @param {number} id 主键
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(id) {
   const row = await getRawById(id);
   if (!row) return 0;
@@ -285,6 +414,10 @@ export async function remove(id) {
   return getDB()(TABLE).where({ id }).del();
 }
 
+/**
+ * Resolve the default seed function id (for trajectories without an explicit function).
+ * @returns {Promise<number|null>} default function id or null when not found
+ */
 export async function getDefaultFunctionId() {
   const row = await getDB()(TABLE)
     .where({ type: NODE_TYPE.FUNCTION, system_id: SEED_FUNCTION_ID })

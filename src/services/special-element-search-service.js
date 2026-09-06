@@ -11,6 +11,11 @@ function tokenize(text) {
 }
 
 /** Normalize common typos / aliases so tag「法定责任人」matches UI「法定代表人». */
+/**
+ * Normalize common typos / aliases so tag 法定责任人 matches UI 法定代表人.
+ * @param {string} text input text
+ * @returns {string} normalized text
+ */
 function normalizeLegalAliases(text) {
   return String(text || '')
     .toLowerCase()
@@ -29,7 +34,13 @@ function stepSummary(steps = []) {
 
 /**
  * Hybrid lexical search within a system.
- * @param {{ systemId: number, description?: string, keyword?: string, limit?: number, includeSteps?: boolean }} opts
+ * @param {object} opts search options
+ * @param {number} opts.systemId system DB id
+ * @param {string} [opts.description] natural-language description to match
+ * @param {string} [opts.keyword] keyword to match
+ * @param {number} [opts.limit] max results (default 3)
+ * @param {boolean} [opts.includeSteps] whether to include full step data (default false)
+ * @returns {Promise<Array<object>>} scored special-element candidates with match reasons
  */
 export async function searchSpecialElements({
   systemId,
@@ -193,7 +204,11 @@ export async function searchSpecialElements({
   return out;
 }
 
-/** Lightweight display payload for phase snapshot / analyze response. */
+/**
+ * Lightweight display payload for phase snapshot / analyze response.
+ * @param {Array<object>} candidates scored special-element candidates
+ * @returns {Array<object>} display payload with selected fields
+ */
 export function toDisplayCandidates(candidates = []) {
   return candidates.map((c) => ({
     id: c.id,

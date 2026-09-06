@@ -21,6 +21,13 @@ import { normalizeFormLabel } from './text.js';
 import { withOccurrence } from './scope.js';
 import { xpathLiteral } from './text.js';
 
+/**
+ * Build the preferred smart (relative / semantic) xpath for an element meta.
+ * Dispatches by `targetKind` to per-control builders, then falls back to
+ * form-label / placeholder / stable-attr / generic clickable paths.
+ * @param {object} opts Element meta (tag, text, formLabel, xpathFull, className, container, targetKind, …).
+ * @returns {string} Smart xpath, or empty string when no anchor is available.
+ */
 export function buildXPathSmart(opts = {}) {
   const {
     tag = '',
@@ -206,8 +213,3 @@ export function buildXPathSmart(opts = {}) {
   const scopeKind = detectContainerKind(xpathFull, cls, container);
   return withOccurrence(scopedXPath(local, scopeKind), occurrence);
 }
-
-/**
- * @param {{ xpathSmart?: string, xpathFull?: string, cssSelector?: string }} opts
- * @returns {Array<{ type: string, value: string }>}
- */

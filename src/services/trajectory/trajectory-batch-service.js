@@ -7,22 +7,25 @@ import {
   USE_EXECUTOR,
   BATCH_SCHEDULER_INTERVAL_MS,
   BATCH_IMPORT_MAX_ROWS,
-} from '../../../config/config.js';
+} from '#config/config.js';
 import * as batchDao from '../../dao/batch-recording-dao.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import { broadcast } from '../../ws-server.js';
-import { validateFunctionAndAccount } from '../trajectory-account-service.js';
-import { parseBatchExcelBuffer, buildTemplateBuffer } from '../trajectory-batch-excel.js';
+import { validateFunctionAndAccount } from './trajectory-account-service.js';
+import { parseBatchExcelBuffer, buildTemplateBuffer } from './trajectory-batch-excel.js';
 import {
   stopTrajectoryRecordingSafe,
   detachTrajectoryLive,
   cleanupPersistedTrajectoryResources,
-} from '../trajectory-recording-service.js';
+} from './trajectory-recording-service.js';
 import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../../models/constants.js';
 import { pumpAnalyze, pumpDraft } from './batch-analyze.js';
 import { pumpRecord } from './batch-record.js';
 import { computeBatchItemProgress, PHASE_LOOKUP_STATUSES } from './batch-item-progress.js';
+import { insertSysMsgFromBatchJob } from '../sys-msg/sys-msg-service.js';
+import { decodeUploadFilename } from '../../http/decode-upload-filename.js';
+import { defaultJobName } from './batch-job-name.js';
 
 /** @type {Set<string>} in-flight cancel tokens for analyzing items */
 export const cancelledAnalyzeTokens = new Set();
@@ -31,6 +34,16 @@ let schedulerTimer = null;
 let kicking = false;
 let started = false;
 
+/**
+ * Compute a SHA-256 request hash for batch dedup (file + function + account + model + mode).
+ * @param {object} root0 hash inputs
+ * @param {Buffer} root0.fileBuffer uploaded file bytes
+ * @param {number} root0.functionId function node id
+ * @param {number} root0.systemAccountId system account id
+ * @param {string} [root0.model] model name
+ * @param {string} [root0.mode] batch mode (record|draft)
+ * @returns {string} hex digest
+ */
 export function buildRequestHash({
   fileBuffer,
   functionId,
@@ -62,6 +75,12 @@ function normalizeBatchMode(raw) {
   return m;
 }
 
+/**
+ * Enrich batch items with phase-based progress (percent, phase counts, done text).
+ * @param {object[]} items batch items
+ * @param {string} [mode] batch mode (record|draft)
+ * @returns {Promise<object[]>} enriched items
+ */
 export async function enrichBatchItems(items, mode = 'record') {
   const list = Array.isArray(items) ? items : [];
   const ids = [...new Set(list
@@ -85,6 +104,13 @@ export async function enrichBatchItems(items, mode = 'record') {
   });
 }
 
+/**
+ * Broadcast a batch:progress event with job summary + item progress.
+ * @param {number} batchId batch job id
+ * @param {object|null} [item] batch item (null for job-level progress)
+ * @param {object} [extra] extra payload fields
+ * @returns {Promise<object>} progress payload
+ */
 export async function emitProgress(batchId, item = null, extra = {}) {
   const job = await batchDao.getJobById(batchId);
   const summary = await batchDao.summarizeJob(batchId);
@@ -120,6 +146,21 @@ export async function emitProgress(batchId, item = null, extra = {}) {
   return payload;
 }
 
+async function notifyBatchTerminalMessage(job, summary) {
+  try {
+    await insertSysMsgFromBatchJob(job, summary);
+  } catch (err) {
+    console.warn('[sys-msg] insert skipped:', err?.message || err);
+  }
+}
+
+/**
+ * Finalize a batch job (cancel or derive terminal status) and broadcast batch:done.
+ * @param {number} batchId batch job id
+ * @param {object} [root0] options
+ * @param {boolean} [root0.cancelled] whether cancellation was requested
+ * @returns {Promise<object>} final job row
+ */
 export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
   const job = await batchDao.getJobById(batchId);
   if (!job || BATCH_JOB_TERMINAL.includes(job.status)) return job;
@@ -136,6 +177,8 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
     }
     await batchDao.forceUpdateJob(batchId, { status: 'cancelled' });
     const summary = await batchDao.summarizeJob(batchId);
+    const cancelledJob = await batchDao.getJobById(batchId);
+    await notifyBatchTerminalMessage(cancelledJob, summary);
     try {
       broadcast('batch:done', {
         batchId,
@@ -144,7 +187,7 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
         summary,
       });
     } catch {}
-    return batchDao.getJobById(batchId);
+    return cancelledJob;
   }
 
   const summary = await batchDao.summarizeJob(batchId);
@@ -166,6 +209,8 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
   }
 
   await batchDao.forceUpdateJob(batchId, { status: terminal });
+  const doneJob = await batchDao.getJobById(batchId);
+  await notifyBatchTerminalMessage(doneJob, summary);
   try {
     broadcast('batch:done', {
       batchId,
@@ -174,15 +219,48 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
       summary,
     });
   } catch {}
-  return batchDao.getJobById(batchId);
+  return doneJob;
 }
 
+/**
+ * 任务名候选（搜索下拉）：按 functionId + 关键字模糊去重，最近创建优先；空=全可见语义。
+ * @param {object} root0 query options
+ * @param {number} root0.functionId function node id
+ * @param {string} [root0.keyword] search keyword
+ * @param {string|null} [root0.paasUserId] PaaS user id filter
+ * @param {number} [root0.limit] max results, default 20
+ * @returns {Promise<Array<string>>} distinct task names
+ */
+export async function listBatchTaskNames({ functionId, keyword = '', paasUserId = null, limit = 20 } = {}) {
+  return batchDao.listDistinctNames({
+    functionId: functionId != null && functionId !== '' ? Number(functionId) : undefined,
+    keyword,
+    paasUserId: paasUserId || null,
+    limit,
+  });
+}
+
+/**
+ * Get a paginated batch job view (job meta + enriched items + summary).
+ * @param {number} batchId batch job id
+ * @param {object} [root0] pagination options
+ * @param {number} [root0.page] page number, default 1
+ * @param {number} [root0.pageSize] page size, default 50
+ * @param {string|null} [root0.paasUserId] PaaS user id filter
+ * @returns {Promise<object>} batch job view
+ */
 export async function getBatchJobView(batchId, {
   page = 1,
   pageSize = 50,
+  paasUserId = null,
 } = {}) {
   const job = await batchDao.getJobById(batchId);
   if (!job) {
+    const err = new Error('Batch not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (paasUserId && job.paasUserId && String(job.paasUserId) !== String(paasUserId)) {
     const err = new Error('Batch not found');
     err.statusCode = 404;
     throw err;
@@ -192,12 +270,13 @@ export async function getBatchJobView(batchId, {
   const summary = await batchDao.summarizeJob(batchId);
   return {
     batchId: job.id,
+    name: job.name || '',
     status: job.status,
     mode: job.mode || 'record',
     functionId: job.functionId,
     systemAccountId: job.systemAccountId,
     model: job.model,
-    originalFilename: job.originalFilename,
+    originalFilename: decodeUploadFilename(job.originalFilename),
     idempotencyKey: job.idempotencyKey,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
@@ -210,6 +289,20 @@ export async function getBatchJobView(batchId, {
   };
 }
 
+/**
+ * Import a batch Excel file → create job + items (dedup via request hash).
+ * @param {object} root0 import options
+ * @param {Buffer} root0.fileBuffer uploaded file bytes
+ * @param {string} [root0.originalFilename] original file name
+ * @param {number} root0.functionId function node id
+ * @param {number} root0.systemAccountId system account id
+ * @param {string} [root0.model] model name
+ * @param {string} [root0.idempotencyKey] client idempotency key
+ * @param {string} [root0.mode] batch mode (record|draft)
+ * @param {string} [root0.name] job display name
+ * @param {string|null} [root0.paasUserId] PaaS user id
+ * @returns {Promise<object>} created batch job
+ */
 export async function importBatchFromExcel({
   fileBuffer,
   originalFilename = '',
@@ -218,8 +311,13 @@ export async function importBatchFromExcel({
   model = '',
   idempotencyKey,
   mode: rawMode,
+  name: rawName = '',
+  paasUserId = null,
 } = {}) {
   const mode = normalizeBatchMode(rawMode);
+
+  const taskName = String(rawName || '').trim()
+    || defaultJobName(originalFilename, new Date());
 
   if (mode === 'record' && !USE_EXECUTOR) {
     const err = new Error('Batch import requires USE_EXECUTOR=true');
@@ -250,6 +348,11 @@ export async function importBatchFromExcel({
 
   const existing = await batchDao.getJobByIdempotencyKey(key);
   if (existing) {
+    if (paasUserId && existing.paasUserId && String(existing.paasUserId) !== String(paasUserId)) {
+      const err = new Error('Idempotency-Key 已被其他用户占用，请重新生成');
+      err.statusCode = 409;
+      throw err;
+    }
     if (existing.requestHash !== requestHash) {
       const err = new Error(
         'Idempotency-Key reused with different request content — generate a new key',
@@ -304,7 +407,9 @@ export async function importBatchFromExcel({
       systemAccountId: validated.systemAccountId,
       model: modelId,
       mode,
-      originalFilename: String(originalFilename || ''),
+      originalFilename: decodeUploadFilename(originalFilename),
+      name: taskName,
+      paasUserId,
       status: 'accepted',
     }, items);
   } catch (err) {
@@ -312,6 +417,11 @@ export async function importBatchFromExcel({
     if (/uk_batch_job_idempotency|ER_DUP_ENTRY/i.test(err.message || '')) {
       const again = await batchDao.getJobByIdempotencyKey(key);
       if (again) {
+        if (paasUserId && again.paasUserId && String(again.paasUserId) !== String(paasUserId)) {
+          const conflict = new Error('Idempotency-Key 已被其他用户占用，请重新生成');
+          conflict.statusCode = 409;
+          throw conflict;
+        }
         const view = await getBatchJobView(again.id);
         view._idempotentReplay = true;
         view._httpStatus = BATCH_JOB_TERMINAL.includes(again.status) ? 200 : 202;
@@ -333,6 +443,10 @@ export { buildTemplateBuffer };
 
 // ── Scheduler / workers ───────────────────────────────────────────────
 
+/**
+ * Start the global FIFO batch scheduler (interval-based pump).
+ * @returns {void}
+ */
 export function startBatchScheduler() {
   if (started) return;
   started = true;
@@ -343,6 +457,10 @@ export function startBatchScheduler() {
   kickScheduler();
 }
 
+/**
+ * Kick the scheduler for an immediate pump (avoid waiting for the next interval).
+ * @returns {void}
+ */
 export function kickScheduler() {
   if (kicking) return;
   kicking = true;
@@ -355,6 +473,11 @@ export function kickScheduler() {
 }
 
 
+/**
+ * Request cancellation of a batch job (stops in-flight items, finalizes as cancelled).
+ * @param {number} batchId batch job id
+ * @returns {Promise<object>} updated job row
+ */
 export async function cancelBatch(batchId) {
   const job = await batchDao.getJobById(batchId);
   if (!job) {
@@ -405,6 +528,10 @@ export async function cancelBatch(batchId) {
 /**
  * Called after executor reconnect window on control-plane boot.
  */
+/**
+ * Recover non-terminal batch jobs on control-plane restart (cleanup + re-pump).
+ * @returns {Promise<object[]>} recovered batch job ids
+ */
 export async function recoverBatchJobsOnStartup() {
   const items = await batchDao.listItemsNeedingRecovery();
   for (const item of items) {
@@ -413,17 +540,13 @@ export async function recoverBatchJobsOnStartup() {
         const tid = Number(item.trajectoryId);
         if (tid) {
           const traj = await trajectoryDao.getById(tid).catch(() => null);
-          if (traj?.recordStatus === 'recorded' || traj?.recordStatus === 'completed') {
-            await batchDao.transitionItem(item.id, ['preparing', 'recording'], 'recorded', {
-              clearLease: true,
-              extra: { errorCode: null, errorMessage: null },
+          if (traj?.recordStatus === 'recording') {
+            // 重启中断属于非终结性中断：恢复录制前持久状态基线，不降级。
+            await trajectoryDao.restorePersistentRecordStatus(tid);
+            await trajectoryDao.updateMeta(tid, {
+              isDone: false,
+              isSuccessful: false,
             });
-            await cleanupPersistedTrajectoryResources(tid, {
-              demoteLive: false,
-              reason: 'batch_recovery',
-            });
-            await maybeFinalizeJob(item.batchId);
-            continue;
           }
           await cleanupPersistedTrajectoryResources(tid, {
             demoteLive: true,
@@ -433,7 +556,7 @@ export async function recoverBatchJobsOnStartup() {
         await batchDao.markItemFailed(item.id, ['preparing', 'recording'], {
           version: item.version,
           errorCode: 'INTERRUPTED',
-          errorMessage: 'Interrupted by control-plane restart — draft retained for manual review',
+          errorMessage: 'Interrupted by control-plane restart — trajectory marked failed (录制异常), retry via record/start',
         });
         await maybeFinalizeJob(item.batchId);
         continue;

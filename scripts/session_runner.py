@@ -2,6 +2,7 @@
 Interactive session mode for browser-use agent.
 Reads JSON instructions from stdin, runs agent steps with SSE output.
 """
+import os
 import sys
 import asyncio
 import json
@@ -15,6 +16,7 @@ from .agent_utils import (
     patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, create_llm,
 )
 from .controller import build_controller
+from .controller.actions.replay_timing import budget_for, budget_overrun_hint
 from .recorder import build_recording_hooks
 
 from .agent.service import (
@@ -41,20 +43,17 @@ from .cdp_ports import (  # noqa: F401  (re-exported for compat)
     _wait_cdp_http,
     wait_cdp_http,
 )
-from .event_dispatch import _convert_action_params, _dispatch_event  # noqa: F401
+from .event_dispatch import _dispatch_event  # noqa: F401
 from .trajectory_store import (  # noqa: F401  (re-exported for compat)
     _accumulate_trajectory,
     _handle_reset_trajectory,
-    _handle_save_case_data,
+    _handle_save_business_data,
     _handle_save_trajectory,
 )
 
-# Actions recorded by the custom controller (subset of all browser_use actions)
-_CUSTOM_ACTIONS = {
-    'fill_form_field', 'select_option', 'click_element_by_index',
-    'click_menu_item', 'click_table_row_button', 'click_table_row_radio', 'click_radio',
-    'fill_date_field', 'click_adjacent_button', 'switch_tab', 'close_dialog',
-}
+# Phase-state-key emission for phase-group shot capture: remember the last phase so
+# the first step of a NEW phase reports its state key (phase 开始即采第一张).
+_last_phase_state_key_phase: int | None = None
 
 
 async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=None, goal_tracker=None):
@@ -87,13 +86,22 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=N
         if event == "cancel_step":
             _request_agent_stop(cancel_flag_path, goal_tracker, reason='cancel_step')
             continue
+        if event == "phase_shot_candidate_result":
+            # Agent 运行期间主循环被 await agent.run() 阻塞，ack 无法经主循环到达；
+            # 在此直接解包 future（未知/迟到 ack 静默丢弃），避免 click_save 等满 timeout。
+            try:
+                from .state import resolve_phase_shot_result
+                resolve_phase_shot_result(msg.get("data") or {})
+            except Exception:
+                pass
+            continue
         await stdin_queue.put(msg)
 
 
-async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
+async def _run_cdp_watcher(browser_context, action_queue, business_data_store):
     """In-process quick-action executor — uses the same browser_context as the Agent.
 
-    Shares _ACTION_LOG and case_data_store with the main Agent, so all actions
+    Shares _ACTION_LOG and business_data_store with the main Agent, so all actions
     executed through this watcher are recorded for script assembly.
     No separate CDP connection needed — actions run on the same Playwright context.
     """
@@ -106,7 +114,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
     #         ctx.get_current_page = _get_page
     # Self-heal scene reproduce uses replay_actions → _replay.replay_action_entries
     # (see browser-session.js /rerun), not this CDP watcher loop.
-    ctrl = build_controller(browser_context, case_data_store=case_data_store)
+    ctrl = build_controller(browser_context, business_data_store=business_data_store)
     actions = ctrl.registry.registry.actions
 
     while True:
@@ -125,18 +133,25 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
             # Per-action watcher mode — skip _ensure_scanned, no auto-fill
             # Tag recorded actions as source=cdp for DB persistence
             from .state import set_current_source
-            case_data_store['_watcher_mode'] = True
+            business_data_store['_watcher_mode'] = True
             set_current_source('cdp')
             try:
-                if isinstance(params, list):
-                    result = await act.function(*params)
-                elif isinstance(params, dict):
-                    result = await act.function(**params)
-                else:
-                    result = await act.function()
+                # 操作预算限时（Z6）：按动作预算包 wait_for，超时 → 重观察语义结果
+                budget = budget_for(action_name)
+                try:
+                    if isinstance(params, list):
+                        result = await asyncio.wait_for(act.function(*params), timeout=budget)
+                    elif isinstance(params, dict):
+                        result = await asyncio.wait_for(act.function(**params), timeout=budget)
+                    else:
+                        result = await asyncio.wait_for(act.function(), timeout=budget)
+                except asyncio.TimeoutError:
+                    result = 'budget-timeout | ' + budget_overrun_hint(action_name)
+                    sys.stderr.write(f"[cdp-watcher] budget-timeout: {action_name} > {budget}s\n")
+                    sys.stderr.flush()
                 result_str = str(result)
             finally:
-                case_data_store['_watcher_mode'] = False
+                business_data_store['_watcher_mode'] = False
                 set_current_source('agent')
             sys.stderr.write(f"[cdp-watcher] {action_name}{params} -> {result_str}\n")
             sys.stderr.flush()
@@ -160,39 +175,34 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
             try:
                 from .state import set_current_source
                 set_current_source('agent')
-                case_data_store['_watcher_mode'] = False
+                business_data_store['_watcher_mode'] = False
             except Exception:
                 pass
             if req_id:
                 emit_json({"event": "cdp_action_result", "id": req_id, "result": None, "error": err_str, "entry": None})
 
 
-async def run_session(args):
-    patch_message_manager()
-    patch_planner_prompt()
-    patch_icon_tooltip_labels()
-    llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
+def _env_llm_timeout_sec():
+    """Read LLM_TIMEOUT_MS env → seconds; <=0 → None (no timeout)."""
+    raw = os.getenv('LLM_TIMEOUT_MS', '').strip()
+    if not raw:
+        return None
+    try:
+        ms = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if ms <= 0:
+        return None
+    return ms / 1000.0
 
-    session_id = args.session_id or "unknown"
+async def _ensure_browser_and_cdp(cdp_url, cdp_port, session_id):
+    """browser/CDP 启动段（原 run_session 内 217-241 / 273-288 段逐字搬移）。
 
-    # P0：初始化外部记忆 writer（异步批量上报，失败不阻塞 Agent）
-    from scripts.memory.writer import (
-        configure as configure_memory_writer,
-        start as start_memory_writer,
-        flush as flush_memory_writer,
-        shutdown as shutdown_memory_writer,
-    )
-    configure_memory_writer(session_id=session_id, model=getattr(args, 'model', None))
-    start_memory_writer()
-
-    cdp_url = getattr(args, 'cdp_url', None) or None
-    cdp_port = getattr(args, 'cdp_port', None)
-    if cdp_port is not None:
-        try:
-            cdp_port = int(cdp_port)
-        except (TypeError, ValueError):
-            cdp_port = None
-
+    构建 Playwright 浏览器与 browser_context（窗口尺寸/无 viewport/忽略证书/
+    适配窗口/原生弹窗关闭/SSL 拦截旁路），并急启 Chrome 会话；随后等待 CDP HTTP
+    就绪并探测 ws URL（外部 cdp_url 直连时直接标记就绪）。
+    返回 (browser, browser_context, cdp_port, cdp_ready, cdp_ws_url)。
+    """
     browser, cdp_port, _ = await _build_browser(
         cdp_url=cdp_url,
         cdp_port=cdp_port,
@@ -219,25 +229,6 @@ async def run_session(args):
     await _dismiss_native_js_dialogs(browser_context)
     await _bypass_ssl_interstitial_if_any(browser_context)
 
-    case_data_store = {}  # process-level in-memory store, persists across steps
-    special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
-    cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
-    goal_tracker = {'goals': [], 'stopped': False}
-
-    on_step_start_hook, on_step_end_hook = build_recording_hooks(
-        goal_tracker, cancel_flag_path, case_data_store,
-    )
-    controller = build_controller(
-        browser_context,
-        case_data_store=case_data_store,
-        llm=llm,
-        special_element_candidates_store=special_element_candidates_store,
-    )
-
-    # Start CDP watcher — runs in-process, shares _ACTION_LOG and case_data_store
-    cdp_action_queue = asyncio.Queue()
-    cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, case_data_store))
-
     # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
     cdp_ready = False
     cdp_ws_url = None
@@ -254,6 +245,114 @@ async def run_session(args):
                 "BiB canvas unavailable; AI/manual recording can still run.\n"
             )
             sys.stderr.flush()
+    return browser, browser_context, cdp_port, cdp_ready, cdp_ws_url
+
+
+async def _teardown_session(browser, browser_context, reader_task, cdp_task, cdp_port, cdp_url, keep_browser):
+    """会话关停段（原 run_session 内 489-522 段逐字搬移）。
+
+    取消 stdin/cdp watcher 任务并等待退出、登记 session-end 终截、关闭
+    browser_context，再按 keep_browser 决定软关闭（留 CDP）或硬关闭；
+    异常路径与 finally 顺序与原 run_session 保持一致。
+    """
+    reader_task.cancel()
+    cdp_task.cancel()
+    await asyncio.gather(reader_task, cdp_task, return_exceptions=True)
+    # 会话结束最终截图：正常 / error / cancel / SystemExit 退出路径统一在此捕获
+    # 当前页面（capturedAt='session-end'）；截图失败静默，不阻塞关闭。
+    try:
+        from .state import register_current_page_screenshot
+        await register_current_page_screenshot(browser_context, captured_at='session-end')
+        sys.stderr.write('[session-end] final screenshot registered\n')
+        sys.stderr.flush()
+    except Exception as exc:
+        sys.stderr.write('[session-end] FAILED: ' + type(exc).__name__ + ': ' + str(exc) + '\n')
+        sys.stderr.flush()
+    try:
+        await browser_context.close()
+    except Exception:
+        pass
+    if keep_browser:
+        # Soft close — leave Chromium on CDP (not the normal「释放资源」path).
+        sys.stderr.write(
+            f"Leaving Chrome idle"
+            + (f" on CDP port={cdp_port}" if cdp_port and not cdp_url else "")
+            + (f" via {cdp_url}" if cdp_url else "")
+            + "\n"
+        )
+        sys.stderr.flush()
+    else:
+        try:
+            await browser.close()
+        except Exception as e:
+            sys.stderr.write(f"WARN: browser.close failed: {e}\n")
+            sys.stderr.flush()
+        sys.stderr.write("Browser closed, exiting\n")
+        sys.stderr.flush()
+
+
+async def run_session(args):
+    patch_message_manager()
+    patch_planner_prompt()
+    patch_icon_tooltip_labels()
+    llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None), timeout=_env_llm_timeout_sec())
+
+    session_id = args.session_id or "unknown"
+
+    # P0：初始化外部记忆 writer（异步批量上报，失败不阻塞 Agent）
+    from scripts.memory.writer import (
+        configure as configure_memory_writer,
+        start as start_memory_writer,
+        flush as flush_memory_writer,
+        shutdown as shutdown_memory_writer,
+    )
+    configure_memory_writer(session_id=session_id, model=getattr(args, 'model', None))
+    start_memory_writer()
+
+    cdp_url = getattr(args, 'cdp_url', None) or None
+    cdp_port = getattr(args, 'cdp_port', None)
+    if cdp_port is not None:
+        try:
+            cdp_port = int(cdp_port)
+        except (TypeError, ValueError):
+            cdp_port = None
+
+    browser, browser_context, cdp_port, cdp_ready, cdp_ws_url = await _ensure_browser_and_cdp(
+        cdp_url, cdp_port, session_id,
+    )
+
+    business_data_store = {}  # process-level in-memory store, persists across steps
+    special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
+    cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
+    goal_tracker = {'goals': [], 'stopped': False}
+
+    on_step_start_hook, on_step_end_hook = build_recording_hooks(
+        goal_tracker, cancel_flag_path, business_data_store,
+    )
+    controller = build_controller(
+        browser_context,
+        business_data_store=business_data_store,
+        llm=llm,
+        special_element_candidates_store=special_element_candidates_store,
+    )
+
+    # Start CDP watcher — runs in-process, shares _ACTION_LOG and business_data_store
+    cdp_action_queue = asyncio.Queue()
+    cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, business_data_store))
+
+    def _on_cdp_task_done(t):
+        """记录 cdp watcher 任务异常退出，避免无人观测的静默死亡。"""
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            sys.stderr.write(f"[cdp-watcher] task exited: {type(exc).__name__}: {exc}\n")
+            sys.stderr.flush()
+
+    cdp_task.add_done_callback(_on_cdp_task_done)
+
+    # cdp_ready / cdp_ws_url already computed by _ensure_browser_and_cdp above;
+    # do not re-wait CDP HTTP here (worst case doubled the 45s readiness wait).
 
     ready_payload = {
         "event": "ready",
@@ -288,18 +387,18 @@ async def run_session(args):
     session_state = {
         'session_id': session_id,
         'cumulative_path': cumulative_path,
-        'case_data_store': case_data_store,
+        'business_data_store': business_data_store,
         'special_element_candidates_store': special_element_candidates_store,
         'browser_context': browser_context,
     }
 
-    case_data_loaded = False
+    business_data_loaded = False
     keep_browser = False  # 「释放资源」默认关浏览器；keep_browser=True 才留 CDP
 
     async def _run_step(data, step_idx):
         """Execute one agent step with the given data."""
         nonlocal cumulative_path
-        from .state import set_current_phase
+        from .state import register_current_page_screenshot, set_current_phase
         # Prefer client-provided phase_number (matches 【阶段N】); fallback to step_idx
         phase_num = data.get("phase_number")
         if phase_num is None:
@@ -309,12 +408,30 @@ async def run_session(args):
         except (TypeError, ValueError):
             phase_num = step_idx
         set_current_phase(phase_num)
+        # 新阶段第一步（agent 运行前）：上报当前状态键 → 控制面开组采集第一张。
+        global _last_phase_state_key_phase
+        if _last_phase_state_key_phase != phase_num:
+            _last_phase_state_key_phase = phase_num
+            try:
+                from .state import current_page_level
+                _phase_state_key, _phase_state_name = await current_page_level(browser_context)
+            except Exception:
+                _phase_state_key = ''
+            emit_json({
+                "event": "phase_state_key",
+                "data": {
+                    "phase": phase_num,
+                    "entryId": '',
+                    "beforeKey": _phase_state_key,
+                    "afterKey": _phase_state_key,
+                },
+            })
         agent_running_ref['value'] = True
         try:
             output_path, task_text = await _run_agent_step(
                 data, step_idx, session_id, args, llm, browser_context,
                 controller, goal_tracker, cancel_flag_path,
-                on_step_start_hook, on_step_end_hook, case_data_store, cumulative_path,
+                on_step_start_hook, on_step_end_hook, business_data_store, cumulative_path,
                 special_element_candidates_store=special_element_candidates_store,
             )
         finally:
@@ -323,6 +440,12 @@ async def run_session(args):
             return
         # Native AgentHistory accumulate disabled (scripts/trajectories/*.json no longer saved).
         # Temp per-step history files may still exist under %TEMP%; not copied to repo.
+        try:
+            from .state import register_current_page_screenshot
+            await register_current_page_screenshot(browser_context)
+        except Exception:
+            pass
+
         phase_done_data: dict = {
             "phase": phase_num,
             "total": -1,
@@ -333,7 +456,7 @@ async def run_session(args):
         }
         try:
             from .controller.actions._phase_context import _outcome_for
-            outcome = _outcome_for(case_data_store, phase_num)
+            outcome = _outcome_for(business_data_store, phase_num)
             if outcome:
                 if 'success' in outcome:
                     phase_done_data['success'] = outcome['success']
@@ -363,6 +486,17 @@ async def run_session(args):
             keep_browser = data.get("keep_browser", data.get("keepBrowser", False)) is True
             break
 
+        # phase_shot_candidate_result 正常由 _stdin_reader 快路径解包；主循环兜底处理
+        #（例如消息在 reader 忙时仍入列的场景），未知 requestId 由 resolve 静默丢弃。
+        if isinstance(msg, dict) and msg.get("event") == "phase_shot_candidate_result":
+            try:
+                from .state import resolve_phase_shot_result
+                resolve_phase_shot_result(msg.get("data") or {})
+            except Exception as e:
+                sys.stderr.write(f"phase_shot_candidate_result resolve failed: {type(e).__name__}: {e}\n")
+                sys.stderr.flush()
+            continue
+
         try:
             action = await _dispatch_event(msg, session_state, agent_running_ref, cdp_action_queue)
             cumulative_path = session_state['cumulative_path']
@@ -374,33 +508,33 @@ async def run_session(args):
             data = msg.get("data", {})
 
             # 业务数据 from the user requirement (soft NL), not 案例数据 from the system.
-            # Prefer case_data_block → _case_scenario_text for the agent; flat case_data
+            # Prefer business_data_block → _business_scenario_text for the agent; flat business_data
             # is optional. See prepareCaseDataInjection terminology note.
-            case_data_inline = data.get("case_data")
-            case_data_file = data.get("case_data_file")
-            case_data_block = data.get("case_data_block") or data.get("caseDataBlock")
-            if isinstance(case_data_block, str) and case_data_block.strip():
-                case_data_store['_case_scenario_text'] = case_data_block.strip()
+            business_data_inline = data.get("business_data")
+            business_data_file = data.get("business_data_file")
+            business_data_block = data.get("business_data_block") or data.get("businessDataBlock")
+            if isinstance(business_data_block, str) and business_data_block.strip():
+                business_data_store['_business_scenario_text'] = business_data_block.strip()
                 sys.stderr.write(
-                    f"Case scenario text ready ({len(case_data_block.strip())} chars)\n"
+                    f"Business scenario text ready ({len(business_data_block.strip())} chars)\n"
                 )
                 sys.stderr.flush()
-            if not case_data_loaded and (case_data_inline or case_data_file):
+            if not business_data_loaded and (business_data_inline or business_data_file):
                 try:
                     imported = {}
-                    if isinstance(case_data_inline, dict):
-                        imported = case_data_inline
-                    elif case_data_file:
-                        with open(case_data_file, 'r', encoding='utf-8') as f:
+                    if isinstance(business_data_inline, dict):
+                        imported = business_data_inline
+                    elif business_data_file:
+                        with open(business_data_file, 'r', encoding='utf-8') as f:
                             imported = json.load(f)
                     if isinstance(imported, dict) and imported:
-                        case_data_store.update(imported)
-                        case_data_loaded = True
-                        src = "inline" if isinstance(case_data_inline, dict) else case_data_file
-                        sys.stderr.write(f"Imported case data ({len(imported)} keys) from {src}\n")
+                        business_data_store.update(imported)
+                        business_data_loaded = True
+                        src = "inline" if isinstance(business_data_inline, dict) else business_data_file
+                        sys.stderr.write(f"Imported business data ({len(imported)} keys) from {src}\n")
                         sys.stderr.flush()
                 except Exception as e:
-                    sys.stderr.write(f"Failed to import case data: {e}\n")
+                    sys.stderr.write(f"Failed to import business data: {e}\n")
                     sys.stderr.flush()
 
             await _run_step(data, step_index)
@@ -419,32 +553,7 @@ async def run_session(args):
             sys.stderr.flush()
             emit_json({"event": "error", "data": {"message": f"Unexpected error: {type(e).__name__}: {e}"}})
 
-    reader_task.cancel()
-    try:
-        cdp_task.cancel()
-    except Exception:
-        pass
-    try:
-        await browser_context.close()
-    except Exception:
-        pass
-    if keep_browser:
-        # Soft close — leave Chromium on CDP (not the normal「释放资源」path).
-        sys.stderr.write(
-            f"Leaving Chrome idle"
-            + (f" on CDP port={cdp_port}" if cdp_port and not cdp_url else "")
-            + (f" via {cdp_url}" if cdp_url else "")
-            + "\n"
-        )
-        sys.stderr.flush()
-    else:
-        try:
-            await browser.close()
-        except Exception as e:
-            sys.stderr.write(f"WARN: browser.close failed: {e}\n")
-            sys.stderr.flush()
-        sys.stderr.write("Browser closed, exiting\n")
-        sys.stderr.flush()
+    await _teardown_session(browser, browser_context, reader_task, cdp_task, cdp_port, cdp_url, keep_browser)
 
     # P0：退出前冲刷记忆队列（不等待太久，避免拖慢关闭）
     flush_memory_writer(timeout=2.0)

@@ -3,17 +3,44 @@
  * resolution (executor mode) and local screencast/input dispatch.
  */
 import { state } from '../../state.js';
-import { onWsMessage } from '../../ws-server.js';
+import {
+  onWsMessage, onWsClientClose, addBinarySubscription, clearBinarySubscriptions,
+  countBinarySubscribers,
+} from '../../ws-server.js';
 import * as remoteSessionService from '../../services/remote-session-service.js';
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import { sendToExecutor } from '../../executor-session-client.js';
-import { getTrajectoryRuntime } from '../../services/trajectory-runtime.js';
+import { getLastRscfPacket } from '../../executor-ws.js';
+import { getTrajectoryRuntime } from '../../services/trajectory/trajectory-runtime.js';
 import { hideHighlight } from '../inspect.js';
 import {
   bridge, getRemoteStatus, broadcastStatus, broadcastInspect,
 } from './state.js';
-import { startScreencast } from './screencast.js';
+import { startScreencast, stopScreencast } from './screencast.js';
 import { handleAck, handleInput, handleViewport } from './cdp-input.js';
+
+/**
+ * Push the current dashboard viewer count for a remote session uuid to the owning
+ * executor (BiB pauses screencast at zero viewers). Best-effort, never throws.
+ * @param {string|null} remoteSessionUuid remote session uuid
+ * @returns {Promise<void>}
+ */
+async function notifyStreamViewers(remoteSessionUuid) {
+  if (!USE_EXECUTOR || !remoteSessionUuid) return;
+  try {
+    const viewers = countBinarySubscribers(remoteSessionUuid);
+    const row = await remoteSessionService.getByUuid(remoteSessionUuid);
+    const nodeId = Number(row?.executorNodeId ?? row?.executor_node_id);
+    if (!Number.isFinite(nodeId)) return;
+    const { executorNodeDao } = await import('../../dao/executor-node-dao.js');
+    const node = await executorNodeDao.getById(nodeId).catch(() => null);
+    if (!node?.nodeUuid) return;
+    sendToExecutor(node.nodeUuid, 'session.bib_stream_viewers', {
+      remoteSessionUuid,
+      viewers,
+    });
+  } catch {}
+}
 
 function pickFromBinding(binding, trajectoryId = null) {
   if (!binding?.agentSessionId) return null;
@@ -54,8 +81,8 @@ function pickFromAgentSession(sessionId, trajectoryId = null) {
  * Resolve which executor session should receive remote:* commands.
  * Priority: trajectoryId → remoteSessionId/uuid → sessionId → traj runtime →
  * single attached binding (only when no identity keys were sent).
- *
- * @param {{ trajectoryId?: number|null, sessionId?: string|null, remoteSessionId?: number|null, remoteSessionUuid?: string|null }} [opts]
+ * @param {{ trajectoryId?: number|null, sessionId?: string|null, remoteSessionId?: number|null, remoteSessionUuid?: string|null }} [opts] Identity keys.
+ * @returns {{ executorNodeUuid: string, sessionId: string, trajectoryId: number|null, remoteSessionId: number|null }|null} Executor target, or null when unresolved.
  */
 export function resolveBibTarget(opts = {}) {
   const tid = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
@@ -113,10 +140,22 @@ export function resolveBibTarget(opts = {}) {
 /**
  * Register the WS message router exactly once. `attachLive` is injected by
  * index.js to keep this module free of import cycles.
+ * @param {(opts?: object) => Promise<object>} attachLive attachLive function from index.js.
+ * @returns {void}
  */
 export function ensureWsHook(attachLive) {
   if (bridge.wsHooked) return;
   bridge.wsHooked = true;
+  // 断连清理：本地模式清 subscribers（0 观众停推）；执行机模式重算观众数下推
+  onWsClientClose((ws) => {
+    bridge.subscribers.delete(ws);
+    const bind = bridge.wsTrajectoryBind.get(ws) || {};
+    bridge.wsTrajectoryBind.delete(ws);
+    if (bridge.subscribers.size === 0 && bridge.client) {
+      stopScreencast().catch(() => {});
+    }
+    notifyStreamViewers(bind.remoteSessionUuid || null);
+  });
   onWsMessage(async (ws, msg) => {
     const type = msg?.type;
     if (!type || !String(type).startsWith('remote:')) return;
@@ -140,12 +179,26 @@ export function ensureWsHook(attachLive) {
           remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : null,
           remoteSessionUuid: remoteSessionUuid || null,
         });
+        // RSCF 二进制帧按订阅过滤：记录该 socket 订阅的 remoteSessionUuid
+        //（payload 未带 uuid 时尝试从 live 状态回填；仍无则集合为空 → 保持全量，向后兼容）。
         const live = await remoteSessionService.getLiveStatus({
           trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
           sessionId: sessionId || undefined,
           remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : undefined,
           remoteSessionUuid: remoteSessionUuid || undefined,
         }).catch(() => null);
+        addBinarySubscription(ws, remoteSessionUuid || live?.remoteSessionUuid || null);
+        notifyStreamViewers(remoteSessionUuid || live?.remoteSessionUuid || null);
+        // 把回填的 uuid 写回 bind —— 否则退订时 prevUuid=null，观众下推会静默跳过
+        const bound = bridge.wsTrajectoryBind.get(ws);
+        if (bound && !bound.remoteSessionUuid && live?.remoteSessionUuid) {
+          bound.remoteSessionUuid = live.remoteSessionUuid;
+        }
+        // 观众秒开：订阅成功即补发缓存的最后一帧（executor 模式缓存于 executor-ws）
+        const lastPacket = getLastRscfPacket(remoteSessionUuid || live?.remoteSessionUuid || null);
+        if (lastPacket && lastPacket.length) {
+          try { ws.send(lastPacket); } catch {}
+        }
         ws.send(JSON.stringify({
           type: 'remote:status',
           payload: live || { attached: false, cdpReady: true, trajectoryId },
@@ -153,7 +206,10 @@ export function ensureWsHook(attachLive) {
         return;
       }
       if (type === 'remote:unsubscribe') {
+        const prevUuid = bridge.wsTrajectoryBind.get(ws)?.remoteSessionUuid || null;
         bridge.wsTrajectoryBind.delete(ws);
+        clearBinarySubscriptions(ws);
+        notifyStreamViewers(prevUuid);
         return;
       }
 
@@ -228,6 +284,8 @@ export function ensureWsHook(attachLive) {
           sendToExecutor(executorNodeUuid, 'session.bib_start', { sessionId: pickSessionId });
         } else if (type === 'remote:stop') {
           sendToExecutor(executorNodeUuid, 'session.bib_stop', { sessionId: pickSessionId });
+          // 停看也是观众离开 —— 同步重算观众数下推（0 → 执行机暂停推流）
+          notifyStreamViewers(remoteSessionUuid || null);
         } else if (type === 'remote:ack') {
           sendToExecutor(executorNodeUuid, 'session.bib_ack', {
             sessionId: pickSessionId,
@@ -280,11 +338,18 @@ export function ensureWsHook(attachLive) {
 
     if (type === 'remote:subscribe') {
       bridge.subscribers.add(ws);
+      // 观众秒开：补发本地缓存的最后一帧
+      if (bridge.lastPacket && bridge.lastPacket.length) {
+        try { ws.send(bridge.lastPacket); } catch {}
+      }
       ws.send(JSON.stringify({ type: 'remote:status', payload: getRemoteStatus() }));
       return;
     }
     if (type === 'remote:unsubscribe') {
       bridge.subscribers.delete(ws);
+      if (bridge.subscribers.size === 0 && bridge.client) {
+        await stopScreencast().catch(() => {});
+      }
       return;
     }
     if (type === 'remote:start') {
@@ -307,8 +372,7 @@ export function ensureWsHook(attachLive) {
     if (type === 'remote:stop') {
       bridge.subscribers.delete(ws);
       if (bridge.subscribers.size === 0 && bridge.client) {
-        try { await bridge.client.send('Page.stopScreencast'); } catch {}
-        bridge.screencastOn = false;
+        await stopScreencast();
       }
       broadcastStatus();
       return;

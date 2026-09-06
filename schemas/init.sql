@@ -40,7 +40,7 @@ CREATE TABLE `system_account` (
   `system_id`   BIGINT UNSIGNED NOT NULL COMMENT '外键 → system.id（type=1）',
   `name`        VARCHAR(255) NOT NULL COMMENT '角色名：管理员/测试人员/…',
   `login_url`   VARCHAR(2048) DEFAULT '' COMMENT '登录/入口网址',
-  `username`    VARCHAR(255) DEFAULT '' COMMENT '测试账号',
+  `account`     VARCHAR(255) DEFAULT '' COMMENT '测试账号',
   `password`    VARCHAR(255) DEFAULT '' COMMENT '测试密码',
   `remark`      TEXT COMMENT '备注（权限说明等）',
   `sort_order`  INT UNSIGNED DEFAULT 0,
@@ -101,12 +101,17 @@ CREATE TABLE `trajectory` (
   `function_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → system.id（type=3 功能）',
   `system_account_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → system_account.id（录制默认登录账号）',
   `remote_session_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → remote_session.id（远程/人工录制来源，可空）',
-  `record_status`     ENUM('draft','live','recording','recorded','completed') NOT NULL DEFAULT 'draft' COMMENT 'draft=空闲; live=推流占用; recording=AI录制中; recorded=录制完成; completed=人工确认',
+  `batch_job_id`       VARCHAR(36) DEFAULT NULL COMMENT '所属批量导入任务（batch_recording_job.id，UUID）；NULL=手动创建',
+  `paas_user_id`      VARCHAR(32) DEFAULT NULL COMMENT '账号中心用户 id（隔离标志；空=无主=全可见）',
+  `record_status`     ENUM('draft','recording','failed','recorded','completed') NOT NULL DEFAULT 'draft' COMMENT 'draft=未录制; recording=录制中; failed=录制异常; recorded=待确认; completed=已确认',
+  `persistent_record_status` ENUM('draft','failed','recorded','completed') NOT NULL DEFAULT 'draft' COMMENT '录制前的持久状态基线（不包含 recording）；进入录制中时记录，录制结束时据此恢复，保证临时录制不降级持久状态',
   `created_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   KEY `idx_function_id` (`function_id`),
   KEY `idx_traj_system_account` (`system_account_id`),
   KEY `idx_remote_session_id` (`remote_session_id`),
+  KEY `idx_batch_job_id` (`batch_job_id`),
+  KEY `idx_trajectory_paas_user_id` (`paas_user_id`),
   KEY `idx_created_at` (`created_at`),
   KEY `idx_model` (`model`),
   KEY `idx_record_status` (`record_status`),
@@ -156,6 +161,7 @@ CREATE TABLE `trajectory_step` (
   `error`               TEXT COMMENT '错误信息',
   `extracted_content`   TEXT COMMENT '执行结果',
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
+  `group_shot_id`      BIGINT UNSIGNED DEFAULT NULL COMMENT '动作前所属状态组截图 → screenshot.id（kind=phase_group）',
   `source`              ENUM('agent','manual','cdp','special_element') NOT NULL DEFAULT 'agent'
     COMMENT '动作来源：agent|manual|cdp|special_element',
   `action_id`           VARCHAR(64) DEFAULT NULL COMMENT 'Python ActionEntry.id（UUID v4）；控制面重启后幂等去重；历史行为 NULL',
@@ -170,7 +176,8 @@ CREATE TABLE `trajectory_step` (
   KEY `idx_source` (`source`),
   UNIQUE KEY `uk_traj_action` (`trajectory_id`, `action_id`),
   CONSTRAINT `fk_step_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL
+  CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_step_group_shot` FOREIGN KEY (`group_shot_id`) REFERENCES `screenshot` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹步骤';
 
 -- ─────────────────────────────────────────────────────────────
@@ -258,6 +265,33 @@ CREATE TABLE `sys_dict_data` (
   `remark`      VARCHAR(500) NULL COMMENT '备注',
   KEY `idx_sys_dict_data_type` (`dict_type`, `status`, `dict_sort`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字典数据表';
+
+-- ─────────────────────────────────────────────────────────────
+-- 产品消息（批量导入终态等）
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE `sys_msg` (
+  `id`               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `msg_title`        VARCHAR(128) NOT NULL DEFAULT '' COMMENT '展示标题；第一种=批量导入任务',
+  `msg_content`      TEXT NOT NULL COMMENT '两行 HTML：功能·文件·状态 / 统计；用户字段已转义',
+  `msg_type`         INT NOT NULL COMMENT 'sys_dict_data.dict_value (sys_msg_type)',
+  `msg_status`       TINYINT NOT NULL DEFAULT 0 COMMENT '0未读 2已读（现阶段全局）',
+  `link_url`         VARCHAR(512) NOT NULL DEFAULT '',
+  `belong_item_name` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '功能名',
+  `belong_item_id`   BIGINT UNSIGNED NULL COMMENT 'system.id type=3',
+  `source_type`      VARCHAR(32) NOT NULL DEFAULT '' COMMENT 'batch_import',
+  `source_id`        VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'batch UUID',
+  `product_code`     VARCHAR(64) NULL COMMENT '挂起',
+  `create_by`        VARCHAR(64) NOT NULL DEFAULT '系统',
+  `user_id`          BIGINT UNSIGNED NULL COMMENT '挂起',
+  `user_flag`        TINYINT NULL COMMENT '挂起',
+  `rule_id`          BIGINT UNSIGNED NULL COMMENT '挂起',
+  `remark`           VARCHAR(500) NULL,
+  `create_time`      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `update_time`      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_sys_msg_source` (`source_type`, `source_id`),
+  KEY `idx_sys_msg_created` (`create_time`),
+  KEY `idx_sys_msg_status` (`msg_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='产品消息';
 
 -- ─────────────────────────────────────────────────────────────
 -- 特殊元素库
@@ -431,17 +465,27 @@ CREATE TABLE `snapshot_field` (
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `screenshot` (
   `id`                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `image_data`          MEDIUMBLOB NOT NULL COMMENT 'PNG 图片二进制 (MEDIUMBLOB 最大 16MB)',
+  `storage_type`        VARCHAR(16) NOT NULL DEFAULT 'minio' COMMENT '图片存储类型: minio|local',
+  `retry_count`         INT NOT NULL DEFAULT 0 COMMENT '本地暂存后的补传重试次数',
+  `last_retry_at`       DATETIME(3) DEFAULT NULL COMMENT '最后一次补传尝试时间',
+  `storage_path`        VARCHAR(512) DEFAULT NULL COMMENT 'MinIO object key（storage_type=minio 时有效）',
+  `image_url`           VARCHAR(1024) DEFAULT NULL COMMENT '图片访问 URL（可为 MinIO 直链或本服务 API 路径）',
   `file_size`           INT UNSIGNED DEFAULT 0 COMMENT '文件大小（字节）',
   `mime_type`           VARCHAR(64) DEFAULT 'image/png' COMMENT 'MIME 类型',
+  `metadata_json`       JSON DEFAULT NULL COMMENT '阶段长图元数据（长宽/元素坐标/region_tree）；kind=phase_highlight 时有效',
   `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id',
   `trajectory_step_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_step.id',
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
-  `kind`                ENUM('before','after','phase_highlight') NOT NULL DEFAULT 'after' COMMENT 'before/after=步骤; phase_highlight=阶段长图',
+  `kind`                ENUM('before','after','phase_highlight','page_level','phase_group') NOT NULL DEFAULT 'after' COMMENT 'before/after=步骤; phase_highlight=阶段长图/弹窗截图; page_level=页面级截图; phase_group=阶段内状态组截图',
+  `state_group`        VARCHAR(128) DEFAULT NULL COMMENT '阶段内状态键（current_page_level level key），kind=phase_group 必填；phase_highlight 行恒为 done',
+  `level_type`          ENUM('page','popup') DEFAULT NULL COMMENT '页面级截图类型',
+  `level_key`           VARCHAR(512) DEFAULT NULL COMMENT 'pageKey/popupKey，V3 页面级截图归属键',
+  `parent_level_key`    VARCHAR(512) DEFAULT NULL COMMENT 'popup 所属 pageKey',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
   UNIQUE KEY `uk_ss_step_kind` (`trajectory_step_id`, `kind`),
-  UNIQUE KEY `uk_ss_phase_kind` (`trajectory_phase_id`, `kind`),
+  UNIQUE KEY `uk_ss_phase_group` (`trajectory_phase_id`, `state_group`),
+  UNIQUE KEY `uk_ss_level_key` (`trajectory_id`, `kind`, `level_key`),
   CONSTRAINT `fk_ss_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_ss_trajectory_step` FOREIGN KEY (`trajectory_step_id`) REFERENCES `trajectory_step` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_ss_trajectory_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE CASCADE
@@ -475,6 +519,12 @@ CREATE TABLE `api_override` (
 -- 默认数据（根 id=0 + type 1/2/3 三级未分类）
 -- ============================================================
 SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_AUTO_VALUE_ON_ZERO');
+
+INSERT INTO `sys_dict_type` (`dict_name`, `dict_type`, `status`, `create_by`, `update_by`, `remark`) VALUES
+  ('消息类型', 'sys_msg_type', '0', '', '', '产品消息抽屉 msgType');
+
+INSERT INTO `sys_dict_data` (`dict_sort`, `dict_label`, `dict_value`, `dict_type`, `status`, `is_default`, `create_by`, `update_by`) VALUES
+  (1, '批量导入任务', '1', 'sys_msg_type', '0', 'N', '', '');
 
 INSERT INTO `system` (`id`, `system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
   (0, '00000000-0000-0000-0000-000000000000', 0, 0, '根', '系统树根节点（不可删除）', 0);

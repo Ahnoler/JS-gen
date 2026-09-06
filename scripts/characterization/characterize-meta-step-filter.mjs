@@ -35,8 +35,8 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '../..');
-const querySrc = readFileSync(join(root, 'src/services/trajectory-query-service.js'), 'utf8');
-const stepSrc = readFileSync(join(root, 'src/services/trajectory-step-service.js'), 'utf8');
+const querySrc = readFileSync(join(root, 'src/services/trajectory/trajectory-query-service.js'), 'utf8');
+const stepSrc = readFileSync(join(root, 'src/services/trajectory/trajectory-step-service.js'), 'utf8');
 const persistSrc = readFileSync(join(root, 'src/routes/browser-session/persist-live.js'), 'utf8');
 const replaySrc = readFileSync(join(root, 'src/services/trajectory/trajectory-session-replay.js'), 'utf8');
 const treeRoute = readFileSync(join(root, 'src/routes/v2/trajectory.js'), 'utf8');

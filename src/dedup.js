@@ -10,7 +10,6 @@
 
 const FIELD_ACTIONS = new Set([
   'fill_form_field',
-  'fill_date_field',
   'select_option',
   'select_tree_option',
   'click_radio',
@@ -26,7 +25,11 @@ function dedupKey(entry) {
   return action + '|' + JSON.stringify(sorted);
 }
 
-/** Same-page-element key; falls back to full action+params key. */
+/**
+ * Same-page-element key; falls back to full action+params key.
+ * @param {object} entry action entry with action/params/element fields
+ * @returns {string} dedup key string for the entry
+ */
 export function elementDedupKey(entry) {
   const action = entry?.action || '';
   const params = entry?.params || {};
@@ -37,7 +40,7 @@ export function elementDedupKey(entry) {
   const xpath = String(el.xpath || el.xpath_smart || entry?.target || '').trim();
   if (xpath) return `xpath:${xpath}`;
 
-  if (action === 'click_icon_button') {
+  if (action === 'click_button') {
     const t = String(params.button_text || '').trim();
     if (t) return `icon:${t}`;
   }
@@ -54,6 +57,11 @@ export function elementDedupKey(entry) {
   return dedupKey(entry);
 }
 
+/**
+ * Coalesce consecutive duplicate entries by element identity (keeps the later entry).
+ * @param {object[]} entries entries
+ * @returns {object[]} result
+ */
 export function deduplicateByXPath(entries) {
   if (!entries || !Array.isArray(entries)) return [];
   const result = [];
@@ -68,6 +76,11 @@ export function deduplicateByXPath(entries) {
   return result;
 }
 
+/**
+ * Deduplicate commands inside an action file JSON (mutates in place) and attach a _meta summary.
+ * @param {string|object} jsonContent raw JSON string or parsed object
+ * @returns {object} the deduplicated object with `_meta` { originalCount, dedupedCount, removedCount }
+ */
 export function deduplicateActionFile(jsonContent) {
   const data = typeof jsonContent === 'string' ? JSON.parse(jsonContent) : jsonContent;
   const commands = (data?.tests?.[0]?.commands) || data?.actions || [];

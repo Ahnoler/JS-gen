@@ -4,24 +4,41 @@
  * trajectory-attach-service.js — move-only, no logic changes.
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as execSession from '../../executor-session-client.js';
 import * as remoteSessionService from '../remote-session-service.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import {
   resolveTrajectoryAccount,
-} from '../trajectory-account-service.js';
-import { getTrajectoryTree } from '../trajectory-query-service.js';
+} from './trajectory-account-service.js';
+import { getTrajectoryTree } from './trajectory-query-service.js';
 import {
   clearStaleTrajectoryRuntime,
   getTrajectoryRuntime,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { bindRecordingPageId } from './recording-page-bind.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import { attachTrajectoryLive } from './trajectory-attach-service.js';
 
+/**
+ * Prepare a trajectory for recording after the session lock is acquired.
+ * Resolves account, resets stale running phases, runs default login, attaches live.
+ * @param {number} tid trajectory DB id
+ * @returns {Promise<object>} prepare result with trajectory, account, and session info
+ */
 export async function prepareTrajectoryRecordingUnlocked(tid) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
+
+  // A fresh prepare must not inherit a stale "recording" signal: reset any phase
+  // left as running by a previous interrupted recording.
+  const stalePhases = await trajectoryPhaseDao.listByTrajectory(tid);
+  for (const phase of stalePhases) {
+    if (phase.status === 'running') {
+      await trajectoryPhaseDao.updateStatus(phase.id, 'pending');
+    }
+  }
 
   if (!USE_EXECUTOR) {
     // Local path: single-live only — refuse if another traj already holds a stream.
@@ -127,7 +144,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
       const attached = await remoteSessionService.attachLive({
         sessionId: runtime.sessionId,
         trajectoryId: tid,
-        quality: 65,
+        // quality unset → remote-bridge falls back to env BIB_STREAM_QUALITY
         viewportW: 1600,
         viewportH: 900,
       });
@@ -161,7 +178,11 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
-    await trajectoryDao.updateMeta(tid, { recordStatus: 'live' }).catch(() => {});
+    // 状态流转 V3：启动浏览器/占用执行资源成功即进入临时「录制中」(recording)。
+    // 进入时记录持久状态基线，关闭浏览器/释放资源时恢复到该基线，持久状态不被临时态降级。
+    await trajectoryDao.enterTransientRecording(tid).catch((err) => {
+      console.warn(`[prepare] enterTransientRecording failed for #${tid}:`, err?.message || err);
+    });
   }
 
   emitStage('login', 'running', { accountId });
@@ -171,13 +192,31 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
       login = { skipped: true, done: true, accountId };
       emitStage('login', 'skipped', { accountId });
     } else {
-      await runDefaultLogin(runtime, account);
+      try {
+        await runDefaultLogin(runtime, account);
+      } catch (firstErr) {
+        // 冷启动时序：新 slot 首次导航后 SPA 首屏尚未挂载完，replay login 会打在
+        // 未初始化页面上（label-not-found 全集）。固定 8s 收窄为「失败即等 8s 重试一次」，
+        // 重试时页面已就绪，能显著吸收该间歇；仅影响首次 login，不改成功路径。
+        console.warn(`[prepare] login first attempt failed, retry once after 8s: ${firstErr?.message || firstErr}`);
+        await new Promise((r) => setTimeout(r, 8000));
+        await runDefaultLogin(runtime, account);
+      }
       login = { skipped: false, done: true, accountId };
       emitStage('login', 'done', { accountId });
     }
   } catch (err) {
     emitStage('login', 'error', { accountId, error: err.message });
     throw err;
+  }
+
+  // ── 起点页面 ID 绑定：导航到功能菜单 → 读组件编号（读不到 AILZ 兜底）；绝不阻断 prepare ──
+  try {
+    if (traj?.functionId) {
+      await bindRecordingPageId({ runtime, tid, functionId: Number(traj.functionId), execSession });
+    }
+  } catch (bindErr) {
+    console.warn('[prepare] page-bind failed:', bindErr?.message || bindErr);
   }
 
   const fresh = await trajectoryDao.getById(tid);
@@ -188,7 +227,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
   return {
     trajectoryId: tid,
     trajectory: fresh || traj,
-    recordStatus: fresh?.recordStatus || (streamOk ? 'live' : traj?.recordStatus) || null,
+    recordStatus: fresh?.recordStatus || (streamOk ? 'recording' : traj?.recordStatus) || null,
     phases: tree?.phases || [],
     orphanSteps: tree?.orphanSteps || [],
     sessionId: runtime.sessionId,

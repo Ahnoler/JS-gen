@@ -10,16 +10,19 @@ Thumbs.db
 start.ps1
 .mcp.json
 .claude/
+.codex/
 .opencode/
 .reasonix/
 .superpowers/
 .vscode/
+.zcode/
 node_modules/
 tmp/
 report/
 report2/
 atp-record/
 docs/*
+!docs/jsdoc-convention.md
 # Probation daily reports (automation); keep other docs/ local-only
 !docs/report/
 !docs/report/**
@@ -34,8 +37,23 @@ scripts/_scratch/
 scripts/smoke/
 chorme-devtools-mcp/
 playwright-cli/
+.playwright-mcp/
 /browser/
 python/
 nodejs/
 __pycache__/
 .idea/dbnavigator.xml
+
+# 运行产物：take_screenshot 等动作的截图归档（不入库）
+scripts/screenshots/
+# 本地试用期日报（绩效考核用，不提交）
+docs/report/
+logs/log.txt
+.node-uuid*.lock
+
+# KB 生成物：export_dicts 写出的归一字典数据（源是运行期 localStorage）
+data/kb/dicts_normalized.json
+data/kb/staging/
+
+# 控制面打包产物
+dist/

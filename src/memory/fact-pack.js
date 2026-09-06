@@ -3,7 +3,11 @@
  * 被裁剪的事实必须进入 dropped（不允许静默丢失，见方案 §5.4.3）。
  */
 
-/** 单条事实 → 可注入文本。 */
+/**
+ * 单条事实 → 可注入文本。
+ * @param {object} [fact] Fact row (id / entity / attribute / value / source / stance / weight).
+ * @returns {string} Formatted fact line for injection.
+ */
 export function formatFact(fact = {}) {
   const entity = String(fact.entity || '?');
   const attribute = String(fact.attribute || 'value');
@@ -20,7 +24,10 @@ export function formatFact(fact = {}) {
 /**
  * 组装 Fact Pack。
  * @param {Array<object>} facts 已按 weight desc 排序
- * @param {{maxChars?: number, limit?: number}} opts
+ * @param {object} opts Pack options.
+ * @param {number} [opts.maxChars] Max total chars (default 2000).
+ * @param {number} [opts.limit] Max item count (default 50).
+ * @returns {{ facts: object[], dropped: Array<{ factId: number, entity: string, reason: string }>, budget: { used: number, max: number, limit: number } }} Picked facts + dropped reasons + budget usage.
  */
 export function buildFactPack(facts, { maxChars = 2000, limit = 50 } = {}) {
   const picked = [];

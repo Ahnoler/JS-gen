@@ -10,36 +10,35 @@ import { normalizeActionName } from './action-name.js';
 import { enrichLocatorFields, sanitizeAttributes } from '../cdp/locator-candidates.js';
 
 /**
- * @typedef {Object} LocatorCandidate
- * @property {'css'|'xpath_full'|'xpath_smart'} type
- * @property {string} value
+ * @typedef {object} LocatorCandidate
+ * @property {'css'|'xpath_full'|'xpath_smart'} type 定位器类型
+ * @property {string} value 定位器值
  */
 
 /**
- * @typedef {Object} ElementJson
- * @property {string} [tag]
- * @property {string} [xpath]
- * @property {string} [cssSelector]
- * @property {Object<string,string>} [attributes]
- * @property {string} [text]
- * @property {string} [xpath_smart]
- * @property {string} [xpath_full]
- * @property {string} [xpath_abs]
- * @property {LocatorCandidate[]} [candidates]
- * @property {string} [target_kind]
- * @property {string} [locator_scope]
- * @property {number} [locator_occurrence]
- * @property {boolean} [locator_verified]
- * @property {string} [locator_strategy]
- * @property {string} [locator_fallback_reason]
- * @property {string} [formLabel]
+ * @typedef {object} ElementJson
+ * @property {string} [tag] 标签名
+ * @property {string} [xpath] 主定位 XPath
+ * @property {string} [cssSelector] CSS 选择器
+ * @property {object} [attributes] 属性表
+ * @property {string} [text] 元素文本
+ * @property {string} [xpath_smart] 智能 XPath
+ * @property {string} [xpath_full] 完整 XPath
+ * @property {string} [xpath_abs] 绝对 XPath
+ * @property {LocatorCandidate[]} [candidates] 定位候选列表
+ * @property {string} [target_kind] 目标类型
+ * @property {string} [locator_scope] 定位作用域
+ * @property {number} [locator_occurrence] 定位出现序号
+ * @property {boolean} [locator_verified] 是否已验证
+ * @property {string} [locator_strategy] 定位策略
+ * @property {string} [locator_fallback_reason] 回退原因
+ * @property {string} [formLabel] 表单标签
  * @property {string[]} [options] — full el-select inventory at record time (export/reference; not the selected value)
  */
 
 /** Single-target DOM actions that require a usable xpath on write. */
 export const SINGLE_TARGET_ACTIONS = Object.freeze([
   'fill_form_field',
-  'fill_date_field',
   'select_option',
   'select_tree_option',
   'click_radio',
@@ -48,7 +47,7 @@ export const SINGLE_TARGET_ACTIONS = Object.freeze([
   'click_table_row_button',
   'click_table_row_radio',
   'click_adjacent_button',
-  'click_icon_button',
+  'click_button',
   'switch_tab',
   'close_dialog',
 ]);
@@ -66,7 +65,9 @@ export const LOCATOR_EXEMPT_ACTIONS = Object.freeze([
 ]);
 
 /**
- * @param {string} actionType
+ * 判断动作是否要求单目标 DOM 定位（写路径需可用 xpath）。
+ * @param {string} actionType 动作类型
+ * @returns {boolean} 是否为单目标 DOM 动作
  */
 export function isSingleTargetAction(actionType) {
   const a = normalizeActionName(actionType || '');
@@ -74,8 +75,9 @@ export function isSingleTargetAction(actionType) {
 }
 
 /**
- * @param {unknown} element
- * @returns {boolean}
+ * 判断元素是否携带可用的定位表达式（xpath_smart / xpath_full / xpath）。
+ * @param {unknown} element 元素 JSON
+ * @returns {boolean} 是否有可用定位
  */
 export function hasUsableLocator(element) {
   if (!element || typeof element !== 'object') return false;
@@ -103,8 +105,8 @@ export function hasUsableLocator(element) {
 
 /**
  * Preserve / copy locator diagnostic fields onto a normalized element.
- * @param {Record<string, unknown>} target
- * @param {Record<string, unknown>} source
+ * @param {Record<string, unknown>} target 目标元素对象
+ * @param {Record<string, unknown>} source 来源元素对象
  */
 function copyLocatorMeta(target, source) {
   for (const key of [
@@ -119,10 +121,33 @@ function copyLocatorMeta(target, source) {
     'region_role',
     'region_id',
     'region_label',
+    'region_chrome',
+    'region_section',
+    'region_block',
   ]) {
     if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
       target[key] = source[key];
     }
+  }
+  if (Array.isArray(source.layers)) target.layers = source.layers;
+  if (source.bbox && typeof source.bbox === 'object' && !Array.isArray(source.bbox)) target.bbox = source.bbox;
+  if (source.page_bbox && typeof source.page_bbox === 'object' && !Array.isArray(source.page_bbox)) target.page_bbox = source.page_bbox;
+  if (source.rect_norm && typeof source.rect_norm === 'object' && !Array.isArray(source.rect_norm)) {
+    // 归一化坐标（plugin-format 对齐）：相对所属截图 0..1，四值有限才透传
+    const rn = source.rect_norm;
+    if ([rn.x1, rn.y1, rn.x2, rn.y2].every((v) => Number.isFinite(Number(v)))) {
+      target.rect_norm = {
+        x1: Number(rn.x1), y1: Number(rn.y1), x2: Number(rn.x2), y2: Number(rn.y2),
+      };
+    }
+  }
+  if (source.attr && typeof source.attr === 'object' && !Array.isArray(source.attr)) {
+    // 结构化布尔属性 {disabled,required,readonly}（plugin-format 对齐；只认三个已知键）
+    target.attr = {
+      disabled: source.attr.disabled === true,
+      required: source.attr.required === true,
+      readonly: source.attr.readonly === true,
+    };
   }
   if (Array.isArray(source.options)) {
     const opts = [];
@@ -142,8 +167,8 @@ function copyLocatorMeta(target, source) {
 /**
  * Build element_json from runtime element info (ActionEntry / StepEntry shape).
  * Preserves strategy / fallback / scope metadata.
- * @param {Object} element
- * @returns {ElementJson}
+ * @param {object} element 运行时元素信息
+ * @returns {ElementJson} 规范化后的元素 JSON
  */
 export function toElementJson(element = {}) {
   const candidates = Array.isArray(element.candidates)
@@ -194,13 +219,12 @@ export function toElementJson(element = {}) {
 /**
  * Derive / normalize element_json for persistence.
  * Offline service must not promote non-DOM-verified expressions to locator_verified.
- *
- * @param {object} opts
- * @param {object|null} [opts.element]
- * @param {string} [opts.actionType]
- * @param {object|null} [opts.params]
- * @param {boolean} [opts.requireUsable=false] — throw if single-target and no xpath
- * @returns {ElementJson|null}
+ * @param {object} opts 选项
+ * @param {object|null} [opts.element] 原始元素信息
+ * @param {string} [opts.actionType] 动作类型
+ * @param {object|null} [opts.params] 动作参数
+ * @param {boolean} [opts.requireUsable] — throw if single-target and no xpath
+ * @returns {ElementJson|null} 规范化的元素 JSON；无定位且原始信息为空时为 null
  */
 export function prepareElementJson({
   element = null,
@@ -224,7 +248,7 @@ export function prepareElementJson({
   const targetKind = raw.target_kind || raw.targetKind || '';
   const inferredKind = targetKind
     || (action === 'click_menu_item' ? 'menu'
-      : action === 'click_icon_button' ? 'icon'
+      : action === 'click_button' ? 'icon'
         : action === 'switch_tab' ? 'tab'
           : action === 'click_table_row_button' ? 'table_row_button'
             : action === 'click_table_row_radio' ? 'table_row_radio'
@@ -298,9 +322,9 @@ export function prepareElementJson({
 
 /**
  * Convert a StepEntry-like action log item to TrajectoryStep entity fields (camelCase).
- * @param {Object} entry
- * @param {Object} [context] — trajectoryId, stepNumber, phaseNumber, etc.
- * @returns {import('./entities.js').TrajectoryStep}
+ * @param {object} entry 动作日志条目
+ * @param {object} [context] — trajectoryId, stepNumber, phaseNumber, etc.
+ * @returns {import('./entities.js').TrajectoryStep} 轨迹步骤实体字段
  */
 export function stepEntryToTrajectoryStep(entry, context = {}) {
   const actionType = normalizeActionName(entry.action || entry.actionType || '');
@@ -330,9 +354,9 @@ export function stepEntryToTrajectoryStep(entry, context = {}) {
 }
 
 /**
- * Map trajectory_step row to action_{ts}.json entry format (for script_assembler).
- * @param {Object} step — camelCase TrajectoryStep from DAO
- * @returns {Object}
+ * Map trajectory_step row to action_{ts}.json entry format (legacy action_{ts}.json export format).
+ * @param {object} step — camelCase TrajectoryStep from DAO
+ * @returns {object} action entry
  */
 export function trajectoryStepToActionEntry(step) {
   let el = step.element ?? step.elementJson ?? {};
@@ -371,31 +395,4 @@ export function trajectoryStepToActionEntry(step) {
     phaseId: step.trajectoryPhaseId ?? step.phaseId ?? null,
     phase: step.phaseNumber ?? step.phase ?? 0,
   };
-}
-
-/**
- * Map trajectory_step rows to assembler command entries (action_{ts}.json shape).
- * Shared by v2 trajectories assemble-file and replay-service prepareReplay.
- *
- * @param {Array} steps
- * @param {Object} [opts]
- * @param {boolean} [opts.preferEntryPhase=false] — when step.phaseNumber is missing,
- *   fall back to entry.phase (step.phase) instead of 0 (replay-service behavior).
- * @returns {Object[]}
- */
-export function stepsToActionCommands(steps, { preferEntryPhase = false } = {}) {
-  return (steps || []).map((s) => {
-    const entry = trajectoryStepToActionEntry(s);
-    const rawEl = s.element ?? s.elementJson ?? null;
-    const el = typeof rawEl === 'string'
-      ? (() => { try { return JSON.parse(rawEl); } catch { return {}; } })()
-      : (rawEl || {});
-    return {
-      ...entry,
-      // Ensure target from either shape
-      target: entry.target || el.xpath || el.target || '',
-      phase: preferEntryPhase ? (s.phaseNumber ?? entry.phase ?? 0) : (s.phaseNumber ?? 0),
-      source: s.source || 'agent',
-    };
-  });
 }

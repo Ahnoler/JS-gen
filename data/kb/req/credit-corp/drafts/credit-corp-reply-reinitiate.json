@@ -1,0 +1,56 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "credit-corp",
+  "flow": "对公授信批复重新发起",
+  "aliases": [
+    "对公授信批复",
+    "重新发起",
+    "批复复制新申请"
+  ],
+  "hash_markers": [
+    "corpCrgReplyPrimPg",
+    "ZJJK16071624",
+    "DGSX"
+  ],
+  "keywords": [
+    "对公授信批复",
+    "重新发起",
+    "复制申请",
+    "业务发起模式"
+  ],
+  "menu_path": "授信管理/对公授信管理/对公授信批复",
+  "preconditions": [
+    "业务发起模式=独立发起（集团成员子批复不可单独重新发起）",
+    "批复状态∈{已失效, 已作废, 已终止}",
+    "非集团成员子批复"
+  ],
+  "steps": [
+    {
+      "name": "批复主页单选记录并点【重新发起】",
+      "leafRef": "wet-test.md 叶38 (ZJJK16071624)",
+      "verify": "match",
+      "menu_path": "授信管理/对公授信管理/对公授信批复",
+      "buttons": ["查看", "作废", "重新发起", "下载批复文件", "下载审查报告", "下载调查报告", "下载风险评价报告"],
+      "columns": ["批复编号", "额度", "生效日", "业务发起模式", "批复状态", "数据来源"],
+      "rules": ["【重新发起】按钮在批复主页同屏实证（叶38 按钮清单 match）；仅独立发起+「已失效/已作废/已终止」状态可用"]
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "按原批复编号复制原授信申请+分项额度（新申请编号=DGSX+yyyyMMdd+5位序号）",
+      "leafRefs": [],
+      "verify": "blocked",
+      "reason": "湿测未覆盖（无独立湿测叶；无失效/已作废/已终止批复样本，复制动作属写操作黑名单禁止）",
+      "retry_condition": "待存在不可用状态批复样本且用户明示放行提交类操作时补测；复制生成的分项额度是否保留原占用余额待湿测（chapters/04 待湿测项）"
+    },
+    {
+      "name": "独立发起→打开对公授信申请办理页（衔接新增链步骤4起）；联合申报→打开对公用信申请二合一页（跨模块 loan-corp）",
+      "leafRefs": [],
+      "verify": "blocked",
+      "reason": "流程推进类，只读不可达常态；二合一页属 loan-corp 分册",
+      "retry_condition": "待复制链贯通后串测"
+    }
+  ],
+  "sourceRefs": [38],
+  "coverage": {"total": 1, "match": 1, "drift": 0, "blocked": 0, "notFound": 0, "gate": "pass"}
+}

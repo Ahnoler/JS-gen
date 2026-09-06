@@ -1,18 +1,25 @@
-// WebSocket 服务端
-// 提供 broadcast API 供路由模块推送实时状态，替代轮询 + SSE
-
+/**
+ * Dashboard WebSocket server (noServer mode).
+ * Provides broadcast API for route modules to push real-time state, replacing polling + SSE.
+ */
 import { WebSocketServer } from 'ws';
 import { state } from './state.js';
 
 let wss = null;
 const wsMessageHandlers = [];
 
-// 注册 WebSocket 消息处理器（由各路由模块在初始化时调用，避免循环依赖）
+/**
+ * Register a WebSocket message handler (called by route modules at init to avoid circular deps).
+ * @param {(ws: object, msg: object) => void} handler handler
+ */
 export function onWsMessage(handler) {
   wsMessageHandlers.push(handler);
 }
 
-// 会话列表快照（与 state.sessions 结构一致，无内部引用）
+/**
+ * Snapshot of current sessions for state broadcast.
+ * @returns {object[]} result
+ */
 function getSessionList() {
   const gb = state.globalBrowser;
   const list = [];
@@ -29,7 +36,10 @@ function getSessionList() {
   return list;
 }
 
-// 构建 Full State 快照（新连接时推送一次，替代"首次轮询"）
+/**
+ * Build a full state snapshot pushed on new client connect.
+ * @returns {object} result
+ */
 function getFullState() {
   const gb = state.globalBrowser;
   return {
@@ -44,7 +54,12 @@ function getFullState() {
   };
 }
 
-// 向所有已连接客户端广播消息
+/**
+ * Broadcast a typed JSON message to all connected dashboard clients.
+ * @param {string} type type
+ * @param {unknown} payload payload
+ * @returns {number|undefined} number of clients that received the message (undefined when wss not initialized)
+ */
 export function broadcast(type, payload) {
   if (!wss) return;
   const msg = JSON.stringify({ type, payload });
@@ -61,13 +76,112 @@ export function broadcast(type, payload) {
 /** Drop frame to a client when its outbound buffer is already large (prefer fresh frames). */
 const BINARY_BUFFERED_LIMIT = 2 * 1024 * 1024;
 
-/** Broadcast a binary Buffer/Uint8Array to all clients (remote screencast frames). */
+/**
+ * Per-socket set of subscribed remoteSessionUuid values (RSCF binary frame filtering).
+ * Empty/absent set → socket receives all frames (backward compatible).
+ * Map (not WeakMap) so subscriber counts per uuid can be pushed to the executor
+ * for zero-viewer screencast pausing; close handlers clean up entries.
+ * @type {Map<object, Set<string>>}
+ */
+const binarySubscriptions = new Map();
+
+/** @type {Array<(ws: object) => void>} */
+const wsCloseHandlers = [];
+
+/**
+ * Register a socket-close cleanup handler (e.g. subscription/viewer bookkeeping).
+ * @param {(ws: object) => void} handler Close handler.
+ * @returns {void}
+ */
+export function onWsClientClose(handler) {
+  wsCloseHandlers.push(handler);
+}
+
+/**
+ * Record a dashboard socket's subscribed remoteSessionUuid (RSCF frame filtering).
+ * @param {object} ws dashboard WebSocket client
+ * @param {string|null} remoteSessionUuid subscribed remote session UUID (no-op when falsy)
+ * @returns {void}
+ */
+export function addBinarySubscription(ws, remoteSessionUuid) {
+  if (!ws || !remoteSessionUuid) return;
+  let set = binarySubscriptions.get(ws);
+  if (!set) {
+    set = new Set();
+    binarySubscriptions.set(ws, set);
+  }
+  set.add(String(remoteSessionUuid));
+}
+
+/**
+ * Clear a socket's binary-frame subscriptions (on unsubscribe; socket reverts to full broadcast).
+ * @param {object} ws dashboard WebSocket client
+ * @returns {void}
+ */
+export function clearBinarySubscriptions(ws) {
+  if (ws) binarySubscriptions.delete(ws);
+}
+
+/**
+ * Count dashboard sockets currently subscribed to a remote session uuid.
+ * @param {string} remoteSessionUuid remote session UUID
+ * @returns {number} subscriber count (0 when none)
+ */
+export function countBinarySubscribers(remoteSessionUuid) {
+  if (!remoteSessionUuid) return 0;
+  const key = String(remoteSessionUuid);
+  let count = 0;
+  for (const set of binarySubscriptions.values()) {
+    if (set.has(key)) count++;
+  }
+  return count;
+}
+
+/**
+ * Extract the remoteSessionUuid from an RSCF binary frame header.
+ * Local copy of remote-bridge parseRemoteFrame layout (magic + frameId + uuidLen + uuid + jpeg)
+ * to avoid an import cycle; keep in sync with src/cdp/remote-bridge/index.js.
+ * @param {Buffer|Uint8Array} data raw frame
+ * @returns {string|null} session uuid, or null when malformed / not RSCF
+ */
+function parseRscfSessionUuid(data) {
+  try {
+    const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    if (buf.length < 10 || buf.subarray(0, 4).toString('utf8') !== 'RSCF') return null;
+    const uuidLen = buf.readUInt16BE(8);
+    if (buf.length < 10 + uuidLen) return null;
+    return buf.subarray(10, 10 + uuidLen).toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Broadcast a binary Buffer/Uint8Array to all clients (remote screencast frames).
+ * Skips clients whose outbound buffer is already large.
+ * When a client has a non-empty subscribed remoteSessionUuid set (via addBinarySubscription),
+ * only frames carrying one of its subscribed uuids are forwarded; clients without
+ * subscriptions keep receiving all frames (backward compatible).
+ * @param {Buffer|Uint8Array} data data
+ * @returns {number} number of clients that received the frame
+ */
 export function broadcastBinary(data) {
   if (!wss) return 0;
   let count = 0;
+  let parsed = false;
+  let sessionUuid = null;
   for (const client of wss.clients) {
     if (client.readyState !== 1) continue;
     if ((client.bufferedAmount || 0) > BINARY_BUFFERED_LIMIT) continue;
+    const subs = binarySubscriptions.get(client);
+    if (subs && subs.size > 0) {
+      if (!parsed) {
+        sessionUuid = parseRscfSessionUuid(data);
+        parsed = true;
+      }
+      // 帧 解析不出 uuid（非 RSCF/损坏）时不投给已订阅过滤的客户端
+      if (!sessionUuid || !subs.has(sessionUuid)) continue;
+    }
     try {
       client.send(data);
       count++;
@@ -76,7 +190,11 @@ export function broadcastBinary(data) {
   return count;
 }
 
-// 初始化 WebSocket 服务（noServer 模式，由 server.mjs 统一 upgrade 路由）
+/**
+ * Initialize the dashboard WebSocket server (noServer mode; upgrade routed by server.mjs).
+ * Sends full state on connect, dispatches client messages to registered handlers, runs heartbeat pings.
+ * @returns {import('ws').WebSocketServer} result
+ */
 export function initWebSocket() {
   wss = new WebSocketServer({ noServer: true });
 
@@ -121,6 +239,11 @@ export function initWebSocket() {
 
     ws.on('close', () => {
       ws._alive = false;
+      // 观众/订阅登记清理（binarySubscriptions 若不清理会永久泄漏并虚增观众数）
+      clearBinarySubscriptions(ws);
+      for (const handler of wsCloseHandlers) {
+        try { handler(ws); } catch {}
+      }
     });
 
     ws.on('error', () => {
@@ -147,7 +270,9 @@ export function initWebSocket() {
   return wss;
 }
 
-/** @returns {import('ws').WebSocketServer|null} */
+/**
+ * @returns {import('ws').WebSocketServer|null} result
+ */
 export function getDashboardWss() {
   return wss;
 }

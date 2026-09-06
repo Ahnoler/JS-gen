@@ -20,9 +20,10 @@ export {
 } from './element.js';
 
 /**
- * @param {import('./entities.js').ElementJson|Record<string, unknown>|null|undefined} element
- * @param {{ actionType?: string, params?: object|null, requireUsable?: boolean }} [opts]
- * @returns {import('./entities.js').ElementJson|null}
+ * 将元素 JSON 归一化为 ElementJson（透传 prepareElementJson）。
+ * @param {import('./entities.js').ElementJson|Record<string, unknown>|null|undefined} element 元素 JSON
+ * @param {{ actionType?: string, params?: object|null, requireUsable?: boolean }} [opts] 选项
+ * @returns {import('./entities.js').ElementJson|null} 规范化后的元素 JSON
  */
 export function normalizeElementJson(element, opts = {}) {
   if (!element || typeof element !== 'object') return null;
@@ -36,13 +37,13 @@ export function normalizeElementJson(element, opts = {}) {
 
 /**
  * Map a runtime step object (from _STEP_LOG / action entry) to TrajectoryStep fields.
- * @param {Object} step
- * @param {Object} [context]
- * @param {number} [context.trajectoryId]
- * @param {number} [context.stepNumber]
- * @param {number} [context.phaseNumber]
- * @param {import('./constants.js').StepSource} [context.source]
- * @returns {import('./entities.js').TrajectoryStep}
+ * @param {object} step 运行时步骤对象
+ * @param {object} [context] 上下文
+ * @param {number} [context.trajectoryId] 轨迹 id
+ * @param {number} [context.stepNumber] 步骤序号
+ * @param {number} [context.phaseNumber] 阶段序号
+ * @param {import('./constants.js').StepSource} [context.source] 步骤来源
+ * @returns {import('./entities.js').TrajectoryStep} 轨迹步骤实体字段
  */
 export function stepFromActionLog(step, context = {}) {
   const action = normalizeActionName(step.action ?? step.actionType ?? '');

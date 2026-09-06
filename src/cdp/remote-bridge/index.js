@@ -16,18 +16,26 @@ import {
   bridge, SESSION_VIEWPORT, getRemoteStatus, broadcastStatus,
 } from './state.js';
 import {
-  startScreencast, onScreencastFrame, clearStallWatch, applyViewportOverride,
+  startScreencast, stopScreencast, onScreencastFrame, clearStallWatch, applyViewportOverride,
   ensureFullSessionViewport,
 } from './screencast.js';
 import { ensureWsHook, resolveBibTarget } from './ws-router.js';
 
 export { getRemoteStatus, resolveBibTarget };
 
+/**
+ * Return the currently attached CDP client, or null when not attached.
+ * @returns {import('../client.js').CdpClient|null} Attached CDP client, or null.
+ */
 export function getAttachedCdpClient() {
   return bridge.client || null;
 }
 
-/** Called when Dashboard toggles manual recording — suppress page inject briefly. */
+/**
+ * Called when Dashboard toggles manual recording — suppress page inject briefly.
+ * @param {boolean} enabled True when manual recording was turned on.
+ * @returns {void}
+ */
 export function notifyManualRecordingChanged(enabled) {
   if (!enabled) return;
   if (bridge.client) {
@@ -37,6 +45,7 @@ export function notifyManualRecordingChanged(enabled) {
 
 /**
  * Refresh CDP endpoints onto globalBrowser (call after Agent ready).
+ * @returns {Promise<{ cdpHttp: string, cdpWsUrl: string, browser: string, port: number }|null>} Discovery hit, or null when not found.
  */
 export async function refreshCdpEndpoints() {
   const gb = state.globalBrowser;
@@ -56,6 +65,10 @@ export async function refreshCdpEndpoints() {
   return hit;
 }
 
+/**
+ * Clear CDP endpoints on globalBrowser and broadcast status.
+ * @returns {void}
+ */
 export function clearCdpEndpoints() {
   const gb = state.globalBrowser;
   gb.cdpHttp = null;
@@ -68,6 +81,14 @@ export function clearCdpEndpoints() {
  * Attach to live Session Chrome, open remote_session row, start screencast.
  * Default: restore full Session viewport (1600×900), never shrink to Dashboard.
  * Pass `{ resize: true, viewportW, viewportH }` only when intentionally resizing.
+ * @param {object} [opts] Attach options.
+ * @param {number} [opts.quality] JPEG quality (40-95, default 65).
+ * @param {boolean} [opts.resize] True to resize Chrome to viewportW/viewportH.
+ * @param {number} [opts.viewportW] Desired viewport width (with resize).
+ * @param {number} [opts.viewportH] Desired viewport height (with resize).
+ * @param {number} [opts.deviceScaleFactor] Device scale factor (with resize).
+ * @param {number} [opts.dpr] Alias for deviceScaleFactor.
+ * @returns {Promise<{ remoteSession: object, status: object }>} Opened remote session + status snapshot.
  */
 export async function attachLive(opts = {}) {
   const gb = state.globalBrowser;
@@ -78,7 +99,8 @@ export async function attachLive(opts = {}) {
   await refreshCdpEndpoints();
   if (!gb.cdpWsUrl) throw new Error('CDP WebSocket URL unavailable (is Session Chrome on 9242/9222?)');
 
-  bridge.quality = Math.min(95, Math.max(40, Number(opts.quality) || 65));
+  // null → startScreencast falls back to env BIB_STREAM_QUALITY
+  bridge.quality = opts.quality == null ? null : Math.min(95, Math.max(40, Number(opts.quality)));
   const wantResize = opts.resize === true;
 
   bridge.client = new CdpClient();
@@ -149,11 +171,16 @@ export async function attachLive(opts = {}) {
   return { remoteSession: bridge.remoteSession, status: getRemoteStatus() };
 }
 
+/**
+ * Detach from Session Chrome: stop screencast, close CDP + remote_session.
+ * @param {{ crashed?: boolean }} [opts] Detach options.
+ * @returns {Promise<{ closedId: number|null, status: object }>} Closed remote-session id + status snapshot.
+ */
 export async function detachLive({ crashed = false } = {}) {
   clearStallWatch();
   bridge.screencastOn = false;
   if (bridge.client) {
-    try { await bridge.client.send('Page.stopScreencast'); } catch {}
+    await stopScreencast();
     try { await bridge.client.close(); } catch {}
     bridge.client = null;
   }
@@ -167,13 +194,16 @@ export async function detachLive({ crashed = false } = {}) {
   const closedId = bridge.remoteSession?.id ?? null;
   bridge.remoteSession = null;
   bridge.subscribers.clear();
+  bridge.lastPacket = null;
   bridge.lastInspectLabel = '';
   broadcastStatus();
   return { closedId, status: getRemoteStatus() };
 }
 
 /**
- * Pack/parse helpers exported for tests / docs
+ * Pack/parse helpers exported for tests / docs.
+ * @param {Buffer} buf Binary frame buffer (RSCF magic + frameId + uuid + jpeg).
+ * @returns {{ frameId: number, sessionUuid: string, jpeg: Buffer }|null} Parsed frame, or null when malformed.
  */
 export function parseRemoteFrame(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 10) return null;
@@ -185,15 +215,19 @@ export function parseRemoteFrame(buf) {
   return { frameId, sessionUuid, jpeg };
 }
 
-/** Call once from route registration so WS handlers exist even before attach */
+/**
+ * Call once from route registration so WS handlers exist even before attach.
+ * @returns {void}
+ */
 export function initRemoteBridgeWs() {
   ensureWsHook(attachLive);
 }
 
 /**
  * Resolve form control by label_text / actionType+params on the attached local BiB CDP page.
- * @param {string} labelText
- * @param {{ actionType?: string, action?: string, params?: object, mode?: string }} [opts]
+ * @param {string} labelText Form label text to resolve.
+ * @param {{ actionType?: string, action?: string, params?: object, mode?: string, pageLabel?: string, page_label?: string }} [opts] Resolve options.
+ * @returns {Promise<object>} Resolved element payload from resolveElementByLabel.
  */
 export async function resolveElementByLabelText(labelText, opts = {}) {
   if (!bridge.client) {
@@ -206,5 +240,6 @@ export async function resolveElementByLabelText(labelText, opts = {}) {
     actionType: opts.actionType || opts.action || '',
     params: opts.params || {},
     mode: opts.mode || 'inventory',
+    pageLabel: opts.pageLabel || opts.page_label || '',
   });
 }

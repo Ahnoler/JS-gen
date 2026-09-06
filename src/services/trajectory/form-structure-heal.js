@@ -7,12 +7,13 @@
  * trajectory, added labels are AI-filled and inserted as structured steps
  * (confirmed=0, picked up by the next batch). Unsafe scans never mutate.
  */
-import { getDB } from '../../../config/database.js';
+import { getDB } from '#config/database.js';
+import { REPLAY_STEP_TIMEOUT_MS } from '#config/config.js';
 import * as execSession from '../../executor-session-client.js';
+import { runReplayActions } from '../replay-actions.js';
 import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import {
-  REPLAY_TIMEOUT_MS,
   USER_ABORT_CODE,
   isUserAbort,
   trajScope,
@@ -23,16 +24,17 @@ import {
 import {
   buildFormStructureHealInstruction,
 } from '../../routes/browser-session/heal-instruction.js';
+import { buildHealContract } from './heal-contract.js';
 import { broadcast } from '../../ws-server.js';
 import {
   markConsumedActionLog,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import {
   markStepReplayFailed,
   markStepReplayOk,
   insertStepsAfter,
   refreshTrajectoryCounts,
-} from '../trajectory-step-service.js';
+} from './trajectory-step-service.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 
 /** Type B may fill several new fields. */
@@ -40,7 +42,6 @@ const FORM_STRUCTURE_HEAL_MAX_STEPS = 24;
 
 const FILL_ACTION_TYPES = new Set([
   'fill_form_field',
-  'fill_date_field',
   'select_option',
   'click_radio',
   'select_tree_option',
@@ -72,7 +73,9 @@ function needsTypeB(report) {
 /**
  * Guard Type B mutations: wrong-scope / collapsed scans must not delete steps or rewrite snapshots.
  * Classic failure: expected main ~70 fields, scanned drawer ~6 → mass missing → wipe trajectory.
- * @returns {{ unsafe: boolean, reason?: string }}
+ * @param {object} report form-structure diff report from replay
+ * @param {object} snap stored form snapshot with fields array
+ * @returns {{ unsafe: boolean, reason?: string }} safety assessment; unsafe=true blocks mutation
  */
 function assessFormStructureDiffSafety(report, snap) {
   if (!report) return { unsafe: true, reason: 'no_report' };
@@ -104,6 +107,22 @@ function assessFormStructureDiffSafety(report, snap) {
   return { unsafe: false };
 }
 
+/**
+ * Handle a Type B form-structure checkpoint during steps/replay.
+ * Compares live scan against stored snapshot; deletes missing-label steps and AI-fills added labels.
+ * @param {object} root0 checkpoint context
+ * @param {number} root0.tid trajectory DB id
+ * @param {object} root0.runtime trajectory runtime object
+ * @param {boolean} root0.doSuppress whether to suppress step persist
+ * @param {object} root0.entry replay action entry
+ * @param {number|null} root0.stepId checkpoint step DB id
+ * @param {number} root0.stepNum step index in the batch
+ * @param {number} root0.total total steps in the batch
+ * @param {Array<object>} root0.actions remaining in-memory action queue
+ * @param {Set<number>} root0.skippedIds set of step ids to skip
+ * @param {Map<number, object>} root0.snapshotsByTrigger form snapshots keyed by trigger step id
+ * @returns {Promise<{ ok: boolean, aborted: boolean, results: Array<object>, healed: Array<object>, error?: string, userAbort?: boolean }>} checkpoint result
+ */
 export async function handleFormStructureCheckpoint({
   tid,
   runtime,
@@ -148,28 +167,25 @@ export async function handleFormStructureCheckpoint({
 
   let result;
   try {
-    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', REPLAY_TIMEOUT_MS);
-    execSession.forwardStdin({
-      nodeUuid: runtime.executorNodeUuid,
+    result = await runReplayActions({
+      execSession,
       sessionId: runtime.sessionId,
-      event: 'replay_actions',
-      data: {
-        actions: [{
-          ...entry,
-          params: {
-            ...(entry.params || {}),
-            fields: (snap.fields || []).map((f) => ({
-              label: f.label,
-              is_required: !!(f.isRequired ?? f.is_required),
-            })),
-            container: snap.container,
-          },
-        }],
-        is_replay: doSuppress,
-        stop_on_fail: true,
-      },
+      nodeUuid: runtime.executorNodeUuid,
+      actions: [{
+        ...entry,
+        params: {
+          ...(entry.params || {}),
+          fields: (snap.fields || []).map((f) => ({
+            label: f.label,
+            is_required: !!(f.isRequired ?? f.is_required),
+          })),
+          container: snap.container,
+        },
+      }],
+      timeoutMs: REPLAY_STEP_TIMEOUT_MS,
+      stopOnFail: true,
+      isReplay: doSuppress,
     });
-    result = await doneP;
     await markConsumedActionLog(runtime);
   } catch (e) {
     const msg = e?.message || String(e);
@@ -324,13 +340,21 @@ export async function handleFormStructureCheckpoint({
   ];
 
   if (addingLabels.length) {
+    const contract = buildHealContract({
+      failedEntry: entry,
+      errorResult: row?.result || 'form structure changed',
+      healType: 'form_structure',
+      maxSteps: FORM_STRUCTURE_HEAL_MAX_STEPS,
+      retryCount: 1,
+      formStructureReport: report,
+    });
     const instruction = buildFormStructureHealInstruction({
       container,
       added_required: report.added_required || [],
       added_optional: report.added_optional || [],
       missing_required: report.missing_required || [],
       missing_optional: report.missing_optional || [],
-    });
+    }, { contract });
     broadcast('recording:replay_heal', {
       ...trajScope(tid),
       stepId,
@@ -342,7 +366,7 @@ export async function handleFormStructureCheckpoint({
 
     try {
       const beforeIds = await peekActionLogIds(runtime);
-      await runHealStep(runtime, instruction, FORM_STRUCTURE_HEAL_MAX_STEPS, 'form_structure');
+      await runHealStep(runtime, instruction, FORM_STRUCTURE_HEAL_MAX_STEPS, 'form_structure', contract);
       const afterEntries = await fetchActionLogEntries(runtime);
       const newEntries = afterEntries.filter((e) => {
         const id = e?.id != null ? String(e.id) : '';

@@ -8,8 +8,8 @@ import {
   BATCH_ANALYZE_CONCURRENCY,
   BATCH_ITEM_LEASE_MS,
   BATCH_ANALYZE_MAX_ATTEMPTS,
-} from '../../../config/config.js';
-import { getDB } from '../../../config/database.js';
+} from '#config/config.js';
+import { getDB } from '#config/database.js';
 import * as batchDao from '../../dao/batch-recording-dao.js';
 import { analyzeRequirementToPhases, createTransactionWithPhases } from './trajectory-meta-service.js';
 import {
@@ -105,7 +105,7 @@ async function runAnalyze(item, token) {
 
     const analysis = {
       phases,
-      caseEntries: Array.isArray(result.caseEntries) ? result.caseEntries : [],
+      businessEntries: Array.isArray(result.businessEntries) ? result.businessEntries : [],
     };
     const fresh = await batchDao.getItemById(item.id);
     const saved = await batchDao.transitionItem(item.id, ['analyzing'], 'analyzed', {
@@ -147,6 +147,8 @@ async function runAnalyze(item, token) {
 
 /**
  * Create trajectory+phases+case from analyzed item; draft → drafted, record → queued.
+ * @param {object} item analyzed batch item with batchId, name, requirement, mode
+ * @returns {Promise<void>} resolves when draft/trajectory is created and item status updated
  */
 async function createDraftFromAnalyzed(item) {
   const job = await batchDao.getJobById(item.batchId);
@@ -178,9 +180,12 @@ async function createDraftFromAnalyzed(item) {
         name: item.name,
         requirement: item.requirement,
         phases,
-        caseEntries: analysis.caseEntries || [],
+        businessEntries: analysis.businessEntries || [],
         model: job.model || '',
         systemAccountId: Number(job.systemAccountId),
+        batchJobId: job.id,
+        // 任务归属用户透传给其生成的交易（否则交易 paas_user_id=NULL 变无主全可见）
+        paasUserId: job.paasUserId || null,
         requireFunctionId: true,
         trx,
       });

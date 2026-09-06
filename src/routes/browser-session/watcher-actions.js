@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { state } from '../../state.js';
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import * as execSession from '../../executor-session-client.js';
 import { persistLiveActionEntries } from './persist-live.js';
 import { sessionRuntimeReady } from './agent-io.js';
@@ -8,6 +8,19 @@ import { createPushChannel } from '../../runtime/sse-channel.js';
 import { executeAgentStep } from './step-execution.js';
 import { onWsMessage } from '../../ws-server.js';
 
+/**
+ * CDP watcher quick-action HTTP handler and WebSocket step registration.
+ * Quick actions run on the live page via the agent (executor or local) and
+ * optionally live-persist to the bound trajectory.
+ */
+
+/**
+ * Handle a CDP watcher quick-action request: forward to agent, await result,
+ * and optionally live-persist the resulting entry.
+ * @param {import('express').Request} req Express request
+ * @param {import('express').Response} res Express response
+ * @returns {Promise<void>}
+ */
 export async function handleWatcherAction(req, res) {
   try {
     const { action, params, trajectoryDbId, sessionId, source } = req.body || {};
@@ -171,10 +184,11 @@ export async function handleWatcherAction(req, res) {
 }
 
 // ── WebSocket 消息处理（通过 ws-server 的 onWsMessage 注册） ──
+/** Register the `session:step` WebSocket message handler (WS-driven step execution). */
 export function registerWatcherWsHandler() {
   onWsMessage((ws, msg) => {
     if (msg.type === 'session:step') {
-      const { sessionId, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId } = msg.payload || {};
+      const { sessionId, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId } = msg.payload || {};
       if (!sessionId || !task) {
         ws.send(JSON.stringify({ type: 'session:error', payload: { message: 'sessionId and task are required' } }));
         return;
@@ -185,7 +199,7 @@ export function registerWatcherWsHandler() {
         return;
       }
       const channel = createPushChannel(ws, null);
-      executeAgentStep({ session, task, maxSteps: maxSteps || 40, caseDataFile, phaseNumber, trajectoryDbId, channel });
+      executeAgentStep({ session, task, maxSteps: maxSteps || 40, businessDataFile, phaseNumber, trajectoryDbId, channel });
     }
   });
 }

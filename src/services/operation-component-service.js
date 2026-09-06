@@ -25,8 +25,8 @@ function svcError(message, statusCode = 400) {
 
 /**
  * Walk system tree from a function/module node up to type=SYSTEM.
- * @param {number} nodeId
- * @returns {Promise<number|null>}
+ * @param {number} nodeId starting node id
+ * @returns {Promise<number|null>} ancestor system id, or null if not under a system
  */
 export async function resolveSystemIdFromNode(nodeId) {
   let id = Number(nodeId);
@@ -46,6 +46,8 @@ export async function resolveSystemIdFromNode(nodeId) {
 
 /**
  * Resolve system id for a trajectory via function_id ancestors.
+ * @param {object} trajectory trajectory row (with functionId/function_id)
+ * @returns {Promise<number|null>} ancestor system id, or null
  */
 export async function resolveSystemIdForTrajectory(trajectory) {
   const functionId = trajectory?.functionId ?? trajectory?.function_id;
@@ -73,16 +75,31 @@ function parseStepParams(step) {
   };
 }
 
+/**
+ * Load and normalize steps for a phase.
+ * @param {number} phaseId phase id
+ * @returns {Promise<object[]>} parsed step rows
+ */
 export async function loadPhaseSteps(phaseId) {
   const steps = await trajectoryStepDao.listByPhase(phaseId);
   return steps.map(parseStepParams);
 }
 
+/**
+ * Recompute occurrence_count for a component from the occurrences table.
+ * @param {number} componentId component id
+ * @returns {Promise<object>} updated component row
+ */
 export async function refreshOccurrenceCount(componentId) {
   const n = await occurrenceDao.countByComponent(componentId);
   return componentDao.setOccurrenceCount(componentId, n);
 }
 
+/**
+ * List operation components with optional filter (system/module/function/status/keyword/time).
+ * @param {object} [query] filter + pagination options
+ * @returns {Promise<{ rows: object[], total: number, page: number, pageSize: number }>} paged component list
+ */
 export async function listComponents(query = {}) {
   const functionId = query.functionId != null && query.functionId !== ''
     ? Number(query.functionId)
@@ -119,6 +136,11 @@ export async function listComponents(query = {}) {
   });
 }
 
+/**
+ * Get a single component by id, enriched with its occurrences.
+ * @param {number} id component id
+ * @returns {Promise<object>} component row with occurrences[]
+ */
 export async function getComponent(id) {
   const row = await componentDao.getById(id);
   if (!row) throw svcError('Operation component not found', 404);
@@ -128,6 +150,8 @@ export async function getComponent(id) {
 
 /**
  * Manual create from trajectoryPhaseId or raw steps.
+ * @param {object} [body] create payload (trajectoryPhaseId or steps[] + systemId)
+ * @returns {Promise<object>} created (or existing) component with occurrences
  */
 export async function createComponent(body = {}) {
   const trajectoryPhaseId = body.trajectoryPhaseId != null
@@ -214,6 +238,12 @@ export async function createComponent(body = {}) {
   return getComponent(created.id);
 }
 
+/**
+ * Patch editable fields (name/key/description/paramSchema); stepsJson/signature are immutable.
+ * @param {number} id component id
+ * @param {object} [body] fields to patch
+ * @returns {Promise<object>} updated component with occurrences
+ */
 export async function updateComponent(id, body = {}) {
   const row = await componentDao.getById(id);
   if (!row) throw svcError('Operation component not found', 404);
@@ -238,6 +268,11 @@ export async function updateComponent(id, body = {}) {
   return getComponent(row.id);
 }
 
+/**
+ * Transition a draft component to confirmed status.
+ * @param {number} id component id
+ * @returns {Promise<object>} confirmed component with occurrences
+ */
 export async function confirmComponent(id) {
   const row = await componentDao.getById(id);
   if (!row) throw svcError('Operation component not found', 404);
@@ -248,6 +283,11 @@ export async function confirmComponent(id) {
   return getComponent(row.id);
 }
 
+/**
+ * Transition a component to deprecated status.
+ * @param {number} id component id
+ * @returns {Promise<object>} deprecated component with occurrences
+ */
 export async function deprecateComponent(id) {
   const row = await componentDao.getById(id);
   if (!row) throw svcError('Operation component not found', 404);
@@ -261,6 +301,11 @@ export async function deprecateComponent(id) {
   return getComponent(row.id);
 }
 
+/**
+ * Delete a draft component (non-draft must use deprecate).
+ * @param {number} id component id
+ * @returns {Promise<{ status: string, id: number }>} deletion result
+ */
 export async function deleteComponent(id) {
   const row = await componentDao.getById(id);
   if (!row) throw svcError('Operation component not found', 404);
@@ -273,6 +318,8 @@ export async function deleteComponent(id) {
 
 /**
  * Collect function ids under a system (module → function).
+ * @param {number} systemId system node id
+ * @returns {Promise<number[]>} function ids under the system
  */
 export async function collectFunctionIdsForSystem(systemId) {
   const modules = await systemDao.listModules(systemId);

@@ -6,7 +6,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+form = (
+    (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    + "\n"
+    + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+)
 
 
 def assert_true(cond: bool, msg: str) -> None:
@@ -32,6 +36,9 @@ def main() -> int:
     assert_true(err >= 0 and rec >= 0, "both _err return and _record_action present")
     assert_true(err < rec, "fail before _record_action / success wait")
     wait = body.find("wait_for_timeout(3000)")
+    if wait < 0:
+        wait = body.find("wait_for_timeout(WAIT_3000_MS)")
+    assert_true(wait > err, "3s wait only on success path (after fail return)")
     assert_true(wait > err, "3s wait only on success path (after fail return)")
     assert_true("return _ok(" in body and "ok-login" in body, "success still ok-login")
     assert_true("if captcha:" in body, "captcha fill remains optional")

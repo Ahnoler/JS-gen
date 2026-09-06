@@ -1,3 +1,6 @@
+/**
+ * DAO for the `special_element_step` table — action steps belonging to a special element.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
@@ -21,6 +24,12 @@ function shape(row) {
   return obj;
 }
 
+/**
+ * List all steps of a special element ordered by step_number.
+ * @param {number} specialElementId 特殊元素 id
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<object[]>} step entities
+ */
 export async function listByElement(specialElementId, trx = null) {
   const db = trx || getDB();
   const rows = await db(TABLE)
@@ -29,12 +38,24 @@ export async function listByElement(specialElementId, trx = null) {
   return rows.map(shape);
 }
 
+/**
+ * Fetch a single step by id.
+ * @param {number} id 主键
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<object|null>} step entity or null when not found
+ */
 export async function getById(id, trx = null) {
   const db = trx || getDB();
   const row = await db(TABLE).where({ id }).first();
   return shape(row);
 }
 
+/**
+ * Batch-insert steps for an element and return the full ordered step list.
+ * @param {object[]} steps array of step objects (specialElementId/stepNumber/...)
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<object[]>} step entities for the element
+ */
 export async function batchCreate(steps, trx = null) {
   if (!steps?.length) return [];
   const db = trx || getDB();
@@ -59,6 +80,13 @@ export async function batchCreate(steps, trx = null) {
   return listByElement(steps[0].specialElementId, trx);
 }
 
+/**
+ * Update a step by id and return the updated entity.
+ * @param {number} id 主键
+ * @param {object} fields partial camelCase step fields
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<object|null>} updated step entity
+ */
 export async function update(id, fields, trx = null) {
   const db = trx || getDB();
   const patch = {};
@@ -79,12 +107,23 @@ export async function update(id, fields, trx = null) {
   return getById(id, trx);
 }
 
+/**
+ * Delete a step by id.
+ * @param {number} id 主键
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(id, trx = null) {
   const db = trx || getDB();
   return db(TABLE).where({ id }).del();
 }
 
-/** Renumber steps 1..n for an element (by current step_number, then id). */
+/**
+ * Renumber steps 1..n for an element (by current step_number, then id).
+ * @param {number} specialElementId 特殊元素 id
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<object[]>} renumbered step entities
+ */
 export async function renumber(specialElementId, trx = null) {
   const db = trx || getDB();
   const rows = await db(TABLE)
@@ -102,6 +141,12 @@ export async function renumber(specialElementId, trx = null) {
   return listByElement(specialElementId, trx);
 }
 
+/**
+ * Count steps belonging to a special element.
+ * @param {number} specialElementId 特殊元素 id
+ * @param {object|null} [trx] optional transaction
+ * @returns {Promise<number>} step count
+ */
 export async function countByElement(specialElementId, trx = null) {
   const db = trx || getDB();
   const row = await db(TABLE)

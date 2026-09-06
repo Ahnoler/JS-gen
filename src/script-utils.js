@@ -1,27 +1,12 @@
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
-import path from 'path';
-import { GENERATED_DIR } from '../config/config.js';
+/**
+ * Trajectory flow extraction helper.
+ */
 
-export function ensureGeneratedDir() {
-  if (!existsSync(GENERATED_DIR)) mkdirSync(GENERATED_DIR, { recursive: true });
-}
-
-export function loadGeneratedIndex() {
-  ensureGeneratedDir();
-  const fp = path.join(GENERATED_DIR, 'index.json');
-  if (!existsSync(fp)) return [];
-  try { return JSON.parse(readFileSync(fp, 'utf-8')); } catch { return []; }
-}
-
-export function saveGeneratedIndex(list) {
-  ensureGeneratedDir();
-  writeFileSync(path.join(GENERATED_DIR, 'index.json'), JSON.stringify(list, null, 2), 'utf-8');
-}
-
-export function cleanupScriptFile(scriptPath) {
-  try { if (existsSync(scriptPath)) unlinkSync(scriptPath); } catch {}
-}
-
+/**
+ * Extract a flattened action flow from a browser-use trajectory's history.
+ * @param {object} trajectory raw trajectory object with `history` array
+ * @returns {object[]} flow steps with stepNumber, type, params, element, success, etc.
+ */
 export function extractFlowFromTrajectory(trajectory) {
   const history = trajectory?.history || [];
   const flow = [];

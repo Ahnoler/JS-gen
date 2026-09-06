@@ -2,20 +2,27 @@ import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 
 /**
+ * Heal-instruction builders for failed-step rerun and form-structure-change
+ * repair. Produces the resume prompt text sent to the agent after replay.
+ */
+
+/**
  * Single-step heal prompt for live steps/replay.
  * Only redo the failed recorded action — no extra diagnosis / fill / next-step ops.
- *
- * @param {{ action?: string, params?: object, id?: string|number }} failedEntry
- * @param {string} [errorResult]
- * @returns {string}
+ * @param {{ action?: string, params?: object, id?: string|number }} failedEntry the failed ACTION_LOG entry
+ * @param {string} [errorResult] error text from the failed step
+ * @param {object} [opts] 选项
+ * @param {string} [opts.reason] 失败原因
+ * @param {object} [opts.contract] 合同信息
+ * @returns {string} 自愈指令文本
  */
-export function buildStepHealInstruction(failedEntry, errorResult = '') {
+export function buildStepHealInstruction(failedEntry, errorResult = '', { reason = null, contract = null } = {}) {
   const action = failedEntry?.action || 'unknown';
   const params = failedEntry?.params || {};
   const intent = describeActionIntent(action, params);
   const err = errorResult ? String(errorResult) : '(unknown)';
 
-  return [
+  const lines = [
     '当前为步骤回放失败后的单步自愈阶段。页面已停在失败步。',
     '请只完成下面这一步的原意图，成功后立即 done(success=true) 停止。',
     '不要做任何额外操作：不要补填其它字段、不要诊断整表、不要点确认/确定/保存（除非原意图本身就是该按钮）、不要执行轨迹下一步。',
@@ -30,17 +37,25 @@ export function buildStepHealInstruction(failedEntry, errorResult = '') {
     '- 不要导航离开当前流程。',
     '- 行选/引入类步骤：选中后弹窗可能仍保持打开——这是正常的；不要点确认/确定去关窗（那是轨迹下一步）。',
     '- 完成后立即 done(success=true)。系统对单步自愈的 done 使用单独判定，不会因弹窗仍开着而拒绝。',
-  ].join('\n');
+  ];
+  const analysis = reason || contract?.reason || null;
+  if (analysis) {
+    lines.push('');
+    lines.push(formatFailureAnalysis(analysis));
+  }
+  return lines.join('\n');
 }
 
 /**
  * Type B — form structure change heal (distinct from single-step Type A).
  * AI only fills newly added fields in the browser; control plane persists steps separately.
- *
- * @param {{ container?: string, added_required?: string[], added_optional?: string[], missing_required?: string[], missing_optional?: string[] }} report
- * @returns {string}
+ * @param {{ container?: string, added_required?: string[], added_optional?: string[], missing_required?: string[], missing_optional?: string[] }} report form structure change report
+ * @param {object} [opts] 选项
+ * @param {string} [opts.reason] 失败原因
+ * @param {object} [opts.contract] 合同信息
+ * @returns {string} 自愈指令文本
  */
-export function buildFormStructureHealInstruction(report = {}) {
+export function buildFormStructureHealInstruction(report = {}, { reason = null, contract = null } = {}) {
   const container = report.container || 'main';
   const addedReq = Array.isArray(report.added_required) ? report.added_required : [];
   const addedOpt = Array.isArray(report.added_optional) ? report.added_optional : [];
@@ -69,25 +84,63 @@ export function buildFormStructureHealInstruction(report = {}) {
   }
   lines.push('');
   lines.push('约束：');
-  lines.push('- 仅填写上述新增字段（fill_form_field / select_option / fill_date_field / click_radio 等）。');
+  lines.push('- 仅填写上述新增字段（fill_form_field / select_option / click_radio 等）。日期也用 fill_form_field。');
   lines.push('- 不要点保存/提交/确认；不要导航；不要处理其它业务步骤。');
   lines.push('- 禁止整表 auto-fill / sync_tasks_from_errors。');
   lines.push('- 完成后立即 done(success=true)。系统对表单结构自愈的 done 使用单独判定，不会因弹窗仍开着而拒绝。');
+  const analysis = reason
+    || contract?.reason
+    || {
+      category: 'changed_structure',
+      suggestedAction: 'repair',
+      evidence: ['heal_type=form_structure'],
+    };
+  if (analysis) {
+    lines.push('');
+    lines.push(formatFailureAnalysis(analysis));
+  }
   return lines.join('\n');
 }
 
+/**
+ * Append the structured failure analysis to a legacy instruction without
+ * rewriting the original text (Python text-fallback detection stays intact).
+ * @param {object} reason 失败原因对象
+ * @returns {string} 格式化后的失败分析文本
+ */
+function formatFailureAnalysis(reason) {
+  if (!reason || typeof reason !== 'object') return '【失败分析】category=unknown';
+  const category = String(reason.category || 'unknown');
+  const suggestedAction = String(reason.suggestedAction || 'fail');
+  const evidence = Array.isArray(reason.evidence)
+    ? reason.evidence.map((item) => String(item ?? '')).filter(Boolean).join(' | ')
+    : '';
+  const lines = [
+    '【失败分析】',
+    `category=${category}`,
+    `suggestedAction=${suggestedAction}`,
+  ];
+  if (evidence) lines.push(`evidence=${evidence}`);
+  return lines.join('\n');
+}
+
+/**
+ * 描述动作意图
+ * @param {string} action 动作类型
+ * @param {object} params 动作参数
+ * @returns {string} 动作意图描述
+ */
 function describeActionIntent(action, params) {
   const p = params || {};
   switch (action) {
     case 'fill_form_field':
-      return `填写 "${p.label_text || ''}" = "${p.value ?? ''}"`;
+    case 'fill_date_field':
+    case 'select_date':
+      return `填写 "${p.label_text || ''}" = "${p.value ?? p.date ?? ''}"`;
     case 'select_option':
       return `在 "${p.label_text || ''}" 中选择 "${p.option_text || ''}"`;
     case 'select_tree_option':
       return `在树选择 "${p.label_text || ''}" 中选择 "${p.option_text || p.node_text || ''}"`;
-    case 'fill_date_field':
-    case 'select_date':
-      return `填写日期 "${p.label_text || ''}" = "${p.value || p.date || ''}"`;
     case 'click_save':
       return `点击保存/提交（${p.button_text || p.text || '保存'}）`;
     case 'click_element_by_index':
@@ -115,6 +168,19 @@ function describeActionIntent(action, params) {
   }
 }
 
+/**
+ * Build the resume instruction for a rerun-from-failed-step, optionally using
+ * the `scripts/prompts/heal-prompt.md` template with URL / form-change / log
+ * sections filled in.
+ * @param {object} opts rerun options
+ * @param {object} opts.actionData parsed action file ({ url, tests/actions })
+ * @param {number} opts.failedStep 1-based failed step index
+ * @param {string} [opts.log_file] relative log file path to embed as context
+ * @param {object|object[]} [opts.form_changes] detected form-structure changes
+ * @param {number} [opts.replayedCount] actions already replayed by _replay
+ * @param {string} opts.PROJECT_DIR project root for resolving paths
+ * @returns {{ resumeInstruction: string }} 包含恢复指令的对象
+ */
 export function buildRerunResumeInstruction({ actionData, failedStep, log_file, form_changes, replayedCount, PROJECT_DIR }) {
   let resumeInstruction = '';
   try {
@@ -198,7 +264,9 @@ export function buildRerunResumeInstruction({ actionData, failedStep, log_file, 
     let logSection = '';
     if (log_file) {
       const logPath = path.resolve(PROJECT_DIR, log_file);
-      if (existsSync(logPath)) {
+      const logRel = path.relative(PROJECT_DIR, logPath);
+      const withinProject = !(logRel.startsWith('..') || path.isAbsolute(logRel));
+      if (withinProject && existsSync(logPath)) {
         const logContent = readFileSync(logPath, 'utf-8');
         if (logContent.trim()) {
           logSection = '\n---\n\n## 文件说明\n\n以下包含两份文件，供你理解任务上下文：\n\n' +

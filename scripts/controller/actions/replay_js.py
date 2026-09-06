@@ -154,7 +154,14 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
     // whose descendant text includes want but is not the control.
     if (want) {
       const exact = nodes.filter((el) => norm(el.innerText || el.textContent) === want);
-      if (!exact.length) return null;
+      if (!exact.length) {
+        // Tree-node text drift: element_json.text may be stale (node renamed after
+        // recording). When the recorded xpath targets .el-tree-node__content and hits
+        // exactly one visible node, trust the xpath — don't let the text guard kill it.
+        const treeish = targetKind === 'tree_node' || /el-tree-node__content/.test(String(xp));
+        if (treeish && nodes.length === 1) return clickEl(nodes[0], how + '-tree-text-drift');
+        return null;
+      }
       nodes = exact;
     }
     return clickEl(nodes[nodes.length - 1], how);
@@ -512,6 +519,44 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath, labelHint]) => {
   return '';
 }'''
 
+# Read back a value by el-form-item label or placeholder — the mirror of
+# JS_FILL_BY_XPATH's placeholder fallback. Used when a fill landed on the
+# placeholder branch (stale xpath) so the verify reads the SAME input the
+# fill wrote, instead of reading an empty stale-xpath node.
+_JS_READ_VALUE_BY_LABEL = r'''([label, placeholder]) => {
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const read = (el) => {
+    if (!el) return '';
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return (el.value || '').trim();
+    const inp = el.querySelector && el.querySelector('input:not([type="hidden"]), textarea');
+    return inp ? (inp.value || '').trim() : '';
+  };
+  const want = String(label || '').trim();
+  const phWant = String(placeholder || '').trim();
+  // Pass 1: exact el-form-item label
+  const items = document.querySelectorAll('.el-form-item');
+  for (const item of items) {
+    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+    if (lbl !== want) continue;
+    const input = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
+    if (input) return read(input);
+  }
+  // Pass 2: visible input matching placeholder (or fuzzy label in placeholder)
+  for (const inp of document.querySelectorAll('input:not([type="hidden"]), textarea')) {
+    if (!isVis(inp) || inp.disabled || inp.readOnly) continue;
+    if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
+    const ph = inp.getAttribute('placeholder') || '';
+    if (!ph) continue;
+    if ((phWant && ph.includes(phWant)) || (want && ph.includes(want))) return read(inp);
+  }
+  return '';
+}'''
 
 
 # Click / focus a control resolved by xpath (returns ok-xpath-smart when found).
@@ -560,3 +605,19 @@ _JS_LOCATE_BY_XPATH = r'''([xpath]) => {
   }
   return 'xpath-not-found';
 }'''
+
+
+# Count visible el-dialog / el-drawer / el-message-box overlays (idempotent close_dialog).
+JS_COUNT_OVERLAYS = '''() => {
+                            const isVis = (el) => {
+                                if (el.offsetParent !== null) return true;
+                                const st = getComputedStyle(el);
+                                if (st.display === 'none' || st.visibility === 'hidden') return false;
+                                const r = el.getBoundingClientRect();
+                                return r.width > 0 && r.height > 0;
+                            };
+                            const d = [...document.querySelectorAll('.el-dialog')].filter(isVis).length;
+                            const w = [...document.querySelectorAll('.el-drawer')].filter(isVis).length;
+                            const m = [...document.querySelectorAll('.el-message-box')].filter(isVis).length;
+                            return d + w + m;
+                        }'''

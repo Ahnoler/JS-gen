@@ -49,12 +49,17 @@ def test_resolve_recorded_option_text() -> None:
 
 
 def test_select_option_already_matched_stamps_concrete() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    idx = form.find("async def select_option(")
-    assert_true(idx >= 0, "select_option present")
-    # Through end of select_option / start of click_adjacent_button
-    end = form.find("async def click_adjacent_button", idx)
-    body = form[idx : end if end > idx else idx + 12000]
+    engines = (
+        ROOT / "scripts/controller/actions/form_action_engines.py"
+    ).read_text(encoding="utf-8")
+    class_idx = engines.find("class SelectEngine")
+    assert_true(class_idx >= 0, "SelectEngine class present")
+    idx = engines.find("async def select_option(", class_idx)
+    assert_true(idx >= 0, "select_option present in SelectEngine")
+    # Through end of SelectEngine.select_option / start of the next engine class
+    end = engines.find("class RadioEngine", idx)
+    assert_true(end > idx, "RadioEngine boundary present after select_option")
+    body = engines[idx:end]
     assert_true(
         "resolve_recorded_option_text" in body,
         "select_option uses resolve_recorded_option_text before record",

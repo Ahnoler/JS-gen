@@ -8,8 +8,9 @@ import { request } from 'undici';
 const DEFAULT_PORTS = [9242, 9222, 9229];
 
 /**
- * @param {{ host?: string, ports?: number[] }} [opts]
- * @returns {Promise<{ cdpHttp: string, cdpWsUrl: string, browser: string, port: number }|null>}
+ * Probe Chrome remote-debugging HTTP endpoints for a CDP WebSocket URL.
+ * @param {{ host?: string, ports?: number[] }} [opts] Discovery options.
+ * @returns {Promise<{ cdpHttp: string, cdpWsUrl: string, browser: string, port: number }|null>} First live CDP endpoint, or null.
  */
 export async function discoverCdp(opts = {}) {
   const host = opts.host || '127.0.0.1';
@@ -41,7 +42,8 @@ export async function discoverCdp(opts = {}) {
 
 /**
  * Retry discover a few times (Chrome may need a moment after Agent ready).
- * @param {{ attempts?: number, delayMs?: number, host?: string, ports?: number[], port?: number }} [opts]
+ * @param {{ attempts?: number, delayMs?: number, host?: string, ports?: number[], port?: number }} [opts] Retry + discovery options.
+ * @returns {Promise<{ cdpHttp: string, cdpWsUrl: string, browser: string, port: number }|null>} First live CDP endpoint, or null.
  */
 export async function discoverCdpWithRetry({
   attempts = 20,
@@ -61,8 +63,8 @@ export async function discoverCdpWithRetry({
 
 /**
  * Probe every port in a contiguous range; return all live CDP endpoints.
- * @param {{ host?: string, portBase?: number, span?: number }} [opts]
- * @returns {Promise<{ port: number, cdpHttp: string, cdpWsUrl: string, browser: string }[]>}
+ * @param {{ host?: string, portBase?: number, span?: number }} [opts] Range discovery options.
+ * @returns {Promise<{ port: number, cdpHttp: string, cdpWsUrl: string, browser: string }[]>} All live CDP endpoints found in the range.
  */
 export async function discoverAllCdpInRange(opts = {}) {
   const host = opts.host || '127.0.0.1';

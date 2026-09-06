@@ -1,0 +1,11 @@
+{
+  "moduleKey": "postloan-warn",
+  "moduleName": "贷后-预警",
+  "sourcePath": "D:/dev/JS-gen/docs/天阳信贷系统需求文档/A_v5.2需求文档0824/I02天阳信贷管理系统-贷后风险需求分册【贷后预警】.docx",
+  "sourceKind": "req",
+  "status": "sliced",
+  "warnings": [],
+  "createdAt": "2026-09-05T12:23:35.733Z",
+  "updatedAt": "2026-09-05T12:44:22.000Z",
+  "note": "batch 0824"
+}

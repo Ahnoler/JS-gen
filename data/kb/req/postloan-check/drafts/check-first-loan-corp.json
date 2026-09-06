@@ -1,0 +1,53 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "postloan-check",
+  "flow": "对公首次贷后检查（列表/借据弹窗 + 纯 blocked 详情族）",
+  "aliases": ["对公首次贷后检查", "法人贷款首检", "房地产开发贷款首检", "项目贷款首检", "流动资金贷款首检"],
+  "hash_markers": ["ZJJK00109757", "ZJJK00109642", "FS00006013", "FS00006027", "FS00006031", "FS00006068"],
+  "keywords": ["对公首次贷后检查", "借据选择弹窗", "首检详情", "是否超期"],
+  "menu_path": "贷后管理/贷后检查/对公首次贷后检查",
+  "preconditions": [
+    "本机构无对公借据/首检任务数据（共 0 条）——详情族整组纯 blocked",
+    "【SUT 实测 2026-09-06】对公列表列含「是否超期」（对私为「是否已超时」）"
+  ],
+  "steps": [
+    {
+      "name": "对公客户首次贷后检查列表主页",
+      "leafRef": "wet-test.md 叶27 (ZJJK00109757)",
+      "verify": "match",
+      "menu_path": "贷后管理/贷后检查/对公首次贷后检查",
+      "query_fields": ["客户名称(放大镜)", "合同编号", "借据编号"],
+      "buttons": ["新增", "查看", "修改", "删除", "生成检查表"],
+      "columns": ["任务编号", "客户编号", "客户名称", "合同编号", "借据编号", "借据金额", "放款日期", "产品名称", "任务生成日期", "任务要求完成时间", "经办人", "经办机构", "流程发起时间", "流程状态", "任务来源", "是否超期"],
+      "rules": "进页共 0 条（无数据，是否自动加载无法确证）"
+    },
+    {
+      "name": "选择借据弹窗（对公）",
+      "leafRef": "wet-test.md 叶28 (ZJJK00109642)",
+      "verify": "match",
+      "enter": "列表【新增】弹「借据选择弹窗」",
+      "query_fields": ["客户名称(放大镜)", "合同编号", "借据编号"],
+      "columns": ["客户编号", "客户名称", "证件类型", "证件号码", "合同编号", "产品名称", "借据编号", "借据金额", "还款方式", "放款日期", "借据到期日", "资金支付方式", "用途"],
+      "buttons": ["取消", "确认"],
+      "rules": "共 0 条；结构核到"
+    }
+  ],
+  "pendingSteps": [
+    {
+      "name": "对公首检详情/任务页族（纯 blocked，无对公数据，不产卡列名）",
+      "leafRefs": ["wet-test.md 叶29 (ZJJK00109599)", "wet-test.md 叶30 (ZJJK00109670)", "wet-test.md 叶31 (ZJJK00109684)", "wet-test.md 叶32 (ZJJK00109686)", "wet-test.md 叶33 (ZJJK00109874)", "wet-test.md 叶34 (ZJJK00109694)", "wet-test.md 叶35 (ZJJK00109736)", "wet-test.md 叶36 (ZJJK00109605)", "wet-test.md 叶37 (ZJJK00109877)", "wet-test.md 叶38 (ZJJK00109610)", "wet-test.md 叶39 (ZJJK00109625)", "wet-test.md 叶40 (ZJJK00109604)", "wet-test.md 叶41 (ZJJK00109730)", "wet-test.md 叶42 (ZJJK00109606)", "wet-test.md 叶43 (ZJJK00109609)", "wet-test.md 叶44 (ZJJK00109540)", "wet-test.md 叶45 (ZJJK00109541)"],
+      "verify": "blocked",
+      "reason": "无对公借据/首检任务数据（本机构共 0 条），对公首检详情各区块（基本信息/客户/评级/用信/合作情况/他行信用/生产经营财务/贷款用途资料/预警/检查结果/项目贷款运行/资金到位/资金使用/检查情况/影像/提交）不可达",
+      "retry_condition": "待有对公首检任务数据"
+    },
+    {
+      "name": "对公首检查看态与审批侧（纯 blocked）",
+      "leafRefs": ["wet-test.md 叶46 (ZJJK00109682 FS00006031 查看态)", "wet-test.md 叶47 (ZJJK00109667 FS00006027 查看态)", "wet-test.md 叶48 (ZJJK00109542 FS00006013 查看态)", "wet-test.md 叶49 (ZJJK00171700PDCP)", "wet-test.md 叶50 (ZJJK00171710PDCP)", "wet-test.md 叶51 (ZJJK00171712PDCP)", "wet-test.md 叶52 (ZJJK00110061 FS00006068 自动查看)", "wet-test.md 叶53 (ZJJK00110059)", "wet-test.md 叶54 (ZJJK00110060)", "wet-test.md 叶55 (ZJJK00110260)"],
+      "verify": "blocked",
+      "reason": "同上无对公数据；查看态机制预期与对私 FS00005608 look 态同构（仅获取/翻步/返回），审批侧另受提交黑名单限制",
+      "retry_condition": "待有对公首检任务数据；审批侧待流程提交后经任务事项→待办核验"
+    }
+  ],
+  "sourceRefs": [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55],
+  "coverage": {"total": 29, "match": 2, "drift": 0, "blocked": 27, "notFound": 0, "gate": "partial"}
+}

@@ -1,4 +1,9 @@
-import { LLM_API_KEY, PORT } from '../../../config/config.js';
+import {
+  LLM_API_KEY, PORT,
+  FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY, FORM_LLM_TIMEOUT_MS,
+  REVIEWER_LLM_MODEL, REVIEWER_LLM_BASE_URL, REVIEWER_LLM_API_KEY,
+  SCENARIO_LLM_MODEL, SCENARIO_LLM_BASE_URL, SCENARIO_LLM_API_KEY, SCENARIO_LLM_TIMEOUT_MS,
+} from '#config/config.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import {
@@ -8,8 +13,15 @@ import {
   killTree, killOrphans, waitForReady, spawnAgent,
 } from '../../runtime/agent-process.js';
 import { broadcastWatcherStatus } from './broadcasts.js';
-import { persistLiveActionEntries, stashOrApplyStepScreenshot } from './persist-live.js';
+import { persistLiveActionEntries, stashOrApplyStepScreenshot, applyPageLevelScreenshot } from './persist-live.js';
 
+/**
+ * Shared global-browser lifecycle — spawn/ensure the local Python agent process,
+ * discover CDP endpoints, wire persistent stdout listeners for action-log /
+ * screenshot events, and tear down the remote bridge on exit.
+ */
+
+/** Discover CDP endpoints for the global browser if not already known. */
 async function ensureCdpDiscovered() {
   const gb = state.globalBrowser;
   if (gb.cdpWsUrl) return;
@@ -20,11 +32,18 @@ async function ensureCdpDiscovered() {
   }
 }
 
+/** Detach the live remote bridge and clear CDP endpoints (crash-safe). */
 export async function teardownRemoteBridge() {
   try { await detachLive({ crashed: true }); } catch {}
   clearCdpEndpoints();
 }
 
+/**
+ * Ensure the shared global browser/agent process is running and ready, spawning
+ * it if needed, discovering CDP, and wiring the persistent stdout event listener.
+ * @param {string} modelId LLM model id to use for the agent
+ * @returns {Promise<void>}
+ */
 export async function ensureGlobalBrowser(modelId) {
   const gb = state.globalBrowser;
   if (gb.isAlive()) {
@@ -35,7 +54,16 @@ export async function ensureGlobalBrowser(modelId) {
   gb.reset();
   killOrphans();
 
-  const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], { OPENAI_API_KEY: LLM_API_KEY });
+  const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], {
+    OPENAI_API_KEY: LLM_API_KEY,
+    // Python 表单 LLM（_llm_values.py）直接读这些 env；缺省回落 agent LLM
+    FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY: FORM_LLM_API_KEY || LLM_API_KEY,
+    FORM_LLM_TIMEOUT_MS: String(FORM_LLM_TIMEOUT_MS),
+    // 角色级 LLM 覆盖（Python 端 os.getenv 直接读取；未设则 Python 回落主 LLM_*）
+    REVIEWER_LLM_MODEL, REVIEWER_LLM_BASE_URL, REVIEWER_LLM_API_KEY: REVIEWER_LLM_API_KEY || LLM_API_KEY,
+    SCENARIO_LLM_MODEL, SCENARIO_LLM_BASE_URL, SCENARIO_LLM_API_KEY: SCENARIO_LLM_API_KEY || LLM_API_KEY,
+    SCENARIO_LLM_TIMEOUT_MS: String(SCENARIO_LLM_TIMEOUT_MS),
+  });
 
   child.stderr.on('data', (chunk) => { console.log(chunk.toString().trimEnd()); });
   child.on('exit', () => {
@@ -124,6 +152,13 @@ export async function ensureGlobalBrowser(modelId) {
                 after: data.after,
                 trajectoryId: session.dbTrajectoryId,
               }).catch((err) => console.warn('[step-screenshot] stash failed:', err.message));
+            }
+          } else if (msg.event === 'page_level_screenshot') {
+            const session = [...state.sessions.values()][0];
+            if (session && Number.isFinite(Number(session.dbTrajectoryId))) {
+              applyPageLevelScreenshot(session.dbTrajectoryId, msg.data || {}).catch((err) => {
+                console.warn('[page-level-screenshot] persist failed:', err.message);
+              });
             }
           } else if (msg.event === 'manual_record_status') {
             gb.manualRecording = !!msg.data?.enabled;

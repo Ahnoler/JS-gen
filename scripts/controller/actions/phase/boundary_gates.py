@@ -18,51 +18,51 @@ from .boundary_contract import (
     phase_boundary_active,
 )
 
-def record_evidence(case_data_store: dict | None, kind: str, detail: str = '') -> None:
-    if not case_data_store or not kind:
+def record_evidence(business_data_store: dict | None, kind: str, detail: str = '') -> None:
+    if not business_data_store or not kind:
         return
-    store = case_data_store.setdefault('_evidence_observed', [])
+    store = business_data_store.setdefault('_evidence_observed', [])
     if not isinstance(store, list):
         store = []
-        case_data_store['_evidence_observed'] = store
+        business_data_store['_evidence_observed'] = store
     entry = {'kind': kind, 'detail': (detail or '')[:160]}
     # Dedup by kind only
     if not any(isinstance(e, dict) and e.get('kind') == kind for e in store):
         store.append(entry)
     # Mirror legacy tokens for opt-out / adapters
     if kind in ('toast_ok', 'url_change', 'saved_navigation'):
-        case_data_store['_last_save_ok'] = True
+        business_data_store['_last_save_ok'] = True
     if kind in ('picker_closed', 'dialog_confirmed', 'introduced_backfilled'):
-        case_data_store['_last_introduce_ok'] = True
-    tokens = case_data_store.setdefault('_success_tokens', [])
+        business_data_store['_last_introduce_ok'] = True
+    tokens = business_data_store.setdefault('_success_tokens', [])
     if isinstance(tokens, list):
         tok = {'kind': kind, 'evidence': detail or kind}
         if tok not in tokens:
             tokens.append(tok)
 
-def observed_kinds(case_data_store: dict | None) -> set[str]:
-    raw = (case_data_store or {}).get('_evidence_observed') or []
+def observed_kinds(business_data_store: dict | None) -> set[str]:
+    raw = (business_data_store or {}).get('_evidence_observed') or []
     out: set[str] = set()
     if isinstance(raw, list):
         for e in raw:
             if isinstance(e, dict) and e.get('kind'):
                 out.add(str(e['kind']))
     # Legacy fallbacks
-    if (case_data_store or {}).get('_last_save_ok'):
+    if (business_data_store or {}).get('_last_save_ok'):
         out.update({'toast_ok', 'url_change', 'saved_navigation'})
-    if (case_data_store or {}).get('_last_introduce_ok'):
+    if (business_data_store or {}).get('_last_introduce_ok'):
         out.update({'picker_closed', 'dialog_confirmed', 'introduced_backfilled'})
     return out
 
-def phase_done_ok(case_data_store: dict | None) -> tuple[bool, list[str]]:
+def phase_done_ok(business_data_store: dict | None) -> tuple[bool, list[str]]:
     """Return (ok, missing_hints). Empty success_when → always ok (non-maintain)."""
-    b = get_phase_boundary(case_data_store)
+    b = get_phase_boundary(business_data_store)
     if not b:
         return True, []
     needed = list(b.get('success_when') or [])
     if not needed:
         return True, []
-    have = observed_kinds(case_data_store)
+    have = observed_kinds(business_data_store)
     intro_kinds = {'picker_closed', 'dialog_confirmed', 'introduced_backfilled'}
     save_kinds = {'toast_ok', 'url_change', 'saved_navigation'}
 
@@ -81,15 +81,15 @@ def phase_done_ok(case_data_store: dict | None) -> tuple[bool, list[str]]:
         return True, []
     return False, [f'missing_any_of:{needed}']
 
-def can_submit_writes(case_data_store: dict | None, section: str = "") -> tuple[bool, list[str]]:
+def can_submit_writes(business_data_store: dict | None, section: str = "") -> tuple[bool, list[str]]:
     """Write gate: maintain + requires_write → no fillable pending in current container."""
-    b = get_phase_boundary(case_data_store)
+    b = get_phase_boundary(business_data_store)
     if not b or not b.get('requires_write_all_editable'):
         return True, []
     from scripts.models.task import TaskList
     from scripts.controller.actions.section_scope import filter_pending_labels
 
-    tl = TaskList.from_store((case_data_store or {}).get('task_list'))
+    tl = TaskList.from_store((business_data_store or {}).get('task_list'))
     pending = filter_pending_labels(tl, section)
     return len(pending) == 0, pending
 
@@ -156,15 +156,15 @@ def should_block_index_submit_boundary(
     # 确认 on maintain overlay (not picker)
     return in_form_overlay and not picker
 
-def mark_parent_form_stale(case_data_store: dict | None, parent_container: str = '') -> None:
-    if not case_data_store:
+def mark_parent_form_stale(business_data_store: dict | None, parent_container: str = '') -> None:
+    if not business_data_store:
         return
-    parent = parent_container or case_data_store.get('_parent_container_before_picker') or 'main'
-    case_data_store['_form_stale'] = parent
-    case_data_store.pop('_query_ui', None)
+    parent = parent_container or business_data_store.get('_parent_container_before_picker') or 'main'
+    business_data_store['_form_stale'] = parent
+    business_data_store.pop('_query_ui', None)
 
 def maybe_record_picker_closed(
-    case_data_store: dict | None,
+    business_data_store: dict | None,
     *,
     still_query_ui: bool,
     parent_container: str = '',
@@ -172,7 +172,7 @@ def maybe_record_picker_closed(
     """If picker closed, record evidence + stale parent. Returns True when recorded."""
     if still_query_ui:
         return False
-    b = get_phase_boundary(case_data_store)
+    b = get_phase_boundary(business_data_store)
     # Always allow recording when introduce goals or picker_allowed
     if b and not (
         b.get('picker_allowed')
@@ -180,24 +180,24 @@ def maybe_record_picker_closed(
         or b.get('requires_introduce_then_save')
     ):
         # Still record if we had parent picker context
-        if not case_data_store.get('_parent_container_before_picker'):
+        if not business_data_store.get('_parent_container_before_picker'):
             return False
-    record_evidence(case_data_store, 'picker_closed', 'dialog-closed')
-    record_evidence(case_data_store, 'dialog_confirmed', 'picker-closed')
-    mark_parent_form_stale(case_data_store, parent_container)
+    record_evidence(business_data_store, 'picker_closed', 'dialog-closed')
+    record_evidence(business_data_store, 'dialog_confirmed', 'picker-closed')
+    mark_parent_form_stale(business_data_store, parent_container)
     return True
 
-def next_action_hint(case_data_store: dict | None) -> str:
+def next_action_hint(business_data_store: dict | None) -> str:
     """NEXT_ACTION cue from boundary goals + current pending."""
-    b = get_phase_boundary(case_data_store)
+    b = get_phase_boundary(business_data_store)
     if not b:
         return ''
     from scripts.models.task import TaskList
 
-    tl = TaskList.from_store((case_data_store or {}).get('task_list'))
+    tl = TaskList.from_store((business_data_store or {}).get('task_list'))
     intervene = [i.label for i in tl.pending if i.needs_intervention]
     fillable = [i for i in tl.pending if not i.needs_intervention]
-    have = observed_kinds(case_data_store)
+    have = observed_kinds(business_data_store)
     intro_kinds = {'picker_closed', 'dialog_confirmed', 'introduced_backfilled'}
 
     if fillable:
@@ -210,7 +210,7 @@ def next_action_hint(case_data_store: dict | None) -> str:
     if b.get('role') == 'maintain':
         # Single-field / no-submit phases must not nudge click_save (burns steps +
         # plants validation errors). Same contract signal as overlay_blocks_done.
-        c = (case_data_store or {}).get('_phase_intent')
+        c = (business_data_store or {}).get('_phase_intent')
         if isinstance(c, dict):
             from scripts.controller.actions.phase.reviewer import coerce_bool
             submit = c.get('submit') if isinstance(c.get('submit'), dict) else {}

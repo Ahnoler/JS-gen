@@ -26,17 +26,17 @@ async def _get_page(ctx):
     return ctx.pages[-1] if ctx.pages else None
 
 
-def _build_ctrl(ctx, case_data_store=None):
+def _build_ctrl(ctx, business_data_store=None):
     """Build a Controller with all registered custom actions.
 
     Args:
         ctx: Playwright browser context with get_current_page injected.
-        case_data_store: Optional shared dict (in-process watcher passes the Agent's store).
+        business_data_store: Optional shared dict (in-process watcher passes the Agent's store).
     """
     from scripts.controller.service import build_controller
 
-    store = case_data_store if case_data_store is not None else {}
-    ctrl = build_controller(ctx, case_data_store=store)
+    store = business_data_store if business_data_store is not None else {}
+    ctrl = build_controller(ctx, business_data_store=store)
     return ctrl
 
 

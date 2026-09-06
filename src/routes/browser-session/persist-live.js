@@ -42,12 +42,13 @@ function decodeB64(b64) {
   }
 }
 
-async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afterB64) {
+async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afterB64, dialogB64 = null, dialogMeta = null) {
   const stepId = Number(trajectoryStepId);
   if (!Number.isFinite(stepId) || stepId <= 0) return;
   const trajId = trajectoryId != null ? Number(trajectoryId) : null;
   const before = decodeB64(beforeB64);
   const after = decodeB64(afterB64);
+  const dialog = decodeB64(dialogB64);
 
   const upsertOne = async (kind, buffer) => {
     try {
@@ -79,21 +80,80 @@ async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afte
 
   if (before) await upsertOne('before', before);
   if (after) await upsertOne('after', after);
+
+  if (dialog) {
+    try {
+      await screenshotService.replaceDialogScreenshot(stepId, {
+        trajectoryId: trajId,
+        buffer: dialog,
+        mimeType: 'image/png',
+        metadataJson: JSON.stringify(dialogMeta || {}),
+      });
+    } catch (err) {
+      const errno = err?.errno ?? err?.code;
+      const sqlMsg = err?.sqlMessage || '';
+      if (errno === 1452 || errno === 'ER_NO_REFERENCED_ROW_2'
+        || /foreign key constraint fails/i.test(sqlMsg)
+        || /foreign key constraint fails/i.test(String(err?.message || ''))) {
+        console.warn(
+          `[step-screenshot] dialog upsert skipped (step ${stepId} gone — coalesce/remove race)`,
+        );
+        return;
+      }
+      console.warn('[step-screenshot] dialog upsert failed:', sqlMsg || err?.message || err);
+    }
+  }
+}
+
+/**
+ * Persist one page-level screenshot (kind='page_level') for V3 page/popup export.
+ * payload: { levelType, levelKey, parentLevelKey, displayName, pngBase64, meta }
+ * @param {number} trajectoryId bound trajectory DB id
+ * @param {object} payload page-level screenshot payload
+ * @returns {Promise<object|null>} upsert result or null when invalid
+ */
+export async function applyPageLevelScreenshot(trajectoryId, payload) {
+  const trajId = Number(trajectoryId);
+  const buffer = decodeB64(payload?.pngBase64);
+  if (!Number.isFinite(trajId) || trajId <= 0 || !buffer) return null;
+  const meta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
+  const levelKey = String(payload?.levelKey || '').trim();
+  const levelType = payload?.levelType === 'popup' ? 'popup' : 'page';
+  const parentLevelKey = payload?.parentLevelKey ? String(payload.parentLevelKey).trim() : null;
+  if (!levelKey) return null;
+  return screenshotService.replacePageLevelScreenshot({
+    trajectoryId: trajId,
+    levelType,
+    levelKey,
+    parentLevelKey,
+    buffer,
+    mimeType: 'image/png',
+    metadataJson: JSON.stringify({
+      ...meta,
+      levelType,
+      levelKey,
+      parentLevelKey: parentLevelKey || '',
+      displayName: payload?.displayName || levelKey,
+    }),
+  });
 }
 
 /**
  * Store screenshots until trajectory_step dbId is known, or apply immediately.
  * @param {object} ctx session or runtime (needs _lastPersistByActionId / _pendingStepShots)
  * @param {string} entryId ACTION_LOG entry UUID
- * @param {{ before?: string|null, after?: string|null, trajectoryId?: number|null }} shots
+ * @param {{ before?: string|null, after?: string|null, dialog?: string|null, dialogMeta?: object|null, trajectoryId?: number|null }} shots base64 screenshots
+ * @returns {Promise<void>}
  */
 export async function stashOrApplyStepScreenshot(ctx, entryId, {
   before = null,
   after = null,
+  dialog = null,
+  dialogMeta = null,
   trajectoryId = null,
 } = {}) {
   const eid = entryId != null ? String(entryId) : '';
-  if (!eid || (!before && !after)) return;
+  if (!eid || (!before && !after && !dialog)) return;
   const maps = ensureShotMaps(ctx);
   if (!maps) return;
   prunePendingShots(maps);
@@ -105,7 +165,7 @@ export async function stashOrApplyStepScreenshot(ctx, entryId, {
     : (info?.trajectoryId != null ? Number(info.trajectoryId) : (ctx.dbTrajectoryId != null ? Number(ctx.dbTrajectoryId) : (ctx.trajectoryId != null ? Number(ctx.trajectoryId) : null)));
 
   if (Number.isFinite(dbId) && dbId > 0) {
-    await writeShotsForStep(dbId, trajId, before, after);
+    await writeShotsForStep(dbId, trajId, before, after, dialog, dialogMeta);
     maps._pendingStepShots.delete(eid);
     return;
   }
@@ -114,6 +174,8 @@ export async function stashOrApplyStepScreenshot(ctx, entryId, {
   maps._pendingStepShots.set(eid, {
     before: before || prev.before || null,
     after: after || prev.after || null,
+    dialog: dialog || prev.dialog || null,
+    dialogMeta: dialogMeta || prev.dialogMeta || null,
     trajectoryId: trajId,
     ts: Date.now(),
   });
@@ -121,6 +183,11 @@ export async function stashOrApplyStepScreenshot(ctx, entryId, {
 
 /**
  * After appendRecordedStep: consume any pending screenshots for this entryId.
+ * @param {object} ctx session or runtime (needs _pendingStepShots)
+ * @param {string} entryId ACTION_LOG entry UUID
+ * @param {number} dbId trajectory_step DB id
+ * @param {number} [trajectoryId] bound trajectory DB id
+ * @returns {Promise<void>}
  */
 export async function flushPendingStepScreenshot(ctx, entryId, dbId, trajectoryId = null) {
   const eid = entryId != null ? String(entryId) : '';
@@ -134,7 +201,7 @@ export async function flushPendingStepScreenshot(ctx, entryId, dbId, trajectoryI
   const trajId = trajectoryId != null
     ? Number(trajectoryId)
     : (pending.trajectoryId != null ? Number(pending.trajectoryId) : null);
-  await writeShotsForStep(stepId, trajId, pending.before, pending.after);
+  await writeShotsForStep(stepId, trajId, pending.before, pending.after, pending.dialog, pending.dialogMeta);
 }
 
 /**
@@ -144,6 +211,10 @@ export async function flushPendingStepScreenshot(ctx, entryId, dbId, trajectoryI
  * Phase targeting:
  * - manual: session.selectedPhaseId, else last phase of trajectory
  * - agent:  session.activePhaseId (current executing phase), else entry.phase, else last phase
+ * @param {object} session target session state
+ * @param {object[]} entries ACTION_LOG entry objects
+ * @param {{ source?: string }} [opts] persistence options
+ * @returns {Promise<object[]>} persisted entry results
  */
 export async function persistLiveActionEntries(session, entries, { source } = {}) {
   const trajId = session?.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null;
@@ -235,9 +306,10 @@ export async function persistLiveActionEntries(session, entries, { source } = {}
 
 /**
  * Remove previously live-persisted steps whose ACTION_LOG entry.id was coalesced away.
- * @param {object} session
+ * @param {object} session target session state
  * @param {string[]} removedIds ACTION_LOG entry UUIDs
  * @param {object} [runtime] optional trajectory runtime (shares maps with session when present)
+ * @returns {Promise<{ removed: number }>} removal result
  */
 export async function removeLivePersistedActions(session, removedIds, runtime = null) {
   const ids = (Array.isArray(removedIds) ? removedIds : [])

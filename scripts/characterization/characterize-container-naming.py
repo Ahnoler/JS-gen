@@ -127,7 +127,10 @@ def test_alias_freeze() -> None:
 def test_source_wires() -> None:
     misc = (ROOT / 'scripts/controller/actions/_misc.py').read_text(encoding='utf-8')
     form = (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
-    scan = (ROOT / 'scripts/controller/actions/form_scan_utils.py').read_text(encoding='utf-8')
+    scan = (
+        (ROOT / 'scripts/controller/actions/form_scan_utils.py').read_text(encoding='utf-8')
+        + (ROOT / 'scripts/controller/actions/task_completion.py').read_text(encoding='utf-8')
+    )
     table = (ROOT / 'scripts/controller/actions/_table.py').read_text(encoding='utf-8')
     assert_true('remember_trigger_button' in misc, 'misc remembers trigger')
     assert_true('clear_trigger_button' in misc, 'misc clears on close_dialog')

@@ -1,4 +1,9 @@
+/**
+ * Special element CRUD + step management + replay/search service.
+ * Special elements are reusable step groups snapshotted from trajectory phases.
+ */
 import { getDB } from '../../config/database.js';
+import { REPLAY_STEP_TIMEOUT_MS } from '../../config/config.js';
 import * as specialElementDao from '../dao/special-element-dao.js';
 import * as specialElementStepDao from '../dao/special-element-step-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
@@ -13,8 +18,9 @@ import {
 } from './special-element-search-service.js';
 import {
   getTrajectoryRuntime,
-} from './trajectory-runtime.js';
+} from './trajectory/trajectory-runtime.js';
 import * as execSession from '../executor-session-client.js';
+import { runReplayActions } from './replay-actions.js';
 import { state } from '../state.js';
 
 const SPECIAL_ELEMENT_TAG = 'special_element_tag';
@@ -35,6 +41,15 @@ function parseJsonMaybe(val) {
   }
 }
 
+/**
+ * Build a whitespace-joined search text from element display fields.
+ * @param {object} root0 display fields
+ * @param {string} root0.name element name
+ * @param {string} root0.dictLabel tag dict label
+ * @param {string} root0.phaseDescription phase description
+ * @param {string} root0.remark remark
+ * @returns {string} joined search text
+ */
 export function buildSearchText({ name, dictLabel, phaseDescription, remark }) {
   return [name, dictLabel, phaseDescription, remark]
     .map((x) => String(x || '').trim())
@@ -50,6 +65,8 @@ async function withSteps(element) {
 
 /**
  * Resolve moduleId → function id list when functionId is absent.
+ * @param {object} [query] query params (functionId / moduleId)
+ * @returns {Promise<{ functionId: number|null, functionIds: number[]|null }>} resolved scope
  */
 async function resolveFunctionScope(query = {}) {
   const functionId = query.functionId != null && query.functionId !== ''
@@ -71,6 +88,11 @@ async function resolveFunctionScope(query = {}) {
   return { functionId: null, functionIds: null };
 }
 
+/**
+ * List special elements with function/module scope, keyword + time filters.
+ * @param {object} [query] list filters (functionId/moduleId/keyword/time/page)
+ * @returns {Promise<{ items: object[], total: number, page: number, pageSize: number }>} paged result
+ */
 export async function listSpecialElements(query = {}) {
   const { functionId, functionIds } = await resolveFunctionScope(query);
   // module selected but empty → no rows
@@ -98,12 +120,23 @@ export async function listSpecialElements(query = {}) {
   });
 }
 
+/**
+ * Get a special element by id (with steps); 404 if not found.
+ * @param {number} id special element DB id
+ * @returns {Promise<object|null>} element row with steps
+ */
 export async function getSpecialElement(id) {
   const row = await specialElementDao.getById(id);
   if (!row) throw httpError(404, 'Special element not found');
   return withSteps(row);
 }
 
+/**
+ * Patch a special element (name/remark/enabled/functionId/tag) and refresh search text.
+ * @param {number} id special element DB id
+ * @param {object} [body] patch fields
+ * @returns {Promise<object|null>} updated element (with steps)
+ */
 export async function updateSpecialElement(id, body = {}) {
   const existing = await specialElementDao.getById(id);
   if (!existing) throw httpError(404, 'Special element not found');
@@ -157,6 +190,11 @@ export async function updateSpecialElement(id, body = {}) {
   }
 }
 
+/**
+ * Delete a special element by id; 404 if not found.
+ * @param {number} id special element DB id
+ * @returns {Promise<{ deleted: boolean, id: number }>} deletion result
+ */
 export async function deleteSpecialElement(id) {
   const existing = await specialElementDao.getById(id);
   if (!existing) throw httpError(404, 'Special element not found');
@@ -166,6 +204,8 @@ export async function deleteSpecialElement(id) {
 
 /**
  * Snapshot selected trajectory steps into a special element group.
+ * @param {object} [body] creation body (trajectoryPhaseId, stepIds, name, tagDictCode, remark, systemId)
+ * @returns {Promise<object>} created special element (with steps)
  */
 export async function createFromTrajectory(body = {}) {
   const phaseId = Number(body.trajectoryPhaseId);
@@ -269,6 +309,12 @@ export async function createFromTrajectory(body = {}) {
   }
 }
 
+/**
+ * Update a single special element step and mark parent embedding stale.
+ * @param {number} stepId step DB id
+ * @param {object} [body] patch fields (actionType/actionIndex/paramsJson/elementJson)
+ * @returns {Promise<object>} updated step row
+ */
 export async function updateStep(stepId, body = {}) {
   const step = await specialElementStepDao.getById(stepId);
   if (!step) throw httpError(404, 'Special element step not found');
@@ -291,6 +337,12 @@ export async function updateStep(stepId, body = {}) {
   return updated;
 }
 
+/**
+ * Append a new step to a special element and bump step count.
+ * @param {number} specialElementId special element DB id
+ * @param {object} [body] step fields (actionType/actionIndex/paramsJson/elementJson)
+ * @returns {Promise<object>} created step row
+ */
 export async function createStep(specialElementId, body = {}) {
   const id = Number(specialElementId);
   if (!Number.isFinite(id) || id <= 0) throw httpError(400, 'Invalid special element id');
@@ -326,6 +378,11 @@ export async function createStep(specialElementId, body = {}) {
   });
 }
 
+/**
+ * Delete a special element step (refuses last step) and renumber the rest.
+ * @param {number} stepId step DB id
+ * @returns {Promise<{ deleted: boolean, id: number }>} deletion result
+ */
 export async function deleteStep(stepId) {
   const step = await specialElementStepDao.getById(stepId);
   if (!step) throw httpError(404, 'Special element step not found');
@@ -349,6 +406,11 @@ export async function deleteStep(stepId) {
 
 /**
  * Manual test replay of a special element into an attached trajectory session.
+ * @param {number} id special element DB id
+ * @param {object} [root0] replay options
+ * @param {number} root0.trajectoryId target trajectory DB id
+ * @param {boolean} [root0.persist] whether to persist replayed steps
+ * @returns {Promise<{ specialElementId: number, trajectoryId: number, persist: boolean, result: object|null }>} replay result
  */
 export async function replaySpecialElement(id, {
   trajectoryId,
@@ -382,21 +444,20 @@ export async function replaySpecialElement(id, {
   runtime.isReplay = !persist;
 
   try {
-    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 300000);
-    const errP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_error', 300000)
-      .then((p) => Promise.reject(new Error(p?.message || 'replay_error')));
-
-    execSession.forwardStdin({
-      nodeUuid: runtime.executorNodeUuid,
+    // 下发编排统一走 runReplayActions；replay_done 与防御性 replay_error 通道的
+    // 竞速由 helper 的 errorEvent 选项持有（胜出方 payload 即 outcome.result）。
+    // 原实现的 replay_error 胜出会转成 Error 抛出；helper 改为正常返回胜出载荷——
+    // 该通道当前全仓无生产者（仅防御性监听），可达路径（replay_done/超时）语义不变。
+    const { result } = await runReplayActions({
+      execSession,
       sessionId: runtime.sessionId,
-      event: 'replay_actions',
-      data: {
-        actions,
-        stop_on_fail: false,
-      },
+      nodeUuid: runtime.executorNodeUuid,
+      actions,
+      timeoutMs: REPLAY_STEP_TIMEOUT_MS,
+      stopOnFail: false,
+      isReplay: true,
+      errorEvent: 'replay_error',
     });
-
-    const result = await Promise.race([doneP, errP]);
     return {
       specialElementId: element.id,
       trajectoryId: tid,
@@ -406,10 +467,19 @@ export async function replaySpecialElement(id, {
   } finally {
     runtime.suppressStepPersist = false;
     runtime.isReplay = false;
-    if (session) session.busy = false;
+    if (session && !session.aiRecording && !runtime.aiRecording) {
+      session.busy = false;
+    } else if (session && (session.aiRecording || runtime.aiRecording)) {
+      session.busy = true;
+    }
   }
 }
 
+/**
+ * Semantic search of special elements within a system.
+ * @param {object} [body] search params (systemId/description/keyword/limit/includeSteps)
+ * @returns {Promise<object>} search results from special-element-search-service
+ */
 export async function search(body = {}) {
   const systemId = Number(body.systemId);
   if (!Number.isFinite(systemId) || systemId <= 0) {
@@ -426,6 +496,10 @@ export async function search(body = {}) {
 
 /**
  * Best-effort attach display candidates to a phase description for a system.
+ * @param {number} systemId system DB id
+ * @param {string} description phase description to match against
+ * @param {number} [limit] max candidates to return, default 3
+ * @returns {Promise<Array<object>>} display candidates (best-effort; [] on error)
  */
 export async function fetchDisplayCandidatesForDescription(systemId, description, limit = 3) {
   if (!Number.isFinite(Number(systemId)) || Number(systemId) <= 0) return [];

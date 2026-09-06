@@ -15,14 +15,13 @@ from pydantic import BaseModel, Field
 # Actions that are recorded in _ACTION_LOG and appear in generated scripts.
 ActionType = Literal[
     "fill_form_field",
-    "fill_date_field",
     "select_option",
     "click_element_by_index",
     "click_menu_item",
     "click_table_row_button",
     "click_table_row_radio",
     "click_adjacent_button",
-    "click_icon_button",
+    "click_button",
     "click_radio",
     "switch_tab",
     "close_dialog",
@@ -43,8 +42,8 @@ SkippedActionType = Literal[
     "verify_field_value",
     "take_screenshot",
     "save_trajectory",
-    "save_case_data",
-    "read_case_data",
+    "save_business_data",
+    "read_business_data",
     "match_form_rule",
     "init_task_list",
     "get_pending_tasks",
@@ -65,7 +64,6 @@ CommandType = Literal[
 # Mapping from action → command (must stay in sync with controller._ACTION_TO_COMMAND)
 ACTION_TO_COMMAND: dict[str, CommandType] = {
     "fill_form_field": "input",
-    "fill_date_field": "input",
     "select_option": "select",
     "select_tree_option": "select",
     "click_element_by_index": "click",
@@ -73,7 +71,7 @@ ACTION_TO_COMMAND: dict[str, CommandType] = {
     "click_table_row_button": "click",
     "click_table_row_radio": "click",
     "click_adjacent_button": "click",
-    "click_icon_button": "click",
+    "click_button": "click",
     "click_radio": "click",
     "switch_tab": "tab",
     "close_dialog": "close",
@@ -127,6 +125,16 @@ class ElementInfo(BaseModel):
     locator_strategy: str = Field(default="", description="xpath_smart | xpath_full")
     locator_fallback_reason: str = Field(default="", description="Why absolute was primary")
     formLabel: str = Field(default="", description="Form label used for smart xpath")
+    region_id: str = Field(default="", description="Element UI region partition id (tab|section|titlebox chain)")
+    region_label: str = Field(default="", description="Human-readable region chain label")
+    layers: list[str] = Field(default_factory=list, description="Region layer stack (tab → section → titlebox)")
+    bbox: dict | None = Field(default=None, description="Content-coordinate bounding box {x1,y1,x2,y2}")
+    page_bbox: dict | None = Field(default=None, description="Document-coordinate bounding box for page-level screenshot {x1,y1,x2,y2}")
+    attr: dict = Field(
+        default_factory=dict,
+        description="Structured boolean flags {disabled,required,readonly} (plugin-format aligned; "
+        "HTML boolean attrs are dropped by attributes sanitize, collected explicitly here)",
+    )
 
     def to_element_json(self) -> dict:
         """Convert to trajectory_step.element_json dict."""
@@ -159,6 +167,18 @@ class ElementInfo(BaseModel):
             data['locator_fallback_reason'] = self.locator_fallback_reason
         if self.formLabel:
             data['formLabel'] = self.formLabel
+        if self.region_id:
+            data['region_id'] = self.region_id
+        if self.region_label:
+            data['region_label'] = self.region_label
+        if self.layers:
+            data['layers'] = list(self.layers)
+        if self.bbox:
+            data['bbox'] = dict(self.bbox)
+        if self.page_bbox:
+            data['page_bbox'] = dict(self.page_bbox)
+        if self.attr:
+            data['attr'] = dict(self.attr)
         return data
 
 
@@ -187,7 +207,7 @@ class ActionEntry(BaseModel):
         default_factory=dict,
         description=(
             "Action-specific parameters. Keys vary by action:\n"
-            "  fill_form_field / fill_date_field: {label_text, value}\n"
+            "  fill_form_field: {label_text, value}\n"
             "  select_option / click_radio:        {label_text, option_text, options?}\n"
             "    option_text: value selected at record time (replay MUST use this exact value)\n"
             "    options: full dropdown inventory for export / other products (reference only)\n"
@@ -196,7 +216,7 @@ class ActionEntry(BaseModel):
             "  click_table_row_button:             {row_text, button_text}\n"
             "  click_table_row_radio:              {row_text}\n"
             "  click_adjacent_button:              {label_text}\n"
-            "  click_icon_button:                  {button_text}\n"
+            "  click_button:                       {button_text}\n"
             "  switch_tab:                         {tab_name}\n"
             "  close_dialog:                       {}\n"
             "  go_to_url:                          {url}\n"
@@ -251,7 +271,7 @@ class ActionEntry(BaseModel):
     @property
     def value(self) -> str:
         """Legacy alias: the fill value or click index."""
-        if self.action in ("fill_form_field", "fill_date_field"):
+        if self.action == "fill_form_field":
             return self.params.get("value", "")
         if self.action == "click_element_by_index":
             return str(self.params.get("index", ""))
@@ -379,6 +399,20 @@ class ActionEntry(BaseModel):
                     entry.element[meta_key] = elem[meta_key]
                 elif meta_key == 'locator_verified' and elem.get(meta_key) is False:
                     entry.element[meta_key] = False
+            for region_key in ('region_id', 'region_label'):
+                if elem.get(region_key):
+                    entry.element[region_key] = elem[region_key]
+            if isinstance(elem.get('layers'), list) and elem.get('layers'):
+                entry.element['layers'] = list(elem['layers'])
+            if isinstance(elem.get('page_bbox'), dict) and elem.get('page_bbox'):
+                entry.element['page_bbox'] = dict(elem['page_bbox'])
+            if isinstance(elem.get('bbox'), dict) and elem.get('bbox'):
+                entry.element['bbox'] = dict(elem['bbox'])
+            if isinstance(elem.get('attr'), dict) and elem.get('attr'):
+                entry.element['attr'] = {
+                    k: bool(v) for k, v in elem['attr'].items()
+                    if k in ('disabled', 'required', 'readonly')
+                }
             if not entry.element.get('locator_strategy'):
                 entry.element['locator_strategy'] = (
                     'xpath_smart' if xpath_smart else ('xpath_full' if (xpath_full or xpath) else '')

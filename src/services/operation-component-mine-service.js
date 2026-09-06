@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { callLLM } from '../llm-utils.js';
+import { LLM_MODEL } from '#config/config.js';
 import * as componentDao from '../dao/operation-component-dao.js';
 import * as occurrenceDao from '../dao/operation-component-occurrence-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
@@ -59,8 +60,8 @@ async function listAllTrajectoryIdsByFunction(functionId) {
 }
 
 /**
- * @param {object} body
- * @returns {Promise<{trajectoryIds: number[], systemIdHint: number|null}>}
+ * @param {object} body mine scope input
+ * @returns {Promise<{trajectoryIds: number[], systemIdHint: number|null}>} resolved trajectory ids + system hint
  */
 async function resolveMineScope(body = {}) {
   const trajectoryIdsRaw = body.trajectoryIds ?? body.trajectory_ids;
@@ -116,7 +117,7 @@ function buildLlmPrompt(template, { phaseDescription, fragments, stepCount }) {
 async function nameClusterWithLlm({ phaseDescription, fragments, stepCount, model }) {
   const template = loadPromptTemplate();
   const prompt = buildLlmPrompt(template, { phaseDescription, fragments, stepCount });
-  const modelId = model || 'deepseek-v4-flash';
+  const modelId = model || LLM_MODEL;
   try {
     const content = await callLLM(prompt, modelId);
     const obj = parseLlmJsonObject(content);
@@ -136,6 +137,8 @@ async function nameClusterWithLlm({ phaseDescription, fragments, stepCount, mode
 
 /**
  * Mine repetitive phases into operation_component drafts.
+ * @param {object} [body] mine scope (systemId / functionId / trajectoryIds)
+ * @returns {Promise<{ created: object[], updated: object[], skippedSingletons: number, scannedPhases: number, trajectoryCount: number, createdCount: number, updatedCount: number }>} mine stats
  */
 export async function mineOperationComponents(body = {}) {
   const { trajectoryIds, systemIdHint } = await resolveMineScope(body);

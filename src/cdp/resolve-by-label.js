@@ -17,10 +17,13 @@ import { normalizeElementJson } from '../models/helpers.js';
 import { PAGE_LOCATOR_HELPERS, enrichLocatorFields } from './locator-candidates.js';
 import { normalizeActionName } from '../models/action-name.js';
 import { displayGroupOf, uniquifyDisplayGroups } from './display-group.js';
+import { prependPageLayer } from './region-layers.js';
+import { assembleRegionTree } from '../services/region-tree.js';
 
 /**
  * Sanitize preview (never expose form values / secrets).
- * @param {object} el
+ * @param {object} el Element meta to preview.
+ * @returns {object} Sanitized preview with secrets stripped.
  */
 function toPreview(el) {
   const attrs = el?.attributes && typeof el.attributes === 'object' ? { ...el.attributes } : {};
@@ -39,13 +42,22 @@ function toPreview(el) {
     region_role: el?.region_role || '',
     region_id: el?.region_id || '',
     region_label: el?.region_label || '',
+    region_chrome: el?.region_chrome,
+    region_section: el?.region_section || '',
+    region_block: el?.region_block || '',
+    layers: Array.isArray(el?.layers) ? el.layers : [],
     display_group: displayGroupOf(el),
   };
 }
 
 /**
  * Page-side script: find all matching controls.
- * @param {object} opts
+ * @param {object} opts Resolve options.
+ * @param {string} [opts.labelText] Form label text to match.
+ * @param {string} [opts.actionType] Action type hint (click / fill / select …).
+ * @param {object} [opts.params] Action params for action-aware matching.
+ * @param {string} [opts.mode] Resolve mode (needle / inventory).
+ * @returns {string} Page eval expression returning match results.
  */
 export function buildResolveExpression({
   labelText = '',
@@ -68,11 +80,16 @@ ${PAGE_LOCATOR_HELPERS}
     function normLabel(s) {
       return String(s || '').trim().replace(/[：:*\\s]+$/g, '');
     }
+    function placeholderLabel(node) {
+      const ph = (node && node.getAttribute && node.getAttribute('placeholder')) || '';
+      return (ph || '').replace(/^请输入/, '').replace(/[：:*\\s]+$/g, '').trim();
+    }
     function formItemLabel(node) {
       const item = node && node.closest && node.closest('.el-form-item');
       if (!item) return '';
       const lbl = item.querySelector('.el-form-item__label');
-      return normLabel(lbl && lbl.textContent);
+      const t = (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+      return t || placeholderLabel(node);
     }
     function xpathOf(node) {
       return absXPath(node);
@@ -100,7 +117,7 @@ ${PAGE_LOCATOR_HELPERS}
     function snap(el, matchedLabel, asFormField, kindHint, regionOverride) {
       const abs = xpathOf(el);
       const rawText = cleanVisibleText(el);
-      const formLabel = asFormField ? matchedLabel : '';
+      const formLabel = asFormField ? formItemLabel(el) : '';
       const loc = buildLocatorSnap(el, rawText, abs, formLabel, {
         targetKind: kindHint || undefined,
         region: regionOverride || undefined,
@@ -127,6 +144,10 @@ ${PAGE_LOCATOR_HELPERS}
         region_role: loc.region_role || '',
         region_id: loc.region_id || '',
         region_label: loc.region_label || '',
+        region_chrome: loc.region_chrome,
+        region_section: loc.region_section || '',
+        region_block: loc.region_block || '',
+        layers: Array.isArray(loc.layers) ? loc.layers : [],
         feature_card: loc.feature_card || undefined,
       };
     }
@@ -379,7 +400,7 @@ ${PAGE_LOCATOR_HELPERS}
     }
 
     // Icon
-    if (action === 'click_icon_button' || params.button_text && action.includes('icon')) {
+    if (action === 'click_button' || params.button_text && action.includes('button')) {
       const name = String(params.button_text || needle || '').trim();
       const nodes = document.querySelectorAll('[aria-label], [title]');
       for (const el of nodes) {
@@ -488,15 +509,17 @@ ${PAGE_LOCATOR_HELPERS}
 }
 
 /**
- * @param {import('./client.js').CdpClient} client
- * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string }} opts
- * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[], truncated?: boolean }>}
+ * Resolve Element UI control by label_text / actionType+params via CDP.
+ * @param {import('./client.js').CdpClient} client CDP client attached to the page.
+ * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string, pageLabel?: string }} opts Resolve options.
+ * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[], truncated?: boolean }>} Resolve result (single element, ambiguous matches, or 404).
  */
 export async function resolveElementByLabel(client, opts = {}) {
   const mode = String(opts.mode || 'needle').trim() || 'needle';
   const labelText = String(opts.labelText || opts.label_text || '').trim();
   const actionType = normalizeActionName(opts.actionType || opts.action || '');
   const params = opts.params && typeof opts.params === 'object' ? opts.params : {};
+  const pageLabel = String(opts.pageLabel || opts.page_label || '').trim();
 
   if (mode !== 'inventory' && !labelText && !actionType && !Object.keys(params).length) {
     const err = new Error('labelText or actionType/params is required');
@@ -566,6 +589,10 @@ export async function resolveElementByLabel(client, opts = {}) {
       region_role: raw.region_role || '',
       region_id: raw.region_id || '',
       region_label: raw.region_label || '',
+      region_chrome: raw.region_chrome,
+      region_section: raw.region_section || '',
+      region_block: raw.region_block || '',
+      layers: Array.isArray(raw.layers) ? raw.layers : [],
     });
     // Preserve DOM-verified flag from page snap
     if (raw.locator_verified === true && enriched.xpath_smart) {
@@ -576,11 +603,15 @@ export async function resolveElementByLabel(client, opts = {}) {
     const featureCard = raw.feature_card && typeof raw.feature_card === 'object'
       ? raw.feature_card
       : undefined;
+    const layers = prependPageLayer(enriched.layers || [], pageLabel);
+    enriched.layers = layers;
     const displayGroup = displayGroupOf(enriched);
     const element = normalizeElementJson(enriched);
+    element.layers = layers;
     if (displayGroup) element.display_group = displayGroup;
     if (featureCard) element.feature_card = featureCard;
     const preview = toPreview(enriched);
+    preview.layers = layers;
     if (featureCard) preview.feature_card = featureCard;
     return {
       matchedLabel: String(raw.matchedLabel || labelText || ''),
@@ -590,11 +621,16 @@ export async function resolveElementByLabel(client, opts = {}) {
   }
 
   const matches = uniquifyDisplayGroups(list.map(enrichOne));
+  const regionTree = assembleRegionTree(
+    matches.map((m) => ({ layers: (m && m.element && Array.isArray(m.element.layers)) ? m.element.layers : [] })),
+    { pageLabel: pageLabel || '' },
+  );
   const truncated = pageTruncated;
   const forceAmbiguous = mode === 'inventory' && !labelText && matches.length >= 1;
   if (forceAmbiguous) {
     return {
       ambiguous: true,
+      regionTree,
       matches,
       ...(truncated ? { truncated: true } : {}),
     };
@@ -607,6 +643,7 @@ export async function resolveElementByLabel(client, opts = {}) {
   }
   return {
     ambiguous: true,
+    regionTree,
     matches,
     ...(truncated ? { truncated: true } : {}),
   };

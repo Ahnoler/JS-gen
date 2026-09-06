@@ -8,6 +8,9 @@ import { state } from '../../state.js';
 import {
   DEFAULT_MIN_FORWARD_MS,
   DEFAULT_EVERY_NTH_FRAME,
+  DEFAULT_STREAM_QUALITY,
+  DEFAULT_STREAM_MAX_W,
+  DEFAULT_STREAM_MAX_H,
   resolveScreencastTiming,
 } from '../screencast-timing.js';
 
@@ -16,8 +19,8 @@ export const MAGIC = Buffer.from('RSCF');
 
 /** Align with Session BrowserContextConfig (session_runner.py) */
 export const SESSION_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
-export const STREAM_MAX_W = 1920;
-export const STREAM_MAX_H = 1080;
+export const STREAM_MAX_W = DEFAULT_STREAM_MAX_W;
+export const STREAM_MAX_H = DEFAULT_STREAM_MAX_H;
 // Re-export default for readers; runtime throttle should use bridge.minForwardMs.
 export const MIN_FORWARD_MS = DEFAULT_MIN_FORWARD_MS;
 export { resolveScreencastTiming };
@@ -29,7 +32,7 @@ export const bridge = {
   remoteSession: null,
   screencastOn: false,
   viewport: { ...SESSION_VIEWPORT },
-  quality: 65,
+  quality: DEFAULT_STREAM_QUALITY,
   /** @type {Set<import('ws').WebSocket>} */
   subscribers: new Set(),
   wsHooked: false,
@@ -44,12 +47,19 @@ export const bridge = {
   lastForwardAt: 0,
   minForwardMs: DEFAULT_MIN_FORWARD_MS,
   everyNthFrame: DEFAULT_EVERY_NTH_FRAME,
+  ackPacer: null,
+  /** Last RSCF packet forwarded — cached for instant paint on new subscriber. */
+  lastPacket: null,
   stallTimer: null,
   restartingCast: false,
   /** @type {WeakMap<import('ws').WebSocket, { trajectoryId: number|null, sessionId: string|null, remoteSessionId: number|null, remoteSessionUuid: string|null }>} */
   wsTrajectoryBind: new WeakMap(),
 };
 
+/**
+ * Build a remote-bridge status snapshot for the dashboard.
+ * @returns {{ attached: boolean, remoteSessionId: number|null, remoteSessionUuid: string|null, cdpReady: boolean, cdpHttp: string|null, inputEnabled: boolean, agentBusy: boolean, manualRecording: boolean, inspectEnabled: boolean, inspectLabel: string|null, viewportW: number, viewportH: number }} Status snapshot.
+ */
 export function getRemoteStatus() {
   const gb = state.globalBrowser;
   return {
@@ -68,6 +78,12 @@ export function getRemoteStatus() {
   };
 }
 
+/**
+ * Push an event line to the agent process stdin (JSON + newline).
+ * @param {string} event Event name.
+ * @param {object} [data] Event payload.
+ * @returns {boolean} True if written, false if agent not ready or write failed.
+ */
 export function pushAgentEvent(event, data = {}) {
   const gb = state.globalBrowser;
   if (!gb.stdin || !gb.ready) return false;
@@ -80,6 +96,11 @@ export function pushAgentEvent(event, data = {}) {
   }
 }
 
+/**
+ * Broadcast a remote:inspect event with the current inspect label.
+ * @param {string} [label] Inspect label text.
+ * @returns {void}
+ */
 export function broadcastInspect(label) {
   bridge.lastInspectLabel = label || '';
   broadcast('remote:inspect', {

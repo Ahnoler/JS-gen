@@ -1,0 +1,47 @@
+{
+  "draftFrom": "req",
+  "moduleKey": "postloan-risk-class",
+  "flow": "风险分类生成配置",
+  "aliases": ["风险分类提醒配置（文档旧口径）", "生成配置"],
+  "hash_markers": ["rskClRmndrCfgList", "astClRmndrCfg", "ZJJK00096712", "ZJJK00096836", "FS00004827"],
+  "keywords": ["风险分类生成配置", "规则名称", "业务种类", "分类频度", "执行日", "任务要求完成天数"],
+  "menu_path": "贷后管理/风险分类/风险分类生成配置",
+  "preconditions": [
+    "【SUT 实测 2026-09-06】页面/菜单实名漂移：SUT 名「风险分类生成配置」≠文档「风险分类提醒配置列表主页」（内部路由仍为 rskClRmndrCfgList/astClRmndrCfg，提醒配置痕迹）；Lead 裁定以 SUT 为准",
+    "【SUT 实测 2026-09-06】列表自动加载 613 条/62 页"
+  ],
+  "steps": [
+    {
+      "name": "生成配置列表主页",
+      "leafRef": "wet-test.md 叶26 (ZJJK00096712)",
+      "verify": "drift",
+      "drift": "wording+structure：①页面实名「风险分类生成配置」≠文档「风险分类提醒配置列表主页」；②查询条件 SUT「业务种类」≠文档「产品名称」；③按钮仅 新增/查看/失效，无【修改】——文档称支持新增/修改/失效/查看",
+      "menu_path": "贷后管理/风险分类/风险分类生成配置",
+      "query_fields": ["规则名称", "客户类型", "业务种类", "风险分类", "分类频度", "执行日", "任务要求完成天数"],
+      "buttons": ["新增", "查看", "失效"],
+      "columns": ["规则名称", "客户类型", "业务品种", "风险分类", "分类频度", "执行日", "任务要求完成天数（自然日）", "规则创建人", "规则状态", "规则生效日期", "规则失效日期"],
+      "rules": ["列表自动加载 613 条"]
+    },
+    {
+      "name": "生成配置新增弹窗",
+      "leafRef": "wet-test.md 叶27 (ZJJK00096836)",
+      "verify": "drift",
+      "drift": "structure+wording：无「执行月份」字段（文档称分类频度=季度→执行月份 1~12 必填，SUT 无此输入）；无【修改】入口；「任务要求完成天数」带后缀「（自然日）」文档无",
+      "enter": "主页【新增】弹「新增风险分类生成配置」",
+      "fields": ["规则名称*", "客户类型*", "业务品种*(树)", "风险分类*", "分类频度*", "执行日*", "任务要求完成天数（自然日）*"],
+      "buttons": ["关闭", "确认"]
+    },
+    {
+      "name": "生成配置查看场景页（FS00004827）",
+      "leafRef": "wet-test.md 叶28 (ZJJK00114927)",
+      "verify": "match",
+      "enter": "选中行点【查看】整页跳转",
+      "fields": ["同新增弹窗 7 项全 disabled 只读（viewType=look）"],
+      "buttons": ["返回"],
+      "rules": ["URL fcnScnEcd=FS00004827、avyEcd=UML00058669、viewType=look 与文档 FS 号一致；URL 携带完整规则字段回显；仅【返回】"]
+    }
+  ],
+  "pendingSteps": [],
+  "sourceRefs": [26, 27, 28],
+  "coverage": {"total": 3, "match": 1, "drift": 2, "blocked": 0, "notFound": 0, "gate": "pass"}
+}

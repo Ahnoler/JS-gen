@@ -18,7 +18,8 @@ process.chdir(__dirname);
 
 
 /**
- * Check if Playwright is installed
+ * Check if Playwright is installed.
+ * @returns {boolean} result
  */
 function checkPlaywrightInstalled() {
   try {
@@ -30,7 +31,8 @@ function checkPlaywrightInstalled() {
 }
 
 /**
- * Get code to execute from various sources
+ * Get code to execute from various sources (file path, inline arg, or stdin).
+ * @returns {string} result
  */
 function getCodeToExecute() {
   const args = process.argv.slice(2);
@@ -78,7 +80,8 @@ function getCodeToExecute() {
 }
 
 /**
- * Clean up old temporary execution files from previous runs
+ * Clean up old temporary execution files from previous runs.
+ * @returns {void} result
  */
 function cleanupOldTempFiles() {
   try {
@@ -101,7 +104,9 @@ function cleanupOldTempFiles() {
 }
 
 /**
- * Wrap code in async IIFE if not already wrapped
+ * Wrap code in async IIFE if not already wrapped.
+ * @param {string} code code
+ * @returns {string} result
  */
 function wrapCodeIfNeeded(code) {
   const hasRequire = code.includes('require(');
@@ -139,7 +144,8 @@ const { chromium } = require('playwright');
 }
 
 /**
- * Main execution
+ * Main execution entry point: parse input, wrap, validate syntax, and run.
+ * @returns {Promise<void>} result
  */
 async function main() {
   console.log('🎭 Playwright Skill - Universal Executor\n');

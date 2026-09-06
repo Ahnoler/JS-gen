@@ -7,16 +7,18 @@ import sys
 from .agent_utils import emit_json
 from .trajectory_store import (
     _handle_reset_trajectory,
-    _handle_save_case_data,
+    _handle_save_business_data,
     _handle_save_trajectory,
 )
 
 
 _REPLAY_ACTION_SIGNATURES = {
     "fill_form_field": {"label_text", "value"},
-    "fill_date_field": {"label_text", "value"},
     "select_option": {"label_text", "option_text"},
-    "click_element_by_index": {"index"},
+    # text/tag_name 等是回放兜底定位的关键线索：白名单丢掉 text 后，
+    # _replay_click_by_index 只能回退 element_json.text（可能过期），导致
+    # _JS_CLICK_DURABLE 文本守卫误杀正确的 xpath 命中（2026-09-06 交易56 树节点案例）。
+    "click_element_by_index": {"index", "text", "tag_name", "menu_text", "parent_text", "target_kind", "icon_class"},
     "click_menu_item": {"menu_text"},
     "click_table_row_button": {"row_text", "button_text"},
     "click_table_row_radio": {"row_text"},
@@ -26,6 +28,9 @@ _REPLAY_ACTION_SIGNATURES = {
     "switch_tab": {"tab_name"},
     "close_dialog": set(),
     "go_to_url": {"url"},
+    "scan_menu_tree": set(),
+    "click_menu_xpath": {"xpath"},
+    "read_page_component_code": set(),
     "login": {"username", "password", "captcha", "sms_code"},
 }
 
@@ -40,7 +45,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
     event = msg.get("event")
 
     if event == "save_trajectory":
-        _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'], case_data_store=session_state.get('case_data_store'))
+        _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'], business_data_store=session_state.get('business_data_store'))
         return 'continue'
 
     if event == "get_action_log":
@@ -54,17 +59,17 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         })
         return 'continue'
 
-    if event == "save_case_data":
-        _handle_save_case_data(session_state['case_data_store'], session_state['session_id'])
+    if event == "save_business_data":
+        _handle_save_business_data(session_state['business_data_store'], session_state['session_id'])
         return 'continue'
 
     if event == "reset_trajectory":
         cum_path = _handle_reset_trajectory(
             session_state['session_id'],
-            case_data_store=session_state.get('case_data_store'),
+            business_data_store=session_state.get('business_data_store'),
         )
         session_state['cumulative_path'] = cum_path
-        session_state['case_data_store'].clear()
+        session_state['business_data_store'].clear()
         return 'continue'
 
     if event == "cdp_action":
@@ -99,10 +104,12 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         return 'continue'
 
     if event == "capture_screenshots":
-        from .state import set_capture_screenshots
+        from .state import reset_page_level_shots, set_capture_screenshots
         data = msg.get("data") or {}
         enabled = bool(data.get("enabled", True))
         set_capture_screenshots(enabled)
+        if enabled:
+            reset_page_level_shots()
         emit_json({"event": "capture_screenshots_status", "data": {"enabled": enabled}})
         sys.stderr.write(f"capture_screenshots={enabled}\n")
         sys.stderr.flush()
@@ -210,7 +217,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         seed_action_log = bool(data.get("seed_action_log"))
         stop_on_fail = bool(data.get("stop_on_fail"))
         browser_context = session_state.get('browser_context')
-        case_data_store = session_state.get('case_data_store', {})
+        business_data_store = session_state.get('business_data_store', {})
         if not browser_context or not entries:
             emit_json({"event": "replay_done", "data": {"count": 0, "error": "no browser_context or empty actions"}})
             return 'continue'
@@ -220,25 +227,25 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         from .controller.service import build_controller
         from .controller.actions._replay import replay_action_entries
 
-        controller = build_controller(browser_context, case_data_store=case_data_store)
+        controller = build_controller(browser_context, business_data_store=business_data_store)
         registry_actions = controller.registry.registry.actions
 
-        # Pass raw params — `_normalize_params` accepts aliases; controller path
-        # filters by function signature inside `_replay_controller_action`.
+        # 签名过滤对已注册动作生效（只保留白名单键，_normalize_params 的别名兜底仅
+        # 作用于未注册动作透传的 raw_params）；注册表未知动作原样透传。
         filtered = []
         for entry in entries:
             action_name = entry.get("action", "")
             raw_params = entry.get("params", {}) or {}
             # Prefer signature filter when known, else keep raw for alias normalize.
             converted = _convert_action_params(action_name, raw_params)
-            merged = {**raw_params, **converted} if converted else dict(raw_params)
+            merged = converted if converted else dict(raw_params)
             filtered.append({**entry, "action": action_name, "params": merged})
 
         summary = await replay_action_entries(
             browser_context,
             filtered,
             controller_actions=registry_actions,
-            case_data_store=case_data_store,
+            business_data_store=business_data_store,
             emit=emit_json,
             stop_on_fail=stop_on_fail,
         )
@@ -248,17 +255,11 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         if seed_action_log:
             try:
                 from . import state as action_state
+                from .state import _SKIP_SCREENSHOT_ACTIONS
                 action_state._ACTION_LOG.clear()
                 for entry in filtered:
                     action_name = entry.get("action") or ""
-                    if action_name in (
-                        'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields',
-                        'scan_visible_fields', 'check_field_value', 'verify_field_value',
-                        'take_screenshot', 'save_trajectory', 'save_case_data', 'read_case_data',
-                        'match_form_rule', 'init_task_list', 'get_pending_tasks',
-                        'sync_tasks_from_errors', 'expand_all_el_tree', 'task_done', 'task_retry',
-                        'save_form_snapshot',
-                    ):
+                    if action_name in _SKIP_SCREENSHOT_ACTIONS:
                         continue
                     dumped = dict(entry)
                     dumped.setdefault('source', 'replay')
