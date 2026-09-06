@@ -11,6 +11,14 @@
 - **遗留移交**：①sync 管道修复方案（Python HTTP 直推）待拍板；②R1 复验（stamp 修复+新门闩）一轮即收；③R2-R7 全量待跑；④T3.1 heal live 验收未动；⑤测试数据残留：SUT 多笔测试客户（KB测客户系列/测试科技发展有限公司/KB主链R1-*）待清理清单
 - 提交：b3d4b974→f178411a 7 commits 已推送
 
+## 2026-09-07 01:57 · ZCode Lead — 阶段回报：用户副本方案评估批准并实施完成 + R1 三证 PASS（回链 00:02 开工）
+- 完成：**用户设计的「服务器端 action_log 副本」方案评估=可行，经批准已实施（e0420001/bb01f05a）**：①新模块 `action-log-copy.js`（按 trajectoryId 的内存副本，action_log_sync 全量快照覆盖，countBusinessSteps 排除 meta+engineering 双类对齐产品 stepCount 口径，30min TTL）；②recording-runner handleActionLogSync 到达即覆盖副本；异步门闩判定源切副本计数（即时），DB 复核保留作最终一致+counts 刷新；③getTrajectoryWithPhases 副本优先覆盖 stepCount（stepCountSource='action-log-copy'），副本缺席回退 DB。
+- **R1 客户新增三证 PASS（traj 595）**：①录制 recorded，副本即时 stepCount=8（finalize 时 copy=8/db=7）；②回放 11/12 confirmed（唯一 false=step1 弹窗关闭点击——回放会话弹窗未出现，环境条件性步骤，正是 P6-3 容错的靶场景）；③**stamp 落库**：客户名称=KB主链R1-20260907-0545、客户编号 26090701521085645（stamp 跨轮保持修复实证生效；证件号码 X 尾冲突 agent 自主改 Y 尾重存=智能行为）。
+- 配套（3488d03c）：每步 persist DB 往返 7-9→1-2（步号内存化/幂等查短路/phaseId 信任/batchSave 返回 insertIds 免回查/counts 延迟到阶段收尾）；修 async gate 误读 `.steps`（应为 `.stepCount`）导致 594 误降级。
+- **用户拍板（本段）**：①Python HTTP 直推否决——部署架构=被测系统在用户内网，执行机出站 WS 向服务器注册，用户经服务器间接操作（架构注释已入库 server.mjs+executor/ws-client.js 顶部）；②服务器端 action_log 副本方案批准并已实施。
+- 状态：R1 DONE（带 1 环境条件步 note）。下一步：R2 评级→R3 授信→R4 审批（分段）→R5 批复→R6 用信→R7 合同→T3.1 heal live→P6-4 终验。
+- 提交：3488d03c/e0420001/bb01f05a 已推送。
+
 ## 2026-09-07 00:02 · ZCode Lead — 开工声明：P6 连续执行启动（用户已批准计划+六项拍板）
 - 用户拍板（2026-09-07 00:00 前后）：①R4 审批=分段录制+单号衔接，接受主链轨迹非单条；②P6-0 直接动他线热文件；③合同止于已保存态 OK；④多角色账号暂无法提供，R4 按已实证配方（701994/WN0001/黄亮）跑，缺角色再回报；⑤上传封死维持绕行；⑥假成功本仓先修+方案同步产品组
 - 范围：P6-0 代码修复（src/services/trajectory/trajectory-recording-runner.js、form-snapshot-append.js 等+Python scripts/agent/recorder_emitters.py、填充回读侧——动手前先查 characterization pin）；P6-1 KB 补卡（data/kb/req/credit-corp/drafts/ 新草稿卡×2+rating 增强，由 general-purpose 子代理产出、Lead 晋升）；随后 P6-2 R1-R7 跑车（tmp/kb-mainchain/、flows 卡 source 回写）+P6-3 容错+P6-4 终验
