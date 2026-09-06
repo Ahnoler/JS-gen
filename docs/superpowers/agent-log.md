@@ -2,9 +2,15 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 22:42 · ZCode Lead — 收工：SKILL 第 6 轮修订 v7 贯通验证契约成文（回链 22:30 开工）
+- 完成（37254816）：**SKILL v6→v7**——新增「贯通验证」契约节（promotion 后置阶段）：管线顺序（fid 核叶子/门闩入任务/任务文案三段式）；**analyze 契约实证修正**（入参 `description` 非 `requirement`、响应直接 `{phases,businessEntries}` 不包壳——源码 `src/services/trajectory/trajectory-meta-service.js:136-207` 核实；阶段数跟编号走+「预期结果：」硬标记+门闩与关键数据段不入 phases=服务端 prompt 硬约束）；create 漏挂 `PUT .../phases` 补；**验收铁律=业务证据（stepCount>0+stamp）不认「全 phase_done」**（record/start 假成功模式+CDP 19242+slot 补证+DONE_WITH_CONCERNS 三态）；卡面回写当场修正带 traj 证据（禁写 flows 的 worker 豁免口径同时落禁区节）；Lead 分波编排骨（每波 ≤2 并行 slot/一波一 commit/影像与文件上传场景禁入）。生命周期一览升六段全链：切片→湿测→回填→草稿卡→晋升→贯通验证；检查清单+贯通项；版本史 v7。**USAGE 新增 Phase G**（分波/派发/每卡验收/每波收口/状态口径）。guides 手册单点修正 analyze 字段名 requirement→description（T4 实证，开工条目已扩项声明）。
+- 杂务：T4 根目录证据残留 35 文件（截图 29+cdp/detach json 6）归档 `tmp/kb-through/_root-strays-20260906/`（移动未删，符合 tmp 清理口径）；agent-log 两条本线 T4 条目从文件绝对顶归位协议块之下（bfa18095）。
+- 验收：SKILL 标题结构 grep 核对（贯通验证节位于晋升管线与实测坑清单之间，v7 版本史在案）；本线 commits bfa18095/37254816 推送 origin。
+- 遗留移交：T1-2批 partial 121 卡晋升（待 T2 blocked 回收）；T2 blocked 686+nf148 回收（触发器=引擎线跑批造数据，台账 `_blocked-backlog.md`）；产品级上报 record/start stepCount 硬校验（待转产品组）；KB 线自此**无在途任务**，SKILL 协议 v1→v7 全链六段成文。
+
 ## 2026-09-06 22:30 · ZCode Lead — 开工声明：SKILL 第 6 轮修订（T4 贯通素材成文）
 - 开工：22:30（date 校准）。接续点=T3+/SKILL 第 6 轮修订（用户「继续」触发；T1-2批/T2 需等引擎线，不动）
-- 范围：`scripts/prompts/skills/req-doc-to-kb/SKILL.md`（v6→v7）、同目录 `USAGE.md`（Phase G）、本文件；收工时顺带把仓库根目录 T4 证据残留（根目录截图 / cdp-*.json / detach-*.json）归档至 tmp/
+- 范围：`scripts/prompts/skills/req-doc-to-kb/SKILL.md`（v6→v7）、同目录 `USAGE.md`（Phase G）、本文件；扩项：`docs/superpowers/guides/ui-record-through-line-agent-prompt.md` 单点修正 analyze 字段名（requirement→description，T4 实证）；收工时顺带把仓库根目录 T4 证据残留（根目录截图 / cdp-*.json / detach-*.json）归档至 tmp/
 - 禁入：他线 WIP 6 文件（scripts/agent/service.py、scripts/session_runner.py、src/services/trajectory/ 下 4 文件）、`docs/superpowers/plans/2026-09-05-unify-save-action.md`、`config/.env*`、`data/kb/flows/**` 卡内容不改
 - 方式：主线程直接编辑（纯文档，无切片/湿测/浏览器动作）；完成即 commit
 - 注意：本次开工顺带把 19:20/21:20 两条本线 T4 条目从文件绝对顶（标题上方）归位至协议块之下（内容未动，仅位置）
