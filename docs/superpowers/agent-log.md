@@ -11,6 +11,12 @@
 - blocked 台账：186（+44）；观察池第 4 轮素材累计 15 条
 - 下一循环：disburse（B 组已派）+ repay（A 组并行）
 
+## 2026-09-06 15:38 · ZCode Lead — 开工声明：SKILL 第 4 轮修订 + 战役收尾 + 推送（用户批准全链）
+- 开工：15:38。①SKILL/USAGE 第 4 轮修订：观察池 20+ 条素材消化（零编号分册/接口分册两新形态契约化、Step 0 入口预检、级联 blocked、静默拦截证据、B 模板补账号预验与两棒接力、已办路径修正等）；②收尾：verify-all 全绿确认+tmp 截图保留口径确认；③推送 origin/uara_V1.2（47 笔未推送，用户已批准）
+- 范围：`scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`USAGE.md`、`scripts/kb/wet-test-check.mjs`（如有补丁）、本文件；tmp 截图**不删**（保留口径）
+- 禁入：src/**、data/kb/**（本轮只读）、他线 WIP（service.py / trajectory* 未提交改动继续隔离）
+- 方式：SKILL 主线程直笔（战役上下文在 Lead），杂项盘点派 worker 并行；推送在收尾全绿后执行
+
 ## 2026-09-06 12:00 · ZCode Lead — 收官：req 作业区逐模块逐叶湿测战役 30/30 全闭环（回链 02:25 常驻窗口）
 - 完成：**30 模块 / 1958 叶全部真机湿测收口**（checker 权威口径：match 1006 / drift 118 / blocked 686 / not-found 148 / pending 0，checker 0 FAIL）；全部 drift 按分类学回填 chapters（双源标注）；blocked 686 叶入 `_blocked-backlog.md` 台账（A 审批链/B 零数据/黑名单/look 态四类成因）；跨模块观察（17 错误名拦截族全集/加载域规律/半译码/旧流程代际/SUT 多出页 30+）汇总 `_cross-module-observations.md`
 - 收官批提交：postloan-check 150/150（最大模块，同构批验）、collection 52/52（dymbdjy SUT 缺陷+数据错位铁证）、product-mgmt 24/24（新增分类定案）、archive 71/71、smart-ctrl 44/44（接力续跑）、portal 33/33（**无编号模块首例+卡片删除事故披露并还原**）、asset-ops 183/183 两棒（旧流程代际共存）、asset-npl 181/181 两棒（i18n 阻断性反差）、digital-mobile 93/93 全 not-found（**PC 环境无移动端入口，五层探测实证**）、digital-loan-desk 84/84（Bearer 菜单树最硬证据）、limit-quota 13/13（组合新增即落库副作用）、limit-ctrl-api 17/17（**trdlog 1031 笔报文映射法**）、meeting-mgmt 15/15（级联 blocked）、collateral-info 56/56（价格指数菜单缺失+押品准入 BizException 铁证）、collateral-func 56/56（南宁城市下拉缺失）、system-mgmt 53/53（收官）、customer-group 45/45（**44 match 全战役最佳**，补做被漏排的第 30 模块）
