@@ -22,7 +22,9 @@
     "审批条件落实"
   ],
   "menu_path": "用信管理/对私用信管理/对私用信申请（经待办/主页在途任务进入任务页）",
-  "biz_key_prefix": ["LS98813"],
+  "biz_key_prefix": [
+    "LS98813"
+  ],
   "preconditions": [
     "主链1（向导发起）完成且发起模式=二合一",
     "【SUT 实测】经主页「通过·合并流程发起」记录（LS98813202600024045 拥军贷·何柳）【查看】只读进入，URL 实证 fcnScnEcd=FS00006502、flowCode=wf_usecredit_004、crutIttModeId=3",
@@ -53,7 +55,11 @@
     }
   ],
   "pendingSteps": [],
-  "sourceRefs": [62, 63, 64],
+  "sourceRefs": [
+    62,
+    63,
+    64
+  ],
   "coverage": {
     "total": 3,
     "match": 3,
@@ -61,5 +67,6 @@
     "blocked": 0,
     "notFound": 0,
     "gate": "full"
-  }
+  },
+  "source": "贯通验证 2026-09-06 traj 550（FS00006502/wf_usecredit_004 在途任务实证）（业务 stamp/结构 CDP 实证，DONE_WITH_CONCERNS）"
 }
