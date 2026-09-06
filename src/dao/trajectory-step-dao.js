@@ -16,10 +16,10 @@ async function dirtyParent(trajectoryId, trx = null) {
  * Batch insert steps. Accepts camelCase fields including:
  * params/element (mapped to params_json/element_json) and source.
  * @param {object[]} steps array of camelCase step objects
- * @returns {Promise<void>}
+ * @returns {Promise<number[]>} inserted row ids (mysql2 batch insert: consecutive from first insertId)
  */
 export async function batchSave(steps) {
-  if (!steps.length) return;
+  if (!steps.length) return [];
   const db = getDB();
   const rows = steps.map((s) => {
     const row = toDbRow({
@@ -40,13 +40,23 @@ export async function batchSave(steps) {
     row.element_json = s.elementJson ?? s.element ?? null;
     return row;
   });
+  const insertedIds = [];
   for (let i = 0; i < rows.length; i += 100) {
-    await db(TABLE).insert(rows.slice(i, i + 100));
+    // mysql2 多值 insert 返回 [首行 insertId, affectedRows]，auto_increment 连续
+    const result = await db(TABLE).insert(rows.slice(i, i + 100));
+    const firstId = Array.isArray(result) ? Number(result[0]) : Number(result);
+    const affected = Array.isArray(result) && Number.isFinite(Number(result[1]))
+      ? Number(result[1])
+      : rows.slice(i, i + 100).length;
+    if (Number.isFinite(firstId) && firstId > 0) {
+      for (let k = 0; k < affected; k++) insertedIds.push(firstId + k);
+    }
   }
   const trajectoryIds = [...new Set(steps.map((s) => s.trajectoryId).filter((id) => id != null))];
   for (const tid of trajectoryIds) {
     await dirtyParent(tid);
   }
+  return insertedIds;
 }
 
 /**

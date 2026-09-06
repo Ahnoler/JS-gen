@@ -23,9 +23,20 @@ import { resolvePhaseIdForPersist } from './trajectory-persist-service.js';
  * @param {object} [root0] options
  * @param {string} [root0.source] step source (manual/agent/cdp)
  * @param {number} [root0.trajectoryPhaseId] explicit phase DB id
+ * @param {number} [root0.stepNumber] caller-managed step number (skips max() query)
+ * @param {boolean} [root0.trustPhaseId] trust trajectoryPhaseId without DB re-validation
+ * @param {boolean} [root0.skipIdempotentDbCheck] skip the DB idempotency lookup (caller short-circuits in memory)
+ * @param {boolean} [root0.deferCounts] defer stepCount/phaseCount refresh to phase closeout
  * @returns {{ stepNumber: number, actionId: string|null, trajectoryPhaseId: number|null, dbId?: number|null }|null} append result, or null if invalid
  */
-export async function appendRecordedStep(trajectoryDbId, entry, { source, trajectoryPhaseId } = {}) {
+export async function appendRecordedStep(trajectoryDbId, entry, {
+  source,
+  trajectoryPhaseId,
+  stepNumber,
+  trustPhaseId,
+  skipIdempotentDbCheck,
+  deferCounts,
+} = {}) {
   const tid = Number(trajectoryDbId);
   if (!Number.isFinite(tid) || tid <= 0 || !entry) return null;
 
@@ -39,7 +50,9 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
   }
 
   const actionId = entry.id ? String(entry.id).trim() : null;
-  if (actionId) {
+  // P6-0 性能：调用方已有内存短路（persistedActionIds）时跳过 DB 幂等查询；
+  // ER_DUP_ENTRY catch 仍是最终防线（远程 DB 65ms RTT 下每步省 1 往返）。
+  if (!skipIdempotentDbCheck && actionId) {
     const existing = await getDB()('trajectory_step')
       .where({ trajectory_id: tid, action_id: actionId })
       .first();
@@ -57,30 +70,39 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
 
   const resolvedSource = source || entry.source || 'agent';
   const phaseNumberHint = Number(entry.phase ?? entry.phaseNumber ?? 0) || 0;
-  const maxStep = await trajectoryDao.getMaxStepNumber(tid);
-  const stepNumber = maxStep + 1;
+  // P6-0 性能：caller 内存步号（persistedActionIds 串行链内安全）替代 max() 查询
+  const resolvedStepNumber = Number.isFinite(Number(stepNumber)) && Number(stepNumber) > 0
+    ? Number(stepNumber)
+    : (await trajectoryDao.getMaxStepNumber(tid)) + 1;
+  const stepNumberOut = resolvedStepNumber;
 
-  const { id: resolvedPhaseId, phaseNumber: resolvedPhaseNumber } = await resolvePhaseIdForPersist(tid, {
-    phaseId: trajectoryPhaseId ?? entry.trajectoryPhaseId ?? null,
-    phaseNumber: phaseNumberHint || null,
-    fallbackLast: true,
-  });
+  const { id: resolvedPhaseId, phaseNumber: resolvedPhaseNumber } = trustPhaseId
+    && Number.isFinite(Number(trajectoryPhaseId))
+    && Number(trajectoryPhaseId) > 0
+    ? { id: Number(trajectoryPhaseId), phaseNumber: null }
+    : await resolvePhaseIdForPersist(tid, {
+      phaseId: trajectoryPhaseId ?? entry.trajectoryPhaseId ?? null,
+      phaseNumber: phaseNumberHint || null,
+      fallbackLast: true,
+    });
 
   let phaseNumber = phaseNumberHint;
   if (resolvedPhaseNumber != null) phaseNumber = resolvedPhaseNumber;
 
   const step = stepFromActionLog(entry, {
     trajectoryId: tid,
-    stepNumber,
+    stepNumber: stepNumberOut,
     phaseNumber,
     source: resolvedSource,
   });
   step.trajectoryId = tid;
-  step.stepNumber = stepNumber;
+  step.stepNumber = stepNumberOut;
   step.trajectoryPhaseId = resolvedPhaseId;
 
+  let dbId = null;
   try {
-    await trajectoryStepDao.batchSave([step]);
+    const insertedIds = await trajectoryStepDao.batchSave([step]);
+    dbId = Number.isFinite(Number(insertedIds?.[0])) ? Number(insertedIds[0]) : null;
   } catch (err) {
     if (err?.code === 'ER_DUP_ENTRY' && actionId) {
       const dup = await getDB()('trajectory_step')
@@ -100,22 +122,19 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
     throw err;
   }
 
-  const row = await getDB()('trajectory_step')
-    .where({ trajectory_id: tid, step_number: stepNumber })
-    .orderBy('id', 'desc')
-    .first();
-  const dbId = row?.id != null ? Number(row.id) : null;
-
-  const counts = await refreshTrajectoryCounts(tid);
-  await trajectoryDao.updateMeta(tid, {
-    stepCount: counts.stepCount,
-    phaseCount: counts.phaseCount,
-  });
+  // P6-0 性能：counts 刷新（2-3 RTT）默认延迟到阶段收尾/门闩统一执行
+  if (!deferCounts) {
+    const counts = await refreshTrajectoryCounts(tid);
+    await trajectoryDao.updateMeta(tid, {
+      stepCount: counts.stepCount,
+      phaseCount: counts.phaseCount,
+    });
+  }
 
   touchTrajectoryRuntimeActivity(tid);
 
   return {
-    stepNumber,
+    stepNumber: stepNumberOut,
     actionId: entry.id || null,
     trajectoryPhaseId: resolvedPhaseId,
     dbId,

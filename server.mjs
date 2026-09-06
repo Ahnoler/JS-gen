@@ -1,3 +1,10 @@
+/**
+ * 【部署架构（2026-09-07 用户定案）】被测系统（SUT）在用户内网，用户 PC 无法直接访问。
+ * 执行机（能连内网）主动向本控制面注册（出站 WS，见 executor/ws-client.js），用户访问
+ * 服务器/前端，经执行机间接操作被测系统。控制面与执行机之间只有这条 WS 通道：指令下发
+ * （session.*）与事件回传（action_log_sync/截图/phase_done 等）都走它——任何需要
+ * 「执行机把数据交回服务器」的新功能都必须复用该通道，不得假设执行机可被反向直连。
+ */
 import express from 'express';
 import { createServer } from 'http';
 import path from 'path';

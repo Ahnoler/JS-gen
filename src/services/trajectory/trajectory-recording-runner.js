@@ -508,9 +508,18 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       if (src === 'manual' || src === 'cdp') continue;
       try {
         runtime.persistedActionIds.add(id);
+        // P6-0 性能：步号内存递增（串行链安全）+跳过 DB 幂等查+counts 延迟到阶段收尾，
+        // 每步 persist 从 7-9 次远程往返（65ms RTT）削到 1-2 次
+        if (!Number.isFinite(runtime._nextStepNumber)) {
+          runtime._nextStepNumber = (await trajectoryDao.getMaxStepNumber(tid)) + 1;
+        }
         const persistArgs = {
           source: src === 'special_element' ? 'special_element' : 'agent',
           trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
+          stepNumber: runtime._nextStepNumber,
+          trustPhaseId: Number.isFinite(phaseIdHint),
+          skipIdempotentDbCheck: true,
+          deferCounts: true,
         };
         // P6-0/T0.2 落库丢失治理：失败重试一次，仍失败则广播告警（不再静默丢弃）
         let persisted = await appendRecordedStep(tid, entry, persistArgs).catch((err1) => {
@@ -530,6 +539,10 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
           });
         }
         if (persisted) {
+          runtime._nextStepNumber = Math.max(
+            runtime._nextStepNumber,
+            Number(persisted.stepNumber) || runtime._nextStepNumber,
+          ) + 1;
           runtime._lastPersistByActionId.set(id, persisted);
           session?._lastPersistByActionId?.set(id, persisted);
           // P6-0/T0.1 计数：persist 返回的 trajectoryPhaseId 是 DB 解析后的真归属，
@@ -726,7 +739,17 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     lockAiRecording(runtime, session, true);
     await broadcastRecordingLock();
     await Promise.resolve(runtime._persistDrain).catch(() => {});
-    // 组图采集先行落定（串行队列），避免 done 长图与组图并发争用 BiB 采集结果事件。
+    // P6-0 性能：counts 刷新从每步一次改为每阶段一次（远程 RTT 下省大量往返）
+    try {
+      const { refreshTrajectoryCounts } = await import('./trajectory-step-service.js');
+      const counts = await refreshTrajectoryCounts(tid);
+      await trajectoryDao.updateMeta(tid, {
+        stepCount: counts.stepCount,
+        phaseCount: counts.phaseCount,
+      });
+    } catch (err) {
+      console.warn('[record] phase counts refresh failed:', err?.message || err);
+    }
     await Promise.resolve(runtime._phaseShotChain).catch(() => {});
     try {
       const { capturePhaseScreenshot } = await import('./phase-highlight-screenshot.js');
@@ -857,7 +880,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       let dbSteps = 0;
       try {
         const { refreshTrajectoryCounts } = await import('./trajectory-step-service.js');
-        dbSteps = Number((await refreshTrajectoryCounts(tid))?.steps || 0);
+        // 注意返回键是 stepCount（业务步，已排除 save_form_snapshot 等 meta）
+        dbSteps = Number((await refreshTrajectoryCounts(tid))?.stepCount || 0);
       } catch (err) {
         console.warn('[record] async gate recount failed:', err?.message || err);
         return;

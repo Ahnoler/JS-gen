@@ -1,5 +1,13 @@
 /**
  * Executor Agent WebSocket client — outbound connect, register, heartbeat, auto-reconnect.
+ *
+ * 【部署架构（2026-09-07 用户定案）】被测系统（SUT）部署在用户内网，用户 PC 无法直接
+ * 访问 SUT。连接方式：能连通内网的「执行机」（本进程 + 其派生的 Python agent +
+ * CDP Chrome）主动向公网「服务器」（控制面）注册（出站 WS，本文件实现），用户访问
+ * 服务器下发指令，经执行机间接操作被测系统。因此：
+ * - 执行机→控制面只做出站连接（WS 注册/心跳/事件上报），控制面不反向直连执行机；
+ * - 执行机上的组件（Python agent 等）不得假设可直接访问控制面 HTTP 之外的网络
+ *   （如直推 DB/第三方服务）——所有回传都必须经本 WS 通道中转。
  */
 import WebSocket from 'ws';
 
