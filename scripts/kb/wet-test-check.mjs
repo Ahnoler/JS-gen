@@ -49,6 +49,8 @@ function extractChapterLeaves(filePath) {
   const leaves = [];
   let hasContractLine = false;
   const leafGroupRe = /ZJJK\d+(?:PDCP|PACP)?(?:\s*\/\s*ZJJK\d+(?:PDCP|PACP)?)*（[^）]*）/g;
+  // 无编号模块占行：`—（页面名）`（源册全册无 ZJJK/FS 时按契约以此占行）
+  const noCodeRe = /—（[^）]*）/g;
   for (const line of text.split(/\r?\n/)) {
     const groups = line.match(leafGroupRe);
     if (groups && groups.length >= 1) {
@@ -57,6 +59,15 @@ function extractChapterLeaves(filePath) {
         // 仅取括号前的前导编号（可含斜杠组）；括号内为 relCmpts 等注释性编号，不计叶
         const head = g.match(/^ZJJK\d+(?:PDCP|PACP)?(?:\s*\/\s*ZJJK\d+(?:PDCP|PACP)?)*/);
         for (const m of head?.[0]?.match(/ZJJK\d+/g) ?? []) leaves.push(m);
+      }
+    }
+    const noCodes = line.match(noCodeRe);
+    if (noCodes) {
+      hasContractLine = true;
+      for (const g of noCodes) {
+        const name = g.slice(2, -1);
+        // 排除契约文档自身的格式说明字面量
+        if (name !== '页面名' && name !== '无编号') leaves.push('NOZJJK:' + name);
       }
     }
   }
@@ -113,10 +124,14 @@ function checkModule(key) {
     return { fails: [`wet-test.md 不存在`], warns, stats };
   }
 
-  // 1. 期望叶集
-  const { expected, missingLineChapters } = collectExpected(moduleDir);
-  if (expected.length === 0) {
-    fails.push('chapters 无任何契约格式 ZJJK 清单行——先按 SKILL「存量回补条款」回补再验收');
+  // 1. 期望叶集（ZJJK 叶与非 ZJJK 占行叶分离；仅当模块无任何 ZJJK 叶时占行叶才参与比对）
+  const { expected: allExpected, missingLineChapters } = collectExpected(moduleDir);
+  const zjzkExpected = allExpected.filter((k) => !k.startsWith('NOZJJK:'));
+  const noCodeExpected = allExpected.filter((k) => k.startsWith('NOZJJK:'));
+  const expected = zjzkExpected.length ? zjzkExpected : noCodeExpected;
+  const noCodeMode = zjzkExpected.length === 0 && noCodeExpected.length > 0;
+  if (allExpected.length === 0) {
+    fails.push('chapters 无任何契约格式清单行（ZJJK 或 —（页面名）占行）——先按 SKILL「存量回补条款」回补再验收');
   }
   for (const f of missingLineChapters) {
     warns.push(`章节有 ZJJK 引用但章末缺契约清单行: ${f}`);
@@ -131,7 +146,13 @@ function checkModule(key) {
     stats[r.verdict] += 1;
     const codes = r.line.match(/ZJJK\d+/g) ?? [];
     for (const c of codes) actual.add(c);
-    if (r.zjjk === null && codes.length === 0 && r.verdict !== 'pending') {
+    if (noCodeMode) {
+      for (const g of r.line.match(/—（[^）]*）/g) ?? []) {
+        const name = g.slice(2, -1);
+        if (name !== '页面名') actual.add('NOZJJK:' + name);
+      }
+    }
+    if (r.zjjk === null && codes.length === 0 && r.verdict !== 'pending' && !(r.line.match(/—（[^）]*）/))) {
       warns.push(`判定行无 ZJJK（无编号场景叶请确认占行口径）: ${r.line.slice(0, 60)}`);
     }
     if (r.verdict !== 'pending' && !/20\d{2}-\d{2}-\d{2}/.test(r.line)) {
