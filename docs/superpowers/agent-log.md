@@ -11,6 +11,13 @@
 - blocked 台账：186（+44）；观察池第 4 轮素材累计 15 条
 - 下一循环：disburse（B 组已派）+ repay（A 组并行）
 
+## 2026-09-06 15:55 · ZCode Lead — 收工：SKILL 第 4 轮修订（回链 15:38 开工）
+- 完成：SKILL v5——①清单行三形态契约化（标准 ZJJK 斜杠组/无编号分册 `—（页面名）`/接口分册接口号叶，表格≠清单行，FS 缺失显式声明）；②**Step 0 入口可达性预检**入湿测节（digital-mobile 教训）；③blocked 证据三子类（黑名单/前端校验/静默拦截）；④执行规则补：两棒接力、同构批验、接口分册间接痕迹判定+trdlog 映射法、无编号模块 Bearer 菜单树定位法、Lead 预验账号、级联 blocked 引用、会话倒计时实为请求续期；⑤坑清单扩至 11 条（已办路径修正/残留 mask JS 强清/树下拉三连真点/图标 tooltip/无确认框删除禁触发/盘库点击即建流程/look 态步进）。USAGE：Phase E 增 Step 0+两棒接力+B 模板蒸馏卡全面升级
+- 验收：checker 7 代表模块回归 0 FAIL；eslint 干净
+- 收尾并行结果：tmp/kb-wet-test 777 截图全部在保留期内零清理；双台账齐备（blocked-backlog 成体系）
+- 下一步：verify-all 全绿后推送 origin/uara_V1.2（47+ 笔，用户已批准）
+- 遗留：drafts 下阶段（门槛就位）；blocked 回收随引擎线；观察池剩余低优条目并入第 5 轮
+
 ## 2026-09-06 15:38 · ZCode Lead — 开工声明：SKILL 第 4 轮修订 + 战役收尾 + 推送（用户批准全链）
 - 开工：15:38。①SKILL/USAGE 第 4 轮修订：观察池 20+ 条素材消化（零编号分册/接口分册两新形态契约化、Step 0 入口预检、级联 blocked、静默拦截证据、B 模板补账号预验与两棒接力、已办路径修正等）；②收尾：verify-all 全绿确认+tmp 截图保留口径确认；③推送 origin/uara_V1.2（47 笔未推送，用户已批准）
 - 范围：`scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`USAGE.md`、`scripts/kb/wet-test-check.mjs`（如有补丁）、本文件；tmp 截图**不删**（保留口径）
