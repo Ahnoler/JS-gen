@@ -2,9 +2,23 @@
   "draftFrom": "req",
   "moduleKey": "collateral-info",
   "flow": "押品估值数据查询（只读）",
-  "aliases": ["押品估值数据查询", "估值数据详情页"],
-  "hash_markers": ["FS00006059"],
-  "keywords": ["押品估值数据查询", "评估批次号", "评估金额", "确认单价", "价值认定日期", "评估方式", "内部", "外部"],
+  "aliases": [
+    "押品估值数据查询",
+    "估值数据详情页"
+  ],
+  "hash_markers": [
+    "FS00006059"
+  ],
+  "keywords": [
+    "押品估值数据查询",
+    "评估批次号",
+    "评估金额",
+    "确认单价",
+    "价值认定日期",
+    "评估方式",
+    "内部",
+    "外部"
+  ],
   "menu_path": "押品管理/押品估值管理/押品估值数据查询",
   "preconditions": [
     "【SUT 实测 2026-09-06】详情页场景号补录：URL fcnScnEcd=FS00006059（文档未收录）"
@@ -16,9 +30,25 @@
       "verify": "drift",
       "drift": "behavior+wording：列表进页自动加载 208 条（本模块全主页自动加载同向）；文档口径「默认查询区间近 12 个月」在 SUT 未呈现显式区间控件（默认过滤待后端核）",
       "menu_path": "押品管理/押品估值管理/押品估值数据查询",
-      "query_fields": ["评估批次号", "押品编号", "押品名称"],
-      "columns": ["评估批次号", "押品编号", "押品名称", "押品种类", "评估金额", "评估单价", "确认金额", "确认单价", "价值认定日期"],
-      "buttons": ["查看"]
+      "query_fields": [
+        "评估批次号",
+        "押品编号",
+        "押品名称"
+      ],
+      "columns": [
+        "评估批次号",
+        "押品编号",
+        "押品名称",
+        "押品种类",
+        "评估金额",
+        "评估单价",
+        "确认金额",
+        "确认单价",
+        "价值认定日期"
+      ],
+      "buttons": [
+        "查看"
+      ]
     },
     {
       "name": "估值数据详情页（全只读）",
@@ -32,6 +62,17 @@
     }
   ],
   "pendingSteps": [],
-  "sourceRefs": [23, 24],
-  "coverage": {"total": 2, "match": 1, "drift": 1, "blocked": 0, "notFound": 0, "gate": "full"}
+  "sourceRefs": [
+    23,
+    24
+  ],
+  "coverage": {
+    "total": 2,
+    "match": 1,
+    "drift": 1,
+    "blocked": 0,
+    "notFound": 0,
+    "gate": "full"
+  },
+  "source": "贯通验证 2026-09-06 traj 572（业务 stamp/结构 CDP 实证，DONE_WITH_CONCERNS）"
 }
