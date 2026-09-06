@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 23:25 · ZCode Lead — 开工声明：重启控制面/执行端 + todo-list 按新目标重整
+- 开工：23:25（date 校准）。用户给向：被测系统开发中（部分模块注定跑不通）；主目标=引擎线跑通真实业务主链（客户新增→对公评级→授信申请→审批→批复→用信→合同）；能力要求=无影像/OCR 前提下自主录制+成功回放+LLM 容错小页面变化；落实产物=需求导入/切片→KB 真实业务流程卡→业务/测试人员用产品功能管理/录制交易
+- 范围：docs/superpowers/todo-list.md（重整当前工作线）、本文件；**服务重启动作**（kill 4097 控制面 + executor 进程，Start-Process 先 server 后 executor，不动任何代码文件）
+- 禁入：他线 WIP 6 文件（scripts/agent/service.py、scripts/session_runner.py、src/services/trajectory/ 下 4 文件）、`config/.env*`、`data/kb/**`、`data/kb/flows/**`
+- 注意：重启将加载工作区他线未提交改动（trajectory-* 等）进运行实例——用户明示重启，照做并在回报注明
+- 方式：主线程直接操作；完成即 commit
+
 ## 2026-09-06 22:42 · ZCode Lead — 收工：SKILL 第 6 轮修订 v7 贯通验证契约成文（回链 22:30 开工）
 - 完成（37254816）：**SKILL v6→v7**——新增「贯通验证」契约节（promotion 后置阶段）：管线顺序（fid 核叶子/门闩入任务/任务文案三段式）；**analyze 契约实证修正**（入参 `description` 非 `requirement`、响应直接 `{phases,businessEntries}` 不包壳——源码 `src/services/trajectory/trajectory-meta-service.js:136-207` 核实；阶段数跟编号走+「预期结果：」硬标记+门闩与关键数据段不入 phases=服务端 prompt 硬约束）；create 漏挂 `PUT .../phases` 补；**验收铁律=业务证据（stepCount>0+stamp）不认「全 phase_done」**（record/start 假成功模式+CDP 19242+slot 补证+DONE_WITH_CONCERNS 三态）；卡面回写当场修正带 traj 证据（禁写 flows 的 worker 豁免口径同时落禁区节）；Lead 分波编排骨（每波 ≤2 并行 slot/一波一 commit/影像与文件上传场景禁入）。生命周期一览升六段全链：切片→湿测→回填→草稿卡→晋升→贯通验证；检查清单+贯通项；版本史 v7。**USAGE 新增 Phase G**（分波/派发/每卡验收/每波收口/状态口径）。guides 手册单点修正 analyze 字段名 requirement→description（T4 实证，开工条目已扩项声明）。
 - 杂务：T4 根目录证据残留 35 文件（截图 29+cdp/detach json 6）归档 `tmp/kb-through/_root-strays-20260906/`（移动未删，符合 tmp 清理口径）；agent-log 两条本线 T4 条目从文件绝对顶归位协议块之下（bfa18095）。
