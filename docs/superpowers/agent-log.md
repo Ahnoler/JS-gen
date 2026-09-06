@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 23:32 · ZCode Lead — 开工声明：主链七环节×三能力盘点 → P6 计划（agent team，只读调研）
+- 更正：23:29 收工条目所述「重启加载了他线未提交改动」已过时——他线 6 文件已由用户当晚提交（b5399d63 等），工作区现仅余 2 个 untracked 文档（unify-save-action 计划、replay-pipeline-handover 调研），运行实例加载的代码已全部入库
+- 开工：23:32。任务边界=**只读盘点+产出 P6 计划文档**，计划经用户审阅批准后才进连续执行（用户明示）；本任务不写 flows/不改引擎代码
+- 主链：客户新增→对公评级→授信申请→审批→批复→用信→合同（对公，绕行影像/OCR）；三能力=自主录制/成功回放/LLM 脚本容错
+- 方式：Lead 代子代理声明并派 3 个只读 Explore 并行（A=KB 资产与 T4 贯通证据盘点：data/kb/**、tmp/kb-through/**；B=录制/回放链路代码现状：src/services/trajectory/**、src/routes/v2/trajectory.js、scripts 回放引擎；C=heal-locate/定位容错现状：grep HEAL_LOCATE 全仓+Z 系列定位层）+ Lead 自读 phase2-plan；Lead 汇总写 `docs/superpowers/research/2026-09-06-mainchain-p6-plan.md` 后**停下等用户批准**
+- 禁入（全体含子代理）：写 data/kb/flows/**、改任何代码、`config/.env*`、子代理 commit（一律不 commit）
+- 注意：git log 见他线新提交 b5399d63（gates 门闩下发）——与他线并行，勿混 commit
+
 ## 2026-09-06 23:29 · ZCode Lead — 收工：服务双端已重启 + todo-list 按引擎主链目标重整（回链 23:25 开工）
 - 完成①**服务重启**：旧控制面 PID 11840 + executor PID 32140 已杀 → Start-Process 先 server 后 executor（独立进程防回收）→ 新控制面 PID 36784 监听 4097，`GET /api/v2/executors` 正常，执行机节点 **LMY online**（inUse=0 空闲；其余 offline 节点为历史注册残留不影响）。注意：本次重启加载了工作区他线未提交改动（trajectory-* 等 6 文件）进运行实例。
 - 完成②**todo-list 重整**（用户定调落档）：顶部加 2026-09-06 重整前提（被测系统开发中，不追全量）；**新 ⑤ 引擎主链贯通**（最高优先：主链七环节 客户新增→对公评级→授信申请→审批→批复→用信→合同；三能力验收口径=自主录制[认 stepCount+stamp 不认 phase_done]/成功回放/LLM 脚本容错[关联 heal-locate-wet]；下一步=七环节×三能力盘点→P6 计划→每环节三证验收）；**新 ⑦ KB 流程卡供给**（战役收官底座+用户面落实产物+主链卡最高保真+主链外保留不追全量+blocked 回收/T1-2批降级按需顺路）；旧 ⑤ KB-I5 留墓碑行并入新 ⑤；①②③④⑥ 他线不动；更新记录加行。
