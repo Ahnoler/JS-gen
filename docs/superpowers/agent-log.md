@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 03:30 · ZCode Lead — 阶段回报：副本方案实施+R1 三证 PASS+R2 深入实证（配方缺口定位），收口待续
+- **副本方案实施完成（e0420001/bb01f05a，用户设计批准）**：action-log-copy.js（快照覆盖+业务步计数排除 meta/engineering 双类+30min TTL）；handleActionLogSync 到达即覆盖副本；异步门闩判定源切副本计数（即时）；getTrajectoryWithPhases 副本优先覆盖 stepCount（stepCountSource 字段标识）。verify-all EXIT=0。
+- **削 RTT（3488d03c）**：每步 persist 7-9 远程往返→1-2（步号内存化/幂等查短路/trustPhaseId/batchSave 返回 insertIds 免回查/counts 延迟阶段收尾）；顺带修门闩误读 `.steps`（应为 `.stepCount`，594 误降级根因）。
+- **R1 客户新增=三证 PASS（traj 595）**：recorded+副本即时 stepCount、回放 11/12 confirmed（1 环境条件步=弹窗关闭）、stamp「KB主链R1-20260907-0545」+客户编号 26090701521085645 落库（stamp 跨轮保持修复实证生效）。
+- **R2 评级 4 轮（596-599）深入实证**：①596/597 卡「选择客户」抽屉——根因=**R1 建的是信贷预客户，不在评级可选范围**（需完整建档转正=主链前置缺口）；②598 偏航操作 MBP 客户撞「已有待发起评级流程」风险阻断（未落库无脏数据），严格查询文案（v4）后修正；③**599 深入 90%**：重评向导→大页面（**PJ20260907016009** 生成）→测算→结论→签署→流程提交，被「请先进行测算」「请先维护客户综合评价」两道业务闸门拦——**配方缺口=评级大页面「客户综合评价」区块**（section 结构 wizard:基本信息|section:客户综合评价|titlebox:股东信息，rating 卡无此 cue）。R2=BLOCKED（配方缺口），录制管线本身全绿（39 步落库+副本即时+门闩正确放行）。
+- 下轮移交：①从 599 form_snapshot 挖综合评价区块字段清单→补 rating.json 配方→v5 重跑（PJ20260907016009 待发起单还在可续操作）；②R1 建档链扩展（预客户→正式客户）补 R1 卡 pendingSteps；③R2 过后 R3-R7 顺序不变；④大页面区块多时 save_form_snapshot 密集（599 共 7 个），落库体积可观察。
+- 提交：3488d03c/e0420001/bb01f05a/136221e9 已推送；本轮 detach+验证为主，无新代码。
+
 ## 2026-09-07 01:16 · ZCode Lead — 阶段回报：P6-0 修路完成（三 commits）+ R1 跑车 8 轮实证，sync 管道产品级缺陷定性，收口待用户定夺
 - **P6-0 交付（aab83b68/795be5ee/f178411a，已推送）**：①假成功硬门闩三版迭代——最终形态=异步终局化（start 立即 recorded，后台 90s 二次 resync+DB 复核，0 业务步降级 failed+广播 fake_success_detected，594 实证全链工作）；②每阶段步数计数（persisted.trajectoryPhaseId 真归属）；③落库失败重试+step_persist_failed 广播；④填充校验对称（false_ok actual=空 时 label 回读升级 ok:label-readback）；⑤零动作 done 门禁（首次拒绝+二次放行，recorder_emitters._guard_done_reject_zero_actions）；⑥auto-fill stamp 跨轮保持（businessEntries 平铺键防 cert-detect 默认值覆盖——590 实证 stamp 被覆盖为「测试科技发展有限公司」）
 - **P6-1 交付（9037f514）**：3 张主链卡晋升 flows 82→84（批复查看 new/审批任务页 new/评级申请链 merge rating.json+14 节点）；promote_draft.mjs 加 curation.include gate 豁免（Steps 零 blocked 的 partial 主链卡）
