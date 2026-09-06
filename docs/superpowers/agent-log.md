@@ -1,3 +1,7 @@
+## 2026-09-06 19:20 · ZCode Lead — 开工声明：T4 滚动批验（其余 pass 卡按域分波，连续执行）
+- 开工：19:20。首卡（traj 527 集群客户）DONE_WITH_CONCERNS 后滚动：剩余 pass 卡按域分波，每波 ≤2 并行 record 会话（slot 隔离，不抢同 Chrome）；影像场景按用户指示跳过（写进任务禁入）
+- 范围：各模块 drafts（只读）、tmp/kb-through/<module>/、flows source 回写、本文件；禁入不变
+- 方式：执行 worker 按 guides/ui-record-through-line-agent-prompt.md 模板派发（手册由 Cursor Lead 落库）；Lead 验收=stepCount>0+stamp 报告+KB source 回写
 # Agent 协作日志
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
