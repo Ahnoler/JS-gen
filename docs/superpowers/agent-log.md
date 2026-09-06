@@ -11,6 +11,12 @@
 - blocked 台账：186（+44）；观察池第 4 轮素材累计 15 条
 - 下一循环：disburse（B 组已派）+ repay（A 组并行）
 
+## 2026-09-06 17:10 · ZCode Lead — 开工声明：T1-exec B1 晋升转换器 + dry-run 审查表
+- 开工：17:10。按 `docs/superpowers/plans/2026-09-06-drafts-promote-plan.md` 执行 B1 棒：新建 `scripts/kb/promote_draft.mjs`（gate=pass 卡→formal schema 转换+同域合并建议）并产出 dry-run 审查表 `tmp/promote-review.md`（53 张 pass 卡）
+- 范围：`scripts/kb/promote_draft.mjs`（新建）、`tmp/promote-review.md`（新建）、本文件；**本棒不写 data/kb/flows/**（B2 应用棒另声明）
+- 禁入：data/kb/flows/**（只读参照）、他线 WIP
+- 方式：转换器+审查表由 worker 产出；Lead 过表裁决后 B2 应用（写 flows 前另有验收）
+
 ## 2026-09-06 16:55 · ZCode Lead — 开工声明：T1 drafts→promote 立项准备（长任务编排第一棒）
 - 开工：16:55。用户批准遗留任务编排并启动 T1：草稿卡晋升正式卡管线。本棒=立项准备（只读研究 promote.py/_kb.py 机制 + 对比 draft/正式卡 schema 差异 + 产出执行计划文档），不改产品代码
 - 范围：`scripts/kb/promote.py`、`scripts/kb/_kb.py`（只读）、`docs/superpowers/plans/2026-09-06-drafts-promote-plan.md`（新建）、本文件
