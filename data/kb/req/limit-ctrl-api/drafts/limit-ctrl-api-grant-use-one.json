@@ -2,9 +2,26 @@
   "draftFrom": "req",
   "moduleKey": "limit-ctrl-api",
   "flow": "授用一体（额度注册并占用一步闭环，lmtRgstAndOcp）",
-  "aliases": ["额度注册并占用", "lmtRgstAndOcp", "授用一体"],
-  "hash_markers": ["lmtRgstAndOcp", "verfInd", "1.1.12"],
-  "keywords": ["注册并占用", "校验模式", "lmtRgst", "lmtOcp", "创建机构", "创建人员", "回滚", "verfInd"],
+  "aliases": [
+    "额度注册并占用",
+    "lmtRgstAndOcp",
+    "授用一体"
+  ],
+  "hash_markers": [
+    "lmtRgstAndOcp",
+    "verfInd",
+    "1.1.12"
+  ],
+  "keywords": [
+    "注册并占用",
+    "校验模式",
+    "lmtRgst",
+    "lmtOcp",
+    "创建机构",
+    "创建人员",
+    "回滚",
+    "verfInd"
+  ],
   "menu_path": "（纯接口，无页面；实证通道=查询交易信息 trdlog）",
   "preconditions": [
     "【SUT 实测 2026-09-06】交易码 lmtRgstAndOcp（成功 52/失败 12）；失败原文 `hdlUser经办人为空`=规则1 创建机构/创建人员必传强校验"
@@ -15,7 +32,11 @@
       "leafRef": "wet-test.md 叶12 (接口 1.1.12，chapters/12)",
       "verify": "match",
       "match_rule": "接口叶：交易码 lmtRgstAndOcp，trdlog 报文映射实证",
-      "req_fields": ["lmtRgst{crtInstNo创建机构, crtPsnNo创建人员, lmtList[{cstNo,cstTp,lmtAmt,ccy,lmtNo,lmtNodeNo,lmtStdt,lmtExdt,ddln,ddlnUnit,rvlInd}]}", "lmtOcp{abvqtOcpInd, bsnInf{ctrNo,ctrAmt,esrAmt,exrt,ccy,ctrSt,ctrStdt,ctrexpdt,pdNo,pdNm}, cstNo, nodeNo, multOcpCstList[]}", "verfInd(\"1\"=校验模式)"],
+      "req_fields": [
+        "lmtRgst{crtInstNo创建机构, crtPsnNo创建人员, lmtList[{cstNo,cstTp,lmtAmt,ccy,lmtNo,lmtNodeNo,lmtStdt,lmtExdt,ddln,ddlnUnit,rvlInd}]}",
+        "lmtOcp{abvqtOcpInd, bsnInf{ctrNo,ctrAmt,esrAmt,exrt,ccy,ctrSt,ctrStdt,ctrexpdt,pdNo,pdNm}, cstNo, nodeNo, multOcpCstList[]}",
+        "verfInd(\"1\"=校验模式)"
+      ],
       "rules": [
         "lmtRgst/lmtOcp 双段=注册+占用一体；lmtList 与规则2 必填集逐一吻合，lmtOcp 与规则4 必填集吻合",
         "【SUT 实测 2026-09-06】verfInd 实测 \"1\"=校验模式（规则7 实证）；规则8 校验结果汇总返回 rspData=\"[]\" 空=通过语义一致；verfInd=\"0\"（正式模式）样本未见",
@@ -24,6 +45,16 @@
     }
   ],
   "pendingSteps": [],
-  "sourceRefs": [12],
-  "coverage": {"total": 1, "match": 1, "drift": 0, "blocked": 0, "notFound": 0, "gate": "match"}
+  "sourceRefs": [
+    12
+  ],
+  "coverage": {
+    "total": 1,
+    "match": 1,
+    "drift": 0,
+    "blocked": 0,
+    "notFound": 0,
+    "gate": "match"
+  },
+  "source": "贯通验证 2026-09-06 traj 581（trdlog lmtRgstAndOcp 64 条复证）（业务 stamp/结构/报文 CDP 实证，DONE_WITH_CONCERNS）"
 }

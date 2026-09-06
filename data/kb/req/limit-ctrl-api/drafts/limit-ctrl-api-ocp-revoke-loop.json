@@ -2,9 +2,39 @@
   "draftFrom": "req",
   "moduleKey": "limit-ctrl-api",
   "flow": "合同实占闭环（额度创建→占用→释放→冲正）",
-  "aliases": ["额度创建", "额度占用", "额度释放", "额度冲正", "lmtRgst", "doOcp", "doOcpRevoke", "doReverse"],
-  "hash_markers": ["lmtRgst", "doOcp", "doOcpRevoke", "doReverse", "tansun-tcp-ulm", "1.1.1", "1.1.3", "1.1.4", "1.1.5"],
-  "keywords": ["额度创建", "额度占用", "额度释放", "额度冲正", "交易码", "trdlog", "报文", "业务流水号", "原业务流水号", "释放原因"],
+  "aliases": [
+    "额度创建",
+    "额度占用",
+    "额度释放",
+    "额度冲正",
+    "lmtRgst",
+    "doOcp",
+    "doOcpRevoke",
+    "doReverse"
+  ],
+  "hash_markers": [
+    "lmtRgst",
+    "doOcp",
+    "doOcpRevoke",
+    "doReverse",
+    "tansun-tcp-ulm",
+    "1.1.1",
+    "1.1.3",
+    "1.1.4",
+    "1.1.5"
+  ],
+  "keywords": [
+    "额度创建",
+    "额度占用",
+    "额度释放",
+    "额度冲正",
+    "交易码",
+    "trdlog",
+    "报文",
+    "业务流水号",
+    "原业务流水号",
+    "释放原因"
+  ],
   "menu_path": "额度管控/额度查询统计/查询交易信息（trdlog，报文实证通道）",
   "preconditions": [
     "接口分册：判定对象=接口在 SUT 的间接业务痕迹（历史报文/额度台账落账）；报文实证通道=「查询交易信息」TCP 交易日志（1031 笔历史报文含请求/响应/错误栈全文）",
@@ -17,7 +47,9 @@
       "leafRef": "wet-test.md 叶1 (接口 1.1.1，chapters/01)",
       "verify": "match",
       "match_rule": "接口叶：交易码 lmtRgst，trdlog 历史报文映射实证",
-      "req_fields": ["nodeList[cstNo,cstNm,cstTp,ccy,lmtAmt,lmtEfdt,lmtExdt,lmtNo,nodeNo,rvlInd(循环标志),st(\"1\"=生效),ddln,ddlnUnit]"],
+      "req_fields": [
+        "nodeList[cstNo,cstNm,cstTp,ccy,lmtAmt,lmtEfdt,lmtExdt,lmtNo,nodeNo,rvlInd(循环标志),st(\"1\"=生效),ddln,ddlnUnit]"
+      ],
       "rules": [
         "与文档规则1必填字段一一对应；状态传\"1\"=生效与规则3一致",
         "额度查询页可见按此创建的额度（EDBH20260803076002 等）=登记落账痕迹",
@@ -30,7 +62,18 @@
       "leafRef": "wet-test.md 叶2 (接口 1.1.3，chapters/03)",
       "verify": "match",
       "match_rule": "接口叶：交易码 doOcp，成功 178/失败 8",
-      "req_fields": ["bsnJrnlNo(业务流水号)", "ctrNo(合同编号)", "ctrAmt(合同金额)", "esrAmt(敞口)", "exrt(汇率)", "oriCcy", "nodeNo", "cstNo/cstTp", "abvqtOcpInd(超额占用标志\"0\")", "crtInstNo/crtPsnNo"],
+      "req_fields": [
+        "bsnJrnlNo(业务流水号)",
+        "ctrNo(合同编号)",
+        "ctrAmt(合同金额)",
+        "esrAmt(敞口)",
+        "exrt(汇率)",
+        "oriCcy",
+        "nodeNo",
+        "cstNo/cstTp",
+        "abvqtOcpInd(超额占用标志\"0\")",
+        "crtInstNo/crtPsnNo"
+      ],
       "rules": [
         "与文档规则1必填集一致；额度查询页落账痕迹：许高 usedAmt=50,000/可用=450,000（额度 500,000）",
         "失败原文：`bsnInf对象的合同金额为空`（规则1金额缺失中断）、`额度不存在，处理前请先检查额度是否存在为空`（规则7生效校验）",
@@ -42,7 +85,16 @@
       "leafRef": "wet-test.md 叶3 (接口 1.1.4，chapters/04)",
       "verify": "match",
       "match_rule": "接口叶：交易码 doOcpRevoke，成功 2/失败 6",
-      "req_fields": ["amt", "bsnInf.ctrNo(合同编号)", "ctrSt", "ccy", "cstNo", "rlseRsn(释放原因，如「发生展期释放额度」)", "bsnJrnlNo", "stmSrc"],
+      "req_fields": [
+        "amt",
+        "bsnInf.ctrNo(合同编号)",
+        "ctrSt",
+        "ccy",
+        "cstNo",
+        "rlseRsn(释放原因，如「发生展期释放额度」)",
+        "bsnJrnlNo",
+        "stmSrc"
+      ],
       "rules": [
         "按合同编号+释放金额+释放原因，与文档规则1/2 一致",
         "【SUT 实测 2026-09-06】api-contract：rlseRsn 释放原因为文档未记载的报文字段（文档 1.1.4 无此字段）",
@@ -55,7 +107,12 @@
       "leafRef": "wet-test.md 叶4 (接口 1.1.5，chapters/05)",
       "verify": "match",
       "match_rule": "接口叶：交易码 doReverse，成功 11/失败 5",
-      "req_fields": ["bsnJrnlNo(本次冲正流水号)", "oriBsnJrnlNo(原业务流水号)", "hdlInst", "hdlUser"],
+      "req_fields": [
+        "bsnJrnlNo(本次冲正流水号)",
+        "oriBsnJrnlNo(原业务流水号)",
+        "hdlInst",
+        "hdlUser"
+      ],
       "rules": [
         "与文档规则1「原业务流水号+本次冲正流水号不能为空」完全对应",
         "失败原文：`冲正时,原交易流水号HT20260624020099找不到流水记录`（规则2按原流水查有效流水）；另 1 笔 NPE（getOcpSeq Map.get null）内部缺陷痕迹备查",
@@ -64,6 +121,19 @@
     }
   ],
   "pendingSteps": [],
-  "sourceRefs": [1, 2, 3, 4],
-  "coverage": {"total": 4, "match": 4, "drift": 0, "blocked": 0, "notFound": 0, "gate": "match"}
+  "sourceRefs": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "coverage": {
+    "total": 4,
+    "match": 4,
+    "drift": 0,
+    "blocked": 0,
+    "notFound": 0,
+    "gate": "match"
+  },
+  "source": "贯通验证 2026-09-06 traj 582（六交易码逐一命中：lmtRgst 243/doOcp 186/doOcpRevoke 8/doReverse 16/doOcpCheck 196）（业务 stamp/结构/报文 CDP 实证，DONE_WITH_CONCERNS）"
 }
