@@ -60,15 +60,40 @@
 | customer-common | 叶106/112/124/131/137 | 提交类叶：到达即需落库，只读湿测不可达；补测=用户授权的单独提交窗口或业务端代提交后经已办核验 |
 | credit-retail | 叶12 | 对私批复作废发起（wf_credit_008）：同上，且叠加 B 类零数据 |
 
-## 统计
+## 统计（2026-09-06 战役收官，checker 权威口径）
 
-- credit-corp：13 blocked（v4 checker 口径，含 #46-48 作废 3 叶）
-- rating：8 blocked
-- customer-corp：11 blocked
-- customer-common：25 blocked
-- credit-retail：33 blocked（对私域存量数据为零所致，B 类为主）
-- credit-group：31 blocked（集团域存量数据全为零，含审批侧 298 条流程无集团记录）
-- credit-interbank：21 blocked（同业域零数据+无批复菜单）
-- loan-corp：10 blocked + 3 not-found（用信域存量较多，blocked 大幅低于授信域）
-- loan-retail：34 blocked（look 态渲染限制+产品子页数据覆盖有限）
-- 合计 186 blocked 待回收（另有 loan-corp 3 not-found）；A 类（审批链）+ B 类（零数据）+ look 态渲染限制三类为主，随引擎线跑流程造数据自然回收。
+| 模块 | 叶数 | match | drift | blocked | not-found |
+|------|------|-------|-------|---------|-----------|
+| credit-corp | 54 | 39 | 2 | 13 | 0 |
+| rating | 46 | 35 | 4 | 7 | 0 |
+| customer-corp | 55 | 39 | 4 | 11 | 1 |
+| customer-common | 141 | 104 | 12 | 25 | 0 |
+| customer-group | 45 | 44 | 1 | 0 | 0 |
+| credit-retail | 81 | 46 | 2 | 33 | 0 |
+| credit-group | 38 | 3 | 4 | 31 | 0 |
+| credit-interbank | 28 | 2 | 5 | 21 | 0 |
+| loan-corp | 48 | 28 | 7 | 10 | 3 |
+| loan-retail | 84 | 43 | 7 | 34 | 0 |
+| disburse | 75 | 33 | 6 | 27 | 9 |
+| repay | 41 | 7 | 3 | 31 | 0 |
+| postloan-risk-class | 42 | 21 | 4 | 17 | 0 |
+| postloan-warn | 55 | 10 | 1 | 44 | 0 |
+| postloan-check | 150 | 78 | 0 | 72 | 0 |
+| collection | 52 | 27 | 2 | 22 | 1 |
+| product-mgmt | 24 | 17 | 2 | 5 | 0 |
+| archive | 71 | 42 | 4 | 25 | 0 |
+| smart-ctrl | 44 | 30 | 9 | 5 | 0 |
+| portal | 33 | 25 | 5 | 2 | 1 |
+| asset-preserve-ops | 183 | 101 | 6 | 57 | 19 |
+| asset-preserve-npl | 181 | 97 | 6 | 78 | 0 |
+| digital-mobile | 93 | 0 | 0 | 0 | 93 |
+| digital-loan-desk | 84 | 31 | 2 | 35 | 16 |
+| limit-quota | 13 | 6 | 5 | 2 | 0 |
+| limit-ctrl-api | 17 | 9 | 0 | 8 | 0 |
+| meeting-mgmt | 15 | 0 | 1 | 14 | 0 |
+| collateral-info | 56 | 16 | 3 | 36 | 1 |
+| collateral-func | 56 | 36 | 4 | 14 | 2 |
+| system-mgmt | 53 | 37 | 7 | 7 | 2 |
+| **合计** | **1958** | **1006** | **118** | **686** | **148** |
+
+> 注：credit-corp 54 叶（含辅 ID 合并行口径）；blocked 大头=审批链无在途流程（A 类）+域存量数据为零（B 类）+look 态渲染限制；digital-mobile 93 叶 not-found=PC 环境无移动端入口（五层探测实证，补测=移动端环境）。pending 全域为 0。

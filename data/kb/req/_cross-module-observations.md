@@ -42,6 +42,17 @@
 - **反向案例（credit-interbank）**：SUT「同业授信管理」子菜单仅新增/变更两项，**无「同业授信批复」菜单**（对公/集团域均有），文档亦未定义——文档与 SUT 双向缺失，批复查看能力是否存在待补测。
 - 处置：不纳入湿测叶表；引擎线如需覆盖另行立项；chapters 已按「SUT 多出页面」单列注记。
 
+## 5. 其他跨模块结论（战役收官汇总，2026-09-06）
+
+- **前端拦截层错误族全集**（同层异名，引擎必须按「错误名→降级路径」建模）：search/diabf/nextBefore/beforeSavetCheck/beforeRskIntcpt/beforInlz/beforeExecBtn/beforeReg/beforeTurn/nextValidate/initBefore/editBefore/beforeOpenAdd/updateData/beforeCerate(疑 beforeCreate 拼写误)/ifShow/dymbdjy——共 17 个错误名，跨 20+ 模块复现。
+- **后端缺陷/环境族**：BizException 全文已留档（作废关联校验、押品准入抵质押率、最高抵质押率获取失败）；SUT 级缺陷=权限申请查看页白屏(923174.js)、dymbdjy 阻断催收流转、评估流程 response undefined、盘库 500、打印存单 504。
+- **噪声级**（不阻断）：i18n ReferenceError（**阻断性反差**：资产保全域阻断步骤切换、他域不阻断——不能以 console 报错预判）、settableheight、btnShow、tssc-ui setGraphData、350866 data。
+- **列表自动加载域规律**（仍须逐页确认）：授信/评级域=手动查询；用信/放还款/贷后/客户/产品/额度/系统管理/门户域=自动加载为主；同模块内弹窗/查询页常有相反案例；数据为空的页两派都有。
+- **半译码/裸码**：多域存在码值未字典翻译列（同表已译+未译混显）——自动化断言逐列区分；KB 卡按「数据级缺陷」登记。
+- **旧流程代际共存**：资产保全委外审批旧版双页签（SW- 前缀）与新链并存；其他资产按 bsnListTp 参数化复用非标组件——引擎宜按组件参数化建模而非按文档独立页。
+- **SUT 多出页面总登记**：portal/资产保全/系统管理/客户管理域合计 30+ 未收录菜单页（用户裁定边缘功能挂起，明细在各模块 wet-test.md 运行记录与 chapters「SUT 多出页面」节）。
+- **环境不可达**：digital-mobile 面客移动端 H5 在 PC 测试环境无入口（五层探测实证）；meeting-mgmt 信审会指定角色七法人登录失败。
+
 ## 5. 其他跨模块结论
 
 - 流水号前缀实测：PMS（权限申请）/ CHD（客户/集团移交）/ PJ（评级）与文档一致。

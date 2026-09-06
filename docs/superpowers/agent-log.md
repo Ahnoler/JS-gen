@@ -11,6 +11,14 @@
 - blocked 台账：186（+44）；观察池第 4 轮素材累计 15 条
 - 下一循环：disburse（B 组已派）+ repay（A 组并行）
 
+## 2026-09-06 12:00 · ZCode Lead — 收官：req 作业区逐模块逐叶湿测战役 30/30 全闭环（回链 02:25 常驻窗口）
+- 完成：**30 模块 / 1958 叶全部真机湿测收口**（checker 权威口径：match 1006 / drift 118 / blocked 686 / not-found 148 / pending 0，checker 0 FAIL）；全部 drift 按分类学回填 chapters（双源标注）；blocked 686 叶入 `_blocked-backlog.md` 台账（A 审批链/B 零数据/黑名单/look 态四类成因）；跨模块观察（17 错误名拦截族全集/加载域规律/半译码/旧流程代际/SUT 多出页 30+）汇总 `_cross-module-observations.md`
+- 收官批提交：postloan-check 150/150（最大模块，同构批验）、collection 52/52（dymbdjy SUT 缺陷+数据错位铁证）、product-mgmt 24/24（新增分类定案）、archive 71/71、smart-ctrl 44/44（接力续跑）、portal 33/33（**无编号模块首例+卡片删除事故披露并还原**）、asset-ops 183/183 两棒（旧流程代际共存）、asset-npl 181/181 两棒（i18n 阻断性反差）、digital-mobile 93/93 全 not-found（**PC 环境无移动端入口，五层探测实证**）、digital-loan-desk 84/84（Bearer 菜单树最硬证据）、limit-quota 13/13（组合新增即落库副作用）、limit-ctrl-api 17/17（**trdlog 1031 笔报文映射法**）、meeting-mgmt 15/15（级联 blocked）、collateral-info 56/56（价格指数菜单缺失+押品准入 BizException 铁证）、collateral-func 56/56（南宁城市下拉缺失）、system-mgmt 53/53（收官）、customer-group 45/45（**44 match 全战役最佳**，补做被漏排的第 30 模块）
+- checker 能力终态：23 模块回归 + IFACE 接口号叶（接口分册）/NOZJJK 占行叶（无编号模块）/relCmpts 括注剥离/判定格宽容解析（词+子类+日期同格），30/30 ALL GREEN
+- **本战役累计**：切片 30/30 → 湿测 30/30 → drift 回填全覆盖；SKILL 协议 v1→v4 全部实战长出；发现文档笔误/滞后/矛盾多处（详见各模块 chapters 双源标注）；SUT 级缺陷 5+（白屏/dymbdjy/response undefined/504/裸码）
+- 遗留移交：①blocked 686 叶补测台账（引擎线造数据后回收）；②SKILL 第 4 轮修订素材 20+ 条在观察池（含 no-code/接口分册两新形态契约化）；③digital-mobile 需移动端环境补测；④meeting-mgmt 需信审会角色账号；⑤drafts/promote 仍待用户明示
+- 引擎线移交入口：`data/kb/req/_cross-module-observations.md`（错误族全集/加载域规律/组件参数化建模建议）
+
 ## 2026-09-06 02:25 · ZCode Lead — 常驻窗口声明：余量 23 模块湿测连续执行（用户指令：不待指令一直做，遇阻塞再商量）
 - 开工：02:25。A→B→C 流水线滚动推进剩余 23 个模块（loan-corp → loan-retail → disburse → repay → postloan×3 → collection → product-mgmt → archive → smart-ctrl → portal → asset-preserve×2 → digital×2 → limit×2 → meeting-mgmt）；流水线重叠：B(N) 浏览器 + A(N+1)/C(N-1) 文本并行
 - 已顺手清账：rating chapters 三章清单行契约化回补（03/04/05），checker 7/7 模块 ALL GREEN（rating 机械口径更正 35/4/7，以表格为准）
