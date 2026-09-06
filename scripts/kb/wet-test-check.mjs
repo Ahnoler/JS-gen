@@ -132,7 +132,7 @@ function checkModule(key) {
 
   // 1. 期望叶集（ZJJK 叶与非 ZJJK 占行叶分离；仅当模块无任何 ZJJK 叶时占行叶才参与比对）
   const { expected: allExpected, missingLineChapters } = collectExpected(moduleDir);
-  const zjzkExpected = allExpected.filter((k) => !k.startsWith('NOZJJK:'));
+  const zjzkExpected = allExpected.filter((k) => !k.startsWith('NOZJJK:') && !k.startsWith('IFACE:'));
   const noCodeExpected = allExpected.filter((k) => k.startsWith('NOZJJK:'));
   const expected = zjzkExpected.length ? zjzkExpected : noCodeExpected;
   const noCodeMode = zjzkExpected.length === 0 && noCodeExpected.length > 0;
