@@ -280,6 +280,8 @@ export async function removeTrajectoryStep(stepId) {
   await assertNotBusyForStepEdit(tid, traj);
 
   await trajectoryStepDao.removeById(Number(stepId));
+  // 级联删除该步骤的截图（phase_highlight/dialog 等），避免孤儿截图行残留
+  await getDB()('screenshot').where({ trajectory_step_id: Number(stepId) }).del();
   await trajectoryStepDao.reorderByTrajectory(existing.trajectoryId);
   const counts = await refreshTrajectoryCounts(existing.trajectoryId);
   await trajectoryDao.updateMeta(existing.trajectoryId, {

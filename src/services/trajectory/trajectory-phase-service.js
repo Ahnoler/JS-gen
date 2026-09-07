@@ -127,6 +127,20 @@ export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) 
     }
 
     // Match getTrajectoryTree assignment: FK first, else unbound steps by phase_number
+    const doomedSteps = await db('trajectory_step')
+      .where({ trajectory_id: tid })
+      .andWhere(function () {
+        this.whereIn('trajectory_phase_id', ownedIds);
+        if (phaseNumbers.length) {
+          this.orWhere(function () {
+            this.where(function () {
+              this.whereNull('trajectory_phase_id').orWhere('trajectory_phase_id', 0);
+            }).whereIn('phase_number', phaseNumbers);
+          });
+        }
+      })
+      .select('id');
+    const doomedStepIds = doomedSteps.map((r) => Number(r.id)).filter((n) => n > 0);
     await db('trajectory_step')
       .where({ trajectory_id: tid })
       .andWhere(function () {
@@ -140,6 +154,16 @@ export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) 
         }
       })
       .del();
+    // 级联删除截图：绑定被删步骤的行 + 这些阶段的 phase_highlight
+    await db('screenshot')
+      .where({ trajectory_id: tid })
+      .andWhere(function () {
+        this.whereIn('trajectory_step_id', doomedStepIds);
+        this.orWhere(function () {
+          this.whereIn('trajectory_phase_id', ownedIds).whereNotNull('trajectory_phase_id');
+        });
+      })
+      .del();
     await db('trajectory_phase')
       .where({ trajectory_id: tid })
       .whereIn('id', ownedIds)
@@ -147,6 +171,8 @@ export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) 
   } else {
     // Delete all steps; keep phase descriptions but reset statuses.
     await db('trajectory_step').where({ trajectory_id: tid }).del();
+    // 级联删除截图（含 page_level 弹窗/页面行——不清会让旧录制的弹窗定义残留到下一次录制）
+    await db('screenshot').where({ trajectory_id: tid }).del();
     await db('trajectory_phase')
       .where({ trajectory_id: tid })
       .update({ status: 'pending', completed_at: null, done_logs: JSON.stringify([]) });
