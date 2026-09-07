@@ -6,8 +6,8 @@
 import * as businessDataDao from '../../dao/business-data-dao.js';
 
 /** Section headers that introduce a business-data block in a requirement. */
-export const BUSINESS_DATA_SECTION_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]?$/i;
-const BUSINESS_DATA_HEADER_INLINE_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]/i;
+export const BUSINESS_DATA_SECTION_RE = /^(业务数据|案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]?$/i;
+const BUSINESS_DATA_HEADER_INLINE_RE = /^(业务数据|案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]/i;
 
 /** Trailing AI value-hint blocks — must not drive phase-type classification. */
 const BUSINESS_DATA_MARK_RE = /\n*【(?:业务数据|业务场景案例数据|预设案例数据)[^\n]*】[\s\S]*$/;
@@ -30,6 +30,10 @@ export function stripBusinessDataBlock(text) {
 export function phaseNeedsBusinessData(phaseText) {
   const t = stripBusinessDataBlock(phaseText);
   if (!t) return false;
+
+  // Phase text explicitly referencing 业务数据 wins over the login/query
+  // gates (auth-recording login task says「账号/密码使用业务数据注入值」).
+  if (/业务数据/.test(t)) return true;
 
   const isLogin = /登录|登入/i.test(t)
     && !/新增|创建|录入|填写|修改|编辑|引入|校验/.test(t);
