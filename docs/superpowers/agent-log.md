@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 23:10 · ZCode 引擎线 — 开工声明：phase_done 跨 run 串台修复实施（runId 归属隔离）
+- 开工：23:10。承接 reviewer 检出的 `docs/spec-phase-done-cross-run-fix.md`（录制中误弹「AI 录制结束」），实施计划已产出：`docs/superpowers/plans/2026-09-07-phase-done-cross-run-fix.md`（6 任务 TDD：归属纯函数模块 → runner runId 下发+owned 等待 → 订阅过滤+finally cancel_step → Python 回带/canceled/new-step 叫停 → verify-all 注册 → 湿测移交）
+- 范围：`src/services/trajectory/run-event-ownership.js`（新）、`trajectory-recording-runner.js`（runId 接线段）、`scripts/state.py`、`scripts/session_runner.py`（main loop/_run_step/_stdin_reader）、`scripts/agent/service.py`（phase_error emit 两处）、`scripts/characterization/characterize-run-event-ownership.mjs` + `characterize-phase-done-runid.py`（新）、`scripts/refactor/verify-all.sh`、本文件
+- 禁入：前端仓库、`data/kb/**`、`src/executor-event-hub.js` 既有导出签名（13 处既有消费点不动）、门闩 v2/合约矫正已提交段、他线 WIP（session_runner.py 本计划要改，执行前须确认他线 probe 改动已收口）、auth-recording SDD 文件集
+- 方式：TDD（Task 1/4 先失败测试）；verify-all 收尾必须 ALL GREEN；子智能体不 commit，主会话验收代提交
+
 ## 2026-09-07 22:30 · ZCode Lead — 收工补充：终审 FIX-FIRST 整改完成，凭据不落库双验证（回链 13:05 开工）
 
 - **完成**：whole-branch 终审（0020bbe..HEAD，22 commits）判 FIX-FIRST（C1=明文密码落库 trajectory.task 可被轨迹搜索 API 读出）。整改提交链 ebadece→b75dbe4→7b56f4d→4e53d56：①canonical task 不再内嵌账密，真实值播种 business_data_entry，agent 走 read_business_data 通道；②组件注册后掩码源轨迹步骤 params（password→__AUTH_PASSWORD__，解析对象精确值匹配）；③Node 侧「业务数据」放行收窄为凭据键共现；④inline 头词表/无 url 系统跳过触发/组件回放 ok>=1 三个 minor。
