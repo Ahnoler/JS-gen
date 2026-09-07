@@ -41,6 +41,7 @@ run() {
 
 run "characterize-dedup"       node scripts/characterization/characterize-dedup.mjs
 run "characterize-trajectory"  node scripts/characterization/characterize-trajectory.mjs
+run "characterize-run-event-ownership" node scripts/characterization/characterize-run-event-ownership.mjs
 run "characterize-region-tree" node scripts/characterization/characterize-region-tree.mjs
 run "characterize-transaction-export-region" node scripts/characterization/characterize-transaction-export-region.mjs
 run "characterize-form-rules" "$PY" scripts/characterization/characterize-form-rules.py
@@ -52,6 +53,7 @@ run "characterize-xpath-primary-ops" "$PY" scripts/characterization/characterize
 run "characterize-xpath-fill-select" "$PY" scripts/characterization/characterize-xpath-fill-select.py
 run "characterize-region-section-alias" "$PY" scripts/characterization/characterize-region-section-alias.py
 run "characterize-phase-runtime" "$PY" scripts/characterization/characterize-phase-runtime.py
+run "characterize-phase-done-runid" "$PY" scripts/characterization/characterize-phase-done-runid.py
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
 run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py
