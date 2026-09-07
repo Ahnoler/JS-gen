@@ -3,6 +3,7 @@ import * as hierarchyService from '../../services/hierarchy-service.js';
 import * as systemAccountService from '../../services/system-account-service.js';
 import * as coverageService from '../../services/coverage-service.js';
 import { NODE_TYPE } from '../../models/hierarchy-constants.js';
+import { startAuthRecording } from '../../services/auth-recording/index.js';
 import { asyncHandler, AppError } from '../../http/app-error.js';
 
 /**
@@ -24,6 +25,12 @@ export default function (app) {
     const { name, description, url } = req.body || {};
     if (!name) throw new AppError('name is required', { code: 'VALIDATION' });
     const system = await hierarchyService.createSystem(name, description, url);
+    // Fire-and-forget: auto-trigger auth recording on system create (type=1).
+    // Never affects the create response — failures are logged only.
+    // Spec: docs/superpowers/specs/2026-09-07-auth-recording-design.md
+    startAuthRecording(system.id).catch((err) => {
+      console.warn(`[auth-recording] auto-trigger for system #${system.id} failed: ${err?.message || err}`);
+    });
     res.status(201).json(system);
   }));
 

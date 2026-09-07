@@ -28,6 +28,7 @@ import registerMemory from './memory.js';
 import registerOperationComponent from './operation-component.js';
 import registerRegions from './regions.js';
 import registerKb from './kb.js';
+import registerAuthRecording from './auth-recording.js';
 
 /**
  * Register all v2 route modules on the Express app (envelope + SSO middleware,
@@ -61,4 +62,5 @@ export default function (app) {
   registerMemory(app);
   registerRegions(app);
   registerKb(app);
+  registerAuthRecording(app);
 }

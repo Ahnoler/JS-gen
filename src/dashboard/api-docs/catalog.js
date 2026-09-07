@@ -23,6 +23,7 @@ import { GROUP_REGIONS } from './groups/regions.js';
 import { GROUP_KB } from './groups/kb.js';
 import { GROUP_AUTH } from './groups/auth.js';
 import { GROUP_LLM } from './groups/llm.js';
+import { GROUP_AUTH_RECORDING } from './groups/auth-recording.js';
 
 /** Live slot occupancy board (not an HTTP endpoint group). */
 export const GROUP_SLOT_MONITOR = [{
@@ -53,6 +54,7 @@ export const API_GROUPS = [
   ...GROUP_HIERARCHY,
   ...GROUP_MESSAGES,
   ...GROUP_COMPONENTS,
+  ...GROUP_AUTH_RECORDING,
   ...GROUP_TRAJECTORY,
   ...GROUP_RECORDING,
   ...GROUP_REGIONS,
