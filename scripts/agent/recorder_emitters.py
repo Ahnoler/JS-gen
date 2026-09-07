@@ -827,9 +827,9 @@ async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> b
                 business_data_store, done_success, cur_url,
             )
             if _guard_done_reject_zero_actions(agent, business_data_store):
-                return
+                return True
             if _guard_done_reject_pending_write(agent, business_data_store, contract):
-                return
+                return True
             done_text, claims_save_ok = _guard_done_claims(_last_result, done_success)
             # Claiming save success without token when contract requires submit
             needs_token = bool(
@@ -839,22 +839,22 @@ async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> b
             if _guard_done_reject_missing_token(
                 agent, business_data_store, contract, done_success, introduce_ok, needs_token,
             ):
-                return
+                return True
             if _guard_done_reject_legacy_claim(
                 agent, business_data_store, save_ok, navigated_ok, introduce_ok,
                 needs_token, claims_save_ok,
             ):
-                return
+                return True
             if _guard_done_reject_overlay(
                 agent, business_data_store, contract, open_overlay,
                 navigated_ok, save_ok, introduce_ok,
             ):
-                return
+                return True
             if _guard_done_reject_errors(
                 agent, business_data_store, contract, error_notifs, form_errors,
                 navigated_ok, save_ok, introduce_ok,
             ):
-                return
+                return True
             _guard_done_accept_success(
                 agent, business_data_store, contract, done_success,
                 save_ok, introduce_ok, navigated_ok,
