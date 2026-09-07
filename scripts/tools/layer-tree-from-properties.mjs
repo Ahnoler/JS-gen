@@ -187,7 +187,7 @@ export function buildTreeFromV3Flat(properties) {
   }
   let eleNo = 0;
   for (const p of properties || []) {
-    if (p.type !== 'element') continue;
+    if (p.type !== 'ele') continue;
     eleNo += 1;
     const parent = nodeMap.get(String(p.propertiesPID ?? '')) || root;
     const item = {
@@ -418,9 +418,9 @@ function buildHtml({ properties, steps, elements, groups, title }) {
     tree = buildTreeFromSteps(steps);
     list = steps;
     unit = '步骤';
-  } else if (Array.isArray(properties) && properties.some((p) => p && (V3_SHOT_TYPES.has(p.type) || V3_INTERMEDIATE_TYPES.has(p.type) || p.type === 'element'))) {
+  } else if (Array.isArray(properties) && properties.some((p) => p && (V3_SHOT_TYPES.has(p.type) || V3_INTERMEDIATE_TYPES.has(p.type) || p.type === 'ele'))) {
     tree = buildTreeFromV3Flat(properties);
-    list = properties.filter((p) => p.type === 'element');
+    list = properties.filter((p) => p.type === 'ele');
     unit = '控件';
     sectionCount = properties.filter((p) => V3_INTERMEDIATE_TYPES.has(p.type)).length;
   } else {
@@ -608,10 +608,10 @@ function main() {
   const base = String(file).split(/[\\/]/).pop().replace(/\.[^.]+$/, '') || 'props';
   const out = join(ROOT, 'tmp', `layer-tree-${base}.html`);
   writeFileSync(out, html, 'utf8');
-  const isV3Flat = properties.some((p) => p && (V3_SHOT_TYPES.has(p.type) || V3_INTERMEDIATE_TYPES.has(p.type) || p.type === 'element'));
+  const isV3Flat = properties.some((p) => p && (V3_SHOT_TYPES.has(p.type) || V3_INTERMEDIATE_TYPES.has(p.type) || p.type === 'ele'));
   const shots = isV3Flat ? properties.filter((p) => V3_SHOT_TYPES.has(p.type)) : [];
   const sections = isV3Flat ? properties.filter((p) => V3_INTERMEDIATE_TYPES.has(p.type)) : [];
-  const eles = isV3Flat ? properties.filter((p) => p.type === 'element') : properties;
+  const eles = isV3Flat ? properties.filter((p) => p.type === 'ele') : properties;
   const unzoned = eles.filter((p) => !String(p.regionId || '').trim()).length;
   console.log(`已生成: ${out}`);
   console.log(`交易: ${title} | ${isV3Flat ? `截图 ${shots.length} | 分区 ${sections.length} | 控件 ${eles.length}` : `操作 ${properties.length} 步`} | 未分区 ${unzoned}`);
@@ -735,7 +735,7 @@ function runV3Mode(file) {
   }
 
   const properties = parseRectStrings(entry?.transcationProperties);
-  if (Array.isArray(properties) && properties.some((p) => p && (V3_SHOT_TYPES.has(p.type) || V3_INTERMEDIATE_TYPES.has(p.type) || p.type === 'element'))) {
+  if (Array.isArray(properties) && properties.some((p) => p && (V3_SHOT_TYPES.has(p.type) || V3_INTERMEDIATE_TYPES.has(p.type) || p.type === 'ele'))) {
     const title = `V3.1 · ${entry?.transcationName || file}`;
     const html = buildHtml({ properties, title });
     const base = String(entry?.transcId || 'payload').replace(/[^A-Za-z0-9_-]/g, '_');
@@ -743,7 +743,7 @@ function runV3Mode(file) {
     writeFileSync(out, html, 'utf8');
     const shots = properties.filter((p) => V3_SHOT_TYPES.has(p.type));
     const sections = properties.filter((p) => V3_INTERMEDIATE_TYPES.has(p.type));
-    const eles = properties.filter((p) => p.type === 'element');
+    const eles = properties.filter((p) => p.type === 'ele');
     const withRect = eles.filter((p) => p.rect && Object.keys(p.rect).length > 0).length;
     console.log(`已生成: ${out}`);
     console.log(`${title} | 截图条目 ${shots.length}（page/popup）| 分区 ${sections.length} | 控件 ${eles.length}（带 rect ${withRect}）`);

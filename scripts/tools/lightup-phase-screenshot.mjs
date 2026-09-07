@@ -410,7 +410,7 @@ async function runV3FlatMode(entry, properties, file) {
     }
     const shots = properties.filter((p) => p.type === 'page' || p.type === 'popup');
     const sections = properties.filter((p) => p.type === 'section' || p.type === 'tab' || p.type === 'wizard' || p.type === 'card');
-    const eles = properties.filter((p) => p.type === 'element');
+    const eles = properties.filter((p) => p.type === 'ele');
 
     // PID 链上溯：partition-via-pid 后 object 的 propertiesPID 指向最近中间节点（而非 page/popup 截图），
     // 需要沿 propertiesPID 链向上找到 object 最终归属的 page/popup 截图条目（防环 guard=100）。

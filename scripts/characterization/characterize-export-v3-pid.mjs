@@ -38,7 +38,7 @@ const sections = properties.filter(p => p.type === 'section');
 check('section count >= 2', sections.length >= 2);
 
 // ele pid 指向 section 而非 page
-const eles = properties.filter(p => p.type === 'element');
+const eles = properties.filter(p => p.type === 'ele');
 check('ele count === 2', eles.length === 2);
 check('ele[0] pid not page id', eles[0].propertiesPID !== '1');
 check('ele[1] pid not page id', eles[1].propertiesPID !== '1');
@@ -63,7 +63,7 @@ const { properties: legacyProps } = buildV3Properties({
   idByDialog: new Map(), idByPhase: new Map(),
   idByPageLevelNorm: new Map(), pageLevelById: new Map(),
 });
-const legacyEles = legacyProps.filter(p => p.type === 'element');
+const legacyEles = legacyProps.filter(p => p.type === 'ele');
 const legacySections = legacyProps.filter(p => p.type === 'section');
 check('legacy no section', legacySections.length === 0);
 check('legacy ele pid = page id', legacyEles[0].propertiesPID === '1');
@@ -111,7 +111,7 @@ check('wizard pid = tab id', wizardNode && wizardNode.propertiesPID === tabNode.
 check('card pid = wizard id', cardNode && cardNode.propertiesPID === wizardNode.propertiesID);
 check('collapse pid = card id', collapseNode && collapseNode.propertiesPID === cardNode.propertiesID);
 check('section pid = collapse id', sectionNode && sectionNode.propertiesPID === collapseNode.propertiesID);
-const mappedEle = mappedProps.find(p => p.type === 'element');
+const mappedEle = mappedProps.find(p => p.type === 'ele');
 check('object pid = section id', mappedEle && mappedEle.propertiesPID === sectionNode.propertiesID);
 
 if (failures.length) { console.error('FAIL:', failures); process.exit(1); }
