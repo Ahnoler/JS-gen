@@ -36,6 +36,13 @@
 - 注意：4097 控制面已带新代码重启（PID 5336），孤儿 CDP Chrome(19242) 已清；点步 confirmed 状态（fill=1/click=0）为回放侧标记，待用户 UI 确认流程处置。
 - 遗留移交：SPA 侧 authKind 徽标+推送确认入口（前次移交不变）；终审 minors m2/m5 不变。
 
+## 2026-09-08 01:10 · ZCode 引擎线 — 收工：phase_done 跨 run 串台修复 6 任务全部落地（回链 23:10 开工）
+- 完成（SDD 6 任务全 commit，review 全 ✅）：Task1 归属纯函数模块 `src/services/trajectory/run-event-ownership.js`（c3388e86：phaseEventOwnership accept/ignore/**legacy** 三态+waitForSessionEventOwned，spec 4.4 兼容——payload 无 runId 按旧行为放行）；Task2 runner 接线（1a6e34cd：runtime.currentRunId=randomUUID、stepData.runId 下发、phase_done/phase_error 改 owned 等待）；Task3 订阅过滤+finally cancel_step（700d0da7：action_log_sync/step_screenshot/page_level_screenshot 按 runId 过滤落库，finally 补发 cancel_step 杀僵尸，幂等）；Task4 执行机回带（9d208326：state.py _CURRENT_RUN_ID、session_runner 存 runId+phase_done/phase_state_key 回带+canceled 双信号判定+_stdin_reader 新 step 强停旧 agent（new_step_arrived）、service.py phase_error 回带；**携带他线未提交 probe 行并扩展 runId 字段**）；Task5 verify-all 注册（e5867e3a）
+- 验收：`characterize-run-event-ownership.mjs` 4/4 PASS、`characterize-phase-done-runid.py` 7 pin PASS；verify-all **ALL GREEN（103 ok，含两个新条目）**；eslint 0 warning；四任务子智能体 review 全 Approved（TDD 红绿证据齐）
+- 湿测移交（需真机执行机）：spec §5 验收 1-3——①录制中注入伪造 phase_done（旧 run 阶段号/无 runId）控制面应忽略不弹「AI 录制结束」；②run N 空闲超时/phase_error 结束后立即重录 run N+1，旧 agent 事件不被消费；③stop 后 agent 在 step 边界停且不再吐有效 done。观察：控制面 `phase_done_missing_runid`/`phase_done_ignored_*`/`persist_event_ignored_*` 日志 + 执行机 `[probe] emit phase_done … runId=…`
+- 遗留移交：①spec P2：replay-heal-shared.js:124 heal 等待带标记（当前 UI 不允许并发，风险低）；②订阅回调中 phase_state_key/phase_*_obs 未按 runId 过滤（Task3 review residual，观察后再议）；③执行机（含服务器/第二执行机）需更新到本提交后 Python 才回带 runId——控制面对旧执行机 legacy 放行不阻塞
+- 争议裁决存档：Task1 brief 源码与测试两处矛盾以测试为准（legacy 仅控制面无 runId 时放行；cancel settle undefined）——已由 Task2/3 消费方确认安全
+
 ## 2026-09-07 23:10 · ZCode 引擎线 — 开工声明：phase_done 跨 run 串台修复实施（runId 归属隔离）
 - 开工：23:10。承接 reviewer 检出的 `docs/spec-phase-done-cross-run-fix.md`（录制中误弹「AI 录制结束」），实施计划已产出：`docs/superpowers/plans/2026-09-07-phase-done-cross-run-fix.md`（6 任务 TDD：归属纯函数模块 → runner runId 下发+owned 等待 → 订阅过滤+finally cancel_step → Python 回带/canceled/new-step 叫停 → verify-all 注册 → 湿测移交）
 - 范围：`src/services/trajectory/run-event-ownership.js`（新）、`trajectory-recording-runner.js`（runId 接线段）、`scripts/state.py`、`scripts/session_runner.py`（main loop/_run_step/_stdin_reader）、`scripts/agent/service.py`（phase_error emit 两处）、`scripts/characterization/characterize-run-event-ownership.mjs` + `characterize-phase-done-runid.py`（新）、`scripts/refactor/verify-all.sh`、本文件
