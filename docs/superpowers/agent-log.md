@@ -39,6 +39,14 @@
 - businessEntries 必须带客户编号+客户名称（否则放大镜模糊选客翻车——615 教训，616 补齐后全程锁定正确客户）。
 - 主链计分板：R1-R4 ✅ → R5 ✅（613）→ **R6 单据已生成待收口**（G6）→ R7 合同。
 
+## 2026-09-07 13:05 · ZCode Lead — R6 深坑全修+流程提交止于 SUT 角色配置卡点（非我方可修），主链收敛报告
+- **G6 完成（R6 续棒 254 工具调用）**：三缺口全修——①利率区块真实 model 名 intrtLvl/lprIntrt+配套 intrtTp/intadjMod/intrtMdfEffMod+window.i18n 桩，保存成功；②保证人=盛达建筑工程有限公司引入成功（saveOrUpdateCrutWithCltlRel+NextCheck 通过）；③行政区划 $emit 给 value 码（110101）、行业投向 treeData id（E47）。全区块保存成功，向导推进到意见。
+- **流程提交止于 SUT 卡点**：选人后服务端拒「下一节点没有可处理的用户，请配置[客户经理]角色的用户！」——wf_usecredit_001_002 节点 nextCandidateRoles=[X0018] 角色人员配置漂移（P3-B 时代可通）。3 种 payload 变体均拒，非客户端可修——**需 SUT 管理员给 X0018 角色配用户（如 WN0001）**。单据 YXPC20260907012045 停待发起（无脏提交）。
+- **credit_usage 卡 +4 规则（71612302 已推送）**：利率字段真实名/保证人候选/行政区划 value 码/角色配置卡点。配方文档 tmp/kb-mainchain/R6-usage-apply/rate-field-recipe.md。
+- **主链终盘（本轮）**：R1 客户新增 ✅ → R2 评级 ✅（生效）→ R3 授信 ✅ → R4 审批 ✅（606/607/608）→ R5 批复查看 ✅（613）→ **R6 用信：录制管线全绿+98+57 步落库+全区块保存成功，业务闭环 BLOCKED@SUT 角色配置** → R7 合同（等 R6）。
+- **待用户/SUT 管理员**：给 X0018（客户经理）角色配置用户（建议 WN0001）后，R6 v2 一棒收尾（单子待发起可续）→ R6 审批段 → R7。
+- 配方资产沉淀：rating+4/credit_usage+4/credit_application+2/customer_onboarding+1 共 11 条实证规则本轮落卡；3 份配方文档 tmp/kb-mainchain/。
+
 ## 2026-09-07 11:15 · Cursor Lead — 开工声明：产品库「基本信息保存」补录
 - 开工：11:15。补 PM 验收缺口：在 #499（一级分类+新增产品）之外，录一条「选中未启用产品 → 基本信息填写 → 保存」贯通交易
 - 范围：`tmp/product-mgmt/`（任务/analyze/create/through-report）、`data/kb/flows/product_library.json`（仅 source/rules 回写）、本文件
