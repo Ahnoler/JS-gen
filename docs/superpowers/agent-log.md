@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 23:05 · Zcode 夜班 — 开工：draft-traj 湿测移交单（migrate + propose→commit）
+
+- 开工：23:05。执行 `plans/2026-09-07-req-draft-traj-wet-handoff.md`（+复检 `2026-09-07-req-to-draft-traj-wet-test-handoff.md`）；⑧ 线遗留「需本机 migrate + 湿测 propose→勾选→commit」
+- 范围：`tmp/req-draft-traj/**`（报告+JSON 证据）、DB 迁移执行（`knex migrate:latest`，不改迁移文件）、本文件、todo ⑧ 勾销
+- 禁入：轨迹查询未提交 WIP（trajectory-dao / v2 trajectory / trajectory-service / trajectory-query-service）；`session_runner.py`；`data/kb/flows/**` promote；R1-R6 主链在途交易；不调用 record/prepare/start；不重启控制面/执行机
+- 方式：先 characterize OK≥19 门闩 → migrate → propose product-mgmt → 勾 1~2 commit → GET provenance → 负例幂等 → 报告 `tmp/req-draft-traj/through-report-wet.md`；提前完成则候补 ② 报文捞取 Tasks 7-10（届时另开工声明）
+
 ## 2026-09-07 22:50 · Cursor Lead — 收工：#614 湿测 PASS（ghost prune 生效，回链 22:40）
 
 - 完成：stamp `20260907-2240` session `e35683db`；p2/p3 序号=1；p4 stderr **`pruned ghost pending: ['法人机构:not-visible']` → `SUCCESS: 操作成功`**；p4/p5 outcome success=True；detach 200；报告 `tmp/product-mgmt/through-report-basicinfo-rerecord-2240.md`
