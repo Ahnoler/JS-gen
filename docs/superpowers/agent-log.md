@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 02:50 · Cursor Reviewer — 开工：req-draft-traj 原子草稿质量修复（回链湿测质量审）
+
+- 开工：02:50。用户要求 reviewer 修一轮后出报告，交 Zcode 复跑 product-mgmt propose/commit
+- 范围：`src/services/req-draft-traj/provenance.js`、`propose.js`（必要时 `index.js`）、`scripts/characterization/characterize-req-draft-traj.mjs`（+fixture 若需）、`docs/superpowers/plans/` 复测移交单、本文件 / todo ⑧ 一句；只读对照 `data/kb/req/product-mgmt/`
+- 禁入：轨迹查询 WIP 四文件；`session_runner` / 主链引擎；R1–R6 轨迹；不 prepare/record；不重切全库 docx
+- 方式：修多 ZJJK/占位解析 + taskDraft `<sourceDoc>`/`<sourceChapter>` 替换 + 概述章降权；characterize 加断言；离线对 product-mgmt 写步骤 resolve 自检；写 Zcode 复测 handoff；本条立即 commit
+
 ## 2026-09-08 10:15 · Zcode 夜班续 — 更正：报文捞取 MVP 实为**搁置**非收官（回链 09:55，用户亲口纠正）
 
 - 完成：todo ② 与 memory 已按用户口径改写——**MVP 搁置，原因=被测系统开发无法提供三接口**（页面元素定义/接口结构定义/日志文件获取）；用户 09-08 所说「已验证」=**调研可行性验证成立**（ELK 实测 2186 条 0 失败、saveCustCorporat 122/122 prop 映射、回填潜力 92%——拿到接口信息即可捞到对应数据），非 live 管线验证
