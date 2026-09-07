@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 10:35 · Zcode — 开工：draft-traj 质量修复复测（执行 Cursor 09-08 移交单）
+
+- 开工：10:35。执行 `plans/2026-09-08-req-draft-traj-quality-rerun-handoff.md`（`b0c7118c` 修复后 LLM propose 路径复测）
+- 范围：重启控制面 4097（实测进程 02:31 启动早于修复提交，旧代码——移交单第 1 条授权）；`tmp/req-draft-traj/`（quality-rerun-* 证据+报告）；本文件、todo ⑧；不改任何代码
+- 禁入：不 prepare/record/start/detach；不清/重录 R1-R6 与 #614（681/682 保留对照）；轨迹查询 WIP 四文件；session_runner/主链引擎；characterization 目录（闲时审查瘦身线在途，勿触碰）；不为过 DoD 手改 propose cache
+- 方式：characterize OK 25 已过 → 重启 4097（先 server 后查 executor 重连）→ propose{maxAtoms:12,chainIds:[chain-a]} → 逐 atom 质量清单（禁概述章/无占位符/fnId 非幻觉）→ 勾 2~3 条（排序/公共要素优先）force:true commit → GET 核对 → 报告 `through-report-quality-rerun.md`
+
 ## 2026-09-08 02:58 · Zcode 闲时审查 — 开工：characterization 目录瘦身（删死孤儿 / 收编高价值 / cold 归档）
 
 - 开工：02:58。承接上轮审查的孤儿对账结论（78 未注册孤儿：73 绿 5 红），经用户批准执行四步
