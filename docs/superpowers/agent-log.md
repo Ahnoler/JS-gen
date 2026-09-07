@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 20:00 · Cursor Lead — 收工：req→draft-traj 实现计划（回链 19:47 spec）
+
+- 完成：writing-plans → `docs/superpowers/plans/2026-09-07-req-to-draft-traj.md`（6 tasks：迁移/解析/propose+cache/commit/路由+docs/读回）；todo ⑧ 挂计划
+- 验收：对照 spec 覆盖 propose/commit、出处四字段、人勾选、禁录制、characterization；commit 靠 `.draft-traj-propose.json` 缓存对齐 atomKeys
+- 遗留：待用户选 Subagent-Driven 或 Inline 开工实现
+
 ## 2026-09-07 19:47 · Cursor Lead — 收工：需求→原子草稿交易设计 spec（回链本条开工）
 
 - 完成：brainstorming 拍板方案 1；规格 `docs/superpowers/specs/2026-09-07-req-to-draft-traj-design.md`；todo ⑧ 本版 + ⑧′ 未来（组件扫描/推送改推组件）
