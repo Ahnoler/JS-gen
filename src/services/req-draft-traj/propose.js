@@ -435,7 +435,9 @@ export async function proposeDraftTrajectories({
     llmAtoms = null;
   }
 
-  if (!llmAtoms) {
+  // Empty array means LLM returned no atoms — still use deterministic fallback
+  // (prose-only through-chains already filtered at list via canProposeAtoms).
+  if (!llmAtoms || llmAtoms.length === 0) {
     // Deterministic fallback: each write step → one atom; nav merges into next write preamble.
     llmAtoms = buildFallbackLlmAtoms(chains, sourceDoc);
   }

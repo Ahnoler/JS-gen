@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:45 · Cursor — 开工+收工：listReqModules 提前标 canProposeAtoms（散文主链不可选）
+
+- 完成：根因=多数 through-chains.md 为 `##`/有序步骤列表，解析后无表格步骤 → propose 0 原子。导出 `hasProposeableChainSteps`；`listReqModules` 增 `canProposeAtoms`；api-docs + characterize；propose 空数组走 fallback；guide `through-chains-proposeable-format.md` 交 Zcode 改写文档
+- 验收：`characterize-kb-req-modules-list.mjs` OK 3；实扫仅 `product-mgmt` canPropose=true
+- 遗留：P0 文档改写 customer-corp/rating（见 guide）；勿提交 `.draft-traj-propose.json`
+- 注意：vue 向导 `canProposeAtoms` 禁用 + hover 文案 + step2「上一步」另仓提交；未触轨迹查询 WIP
+
 ## 2026-09-08 04:30 · Zcode 闲时审查 — 开工+收工：闲时审查触发方式纠偏（定时任务已删，约束固化进 guide）
 
 - 完成（用户纠偏）：上午建的 automation-cb2a608d 是**定时任务**（cron 固定触发），不是用户要的**闲时任务管线**——已 CronDelete 删除。正确形态=guide 即 dispatch 产物：`docs/superpowers/guides/idle-review-prompt.md` 已固化四项——①头部管线说明（只走闲时管线，频次由派发方定）；②花销约束节（严格 3 子智能体/P1 主线程直改优先/禁真机湿测与写库冒烟/单轮完成）；③下轮复查入口台账（quality-final-gate / recorder-phase-reset / req-draft-fk-guard / owned-wait-shape / 先行护栏，每轮先跑确认仍绿）；④回归验证更新（verify-all 基线=ALL GREEN，红先归因形状漂移 vs 回归；离线 characterization 禁触真实 DB + 注入桩要求）

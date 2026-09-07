@@ -6,6 +6,7 @@ import { constants } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AppError } from '../http/app-error.js';
+import { hasProposeableChainSteps } from './req-draft-traj/parse-through-chains.js';
 
 /** @typedef {'registered'|'sliced'|'drafted'} ReqModuleStatus */
 
@@ -145,7 +146,7 @@ export async function registerReqModule({
  * 列出已登记模块（跳过无 manifest 的子目录）。
  * @param {object} [opts] 查询选项
  * @param {string} [opts.rootDir] 作业区根目录（缺省=data/kb/req）
- * @returns {Promise<(ReqModuleManifest & { hasThroughChains: boolean })[]>} manifest 列表（按 moduleKey 排序）
+ * @returns {Promise<(ReqModuleManifest & { hasThroughChains: boolean, canProposeAtoms: boolean })[]>} manifest 列表（按 moduleKey 排序）
  */
 export async function listReqModules({ rootDir } = {}) {
   const root = resolveRootDir(rootDir);
@@ -161,12 +162,23 @@ export async function listReqModules({ rootDir } = {}) {
   for (const ent of entries) {
     if (!ent.isDirectory()) continue;
     const manifest = await readManifestFile(join(root, ent.name, 'manifest.json'));
-    if (manifest) {
-      rows.push({
-        ...manifest,
-        hasThroughChains: await pathExists(join(root, ent.name, 'through-chains.md')),
-      });
+    if (!manifest) continue;
+    const chainsPath = join(root, ent.name, 'through-chains.md');
+    const hasThroughChains = await pathExists(chainsPath);
+    let canProposeAtoms = false;
+    if (hasThroughChains) {
+      try {
+        const md = await readFile(chainsPath, 'utf-8');
+        canProposeAtoms = hasProposeableChainSteps(md);
+      } catch {
+        canProposeAtoms = false;
+      }
     }
+    rows.push({
+      ...manifest,
+      hasThroughChains,
+      canProposeAtoms,
+    });
   }
   return rows.sort((a, b) => a.moduleKey.localeCompare(b.moduleKey));
 }

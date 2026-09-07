@@ -82,11 +82,15 @@ export const GROUP_KB = [{
             status: 'registered',
             warnings: [],
             hasThroughChains: true,
+            canProposeAtoms: true,
             createdAt: '2026-09-05T10:00:00.000Z',
             updatedAt: '2026-09-05T10:00:00.000Z',
           }],
         },
       }),
+      notes: [
+        'hasThroughChains=文件存在；canProposeAtoms=解析后至少一条表格步骤（draft-traj propose 可结构化出候选）',
+      ],
     },
     {
       method: 'GET', path: '/api/v2/kb/req-modules/:moduleKey',

@@ -216,6 +216,17 @@ export function parseThroughChainsMarkdown(md) {
 }
 
 /**
+ * True when through-chains markdown yields at least one parsed table step
+ * (draft-traj propose needs structured step tables, not prose-only lists).
+ * @param {string} md Raw through-chains.md content
+ * @returns {boolean} Whether propose can produce structured atom candidates
+ */
+export function hasProposeableChainSteps(md) {
+  const { chains } = parseThroughChainsMarkdown(md);
+  return chains.some((c) => Array.isArray(c.steps) && c.steps.length > 0);
+}
+
+/**
  * Build a stable slug-like atom key for propose/commit idempotency.
  * @param {object} opts Atom identity fields
  * @param {string} opts.moduleKey Req module key

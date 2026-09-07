@@ -1,7 +1,7 @@
 /**
  * Req→draft-traj service: parse chains, provenance, propose atomic candidates.
  */
-export { parseThroughChainsMarkdown, buildAtomKey } from './parse-through-chains.js';
+export { parseThroughChainsMarkdown, buildAtomKey, hasProposeableChainSteps } from './parse-through-chains.js';
 export {
   loadSourceDoc,
   resolveChapterRef,
