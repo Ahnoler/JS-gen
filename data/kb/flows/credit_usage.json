@@ -141,6 +141,26 @@
     {
       "keyword": "数字产业分类-列超长",
       "rule": "digtIdyCl 传字典码 '000000'(6位) 触发后端 MysqlDataTruncation: Data too long for column 'DIGT_IDY_CL' → rtlLoanDtlInf/saveOrUpdate 500（SUT 列定义比自家字典码短）；绕行 model.digtIdyCl='0' 后保存 200"
+    },
+    {
+      "keyword": "利率区块字段真实名",
+      "rule": "用信大页面利率区块（disabled+required）真实 model 名：intrtLvl（利率档次，0=一年期；disabled 由 tab 组件 $data.intrtGrdeReadOnly=false 解锁）+lprIntrt（LPR 利率，disabled 输入框 native setter 无效须直写 Vue model，存 3.100000 形态）+配套 intrtTp=TR05/intadjMod=2/intrtMdfEffMod=4（漏它报「请选择利率变更生效方式」）；利率块保存还需 window.i18n 桩（否则 ReferenceError: i18n is not defined）。run26e 时代配方 intrtLvl/L01 在此页面口径不同（2026-09-07 traj 616/续棒实证，rate-field-recipe.md）。",
+      "source": "traj 616 续棒 MCP 深扫实证"
+    },
+    {
+      "keyword": "保证人候选",
+      "rule": "引入保证人弹窗按担保人名称查询：贯通验证企业190416/瑞昇进出口 均 0 行（不可自担保/候选池按正式客户）；可用候选=盛达建筑工程有限公司（260610093437282160，合作伙伴关系引入+担保金额 100000，saveOrUpdateCrutWithCltlRel 保存成功+doDclScmNextCheck 网关通过）。",
+      "source": "traj 616 续棒实证"
+    },
+    {
+      "keyword": "行政区划与行业投向",
+      "rule": "贷款投向行政区划：$emit 必须给 value 码非 label（北京市=110000/110100/110101，落库 loanIvsinAdivNm=北京市北京市东城区+loanIvsinAdivcd=110101）；行业投向为 TsscMultiTree：从组件 treeData 读 id（房屋建筑业=E47）后 $emit(input)。select_option 直选 label 会 value-mismatch。",
+      "source": "traj 616 续棒实证"
+    },
+    {
+      "keyword": "用信提交角色配置卡点",
+      "rule": "流程提交选人后服务端拒「下一节点没有可处理的用户，请配置[客户经理]角色的用户！」——wf_usecredit_001_002 节点 nextCandidateRoles=[X0018]、nodeSelMode=byLastTask，测试环境 X0018 角色人员配置漂移（P3-B 时代 YXPC20260905012041 可通）。选人弹窗「确定」无声失效（handleDialogBtnClick 不发请求）绕行=直调组件 confirmSubmit()。该卡点需 SUT 管理员在系统管理给 X0018 角色配用户（如 WN0001），非客户端可修（2026-09-07 traj 616 续棒 3 种 payload 均拒实证）。",
+      "source": "traj 616 续棒服务端拒单原文"
     }
   ],
   "exceptions": [
