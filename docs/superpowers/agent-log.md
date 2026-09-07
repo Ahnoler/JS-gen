@@ -2,12 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 03:20 · Zcode 闲时 — 开工：文档清理批次二（归档积压 + 未入库文档 + 状态横幅 + 杂物移除）
+
+- 开工：03:20。用户三项拍板（归档批次按工作线 / 根目录 yml 移除 / reasonix 删除）；承接 00:55 审计线收工条目的清理建议
+- 范围：①`docs/superpowers/specs|plans` 42 篇已闭环工作线文件 `git mv` 至 `archive/specs|plans`（830 冲刺/xpath 统一/菜单切换推送链/Z1-Z8/KB 战役/auth-recording/ghost-pending-prune）+ `todos/` 3 篇 Done 移 `archive/todos/`；②重建 `archive/README.md` 批次索引；③入库 untracked 的 `plans/2026-09-05-unify-save-action.md`、`research/2026-09-01-replay-pipeline-handover.md`；④`docs/报文日志捞取接口设计.md` 加搁置横幅、`docs/830格式对齐改造spec.md` 加收官横幅、`docs/README.md` 对应标注；⑤移除 untracked 杂物：根目录 `rate-save-after.yml`、`step2.yml`（Playwright aria 快照残留）、`docs/reasonix/`（gitignored，被 superpowers/plans 取代）
+- 禁入：capture 在途线文件（api-capture.mjs / network_capture.py / session_runner.py / memory\* / system-ref-\* / 其 plans×3 + sut-three-interfaces 等 capture 族 specs 留活区）；轨迹查询未提交 WIP；`data/kb/**`；`docs/report/**`；`config/update-db-whitelist.*`（归属未拍板，不动）；R1-R6 在途交易
+- 方式：git mv 保留历史；归档批次单独 commit，入库 commit、横幅 commit 分开；untracked 删除无 git 记录，以收工条 + ls 为证；每批 commit 前核暂存区不含他线文件
+
 ## 2026-09-08 03:10 · Cursor Reviewer — 收工：接 Zcode 质量复测回执并裁定（无代码改动）
 
 - 完成：复核报告 `tmp/req-draft-traj/through-report-quality-rerun.md` + GET **687/688/689**（draft / `03-配置产品信息` / task 无占位）与 **681/682**（task 仍含占位，属旧标准）；确认 `fa2e5be9` 收工与 todo ⑧ PASS 口径一致
-- Lead 裁定：① **同意清理 681/682**（对照已够，勿当样例）；② **余 6 atoms 不批量 commit**，等 SPA/业务勾选
-- 范围：仅 `docs/superpowers/todo-list.md` + 本文件；禁入他线 WIP / 不删库本轮（清理可交空闲会话）
-- 遗留：⑧ 非阻塞项=SPA + 顺手 DELETE 681/682；全库重跑仍不开放，待 SPA 或业务点名模块
+- Lead 裁定：① **同意并已执行清理 681/682**（DELETE 200，GET 404；687 仍在）；② **余 6 atoms 不批量 commit**，等 SPA/业务勾选
+- 范围：仅 `docs/superpowers/todo-list.md` + 本文件；DB 仅删旧标准 draft 681/682
+- 遗留：⑧ 非阻塞项=SPA 勾选；全库重跑仍不开放，待 SPA 或业务点名模块
 
 ## 2026-09-08 03:05 · Zcode — 收工：draft-traj 质量复测 PASS（回链 10:35 开工；本条及该条钟点为手写误差，机器真实时刻 02:xx-03:05，以 git 时间为准）
 
