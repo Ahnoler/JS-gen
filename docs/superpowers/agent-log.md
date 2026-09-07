@@ -3,10 +3,17 @@
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
 ## 2026-09-08 00:15 · ZCode V3导出线 — 开工声明：V3 弹窗触发链挂载（popup 父改挂触发对象 + trigger 最晚者优先归属）
-- 开工：00:15。承接交易 499 三次重录验证：双断裂修复（305d6c7b state.py / 15e5048c element.js）已生效（stamp 带 @@anchor），但导出侧仍有 2 步错位（填表早于弹窗截图注册→无 anchor 步 / _CURRENT_POPUP_KEY 滞后→旧 anchor 步）。实施导出侧规则：popup 归属=同标题弹窗中触发步骤（点击 anchor 元素的 click 步）最晚且 ≤ 当前步骤者；popup propertiesPID 改挂触发图标对象节点（用户期望：弹窗挂在对应图标按钮后面）。
+- 开工：00:15。承接交易 499 三次重录验证：双断裂修复（305d6c7b state.py / 15e5048c element.js）已生效（stamp 带 @@anchor），但导出侧仍有 2 步错位（填表早于弹窗截图注册→无 anchor 步 / _CURRENT_POPUP_KEY 滞后→旧 anchor 步）。实施导出侧规则：popup 归属=同页面同标题弹窗中触发步骤（点击 anchor 元素的 click 步）最晚且 ≤ 当前步骤者；popup propertiesPID 改挂触发图标对象节点（用户期望：弹窗挂在对应图标按钮后面）。
 - 范围：`src/services/transaction-export-v3-properties.js`、`src/services/transaction-export-v3.js`（stats 透传，如有）、`scripts/characterization/characterize-export-v3.mjs`（如断言需扩）、`tmp/*.mjs`（一次性验证脚本）、本文件、桌面产物（C:/Users/water/Desktop/transaction-499-*）
 - 禁入：`scripts/session_runner.py`（他线 probe WIP）、run-event-ownership 文件集（引擎线 23:10 在途）、`scripts/state.py`/`src/models/element.js`（本线已收口段，本轮不动）、前端仓库
 - 方式：主线程直接改（小改动）→ node 重建 499 payload 验证树 → lint + characterize-export-v3 回归 → commit + 收工
+
+## 2026-09-08 00:40 · ZCode V3导出线 — 收工：popup 触发链挂载落地（回链 00:15 开工）
+- 完成（90cc6f1a）：transaction-export-v3-properties.js 触发链规则（anchor↔步骤元素匹配、同页同标题弹窗 trigger 最晚且 ≤ stepIdx 优先，精确 key 链回退保存量兼容）+ popup propertiesPID 挂触发对象节点 + stats.popupTriggerLinked 双级透传；transaction-export-v3.js 解构/stats 汇总接线。
+- 验收：traj 499 重建 payload 树全对——popup 产品(2)←图标新增一级分类(5)、popup 产品3(4)←图标新增产品(15)、各弹窗内容对象归位、行内编辑留 page；popupTriggerLinked=2；eslint exit 0；characterize-export-v3 OK（122/122 PID、115/115 rect 三形态）。
+- 交付：C:/Users/water/Desktop/transaction-499-push.json（internal_v3+partner_wire）、transaction-499-layer-tree.html（分层静态页，可交互树）。
+- 遗留移交：①popup「产品2」(id3, anchor=新增分类) 今日录制未开此弹窗、无触发步骤，暂挂 page（符合规则）；②存量旧弹窗截图行（13466-13511，09-04）created_at 旧但 replacePageLevel upsert 已换新图 URL，无碍；③伙伴平台侧「前端不显示产品内部数据」解析问题+token 过期（401）待同事换 token 联调；④tmp/build-499-*.mjs、check-499-mount.mjs 一次性验证脚本留 tmp/。
+
 
 
 ## 2026-09-07 23:59 · ZCode Lead — 收工：auth 交易禁跑 Type B 表单自愈 + 重录 job27 修复「只剩登录步」（回链 22:30 收工）
