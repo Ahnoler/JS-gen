@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 02:58 · Zcode 闲时审查 — 开工：characterization 目录瘦身（删死孤儿 / 收编高价值 / cold 归档）
+
+- 开工：02:58。承接上轮审查的孤儿对账结论（78 未注册孤儿：73 绿 5 红），经用户批准执行四步
+- 范围：`scripts/characterization/**`（删 4 个死/过期孤儿：agent-stderr-log、batch-task-name、l2-todo-region、partition-compose；收编 6 个高价值入 verify-all：save-section、phase-reviewer、phase-reviewer-flow、session-lifecycle、real-click、tree-check-confirm；其余 67 个 `git mv` 至 `scripts/characterization/cold/` + 相对深度 codemod + README）；`scripts/refactor/verify-all.sh`（+6 注册）；本文件
+- 禁入：轨迹查询未提交 WIP 四文件；`src/services/req-draft-traj/**`（Cursor 线刚收工 02:55，只消费不修改）；`characterize-menu-import-nine-rules.mjs` 只读归因不修改（其归属线=菜单线）；`data/kb/**`；前端仓库；不重启控制面/执行机
+- 方式：删/移/注册后全量重跑被移动脚本对照基线（73 绿零劣化）+ verify-all 全量（预期仅 sso-auth 存量红）；codemod 只动路径深度（parents[2]→[3]、'../..'→'../../..'、import 前缀），重跑不绿即人工修或回退该文件
+
 ## 2026-09-08 02:55 · Cursor Reviewer — 收工：req-draft-traj 质量修复 + Zcode 复测移交（回链 02:50）
 
 - 完成：`extractZjjkCodes` + 多命中评分（概述降权 / 复用降权 / hint·action 加权）；占位 ZJJK（`—`/`主页`）忽略改走 hint；`fillTaskDraftProvenancePlaceholders` 在 materialize 替换；characterize **OK 25**；离线 product-mgmt chain-a 步 5/7/8/9 均 → `03-配置产品信息`；移交 [`plans/2026-09-08-req-draft-traj-quality-rerun-handoff.md`](plans/2026-09-08-req-draft-traj-quality-rerun-handoff.md)；todo ⑧ 已更新
