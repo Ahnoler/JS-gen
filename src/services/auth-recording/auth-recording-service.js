@@ -148,6 +148,25 @@ async function resolveDefaultAccount(systemId) {
 }
 
 /**
+ * Inject job credentials into a phase task prompt: the prompt templates carry
+ * `__AUTH_USERNAME__` / `__AUTH_PASSWORD__` placeholders (never literal
+ * credentials); replace them with the resolved system account values.
+ * @param {string} promptText prompt template text
+ * @param {string} account account username
+ * @param {string} password account password
+ * @returns {string} prompt text with placeholders substituted
+ */
+function injectAuthCredentials(promptText, account, password) {
+  const replaced = String(promptText ?? '')
+    .replaceAll('__AUTH_USERNAME__', String(account ?? ''))
+    .replaceAll('__AUTH_PASSWORD__', String(password ?? ''));
+  if (replaced.includes('__AUTH_USERNAME__') || replaced.includes('__AUTH_PASSWORD__')) {
+    throw svcError('auth prompt still contains credential placeholders after injection', 500);
+  }
+  return replaced;
+}
+
+/**
  * Create one auth trajectory (with its single phase) for a segment.
  * @param {object} args segment descriptors
  * @param {number} args.functionNodeId mount function node id
@@ -514,7 +533,7 @@ export async function startAuthRecording(systemId, { accountId = null } = {}) {
       authKind: 'login',
       name: '登录演练',
       phaseName: '登录',
-      task: loadPrompt('auth-login-prompt.md'),
+      task: injectAuthCredentials(loadPrompt('auth-login-prompt.md'), account.account, account.password),
       url: loginUrl,
       systemAccountId: account.id,
     });
@@ -523,7 +542,7 @@ export async function startAuthRecording(systemId, { accountId = null } = {}) {
       authKind: 'logout',
       name: '登出演练',
       phaseName: '登出',
-      task: loadPrompt('auth-logout-prompt.md'),
+      task: injectAuthCredentials(loadPrompt('auth-logout-prompt.md'), account.account, account.password),
       url: loginUrl,
       systemAccountId: account.id,
     });
