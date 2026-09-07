@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 19:26 · Cursor Lead — 开工：引擎 create 合约硬矫正后重录 #614
+
+- 开工：19:26。用户确认引擎已修好（sanitize create→assistant=true/all_editable；#499 拆单 675/676/678 已湿测序号）；本单对 #614 清空后重录验收
+- 范围：`tmp/product-mgmt/`（clear/prepare/start/through-report）、`docs/superpowers/agent-log.md`；必要时 `data/kb/flows/product_library.json` source/rules；不改引擎
+- 禁入：session_runner 他线 WIP；auth-recording；V3 导出线；phase_done runId 刚合入段只读；save_section 恢复禁令
+- 方式：fid=9000000740 account=2；stamp `20260907-1926`；验收认 p2/p3 含 fill 序号 + p4 select_option + toast/stamp，不认仅 phase_done
 ## 2026-09-07 18:50 · Cursor Lead — 收工：#499 新粒度三笔串行录制 PASS（回链 18:35）
 
 - 完成：stamp `20260907-1835` 三笔串行均 `recorded`+成功——**675** 一级分类（5 步，名称+序号）/ **676** 子分类（6 步，点「新增分类」非一级）/ **678** 产品（8 步，名称+序号+描述）；砍启用核对方
