@@ -16,7 +16,7 @@
 - **质量审 + 修复（2026-09-08 Cursor Reviewer）**：章节挂错（概述/复用章）+ task 占位未替换 → 已修 `provenance.js`/`propose.js`；离线 chain-a 10 步 resolve 均指向 `03-配置产品信息`
 - **质量复测 PASS（2026-09-08 Zcode，`b0c7118c` LLM 路径）**：重启控制面后 propose 9 atoms/0 rejected——概述挂载 0、占位残留 0、fnId 全 null；force commit 排序/公共要素/个性化 → traj **687/688/689** GET 验证过；报告 `tmp/req-draft-traj/through-report-quality-rerun.md`
 - **Lead 裁定（2026-09-08 Cursor Reviewer 接回收执）**：① **已清理 681/682**（DELETE 200→404；对照价值已由报告+687/688/689 覆盖）；② **余 6 atoms 不自动 commit**，等 SPA / 业务勾选（设计门闩：人未勾选不建交易）
-- **待做（非阻塞）**：SPA 勾选入口（前端仓库）
+- **待做（非阻塞）**：前端向导实现计划已就绪 [`plans/2026-09-08-req-draft-wizard-ui.md`](plans/2026-09-08-req-draft-wizard-ui.md)（规格 [`specs/2026-09-08-req-draft-wizard-ui-design.md`](specs/2026-09-08-req-draft-wizard-ui-design.md)）；落地在 vue-project
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 
