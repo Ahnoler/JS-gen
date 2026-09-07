@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:55 · Zcode — 开工：through-chains 可 propose 化 P0（customer-corp + rating，纯文档）
+
+- 开工：04:55。执行 `guides/through-chains-proposeable-format.md` SOP §4，P0 两模块
+- 范围：`data/kb/req/customer-corp/through-chains.md`、`data/kb/req/rating/through-chains.md`、本文件、todo ⑧ 关联段；**仅文档 diff**
+- 禁入：`parse-through-chains.js`/propose/Vue（边界 §6）；轨迹查询 WIP 四文件；录制/回放；DB；不提交 `.draft-traj-propose.json` 缓存；不为过门控空表灌水（步骤全部来自现有需求口径，业务信息不删）
+- 方式：金标=product-mgmt 主链 A 表式；每条候选链 `### 主链 X` + `|#|步骤|页面/弹窗|ZJJK|关键按钮|` 表；ZJJK 从原文抽列、多码 ` / `、暂无写 `—`；旁路/Out 保持非 `### 主链` 开头；改完跑 §4 单文件解析自检（离线）+ GET req-modules 看 canProposeAtoms
+
 ## 2026-09-08 04:45 · Cursor — 开工+收工：listReqModules 提前标 canProposeAtoms（散文主链不可选）
 
 - 完成：`f8e8bc43` 根因=多数 through-chains.md 为 `##`/有序步骤列表，解析后无表格步骤 → propose 0 原子。导出 `hasProposeableChainSteps`；`listReqModules` 增 `canProposeAtoms`；api-docs + characterize；propose 空数组走 fallback；guide `through-chains-proposeable-format.md` 交 Zcode 改写文档。vue：`faf94fc` 禁用+hover+step2 上一步
