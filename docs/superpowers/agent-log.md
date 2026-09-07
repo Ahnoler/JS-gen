@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 22:50 · Cursor Lead — 收工：#614 湿测 PASS（ghost prune 生效，回链 22:40）
+
+- 完成：stamp `20260907-2240` session `e35683db`；p2/p3 序号=1；p4 stderr **`pruned ghost pending: ['法人机构:not-visible']` → `SUCCESS: 操作成功`**；p4/p5 outcome success=True；detach 200；报告 `tmp/product-mgmt/through-report-basicinfo-rerecord-2240.md`
+- 验收：tree 含序号 fill + select_option×5 + p4 `ok-clicked-save:保存` + stamp 2240；不认仅 isSuccessful
+- 遗留：方案 B 扫描准入；多线 NAT 白名单需跟新 IP（本轮 `113.246.107.11`）；KB source 可另补
+
 ## 2026-09-07 22:40 · Cursor Lead — 开工：#614 湿测重录（ghost-pending prune 后）
 
 - 开工：22:40。方案 A 已合入 `00c5f1bf`；本单清空 #614 用新 stamp 重录，验收 stderr `pruned ghost pending` + p4 保存 toast
