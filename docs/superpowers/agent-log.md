@@ -2,6 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 11:00 · ZCode Lead — 收工回报：登录/登出自动化录制 spec 已产出（回链 11:00 开工条目）
+- **完成**：spec `docs/superpowers/specs/2026-09-07-auth-recording-design.md`（brainstorming 五决策点定案：agent 自主演练录制 / 替换 runDefaultLogin / 双载体轨迹+组件 / 单账号一套组件 / 推送不自动走既有链路；含数据模型 1 新表+3 列、job 编排、运行时注入账密、验收标准 6 条、边界 4 条）。
+- **验收证据**：spec 自审通过（无占位/一致/无歧义）；本任务单元未动任何代码，改动面仅在文档。
+- **遗留移交**：待用户评审 spec → 评审通过后走 writing-plans 出实施计划；实施时需与引擎线协调 `trajectory-record-lifecycle.js`/`trajectory-recording-runner.js` 改造窗口（引擎线 R4 审批棒在途）。
+
 ## 2026-09-07 11:00 · ZCode Lead — 开工声明：登录/登出自动化录制 spec 设计（brainstorming）
 - **范围（本任务单元）**：仅 `docs/superpowers/specs/2026-09-07-auth-recording-design.md`（新建）+ 本日志条目。设计与方案文档，**不动任何代码**。
 - **禁入区**：他线热区（R4 审批棒在途、rating/credit_application 卡面、tmp/kb-mainchain）、工作区 WIP（scripts/session_runner.py 修改属他线）。
