@@ -226,6 +226,33 @@ async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true 
   });
 
   const { trajectoryStepToActionEntry } = await import('../../models/element.js');
+  // Auth-recording trajectories persist masked credentials
+  // (__AUTH_USERNAME__/__AUTH_PASSWORD__) in step params — restore the bound
+  // account's real credentials before execution.
+  const trajRow = await db('trajectory').where('id', tid).first();
+  if (trajRow?.system_account_id) {
+    const accountRow = await db('system_account')
+      .where('id', Number(trajRow.system_account_id))
+      .first();
+    if (accountRow && (accountRow.account || accountRow.password)) {
+      const { resolveAuthPlaceholdersDeep } =
+        await import('../operation-component-service.js');
+      for (const r of rows) {
+        if (r.params_json == null) continue;
+        let parsed = r.params_json;
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch { continue; }
+        }
+        const resolved = resolveAuthPlaceholdersDeep(parsed, {
+          account: accountRow.account,
+          password: accountRow.password,
+        });
+        r.params_json = typeof r.params_json === 'string'
+          ? JSON.stringify(resolved)
+          : resolved;
+      }
+    }
+  }
   const actions = rows.map((r) => {
     const step = fromDbRowCompat(r);
     const entry = trajectoryStepToActionEntry(step);

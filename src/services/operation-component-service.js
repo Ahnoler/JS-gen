@@ -581,3 +581,23 @@ export function resolveAuthComponentSteps(component, { account, password }) {
       : item.params,
   }));
 }
+
+/**
+ * Substitute __AUTH_USERNAME__ / __AUTH_PASSWORD__ placeholders with real
+ * credentials anywhere in an arbitrary params tree. Used by the trajectory
+ * steps/replay path: auth-recording source trajectories persist masked step
+ * params, so every replay entry point must restore the bound account's real
+ * credentials before execution.
+ * @param {string|object|Array<*>} value params value (string/object/array)
+ * @param {object} creds real credentials
+ * @param {string} creds.account username
+ * @param {string} creds.password password
+ * @returns {string|object|Array<*>} same shape with placeholders substituted
+ */
+export function resolveAuthPlaceholdersDeep(value, { account, password }) {
+  if (account == null && password == null) return value;
+  return deepResolvePlaceholders(value, new Map([
+    [AUTH_USERNAME_PLACEHOLDER, String(account ?? '')],
+    [AUTH_PASSWORD_PLACEHOLDER, String(password ?? '')],
+  ]));
+}
