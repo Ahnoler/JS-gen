@@ -480,12 +480,31 @@ async function runSegment(tid, { accountId, loginUrl, criteria, segmentLabel, na
     }
   }
   await startTrajectoryRecording(tid, { accountId: accountId ?? null });
+  // The agent closes its browser right after done(), so a post-finish
+  // list_tabs read races the session teardown and intermittently times out
+  // (observed on jobs #14/#23/#25). Poll the live URL during the recording
+  // and keep the last successful read as fallback evidence — the agent's
+  // done() only fires after it verified the final page, so the last polled
+  // URL is the final state.
+  let lastLiveUrl = null;
+  let pollBusy = false;
+  const liveUrlPoller = setInterval(() => {
+    if (pollBusy) return;
+    pollBusy = true;
+    const runtime = getTrajectoryRuntime(tid);
+    readLivePageUrl(runtime, 4000)
+      .then((u) => { if (u) lastLiveUrl = u; })
+      .catch(() => {})
+      .finally(() => { pollBusy = false; });
+  }, 5000);
   const wait = await waitForRecordingFinish(tid);
+  clearInterval(liveUrlPoller);
   // Capture the live page URL while the browser is still attached (trajectory
   // `url` keeps the segment's start URL and never tracks navigation).
   let liveUrl = null;
   if (wait.ok) {
     liveUrl = await readLivePageUrlWithRetry(getTrajectoryRuntime(tid));
+    if (liveUrl == null) liveUrl = lastLiveUrl;
   }
   await detachTrajectoryLive(tid, { reason: 'auth_record_segment' }).catch(() => {});
   if (!wait.ok) {
