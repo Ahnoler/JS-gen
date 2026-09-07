@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 20:08 · Cursor Lead — 开工：req→draft-traj SDD 实施（6 tasks）
+
+- 开工：20:08。执行 `plans/2026-09-07-req-to-draft-traj.md`；Subagent-Driven；工作区本仓 `uara_V1.2`（非 main）
+- 范围：migration provenance、`src/services/req-draft-traj/**`、`src/routes/v2/kb.js`、api-docs kb、characterize-req-draft-traj、verify-all、trajectory-dao/meta-service；本文件
+- 禁入：session_runner WIP；save_section 恢复；组件扫描/批量推送改造（⑧′）；勿抢他线 busy 槽
+- 方式：每 task 子智能体实现+主会话验收代提交；ledger `.superpowers/sdd/2026-09-07-req-to-draft-traj/`
+
 ## 2026-09-07 20:00 · Cursor Lead — 收工：req→draft-traj 实现计划（回链 19:47 spec）
 
 - 完成：writing-plans → `docs/superpowers/plans/2026-09-07-req-to-draft-traj.md`（6 tasks：迁移/解析/propose+cache/commit/路由+docs/读回）；todo ⑧ 挂计划
