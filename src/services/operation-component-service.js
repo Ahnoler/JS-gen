@@ -340,6 +340,10 @@ const AUTH_FILL_ACTIONS = new Set([
   'fill_input',
   'type_text',
   'input_text',
+  // Composite one-shot login action (form_action_engines LoginEngine.login):
+  // params carry username/password values directly, so the scan below hits
+  // them the same way as per-field fills; replay resolves via placeholders.
+  'login',
 ]);
 
 const AUTH_USERNAME_PLACEHOLDER = '__AUTH_USERNAME__';
