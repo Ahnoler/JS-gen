@@ -588,11 +588,11 @@ export function resolveAuthComponentSteps(component, { account, password }) {
  * steps/replay path: auth-recording source trajectories persist masked step
  * params, so every replay entry point must restore the bound account's real
  * credentials before execution.
- * @param {string|object|Array<*>} value params value (string/object/array)
+ * @param {string|object|Array<string|object>} value params value (string/object/array)
  * @param {object} creds real credentials
  * @param {string} creds.account username
  * @param {string} creds.password password
- * @returns {string|object|Array<*>} same shape with placeholders substituted
+ * @returns {string|object|Array<string|object>} same shape with placeholders substituted
  */
 export function resolveAuthPlaceholdersDeep(value, { account, password }) {
   if (account == null && password == null) return value;
