@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 05:30 · Zcode — 收工：through-chains 可 propose 化全量完成 29/29（回链 05:17 开工）
+
+- 完成：**全部 29 个 req 作业区模块 `canProposeAtoms=true`（服务端 GET 实测）**——P1 两波 25 模块（子智能体 8 个并行、文件集互不相交、主会话机械验收）+ credit-retail 主线程补漏（波次清单漏派，自纠）+ product-mgmt 主链 B-G 表格化（1→7 链可解析）
+- 验收口径（每模块三关）：①`parseThroughChainsMarkdown` proposeable=true 且各链 steps>0 ②**机械覆盖核对**：原文 ZJJK 码与「」短语 vs 改写版 **0 缺失**（12+13+1 全查）③服务端 GET /api/v2/kb/req-modules 门控字段
+- 注意：①波1 有一个子智能体报告举例失实（声称保留 repay「TK+yyMMdd」冲正规则——原文本无此项），内容经机械核对无损，已记为「报告虚报、内容无损」教训：子智能体自证举例不可信，覆盖核对必须脚本化 ②无码模块（limit-ctrl-api 接口型/portal/system-mgmt/meeting-mgmt/collateral-* ）ZJJK 列如实 `—` 未灌水 ③`.draft-traj-propose.json` 缓存均未入库 ④4097 未再重启（canProposeAtoms 实时读文件）
+- 提交：`3c9b5d39`(P0)/`17b1cd6d`(波1)/`c35f2983`(波2)/补漏+product-mgmt commit 见 git log；todo ⑧ 已记
+- 遗留移交：全库 propose/勾选由业务在向导自选（人未勾选不建交易不变）；后续新增模块按 guide SOP 走
+
 ## 2026-09-08 05:17 · Zcode — 开工：through-chains 可 propose 化 P1 全量（26 模块，连续执行模式）
 
 - 开工：05:17。用户指令连续执行做完剩余全部；按 `guides/through-chains-proposeable-format.md` SOP 把 26 个散文态模块改写为表式
