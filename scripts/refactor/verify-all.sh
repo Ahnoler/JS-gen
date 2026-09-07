@@ -94,6 +94,7 @@ run "characterize-page-level-screenshot" node scripts/characterization/character
 run "characterize-phase-group-shot" "$PY" scripts/characterization/characterize-phase-group-shot.py
 
 run "characterize-form-engine-wiring" "$PY" scripts/characterization/characterize-form-engine-wiring.py
+run "characterize-ghost-pending-prune" "$PY" scripts/characterization/characterize-ghost-pending-prune.py
 run "characterize-done-accept-reason" "$PY" scripts/characterization/characterize-done-accept-reason.py
 run "characterize-save-retry-scope" "$PY" scripts/characterization/characterize-save-retry-scope.py
 run "characterize-duplicate-failure-cue" "$PY" scripts/characterization/characterize-duplicate-failure-cue.py

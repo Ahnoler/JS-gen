@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 21:50 · Cursor Lead — 收工：click_save 幽灵 pending 活体剪枝（回链 21:35）
+
+- 完成：`JS_CHECK_SINGLE_FIELD` +`visible`；`form_save` prune `not-found`/`not-visible` + stderr `pruned ghost pending`；characterize-ghost-pending-prune + verify-all 注册；plan `docs/superpowers/plans/2026-09-07-ghost-pending-prune.md`
+- 验收：`characterize-ghost-pending-prune: OK`；verify-all 见本收工 commit 证据
+- 遗留移交：#614 湿测重录另开；方案 B 扫描准入 / isSuccessful 假成功未做
+
 ## 2026-09-07 21:35 · Cursor Lead — 开工：click_save 幽灵 pending 活体剪枝（方案 A）
 
 - 开工：21:35。用户确认方案 A；先落 spec，审阅通过后写 plan 再改代码

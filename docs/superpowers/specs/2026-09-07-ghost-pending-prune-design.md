@@ -1,9 +1,10 @@
 # Design: click_save 幽灵 pending 活体剪枝
 
 **日期**：2026-09-07  
-**状态**：待用户审阅 spec 后实施  
+**状态**：已实现（方案 A）；湿测 #614 另开  
 **触发**：#614 重录阶段 4 — sticky `task_list` 含「法人机构」，可见基本信息页无该字段；`click_save` 报 `err-pending-fields`，同时 `scan_editable_summary` 已 `pending=0`。  
 **方案**：A（闸门侧活体剪枝），不做扫描准入收紧（B）或闸门改信 live summary（C）。
+**计划**：[`docs/superpowers/plans/2026-09-07-ghost-pending-prune.md`](../plans/2026-09-07-ghost-pending-prune.md)
 
 ## 目标
 

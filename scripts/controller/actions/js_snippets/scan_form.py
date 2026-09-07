@@ -795,6 +795,17 @@ JS_CHECK_SINGLE_FIELD = '''([label, buttonKeywords]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const isRequired = ''' + JS_FIELD_REQUIRED + ''';
     const readValue = ''' + JS_READ_CURRENT_VALUE + ''';
+    // Ghost-pending prune (#614): display/visibility/zero-rect only — not viewport.
+    const fieldVisible = (el) => {
+        let n = el;
+        while (n && n.nodeType === 1) {
+            const st = window.getComputedStyle(n);
+            if (st.display === 'none' || st.visibility === 'hidden') return false;
+            n = n.parentElement;
+        }
+        const r = el.getBoundingClientRect();
+        return !(r.width <= 0 || r.height <= 0);
+    };
     for (let pass = 1; pass <= 2; pass++) {
         const exact = pass === 1;
         for (const item of container.querySelectorAll('.el-form-item')) {
@@ -822,7 +833,8 @@ JS_CHECK_SINGLE_FIELD = '''([label, buttonKeywords]) => {
                 return '';
             })();
             const required = isRequired(item, lbl, inputEl);
-            return JSON.stringify({ label: lbl, kind, currentValue, placeholder, disabled, selected, required, hasButton });
+            const visible = fieldVisible(item);
+            return JSON.stringify({ label: lbl, kind, currentValue, placeholder, disabled, selected, required, hasButton, visible });
         }
     }
     return 'label-not-found';

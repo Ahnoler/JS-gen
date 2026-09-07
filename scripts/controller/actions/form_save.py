@@ -137,11 +137,12 @@ class SaveEngine(_FormActionEngineBase):
 
             gate_ok, pending_labels = check_pending_write_gate(self.business_data_store, section=sec)
         if not gate_ok:
-            # Live-prune: fields wrongly left in pending because scan missed Vue disabled
+            # Live-prune: Vue disabled misses + sticky ghost pending (#614 法人机构)
             btn_kw = self._button_keywords()
             tl = TaskList.from_store((self.business_data_store or {}).get('task_list'))
             kept = []
-            pruned = []
+            pruned_disabled = []
+            pruned_ghost = []
             for item in list(tl.pending):
                 if item.needs_intervention:
                     kept.append(item)
@@ -150,20 +151,34 @@ class SaveEngine(_FormActionEngineBase):
                     raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, [item.label, btn_kw])
                     info = json.loads(raw) if isinstance(raw, str) and raw.startswith('{') else {}
                 except Exception:
-                    sys.stderr.write("[click_save] prune-check JS_CHECK_SINGLE_FIELD failed label={item.label!r}" + '\n')
+                    sys.stderr.write(
+                        f"[click_save] prune-check JS_CHECK_SINGLE_FIELD failed label={item.label!r}\n"
+                    )
                     sys.stderr.flush()
-                    info = {}
+                    kept.append(item)
+                    continue
+                if raw == 'label-not-found':
+                    tl.done.append(item)
+                    pruned_ghost.append(f'{item.label}:not-found')
+                    continue
+                if info and info.get('visible') is False:
+                    tl.done.append(item)
+                    pruned_ghost.append(f'{item.label}:not-visible')
+                    continue
                 if info.get('disabled') and not info.get('hasButton'):
                     item.disabled = True
                     tl.done.append(item)
-                    pruned.append(item.label)
+                    pruned_disabled.append(item.label)
                     continue
                 kept.append(item)
-            if pruned:
+            if pruned_disabled or pruned_ghost:
                 tl.pending = kept
                 if self.business_data_store is not None:
                     self.business_data_store['task_list'] = tl.to_store()
-                sys.stderr.write(f'[click_save] pruned disabled pending: {pruned}\n')
+                if pruned_disabled:
+                    sys.stderr.write(f'[click_save] pruned disabled pending: {pruned_disabled}\n')
+                if pruned_ghost:
+                    sys.stderr.write(f'[click_save] pruned ghost pending: {pruned_ghost}\n')
                 sys.stderr.flush()
                 gate_ok, pending_labels = check_pending_write_gate(self.business_data_store, section=sec)
         if not gate_ok:
