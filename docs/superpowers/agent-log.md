@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 18:35 · Cursor Lead — 开工：#499 新粒度串行录制（一级分类/子分类/产品 三交易）
+
+- 开工：18:35。PM：#499 粒度过大——前三阶段拆成三笔串行交易，第四阶段（核对启用）不做；引擎 create 合约硬矫正已合入，本单湿测
+- 范围：`tmp/product-mgmt/split-499/`（task/analyze/create/through-report）、`docs/superpowers/agent-log.md`；必要时 `data/kb/flows/product_library.json` source 回写；**不改引擎**
+- 禁入：`scripts/session_runner.py` 他线 WIP；V3 导出线刚改文件；auth-recording；`save_section.py` 恢复禁令；不抢他线 busy 槽
+- 方式：fid=9000000740 account=2；子分类按钮用「新增分类」（禁「新增子分类」）；每笔 analyze→create→prepare→start→detach；验收认 stepCount+序号步+业务 stamp
 ## 2026-09-08 00:15 · ZCode V3导出线 — 开工声明：V3 弹窗触发链挂载（popup 父改挂触发对象 + trigger 最晚者优先归属）
 - 开工：00:15。承接交易 499 三次重录验证：双断裂修复（305d6c7b state.py / 15e5048c element.js）已生效（stamp 带 @@anchor），但导出侧仍有 2 步错位（填表早于弹窗截图注册→无 anchor 步 / _CURRENT_POPUP_KEY 滞后→旧 anchor 步）。实施导出侧规则：popup 归属=同页面同标题弹窗中触发步骤（点击 anchor 元素的 click 步）最晚且 ≤ 当前步骤者；popup propertiesPID 改挂触发图标对象节点（用户期望：弹窗挂在对应图标按钮后面）。
 - 范围：`src/services/transaction-export-v3-properties.js`、`src/services/transaction-export-v3.js`（stats 透传，如有）、`scripts/characterization/characterize-export-v3.mjs`（如断言需扩）、`tmp/*.mjs`（一次性验证脚本）、本文件、桌面产物（C:/Users/water/Desktop/transaction-499-*）
