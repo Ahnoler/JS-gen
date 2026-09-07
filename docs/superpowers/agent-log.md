@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 03:05 · Zcode — 收工：draft-traj 质量复测 PASS（回链 10:35 开工；本条及该条钟点为手写误差，机器真实时刻 02:xx-03:05，以 git 时间为准）
+
+- 完成：**DoD 6/6 PASS**——characterize OK 25；重启 4097 加载 `b0c7118c`（旧进程 02:31 早于修复提交，实测确证移交单第 1 条必要；重启后 LMY 自动重连 online）；propose chain-a **9 atoms/0 rejected**；**概述章挂载 0**（排序/启用/公共要素等上轮错挂全修）、**占位符残留 0**（task「来源：」行为真实路径）、**fnId 9/9=null**（FK guard 生效无幻觉码）、个性化要素由 rejected 转 atoms=改善
+- commit：force:true 勾 5/7/8 三条 → **traj 687/688/689** 全 draft，GET 验 provenance 四字段+无占位+非概述章全过；681/682 保留对照
+- 验收证据：`tmp/req-draft-traj/through-report-quality-rerun.md` + quality-rerun-propose/commit.json
+- 遗留移交：无阻塞；681/682 旧标准草稿清理与否待 Lead 定；余 6 atoms 待 SPA 勾选入口
+- 注意：本轮 agent-log 早前数条手写钟点偏移（把机器凌晨写成上午），后续条目一律先 `date` 取真实时刻
+
 ## 2026-09-08 10:35 · Zcode — 开工：draft-traj 质量修复复测（执行 Cursor 09-08 移交单）
 
 - 开工：10:35。执行 `plans/2026-09-08-req-draft-traj-quality-rerun-handoff.md`（`b0c7118c` 修复后 LLM propose 路径复测）
