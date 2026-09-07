@@ -132,7 +132,10 @@ async function hardCloseRemoteSession(remoteSessionId) {
     await clearOwnershipOnClose(remoteSessionId);
     await remoteSessionDao.close(remoteSessionId, { crashed: false });
     remoteSessionService.clearLiveBinding(remoteSessionId);
-  } catch {}
+  } catch (err) {
+    // 清理失败不可静默：remote_session 行残留 = ghost mount 永久 409 占位且无痕（09-07 教训）
+    console.warn('[attach] hardCloseRemoteSession cleanup failed for', remoteSessionId, '-', err?.message || err);
+  }
 }
 
 async function releaseOpenedSessionBestEffort(sessionId, opened) {

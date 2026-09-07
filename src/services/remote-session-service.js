@@ -452,18 +452,27 @@ export async function attachLive(opts = {}) {
     // trajectory.remote_session_id stays a ghost mount (perpetual 409 occupancy).
     try {
       const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
-      await clearOwnershipOnClose(remoteSession.id).catch(() => {});
+      await clearOwnershipOnClose(remoteSession.id).catch((sweepErr) => {
+        console.warn(`[remote-session] attach-failure ownership sweep failed for ${remoteSession.id}:`, sweepErr?.message || sweepErr);
+      });
       await remoteSessionDao.close(remoteSession.id, { crashed: true });
-    } catch {}
+    } catch (cleanupErr) {
+      // 清理失败不可静默：remote_session 行残留 active = 永久 409 占位且无痕（09-07 教训：失败不可见=隐患）
+      console.error(`[remote-session] attach-failure cleanup failed for ${remoteSession.id} (ghost mount risk):`, cleanupErr?.message || cleanupErr);
+    }
     throw err;
   }
   if (!ready) {
     liveByRemoteSessionId.delete(remoteSession.id);
     try {
       const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
-      await clearOwnershipOnClose(remoteSession.id).catch(() => {});
+      await clearOwnershipOnClose(remoteSession.id).catch((sweepErr) => {
+        console.warn(`[remote-session] attach-timeout ownership sweep failed for ${remoteSession.id}:`, sweepErr?.message || sweepErr);
+      });
       await remoteSessionDao.close(remoteSession.id, { crashed: true });
-    } catch {}
+    } catch (cleanupErr) {
+      console.error(`[remote-session] attach-timeout cleanup failed for ${remoteSession.id} (ghost mount risk):`, cleanupErr?.message || cleanupErr);
+    }
     throw new Error(
       `Executor BiB attach timed out (no session.bib_ready). Check executor CDP port / Chrome for session ${sessionId}`,
     );
