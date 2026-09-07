@@ -42,6 +42,7 @@ run() {
 run "characterize-dedup"       node scripts/characterization/characterize-dedup.mjs
 run "characterize-trajectory"  node scripts/characterization/characterize-trajectory.mjs
 run "characterize-run-event-ownership" node scripts/characterization/characterize-run-event-ownership.mjs
+run "characterize-owned-wait-shape" node scripts/characterization/characterize-owned-wait-shape.mjs
 run "characterize-quality-final-gate" node scripts/characterization/characterize-quality-final-gate.mjs
 run "characterize-region-tree" node scripts/characterization/characterize-region-tree.mjs
 run "characterize-transaction-export-region" node scripts/characterization/characterize-transaction-export-region.mjs
