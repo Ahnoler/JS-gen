@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:05 · Zcode 闲时审查 — 开工：存量假成功数据清洗 + 门闩残余批次 + 闲时审查定时化
+
+- 开工：04:05。用户五项批复的执行单：③存量假成功清洗（已批准）+④门闩残余（「先看可否进行」——已核：Cursor wizard 线范围 kb-req-modules/api-docs/前端仓与本批不相交，轨迹查询 WIP 已提交，session_runner 解冻，执行机空闲）+⑤闲时审查定时化（考虑花销，低频）
+- 范围：DB 数据修复（trajectory.is_successful 置 0，24 条 biz=0 存量假成功，不动 record_status）；`src/services/trajectory/replay-heal-shared.js`（runHealStep 补 canceled 过滤+success 检查+runId）；`scripts/session_runner.py`（`_last_phase_state_key_phase` 随 runId 切换复位）；`src/services/trajectory/attach-runner.js`（登录重试时延 env 化）；`scripts/characterization/characterize-owned-wait-shape.mjs`（新，生产形状 smoke）；`scripts/refactor/verify-all.sh`（注册 smoke，提交前重读防撞 wizard 线）；本文件。record-lifecycle stop-busy-race 先读后定（语义敏感可移交）
+- 禁入：Cursor wizard 线文件集（`src/services/kb-req-modules.js`、api-docs、前端仓、其 characterization 新文件）；`data/kb/**`；record/prepare/start（不占槽不发起录制）；不重启服务；trajectory-dao/trajectory.js/trajectory-service/trajectory-query-service
+- 方式：数据修复带前后对照清单；代码改动逐条过 node --check/eslint/py_compile + 新 smoke；verify-all 全量收尾；CronCreate 定时任务（仓库外动作，收工条注明）
+
 ## 2026-09-08 03:25 · Cursor Lead — 开工：SDD 执行 req-draft-wizard UI 计划（用户选 Subagent-Driven）
 
 - 开工：03:25。计划 `docs/superpowers/plans/2026-09-08-req-draft-wizard-ui.md`（9 Task）；规格已确认
