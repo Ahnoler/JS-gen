@@ -124,6 +124,7 @@ export function buildTransactionEntryV3(traj, {
     missingOptions,
     noRectControls,
     normalizedRects,
+    popupTriggerLinked,
   } = buildV3Properties({
     traj,
     phases,
@@ -187,6 +188,7 @@ export function buildTransactionEntryV3(traj, {
       missingOptions,
       noRectControls,
       normalizedRects,
+      popupTriggerLinked,
       coverageMode: usedPageLevelScreenshots ? 'page_level' : 'legacy_phase_fallback',
       coverageExemptSteps: coverage.exempt.length,
       missingPageLevelScreenshots: coverage.missing.length,
@@ -238,6 +240,7 @@ export function wrapTransactionListV3(builtEntries = []) {
   let missingOptions = 0;
   let noRectControls = 0;
   let normalizedRects = 0;
+  let popupTriggerLinked = 0;
   let missingPageLevelScreenshots = 0;
   let coverageExemptSteps = 0;
   let fieldCompletenessIssues = 0;
@@ -254,6 +257,7 @@ export function wrapTransactionListV3(builtEntries = []) {
     missingOptions += Number(b.stats?.missingOptions) || 0;
     noRectControls += Number(b.stats?.noRectControls) || 0;
     normalizedRects += Number(b.stats?.normalizedRects) || 0;
+    popupTriggerLinked += Number(b.stats?.popupTriggerLinked) || 0;
     missingPageLevelScreenshots += Number(b.stats?.missingPageLevelScreenshots) || 0;
     coverageExemptSteps += Number(b.stats?.coverageExemptSteps) || 0;
     fieldCompletenessIssues += Number(b.stats?.fieldCompletenessIssues) || 0;
@@ -277,6 +281,7 @@ export function wrapTransactionListV3(builtEntries = []) {
       missingOptions,
       noRectControls,
       normalizedRects,
+      popupTriggerLinked,
       coverageMode: coverageModes.size === 1 ? [...coverageModes][0] : [...coverageModes].join('+'),
       coverageExemptSteps,
       missingPageLevelScreenshots,

@@ -55,13 +55,14 @@ function isLegalRect(bbox) {
  * @param {Map<string,number>} [opts.idByPageLevel] - pageKey/popupKey → entryId 映射
  * @param {Map<string,number>} [opts.idByPageLevelNorm] - 规范化 pageKey/popupKey → entryId 映射
  * @param {Map<string,object>} [opts.pageLevelById] - entryId → 截图条目映射
- * @returns {{properties: Array, metaActions: number, absoluteFallback: number, missingOptions: number, noRectControls: number, normalizedRects: number}}
+ * @returns {{properties: Array, metaActions: number, absoluteFallback: number, missingOptions: number, noRectControls: number, normalizedRects: number, popupTriggerLinked: number}}
  *   properties - 控件 properties 数组
  *   metaActions - 元操作计数
  *   absoluteFallback - 绝对回退计数
  *   missingOptions - 缺少选项计数
  *   noRectControls - 无 rect 控件计数
  *   normalizedRects - 归一化 rect 计数
+ *   popupTriggerLinked - popup 挂上触发对象节点的计数
  */
 export function buildV3Properties({
   traj = {},
@@ -167,7 +168,75 @@ export function buildV3Properties({
   // 页面上下文：步骤无页面锚点（人工/抓取步骤，region 常为 table 等区域标记）时，
   // 继承前序最近步骤所在页面 —— 步骤按执行顺序流转，操作发生在该页面，归属同一页面截图
   let lastPageKey = '';
-  for (const step of traj.steps || []) {
+
+  // ── 弹窗触发链（同标题多弹窗消歧 + popup 挂触发对象）──
+  // 录制侧 stamp 的 popup_level_key 有两类失真：①填表早于弹窗截图注册 → key 缺 @@anchor；
+  // ②弹窗切换瞬间 _CURRENT_POPUP_KEY 滞后 → stamp 带旧弹窗 anchor。两类都会挂错弹窗。
+  // 规则：弹窗归属 = 同页面同标题弹窗中，触发步骤（点击 anchor 元素的 click 步）最晚
+  // 且不晚于当前步骤者；popup 的 propertiesPID 改挂触发图标对象节点（弹窗挂在触发按钮后面）。
+  // anchor 形如 "//a[@aria-label='新增一级分类']"，提取第一个属性值与步骤元素匹配。
+  function anchorMatchLabel(anchor) {
+    const m = String(anchor || '').match(/='([^']+)'/);
+    return m ? m[1] : '';
+  }
+
+  function elementMatchesAnchor(el, anchor) {
+    const anchorStr = String(anchor || '').trim();
+    if (!anchorStr) return false;
+    const candidates = [el.xpath, el.xpath_smart, el.xpath_full, el.cssSelector]
+      .map((x) => String(x || ''))
+      .filter(Boolean);
+    if (candidates.some((x) => x.includes(anchorStr))) return true;
+    const label = anchorMatchLabel(anchorStr);
+    if (!label) return false;
+    if (el.attributes?.['aria-label'] === label) return true;
+    if (String(el.text ?? '').trim() === label) return true;
+    return candidates.some((x) => x.includes(`='${label}']`) || x.includes(`="${label}"]`));
+  }
+
+  function popupPartsFromRegionId(regionId) {
+    const key = String(regionId || '');
+    const m = key.match(/\|dialog:([^@|]*)(?:@@anchor:(.*))?$/);
+    if (!m) return null;
+    return { pageKey: key.slice(0, m.index), title: m[1].trim(), anchor: (m[2] || '').trim() };
+  }
+
+  const stepList = traj.steps || [];
+  const stepMetaByStepIdx = stepList.map((step) => {
+    const el = parseStepElement(step);
+    const ev = mapStepToTransactionEvent(step);
+    return { el, mapped: !!ev, isClick: ev?.eventTypeValue === 'click' };
+  });
+
+  const popupInfos = [];
+  if (pageLevelById) {
+    for (const [entryId, entry] of pageLevelById) {
+      if (entry?.type !== 'popup') continue;
+      const parts = popupPartsFromRegionId(entry.regionId);
+      if (!parts || !parts.anchor) continue;
+      const triggerIdx = stepMetaByStepIdx.findIndex(
+        (sm) => sm.mapped && sm.isClick && sm.el && elementMatchesAnchor(sm.el, parts.anchor)
+      );
+      popupInfos.push({ entryId: String(entryId), ...parts, triggerIdx: triggerIdx >= 0 ? triggerIdx : null });
+    }
+  }
+
+  // 触发链归属：返回最晚触发且 ≤ stepIdx 的同页弹窗 entryId；无候选返回 null
+  function popupByTriggerChain(pageKey, stepIdx) {
+    if (!pageKey) return null;
+    let best = null;
+    for (const info of popupInfos) {
+      if (info.pageKey !== pageKey || info.triggerIdx == null || info.triggerIdx > stepIdx) continue;
+      if (!best || info.triggerIdx > best.triggerIdx) best = info;
+    }
+    return best ? best.entryId : null;
+  }
+
+  const objectIdByStepIdx = new Map();
+  let popupTriggerLinked = 0;
+
+  for (let stepIdx = 0; stepIdx < stepList.length; stepIdx++) {
+    const step = stepList[stepIdx];
     const ev = mapStepToTransactionEvent(step);
     if (!ev) {
       metaActions += 1;
@@ -193,9 +262,14 @@ export function buildV3Properties({
       : '';
 
     // pid 指向所属截图条目的 id（字符串）：弹窗控件→弹窗截图，否则→页面截图；找不到给 "0"
-    // 精确 key 未命中时用规范化 key（剥 hash 内易变 query）兜底，对齐存量两代数据
+    // 弹窗控件优先走触发链归属（同页同标题弹窗中触发最晚者），失败再落回
+    // 精确 key / 规范化 key / 标题兜底链（对齐存量两代数据）
     let pid = '0';
-    if (popupKey && idByPageLevel?.has(popupKey)) {
+    const triggerPid = overlay ? popupByTriggerChain(pageKey, stepIdx) : null;
+    if (triggerPid != null) {
+      pid = triggerPid;
+    }
+    if (pid === '0' && popupKey && idByPageLevel?.has(popupKey)) {
       pid = String(idByPageLevel.get(popupKey));
     }
     if (pid === '0' && popupKey) {
@@ -310,6 +384,18 @@ export function buildV3Properties({
       };
       properties.push(node);
     }
+    objectIdByStepIdx.set(stepIdx, String(nextId));
+  }
+
+  // popup 挂触发对象：popup 的父从 page 改为触发图标按钮的 object 节点（弹窗挂在按钮后面）
+  for (const info of popupInfos) {
+    if (info.triggerIdx == null) continue;
+    const triggerObjId = objectIdByStepIdx.get(info.triggerIdx);
+    if (!triggerObjId) continue;
+    const popupEntry = pageLevelById?.get(info.entryId);
+    if (!popupEntry) continue;
+    popupEntry.propertiesPID = triggerObjId;
+    popupTriggerLinked += 1;
   }
 
   // propertiesName 去重在 buildTransactionEntryV3 合并截图+控件后统一做，
@@ -322,6 +408,7 @@ export function buildV3Properties({
     missingOptions,
     noRectControls,
     normalizedRects,
+    popupTriggerLinked,
   };
 }
 
