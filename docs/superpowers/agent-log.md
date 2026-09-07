@@ -25,6 +25,7 @@
 - 验收：traj 499 重建 payload 树全对——popup 产品←图标新增一级分类、popup 产品3←图标新增产品、残留弹窗「产品2」已剔除（截图 4→3）、各弹窗内容对象归位、行内编辑留 page；popupTriggerLinked=2；18 控件全 type=ele；eslint exit 0；characterize 六篇全绿（115/115 rect 三形态）。
 - 交付：C:/Users/water/Desktop/transaction-499-push.json（internal_v3+partner_wire，type=ele）、transaction-499-layer-tree.html（分层静态页，可交互树）。
 - 遗留移交：①伙伴平台侧「前端不显示产品内部数据」解析问题+token 过期（401）待同事换 token 联调；②tmp/build-499-*.mjs、check-499-mount.mjs 一次性验证脚本留 tmp/。
+- **追加（197ea073）：清空步骤级联删除截图**——clearTrajectory 全清删该轨迹全部 screenshot 行（含 page_level），phaseIds 局部清级联删被删步骤/阶段绑定行；removeTrajectoryStep 顺路级联删单步截图。用户裁决：残留弹窗根因在清空步骤不动截图，录制侧修（本条）为主，导出侧清理（03e574e6）留作纵深防御。范围外注意：本次未动 `trajectory-steps.js` 路由层。
 
 
 
