@@ -33,6 +33,7 @@ import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { capturePhaseBuffer, buildMetadata } from './phase-highlight-screenshot.js';
 import { replacePhaseGroupScreenshot } from '../screenshot-service.js';
+import { waitForSessionEventOwned } from './run-event-ownership.js';
 
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -674,6 +675,11 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // 假成功防线 v2：每阶段业务步计数快照（终局门闩按阶段降级用，phaseNumber → count）
   runtime.phaseBusinessCounts = new Map();
 
+  // phase_done 跨 run 串台修复（spec 4.1）：本轮录制唯一 runId，随 step 下发，
+  // 事件按归属过滤；finally 补发 cancel_step 也以此标记本次 run。
+  runtime.currentRunId = (await import('node:crypto')).randomUUID();
+  runtime._sentStepThisRun = false;
+
   /**
    * 阶段空闲看门狗：超过 PHASE_IDLE_TIMEOUT_MS 无 agent 活动（action_log_sync 等）
    * 则 reject 返回的 idleP；就地更新外层 phaseActivity / clearPhaseActivity。
@@ -800,8 +806,20 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
 
       // phase_done / phase_error have no fixed timeout — the activity watchdog above
       // is the only timeout, so a long auto-fill phase cannot be killed at 300s.
-      const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', null);
-      const errRaw = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', null);
+      const ownedWaitOpts = {
+        addListener: execSession.onSessionEvent,
+        runId: runtime.currentRunId,
+        phaseNumber: phase.phaseNumber,
+        onIgnored: (payload, reason) => {
+          console.warn(
+            `[record] phase_done_${reason === 'missing_runid' ? 'missing_runid' : `ignored_${reason}`}`
+            + ` session=${runtime.sessionId} phase=${payload?.phase} gotRunId=${payload?.runId}`
+            + ` expect=${runtime.currentRunId}`,
+          );
+        },
+      };
+      const doneP = waitForSessionEventOwned({ ...ownedWaitOpts, type: 'phase_done' });
+      const errRaw = waitForSessionEventOwned({ ...ownedWaitOpts, type: 'phase_error' });
       const errP = errRaw.then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
       errP.catch(() => {});
       const stepData = {
@@ -844,6 +862,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       }
       // P1：Python 记忆 writer 需要 trajectory_id（否则 business_saved 等事件无归属）
       stepData.trajectory_id = tid;
+      stepData.runId = runtime.currentRunId;
+      runtime._sentStepThisRun = true;
       // 业务数据仅挂到填表/引入阶段；导航阶段保持干净描述供边界分类。
       applyBusinessDataToStep(stepData, phase.description || '', bizCtx);
       await attachSpecialElementCandidates(stepData, {
