@@ -42,6 +42,7 @@ run() {
 run "characterize-dedup"       node scripts/characterization/characterize-dedup.mjs
 run "characterize-trajectory"  node scripts/characterization/characterize-trajectory.mjs
 run "characterize-run-event-ownership" node scripts/characterization/characterize-run-event-ownership.mjs
+run "characterize-quality-final-gate" node scripts/characterization/characterize-quality-final-gate.mjs
 run "characterize-region-tree" node scripts/characterization/characterize-region-tree.mjs
 run "characterize-transaction-export-region" node scripts/characterization/characterize-transaction-export-region.mjs
 run "characterize-form-rules" "$PY" scripts/characterization/characterize-form-rules.py
@@ -53,6 +54,7 @@ run "characterize-xpath-primary-ops" "$PY" scripts/characterization/characterize
 run "characterize-xpath-fill-select" "$PY" scripts/characterization/characterize-xpath-fill-select.py
 run "characterize-region-section-alias" "$PY" scripts/characterization/characterize-region-section-alias.py
 run "characterize-phase-runtime" "$PY" scripts/characterization/characterize-phase-runtime.py
+run "characterize-recorder-phase-reset" "$PY" scripts/characterization/characterize-recorder-phase-reset.py
 run "characterize-phase-done-runid" "$PY" scripts/characterization/characterize-phase-done-runid.py
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
@@ -130,6 +132,7 @@ run "characterize-kb-recall" "$PY" scripts/characterization/characterize-kb-reca
 run "characterize-kb-insights" node scripts/characterization/characterize-kb-insights.mjs
 run "characterize-kb-req-modules" node scripts/characterization/characterize-kb-req-modules.mjs
 run "characterize-req-draft-traj" node scripts/characterization/characterize-req-draft-traj.mjs
+run "characterize-req-draft-fk-guard" node scripts/characterization/characterize-req-draft-fk-guard.mjs
 run "characterize-network-capture" node scripts/characterization/characterize-network-capture.mjs
 
 if [ "$FAILED" -ne 0 ]; then
