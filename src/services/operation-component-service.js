@@ -489,12 +489,12 @@ export async function registerAuthComponent({
   }));
   const signature = computePhaseSignature(steps).signature;
 
+  const db = getDB();
+
   // Source phase for the 来源阶段/出现次数 UI (occurrence provenance).
   const phaseRow = await db('trajectory_phase')
     .where({ trajectory_id: tid, phase_number: 1 })
     .first();
-
-  const db = getDB();
   await db('operation_component')
     .where({ system_id: sid, component_type: componentType })
     .whereNot('status', 'deprecated')
