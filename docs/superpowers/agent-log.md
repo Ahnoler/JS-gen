@@ -8,6 +8,12 @@
 - 主链计分板：R1 ✅ → R2 ✅（评级生效）→ R3 ✅ → R4 ✅（606/607/608）→ **R5+R6 进行中** → R7 合同（批复生效后主合同自动创建，签订止于已保存态=产品裁定）。
 - G4 坑位沉淀（后续轨迹通用）：阶段 1 必须显式「关闭天元相关配置欢迎弹窗（点确定）」；record/start 过早返回 recorded——detach 前盯 agent-stderr session-end 或 stepCount 连续稳定；stepCount 口径以 recordStatus+isSuccessful+tree 为准。
 
+## 2026-09-07 11:35 · Cursor Lead — 收工：产品库基本信息保存补录（回链 11:15）
+- 完成：PM 缺口「基本信息填写并保存」——交易 **#614**（fid=0740）；业务门闩经 CDP 达成（toast「操作成功」+ 描述 stamp `20260907-1130`）；#499 仍覆盖新增一级分类+新增产品
+- 验收：`tmp/product-mgmt/through-report-basicinfo.md`；`_cdp614_basicinfo.json/.png`；`product_library.json` 已回写 source/rule
+- 注意：#612 假成功作废；#614 AI 保存阶段 steps=0（record/start 假成功复现）→ **DONE_WITH_CONCERNS**；强步骤数验收需引擎修后重录
+- 禁入遵守：未碰 session_runner 等他线 WIP；未恢复 save_section
+
 ## 2026-09-07 11:15 · Cursor Lead — 开工声明：产品库「基本信息保存」补录
 - 开工：11:15。补 PM 验收缺口：在 #499（一级分类+新增产品）之外，录一条「选中未启用产品 → 基本信息填写 → 保存」贯通交易
 - 范围：`tmp/product-mgmt/`（任务/analyze/create/through-report）、`data/kb/flows/product_library.json`（仅 source/rules 回写）、本文件
