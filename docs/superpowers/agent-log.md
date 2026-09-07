@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 05:17 · Zcode — 开工：through-chains 可 propose 化 P1 全量（26 模块，连续执行模式）
+
+- 开工：05:17。用户指令连续执行做完剩余全部；按 `guides/through-chains-proposeable-format.md` SOP 把 26 个散文态模块改写为表式
+- 范围：`data/kb/req/{asset-preserve-npl,asset-preserve-ops,collateral-func,collateral-info,collection,credit-corp,credit-group,credit-interbank,credit-retail,customer-common,customer-group,digital-loan-desk,digital-mobile,disburse,limit-ctrl-api,limit-quota,loan-corp,loan-retail,meeting-mgmt,portal,postloan-check,postloan-risk-class,postloan-warn,repay,smart-ctrl,system-mgmt}/through-chains.md`（26 文件）+ product-mgmt 主链 B+ 表格化 + 本文件 + todo
+- 禁入：解析器/propose/Vue 代码；轨迹查询 WIP 四文件；录制/回放；DB；`.draft-traj-propose.json` 一律不入库；不为过门控灌水（无闭环链的模块如实报 false）
+- 方式：子智能体编队分 2 波并行（文件集互不相交，主会话代声明、子不 commit），每波主会话验收（离线解析+抽查业务内容保留）后按波 commit；全部完成后 GET req-modules 全量核对 canProposeAtoms + 收工条
+
 ## 2026-09-08 05:00 · Zcode — 收工：through-chains 可 propose 化 P0 完成（回链 04:55 开工）
 
 - 完成：customer-corp / rating 两模块 `through-chains.md` 改写为金标表式（10 链 45 步 / 8 链 38 步；业务口径零删减，ZJJK 从原文抽列、多码 ` / `、无码 `—`；旁路/Out 保持非主链标题）
