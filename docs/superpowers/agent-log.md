@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 03:25 · Cursor Lead — 开工：SDD 执行 req-draft-wizard UI 计划（用户选 Subagent-Driven）
+
+- 开工：03:25。计划 `docs/superpowers/plans/2026-09-08-req-draft-wizard-ui.md`（9 Task）；规格已确认
+- 范围：Task1=`src/services/kb-req-modules.js` + api-docs + characterization；Task2+=`D:/dev/ui-auto-recording-agent-vue-master/vue-project`（api/kb.ts、router、req-draft-wizard、录制列表入口）；本文件 / todo ⑧；SDD ledger `.superpowers/sdd/2026-09-08-req-draft-wizard-ui/`
+- 禁入：轨迹查询 WIP 四文件；系统树配置页；prepare/record；不改 draft-traj 核心（除 list 字段）
+- 方式：主会话代声明；子智能体实现+commit（各仓分开）；Task 间审查；连续执行不中途问人
+
 ## 2026-09-08 04:00 · Zcode 闲时 — 收工：MySQL 白名单同步脚本入库（回链 03:55 开工）
 
 - 完成：`26211d5b` 跟踪 `config/update-db-whitelist.cmd`（10 分钟循环包装）+ `update-db-whitelist.ps1`（服务端 dmesg LOG 规则观测真实出口 IP→白名单更新）；`.gitignore` 增 `config/.db-whitelist-lastip` 一行——更正开工条：`.db-whitelist-sync.log` 已被既有 `*.log` 规则覆盖，无需新增
