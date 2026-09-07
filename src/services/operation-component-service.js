@@ -438,23 +438,29 @@ export async function registerAuthComponent({
   }
   const steps = rawSteps.map(parseStepParams);
 
+  const isLogout = componentType === 'logout';
   let usernameStepNumber = null;
   let passwordStepNumber = null;
-  for (const step of steps) {
-    const actionType = String(step.actionType || '').trim();
-    if (!AUTH_FILL_ACTIONS.has(actionType)) continue;
-    const params = step.params && typeof step.params === 'object' ? step.params : {};
-    for (const value of Object.values(params)) {
-      if (typeof value !== 'string') continue;
-      if (usernameStepNumber == null && value === account) {
-        usernameStepNumber = Number(step.stepNumber);
-      }
-      if (passwordStepNumber == null && value === password) {
-        passwordStepNumber = Number(step.stepNumber);
+  // Logout has no credential fields — skip injection-point location entirely
+  // (a logout trajectory contains no fill/login steps carrying the account /
+  // password, so the scan would always reject it, observed on job #10).
+  if (!isLogout) {
+    for (const step of steps) {
+      const actionType = String(step.actionType || '').trim();
+      if (!AUTH_FILL_ACTIONS.has(actionType)) continue;
+      const params = step.params && typeof step.params === 'object' ? step.params : {};
+      for (const value of Object.values(params)) {
+        if (typeof value !== 'string') continue;
+        if (usernameStepNumber == null && value === account) {
+          usernameStepNumber = Number(step.stepNumber);
+        }
+        if (passwordStepNumber == null && value === password) {
+          passwordStepNumber = Number(step.stepNumber);
+        }
       }
     }
   }
-  if (usernameStepNumber == null || passwordStepNumber == null) {
+  if (!isLogout && (usernameStepNumber == null || passwordStepNumber == null)) {
     throw svcError(
       `Cannot locate credential injection points in trajectory ${tid}`
       + ` (usernameStepNumber=${usernameStepNumber}, passwordStepNumber=${passwordStepNumber})`,
@@ -464,6 +470,8 @@ export async function registerAuthComponent({
 
   const snapshot = stepsToSnapshot(steps).map((item) => ({
     ...item,
+    // Logout steps normally carry no credentials, but mask defensively too:
+    // if any step value happens to equal account/password it gets shadowed.
     params: item.params
       ? deepReplaceStringValues(item.params, new Map([
         [account, AUTH_USERNAME_PLACEHOLDER],
@@ -491,7 +499,7 @@ export async function registerAuthComponent({
     systemId: sid,
     componentType,
     status: 'confirmed',
-    paramSchema: { usernameStepNumber, passwordStepNumber },
+    paramSchema: isLogout ? {} : { usernameStepNumber, passwordStepNumber },
     stepsJson: JSON.stringify(snapshot),
     signature,
     sourceTrajectoryId: tid,

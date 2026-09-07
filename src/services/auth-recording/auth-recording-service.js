@@ -167,22 +167,74 @@ function injectAuthCredentials(promptText, account, password) {
 }
 
 /**
+ * Build the canonical auth segment texts following the analyze-pipeline
+ * conventions (trajectory-text-extract.js parse contract + analyze prompt
+ * format in trajectory-meta-service.js): trajectory.task = requirement full
+ * text (numbered steps + 业务数据 KV block + 【硬性成功门闩】constraints);
+ * phase description = single line「{操作}。预期结果：{可见结果}」.
+ * Login segment additionally keeps the credential values inline in the
+ * description — the executor skips business-data hints for login phases
+ * (scripts/agent/service.py "Skip business-data hint (phase is not
+ * fill/introduce)"), so the inline value is the only guaranteed channel.
+ * @param {object} args segment descriptors
+ * @param {'login'|'logout'} args.authKind segment kind
+ * @param {string} args.task prompt-template text with placeholders already
+ *   injected (used only for provenance length checks; canonical texts are
+ *   composed here)
+ * @param {string} args.account account username (injected value)
+ * @param {string} args.password account password (injected value)
+ * @returns {{ task: string, description: string }} canonical task + phase description
+ */
+function buildCanonicalAuthTexts({ authKind, task, account, password }) {
+  void task;
+  if (authKind === 'login') {
+    const description = '调用 login 动作完成登录（账号/密码使用业务数据注入值，验证码留空）。预期结果：离开登录页进入系统首页。';
+    const text = [
+      '1、在登录页调用 login 动作完成登录。',
+      '',
+      '业务数据：',
+      `账号：${account}`,
+      `密码：${password}`,
+      '',
+      '【硬性成功门闩——任一门闩未满足不得结束本阶段】',
+      '- 凭据只使用业务数据注入值（账号/密码见上），禁止编造或尝试其他任何账号（如 admin 类）。',
+      '- 出现验证码拦截：不要猜测或绕过，立即如实报告「出现验证码，无法自动登录」并退出。',
+      '- 登录失败（错误提示、仍在登录页）时如实报告失败原因，不得伪造成功、不得重试超过 2 次。',
+    ].join('\n');
+    return { task: text, description };
+  }
+  const description = '找到登出入口并真实点击登出（常见右上角头像/用户名下拉的退出项，确认弹窗点确定）。预期结果：回到登录页。';
+  const text = [
+    '1、找到登出入口并真实点击登出（常见右上角头像/用户名下拉的退出项，确认弹窗点确定）。',
+    '',
+    '【硬性成功门闩——任一门闩未满足不得结束本阶段】',
+    '- 未回到登录页不得 done：验证已出现账号/密码输入框才算成功。',
+    '- 找不到登出入口时如实报告「未找到登出入口」，不得伪造成功。',
+  ].join('\n');
+  return { task: text, description };
+}
+
+/**
  * Create one auth trajectory (with its single phase) for a segment.
  * @param {object} args segment descriptors
  * @param {number} args.functionNodeId mount function node id
  * @param {string} args.authKind 'login' or 'logout'
  * @param {string} args.name trajectory name
- * @param {string} args.task phase task prompt text (credential-injected); the
- *   agent's task channel is phase.description (trajectory-recording-runner
- *   passes `instruction: phase.description`), so the full prompt must live here
+ * @param {string} args.task phase task prompt text (credential-injected template);
+ *   the canonical task/description pair is composed in buildCanonicalAuthTexts —
+ *   the agent's task channel is phase.description (trajectory-recording-runner
+ *   passes `instruction: phase.description`)
+ * @param {string} args.account account username (injected value)
+ * @param {string} args.password account password (injected value)
  * @param {string} args.url system login URL (trajectory.url initial value)
  * @param {number|null} args.systemAccountId bound system account id
  * @returns {Promise<number>} created trajectory id
  */
-async function createAuthTrajectory({ functionNodeId, authKind, name, task, url, systemAccountId }) {
+async function createAuthTrajectory({ functionNodeId, authKind, name, task, account, password, url, systemAccountId }) {
+  const canonical = buildCanonicalAuthTexts({ authKind, task, account, password });
   const tid = await trajectoryDao.save({
     name,
-    task,
+    task: canonical.task,
     url,
     functionId: functionNodeId,
     authKind,
@@ -198,7 +250,7 @@ async function createAuthTrajectory({ functionNodeId, authKind, name, task, url,
     phaseNumber: 1,
     trajectoryId: Number(tid),
     status: 'pending',
-    description: task,
+    description: canonical.description,
   });
   return Number(tid);
 }
@@ -533,8 +585,11 @@ export async function startAuthRecording(systemId, { accountId = null } = {}) {
       functionNodeId,
       authKind: 'login',
       name: '登录演练',
-      phaseName: '登录',
+      // credential-injected prompt template kept as provenance; canonical
+      // task/description pair is composed in buildCanonicalAuthTexts
       task: injectAuthCredentials(loadPrompt('auth-login-prompt.md'), account.account, account.password),
+      account: account.account,
+      password: account.password,
       url: loginUrl,
       systemAccountId: account.id,
     });
@@ -542,8 +597,9 @@ export async function startAuthRecording(systemId, { accountId = null } = {}) {
       functionNodeId,
       authKind: 'logout',
       name: '登出演练',
-      phaseName: '登出',
       task: injectAuthCredentials(loadPrompt('auth-logout-prompt.md'), account.account, account.password),
+      account: account.account,
+      password: account.password,
       url: loginUrl,
       systemAccountId: account.id,
     });
