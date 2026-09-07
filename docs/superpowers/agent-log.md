@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:30 · Zcode 闲时审查 — 开工+收工：闲时审查触发方式纠偏（定时任务已删，约束固化进 guide）
+
+- 完成（用户纠偏）：上午建的 automation-cb2a608d 是**定时任务**（cron 固定触发），不是用户要的**闲时任务管线**——已 CronDelete 删除。正确形态=guide 即 dispatch 产物：`docs/superpowers/guides/idle-review-prompt.md` 已固化四项——①头部管线说明（只走闲时管线，频次由派发方定）；②花销约束节（严格 3 子智能体/P1 主线程直改优先/禁真机湿测与写库冒烟/单轮完成）；③下轮复查入口台账（quality-final-gate / recorder-phase-reset / req-draft-fk-guard / owned-wait-shape / 先行护栏，每轮先跑确认仍绿）；④回归验证更新（verify-all 基线=ALL GREEN，红先归因形状漂移 vs 回归；离线 characterization 禁触真实 DB + 注入桩要求）
+- 验收：CronList 无该 automation；guide 改动为纯文档增补（头部/新增两节/回归节），不影响任何代码与门禁
+- 遗留：无。后续要跑闲时审查=向闲时会话派发该 guide 的提示词正文即可
+- 注意：本条为文档+调度面小单元，走「开工+收工」合并条目（沿 09-07 15:10 先例）
+
 ## 2026-09-08 04:28 · Zcode 闲时审查 — 收工：sso-auth pin 回调完成，verify-all ALL GREEN（回链 04:20 开工）
 
 - 完成：`b99e61b2` characterize-sso-auth 两条断言按 17b4a512 新形状重写——①listByFunction 改钉「薄壳转发契约」（正则钉 `listByFunctionIds([functionId], options)` 转发 + `listByFunctionIds` 解构 `paasUserId = null`）；②stats 透传文本改钉 `countByRecordStatus({ functionIds: ids, …, paasUserId, isExport })`。**改 pin 前已核功能完好**：paasUserId 过滤与 stats 隔离在新函数体内完整在位（纯形状失配，非行为回归）

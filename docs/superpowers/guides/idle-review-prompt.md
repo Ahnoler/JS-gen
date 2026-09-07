@@ -1,6 +1,7 @@
 # 闲时任务提示词：基于教训的定期代码审查与优化
 
-> 用途：交给闲时会话/定时任务执行，对本仓代码做一轮「教训驱动」的定向审查，并**根据报告实施优化**。
+> 用途：**交给闲时任务管线派发执行**（对本仓代码做一轮「教训驱动」的定向审查，并**根据报告实施优化**）。
+> **管线说明（2026-09-08 定）：本任务只走闲时管线，不建 cron 定时任务**——频次由派发方按闲时与花销决定，guide 本身即完整自包含的 dispatch 产物。
 > 源头：2026-09-07/08 agent-log 教训总结。教训清单过期时，先重读 `docs/superpowers/agent-log.md` 最近 30 条与 `docs/superpowers/todo-list.md` 更新本文件的「教训检查单」。
 
 ---
@@ -8,6 +9,22 @@
 ## 提示词正文（复制以下全部内容作为任务 prompt）
 
 你是 JS-gen 仓库的闲时代码审查员。本轮任务分两阶段：**阶段一只读审查、产出报告；阶段二根据报告实施优化（修复+加固+回归验证）**。
+
+### 花销约束（硬要求，2026-09-08 用户定）
+
+- 审查子智能体**严格 3 个**（第四步编队），不追加派发、不拆更细；
+- **P1 修复主线程直改优先**，只有文件集互不相交且批量明显时才派发子智能体；
+- **禁真机类验证**：不发起 record/prepare/start、不占执行机槽、不做任何写库冒烟——只跑离线 characterization；
+- 审查+修复在**单轮会话内完成**；在途线与目标文件大面积冲突时，缩范围为非冲突族并在收工条说明。
+
+### 下轮复查入口（防再犯护栏台账，每轮先跑一遍确认仍绿）
+
+- `characterize-quality-final-gate.mjs`——终局门闩 v3（quality_failed 捕获 / phaseOutcomes 消费 / perRunZero / gate runId 守卫 + batch 收敛）；
+- `characterize-recorder-phase-reset.py`——done 拒绝分支 return True / save 三键阶段清理 / persist 事件 runId 盖章；
+- `characterize-req-draft-fk-guard.mjs` + `characterize-req-draft-traj.mjs`——suggestedFunctionId FK 双防御；
+- `characterize-owned-wait-shape.mjs`——真实 hub 驱动 owned-wait（3 参 arity 钉）+ runHealStep runId/success 接线；
+- `characterize-ghost-pending-prune` / `characterize-run-event-ownership` / `characterize-phase-done-runid`——先行护栏。
+（新护栏落地后追加到本清单；发现护栏红=先归因「形状漂移 vs 回归」再动 pin。）
 
 ### 第一步：开工声明（硬约定）
 
@@ -94,8 +111,9 @@
 **回归验证（每个修复 commit 前必跑）**：
 - Node 改动：`node --check` + `npx eslint <改动文件>` 0 新 warning；
 - Python 改动：`python -m py_compile` 或 ast.parse；
-- 涉及引擎/服务链：`bash scripts/refactor/verify-all.sh`（注意 3 存量红基线，只求不新增红）；
-- 涉及录制门闩/假成功类的修复，必须新增性质化断言入 verify-all（新 red→green 证据）。
+- 涉及引擎/服务链：`bash scripts/refactor/verify-all.sh`（**基线=ALL GREEN，2026-09-08 起**；出现红先归因「他线形状漂移 vs 本批回归」，形状漂移按其最终契约回调 pin 或移交该线，不许带着红收工）；
+- 涉及录制门闩/假成功类的修复，必须新增性质化断言入 verify-all（新 red→green 证据）；
+- **离线 characterization 不得触发真实 DB 查询**（教训：fixture 带真实业务 id 会让新加的 DAO 校验开 knex 池且不退出，verify-all 挂死而非红）——给服务函数加真实 DAO 调用时必须同步提供可注入桩参数（如 `functionIdExists`），characterization 传 `async () => true/false`。
 
 ### 第七步：收工回报
 
