@@ -55,6 +55,12 @@ run "characterize-xpath-fill-select" "$PY" scripts/characterization/characterize
 run "characterize-region-section-alias" "$PY" scripts/characterization/characterize-region-section-alias.py
 run "characterize-phase-runtime" "$PY" scripts/characterization/characterize-phase-runtime.py
 run "characterize-recorder-phase-reset" "$PY" scripts/characterization/characterize-recorder-phase-reset.py
+run "characterize-phase-reviewer" "$PY" scripts/characterization/characterize-phase-reviewer.py
+run "characterize-phase-reviewer-flow" "$PY" scripts/characterization/characterize-phase-reviewer-flow.py
+run "characterize-save-section" "$PY" scripts/characterization/characterize-save-section.py
+run "characterize-real-click" "$PY" scripts/characterization/characterize-real-click.py
+run "characterize-tree-check-confirm" "$PY" scripts/characterization/characterize-tree-check-confirm.py
+run "characterize-session-lifecycle" node scripts/characterization/characterize-session-lifecycle.mjs
 run "characterize-phase-done-runid" "$PY" scripts/characterization/characterize-phase-done-runid.py
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
