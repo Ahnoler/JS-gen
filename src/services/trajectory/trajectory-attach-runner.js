@@ -187,6 +187,13 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
 
   emitStage('login', 'running', { accountId });
   let login = { skipped: false, done: false, accountId };
+  // Auth dry-run login segment: the agent performs the login itself as the
+  // recorded phase — skip the prepare-time default login (incl. its 8s retry).
+  // Flag is read-only here; it lives until the runtime is torn down at detach.
+  if (runtime.skipDefaultLogin) {
+    login = { skipped: true, done: true, accountId };
+    emitStage('login', 'skipped', { accountId });
+  } else
   try {
     if (runtime.loginDone && Number(runtime.loginAccountId) === Number(accountId)) {
       login = { skipped: true, done: true, accountId };

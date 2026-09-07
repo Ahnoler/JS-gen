@@ -88,13 +88,15 @@ export function normalizeUrl(url) {
 
 /**
  * Pure criteria check for the login segment: after a successful login the
- * current page URL must have moved away from the login page URL.
- * @param {object|null} traj trajectory entity (uses `url` field)
+ * current page URL must have moved away from the login page URL. Prefers the
+ * live page URL captured at recording end; falls back to trajectory `url`.
+ * @param {object|null} traj trajectory entity (uses `url` field as fallback)
  * @param {string} loginUrl system login page URL
+ * @param {string|null} [liveUrl] live browser page URL read at recording end
  * @returns {boolean} true when the login criteria is satisfied
  */
-export function checkLoginCriteria(traj, loginUrl) {
-  const finalUrl = String(traj?.url ?? '').trim();
+export function checkLoginCriteria(traj, loginUrl, liveUrl = null) {
+  const finalUrl = String(liveUrl ?? traj?.url ?? '').trim();
   if (!finalUrl) return false;
   const base = normalizeUrl(loginUrl);
   if (!base) return false;
@@ -103,13 +105,15 @@ export function checkLoginCriteria(traj, loginUrl) {
 
 /**
  * Pure criteria check for the logout segment: after a successful logout the
- * current page URL must be back at the login page URL.
- * @param {object|null} traj trajectory entity (uses `url` field)
+ * current page URL must be back at the login page URL. Prefers the live page
+ * URL captured at recording end; falls back to trajectory `url`.
+ * @param {object|null} traj trajectory entity (uses `url` field as fallback)
  * @param {string} loginUrl system login page URL
+ * @param {string|null} [liveUrl] live browser page URL read at recording end
  * @returns {boolean} true when the logout criteria is satisfied
  */
-export function checkLogoutCriteria(traj, loginUrl) {
-  const finalUrl = String(traj?.url ?? '').trim();
+export function checkLogoutCriteria(traj, loginUrl, liveUrl = null) {
+  const finalUrl = String(liveUrl ?? traj?.url ?? '').trim();
   if (!finalUrl) return false;
   const base = normalizeUrl(loginUrl);
   if (!base) return false;
@@ -197,9 +201,40 @@ async function waitForRecordingFinish(tid, timeoutMs = RECORD_TIMEOUT_MS) {
 }
 
 /**
+ * Read the live page URL of the recording session via the executor's existing
+ * `list_tabs` event channel (tabs_result carries each tab's url; the active
+ * tab matches the browser's current page). Read-only — no CDP pipeline here.
+ * @param {object|null} runtime trajectory runtime (sessionId / executorNodeUuid)
+ * @param {number} [timeoutMs] wait timeout for tabs_result
+ * @returns {Promise<string|null>} current page URL, or null when unavailable
+ */
+async function readLivePageUrl(runtime, timeoutMs = 8000) {
+  if (!runtime?.sessionId || !runtime?.executorNodeUuid) return null;
+  try {
+    const resultP = execSession.waitForSessionEvent(runtime.sessionId, 'tabs_result', timeoutMs);
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'list_tabs',
+      data: {},
+    });
+    const result = await resultP;
+    const tabs = Array.isArray(result?.tabs) ? result.tabs : [];
+    if (!tabs.length) return null;
+    const activeId = result?.activePageId;
+    const active = tabs.find((t) => String(t.pageId) === String(activeId)) || tabs[0];
+    return String(active?.url || '').trim() || null;
+  } catch (err) {
+    console.warn(`[auth-recording] readLivePageUrl failed: ${err?.message || err}`);
+    return null;
+  }
+}
+
+/**
  * Run one recording segment: prepare → (login segment only: navigate to the
  * login page via suppressed replay and arm skipDefaultLogin) → start → wait
- * finish → criteria check. Always detaches live resources afterwards.
+ * finish → read live page URL → criteria check. Always detaches live
+ * resources afterwards.
  * @param {number} tid trajectory id
  * @param {object} opts segment options
  * @param {number|null} [opts.accountId] login account id override
@@ -246,15 +281,26 @@ async function runSegment(tid, { accountId, loginUrl, criteria, segmentLabel, na
   }
   await startTrajectoryRecording(tid, { accountId: accountId ?? null });
   const wait = await waitForRecordingFinish(tid);
+  // Capture the live page URL while the browser is still attached (trajectory
+  // `url` keeps the segment's start URL and never tracks navigation).
+  let liveUrl = null;
+  if (wait.ok) {
+    liveUrl = await readLivePageUrl(getTrajectoryRuntime(tid));
+  }
   await detachTrajectoryLive(tid, { reason: 'auth_record_segment' }).catch(() => {});
   if (!wait.ok) {
     throw new Error(`${segmentLabel} recording timed out after ${Math.round(RECORD_TIMEOUT_MS / 1000)}s`);
   }
   const traj = await trajectoryDao.getById(tid);
   if (!traj) throw new Error(`${segmentLabel} trajectory disappeared after recording`);
-  if (!criteria(traj, loginUrl)) {
+  if (liveUrl == null) {
+    console.warn(
+      `[auth-recording] ${segmentLabel}: live page URL unavailable — falling back to trajectory url="${String(traj.url ?? '').trim()}"`,
+    );
+  }
+  if (!criteria(traj, loginUrl, liveUrl)) {
     throw new Error(
-      `${segmentLabel} criteria not met — final url="${String(traj.url ?? '').trim()}"`,
+      `${segmentLabel} criteria not met — final url="${String(liveUrl ?? traj.url ?? '').trim()}"`,
     );
   }
   return { traj };

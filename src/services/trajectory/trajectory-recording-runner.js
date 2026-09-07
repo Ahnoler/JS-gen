@@ -313,9 +313,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   const { account, accountId: acctId } = await resolveTrajectoryAccount(tid, accountId);
   try {
     if (runtime.skipDefaultLogin) {
-      // One-shot flag (auth dry-run login segment): the agent performs the
-      // login itself as the recorded phase — no prepare-time default login.
-      runtime.skipDefaultLogin = false;
+      // Auth dry-run login segment: the agent performs the login itself.
+      // Read-only here — the flag lives until runtime teardown at detach.
     } else if (!(runtime.loginDone && Number(runtime.loginAccountId) === Number(acctId))) {
       await runDefaultLogin(runtime, account);
     }
