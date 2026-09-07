@@ -436,7 +436,12 @@ export async function registerAuthComponent({
   if (!rawSteps.length) {
     throw svcError(`Trajectory ${tid} has no steps`, 400);
   }
-  const steps = rawSteps.map(parseStepParams);
+  // Drop the save_form_snapshot checkpoint: replaying an auth component must
+  // never trigger Type B form-structure healing (login pages re-render after
+  // navigation and the checkpoint deleted the fill steps — observed on traj 668).
+  const steps = rawSteps
+    .filter((s) => String(s.action_type || s.actionType || s.action || '') !== 'save_form_snapshot')
+    .map(parseStepParams);
 
   const isLogout = componentType === 'logout';
   let usernameStepNumber = null;

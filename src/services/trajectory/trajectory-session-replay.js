@@ -230,6 +230,23 @@ async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true 
   // (__AUTH_USERNAME__/__AUTH_PASSWORD__) in step params — restore the bound
   // account's real credentials before execution.
   const trajRow = await db('trajectory').where('id', tid).first();
+  // Auth transactions must never run the Type B form-structure checkpoint:
+  // the login page re-renders after navigation, verifyFormStructure then
+  // reports the username/password fields as "missing" and the heal deletes
+  // the fill steps (observed on traj 668). Drop snapshot meta rows upfront.
+  if (trajRow?.auth_kind) {
+    const kept = rows.filter(
+      (r) => String(r.action_type || '') !== 'save_form_snapshot',
+    );
+    if (kept.length !== rows.length) {
+      const droppedIds = new Set(
+        rows.filter((r) => String(r.action_type || '') === 'save_form_snapshot').map((r) => Number(r.id)),
+      );
+      rows.length = 0;
+      rows.push(...kept);
+      for (const id of droppedIds) selectedIdSet?.delete?.(id);
+    }
+  }
   if (trajRow?.system_account_id) {
     const accountRow = await db('system_account')
       .where('id', Number(trajRow.system_account_id))
