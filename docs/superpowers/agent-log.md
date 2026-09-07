@@ -2,6 +2,22 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 01:00 · Zcode 闲时审查 — 收工：教训驱动两阶段审查+修复落地（回链 23:31 开工）
+
+- 完成：**阶段一**3 子智能体并行只读审查（Node A 假成功+D 时序 / Python B 接线+A-py 门闩 / 横切 C 静默+E 进程+F 对账），主线程对全部 P0/P1 逐一 Read 核实（防假完成/误报）；报告 `tmp/idle-review/2026-09-07-report.md`（P0×1 确认 + P1×7 + P2×12 疑似/移交 + F 对账 10 项）。**阶段二 8 commits**：
+  - `7d505102` runner 终局门闩 v3——phase_end.quality_failed 捕获（原零消费）+ phaseOutcomes success=false 终局消费 + perRunZero 真源复核（堵重录累积口径掩护）+ 90s 门闩 runId 归属守卫（旧 timer 不再覆写新 run 基线）；#612/#614/19:55「QUALITY FAIL 后不应标成功」收官
+  - `3d4189e9` batch 收敛——recordStatus=failed → markItemFailed（RECORD_QUALITY_GATE），job 不再假绿
+  - `3b03e231` propose/commit FK 双防御（draft-traj 遗留①）——越界 id propose 置 null / commit skip `unknown_function_id`；`functionIdExists` 注入修复离线 characterization 触真实 DB 挂起（fixture id → knex 池不退，EXIT=124 复现实证）
+  - `7144a9c2` recorder 六拒绝分支 `return True`（6aeedcb0 搬迁回归：recorder.py:214 真值检查曾是死代码，被拒 done 继续后半段致 goal-loop 误强停）
+  - `769e6964` 阶段边界清 `_last_save_ok`/`_success_tokens`/`_url_before_save`（跨阶段 save_ok 串台假成功）
+  - `33d892ea` state.py 三发射器盖 runId——2a30fc6c 留下的「死过滤器」激活（spec 4.1.4 两侧闭环；None 省略保 legacy 兼容）
+  - `930f026f` attach 失败清理去静默（remote-session/attach-service，ghost mount 风险可见化）
+  - `e444037a` verify-all 注册三新门闩
+- 验收：verify-all **104 ok / 1 红**——唯一红 `characterize-sso-auth` 两断言=轨迹查询线未提交 WIP 重构 `listByFunction`→`listByFunctionIds` 破 pin（夜班 02:10 收工独立同判，随其提交自愈）；node --check ×6、eslint 0 新 warning、py_compile ×3；子智能体（FK 修复 / Python 三修）产物 diff 主线程逐行复核，均零删除行、未 commit
+- 护栏落点（下轮闲时复查入口）：`characterize-quality-final-gate.mjs`（含「降级判定先于 success 写」顺序 pin + batch 收敛 pin）/ `characterize-recorder-phase-reset.py`（39 checks：6×return True + 三键清理 + runId 携带/省略）/ `characterize-req-draft-fk-guard.mjs`（11 pin）+ characterize-req-draft-traj +2 行为断言（null-on-unknown / skip 且 analyze 不被调）
+- 遗留移交（P2，详见报告「疑似/需人工判断」表）：①form_save 静默分支伪 toast_ok 令牌（需裁决兼容面：独立 kind + 契约 kinds 采认）②phase_*_obs 用 step_index 当 phase 号（service.py 改用 _CURRENT_PHASE）③`_last_phase_state_key_phase` 跨 run 不复位（session_runner 当时禁入未修）④`_CURRENT_POPUP_KEY` 弹窗关闭不清 ⑤runHealStep 缺 canceled 过滤+success 检查（与 runId 遗留同刀修）⑥owned-wait 接线缺生产形状 smoke ⑦广播族静默 catch / 批量取消 detach 无日志 ⑧`String(failResult)` 疑似对象 ⑨restart-local.cmd 只清 19242 ⑩phaseCompleted 虚高（与 P0-1 同根的显示面）⑪manual ack 8s 乐观置位阻断 reaper ⑫lease 对账静默；另 network_capture 三点形状备注（asyncio.run 兜底/新 tab 不附着/mem persist 归属）移交报文捞取线，AGENTS.md `start.ps1` 失效移交文档线
+- 注意：**生效需重启**——控制面 4097 加载 runner/batch/Node 侧改动；executor Python（state.py/recorder_emitters/intent_contract）随下次会话加载；新旧双向兼容（payload 无 runId→legacy 放行，不阻塞）。本轮未动 todo-list（避让并行文档线，移交已全量落本条）；工作区仅剩轨迹查询线四 WIP 文件（未触碰）；memory few-shot 污染面（is_successful=1 选历史）随 P0-1 落地收敛
+
 ## 2026-09-08 02:10 · Zcode 夜班 — 收工：报文捞取 Tasks 7-9 落地（回链 00:25 开工）
 
 - 完成：Task 7 `api-capture.mjs`（`2e359ef6`+JSDoc `a5620ee0`，子智能体验证+本地 smoke 2 captures，修 URL 遮蔽真 bug）；Task 8 `network_capture.py`（`314be568`，11/11 断言+便携 python 真实 import）；Task 9 接线持久化（`f2cbc9f3`，session_runner attach/finally-cleanup 全 try/except + protocol 事件类型 + memory-service 摄取分支 + system-ref findByUrlPattern/persistCapturedInterface + characterize-network-capture）；verify-all 注册 `7bb59b8c`。Task 10 CHANGELOG 段按 09-04 约定废止未执行
