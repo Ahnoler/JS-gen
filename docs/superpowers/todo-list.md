@@ -9,11 +9,12 @@
 
 ## 当前工作线（2026-09-06 起）
 
-### ⑧ 需求切片 → 原子草稿交易（2026-09-07 设计拍板 · 待写计划）
+### ⑧ 需求切片 → 原子草稿交易（2026-09-07 设计拍板 · 计划已写）
 
 - **本版**：控制面两段式 API（`draft-traj/propose` → 人勾选 → `commit` 仅建 draft）；粒度=原子化（登录级）；草稿必须结构化标注需求文档 + 章节；不开自动录制。
-- 规格：[`specs/2026-09-07-req-to-draft-traj-design.md`](specs/2026-09-07-req-to-draft-traj-design.md)。
-- 切片入口本版沿用 `req-modules` + Agent Skill；SPA 后补。
+- 规格：[`specs/2026-09-07-req-to-draft-traj-design.md`](specs/2026-09-07-req-to-draft-traj-design.md)
+- 计划：[`plans/2026-09-07-req-to-draft-traj.md`](plans/2026-09-07-req-to-draft-traj.md)（6 tasks；propose cache 解决 commit 只传 atomKeys）
+- **待执行**：按计划实现；未开工代码。
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 
