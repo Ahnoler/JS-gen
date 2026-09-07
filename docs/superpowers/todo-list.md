@@ -18,6 +18,7 @@
 - **Lead 裁定（2026-09-08）**：681/682 已清理；余 6 atoms 不批量 commit——由 SPA 勾选门闩承接
 - **SPA 向导已交付（2026-09-08 SDD Task 1–9）**：规格 [`specs/2026-09-08-req-draft-wizard-ui-design.md`](specs/2026-09-08-req-draft-wizard-ui-design.md) / 计划 [`plans/2026-09-08-req-draft-wizard-ui.md`](plans/2026-09-08-req-draft-wizard-ui.md)；JS-gen `aa4ca8a8`（`hasThroughChains`）；vue-project `37b5219`→`6346e1c`（四步向导 + 录制列表「需求生成草稿」）；Task 9 冒烟 `tmp/req-draft-traj/through-report-wizard-ui.md`（API PASS + 静态无 prepare/record；UI 浏览器湿测未跑）
 - **余（可选 polish）**：前端 dev 下手工/Playwright 四步湿测 + DevTools 确认无录制 API；`npm run build`（vue-tsc）例行门闩
+- **现状（2026-09-08 用户）**：SPA 已过完，**⑧ 整线进入 bug 测试期**——测试发现的 bug 随测随派修复单；各会话接到 ⑧ 相关 bug 单先看本节与两份报告（wet/quality-rerun）再动手
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 
