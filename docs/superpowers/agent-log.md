@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:00 · Zcode 闲时 — 收工：MySQL 白名单同步脚本入库（回链 03:55 开工）
+
+- 完成：`26211d5b` 跟踪 `config/update-db-whitelist.cmd`（10 分钟循环包装）+ `update-db-whitelist.ps1`（服务端 dmesg LOG 规则观测真实出口 IP→白名单更新）；`.gitignore` 增 `config/.db-whitelist-lastip` 一行——更正开工条：`.db-whitelist-sync.log` 已被既有 `*.log` 规则覆盖，无需新增
+- 验收证据：提交后 `git status` 中 whitelist 相关条目清零（仅剩他线轨迹 WIP 四文件 + draft-traj 缓存 json）；暂存区核对仅含上述三文件
+- 注意：LF→CRLF warning 为 autocrlf 常规提示；ps1 带 BOM 属 PowerShell 正常；脚本无密钥（SSH key 认证）
+- 遗留：无（03:45 遗留①就此关闭）
+
 ## 2026-09-08 03:55 · Zcode 闲时 — 开工：入库 MySQL 白名单同步脚本（用户拍板）
 
 - 开工：03:55。用户指令「config/update-db-whitelist.cmd/.ps1 提交」；回链 03:45 收工条遗留①
