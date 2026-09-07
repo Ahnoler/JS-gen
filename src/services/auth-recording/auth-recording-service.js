@@ -275,20 +275,51 @@ async function createAuthTrajectory({ functionNodeId, authKind, name, task, acco
  * @param {string} password real account password to scrub
  * @returns {Promise<void>}
  */
+/**
+ * Mask the account password inside a trajectory's persisted step params
+ * (auth-recording login steps contain the real password in `login` action
+ * params; the component snapshot is masked separately at registration).
+ * Walks each step's parsed params object and replaces string values exactly
+ * equal to the password with the __AUTH_PASSWORD__ placeholder — exact-value
+ * matching keeps short passwords (e.g. "1") from corrupting other content,
+ * and a re-registration from the masked trajectory still resolves.
+ * @param {number} tid trajectory id
+ * @param {string} password real account password to scrub
+ * @returns {Promise<void>}
+ */
 async function maskTrajectoryStepSecrets(tid, password) {
   const pwd = String(password ?? '');
   if (!pwd) return;
   const db = getDB();
-  // JS-side filtering: MySQL 5.7 rejects whereLike's implicit utf8_bin COLLATE
-  // on utf8mb4 columns, and step rows per trajectory are few.
   const rows = await db('trajectory_step')
     .where('trajectory_id', Number(tid))
     .select('id', 'params_json');
   for (const row of rows) {
-    const raw = String(row.params_json ?? '');
-    if (!raw.includes(pwd)) continue;
+    const raw = row.params_json;
+    let obj = raw;
+    if (typeof obj === 'string') {
+      try { obj = JSON.parse(obj); } catch { continue; }
+    }
+    if (!obj || typeof obj !== 'object') continue;
+    let changed = false;
+    const walk = (node) => {
+      if (Array.isArray(node)) {
+        node.forEach((v, i) => {
+          if (typeof v === 'string' && v === pwd) { node[i] = '__AUTH_PASSWORD__'; changed = true; }
+          else if (v && typeof v === 'object') walk(v);
+        });
+      } else if (node && typeof node === 'object') {
+        for (const k of Object.keys(node)) {
+          const v = node[k];
+          if (typeof v === 'string' && v === pwd) { node[k] = '__AUTH_PASSWORD__'; changed = true; }
+          else if (v && typeof v === 'object') walk(v);
+        }
+      }
+    };
+    walk(obj);
+    if (!changed) continue;
     await db('trajectory_step').where('id', row.id).update({
-      params_json: raw.split(pwd).join('__AUTH_PASSWORD__'),
+      params_json: JSON.stringify(obj),
     });
   }
 }
