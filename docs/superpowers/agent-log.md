@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 12:35 · Cursor Lead — 开工：核收假成功门闩 v2 后清空 #614 并重录
+
+- 开工：12:35。核收引擎线 `5d6a829a`（form_errors 不再被 save_ok 豁免 + 按阶段终局降级）；用户已在 SUT 清理首录相关记录，本单对 #614 清空步骤后重录验证门闩
+- 范围：`tmp/product-mgmt/`（clear/prepare/start/through-report）、`docs/superpowers/agent-log.md`；必要时 `data/kb/flows/product_library.json` source/rules 回写；不改引擎
+- 禁入：`scripts/session_runner.py` 他线 WIP；`save_section.py` 恢复禁令；R5/R6 在途 traj；引擎线刚改文件（recorder_emitters / recording-runner / action-log-copy）只读核收
+- 方式：POST `/clear` → 更新 stamp 任务文案 → prepare → record/start → 验收认 stepCount + select_option + toast/stamp，不认仅 phase_done
 ## 2026-09-07 13:20 · ZCode 引擎线 — 开工声明：record 假成功根因排查+门闩修复（#612/#614 移交）
 - 开工：13:20。承接产品线移交：#612/#614 record/start 假成功（必填 el-select 跳过+关键写阶段 0 步仍 recorded/isSuccessful=1）；Phase 1 根因已定位（零动作门闩二次放行 + 服务端终局仅判总数 0 + 错误门闩 save_ok 放行），进入修复
 - 范围：`scripts/agent/recorder_emitters.py`（错误门闩）、`src/services/trajectory/trajectory-recording-runner.js`（终局门闩按阶段降级）、必要时 `src/services/trajectory/action-log-copy.js`（按阶段计数 helper）、`docs/superpowers/agent-log.md`、`tmp/` 验证产物
