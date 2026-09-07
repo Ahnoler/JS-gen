@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 13:05 · ZCode Lead — 开工声明：登录/登出自动化录制实施（SDD 9 任务）
+- **范围（本任务单元）**：migrations/20260907000000_auth_recording.js（新）、src/services/auth-recording/（新）、src/services/operation-component-service.js、src/services/trajectory/trajectory-record-lifecycle.js + trajectory-recording-runner.js + trajectory-dao.js、src/routes/v2/auth-recording.js（新）+ __init__.js + hierarchy.js（系统创建钩子）、src/dashboard/api-docs/catalog.js、src/dashboard/ 系统详情与推送列表组件、scripts/prompts/auth-*-prompt.md（新）。
+- **禁入区**：引擎线热区（product_library.json 卡面、tmp/product-mgmt、save_section.py、recorder_emitters/recording-runner 的引擎线改动段——我方仅插登录准备段且另行协调）、scripts/session_runner.py（他线 WIP）、共享文件（package.json、_locator_helpers_js.py）。
+- **方式**：subagent-driven-development，每任务子智能体实现+主会话验收代提交+任务评审。spec=docs/superpowers/specs/2026-09-07-auth-recording-design.md，plan=f34e34c。
+- **协调**：trajectory-recording-runner.js 与引擎线都在改——我方改动限于 runDefaultLogin/登录准备段（:305-321 一带），开工时若该段有引擎线未提交改动则先等再改。
+
 ## 2026-09-07 12:55 · Cursor Lead — 收工：核收门闩 v2 后 #614 清空重录 PASS（回链 12:35）
 
 - **核收**：引擎 `5d6a829a`（form_errors 不再被 save_ok 豁免 + 按阶段终局降级）——本轮湿测见效：首击保存 `err-save-validation:序号` 后补填再存，未在校验红字下假绿
