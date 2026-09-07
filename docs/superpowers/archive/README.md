@@ -1,6 +1,6 @@
 # Archive — Implemented specs & plans
 
-已落地、不再作为当前实施入口的设计/计划。**保留作决策记录**；活待办见 [`../backlog-visible-editable-controls.md`](../backlog-visible-editable-controls.md)。
+已落地、不再作为当前实施入口的设计/计划。**保留作决策记录**；活待办见 [`../todo-list.md`](../todo-list.md)。
 
 | Spec | Plan | Topic |
 |------|------|--------|

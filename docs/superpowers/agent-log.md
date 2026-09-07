@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 01:20 · Zcode 闲时 — 收工：文档一致性审计（回链 00:55 开工）
+
+- 完成：5 文件最小修订，全部为代码/配置/提交记录可直接证实的不一致——①`README.md`：环境要求 MySQL 8.0+→5.7+（迁移 99606717/7b56f4d8 已移除 5.7 不支持的 utf8mb4_0900_ai_ci）+ 根路径行为改为「直接返回 api-docs.html」（server.mjs:40 现为 sendFile，非跳转）；②`docs/README.md`：索引重建——CHANGELOG 引用改 git commit 历史（23eed6d0 已删档），清除 8 处死链（backlog-visible-editable-controls/superpowers-README/T4-P0 spec+plan/5 个战略文档均已不在盘上），活文档表改指现存 todo-list/agent-log/guides/jsdoc-convention；③`docs/superpowers/todo-list.md` 头部：CHANGELOG 引用修正 + 删除 backlog 死链行；④`docs/superpowers/archive/README.md`：活待办死链改指 `../todo-list.md`；⑤`docs/jsdoc-convention.md`：5 处示例引用漂移修正——checkScriptErrors/executeScript 已随组装引擎移除不存在（全仓 grep 证实），模板 A/B/C 示例换为现存真实代码（broadcasts.js:12 / llm-utils.js:15-20 / executor-session-client.js:312-320），模板 D 与路由示例行号更新（trajectory-dao.js:91-103 / trajectory.js:15，附 asyncHandler 实形）
+- 验收证据：核对未改动的声明均通过——package.json scripts/依赖、characterization 四命令+verify-all、requirements.txt、config/.env.example 与 config/config.js+database.js 逐键一致（BATCH_*/LLM_TIMEOUT_MS=120000/DB_POOL_MAX=10/EXECUTOR_DISCONNECT_TIMEOUT_MS 在 executor/config.js:207）、executor/.env.example 与 executor 实现一致（CDP 19242/node-uuid/心跳 ack）、record_status 五值与 remote_session 四值与迁移一致、v2 路由与 410/301 行为与 README 表一致；行号引用逐一 sed 复核
+- 遗留移交：①`reasonix/`、`830需求文档+原型：菜单分级/` 等目录未入索引（内容未核实，不猜述）；②docs/ 其余历史文档（设计/归档）未逐链接核对，仅覆盖用户面文档；③并行闲时审查线 23:31 开工声明将本线文件集列为禁入，两线无交集，本收工不携带其条目
+
 ## 2026-09-07 23:31 · Zcode 闲时审查 — 开工：教训驱动定向代码审查（两阶段：报告 → 实施优化）
 
 - 开工：23:31（本机真实时刻，git 时间为证；上方条目标签时刻为该线时钟读数）。执行 `guides/idle-review-prompt.md`（六族检查单 + 3 子智能体并行审查 + 阶段二修复带防再犯护栏）

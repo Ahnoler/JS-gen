@@ -117,7 +117,7 @@ JS-gen/
 
 - Node.js 18+，建议使用当前 LTS 版本。
 - npm。
-- MySQL 8.0+，使用 `utf8mb4`。数据库版本和排序规则应以当前 schema/migration 能支持的版本为准。
+- MySQL 5.7+，使用 `utf8mb4`。数据库版本和排序规则应以当前 schema/migration 能支持的版本为准（迁移已移除 MySQL 5.7 不支持的 `utf8mb4_0900_ai_ci` 排序规则）。
 - Python 3.10+，用于本地或 Executor 侧 Agent。
 - Chromium，由 Playwright 安装管理。
 - 可选 MinIO，用于截图对象存储。
@@ -263,7 +263,7 @@ npm run dev
 - Dashboard WebSocket：`ws://localhost:4097/ws`
 - Executor WebSocket：`ws://localhost:4097/ws/executor`
 
-根路径 `/` 在已配置时跳转到 `/api/docs`，未配置时跳转到 `/api/setup`。
+根路径 `/` 直接返回 API 文档页面（`api-docs.html`）；首次配置可访问 `/api/setup`。
 
 ### Executor
 

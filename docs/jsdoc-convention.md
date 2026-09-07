@@ -50,29 +50,27 @@
 逻辑简单、参数自解释时用单行：
 
 ```js
-/** Same-page-element key; falls back to full action+params key. */
-export function elementDedupKey(entry) {
+/** Broadcast the current session list (sessions:updated) to all WS clients. */
+export function broadcastSessions() {
 ```
 
-> 参考：`src/dedup.js:28`
+> 参考：`src/routes/browser-session/broadcasts.js:12`
 
 ### 模板 B — 标准多行（含 @param / @returns）
 
 ```js
 /**
- * Read and parse script-errors.json from a Playwright run.
- * @param {string} scriptPath
- * @param {number|null} code
- * @param {string} [logSuffix]
- * @param {string} [runDir] directory that received TMPDIR for this run
- * @returns {{ scriptErrors: object[]|null, success: boolean }}
+ * Call the LLM chat-completions endpoint and return the assistant message content.
+ * @param {string} text user prompt text
+ * @param {string|object} [model] model id or model object; falls back to LLM_MODEL
+ * @returns {Promise<string>} assistant message content (empty string if none)
  */
-export function checkScriptErrors(scriptPath, code, logSuffix = '', runDir = TMP_DIR) {
+export async function callLLM(text, model) {
 ```
 
 要点：可选参数用 `[name]`，类型标注 `{Type}` 必带。
 
-> 参考：`src/runtime/script-runner.js:54-62`
+> 参考：`src/llm-utils.js:15-20`
 
 ### 模板 C — 复杂 opts 解构（嵌套 @param）
 
@@ -80,25 +78,24 @@ export function checkScriptErrors(scriptPath, code, logSuffix = '', runDir = TMP
 
 ```js
 /**
- * Execute a Playwright script and push events via channel.send(event, payload).
- *
- * @param {object} opts
- * @param {string} opts.script
- * @param {string} [opts.fileName]
- * @param {{ send: Function, end: Function, onAbort: Function }} opts.channel
- * @param {{
- *   onStdoutLine?: (line: string, ctx: { screenshotsSoFar: Function }) => void,
- *   keepScriptFile?: boolean,
- *   busyMessage?: string,
- * }} [opts.hooks]
- * @returns {{ abort: () => void }|null} null if busy
+ * Close a session on the executor and release its control-plane lease.
+ * @param {object} opts 会话关闭选项
+ * @param {string} opts.nodeUuid 节点UUID
+ * @param {string} opts.sessionId 会话ID
+ * @param {boolean} [opts.keepBrowser] 是否保留Chrome用于CDP复用（默认false）
+ * @param {number} [opts.timeoutMs] timeout ms
+ * @returns {Promise<void>} 无返回值
  */
-export function executeScript({ script, fileName, channel, hooks = {} }) {
+export async function closeSession({
+  nodeUuid,
+  sessionId,
+  keepBrowser = false,
+  timeoutMs = 15000,
 ```
 
-要点：`@param {object} opts` 先声明根对象，再 `@param {string} opts.script` 逐字段；可选字段加 `[]`；回调类型用函数签名标注。
+要点：`@param {object} opts` 先声明根对象，再 `@param {string} opts.nodeUuid` 逐字段；可选字段加 `[]`；回调类型用函数签名标注。
 
-> 参考：`src/runtime/script-runner.js:154-167`
+> 参考：`src/executor-session-client.js:312-320`
 
 ### 模板 D — DAO / Service 带 Promise 返回类型
 
@@ -112,7 +109,7 @@ export async function countByRecordStatus({ functionId = null, ... } = {}) {
 
 要点：`async` 函数用 `@returns {Promise<{...}>}`；中文描述允许，但同一文件内保持一致。
 
-> 参考：`src/dao/trajectory-dao.js:65-69`
+> 参考：`src/dao/trajectory-dao.js:91-103`
 
 ---
 
@@ -123,11 +120,11 @@ export async function countByRecordStatus({ functionId = null, ... } = {}) {
 - **不强制**标注 `@param req/res`（Express 类型重复，项目惯例省略）
 
 ```js
-/** AI 分析：需求描述 -> { phases }（不落库；阶段数跟用户分步） */
-app.post('/api/v2/trajectories/analyze', async (req, res) => {
+/** AI 分析：需求描述 -> { phases }（不落库；阶段数跟用户分步；业务数据附在各阶段描述后） */
+app.post('/api/v2/trajectories/analyze', asyncHandler(async (req, res) => {
 ```
 
-> 参考：`src/routes/v2/trajectory.js:11`
+> 参考：`src/routes/v2/trajectory.js:15`
 
 ---
 
