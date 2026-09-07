@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 09:40 · Zcode 夜班续 — 开工：Task 9 报文捕获 live 冒烟（用户已重启控制面）
+
+- 开工：09:40。执行 `tmp/capture-live-smoke/README.md` 交棒包——验 `network_captured → system_ref_data` 全链落表
+- 范围：`tmp/product-mgmt/`（本次冒烟 analyze/create/start 证据）、`tmp/capture-live-smoke/`、本文件、todo ②；**不改任何引擎/业务代码**
+- 禁入：不 clear/不重录 #614 及 R1-R6 主链轨迹；不抢他线槽（先 GET executors 核空闲）；轨迹查询 WIP 四文件；data/kb/**；detach 只对本次新建 traj
+- 方式：functionId=9000000740 account=2；最小任务（进产品库→新增一级分类 stamp `20260908-capture-smoke`→保存）保证至少一条 save POST；start 用后台轮询防网关挂起；PASS 判据=check-capture.mjs 见 system_capture 行且 entries 非空
+
 ## 2026-09-08 01:00 · Zcode 闲时审查 — 收工：教训驱动两阶段审查+修复落地（回链 23:31 开工）
 
 - 完成：**阶段一**3 子智能体并行只读审查（Node A 假成功+D 时序 / Python B 接线+A-py 门闩 / 横切 C 静默+E 进程+F 对账），主线程对全部 P0/P1 逐一 Read 核实（防假完成/误报）；报告 `tmp/idle-review/2026-09-07-report.md`（P0×1 确认 + P1×7 + P2×12 疑似/移交 + F 对账 10 项）。**阶段二 8 commits**：
