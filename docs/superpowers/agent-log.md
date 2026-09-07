@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 00:15 · ZCode V3导出线 — 开工声明：V3 弹窗触发链挂载（popup 父改挂触发对象 + trigger 最晚者优先归属）
+- 开工：00:15。承接交易 499 三次重录验证：双断裂修复（305d6c7b state.py / 15e5048c element.js）已生效（stamp 带 @@anchor），但导出侧仍有 2 步错位（填表早于弹窗截图注册→无 anchor 步 / _CURRENT_POPUP_KEY 滞后→旧 anchor 步）。实施导出侧规则：popup 归属=同标题弹窗中触发步骤（点击 anchor 元素的 click 步）最晚且 ≤ 当前步骤者；popup propertiesPID 改挂触发图标对象节点（用户期望：弹窗挂在对应图标按钮后面）。
+- 范围：`src/services/transaction-export-v3-properties.js`、`src/services/transaction-export-v3.js`（stats 透传，如有）、`scripts/characterization/characterize-export-v3.mjs`（如断言需扩）、`tmp/*.mjs`（一次性验证脚本）、本文件、桌面产物（C:/Users/water/Desktop/transaction-499-*）
+- 禁入：`scripts/session_runner.py`（他线 probe WIP）、run-event-ownership 文件集（引擎线 23:10 在途）、`scripts/state.py`/`src/models/element.js`（本线已收口段，本轮不动）、前端仓库
+- 方式：主线程直接改（小改动）→ node 重建 499 payload 验证树 → lint + characterize-export-v3 回归 → commit + 收工
+
+
 ## 2026-09-07 23:59 · ZCode Lead — 收工：auth 交易禁跑 Type B 表单自愈 + 重录 job27 修复「只剩登录步」（回链 22:30 收工）
 - 完成（5602b3b6）：排查用户报告「登录演练只剩 1 步」——根因是我方验证回放触发 Type B 表单结构自愈：点完登录页跳 #/home 后 verifyFormStructure 报 用户名/密码 字段 missing，自愈将 traj 668 两条 fill 步删除。双防护落地：① registerAuthComponent 注册时从组件快照剔除 save_form_snapshot；② prepareReplayBatch 对 auth_kind 轨迹剔除 save_form_snapshot 元步（Type B 永不触发）。
 - 重录：job27 success（系统1，账号 2）——traj 671 登录 3 步（fill账号/fill密码/点击登录，密码已掩码 __AUTH_PASSWORD__）、traj 672 登出 3 步（672.step_count 字段漏刷已修正=3）；组件 57（login，paramSchema username=1/password=3）与 58（logout）confirmed。
