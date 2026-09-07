@@ -100,10 +100,24 @@ def sanitize_contract_for_mode(contract: dict[str, Any]) -> dict[str, Any]:
 
     LLM reviewers often invent submit.required=true + toast_ok/url_change for
     login/navigate; recorder then rejects every done() (no token is ever recorded).
+
+    Maintain-side contradiction guard (#614 移交，2026-09-07)：reviewer 偶发把
+    create/修改弹窗判成「部分点名」语义（allow_form_assistant=False +
+    refill=touched）——run_form_assistant 被封（form_scan_actions
+    err-form-assistant-forbidden）且 pending-write 门闩失效
+    （requires_write_all_editable=False），agent 只填任务点名字段即可提交，
+    其余必填（如新增一级分类弹窗的「序号」）整段漏填。硬规则与
+    phase-reviewer-prompt 规则 2/3 对齐：create 一律 assistant+全量 refill；
+    modify 仅在矛盾组合出现时矫正（显式正确合约原样放行）。
     """
     c = dict(contract)
     mode = c.get('mode') or 'other'
     if mode not in _NO_SUBMIT_TOKEN_MODES:
+        if mode in ('create', 'modify'):
+            touched_only = c.get('refill') == 'touched' and not c.get('allow_form_assistant')
+            if mode == 'create' or touched_only:
+                c['allow_form_assistant'] = True
+                c['refill'] = 'all_editable'
         return c
     submit = dict(c.get('submit') or {})
     submit['required'] = False

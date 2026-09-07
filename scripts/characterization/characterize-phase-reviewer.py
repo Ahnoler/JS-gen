@@ -32,7 +32,9 @@ def main() -> None:
     c = normalize_reviewer_payload(raw)
     assert c and c['mode'] == 'navigate' and c['allow_form_assistant'] is False
     assert normalize_reviewer_payload(
-        '{"mode":"create","allow_form_assistant":"false","refill":"all_editable",'
+        # coerce_bool: "false" 字符串须落到 False；用 modify+all_editable（显式
+        # 组合，sanitize 不矫正）承载该断言——create 已被 #614 硬规则强制 True
+        '{"mode":"modify","allow_form_assistant":"false","refill":"all_editable",'
         '"goal":"","in_scope":[],"out_of_scope":[],"done_when":"",'
         '"submit":{"required":true,"via":"click_save","button_text":"保存"},'
         '"success":{"kinds":[],"evidence":[]}}'
@@ -83,6 +85,40 @@ def main() -> None:
     })
     assert kept['submit']['required'] is True
     assert kept['success']['kinds'] == ['toast_ok']
+
+    # #614 移交：create 下 reviewer 给出 allow_form_assistant=False + refill=touched
+    # 的自相矛盾组合 → sanitize 强制 assistant=True + refill=all_editable（否则
+    # run_form_assistant 被封 + pending-write 门闩失效，agent 只填点名字段即提交）
+    contradicted = sanitize_contract_for_mode({
+        'mode': 'create',
+        'submit': {'required': True, 'via': 'click_save', 'button_text': '确定'},
+        'success': {'kinds': ['tree_node_added'], 'evidence': []},
+        'refill': 'touched',
+        'allow_form_assistant': False,
+    })
+    assert contradicted['allow_form_assistant'] is True, 'create must force assistant on'
+    assert contradicted['refill'] == 'all_editable', 'create must force full refill'
+    assert contradicted['submit']['required'] is True
+    assert contradicted['success']['kinds'] == ['tree_node_added']
+    # modify 同规则（整表修改语义），但保持 submit/success 不动
+    mod_fixed = sanitize_contract_for_mode({
+        'mode': 'modify',
+        'submit': {'required': True, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': ['toast_ok'], 'evidence': []},
+        'refill': 'touched',
+        'allow_form_assistant': False,
+    })
+    assert mod_fixed['allow_form_assistant'] is True
+    assert mod_fixed['refill'] == 'all_editable'
+    # 显式正确合约（create + assistant + all_editable）不被改写
+    kept2 = sanitize_contract_for_mode({
+        'mode': 'create',
+        'refill': 'all_editable',
+        'allow_form_assistant': True,
+        'submit': {'required': True, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': [], 'evidence': []},
+    })
+    assert kept2['refill'] == 'all_editable' and kept2['allow_form_assistant'] is True
 
     # force-cap: effort buckets / estimated_steps+buffer=2, never above ceiling
     assert resolve_phase_max_steps(30, {'effort': 'short'}) == 5

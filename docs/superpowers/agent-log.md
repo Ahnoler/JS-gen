@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 15:10 · ZCode 引擎线 — 开工+收工：create 弹窗合约矛盾矫正（#614 二次移交，回链本条=开工）
+- **开工**：15:10。范围=`scripts/controller/actions/phase/reviewer.py`（sanitize 矫正）+ `scripts/characterization/characterize-phase-reviewer.py`（断言）+ 本文件；禁入=session_runner.py（他线 WIP）/data/kb/**/产品线文件/auth-recording SDD 九文件集。
+- **根因（Phase 1 实证）**：#614 阶段 2 stderr `e468a25a` 合约 `mode=create allow_assistant=False refill=touched`——reviewer 把「只点名字段」判成部分点名语义；`sanitize_contract_for_mode` 对 create/modify 提前 return 不矫正；落地链 `refill=touched`→boundary `requires_write_all_editable=False`→pending-write 门闩失效，且 `allow_form_assistant=False` 直接封 run_form_assistant（form_scan_actions.py:208）——agent 只填名称即点确定，序号漏填。
+- **修复（reviewer.py sanitize_contract_for_mode）**：create 一律强制 `allow_form_assistant=True + refill=all_editable`（与 phase-reviewer-prompt 规则 2/3 对齐）；modify 仅在矛盾组合（touched+assistant=false）时矫正；submit/success 令牌原样保留。TDD：先加失败断言再修；旧断言「create+"false"字符串透传」与硬规则冲突，改用 modify+all_editable 显式组合承载 coerce_bool 测试意图。
+- **验收**：characterize-phase-reviewer PASS、save-cue-promote PASS、**verify-all ALL GREEN**。
+- **「清空步骤(5)」排查结论（另报项，非缺陷）**：与 `POST /clear` 无耦合——路径=编辑弹窗 AI 重分析把阶段置为全新列表（`RecordingDialog.vue:163` 注释明示「无 phaseId → 保存时删除旧阶段及步骤」）→ `PUT /phases` → `syncTrajectoryPhaseDescriptions`（trajectory-phase-service.js:292-305）删除不在清单中的阶段及其步骤。前端有意设计；产品线若嫌突兀应在重分析时提示「将作废已录步骤」，引擎侧不动。
+- **移交**：引擎改动无需重启 Python（合约每阶段经 reviewer 重新生成+sanitize）；产品线可清空重录 #614 湿测验收（验收口径：任务只点名分类名称时落库须出现序号填写步/助手等价写入，且弹窗关闭后不得点主区保存）。
+
 ## 2026-09-07 13:05 · ZCode Lead — 开工声明：登录/登出自动化录制实施（SDD 9 任务）
 - **范围（本任务单元）**：migrations/20260907000000_auth_recording.js（新）、src/services/auth-recording/（新）、src/services/operation-component-service.js、src/services/trajectory/trajectory-record-lifecycle.js + trajectory-recording-runner.js + trajectory-dao.js、src/routes/v2/auth-recording.js（新）+ __init__.js + hierarchy.js（系统创建钩子）、src/dashboard/api-docs/catalog.js、src/dashboard/ 系统详情与推送列表组件、scripts/prompts/auth-*-prompt.md（新）。
 - **禁入区**：引擎线热区（product_library.json 卡面、tmp/product-mgmt、save_section.py、recorder_emitters/recording-runner 的引擎线改动段——我方仅插登录准备段且另行协调）、scripts/session_runner.py（他线 WIP）、共享文件（package.json、_locator_helpers_js.py）。
