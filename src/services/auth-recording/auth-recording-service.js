@@ -31,6 +31,9 @@ const RECORD_POLL_INTERVAL_MS = 3000;
 /** Hard timeout for one recording segment (10 minutes). */
 const RECORD_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** A pending/running job untouched for this long is considered stale (crashed executor) and superseded. */
+const STALE_JOB_MS = 30 * 60 * 1000;
+
 function svcError(message, statusCode = 400) {
   const err = new Error(message);
   err.statusCode = statusCode;
@@ -42,6 +45,21 @@ function sleep(ms) {
 }
 
 /**
+ * A pending/running job whose updated_at is older than STALE_JOB_MS is treated
+ * as a crash leftover (no executor heartbeat / status transition for 30 min).
+ * @param {object} job auth recording job row (camelCase, updatedAt as Date|string|null)
+ * @returns {boolean} true when the job is considered stale
+ */
+function isStaleJob(job) {
+  if (!job) return false;
+  const ts = job.updatedAt ?? job.updated_at;
+  if (ts == null) return false;
+  const time = ts instanceof Date ? ts.getTime() : Date.parse(String(ts));
+  if (!Number.isFinite(time)) return false;
+  return Date.now() - time > STALE_JOB_MS;
+}
+
+/**
  * Read a phase task prompt file by name.
  * @param {string} fileName prompt file under scripts/prompts/
  * @returns {string} prompt text (empty string when unreadable)
@@ -49,18 +67,20 @@ function sleep(ms) {
 function loadPrompt(fileName) {
   try {
     return readFileSync(path.resolve(__dirname, '../../../scripts/prompts', fileName), 'utf-8');
-  } catch {
+  } catch (err) {
+    console.warn(`[auth-recording] prompt ${fileName} unreadable, phase task falls back to empty: ${err?.message || err}`);
     return '';
   }
 }
 
 /**
- * Normalize a URL for comparison: trim + strip a single trailing slash.
+ * Normalize a URL for comparison: trim, lowercase (host is case-insensitive)
+ * and strip trailing slashes.
  * @param {string|null} url raw URL
- * @returns {string} normalized URL (lowercased trailing-slash-free)
+ * @returns {string} normalized URL (lowercased, trailing-slash-free)
  */
 export function normalizeUrl(url) {
-  return String(url ?? '').trim().replace(/\/+$/, '');
+  return String(url ?? '').trim().toLowerCase().replace(/\/+$/, '');
 }
 
 /**
@@ -146,6 +166,8 @@ async function createAuthTrajectory({ functionNodeId, authKind, name, phaseName,
 
 /**
  * Poll trajectory.record_status until it leaves 'recording' (or timeout).
+ * Transient DB read failures / missing rows are NOT treated as "recording
+ * finished" — polling continues until a confirmed status read or timeout.
  * @param {number} tid trajectory id
  * @param {number} [timeoutMs] max wait time
  * @returns {Promise<{ ok: boolean, recordStatus: string|null }>} ok=false on timeout
@@ -153,10 +175,20 @@ async function createAuthTrajectory({ functionNodeId, authKind, name, phaseName,
 async function waitForRecordingFinish(tid, timeoutMs = RECORD_TIMEOUT_MS) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const row = await trajectoryDao.getRecordStatusRow(tid).catch(() => null);
-    const status = row?.recordStatus ?? null;
-    if (!status || status !== 'recording') return { ok: true, recordStatus: status };
-    if (Date.now() > deadline) return { ok: false, recordStatus: status };
+    let recordStatus = null;
+    try {
+      const row = await trajectoryDao.getRecordStatusRow(tid);
+      recordStatus = row?.recordStatus ?? null;
+    } catch {
+      recordStatus = null;
+    }
+    // Only a confirmed read of a non-recording status ends the wait.
+    if (recordStatus != null && recordStatus !== 'recording') {
+      return { ok: true, recordStatus };
+    }
+    if (Date.now() > deadline) {
+      return { ok: false, recordStatus };
+    }
     await sleep(RECORD_POLL_INTERVAL_MS);
   }
 }
@@ -211,7 +243,6 @@ async function runAuthRecordingJob(ctx) {
     await store.updateJob(jobId, { status: 'running', updatedAt: new Date() });
 
     // --- Login segment ---
-    let loginOk = false;
     try {
       await runSegment(loginTid, {
         accountId,
@@ -219,7 +250,6 @@ async function runAuthRecordingJob(ctx) {
         criteria: checkLoginCriteria,
         segmentLabel: '登录段',
       });
-      loginOk = true;
     } catch (err) {
       await detachTrajectoryLive(loginTid, { reason: 'auth_record_failed' }).catch(() => {});
       throw new Error(`登录段失败: ${String(err.message || err).slice(0, 2000)}`);
@@ -259,8 +289,6 @@ async function runAuthRecordingJob(ctx) {
         password,
       });
     }
-    if (!loginOk) throw new Error('unreachable');
-
     await store.updateJob(jobId, { status: 'success', error: null, updatedAt: new Date() });
   } catch (err) {
     const message = String(err?.message || err).slice(0, 4000);
@@ -297,7 +325,16 @@ export async function startAuthRecording(systemId, { accountId = null } = {}) {
 
   const existing = await store.latestJobForSystem(sid);
   if (existing && (existing.status === 'pending' || existing.status === 'running')) {
-    throw svcError(`Auth recording job #${existing.id} is already ${existing.status} for this system`, 409);
+    if (isStaleJob(existing)) {
+      // Crash leftover: mark stale job failed and allow a new trigger.
+      await store.updateJob(existing.id, {
+        status: 'failed',
+        error: 'stale job superseded',
+        updatedAt: new Date(),
+      }).catch(() => {});
+    } else {
+      throw svcError(`Auth recording job #${existing.id} is already ${existing.status} for this system`, 409);
+    }
   }
 
   let account = null;
