@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 13:20 · ZCode 引擎线 — 开工声明：record 假成功根因排查+门闩修复（#612/#614 移交）
+- 开工：13:20。承接产品线移交：#612/#614 record/start 假成功（必填 el-select 跳过+关键写阶段 0 步仍 recorded/isSuccessful=1）；Phase 1 根因已定位（零动作门闩二次放行 + 服务端终局仅判总数 0 + 错误门闩 save_ok 放行），进入修复
+- 范围：`scripts/agent/recorder_emitters.py`（错误门闩）、`src/services/trajectory/trajectory-recording-runner.js`（终局门闩按阶段降级）、必要时 `src/services/trajectory/action-log-copy.js`（按阶段计数 helper）、`docs/superpowers/agent-log.md`、`tmp/` 验证产物
+- 禁入：`scripts/session_runner.py`（他线未提交 probe 改动在身）、`data/kb/**`、产品线文件（tmp/product-mgmt 只读）、R4-R6 在途 traj、`config/.env*`
+- 方式：systematic-debugging 四阶段；修后跑 `bash scripts/refactor/verify-all.sh`（注意 3 存量红基线）；子智能体不 commit，主会话验收后代提交
+
 ## 2026-09-07 12:10 · ZCode Lead — R4 全部达成（606/607/608 三轨迹）+ G5 派发（R5 批复查看+R6 用信打包棒）
 - **G4 完成（R4 棒 2，主链审批段闭环）**：①WN0001 账号补建（systemAccountId=26）②traj 607=评级二次调查录制，**PJ20260907016009 状态=通过（评级生效，bsnSt=5）**③traj 608=授信二次调查录制，**DGSX20260907056033 通过（applyState=5）→批复自动生成 DGSXPF20260907020005 已生效**（R5 对象）。注意：评级/授信列表按经办人数据域强过滤（WN0001 名下恒 0 条），pageBsnInf 等 API 可按 bsnNo 直查；curl 中文 body 须 UTF-8 文件 --data-binary。
 - **G5 已派发（R5+R6 打包棒，进行中）**：R5=批复查看录制（fid=9000000057，DGSXPF20260907020005 要素核对，只读）；R6=对公用信申请录制（批复 DGSXPF20260907020005→方案品种命中分项→10 万/12 月→保证+引入保证人→利率→提交→黄亮；credit_usage 卡配方 P3-B 实证）。
