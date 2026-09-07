@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 19:55 · Cursor Lead — 收工：#614 重录部分通过（回链 19:26）
+
+- 完成：stamp `20260907-1926` 重录 session `e72482e4`；p2/p3 **序号=1 已落库**（create 合约修复湿测成立）；p4 有 select_option×5 + 日期/描述 stamp，但 **QUALITY FAIL：pending_fields=法人行社 + missing_success_token**，无基本信息保存 toast；轨迹仍标 `recorded/isSuccessful=1`（不可信）
+- 验收证据：`tmp/product-mgmt/through-report-basicinfo-rerecord-1926.md`、`steps-614-1926.json`、stderr `e72482e4-*.log`；已 detach
+- 遗留移交：①法人行社硬门 vs optional 需产品/引擎裁决后再清 #614 重录；②QUALITY FAIL 后不应标成功；③本轮不写 KB；SUT 留 stamp 1926 节点可清
+- 注意：未改引擎/KB；控制面曾因 arity fix 重启（PID 39220）
+
 ## 2026-09-07 19:26 · Cursor Lead — 开工：引擎 create 合约硬矫正后重录 #614
 
 - 开工：19:26。用户确认引擎已修好（sanitize create→assistant=true/all_editable；#499 拆单 675/676/678 已湿测序号）；本单对 #614 清空后重录验收
