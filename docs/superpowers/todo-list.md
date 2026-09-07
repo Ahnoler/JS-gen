@@ -8,15 +8,16 @@
 
 ## 当前工作线（2026-09-06 起）
 
-### ⑧ 需求切片 → 原子草稿交易（2026-09-07 · 已落地；质量复测 PASS）
+### ⑧ 需求切片 → 原子草稿交易（2026-09-07 · 已落地；SPA 向导已交付）
 
 - **已合入**：两段式 API `draft-traj/propose|commit`；provenance 四字段迁移；propose cache；characterize **OK 25**（质量修复后）。
 - 规格/计划：[`specs/2026-09-07-req-to-draft-traj-design.md`](specs/2026-09-07-req-to-draft-traj-design.md) / [`plans/2026-09-07-req-to-draft-traj.md`](plans/2026-09-07-req-to-draft-traj.md)
 - **湿测通路 PASS（2026-09-08 凌晨）**：traj 681/682；报告 `tmp/req-draft-traj/through-report-wet.md`；FK guard `3b03e231`
 - **质量审 + 修复（2026-09-08 Cursor Reviewer）**：章节挂错（概述/复用章）+ task 占位未替换 → 已修 `provenance.js`/`propose.js`；离线 chain-a 10 步 resolve 均指向 `03-配置产品信息`
 - **质量复测 PASS（2026-09-08 Zcode，`b0c7118c` LLM 路径）**：重启控制面后 propose 9 atoms/0 rejected——概述挂载 0、占位残留 0、fnId 全 null；force commit 排序/公共要素/个性化 → traj **687/688/689** GET 验证过；报告 `tmp/req-draft-traj/through-report-quality-rerun.md`
-- **Lead 裁定（2026-09-08 Cursor Reviewer 接回收执）**：① **已清理 681/682**（DELETE 200→404；对照价值已由报告+687/688/689 覆盖）；② **余 6 atoms 不自动 commit**，等 SPA / 业务勾选（设计门闩：人未勾选不建交易）
-- **待做（非阻塞）**：前端向导实现计划已就绪 [`plans/2026-09-08-req-draft-wizard-ui.md`](plans/2026-09-08-req-draft-wizard-ui.md)（规格 [`specs/2026-09-08-req-draft-wizard-ui-design.md`](specs/2026-09-08-req-draft-wizard-ui-design.md)）；落地在 vue-project
+- **Lead 裁定（2026-09-08）**：681/682 已清理；余 6 atoms 不批量 commit——由 SPA 勾选门闩承接
+- **SPA 向导已交付（2026-09-08 SDD Task 1–9）**：规格 [`specs/2026-09-08-req-draft-wizard-ui-design.md`](specs/2026-09-08-req-draft-wizard-ui-design.md) / 计划 [`plans/2026-09-08-req-draft-wizard-ui.md`](plans/2026-09-08-req-draft-wizard-ui.md)；JS-gen `aa4ca8a8`（`hasThroughChains`）；vue-project `37b5219`→`6346e1c`（四步向导 + 录制列表「需求生成草稿」）；Task 9 冒烟 `tmp/req-draft-traj/through-report-wizard-ui.md`（API PASS + 静态无 prepare/record；UI 浏览器湿测未跑）
+- **余（可选 polish）**：前端 dev 下手工/Playwright 四步湿测 + DevTools 确认无录制 API；`npm run build`（vue-tsc）例行门闩
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 

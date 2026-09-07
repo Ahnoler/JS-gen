@@ -2,6 +2,15 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:10 · Cursor Subagent — 收工：SDD req-draft-wizard UI Task 9 冒烟 + 关闭 ⑧ SPA（回链 03:25 Lead 开工）
+
+- 完成：Task 9 E2E 冒烟清单执行完毕；todo ⑧ SPA 勾选项标为已交付；SDD 向导线（Task 1–9）文档收口
+- JS-gen 代码：`aa4ca8a8`（`hasThroughChains` + characterize OK 3）——本轮仅 docs commit
+- vue-project（他仓，子智能体已提交）：`37b5219` api/kb → `ecfef3b` 路由壳 → `21a4ef5` step1 → `ab5eab5` step2 → `ebbca9b` step3 → `d63cfd7` step4 → `6346e1c` 列表入口「需求生成草稿」
+- 验收证据：控制面 4097 UP；`GET /api/v2/kb/req-modules` 30 行均含 `hasThroughChains`；`POST product-mgmt/draft-traj/propose` 9 atoms/0 rejected（概述挂载 0）；`characterize-kb-req-modules-list.mjs` OK 3；`req-draft-wizard` 静态 grep 无 prepare/record；报告 `tmp/req-draft-traj/through-report-wizard-ui.md` + `.superpowers/sdd/.../task-9-report.md`（均 gitignored）
+- 遗留移交：可选 polish = 前端 dev 四步 UI 湿测 + DevTools 无录制 API；commit API 本轮未再 POST（687–689 湿测仍有效）
+- 注意：未触轨迹查询 WIP 四文件；tmp/ 不入库
+
 ## 2026-09-08 04:05 · Zcode 闲时审查 — 开工：存量假成功数据清洗 + 门闩残余批次 + 闲时审查定时化
 
 - 开工：04:05。用户五项批复的执行单：③存量假成功清洗（已批准）+④门闩残余（「先看可否进行」——已核：Cursor wizard 线范围 kb-req-modules/api-docs/前端仓与本批不相交，轨迹查询 WIP 已提交，session_runner 解冻，执行机空闲）+⑤闲时审查定时化（考虑花销，低频）
