@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 21:35 · Cursor Lead — 开工：click_save 幽灵 pending 活体剪枝（方案 A）
+
+- 开工：21:35。用户确认方案 A；先落 spec，审阅通过后写 plan 再改代码
+- 范围：`docs/superpowers/specs/2026-09-07-ghost-pending-prune-design.md`；随后 `scripts/controller/actions/js_snippets/scan_form.py`（`JS_CHECK_SINGLE_FIELD`+visible）、`form_save.py`（ghost prune）、相关 characterization、本文件
+- 禁入：session_runner WIP；轨迹查询未提交改动（trajectory-dao / v2 trajectory / trajectory-service / trajectory-query-service）；方案 B/C；isSuccessful 假成功；本单不重录 #614
+- 方式：spec → 用户审阅 → writing-plans → TDD pin + 实现 + verify-all；证据锚 #614 stderr `e72482e4`（法人机构）
+
 ## 2026-09-07 20:45 · Cursor Lead — 收工：req→draft-traj SDD 六任务落地（回链 20:08）
 
 - 完成：`propose`/`commit` API + provenance 四字段 + propose cache + characterize OK 19；终审 Important 已修（`c044387f`）；提交链 `a029bb03..c044387f`
