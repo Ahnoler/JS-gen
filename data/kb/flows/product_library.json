@@ -275,7 +275,7 @@
     },
     {
       "keyword": "基本信息保存",
-      "rule": "未启用产品右侧「基本信息」页签底部【保存】；成功 toast「操作成功」。贯通补录 #614（stamp 20260907-1130，目标产品示例：测试产品A）；#499 不含本步。CDP 证据 tmp/product-mgmt/_cdp614_basicinfo.json"
+      "rule": "未启用产品右侧「基本信息」页签底部【保存】；成功 toast「操作成功」。必填下拉（额度类型/征信产品类型/征信组别大类小类）须 select_option，校验红字未清不得 done。贯通 #614 重录（引擎门闩 v2 后，stamp 20260907-1235，产品示例：测试产品B-20260907-1235；stepCount=22含3×select_option）；报告 tmp/product-mgmt/through-report-basicinfo-rerecord.md。#499 不含本步"
     }
   ],
   "exceptions": [
@@ -288,5 +288,5 @@
     "选中父节点后再点「新增一级分类」仍造顶层一级（#504 证伪「选父即落子」）；子级必须点第二个 folder-add「新增分类」",
     "agent 可能误报「父下已见子节点」——须 CDP/树 depth 核对，勿信 done 文案 alone（#504 P3）"
   ],
-  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用；I3 #500 克隆→启用；I4 #502 禁用；I6 #504 证伪选父+一级分类；I7 #506 选父+「新增分类」挂子 depth=1（KB测子挂-20260905-0015）；recall 535d6d7；I11 #614 基本信息保存（20260907-1130）：AI recorded 弱步骤；CDP 铁证 toast 操作成功 + 描述 stamp；详见 tmp/product-mgmt/through-report-basicinfo.md"
+  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用；I3 #500 克隆→启用；I4 #502 禁用；I6 #504 证伪选父+一级分类；I7 #506 选父+「新增分类」挂子 depth=1（KB测子挂-20260905-0015）；recall 535d6d7；I11 #614 基本信息保存重录（20260907-1235，引擎假成功门闩 v2 后）：recorded stepCount=22 + select_option×3 + toast 操作成功；详见 tmp/product-mgmt/through-report-basicinfo-rerecord.md"
 }

@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 12:55 · Cursor Lead — 收工：核收门闩 v2 后 #614 清空重录 PASS（回链 12:35）
+
+- **核收**：引擎 `5d6a829a`（form_errors 不再被 save_ok 豁免 + 按阶段终局降级）——本轮湿测见效：首击保存 `err-save-validation:序号` 后补填再存，未在校验红字下假绿
+- **完成**：#614 clear → 因 SUT 已删「测试产品A」改为新建 `测试一级分类B/测试产品B-20260907-1235` → 基本信息保存；`recorded` stepCount=**22**；`select_option`×3；stderr toast **操作成功**；p5 核对未启用+stamp
+- **验收**：`tmp/product-mgmt/through-report-basicinfo-rerecord.md` + `_tree614-r3.json`；`product_library.json` source/rule 已回写 stamp 1235
+- **注意**：①中间一次以旧目标重录曾 p2 失败且控制面过早 recorded（并行观察）；②征信组别小类日志 ok-already 未重复落库；③未碰 session_runner / 未恢复 save_section
 ## 2026-09-07 12:35 · Cursor Lead — 开工：核收假成功门闩 v2 后清空 #614 并重录
 
 - 开工：12:35。核收引擎线 `5d6a829a`（form_errors 不再被 save_ok 豁免 + 按阶段终局降级）；用户已在 SUT 清理首录相关记录，本单对 #614 清空步骤后重录验证门闩
