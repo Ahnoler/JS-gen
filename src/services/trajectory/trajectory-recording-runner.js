@@ -33,7 +33,7 @@ import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { capturePhaseBuffer, buildMetadata } from './phase-highlight-screenshot.js';
 import { replacePhaseGroupScreenshot } from '../screenshot-service.js';
-import { waitForSessionEventOwned } from './run-event-ownership.js';
+import { phaseEventOwnership, waitForSessionEventOwned } from './run-event-ownership.js';
 
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -601,6 +601,18 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     if (type === 'phase_done' || type === 'action_log_sync') {
       console.log(`[probe] session=${runtime.sessionId} event=${type} entries=${Array.isArray(payload?.entries) ? payload.entries.length : '-'}`);
     }
+    // 落库事件归属过滤（spec 4.1.4）：上一轮 run 的持久化事件不写入本轮步骤表、
+    // 不喂空闲看门狗。legacy（旧执行机 payload 无 runId）按 spec 4.4 兼容放行。
+    if (type === 'action_log_sync' || type === 'step_screenshot' || type === 'page_level_screenshot') {
+      const own = phaseEventOwnership(payload, { runId: runtime.currentRunId });
+      if (own.decision === 'ignore') {
+        console.warn(
+          `[record] persist_event_ignored_${own.reason} session=${runtime.sessionId} type=${type}`
+          + ` gotRunId=${payload?.runId} expect=${runtime.currentRunId}`,
+        );
+        return Promise.resolve();
+      }
+    }
     if (type === 'action_log_sync' || type === 'step_screenshot' || type === 'page_level_screenshot') {
       try { phaseActivity?.(); } catch {}
     }
@@ -1039,6 +1051,19 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     runtime.abortRecording = false;
     runtime.aiRecording = false;
     runtime.userStop = null;
+    // spec 4.2：所有异常结束路径补发 cancel_step，防止空闲超时/phase_error 退出后
+    // 执行机 agent 成为僵尸。幂等：用户 stop 路径已发过，再发无害（执行机侧
+    // _request_agent_stop 天然幂等）。发送失败不影响 finally 其余清理。
+    if (runtime._sentStepThisRun) {
+      try {
+        execSession.forwardStdin({
+          nodeUuid: runtime.executorNodeUuid,
+          sessionId: runtime.sessionId,
+          event: 'cancel_step',
+          data: {},
+        });
+      } catch {}
+    }
     clearPhaseActivity();
     // Subscription deliberately NOT unsubscribed here: it lives until the session
     // closes (see the _aiRecordUnsub stash above) so session-end events (final
