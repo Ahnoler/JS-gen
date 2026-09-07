@@ -41,6 +41,33 @@ async function main() {
     assert.equal(typeof dao.findDraftByReqAtomKey, 'function');
   });
 
+  const { fromDbRow } = await import(pathToFileURL(join(ROOT, 'src/dao/helpers.js')).href);
+  run('fromDbRow surfaces trajectory provenance columns (GET detail passthrough)', () => {
+    const entity = fromDbRow({
+      id: 42,
+      req_module_key: 'demo-mod',
+      req_source_path: 'demo.docx',
+      req_chapter_ref: 'chapters/01-product-library.md#产品库管理',
+      req_atom_key: 'demo-mod:chain-a:2:新增一级分类',
+      record_status: 'draft',
+    });
+    assert.equal(entity.reqModuleKey, 'demo-mod');
+    assert.equal(entity.reqSourcePath, 'demo.docx');
+    assert.equal(entity.reqChapterRef, 'chapters/01-product-library.md#产品库管理');
+    assert.equal(entity.reqAtomKey, 'demo-mod:chain-a:2:新增一级分类');
+    assert.equal(entity.recordStatus, 'draft');
+  });
+
+  run('getTrajectoryWithPhases returns full dao entity (no field allowlist)', () => {
+    const src = readFileSync(
+      join(ROOT, 'src/services/trajectory/trajectory-query-service.js'),
+      'utf8',
+    );
+    assert.match(src, /export async function getTrajectoryWithPhases/);
+    assert.match(src, /return traj;/);
+    assert.doesNotMatch(src, /\breqModuleKey\b.*\bdelete\b/);
+  });
+
   const parseMod = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/parse-through-chains.js')).href);
   const provMod = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/provenance.js')).href);
 
@@ -317,6 +344,15 @@ async function main() {
   await runAsync('commitDraftTrajectories exported from index', async () => {
     const idx = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/index.js')).href);
     assert.equal(typeof idx.commitDraftTrajectories, 'function');
+  });
+
+
+  await runAsync('kb.js wires draft-traj propose and commit routes', async () => {
+    const src = readFileSync(join(ROOT, 'src/routes/v2/kb.js'), 'utf8');
+    assert.match(src, /draft-traj\/propose/);
+    assert.match(src, /draft-traj\/commit/);
+    assert.match(src, /proposeDraftTrajectories|reqDraftTraj\.propose/);
+    assert.match(src, /commitDraftTrajectories|reqDraftTraj\.commit/);
   });
 
   console.log(`OK ${passed}`);

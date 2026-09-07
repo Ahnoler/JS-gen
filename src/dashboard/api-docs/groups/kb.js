@@ -170,7 +170,7 @@ export const GROUP_KB = [{
         message: 'ok',
         data: {
           created: [{ trajectoryId: 4242, atomKey: 'product-mgmt:chain-a:2:新增一级分类', name: '新增一级分类' }],
-          skipped: [{ atomKey: 'product-mgmt:chain-a:9:不存在', reason: 'unknown or stale atomKey' }],
+          skipped: [{ atomKey: 'product-mgmt:chain-a:9:不存在', reason: 'unknown_or_stale_atom' }],
         },
       }),
       notes: ['atomKeys 必填且非空', '未先 propose → 400', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
