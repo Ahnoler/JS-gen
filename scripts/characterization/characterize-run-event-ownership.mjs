@@ -1,0 +1,123 @@
+/**
+ * runId ownership filter (offline, no DB/session).
+ * Run: node scripts/characterization/characterize-run-event-ownership.mjs
+ */
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { EventEmitter } from 'node:events';
+import {
+  phaseEventOwnership,
+  waitForSessionEventOwned,
+} from '../../src/services/trajectory/run-event-ownership.js';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+
+function testOwnership() {
+  // owned + matching phase → accept
+  assert.deepEqual(
+    phaseEventOwnership({ runId: 'r1', phase: 2 }, { runId: 'r1', phaseNumber: 2 }),
+    { decision: 'accept', reason: '' },
+  );
+  // runId mismatch → ignore（僵尸 agent 事件）
+  assert.equal(
+    phaseEventOwnership({ runId: 'stale', phase: 4 }, { runId: 'r1', phaseNumber: 1 }).decision,
+    'ignore',
+  );
+  // phase mismatch（同 run 内等阶段 1 时到了阶段 2 的 done）→ ignore
+  assert.equal(
+    phaseEventOwnership({ runId: 'r1', phase: 2 }, { runId: 'r1', phaseNumber: 1 }).decision,
+    'ignore',
+  );
+  // payload 无 runId → legacy（兼容旧执行机），phase 匹配时放行
+  assert.deepEqual(
+    phaseEventOwnership({ phase: 2 }, { runId: 'r1', phaseNumber: 2 }),
+    { decision: 'legacy', reason: 'missing_runid' },
+  );
+  // persist 类订阅不传 phaseNumber → 不做阶段校验
+  assert.equal(
+    phaseEventOwnership({ runId: 'r1', phase: 9 }, { runId: 'r1' }).decision,
+    'accept',
+  );
+  assert.equal(
+    phaseEventOwnership({ runId: 'stale' }, { runId: 'r1' }).decision,
+    'ignore',
+  );
+}
+
+async function testOwnedWait() {
+  const hub = new EventEmitter();
+  const addListener = (type, handler) => {
+    hub.on(type, handler);
+    return () => hub.off(type, handler);
+  };
+  const ignored = [];
+  const doneP = waitForSessionEventOwned({
+    addListener,
+    type: 'phase_done',
+    runId: 'r1',
+    phaseNumber: 1,
+    onIgnored: (payload, reason) => ignored.push(reason),
+  });
+  // 僵尸 done：旧 run 事件、同 run 阶段错位、本轮 canceled —— 均忽略
+  hub.emit('phase_done', { runId: 'stale', phase: 4 });
+  hub.emit('phase_done', { runId: 'r1', phase: 2 });
+  hub.emit('phase_done', { runId: 'r1', phase: 1, canceled: true });
+  assert.deepEqual(ignored, ['runid_mismatch', 'phase_mismatch', 'canceled']);
+  // 真正的本轮阶段 1 done → resolve
+  hub.emit('phase_done', { runId: 'r1', phase: 1, success: true });
+  const payload = await doneP;
+  assert.equal(payload.success, true);
+
+  // 兼容旧执行机（spec 4.4）：payload 无 runId → legacy 放行（resolve，日志经 onIgnored）
+  const legacyIgnored = [];
+  const legacyP = waitForSessionEventOwned({
+    addListener,
+    type: 'phase_done',
+    runId: 'r2',
+    phaseNumber: 3,
+    onIgnored: (payload, reason) => legacyIgnored.push(reason),
+  });
+  hub.emit('phase_done', { phase: 3, success: false });
+  const legacyPayload = await legacyP;
+  assert.equal(legacyPayload.success, false);
+  assert.deepEqual(legacyIgnored, ['missing_runid']);
+
+  // cancel 语义：cancel 后 await 静默 resolve undefined（不挂起、不 reject）
+  const p2 = waitForSessionEventOwned({ addListener, type: 'phase_done', runId: 'rX' });
+  p2.cancel();
+  assert.equal(await p2, undefined);
+}
+
+function testRunnerWiring() {
+  // 文本 pin：runner 已接线（Task 2/3 完成后本段通过）
+  const runner = readFileSync(
+    join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
+  assert.ok(runner.includes('runtime.currentRunId'), 'runner stores currentRunId');
+  assert.ok(runner.includes('stepData.runId'), 'runner sends runId in step data');
+  assert.ok(
+    runner.includes("waitForSessionEventOwned({") ,
+    'phase_done/phase_error waits go through owned filter',
+  );
+  assert.ok(runner.includes('cancel_step'), 'finally re-sends cancel_step');
+}
+
+function testRunnerOwnFilterWiring() {
+  const runner = readFileSync(
+    join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
+  // 订阅回调里的落库事件过滤（Task 3）：persist 事件必须先过 ownership 再计数/落库
+  const cb = runner.split('subscribeSessionEvents(runtime.sessionId')[1] || '';
+  assert.ok(cb.includes('phaseEventOwnership'), 'persist callback filters by ownership');
+}
+
+const steps = [testOwnership, testOwnedWait, testRunnerWiring, testRunnerOwnFilterWiring];
+for (const [i, fn] of steps.entries()) {
+  try {
+    await fn();
+  } catch (err) {
+    console.error(`FAIL step ${i + 1} (${fn.name}): ${err.message}`);
+    process.exit(1);
+  }
+}
+console.log('PASS characterize-run-event-ownership');
