@@ -50,7 +50,7 @@ function normalizeUrl(url) {
 /**
  * Parse body as JSON when possible, else truncate text to 4KB.
  * @param {Buffer|null} bodyBytes - Raw body bytes.
- * @returns {Object|string|null} Parsed JSON, truncated text, or null.
+ * @returns {object|string|null} Parsed JSON, truncated text, or null.
  */
 function safeBody(bodyBytes) {
   if (bodyBytes == null) return null;
