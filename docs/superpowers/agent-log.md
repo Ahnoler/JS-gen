@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 00:25 · Zcode 夜班 — 开工：报文捞取 Tasks 7-10（capture + persistence，回链 23:05 湿测已收口）
+
+- 开工：00:25。draft-traj 湿测已收口（见 00:05 收工条）；候补任务按 todo ② 执行 `plans/2026-08-25-capture-persistence.md`（Task 7-9；Task 10 CHANGELOG 段废止不执行）
+- 范围：新建 `scripts/tools/api-capture.mjs`、`scripts/controller/actions/network_capture.py`；修改 `scripts/session_runner.py`（try/except 包裹的 attach+cleanup）、`src/memory/protocol.js`、`src/memory/memory-service.js`、`src/dao/system-ref-dao.js`、`src/services/system-ref-service.js`、characterization、本文件、todo ②
+- 禁入：轨迹查询未提交 WIP（trajectory-dao / v2 trajectory / trajectory-service / trajectory-query-service）；`data/kb/flows/**`；R1-R6 主链交易；不重启控制面/执行机
+- 方式：Task 7/8 纯新增先落地+commit；Task 9 接线改动按 09-07 教训须**真实形状 smoke**（module 级真实 import + hub 事件形状对拍）+ attach 全程 try/except 防炸录制；每 task 一 commit
+
 ## 2026-09-08 00:05 · Zcode 夜班 — 收工：draft-traj 湿测 PASS（回链 23:05 开工）
 
 - 完成：**首通 PASS，DoD 6/6**——characterize OK 19；migrate 无需执行（四列已在库）；product-mgmt propose 8 atoms+1 rejected（出处全非空、粒度原子）；commit traj **681/682** draft + provenance 四字段 GET 验证过；负例 duplicate_draft / unknown_or_stale_atom / 无-cache 400 三发全过；todo ⑧ 已勾销湿测段
