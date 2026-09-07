@@ -1,0 +1,10 @@
+{
+  "moduleKey": "demo-mod",
+  "moduleName": "Demo 模块",
+  "sourcePath": "C:/fixtures/demo-mod.docx",
+  "sourceKind": "req",
+  "status": "sliced",
+  "warnings": [],
+  "createdAt": "2026-09-07T00:00:00.000Z",
+  "updatedAt": "2026-09-07T00:00:00.000Z"
+}
