@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:18 · Zcode 闲时审查 — 收工：数据清洗 + 门闩残余批次 + 闲时审查定时化（回链 04:05 开工）
+
+- 完成：用户五项批复执行完毕——①**存量假成功数据清洗**（已批准③）：只读盘点 359 条 recorded/completed+is_successful=1，其中 **24 条业务步=0 的铁板假成功**（KB-I5 探针 + 09-06 晚 KB贯通批量）已置 is_successful=0，record_status 未动；#612（16 业务步）/#614（26 业务步）已被真实重录覆盖不在清洗范围；剩余 335 条均有业务步，无法离线判定者不盲目清洗。DB 动作无 repo commit，脚本与输出在 tmp/idle-review/。②**门闩残余批次**（④核可后实施）3 commits：`8e235709`+`6bd37373` runHealStep 归属修复——手搓等待换 waitForSessionEventOwned（runId 过滤+canceled 丢弃+legacy 放行），heal step 盖 healRunId，success=false 显式拒收（Type A 不再无证据标 healed-by-ai）+ 新护栏 characterize-owned-wait-shape.mjs（真实 hub+3 参 arity 钉，补 2a30fc6c 自身测试的形状缺口）；`816765ab` session_runner runId 变化复位 `_last_phase_state_key_phase`（新 run 首阶段不再漏发开组事件）；`b24580b5` 登录重试时延 env 化 `PREPARE_LOGIN_RETRY_DELAY_MS`（挂起项事件驱动重设计维持缓行）。③**定时化**（⑤考虑花销）：CronCreate automation-cb2a608d「闲时教训驱动代码审查·每周一凌晨3点半」，prompt 含花销约束（严格 3 子智能体/P1 主线程直改/禁真机湿测写库冒烟/冲突可缩范围）
+- 环境核验（①重启+②重录确认）：4097 PID 23824 StartTime 03:54:46 > 最新代码提交 03:26:57（新代码已加载，无旧实例）；轨迹查询 WIP 四文件已提交（17b4a512），工作区干净；库中 #614 updated 09-07 22:50=昨晚 22:40 那次真实录制，重启后无新轨迹——**门闩 v3 实战验证（failure/广播语义）待下一次真实录制观察**
+- 验收：node --check/eslint ×3、py_compile+AST ×1；characterize-owned-wait-shape 4/4；heal 三套件（locate 39/mode/decision）全绿；verify-all 全量 112 ok / 1 红——红=sso-auth 两断言，**新归因：17b4a512 把 listByFunction 重构为 listByFunctionIds 转发薄壳，pin 断言的源码形状失配，期望过期非回归**（本会话 03:57 曾单跑绿=当时旧形状尚在，17b4a512 落于其后）
+- 遗留移交：①**sso-auth pin 回调归轨迹查询线**（禁入区+其改法已定：pin 改为断言转发薄壳存在+listByFunctionIds 内部实现，或按其最终形状重写；见其 03:45 收工条预留约定）；②stop-busy-race 维持挂起且风险面已变——executor 侧 runId 批次已升级 cancel 处理（步边界判定+强停），原「不等 busy 发取消」注释描述的场景需按新语义重新评估后再动；③memory few-shot 若仍见噪声，下一批可考虑给 listFactsByFunctionHistory 加 stepCount>0 门槛（本轮以数据清洗为先，代码不加双保险避免过度设计）
+- 注意：wizard 线（03:25-04:10）与本批文件集全程不相交，verify-all.sh 编辑前已重读防撞；新录制/回放类验证一律未做（不占槽）
+
 ## 2026-09-08 04:10 · Cursor Subagent — 收工：SDD req-draft-wizard UI Task 9 冒烟 + 关闭 ⑧ SPA（回链 03:25 Lead 开工）
 
 - 完成：Task 9 E2E 冒烟清单执行完毕；todo ⑧ SPA 勾选项标为已交付；SDD 向导线（Task 1–9）文档收口
