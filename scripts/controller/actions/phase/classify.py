@@ -79,6 +79,29 @@ def classification_task_text(task_text: str) -> str:
     return strip_business_data_block(task_text)
 
 
+# Store keys that carry login credentials — a login phase whose business data
+# provides them must receive the 业务数据 hint (auth dry-run rehearsal; without
+# it the agent has no credential source and NO-DATA idles out with zero actions).
+_AUTH_CREDENTIAL_KEYS = frozenset({
+    'username', 'password', '账号', '帐号', '用户名', '密码', '口令',
+})
+
+
+def _store_has_auth_credentials(business_data_store: dict | None) -> bool:
+    """True when the store's user business data carries a credential key.
+
+    User KV keys only (skip internal ``_``-prefixed runtime keys).
+    """
+    if not business_data_store:
+        return False
+    for key in business_data_store.keys():
+        if not isinstance(key, str) or key.startswith('_'):
+            continue
+        if key.strip().lower() in _AUTH_CREDENTIAL_KEYS:
+            return True
+    return False
+
+
 def needs_business_data_context(
     task_text: str,
     business_data_store: dict | None = None,
@@ -86,7 +109,9 @@ def needs_business_data_context(
     """Whether to show 【业务数据】to the model for this phase.
 
     Only fill / modify / introduce (incl. introduce-then-save). Not login,
-    pure open-page navigate, or list query.
+    pure open-page navigate, or list query — except a login phase whose
+    business data carries credential keys (username/password/账号/密码), which
+    opts in so the agent can read the injected credentials instead of guessing.
     """
     t = classification_task_text(task_text)
     if not t:
@@ -94,7 +119,9 @@ def needs_business_data_context(
     if business_data_store:
         contract = business_data_store.get('_phase_intent') or {}
         mode = contract.get('mode')
-        if mode in ('navigate', 'login', 'query'):
+        if mode == 'login':
+            return _store_has_auth_credentials(business_data_store)
+        if mode in ('navigate', 'query'):
             return False
         if mode in ('create', 'modify', 'introduce_pick'):
             return True
@@ -113,8 +140,12 @@ def needs_business_data_context(
         contract = business_data_store.get('_phase_intent') or {}
         if contract.get('mode') == 'introduce_pick':
             return True
-    if mode in ('login', 'query'):
+    if mode == 'query':
         return False
+    if mode == 'login':
+        # Credential-keyed store opts the login phase in (auth dry-run);
+        # plain login phases without credentials stay excluded.
+        return _store_has_auth_credentials(business_data_store)
     # Pure open-page / menu navigate — no value hints
     if mode == 'other' and is_open_page_task(t):
         return False
