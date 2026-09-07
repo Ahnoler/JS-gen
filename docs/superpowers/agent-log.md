@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:57 · Zcode — 开工+收工：夜班长线任务迁入闲时管线（cron 已删，指令全文迁入 guides）
+
+- 完成（用户指令「这个任务改到闲时任务中」）：删除定时任务 automation-99c0d73a「每晚23:00夜班长线任务」（该任务 09-07 晚曾跑一轮=报文捞取 Tasks 7-9 那班）；指令全文迁入 `docs/superpowers/guides/night-shift-prompt.md` 作为闲时 dispatch 产物，与 idle-review-prompt 同规格（头部管线说明：只走闲时管线不建 cron，时机由派发方决定）
+- 增值：正文补「夜班守则补充」节——把 09-07/08 夜班实战教训固化（4097 StartTime 核验 / 多会话期禁 amend / 中文 JSON --data-binary / 离线 characterization 禁触真实 DB / verify-all ALL GREEN 基线与红归因 / 长跑只读 CDP 实时探测 / agent-log 提交只带自己条目）
+- 验收：CronList 无该 automation；guide 为纯文档新增，不涉代码与门禁；与 04:55 through-chains 文档线（data/kb/req/**）文件集不相交
+- 遗留：无。派发方式=晚间把 guide 的提示词正文交给闲时会话
+
 ## 2026-09-08 04:55 · Zcode — 开工：through-chains 可 propose 化 P0（customer-corp + rating，纯文档）
 
 - 开工：04:55。执行 `guides/through-chains-proposeable-format.md` SOP §4，P0 两模块
