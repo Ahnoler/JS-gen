@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 23:31 · Zcode 闲时审查 — 开工：教训驱动定向代码审查（两阶段：报告 → 实施优化）
+
+- 开工：23:31（本机真实时刻，git 时间为证；上方条目标签时刻为该线时钟读数）。执行 `guides/idle-review-prompt.md`（六族检查单 + 3 子智能体并行审查 + 阶段二修复带防再犯护栏）
+- 范围：阶段一=全仓只读审查（3 子智能体：Node A 假成功+D 时序 / Python B 接线+A-py 门闩 / 横切 C 静默兜底+E 进程+F 遗留对账），报告落 `tmp/idle-review/2026-09-07-report.md`；阶段二预计修复面=`src/services/trajectory/**`（query-service 除外）、`src/services/req-draft-traj/**`、`src/routes/v2/**`（trajectory.js 除外）、`scripts/agent/**`、`scripts/controller/actions/**`（network_capture.py 除外）、`scripts/state.py`、`server.mjs`、新增 characterization + verify-all 注册
+- 禁入：报文捞取 Task9 在途文件集（`scripts/tools/api-capture.mjs`、`scripts/controller/actions/network_capture.py`、`scripts/session_runner.py`、`src/memory/**`、`src/dao/system-ref-dao.js`、`src/services/system-ref-service.js`）；轨迹查询未提交 WIP 四文件（trajectory-dao / v2 trajectory / trajectory-service / trajectory-query-service）；`data/kb/**`；前端仓库；文档一致性审计线文件集（README/docs 用户文档/.env.example）；不重启控制面/执行机；不碰 R1-R6 在途轨迹数据
+- 方式：子智能体只读审查（不编辑不 commit，主会话代为声明）→ 主线程抽查核实防假完成/误报 → P0 主线程修+护栏、P1 派发、P2 移交收工条目（不动 todo-list 挂起区，避让文档审计线）；每修复独立 commit 引用教训来源
+
 ## 2026-09-08 00:55 · Zcode 闲时 — 开工：文档一致性审计（README/docs/配置说明/使用示例）
 
 - 开工：00:55。用户指令：基于当前代码与最近提交核查 README、docs、配置说明与使用示例是否过时，只改能从代码/配置/提交记录直接确认的内容，不改结构/术语/文风
