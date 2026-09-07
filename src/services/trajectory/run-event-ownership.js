@@ -15,14 +15,17 @@
  */
 export function phaseEventOwnership(payload, { runId, phaseNumber = null } = {}) {
   const pRunId = payload?.runId;
+  // phase 校验先于 legacy 放行（终审 M1）：phase 号只收窄接受面、零兼容成本——
+  // 否则旧执行机（payload 无 runId）的僵尸 phase_done（错误阶段号）仍会被误吃，
+  // 即原缺陷 B 场景在兼容期复活。
+  if (phaseNumber != null && Number(payload?.phase) !== Number(phaseNumber)) {
+    return { decision: 'ignore', reason: 'phase_mismatch' };
+  }
   if (pRunId == null || pRunId === '') {
     return { decision: 'legacy', reason: 'missing_runid' };
   }
   if (runId != null && String(pRunId) !== String(runId)) {
     return { decision: 'ignore', reason: 'runid_mismatch' };
-  }
-  if (phaseNumber != null && Number(payload?.phase) !== Number(phaseNumber)) {
-    return { decision: 'ignore', reason: 'phase_mismatch' };
   }
   return { decision: 'accept', reason: '' };
 }

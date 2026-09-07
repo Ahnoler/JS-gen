@@ -819,19 +819,22 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       // phase_done / phase_error have no fixed timeout — the activity watchdog above
       // is the only timeout, so a long auto-fill phase cannot be killed at 300s.
       const ownedWaitOpts = {
-        addListener: execSession.onSessionEvent,
+        // execSession.onSessionEvent 是 3 参 (sessionId, type, handler)——必须在此
+        // 绑定 sessionId；直传会错位实参并抛 TypeError，录制在阶段 1 即失败（终审 B1）。
+        addListener: (type, handler) => execSession.onSessionEvent(runtime.sessionId, type, handler),
         runId: runtime.currentRunId,
         phaseNumber: phase.phaseNumber,
-        onIgnored: (payload, reason) => {
-          console.warn(
-            `[record] phase_done_${reason === 'missing_runid' ? 'missing_runid' : `ignored_${reason}`}`
-            + ` session=${runtime.sessionId} phase=${payload?.phase} gotRunId=${payload?.runId}`
-            + ` expect=${runtime.currentRunId}`,
-          );
-        },
       };
-      const doneP = waitForSessionEventOwned({ ...ownedWaitOpts, type: 'phase_done' });
-      const errRaw = waitForSessionEventOwned({ ...ownedWaitOpts, type: 'phase_error' });
+      // 观察日志（spec 5.5）：标签带事件类型，避免 phase_error 被误记为 phase_done_*。
+      const onIgnored = (type) => (payload, reason) => {
+        console.warn(
+          `[record] ${type}_${reason === 'missing_runid' ? 'missing_runid' : `ignored_${reason}`}`
+          + ` session=${runtime.sessionId} phase=${payload?.phase} gotRunId=${payload?.runId}`
+          + ` expect=${runtime.currentRunId}`,
+        );
+      };
+      const doneP = waitForSessionEventOwned({ ...ownedWaitOpts, type: 'phase_done', onIgnored: onIgnored('phase_done') });
+      const errRaw = waitForSessionEventOwned({ ...ownedWaitOpts, type: 'phase_error', onIgnored: onIgnored('phase_error') });
       const errP = errRaw.then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
       errP.catch(() => {});
       const stepData = {

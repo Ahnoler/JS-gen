@@ -35,6 +35,11 @@ function testOwnership() {
     phaseEventOwnership({ phase: 2 }, { runId: 'r1', phaseNumber: 2 }),
     { decision: 'legacy', reason: 'missing_runid' },
   );
+  // 终审 M1：phase 校验先于 legacy 放行——旧执行机僵尸 done（无 runId 且阶段错位）必须丢
+  assert.equal(
+    phaseEventOwnership({ phase: 9 }, { runId: 'r1', phaseNumber: 2 }).decision,
+    'ignore',
+  );
   // persist 类订阅不传 phaseNumber → 不做阶段校验
   assert.equal(
     phaseEventOwnership({ runId: 'r1', phase: 9 }, { runId: 'r1' }).decision,
@@ -61,10 +66,11 @@ async function testOwnedWait() {
     onIgnored: (payload, reason) => ignored.push(reason),
   });
   // 僵尸 done：旧 run 事件、同 run 阶段错位、本轮 canceled —— 均忽略
+  // （M1 后 phase 校验先行：两例均以 phase_mismatch 命中）
   hub.emit('phase_done', { runId: 'stale', phase: 4 });
   hub.emit('phase_done', { runId: 'r1', phase: 2 });
   hub.emit('phase_done', { runId: 'r1', phase: 1, canceled: true });
-  assert.deepEqual(ignored, ['runid_mismatch', 'phase_mismatch', 'canceled']);
+  assert.deepEqual(ignored, ['phase_mismatch', 'phase_mismatch', 'canceled']);
   // 真正的本轮阶段 1 done → resolve
   hub.emit('phase_done', { runId: 'r1', phase: 1, success: true });
   const payload = await doneP;
@@ -100,6 +106,14 @@ function testRunnerWiring() {
     runner.includes("waitForSessionEventOwned({") ,
     'phase_done/phase_error waits go through owned filter',
   );
+  // 终审 B1 回归 pin：addListener 必须在 runner 内绑定 sessionId（3 参），不能直传
+  // execSession.onSessionEvent（错位实参 → TypeError → 所有录制阶段 1 失败）。
+  assert.ok(
+    /addListener:\s*\(type,\s*handler\)\s*=>\s*execSession\.onSessionEvent\(runtime\.sessionId,\s*type,\s*handler\)/.test(runner),
+    'addListener binds sessionId (arity regression pin)',
+  );
+  assert.ok(!/addListener:\s*execSession\.onSessionEvent\b/.test(runner),
+    'addListener must not be passed unbound');
   assert.ok(runner.includes('cancel_step'), 'finally re-sends cancel_step');
 }
 
