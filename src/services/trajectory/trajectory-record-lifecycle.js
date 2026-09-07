@@ -7,6 +7,7 @@ import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as systemDao from '../../dao/system-dao.js';
 import * as execSession from '../../executor-session-client.js';
 import { runReplayActions } from '../replay-actions.js';
+import { findActiveAuthComponent, resolveAuthComponentSteps } from '../operation-component-service.js';
 import { state } from '../../state.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import * as remoteBridge from '../../cdp/remote-bridge.js';
@@ -260,6 +261,51 @@ export async function runDefaultLogin(runtime, account, system = null) {
       err.statusCode = 400;
       throw err;
     }
+    // --- 登录组件优先（Task 7）：查到 active login 组件则 replay 组件步骤，
+    // 否则回落到下方硬编码 go_to_url + wait_for_loading + login 序列。
+    let componentSteps = null;
+    try {
+      const sysIdNum = Number(account?.systemId);
+      if (Number.isFinite(sysIdNum)) {
+        const component = await findActiveAuthComponent(sysIdNum, 'login');
+        if (component) {
+          const steps = resolveAuthComponentSteps(component, { account: username, password });
+          if (Array.isArray(steps) && steps.length) {
+            componentSteps = steps;
+            console.log(`[record] auth component hit (componentId=${component.id}) — replay component login steps`);
+          }
+        }
+      }
+    } catch (err) {
+      componentSteps = null;
+      console.warn('[record] auth component lookup failed → fallback to hardcoded login:', err?.message || err);
+    }
+    if (componentSteps) {
+      const { result } = await runReplayActions({
+        execSession,
+        sessionId: runtime.sessionId,
+        nodeUuid: runtime.executorNodeUuid,
+        actions: [
+          { action: 'go_to_url', params: { url } },
+          // 登录前等待页面 loading mask 消退（与登录控件探针构成双重防线）
+          { action: 'wait_for_loading' },
+          ...componentSteps,
+        ],
+        timeoutMs: 180000,
+        stopOnFail: true,
+        isReplay: true,
+      });
+      const failed = Number(result?.failed || 0);
+      const okCount = Number(result?.ok || 0);
+      if (result?.error || failed > 0) {
+        throw new Error(result?.error || `auth component login replay failed (ok=${okCount} failed=${failed})`);
+      }
+      await markConsumedActionLog(runtime);
+      runtime.loginDone = true;
+      runtime.loginAccountId = Number(account.id);
+      return;
+    }
+    console.log('[record] auth component miss → fallback to hardcoded login sequence');
     const { result } = await runReplayActions({
       execSession,
       sessionId: runtime.sessionId,
