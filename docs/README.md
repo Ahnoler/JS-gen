@@ -17,8 +17,8 @@
 | 文档 | 用途 |
 |------|------|
 | [AI记忆系统优化方案.md](AI记忆系统优化方案.md) | 记忆设计权威 |
-| [830格式对齐改造spec.md](830格式对齐改造spec.md) | 伙伴平台 V3 格式对齐规格 |
-| [报文日志捞取接口设计.md](报文日志捞取接口设计.md) | 被测系统三接口开发请求文档 |
+| [830格式对齐改造spec.md](830格式对齐改造spec.md) | 伙伴平台 V3 格式对齐规格（已收官，2026-09-08 补记） |
+| [报文日志捞取接口设计.md](报文日志捞取接口设计.md) | 被测系统三接口开发请求文档（已搁置；被动捕获框架资产保留） |
 | [spec-phase-done-cross-run-fix.md](spec-phase-done-cross-run-fix.md) | phase_done 跨 run 串台修复规格 |
 | [orchestration/](orchestration/) | 多子智能体编排框架（workflow 方式B） |
 
