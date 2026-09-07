@@ -3,7 +3,18 @@
  * 从 transaction-export-v3.js 拆出（行为保持重构），原路径继续作为 barrel 导出这些名字。
  */
 import { MINIO_BUCKET, MINIO_PUBLIC_URL } from '../../config/config.js';
+import { mapStepToTransactionEvent } from './transaction-export.js';
 import { stripVolatileQuery } from './transaction-export-v3-region.js';
+
+function parseJson(raw) {
+  if (raw == null) return null;
+  if (typeof raw === 'object') return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 构建截图永久直链 URL。
@@ -80,10 +91,53 @@ export function buildScreenshotEntries({
 
   const pageLevels = Array.isArray(pageLevelScreenshots) ? pageLevelScreenshots : [];
   if (pageLevels.length) {
+    // 残留弹窗清理：页面级截图行按 level_key upsert，旧录制的同页同标题弹窗行会留存。
+    // 判据：同 parentKey+标题的一组 popup 中，至少一个弹窗的 anchor 能匹配到本轨迹的
+    // 触发步骤（click 步元素含 anchor 或属性值），而某弹窗的 anchor 匹配不到任何步骤
+    // ——匹配不到者为旧录制残留，跳过不导出。全部都匹配不到时保留（无法分辨，不误删）。
+    const anchorOf = (shot) => {
+      const key = String(shot?.levelKey || shot?.metadataJson?.levelKey || '');
+      const m = key.match(/\|dialog:([^@|]*)@@anchor:(.*)$/);
+      return m ? { title: m[1].trim(), anchor: m[2].trim(), parentKey: key.slice(0, m.index) } : null;
+    };
+    const stepEls = (traj.steps || [])
+      .map((step) => {
+        const el = parseJson(step?.elementJson);
+        const ev = mapStepToTransactionEvent(step);
+        return el && ev?.eventTypeValue === 'click' ? el : null;
+      })
+      .filter(Boolean);
+    const anchorMatched = (anchor) => {
+      const a = String(anchor || '').trim();
+      if (!a) return false;
+      const am = a.match(/='([^']+)'/);
+      const label = am ? am[1] : '';
+      const inStr = (s) => {
+        const str = String(s || '');
+        return str.includes(a) || (label && (str.includes(`='${label}']`) || str.includes(`="${label}"]`)));
+      };
+      return stepEls.some((el) => inStr(el.xpath) || inStr(el.xpath_smart) || inStr(el.xpath_full)
+        || el.attributes?.['aria-label'] === label || String(el.text ?? '').trim() === label);
+    };
+    const groups = new Map(); // parentKey|title → 至少一个弹窗被本轨迹触发
+    for (const shot of pageLevels) {
+      const parts = anchorOf(shot);
+      if (!parts) continue;
+      const gk = `${parts.parentKey}|${parts.title}`;
+      if (!groups.has(gk)) groups.set(gk, false);
+      if (anchorMatched(parts.anchor)) groups.set(gk, true);
+    }
+    const stalePopup = (shot) => {
+      const parts = anchorOf(shot);
+      if (!parts) return false;
+      return groups.get(`${parts.parentKey}|${parts.title}`) === true && !anchorMatched(parts.anchor);
+    };
+
     // 新链路：页面级截图（kind='page_level'）。一个 page/popup 一个条目。
     for (const shot of pageLevels) {
       const url = resolveScreenshotUrl(shot);
       if (!url) continue; // 本地暂存未上传，跳过
+      if (stalePopup(shot)) continue; // 旧录制残留弹窗，跳过
       const meta = shot.metadataJson || {};
       const levelType = shot.levelType === 'popup' ? 'popup' : 'page';
       const levelKey = String(shot.levelKey || meta.levelKey || '').trim();
