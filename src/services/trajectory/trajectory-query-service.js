@@ -220,3 +220,13 @@ export async function listStepsByPhase(phaseDbId, { includeMeta = false } = {}) 
 export async function listByFunction(functionId, pagination) {
   return trajectoryDao.listByFunction(functionId, pagination);
 }
+
+/**
+ * List trajectories under a set of functions, with pagination.
+ * @param {number[]} functionIds function DB ids
+ * @param {object} pagination pagination options
+ * @returns {Promise<object>} paginated trajectory rows across the functions
+ */
+export async function listByFunctionIds(functionIds, pagination) {
+  return trajectoryDao.listByFunctionIds(functionIds, pagination);
+}

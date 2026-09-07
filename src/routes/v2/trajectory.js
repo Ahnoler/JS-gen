@@ -66,6 +66,7 @@ export default function (app) {
         page,
         pageSize,
         functionId,
+        functionIds,
         keyword,
         sortBy,
         order,
@@ -102,9 +103,18 @@ export default function (app) {
         paasUserId: req.paasUserId ?? null,
         isExport: isExportFilter,
       };
-      const result = functionId
-        ? await trajectoryService.listByFunction(+functionId, pagination)
-        : await trajectoryDao.list(pagination);
+      // functionIds: comma-separated function ids — aggregated list across a
+      // system/module node (e.g. all transactions under a system). Takes
+      // precedence over functionId when present and non-empty.
+      const idList = String(functionIds || '')
+        .split(',')
+        .map((s) => Number(String(s).trim()))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      const result = idList.length
+        ? await trajectoryService.listByFunctionIds(idList, pagination)
+        : functionId
+          ? await trajectoryService.listByFunction(+functionId, pagination)
+          : await trajectoryDao.list(pagination);
       res.json(result);
     } catch (err) {
       // Legacy shape: always 500 { error } regardless of err.statusCode

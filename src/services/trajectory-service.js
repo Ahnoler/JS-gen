@@ -17,6 +17,7 @@ export {
   listPhasesByTrajectory,
   listStepsByPhase,
   listByFunction,
+  listByFunctionIds,
 } from './trajectory/trajectory-query-service.js';
 
 export {
