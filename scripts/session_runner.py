@@ -16,6 +16,7 @@ from .agent_utils import (
     patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, create_llm,
 )
 from .controller import build_controller
+from .controller.actions.network_capture import attach_network_capture
 from .controller.actions.replay_timing import budget_for, budget_overrun_hint
 from .recorder import build_recording_hooks
 
@@ -329,6 +330,7 @@ async def run_session(args):
 
     business_data_store = {}  # process-level in-memory store, persists across steps
     special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
+    _net_cleanup = None  # network capture detach closure (None until attached)
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
 
@@ -345,6 +347,16 @@ async def run_session(args):
     # Start CDP watcher — runs in-process, shares _ACTION_LOG and business_data_store
     cdp_action_queue = asyncio.Queue()
     cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, business_data_store))
+
+    # Task 9: attach passive network capture (form-related XHR/fetch → memory events).
+    # Failure to attach must never break the recording session.
+    try:
+        _page_for_capture = await browser_context.get_current_page()
+        _net_cleanup = attach_network_capture(_page_for_capture, business_data_store)
+    except Exception as _net_err:
+        _net_cleanup = None
+        sys.stderr.write(f"[network-capture] attach failed (ignored): {type(_net_err).__name__}: {_net_err}\n")
+        sys.stderr.flush()
 
     def _on_cdp_task_done(t):
         """记录 cdp watcher 任务异常退出，避免无人观测的静默死亡。"""
@@ -623,6 +635,13 @@ async def run_session(args):
             emit_json({"event": "error", "data": {"message": f"Unexpected error: {type(e).__name__}: {e}"}})
 
     await _teardown_session(browser, browser_context, reader_task, cdp_task, cdp_port, cdp_url, keep_browser)
+
+    # Task 9: detach network capture listener (best effort, before memory flush)
+    if _net_cleanup:
+        try:
+            _net_cleanup()
+        except Exception:
+            pass
 
     # P0：退出前冲刷记忆队列（不等待太久，避免拖慢关闭）
     flush_memory_writer(timeout=2.0)

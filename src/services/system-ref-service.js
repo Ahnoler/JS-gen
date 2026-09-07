@@ -99,6 +99,72 @@ export async function listTrajectorySystemRefEntries(trajectoryId, query = {}) {
 }
 
 /**
+ * Persist a captured network exchange as a system_ref_data record (Task 9).
+ * Dedup key: ``method + ' ' + normalizedUrl`` — an existing record short-circuits
+ * persistence. Entries are extracted from the top-level keys of the captured
+ * requestBody (prefix ``req.``) and responseBody (prefix ``resp.``); values are
+ * JSON-stringified and truncated to 500 chars. When a body is not an object
+ * (text/plain body), the whole body degrades to a single entry (prefix
+ * ``req.``/``resp.`` + '_body'); null/empty bodies are skipped.
+ * @param {number|string} trajectoryId trajectory DB id the capture belongs to
+ * @param {object} payload network_captured entry (url, normalizedUrl, method, requestBody, responseBody, responseStatus, capturedAt)
+ * @returns {Promise<{persisted: boolean, id?: number, existingId?: number, description?: string}>} persistence result
+ */
+export async function persistCapturedInterface(trajectoryId, payload) {
+  const tid = Number(trajectoryId);
+  const data = (payload && typeof payload === 'object') ? payload : {};
+  const method = String(data.method || '').toUpperCase();
+  const normalizedUrl = String(data.normalizedUrl || '');
+  if (!Number.isFinite(tid) || tid <= 0 || !normalizedUrl || !method) {
+    return { persisted: false };
+  }
+
+  const existing = await systemRefDao.findByUrlPattern(normalizedUrl, method);
+  if (existing) {
+    return { persisted: false, existingId: existing.id };
+  }
+
+  const description = `${method} ${normalizedUrl}`;
+  const entries = [];
+
+  const pushEntries = (prefix, body) => {
+    if (body == null) return;
+    if (typeof body === 'object' && !Array.isArray(body)) {
+      for (const key of Object.keys(body)) {
+        entries.push({
+          fieldKey: `${prefix}.${key}`,
+          fieldValue: JSON.stringify(body[key])?.slice(0, 500),
+          source: 'system_capture',
+          verificationStatus: 'raw',
+        });
+      }
+      return;
+    }
+    // Non-object body (text / array / number): degrade to one whole-body entry.
+    entries.push({
+      fieldKey: `${prefix}_body`,
+      fieldValue: String(typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 500),
+      source: 'system_capture',
+      verificationStatus: 'raw',
+    });
+  };
+  pushEntries('req', data.requestBody);
+  pushEntries('resp', data.responseBody);
+
+  const recordId = `sref_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const id = await systemRefDao.save({
+    trajectoryId: tid,
+    recordId,
+    source: 'system_capture',
+    description,
+    keyCount: entries.length,
+    rawJson: JSON.stringify(data),
+    entries,
+  });
+  return { persisted: true, id };
+}
+
+/**
  * Delete a single system_ref_data header by id.
  * @param {number} id system_ref_data DB id
  * @returns {Promise<{ status: string, id: number, recordId: string }>} deletion result

@@ -114,6 +114,22 @@ export async function save(record) {
 }
 
 /**
+ * Find the most recent system_ref_data header whose description starts with
+ * ``<method> <urlPattern>`` (URL-pattern dedup key written by capture persistence).
+ * @param {string} urlPattern normalized URL pattern (e.g. '/api/form/{id}/save')
+ * @param {string} method HTTP method (e.g. 'POST')
+ * @returns {Promise<object|null>} latest matching header entity, or null when none
+ */
+export async function findByUrlPattern(urlPattern, method) {
+  const pattern = `${String(method || '').toUpperCase()} ${String(urlPattern || '')}`;
+  const row = await getDB()(TABLE)
+    .where('description', 'like', `${pattern}%`)
+    .orderBy('created_at', 'desc')
+    .first();
+  return row ? fromDbRow(row) : null;
+}
+
+/**
  * Fetch a system_ref_data record by id, including its entries.
  * @param {number} id 主键
  * @returns {Promise<object|null>} record entity with entries, or null when not found

@@ -246,6 +246,24 @@ export async function ingestEvents(payload = {}) {
           console.warn('[memory] fill_before_save modeling skipped:', err?.message || err);
         }
       }
+
+      // Task 9: 报文捕获持久化 — network_captured 事件旁路写入 system_ref_data
+      // （按 method+normalizedUrl 去重，失败不阻塞事件摄取）。
+      if (event.eventType === 'network_captured' && event.trajectoryId) {
+        try {
+          const { persistCapturedInterface } = await import('../services/system-ref-service.js');
+          const capturePayload = typeof event.payloadJson === 'string'
+            ? JSON.parse(event.payloadJson)
+            : event.payloadJson;
+          const result = await persistCapturedInterface(event.trajectoryId, capturePayload);
+          if (result?.persisted) {
+            console.log('[memory] network_captured persisted: '
+              + `${capturePayload?.method} ${capturePayload?.normalizedUrl} -> system_ref_data#${result.id}`);
+          }
+        } catch (err) {
+          console.warn('[memory] network_captured persist failed:', err?.message || err);
+        }
+      }
     }
 
     const relationCount = await memoryDao.upsertRelations(relations, trx);

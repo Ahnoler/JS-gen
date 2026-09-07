@@ -19,6 +19,7 @@ export const KNOWN_EVENT_TYPES = new Set([
   'page_state',
   'form_state',
   'action_removed',
+  'network_captured',
   'system',
 ]);
 
