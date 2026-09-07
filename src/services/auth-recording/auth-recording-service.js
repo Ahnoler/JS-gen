@@ -63,6 +63,14 @@ function isStaleJob(job) {
 }
 
 /**
+ * Poll interval while waiting for a trajectory's recorded steps to hit the DB.
+ */
+const STEP_POLL_INTERVAL_MS = 5000;
+
+/** Max wait for trajectory_step rows to appear after recording ends. */
+const STEP_POLL_TIMEOUT_MS = 60 * 1000;
+
+/**
  * Read a phase task prompt file by name.
  * @param {string} fileName prompt file under scripts/prompts/
  * @returns {string} prompt text (empty string when unreadable)
@@ -88,15 +96,17 @@ export function normalizeUrl(url) {
 
 /**
  * Pure criteria check for the login segment: after a successful login the
- * current page URL must have moved away from the login page URL. Prefers the
- * live page URL captured at recording end; falls back to trajectory `url`.
- * @param {object|null} traj trajectory entity (uses `url` field as fallback)
+ * current page URL must have moved away from the login page URL. Only the live
+ * page URL captured at recording end is authoritative — when it is unavailable
+ * the segment is NOT judged as passed (no trajectory `url` fallback: traj.url
+ * keeps the segment's start URL and would always differ from loginUrl).
+ * @param {object|null} traj trajectory entity (unused; kept for signature compat)
  * @param {string} loginUrl system login page URL
  * @param {string|null} [liveUrl] live browser page URL read at recording end
  * @returns {boolean} true when the login criteria is satisfied
  */
 export function checkLoginCriteria(traj, loginUrl, liveUrl = null) {
-  const finalUrl = String(liveUrl ?? traj?.url ?? '').trim();
+  const finalUrl = String(liveUrl ?? '').trim();
   if (!finalUrl) return false;
   const base = normalizeUrl(loginUrl);
   if (!base) return false;
@@ -105,15 +115,17 @@ export function checkLoginCriteria(traj, loginUrl, liveUrl = null) {
 
 /**
  * Pure criteria check for the logout segment: after a successful logout the
- * current page URL must be back at the login page URL. Prefers the live page
- * URL captured at recording end; falls back to trajectory `url`.
- * @param {object|null} traj trajectory entity (uses `url` field as fallback)
+ * current page URL must be back at the login page URL. Only the live page URL
+ * captured at recording end is authoritative — when it is unavailable the
+ * segment is NOT judged as passed (no trajectory `url` fallback: traj.url is
+ * the loginUrl itself, so the fallback would always falsely pass).
+ * @param {object|null} traj trajectory entity (unused; kept for signature compat)
  * @param {string} loginUrl system login page URL
  * @param {string|null} [liveUrl] live browser page URL read at recording end
  * @returns {boolean} true when the logout criteria is satisfied
  */
 export function checkLogoutCriteria(traj, loginUrl, liveUrl = null) {
-  const finalUrl = String(liveUrl ?? traj?.url ?? '').trim();
+  const finalUrl = String(liveUrl ?? '').trim();
   if (!finalUrl) return false;
   const base = normalizeUrl(loginUrl);
   if (!base) return false;
@@ -208,7 +220,7 @@ async function waitForRecordingFinish(tid, timeoutMs = RECORD_TIMEOUT_MS) {
  * @param {number} [timeoutMs] wait timeout for tabs_result
  * @returns {Promise<string|null>} current page URL, or null when unavailable
  */
-async function readLivePageUrl(runtime, timeoutMs = 8000) {
+async function readLivePageUrl(runtime, timeoutMs = 15000) {
   if (!runtime?.sessionId || !runtime?.executorNodeUuid) return null;
   try {
     const resultP = execSession.waitForSessionEvent(runtime.sessionId, 'tabs_result', timeoutMs);
@@ -231,6 +243,49 @@ async function readLivePageUrl(runtime, timeoutMs = 8000) {
 }
 
 /**
+ * Read the live page URL with one retry: the executor's tabs_result can be
+ * slow to arrive (observed timeouts on real SUT), so a first null/timeout
+ * result is retried once before giving up.
+ * @param {object|null} runtime trajectory runtime (sessionId / executorNodeUuid)
+ * @returns {Promise<string|null>} current page URL, or null after both attempts
+ */
+async function readLivePageUrlWithRetry(runtime) {
+  const first = await readLivePageUrl(runtime);
+  if (first != null) return first;
+  console.warn('[auth-recording] readLivePageUrl first attempt failed — retrying once');
+  return readLivePageUrl(runtime);
+}
+
+/**
+ * Poll trajectory_step row count until > 0 (or timeout). The recording gate's
+ * async finalize can land steps in the DB slightly after record_status leaves
+ * 'recording'; registerAuthComponent would otherwise race and reject a valid
+ * segment with "no steps". Also catches a genuinely empty (0-step) segment.
+ * @param {number} tid trajectory id
+ * @param {number} [timeoutMs] max wait time (default 60s)
+ * @returns {Promise<number>} final step count (> 0 on success)
+ */
+async function waitForTrajectorySteps(tid, timeoutMs = STEP_POLL_TIMEOUT_MS) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    let count = 0;
+    try {
+      const row = await getDB()('trajectory_step')
+        .where({ trajectory_id: Number(tid) })
+        .count('* as c')
+        .first();
+      count = Number(row?.c ?? row?.count ?? 0) || 0;
+    } catch (err) {
+      console.warn(`[auth-recording] step count poll failed for #${tid}: ${err?.message || err}`);
+      count = 0;
+    }
+    if (count > 0) return count;
+    if (Date.now() > deadline) return 0;
+    await sleep(STEP_POLL_INTERVAL_MS);
+  }
+}
+
+/**
  * Run one recording segment: prepare → (login segment only: navigate to the
  * login page via suppressed replay and arm skipDefaultLogin) → start → wait
  * finish → read live page URL → criteria check. Always detaches live
@@ -243,11 +298,15 @@ async function readLivePageUrl(runtime, timeoutMs = 8000) {
  * @param {string} opts.segmentLabel label for error messages
  * @param {string|null} [opts.navigateUrl] when set (login segment), navigate the
  *   browser to this URL before starting the agent rehearsal and skip the
- *   prepare-time default login (one-shot runtime.skipDefaultLogin)
+ *   prepare-time default login (both via prepare opts and one-shot
+ *   runtime.skipDefaultLogin as double insurance)
  * @returns {Promise<{ traj: object }>} recorded trajectory entity
  */
 async function runSegment(tid, { accountId, loginUrl, criteria, segmentLabel, navigateUrl = null }) {
-  await prepareTrajectoryRecording(tid);
+  // The runtime object only exists after prepare creates it, so the
+  // skipDefaultLogin flag must be threaded through prepare itself — setting
+  // runtime.skipDefaultLogin here would race the prepare-time default login.
+  await prepareTrajectoryRecording(tid, navigateUrl ? { skipDefaultLogin: true } : undefined);
   if (navigateUrl) {
     const runtime = getTrajectoryRuntime(tid);
     if (!runtime) {
@@ -285,18 +344,25 @@ async function runSegment(tid, { accountId, loginUrl, criteria, segmentLabel, na
   // `url` keeps the segment's start URL and never tracks navigation).
   let liveUrl = null;
   if (wait.ok) {
-    liveUrl = await readLivePageUrl(getTrajectoryRuntime(tid));
+    liveUrl = await readLivePageUrlWithRetry(getTrajectoryRuntime(tid));
   }
   await detachTrajectoryLive(tid, { reason: 'auth_record_segment' }).catch(() => {});
   if (!wait.ok) {
     throw new Error(`${segmentLabel} recording timed out after ${Math.round(RECORD_TIMEOUT_MS / 1000)}s`);
   }
+  // Async gate finalize may persist steps slightly after recording ends; wait
+  // for them before component registration. Also rejects genuinely 0-step runs.
+  const stepCount = await waitForTrajectorySteps(tid);
+  if (stepCount <= 0) {
+    throw new Error(`${segmentLabel} recording produced no steps within ${Math.round(STEP_POLL_TIMEOUT_MS / 1000)}s after recording finished`);
+  }
   const traj = await trajectoryDao.getById(tid);
   if (!traj) throw new Error(`${segmentLabel} trajectory disappeared after recording`);
   if (liveUrl == null) {
-    console.warn(
-      `[auth-recording] ${segmentLabel}: live page URL unavailable — falling back to trajectory url="${String(traj.url ?? '').trim()}"`,
-    );
+    // liveUrl unavailable is NOT judged via traj.url fallback (it equals
+    // loginUrl for the logout segment and start URL for login) — fail the
+    // segment explicitly as undeterminable.
+    throw new Error(`${segmentLabel} criteria undeterminable — live page URL unavailable (live-url unavailable), traj.url="${String(traj.url ?? '').trim()}" not used as evidence`);
   }
   if (!criteria(traj, loginUrl, liveUrl)) {
     throw new Error(

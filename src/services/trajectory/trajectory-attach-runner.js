@@ -26,9 +26,13 @@ import { attachTrajectoryLive } from './trajectory-attach-service.js';
  * Prepare a trajectory for recording after the session lock is acquired.
  * Resolves account, resets stale running phases, runs default login, attaches live.
  * @param {number} tid trajectory DB id
+ * @param {object} [opts] prepare options
+ * @param {boolean} [opts.skipDefaultLogin] when true, skip the prepare-time
+ *   default login (same effect as runtime.skipDefaultLogin, but known before
+ *   the runtime object exists — auth dry-run login segment)
  * @returns {Promise<object>} prepare result with trajectory, account, and session info
  */
-export async function prepareTrajectoryRecordingUnlocked(tid) {
+export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin = false } = {}) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
 
   // A fresh prepare must not inherit a stale "recording" signal: reset any phase
@@ -190,7 +194,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
   // Auth dry-run login segment: the agent performs the login itself as the
   // recorded phase — skip the prepare-time default login (incl. its 8s retry).
   // Flag is read-only here; it lives until the runtime is torn down at detach.
-  if (runtime.skipDefaultLogin) {
+  if (runtime.skipDefaultLogin || skipDefaultLogin) {
     login = { skipped: true, done: true, accountId };
     emitStage('login', 'skipped', { accountId });
   } else

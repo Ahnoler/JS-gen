@@ -235,11 +235,14 @@ export function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
 /**
  * One-shot prepare for recording studio (serialized per trajectory).
  * @param {number} trajectoryId trajectory DB id
+ * @param {object} [opts] prepare options
+ * @param {boolean} [opts.skipDefaultLogin] when true, skip the prepare-time
+ *   default login (auth dry-run login segment)
  * @returns {Promise<object>} prepare result (sessionId, executorNodeUuid, status, …)
  */
-export async function prepareTrajectoryRecording(trajectoryId) {
+export async function prepareTrajectoryRecording(trajectoryId, opts = {}) {
   const tid = Number(trajectoryId);
-  return remoteSessionService.withTrajectoryLock(tid, () => prepareTrajectoryRecordingUnlocked(tid));
+  return remoteSessionService.withTrajectoryLock(tid, () => prepareTrajectoryRecordingUnlocked(tid, opts));
 }
 
 
