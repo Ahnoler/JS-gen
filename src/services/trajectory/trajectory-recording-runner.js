@@ -618,6 +618,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     }
     const work = (async () => {
       if (type === 'phase_intent_obs' || type === 'phase_boundary_obs' || type === 'phase_end') {
+        if (type === 'phase_end' && payload?.quality_failed === true) {
+          // 假成功防线 v3：QUALITY FAIL（pending_fields/missing_success_token 等）只进
+          // phase_end 事件——在此捕获，终局门闩消费（09-07 #612/#614/19:55 教训）。
+          (runtime.phaseQualityFails = runtime.phaseQualityFails || []).push({
+            phase: payload?.phase,
+            reasons: payload?.quality_failed_reasons || [],
+          });
+        }
         pushPhaseObservation(type, payload);
         return;
       }
@@ -682,6 +690,11 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     description: p.description || '',
   }));
   runtime.phaseOutcomes = {};
+  // 假成功防线 v3：phase_end.quality_failed 捕获（终局门闩消费，per-run 重置）
+  runtime.phaseQualityFails = [];
+  // 假成功防线 v3：本轮 0 落库步却自报 success=true 的阶段。重录场景下副本/DB 均为
+  // 跨 run 累积口径（旧步骤掩护空洞阶段），唯有 phaseStepCounts 是本轮真源。
+  runtime.perRunZeroSuccessPhases = [];
   // 假成功防线（P6-0/T0.1）：每阶段落库步数计数，recordPhaseResult 与收尾门闩消费
   runtime.phaseStepCounts = new Map();
   // 假成功防线 v2：每阶段业务步计数快照（终局门闩按阶段降级用，phaseNumber → count）
@@ -739,6 +752,12 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       console.warn(
         `[record] phase #${phase.phaseNumber} self-reported success with 0 persisted steps — downgraded to unknown`,
       );
+      // 假成功防线 v3：登记到 per-run 嫌疑清单——异步终局门闩 drain 后复读
+      // phaseStepCounts（本轮真源）仍 0 则整轨降级（堵重录累积口径掩护）。
+      (runtime.perRunZeroSuccessPhases = runtime.perRunZeroSuccessPhases || []).push({
+        id: phase.id,
+        phaseNumber: phase.phaseNumber,
+      });
     }
     // 假成功防线 v2：自报 success=true 且 0 业务步的阶段即嫌疑（与上面阶段级
     // 降级同一判据），终局门闩对其做双源复核，仍 0 则整轨降级。
@@ -921,7 +940,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     } catch (err) {
       console.warn('[record] fake-success gate resync send failed:', err?.message || err);
     }
+    // 门闩归属守卫（09-07 教训：timer 从不取消，90s 内重录会让旧门闩在新录制进行中
+    // 触发——覆写新 run 的持久基线、清掉新副本）。runId 变化即整体跳过。
+    const gateRunId = runtime.currentRunId;
     const finalizeGate = setTimeout(async () => {
+      if (runtime.currentRunId !== gateRunId) {
+        console.log(`[record] async gate skipped for traj=${tid}: superseded by a newer run`);
+        return;
+      }
       try {
         execSession.forwardStdin({
           nodeUuid: runtime.executorNodeUuid,
@@ -994,7 +1020,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
               `[record] traj #${tid} downgraded recorded→failure: zero-step phases [${zeroPhaseBoth}] after finalization window`,
             );
           } catch (err) {
-            console.warn('[record] async gate per-phase downgrade failed:', err?.message || err);
+            console.warn('[record] async gate downgrade failed:', err?.message || err);
           }
         }
       } else if (copySteps === 0 && dbSteps === 0) {
@@ -1009,20 +1035,71 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
           console.warn('[record] async gate downgrade failed:', err?.message || err);
         }
       }
+      // 假成功防线 v3（per-run 真源）：本轮 0 落库步却自报 success=true 的阶段。
+      // 重录场景下上面两条累积口径（副本/DB）均被旧 run 步骤掩护，唯有
+      // phaseStepCounts 只计本轮；drain 后复读防迟到步误杀。
+      const perRunZeroPhases = (runtime.perRunZeroSuccessPhases || [])
+        .filter((p) => (runtime.phaseStepCounts?.get(p.id) || 0) === 0)
+        .map((p) => p.phaseNumber);
+      if (perRunZeroPhases.length) {
+        try {
+          await trajectoryDao.finishTransientRecording(tid, 'failure');
+          await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
+          broadcast('fake_success_detected', {
+            trajectoryDbId: tid,
+            perRunZeroPhases,
+          });
+          console.warn(
+            `[record] traj #${tid} downgraded recorded→failure: phases with 0 steps THIS run [${perRunZeroPhases}] (cumulative copy/DB masked by previous runs)`,
+          );
+        } catch (err) {
+          console.warn('[record] per-run zero downgrade failed:', err?.message || err);
+        }
+      }
       try {
         clearActionLogCopy(tid);
       } catch {}
     }, 90000);
     if (typeof finalizeGate.unref === 'function') finalizeGate.unref();
-    // 录制成功（V3）：无论持久基线为何，显式结束成功 → 待确认(recorded)。
-    finalStatus = await trajectoryDao.finishTransientRecording(tid, 'success');
-    await trajectoryDao.updateMeta(tid, {
-      isDone: true,
-      isSuccessful: true,
-    });
-    await trajectoryPhaseDao.updateRunningStatus(tid, 'completed').catch((err) => {
-      console.warn(`[record] updateRunningStatus(completed) failed for #${tid}:`, err?.message || err);
-    });
+    // 假成功防线 v3（终局判定消费阶段结果——09-07 #612/#614/19:55 教训）：任一阶段
+    // 显式 success=false，或 phase_end 上报 QUALITY FAIL（pending_fields /
+    // missing_success_token 等），整轨按 failure 收官（宁误拒不假绿），不再无条件
+    // recorded/isSuccessful=1。零步类假成功由上方异步门闩三路复核兜底。
+    const failedOutcomeKeys = [];
+    const seenOutcome = new Set();
+    for (const [key, outcome] of Object.entries(runtime.phaseOutcomes || {})) {
+      if (outcome?.success === false && !seenOutcome.has(outcome)) {
+        seenOutcome.add(outcome);
+        failedOutcomeKeys.push(key);
+      }
+    }
+    const qualityFails = runtime.phaseQualityFails || [];
+    if (failedOutcomeKeys.length || qualityFails.length) {
+      finalStatus = await trajectoryDao.finishTransientRecording(tid, 'failure');
+      await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
+      broadcast('fake_success_detected', {
+        trajectoryDbId: tid,
+        failedPhases: failedOutcomeKeys,
+        qualityFailedPhases: qualityFails,
+      });
+      console.warn(
+        `[record] traj #${tid} finalized as failure: failedPhases=[${failedOutcomeKeys}]`
+        + ` qualityFails=${JSON.stringify(qualityFails)}`,
+      );
+      await trajectoryPhaseDao.updateRunningStatus(tid, 'failed').catch((err) => {
+        console.warn(`[record] updateRunningStatus(failed) failed for #${tid}:`, err?.message || err);
+      });
+    } else {
+      // 录制成功（V3）：无论持久基线为何，显式结束成功 → 待确认(recorded)。
+      finalStatus = await trajectoryDao.finishTransientRecording(tid, 'success');
+      await trajectoryDao.updateMeta(tid, {
+        isDone: true,
+        isSuccessful: true,
+      });
+      await trajectoryPhaseDao.updateRunningStatus(tid, 'completed').catch((err) => {
+        console.warn(`[record] updateRunningStatus(completed) failed for #${tid}:`, err?.message || err);
+      });
+    }
   } catch (err) {
     // A user-initiated record/stop already wrote the final recordStatus
     // (recorded/failed); don't let the aborted runner overwrite that choice.
