@@ -341,6 +341,48 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  await runAsync('commitDraftTrajectories skips missing_function_id when suggestedFunctionId null and no override', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    const noFnAtom = { ...GOOD_ATOM, suggestedFunctionId: null };
+    await seedCache(tmp, [noFnAtom]);
+
+    let analyzeCalled = false;
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => {
+        analyzeCalled = true;
+        return { phases: ['x'], businessEntries: [] };
+      },
+      createFn: async () => ({ id: 1 }),
+      findDraftFn: async () => null,
+    });
+    assert.equal(out.created.length, 0);
+    assert.equal(out.skipped.length, 1);
+    assert.equal(out.skipped[0].reason, 'missing_function_id');
+    assert.equal(analyzeCalled, false);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commitDraftTrajectories tolerates functionIdOverrides null', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      functionIdOverrides: null,
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async () => ({ id: 4242 }),
+      findDraftFn: async () => null,
+    });
+    assert.equal(out.created.length, 1);
+    assert.equal(out.created[0].trajectoryId, 4242);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   await runAsync('commitDraftTrajectories exported from index', async () => {
     const idx = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/index.js')).href);
     assert.equal(typeof idx.commitDraftTrajectories, 'function');

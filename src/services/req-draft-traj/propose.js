@@ -248,6 +248,22 @@ function countWriteStepsInIndexes(chain, stepIndexes) {
 }
 
 /**
+ * Pick the step index used in atomKey: first write-like step in stepIndexes, else first index.
+ * @param {import('./parse-through-chains.js').ThroughChain} chain Chain
+ * @param {number[]} stepIndexes 1-based step indexes from LLM atom
+ * @returns {number} Step index for buildAtomKey
+ */
+function pickAtomKeyStepIndex(chain, stepIndexes) {
+  for (const stepIndex of stepIndexes) {
+    const step = findStepByIndex(chain, stepIndex);
+    if (step && isWriteStep(step.action)) {
+      return step.index;
+    }
+  }
+  return stepIndexes[0] || chain.steps[0]?.index || 1;
+}
+
+/**
  * Materialize one LLM atom into a DraftAtom or rejection entry.
  * @param {Record<string, unknown>} llmAtom Raw LLM atom
  * @param {object} ctx Materialization context
@@ -272,6 +288,10 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   const title = String(llmAtom.title || primaryStep?.action || '').trim();
   const stepIndex = primaryStep?.index || primaryIndex;
 
+  const atomKeyStepIndex = stepIndexes.length > 0
+    ? pickAtomKeyStepIndex(chain, stepIndexes)
+    : stepIndex;
+
   const writeStepCount = stepIndexes.length > 0
     ? countWriteStepsInIndexes(chain, stepIndexes)
     : (primaryStep && isWriteStep(primaryStep.action) ? 1 : 0);
@@ -279,7 +299,7 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     const atomKey = buildAtomKey({
       moduleKey,
       chainId: chain.chainId,
-      stepIndex,
+      stepIndex: atomKeyStepIndex,
       title,
     });
     return { rejected: { atomKey, reason: 'multi_write_atom' } };
@@ -288,7 +308,7 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   const atomKey = buildAtomKey({
     moduleKey,
     chainId: chain.chainId,
-    stepIndex,
+    stepIndex: atomKeyStepIndex,
     title,
   });
 

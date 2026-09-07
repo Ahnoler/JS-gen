@@ -146,7 +146,7 @@ export const GROUP_KB = [{
           rejected: [{ atomKey: 'product-mgmt:chain-a:1:进入产品库', reason: 'empty_task_draft' }],
         },
       }),
-      notes: ['模块未登记或缺 through-chains.md → 400 VALIDATION', '不建交易、不录制'],
+      notes: ['模块未登记 → NOT_FOUND/404', '缺 through-chains.md → 400 VALIDATION', '不建交易、不录制'],
     },
     {
       method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/commit',
@@ -173,7 +173,7 @@ export const GROUP_KB = [{
           skipped: [{ atomKey: 'product-mgmt:chain-a:9:不存在', reason: 'unknown_or_stale_atom' }],
         },
       }),
-      notes: ['atomKeys 必填且非空', '未先 propose → 400', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
+      notes: ['atomKeys 必填且非空', '未先 propose → 400', '缺 functionId 且无 override → skipped missing_function_id', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
     },
   ],
 }];

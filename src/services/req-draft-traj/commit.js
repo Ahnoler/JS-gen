@@ -37,6 +37,9 @@ export async function commitDraftTrajectories({
   createFn,
   findDraftFn,
 } = {}) {
+  const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
+    ? functionIdOverrides
+    : {};
   const keys = Array.isArray(atomKeys) ? atomKeys.map(String) : [];
   const cache = await readProposeCache(moduleDir(moduleKey, rootDir));
   if (!cache?.atoms?.length) {
@@ -67,6 +70,11 @@ export async function commitDraftTrajectories({
         continue;
       }
     }
+    const functionId = overrides[atomKey] ?? atom.suggestedFunctionId;
+    if (!Number(functionId)) {
+      skipped.push({ atomKey, reason: 'missing_function_id' });
+      continue;
+    }
     let analyzed;
     try {
       analyzed = await analyze({ description: atom.taskDraft });
@@ -74,10 +82,9 @@ export async function commitDraftTrajectories({
       skipped.push({ atomKey, reason: `analyze_failed:${e.message}` });
       continue;
     }
-    const functionId = functionIdOverrides[atomKey] ?? atom.suggestedFunctionId;
     try {
       const traj = await create({
-        functionId: functionId != null ? Number(functionId) : undefined,
+        functionId: Number(functionId),
         name: atom.title,
         requirement: atom.taskDraft,
         phases: analyzed.phases,

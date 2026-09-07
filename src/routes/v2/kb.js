@@ -72,11 +72,14 @@ export default function registerKbRoutes(app) {
     if (!Array.isArray(atomKeys) || !atomKeys.length) {
       throw new AppError('atomKeys required', { code: 'VALIDATION' });
     }
+    const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
+      ? functionIdOverrides
+      : {};
     const result = await reqDraftTraj.commitDraftTrajectories({
       moduleKey: req.params.moduleKey,
       atomKeys,
       systemAccountId,
-      functionIdOverrides,
+      functionIdOverrides: overrides,
       force: Boolean(force),
     });
     sendOk(res, result);
