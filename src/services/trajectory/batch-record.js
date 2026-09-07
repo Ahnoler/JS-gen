@@ -135,7 +135,27 @@ async function runRecord(item, token) {
     }
     await emitProgress(batchId, recording);
 
-    await startTrajectoryRecording(tid);
+    const recordOutcome = await startTrajectoryRecording(tid);
+
+    if (recordOutcome?.recordStatus === 'failed') {
+      // 假成功防线 v3 联动（09-07 #612/#614 教训）：轨迹终局 failure（阶段显式失败 /
+      // QUALITY FAIL / 0 步门闩）不得回填 item recorded——否则 job 假绿且无再收敛。
+      const freshFail = await batchDao.getItemById(item.id);
+      await batchDao.markItemFailed(item.id, ['preparing', 'recording'], {
+        version: freshFail?.version,
+        expectedWorkerToken: token,
+        errorCode: 'RECORD_QUALITY_GATE',
+        errorMessage: 'recording finalized as failed (phase failure / quality gate)',
+      });
+      try {
+        await detachTrajectoryLive(tid, { reason: 'batch_failed' });
+      } catch (err) {
+        console.warn('[batch] detach after gate failure failed:', err.message);
+      }
+      await emitProgress(batchId);
+      await maybeFinalizeJob(batchId);
+      return;
+    }
 
     const after = await batchDao.getItemById(item.id);
     const marked = await batchDao.markItemRecorded(item.id, {
