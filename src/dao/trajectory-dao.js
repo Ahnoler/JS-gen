@@ -100,11 +100,13 @@ const RECORD_STATUS_STATS = ['draft', 'recording', 'failed', 'recorded', 'comple
  * @param {number|null} [options.isExport] Filter by export flag (0 = not exported, 1 = exported, null = all)
  * @returns {Promise<{ total: number, draft: number, recording: number, failed: number, recorded: number, completed: number }>} 各状态统计
  */
-export async function countByRecordStatus({ functionId = null, keyword = null, recordStatus = null, batchTaskName = null, paasUserId = null, isExport = null } = {}) {
+export async function countByRecordStatus({ functionId = null, functionIds = null, keyword = null, recordStatus = null, batchTaskName = null, paasUserId = null, isExport = null } = {}) {
   const db = getDB();
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
-  if (functionId != null && Number.isFinite(Number(functionId))) {
+  if (Array.isArray(functionIds) && functionIds.length) {
+    base.whereIn('t.function_id', functionIds.map(Number).filter(Number.isFinite));
+  } else if (functionId != null && Number.isFinite(Number(functionId))) {
     base.where('t.function_id', Number(functionId));
   }
   applyListFilters(base, { keyword, recordStatus, isExport });
@@ -167,6 +169,10 @@ export async function save(trajectory, trx = null) {
       recordStatus: trajectory.recordStatus ?? 'draft',
       persistentRecordStatus: trajectory.persistentRecordStatus
         ?? (isPersistentRecordStatus(trajectory.recordStatus) ? trajectory.recordStatus : 'draft'),
+      reqModuleKey: trajectory.reqModuleKey ?? null,
+      reqSourcePath: trajectory.reqSourcePath ?? null,
+      reqChapterRef: trajectory.reqChapterRef ?? null,
+      reqAtomKey: trajectory.reqAtomKey ?? null,
     }));
 
     if (trajectory.steps?.length) {
@@ -562,6 +568,27 @@ export async function getMaxPhaseNumber(trajectoryDbId) {
 }
 
 /**
+ * Find an existing draft trajectory for a req atom (idempotency).
+ * @param {string} moduleKey
+ * @param {string} atomKey
+ * @returns {Promise<object|null>}
+ */
+export async function findDraftByReqAtomKey(moduleKey, atomKey) {
+  const mk = String(moduleKey || '').trim();
+  const ak = String(atomKey || '').trim();
+  if (!mk || !ak) return null;
+  const row = await getDB()(TABLE)
+    .where({
+      req_module_key: mk,
+      req_atom_key: ak,
+      record_status: 'draft',
+    })
+    .orderBy('id', 'desc')
+    .first();
+  return fromDbRow(row);
+}
+
+/**
  * Load trajectory by numeric primary key with steps.
  * @param {number} id The trajectory ID to load
  * @returns {Promise<object|null>} Trajectory object with steps or null if not found
@@ -594,14 +621,29 @@ export async function getById(id) {
  * @param {number|null} [options.isExport] Filter by export flag (0 = not exported, 1 = exported, null = all)
  * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number, stats: object }>} Paginated trajectory list with statistics
  */
-export async function listByFunction(functionId, {
+export async function listByFunction(functionId, options = {}) {
+  return listByFunctionIds([functionId], options);
+}
+
+/**
+ * List trajectories under a set of function IDs with pagination and filtering.
+ * Used for aggregated views (e.g. all transactions under a system node).
+ * @param {number[]} functionIds Function IDs to filter by (non-empty)
+ * @param {object} [options] Same options as listByFunction
+ * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number, stats: object }>} Paginated trajectory list with statistics
+ */
+export async function listByFunctionIds(functionIds, {
   page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null, isExport = null,
 } = {}) {
   const db = getDB();
+  const ids = (Array.isArray(functionIds) ? functionIds : []).map(Number).filter(Number.isFinite);
+  if (!ids.length) {
+    return { rows: [], total: 0, page, pageSize, stats: { total: 0 } };
+  }
   const offset = (page - 1) * pageSize;
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id')
-    .where('t.function_id', functionId);
+    .whereIn('t.function_id', ids);
   const query = applyListFilters(base, { keyword, recordStatus, isExport });
   applyBatchTaskNameFilter(query, batchTaskName);
   if (paasUserId) query.where('t.paas_user_id', paasUserId);
@@ -623,7 +665,7 @@ export async function listByFunction(functionId, {
     e.isExport = Number(e.isExport) ? 1 : 0;
     e.phaseCount = phaseCounts.get(Number(e.id)) || 0;
   }
-  const stats = await countByRecordStatus({ functionId, keyword, recordStatus, batchTaskName, paasUserId, isExport });
+  const stats = await countByRecordStatus({ functionIds: ids, keyword, recordStatus, batchTaskName, paasUserId, isExport });
   return { rows: entities, total, page, pageSize, stats };
 }
 
