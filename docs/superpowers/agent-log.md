@@ -209,6 +209,12 @@
 - **待用户/SUT 管理员**：给 X0018（客户经理）角色配置用户（建议 WN0001）后，R6 v2 一棒收尾（单子待发起可续）→ R6 审批段 → R7。
 - 配方资产沉淀：rating+4/credit_usage+4/credit_application+2/customer_onboarding+1 共 11 条实证规则本轮落卡；3 份配方文档 tmp/kb-mainchain/。
 
+## 2026-09-07 14:20 · ZCode Lead — 收工回报：主链 R1-R5 PASS + R6/R7 挂起（用户拍板），todo-list 落档
+- **用户拍板**：被测系统暂时不能提供账号支持（X0018 角色配用户）——R6/R7 **暂时搁置**；todo-list ⑤ 已改写为「完成矩阵（R1-R5 全 PASS 双证）+R6 挂起项（阻塞点/恢复条件/一棒收尾续接步骤）」。
+- **主链最终战报**：R1 客户新增（595）→ R2 评级（604+607，生效）→ R3 授信（605+608，通过）→ R4 审批（606/607/608，WN0001 id=26）→ R5 批复查看（613）→ R6 用信（616+续棒：YXPC20260907012045 待发起，三深坑全修，流程提交止于 SUT 角色配置）。合计 11 条录制轨迹、300+ 步落库、11 条实证规则落卡（rating+4/credit_usage+4/credit_application+2/customer_onboarding+1）、3 份配方文档 tmp/kb-mainchain/。
+- **本轮全部推送**：最新 4ac2e28e→e9648bfb（含 G1-G6 子代理产物与全部阶段回报）。另：DB 直连方案（用户解决）替代 SSH 隧道=落库延迟真凶根治；并行会话 auth-recording spec 线条目已随 commit 携带。
+- **挂起移交**：R6/R7 等 SUT 管理员给 X0018 角色配用户（建议 WN0001）；恢复即 R6 v2 一棒收尾→审批段→R7→T3.1 heal live→P6-4 终验。
+
 ## 2026-09-07 11:15 · Cursor Lead — 开工声明：产品库「基本信息保存」补录
 - 开工：11:15。补 PM 验收缺口：在 #499（一级分类+新增产品）之外，录一条「选中未启用产品 → 基本信息填写 → 保存」贯通交易
 - 范围：`tmp/product-mgmt/`（任务/analyze/create/through-report）、`data/kb/flows/product_library.json`（仅 source/rules 回写）、本文件
