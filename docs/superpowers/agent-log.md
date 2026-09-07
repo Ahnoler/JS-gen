@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 22:40 · Cursor Lead — 开工：#614 湿测重录（ghost-pending prune 后）
+
+- 开工：22:40。方案 A 已合入 `00c5f1bf`；本单清空 #614 用新 stamp 重录，验收 stderr `pruned ghost pending` + p4 保存 toast
+- 范围：`tmp/product-mgmt/`（task/patch/clear/prepare/start/through-report）、本文件；不改引擎
+- 禁入：trajectory-dao 等未提交 WIP；session_runner；方案 B/C
+- 方式：fid=9000000740 account=2；stamp `20260907-2240`；控制面已带新代码；执行机 LMY 本地重连
+
 ## 2026-09-07 21:50 · Cursor Lead — 收工：click_save 幽灵 pending 活体剪枝（回链 21:35）
 
 - 完成：`JS_CHECK_SINGLE_FIELD` +`visible`；`form_save` prune `not-found`/`not-visible` + stderr `pruned ghost pending`；characterize-ghost-pending-prune + verify-all 注册；plan `docs/superpowers/plans/2026-09-07-ghost-pending-prune.md`
