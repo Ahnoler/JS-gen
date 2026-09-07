@@ -14,6 +14,12 @@
 - 注意：#612 假成功作废；#614 AI 保存阶段 steps=0（record/start 假成功复现）→ **DONE_WITH_CONCERNS**；强步骤数验收需引擎修后重录
 - 禁入遵守：未碰 session_runner 等他线 WIP；未恢复 save_section
 
+## 2026-09-07 12:40 · ZCode Lead — R5 批复查看 PASS（traj 613）+ R6 单据生成（YXPC20260907012045 待发起）+ G6 续棒派发
+- **G5 完成**：①R5 批复查看录制 PASS（traj 613 recorded，4 步落库，查看页要素全核对：DGSXPF20260907020005/100 万/生效/关联额度 EDBH20260905080002）②R6 用信：第 1 轮选错客户撞盛达草稿（立即 stop 止损）→第 2 轮（traj 616，recorded，98 步）**YXPC20260907012045 生成（待发起）**，卡三点：利率档次/LPR disabled+required 字段名未命中 Vue model（run26e 配方字段名不匹配）、保证人引入 0 候选（190416/瑞昇均查不到）、省份下拉 value-mismatch。
+- **G6 已派发（R6 续棒，进行中）**：利率字段名深扫（枚举 form model 键名）→直写；保证人改盛达/MBP 重试（或切信用方式）；省份真实 click；提交→黄亮→审批中。
+- businessEntries 必须带客户编号+客户名称（否则放大镜模糊选客翻车——615 教训，616 补齐后全程锁定正确客户）。
+- 主链计分板：R1-R4 ✅ → R5 ✅（613）→ **R6 单据已生成待收口**（G6）→ R7 合同。
+
 ## 2026-09-07 11:15 · Cursor Lead — 开工声明：产品库「基本信息保存」补录
 - 开工：11:15。补 PM 验收缺口：在 #499（一级分类+新增产品）之外，录一条「选中未启用产品 → 基本信息填写 → 保存」贯通交易
 - 范围：`tmp/product-mgmt/`（任务/analyze/create/through-report）、`data/kb/flows/product_library.json`（仅 source/rules 回写）、本文件
