@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 03:08 · Zcode 闲时审查 — 收工：characterization 目录瘦身（回链 02:58 开工）
+
+- 完成：孤儿对账落地四步，4 commits——①`a1d9416f` 删 4 个死/过期孤儿（agent-stderr-log 钉已删除的 executor/stderr-prefix.js[18d9b585 删]、batch-task-name 钉已不存在 batch-job-name.js、l2-todo-region/partition-compose 期望过期于语义变更）；②`f95e7a06` 收编 6 个高价值孤儿入 verify-all（save-section 负向 pin 守恢复禁令 / phase-reviewer+flow [reviewer.py 合约热区，过往「PASS」实为手动跑] / real-click / tree-check-confirm / session-lifecycle）；③`97fcad54` 其余 67 个绿孤儿 `git mv` 至 `scripts/characterization/cold/` + 路径深度 codemod（parents[2]→[3]、'../..'→'../../..'、import 前缀、单 '..' join×4 手补）+ cold/README.md（分层/运行约定/收编政策）；④menu-nine-rules **只读归因未改**：09-04 18/18 后菜单扫描/导入被 intermediate_flag 语义线改动 6 commit（ed0a8c7b→85b7533c，叶子一律 intermediate/扫描跳过），FAIL 5/18 判**期望过期非回归**（该检查写库，未复跑确认），移交菜单线更新期望
+- 验收：67 个移动脚本自仓库根全量重跑 **67/67 PASS=移动前基线**（中途一次假红系 shell cwd 停在 scripts/ 的相对路径事故，非脚本问题）；verify-all 全量 **111 ok / 1 红**——唯一红=characterize-sso-auth（轨迹查询线 WIP 已知存量红，独立复现），零劣化；门禁条目 96→102，注册项抽样零死 pin（region-tree 的 assembleRegionTree 等均为现行函数）；全套墙钟 106s，性能不构成瘦身动因
+- 遗留移交：①menu-import-nine-rules.mjs 期望需按 intermediate 新语义更新（归属：菜单线，写库检查勿入 verify-all）；②l2-todo-region/partition-compose 若语义仍有消费方可按新期望重写后再收编（当前判过期删除）；③cold/ 目录脚本路径已改深度，**回门禁时须移回上级并还原相对深度**（README 已写）；④「新 characterization 必须注册」政策已写进 cold/README，未做成硬约束（可下轮加 pin：目录清单 vs verify-all diff 检查）
+- 注意：本轮全程未触轨迹查询 WIP 四文件与 req-draft-traj services（Cursor 线 02:55 刚收工）；characterization/** 免 lint（pre-commit 的 ignore 提示为既有噪音）
+
 ## 2026-09-08 03:20 · Zcode 闲时 — 开工：文档清理批次二（归档积压 + 未入库文档 + 状态横幅 + 杂物移除）
 
 - 开工：03:20。用户三项拍板（归档批次按工作线 / 根目录 yml 移除 / reasonix 删除）；承接 00:55 审计线收工条目的清理建议
