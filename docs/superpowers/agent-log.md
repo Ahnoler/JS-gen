@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:20 · Zcode 闲时审查 — 开工：收尾轨迹查询线 17b4a512 的 sso-auth pin 回调（用户委托）
+
+- 开工：04:20。用户确认轨迹查询线按需求改动（17b4a512 listByFunction→listByFunctionIds 重构），委托收尾遗留问题
+- 范围：仅 `scripts/characterization/characterize-sso-auth.mjs` 两条过期断言（:209 listByFunction 形状 / :221 stats 透传文本）改为新形状；本文件。**不动 trajectory-dao 等业务代码**（已核功能完好：薄壳转发 options 透传、listByFunctionIds 完整处理 paasUserId 过滤+stats，纯 pin 形状失配）
+- 禁入：src/dao/trajectory-dao.js 及轨迹查询线全部文件（只读）；其余沿用上轮禁入区
+- 方式：改断言 → sso-auth 单跑绿 → verify-all 全量（预期全绿）→ 收工
+
 ## 2026-09-08 04:18 · Zcode 闲时审查 — 收工：数据清洗 + 门闩残余批次 + 闲时审查定时化（回链 04:05 开工）
 
 - 完成：用户五项批复执行完毕——①**存量假成功数据清洗**（已批准③）：只读盘点 359 条 recorded/completed+is_successful=1，其中 **24 条业务步=0 的铁板假成功**（KB-I5 探针 + 09-06 晚 KB贯通批量）已置 is_successful=0，record_status 未动；#612（16 业务步）/#614（26 业务步）已被真实重录覆盖不在清洗范围；剩余 335 条均有业务步，无法离线判定者不盲目清洗。DB 动作无 repo commit，脚本与输出在 tmp/idle-review/。②**门闩残余批次**（④核可后实施）3 commits：`8e235709`+`6bd37373` runHealStep 归属修复——手搓等待换 waitForSessionEventOwned（runId 过滤+canceled 丢弃+legacy 放行），heal step 盖 healRunId，success=false 显式拒收（Type A 不再无证据标 healed-by-ai）+ 新护栏 characterize-owned-wait-shape.mjs（真实 hub+3 参 arity 钉，补 2a30fc6c 自身测试的形状缺口）；`816765ab` session_runner runId 变化复位 `_last_phase_state_key_phase`（新 run 首阶段不再漏发开组事件）；`b24580b5` 登录重试时延 env 化 `PREPARE_LOGIN_RETRY_DELAY_MS`（挂起项事件驱动重设计维持缓行）。③**定时化**（⑤考虑花销）：CronCreate automation-cb2a608d「闲时教训驱动代码审查·每周一凌晨3点半」，prompt 含花销约束（严格 3 子智能体/P1 主线程直改/禁真机湿测写库冒烟/冲突可缩范围）
