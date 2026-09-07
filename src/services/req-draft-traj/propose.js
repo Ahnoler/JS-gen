@@ -1,0 +1,370 @@
+/**
+ * Propose atomic draft trajectory candidates from req-module through-chains.
+ */
+import { readFileSync, existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { AppError } from '../../http/app-error.js';
+import { callLLM as defaultCallLLM } from '../../llm-utils.js';
+import { getReqModule, moduleDir } from '../kb-req-modules.js';
+import { parseLlmJsonObject } from '../operation-component-signature.js';
+import { buildAtomKey, parseThroughChainsMarkdown } from './parse-through-chains.js';
+import {
+  assertAtomProvenance,
+  loadSourceDoc,
+  resolveChapterRef,
+} from './provenance.js';
+import { writeProposeCache } from './propose-cache.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
+const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
+
+/**
+ * @typedef {object} DraftAtom
+ * @property {string} atomKey Stable atom key for idempotency
+ * @property {string} title Human-readable atom title
+ * @property {number|null} suggestedFunctionId Guessed function id or null
+ * @property {string} sourceDoc Source document path
+ * @property {string} sourceChapter Chapter reference under module
+ * @property {string} taskDraft Task text for analyze
+ * @property {string[]} phaseHints Short phase titles
+ * @property {string} [wetTestHint] Optional wet-test hint
+ */
+
+const WRITE_ACTION_RE = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交|启用|禁用|克隆|删除/;
+const NAV_ACTION_RE = /进入|加载|刷树|打开|导航|切换|刷新/;
+
+/**
+ * Load atomize system prompt template from disk.
+ * @returns {string} Prompt text
+ */
+function loadAtomizePrompt() {
+  if (existsSync(PROMPT_PATH)) {
+    return readFileSync(PROMPT_PATH, 'utf-8');
+  }
+  return '你是原子化交易拆解助手。输出严格 JSON：{"atoms":[...]}';
+}
+
+/**
+ * True when a step action is a write/mutation operation.
+ * @param {string} action Step action text
+ * @returns {boolean} True when the step action is a write/mutation operation
+ */
+function isWriteStep(action) {
+  return WRITE_ACTION_RE.test(String(action || ''));
+}
+
+/**
+ * True when a step action is navigation-only (no write).
+ * @param {string} action Step action text
+ * @returns {boolean} True when the step action is navigation-only (no write)
+ */
+function isNavigationStep(action) {
+  const text = String(action || '');
+  return NAV_ACTION_RE.test(text) && !isWriteStep(text);
+}
+
+/**
+ * Parse suggestedFunctionId from LLM output.
+ * @param {unknown} value Raw value
+ * @returns {number|null} Parsed function id or null when invalid
+ */
+function parseSuggestedFunctionId(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Build a minimal taskDraft template for deterministic fallback atoms.
+ * @param {string[]} navPreamble Prior navigation step actions
+ * @param {string} action Primary step action
+ * @param {{ buttons?: string, page?: string }} step Step row
+ * @param {string} sourceDoc Source document path
+ * @returns {string} Task draft text
+ */
+function buildTemplateTaskDraft(navPreamble, action, step, sourceDoc) {
+  const lines = [];
+  let idx = 1;
+  for (const nav of navPreamble) {
+    lines.push(`${idx}、${nav}`);
+    idx += 1;
+  }
+  const buttons = step.buttons ? `，操作：${step.buttons}` : '';
+  const page = step.page ? `（${step.page}）` : '';
+  lines.push(`${idx}、${action}${page}${buttons}`);
+  lines.push('');
+  lines.push(`来源：${sourceDoc}`);
+  return `${lines.join('\n')}\n`;
+}
+
+/**
+ * Deterministic fallback when LLM fails: one write step → one atom;
+ * navigation-only steps merge into the next write atom's taskDraft preamble.
+ * @param {import('./parse-through-chains.js').ThroughChain[]} chains Parsed chains
+ * @param {string} sourceDoc Source document path for template
+ * @returns {Array<{ chainId: string, stepIndexes: number[], title: string, taskDraft: string, phaseHints: string[], suggestedFunctionId: null }>} Fallback LLM-shaped atom list
+ */
+function buildFallbackLlmAtoms(chains, sourceDoc) {
+  /** @type {Array<{ chainId: string, stepIndexes: number[], title: string, taskDraft: string, phaseHints: string[], suggestedFunctionId: null }>} */
+  const atoms = [];
+
+  for (const chain of chains) {
+    const steps = chain.steps || [];
+    /** @type {string[]} */
+    let navPreamble = [];
+
+    for (let i = 0; i < steps.length; i += 1) {
+      const step = steps[i];
+      const action = String(step.action || '').trim();
+      if (!action) {
+        continue;
+      }
+
+      if (isNavigationStep(action)) {
+        navPreamble.push(action);
+        const hasLaterWrite = steps.slice(i + 1).some((s) => isWriteStep(s.action));
+        if (!hasLaterWrite) {
+          atoms.push({
+            chainId: chain.chainId,
+            stepIndexes: [step.index],
+            title: action,
+            taskDraft: buildTemplateTaskDraft([], action, step, sourceDoc),
+            phaseHints: [action],
+            suggestedFunctionId: null,
+          });
+          navPreamble = [];
+        }
+        continue;
+      }
+
+      if (isWriteStep(action)) {
+        const preamble = navPreamble.slice();
+        navPreamble = [];
+        atoms.push({
+          chainId: chain.chainId,
+          stepIndexes: [step.index],
+          title: action,
+          taskDraft: buildTemplateTaskDraft(preamble, action, step, sourceDoc),
+          phaseHints: preamble.length > 0 ? [...preamble, action] : [action],
+          suggestedFunctionId: null,
+        });
+        continue;
+      }
+
+      navPreamble = [];
+      atoms.push({
+        chainId: chain.chainId,
+        stepIndexes: [step.index],
+        title: action,
+        taskDraft: buildTemplateTaskDraft([], action, step, sourceDoc),
+        phaseHints: [action],
+        suggestedFunctionId: null,
+      });
+    }
+  }
+
+  return atoms;
+}
+
+/**
+ * Serialize chains for LLM input, truncating when payload is huge.
+ * @param {import('./parse-through-chains.js').ThroughChain[]} chains Chains to serialize
+ * @returns {string} JSON string for user payload
+ */
+function serializeChainsForLlm(chains) {
+  let payload = JSON.stringify({ chains }, null, 2);
+  if (payload.length <= MAX_CHAIN_PAYLOAD_CHARS) {
+    return payload;
+  }
+  const trimmed = chains.map((chain) => ({
+    ...chain,
+    steps: (chain.steps || []).map((step) => ({
+      index: step.index,
+      action: step.action,
+      zjjk: step.zjjk,
+      buttons: step.buttons,
+    })),
+  }));
+  payload = JSON.stringify({ chains: trimmed, truncated: true }, null, 2);
+  if (payload.length > MAX_CHAIN_PAYLOAD_CHARS) {
+    return `${payload.slice(0, MAX_CHAIN_PAYLOAD_CHARS)}\n/* truncated */`;
+  }
+  return payload;
+}
+
+/**
+ * Invoke LLM atomize prompt and parse atoms array.
+ * @param {import('./parse-through-chains.js').ThroughChain[]} chains Filtered chains
+ * @param {string} moduleKey Module key
+ * @param {(text: string) => Promise<string>} llmFn Injectable LLM caller
+ * @returns {Promise<Array<Record<string, unknown>>>} Raw LLM atom objects
+ */
+async function callAtomizeLlm(chains, moduleKey, llmFn) {
+  const systemPrompt = loadAtomizePrompt();
+  const userPayload = serializeChainsForLlm(chains);
+  const prompt = `${systemPrompt}\n\n---\n\nmoduleKey: ${moduleKey}\n\n${userPayload}`;
+  const raw = await llmFn(prompt);
+  const parsed = parseLlmJsonObject(raw);
+  if (!parsed || !Array.isArray(parsed.atoms)) {
+    return null;
+  }
+  return parsed.atoms;
+}
+
+/**
+ * Resolve a chain step by 1-based index.
+ * @param {import('./parse-through-chains.js').ThroughChain} chain Chain
+ * @param {number} stepIndex 1-based step index
+ * @returns {import('./parse-through-chains.js').ThroughChainStep|undefined} Matching step or undefined
+ */
+function findStepByIndex(chain, stepIndex) {
+  const direct = chain.steps.find((s) => s.index === stepIndex);
+  if (direct) {
+    return direct;
+  }
+  return chain.steps[stepIndex - 1];
+}
+
+/**
+ * Materialize one LLM atom into a DraftAtom or rejection entry.
+ * @param {Record<string, unknown>} llmAtom Raw LLM atom
+ * @param {object} ctx Materialization context
+ * @param {string} ctx.moduleKey Module key
+ * @param {string} ctx.modDir Module directory
+ * @param {import('./parse-through-chains.js').ThroughChain[]} ctx.chains Parsed chains
+ * @param {string} ctx.sourceDoc Source document path
+ * @returns {Promise<{ atom?: DraftAtom, rejected?: { atomKey?: string, reason: string } }>} Materialized atom or rejection
+ */
+async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDoc }) {
+  const chainId = String(llmAtom.chainId || '').trim();
+  const chain = chains.find((c) => c.chainId === chainId);
+  if (!chain) {
+    return { rejected: { reason: 'unknown_chain_id' } };
+  }
+
+  const stepIndexes = Array.isArray(llmAtom.stepIndexes)
+    ? llmAtom.stepIndexes.map((v) => Number(v)).filter((n) => Number.isFinite(n) && n > 0)
+    : [];
+  const primaryIndex = stepIndexes[0] || chain.steps[0]?.index || 1;
+  const primaryStep = findStepByIndex(chain, primaryIndex) || chain.steps[0];
+  const title = String(llmAtom.title || primaryStep?.action || '').trim();
+  const stepIndex = primaryStep?.index || primaryIndex;
+
+  const atomKey = buildAtomKey({
+    moduleKey,
+    chainId: chain.chainId,
+    stepIndex,
+    title,
+  });
+
+  const sourceChapter = await resolveChapterRef({
+    chaptersDir: join(modDir, 'chapters'),
+    chapterHint: chain.chapterHint,
+    zjjk: primaryStep?.zjjk || '',
+  });
+
+  /** @type {DraftAtom} */
+  const atom = {
+    atomKey,
+    title,
+    suggestedFunctionId: parseSuggestedFunctionId(llmAtom.suggestedFunctionId),
+    sourceDoc,
+    sourceChapter: sourceChapter || '',
+    taskDraft: String(llmAtom.taskDraft || '').trim(),
+    phaseHints: Array.isArray(llmAtom.phaseHints)
+      ? llmAtom.phaseHints.map((h) => String(h))
+      : [],
+  };
+
+  if (llmAtom.wetTestHint != null && String(llmAtom.wetTestHint).trim()) {
+    atom.wetTestHint = String(llmAtom.wetTestHint).trim();
+  }
+
+  const prov = assertAtomProvenance(atom);
+  if (!prov.ok) {
+    return { rejected: { atomKey, reason: prov.reason } };
+  }
+
+  return { atom };
+}
+
+/**
+ * Propose atomic draft trajectory candidates for a req module.
+ * @param {object} opts Propose options
+ * @param {string} opts.moduleKey Req module key
+ * @param {string} [opts.rootDir] Req modules root directory
+ * @param {string[]} [opts.chainIds] Optional chain id filter
+ * @param {number} [opts.maxAtoms] Max selectable atoms to return
+ * @param {(text: string) => Promise<string>} [opts.callLLM] Injectable LLM caller (offline tests)
+ * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }> }>} Accepted and rejected atoms
+ */
+export async function proposeDraftTrajectories({
+  moduleKey,
+  rootDir,
+  chainIds,
+  maxAtoms,
+  callLLM,
+}) {
+  const mod = await getReqModule({ rootDir, moduleKey });
+  if (!mod.hasThroughChains) {
+    throw new AppError('through-chains.md required', { code: 'VALIDATION' });
+  }
+
+  const modDir = moduleDir(moduleKey, rootDir);
+  const md = await readFile(join(modDir, 'through-chains.md'), 'utf-8');
+  const { chains: allChains } = parseThroughChainsMarkdown(md);
+
+  const chainIdSet = Array.isArray(chainIds) && chainIds.length > 0
+    ? new Set(chainIds.map(String))
+    : null;
+  const chains = chainIdSet
+    ? allChains.filter((c) => chainIdSet.has(c.chainId))
+    : allChains;
+
+  const sourceDoc = await loadSourceDoc(modDir);
+  const llmFn = callLLM || defaultCallLLM;
+
+  let llmAtoms = null;
+  try {
+    llmAtoms = await callAtomizeLlm(chains, moduleKey, llmFn);
+  } catch {
+    llmAtoms = null;
+  }
+
+  if (!llmAtoms) {
+    // Deterministic fallback: each write step → one atom; nav merges into next write preamble.
+    llmAtoms = buildFallbackLlmAtoms(chains, sourceDoc);
+  }
+
+  /** @type {DraftAtom[]} */
+  const atoms = [];
+  /** @type {Array<{ atomKey?: string, reason: string }>} */
+  const rejected = [];
+
+  for (const llmAtom of llmAtoms) {
+    const result = await materializeLlmAtom(llmAtom, {
+      moduleKey,
+      modDir,
+      chains,
+      sourceDoc,
+    });
+    if (result.atom) {
+      atoms.push(result.atom);
+    } else if (result.rejected) {
+      rejected.push(result.rejected);
+    }
+  }
+
+  const capped = Number.isFinite(maxAtoms) && maxAtoms > 0
+    ? atoms.slice(0, maxAtoms)
+    : atoms;
+
+  await writeProposeCache(modDir, { atoms: capped, rejected });
+
+  return { atoms: capped, rejected };
+}

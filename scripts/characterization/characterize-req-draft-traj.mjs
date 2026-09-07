@@ -5,7 +5,8 @@
  *   node scripts/characterization/characterize-req-draft-traj.mjs
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -87,6 +88,59 @@ async function main() {
       sourceChapter: 'chapters/01-product-library.md#产品库管理',
     });
     assert.equal(bad.ok, false);
+  });
+
+  const { proposeDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href);
+  const { AppError } = await import(pathToFileURL(join(ROOT, 'src/http/app-error.js')).href);
+
+  await runAsync('proposeDraftTrajectories on fixture with fakeLLM', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        {
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '1、进入产品库。\n2、点击新增一级分类，名称填「KB测一级」，序号填「1」，确定。\n\n来源：demo.docx / chapters/01-product-library.md\n\n关键数据\n分类名称：KB测一级\n序号：1\n',
+          phaseHints: ['进入产品库', '新增一级分类并确定'],
+          suggestedFunctionId: 9000000740,
+        },
+      ],
+    });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+    });
+    assert.ok(out.atoms.length >= 1);
+    assert.ok(out.atoms.every((a) => a.sourceDoc && a.sourceChapter && a.atomKey));
+    assert.ok(!out.atoms.some((a) => !a.sourceChapter));
+    const cachePath = join(tmp, 'demo-mod', '.draft-traj-propose.json');
+    assert.ok(existsSync(cachePath));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('proposeDraftTrajectories rejects missing through-chains', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    rmSync(join(tmp, 'demo-mod', 'through-chains.md'), { force: true });
+
+    let err;
+    try {
+      await proposeDraftTrajectories({
+        moduleKey: 'demo-mod',
+        rootDir: tmp,
+        callLLM: async () => '{"atoms":[]}',
+      });
+    } catch (e) {
+      err = e;
+    }
+    assert.ok(err instanceof AppError);
+    assert.equal(err.code, 'VALIDATION');
+    rmSync(tmp, { recursive: true, force: true });
   });
 
   console.log(`OK ${passed}`);
