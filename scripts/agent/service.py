@@ -639,10 +639,25 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
     except asyncio.CancelledError:
         sys.stderr.write("Agent run cancelled\n");
         sys.stderr.flush()
-        emit_json({"event": "phase_error",
-                   "data": {"phase": step_index, "name": task_text[:60], "message": "Agent run cancelled"}})
+        try:
+            from ..state import get_current_run_id
+            _run_id = get_current_run_id()
+        except Exception:
+            _run_id = None
+        _phase_err_data = {"phase": step_index, "name": task_text[:60], "message": "Agent run cancelled"}
+        if _run_id:
+            _phase_err_data["runId"] = _run_id
+        emit_json({"event": "phase_error", "data": _phase_err_data})
     except Exception as e:
-        emit_json({"event": "phase_error", "data": {"phase": step_index, "name": task_text[:60], "message": str(e)}})
+        try:
+            from ..state import get_current_run_id
+            _run_id = get_current_run_id()
+        except Exception:
+            _run_id = None
+        _phase_err_data = {"phase": step_index, "name": task_text[:60], "message": str(e)}
+        if _run_id:
+            _phase_err_data["runId"] = _run_id
+        emit_json({"event": "phase_error", "data": _phase_err_data})
     return output_path, budget_extensions, max_actions_per_step
 
 

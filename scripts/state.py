@@ -16,6 +16,10 @@ from urllib.parse import urlsplit
 _ACTION_LOG: list[dict] = []
 _TRAJECTORY_URL: str | None = None
 _CURRENT_PHASE: int = 0
+# Current recording run id: control plane sends runId with each `step` event;
+# echoed back on phase_done / phase_error / phase_state_key payloads so the
+# control plane can attribute events to the right recording run (spec 4.3.1).
+_CURRENT_RUN_ID: str | None = None
 _CURRENT_SOURCE: str = 'agent'
 _CAPTURE_SCREENSHOTS: bool = False
 
@@ -62,6 +66,17 @@ _FIELD_COALESCE_ACTIONS = frozenset({
     'fill_form_field',
     'select_option', 'select_tree_option', 'click_radio',
 })
+
+
+def set_current_run_id(run_id):
+    """Set current recording run id (echoed on phase_done/phase_error events)."""
+    global _CURRENT_RUN_ID
+    _CURRENT_RUN_ID = run_id
+
+
+def get_current_run_id():
+    """Return current recording run id (None when not set / legacy control plane)."""
+    return _CURRENT_RUN_ID
 
 
 def set_current_phase(n: int):

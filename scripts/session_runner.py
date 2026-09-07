@@ -86,6 +86,12 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=N
         if event == "cancel_step":
             _request_agent_stop(cancel_flag_path, goal_tracker, reason='cancel_step')
             continue
+        # spec 4.3.3: a new `step` arrived while the old agent is still running
+        # (run N+1 queued behind a zombie run N) → force-stop the old agent
+        # BEFORE enqueueing to shorten the zombie window; the interrupted step's
+        # phase_done is flagged `canceled` by _run_step and filtered control-side.
+        if event == "step" and agent_running_ref.get('value'):
+            _request_agent_stop(cancel_flag_path, goal_tracker, reason='new_step_arrived')
         if event == "phase_shot_candidate_result":
             # Agent 运行期间主循环被 await agent.run() 阻塞，ack 无法经主循环到达；
             # 在此直接解包 future（未知/迟到 ack 静默丢弃），避免 click_save 等满 timeout。
@@ -399,6 +405,7 @@ async def run_session(args):
         """Execute one agent step with the given data."""
         nonlocal cumulative_path
         from .state import register_current_page_screenshot, set_current_phase
+        from .state import get_current_run_id
         # Prefer client-provided phase_number (matches 【阶段N】); fallback to step_idx
         phase_num = data.get("phase_number")
         if phase_num is None:
@@ -432,8 +439,15 @@ async def run_session(args):
                     "entryId": '',
                     "beforeKey": _phase_state_key,
                     "afterKey": _phase_state_key,
+                    "runId": get_current_run_id(),
                 },
             })
+        # 新阶段开始：清掉上轮 cancel 残留（cancel_flag 是 per-session 常驻临时文件，
+        # 不清会让后续所有阶段误判 canceled）。
+        try:
+            Path(cancel_flag_path).write_text('', encoding='utf-8')
+        except Exception:
+            pass
         agent_running_ref['value'] = True
         try:
             output_path, task_text = await _run_agent_step(
@@ -454,6 +468,20 @@ async def run_session(args):
         except Exception:
             pass
 
+        # spec 4.3.2: canceled step detection — cancel flag content OR the
+        # cooperative stop marker; either means this step was interrupted.
+        step_canceled = False
+        try:
+            if Path(cancel_flag_path).read_text(encoding='utf-8').strip() == 'cancel':
+                step_canceled = True
+        except Exception:
+            pass
+        try:
+            if isinstance(goal_tracker, dict) and goal_tracker.get('stopped'):
+                step_canceled = True
+        except Exception:
+            pass
+
         phase_done_data: dict = {
             "phase": phase_num,
             "total": -1,
@@ -462,6 +490,14 @@ async def run_session(args):
             "cumulative_file": str(cumulative_path),
             "step_index": step_idx,
         }
+        # spec 4.3.1: echo the runId sent with this run's step events so the
+        # control plane can attribute this phase_done to the right recording run.
+        if get_current_run_id():
+            phase_done_data["runId"] = get_current_run_id()
+        if step_canceled:
+            phase_done_data['canceled'] = True
+            sys.stderr.write(f"[recorder] step canceled — phase_done flagged canceled phase={phase_num}\n")
+            sys.stderr.flush()
         try:
             from .controller.actions._phase_context import _outcome_for
             outcome = _outcome_for(business_data_store, phase_num)
@@ -474,6 +510,12 @@ async def run_session(args):
                 # No accepted done() → unknown (not success). Control plane must not
                 # coerce missing success to true.
                 phase_done_data['success'] = None
+        except Exception:
+            pass
+        try:
+            from .state import _ACTION_LOG as _probe_alog
+            sys.stderr.write(f"[probe] emit phase_done phase={phase_num} actions={len(_probe_alog)} session={session_id} runId={get_current_run_id()}\n")
+            sys.stderr.flush()
         except Exception:
             pass
         emit_json({
@@ -514,6 +556,16 @@ async def run_session(args):
 
             step_index += 1
             data = msg.get("data", {})
+
+            # spec 4.3.1: remember this run's runId (control plane sends it with
+            # every step event, same lifecycle as phase_number); echoed back on
+            # phase_done / phase_error / phase_state_key. None when absent
+            # (legacy control plane).
+            try:
+                from .state import set_current_run_id
+                set_current_run_id(data.get("runId") or None)
+            except Exception:
+                pass
 
             # 业务数据 from the user requirement (soft NL), not 案例数据 from the system.
             # Prefer business_data_block → _business_scenario_text for the agent; flat business_data
