@@ -43,6 +43,15 @@ export const GROUP_PENDING_SCREENSHOTS = [{
   monitor: true,
 }];
 
+/** Live auth-recording trigger/status board (not an HTTP endpoint group). */
+export const GROUP_AUTH_RECORDING_PANEL = [{
+  id: 'auth-recording-panel',
+  name: '登录/登出录制面板',
+  description: '按系统触发/重录两段式演练录制并轮询 job 状态；账密变更重录提示',
+  endpoints: [],
+  monitor: true,
+}];
+
 /** @type {TagGroup[]} */
 export const API_GROUPS = [
   GROUP_OVERVIEW[0], // 概览
@@ -55,6 +64,7 @@ export const API_GROUPS = [
   ...GROUP_MESSAGES,
   ...GROUP_COMPONENTS,
   ...GROUP_AUTH_RECORDING,
+  ...GROUP_AUTH_RECORDING_PANEL,
   ...GROUP_TRAJECTORY,
   ...GROUP_RECORDING,
   ...GROUP_REGIONS,

@@ -66,10 +66,14 @@ export const GROUP_TRAJECTORY = [
             recordStatus: 'draft', isExport: 0, stepCount: 0, phaseCount: 3,
             functionId: 3, systemAccountId: 10, model: 'Qwen/Qwen3.5-35B-A3B',
             batchTaskName: '批量录制导入模板_0814-1251',
+            authKind: null,
           }],
           total: 42, page: 1, pageSize: 20,
           stats: { total: 42, draft: 8, recording: 7, failed: 0, recorded: 20, completed: 7 },
         }),
+        notes: [
+          '行内 authKind：null（普通交易）/ \'login\' / \'logout\'（登录/登出演练交易）— 前端列表据此渲染「登录」/「登出」徽标',
+        ],
       },
       {
         method: 'POST', path: '/api/v2/trajectories',

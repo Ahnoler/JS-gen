@@ -590,6 +590,62 @@ a:hover { text-decoration: underline; }
 .ps-badge-phase_highlight { background: #ede9fe; color: #6d28d9; }
 .ps-badge-unknown { background: #f3f4f6; color: #6b7280; }
 
+/* Auth recording panel */
+.ar-panel { padding: 14px 16px 18px; }
+.ar-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.ar-badge-pending { background: #fef9c3; color: #a16207; }
+.ar-badge-running { background: #dbeafe; color: #1d4ed8; }
+.ar-badge-success { background: #dcfce7; color: #15803d; }
+.ar-badge-failed { background: #fef2f2; color: #b91c1c; }
+.ar-badge-draft { background: #f3f4f6; color: #6b7280; }
+.ar-badge-recorded { background: #e0f2fe; color: #0369a1; }
+.ar-badge-completed { background: #dcfce7; color: #15803d; }
+.ar-badge-unknown { background: #f3f4f6; color: #6b7280; }
+.ar-card {
+  border: 1px solid var(--docs-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ar-job-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.ar-job-meta { font-size: 12px; }
+.ar-traj-list { display: flex; flex-direction: column; gap: 4px; }
+.ar-traj-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.ar-traj-label { font-weight: 600; min-width: 28px; }
+.ar-error {
+  max-height: 160px;
+  overflow: auto;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+.ar-alert { margin-bottom: 10px; }
+.ar-warn {
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fef9c3;
+  color: #a16207;
+}
+
 @media (max-width: 900px) {
   body { grid-template-columns: 1fr; }
   .docs-sidebar {
