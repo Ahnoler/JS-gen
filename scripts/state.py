@@ -332,6 +332,10 @@ def _register_page_level_shot(
 def _emit_page_level_screenshot(snapshot: dict) -> None:
     try:
         from .agent_utils import emit_json
+        # 平铺附加当前录制 runId，供 Node 侧按 run 归属过滤（None 时省略保持 legacy 兼容）
+        rid = get_current_run_id()
+        if rid is not None:
+            snapshot = {**snapshot, 'runId': rid}
         emit_json({
             'event': 'page_level_screenshot',
             'data': snapshot,
@@ -642,6 +646,10 @@ def emit_step_screenshot(
     if dialog_b64:
         data["dialog"] = dialog_b64
         data["dialogMeta"] = dialog_meta or {}
+    # 附加当前录制 runId，供 Node 侧按 run 归属过滤（None 时省略保持 legacy 兼容）
+    rid = get_current_run_id()
+    if rid is not None:
+        data["runId"] = rid
     try:
         from .agent_utils import emit_json
         emit_json({
@@ -693,6 +701,10 @@ def _emit_action_log_sync(removed_ids=None):
         }
         if removed_ids:
             data["removedIds"] = [str(x) for x in removed_ids if x]
+        # 附加当前录制 runId，供 Node 侧按 run 归属过滤（None 时省略保持 legacy 兼容）
+        rid = get_current_run_id()
+        if rid is not None:
+            data["runId"] = rid
         emit_json({"event": "action_log_sync", "data": data})
     except ImportError:
         pass
