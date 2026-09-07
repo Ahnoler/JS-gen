@@ -641,10 +641,17 @@ def _guard_done_reject_errors(agent, business_data_store, contract, error_notifs
 
     可见错误通知/表单校验错误且契约不允许时拒绝（改写历史结果）；
     契约允许时仅记录放行日志。返回 True 表示已拒绝。
+
+    P6-0 v2（#612/#614 移交）：表单校验红字（.el-form-item__error）在页面上
+    可见且未发生跳转时，保存必然未成功——``save_ok``（含 form_save 静默保存
+    分支）/``introduce_ok`` 不再豁免 form_errors（error_notifs 维持原语义，
+    契约宽松时可放行）。
     """
     from ..controller.actions._phase_intent import overlay_blocks_done
-    if (error_notifs or form_errors) and not navigated_ok and not save_ok and not introduce_ok:
-        if overlay_blocks_done(contract):
+    form_err_hit = bool(form_errors) and not navigated_ok
+    notif_hit = bool(error_notifs) and not navigated_ok and not save_ok and not introduce_ok
+    if form_err_hit or notif_hit:
+        if form_err_hit or overlay_blocks_done(contract):
             sys.stderr.write(
                 f"[recorder] ⚠ Premature done() — visible errors at step {agent.state.n_steps}: "
                 f"notifs={error_notifs[:2]} formErrors={form_errors[:3]}, forcing continue\n"

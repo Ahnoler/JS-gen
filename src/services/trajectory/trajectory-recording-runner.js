@@ -27,7 +27,8 @@ import {
   attachSpecialElementCandidates,
 } from './recording-runner-step-context.js';
 import { appendPhaseDoneLog } from './trajectory-phase-service.js';
-import { setActionLogCopy, countBusinessSteps, clearActionLogCopy } from './action-log-copy.js';
+import { setActionLogCopy, countBusinessSteps, countBusinessStepsByPhase, clearActionLogCopy } from './action-log-copy.js';
+import { META_STEP_ACTIONS, isEngineeringStepAction } from '../../models/meta-step-actions.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { capturePhaseBuffer, buildMetadata } from './phase-highlight-screenshot.js';
@@ -667,6 +668,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   runtime.phaseOutcomes = {};
   // 假成功防线（P6-0/T0.1）：每阶段落库步数计数，recordPhaseResult 与收尾门闩消费
   runtime.phaseStepCounts = new Map();
+  // 假成功防线 v2：每阶段业务步计数快照（终局门闩按阶段降级用，phaseNumber → count）
+  runtime.phaseBusinessCounts = new Map();
 
   /**
    * 阶段空闲看门狗：超过 PHASE_IDLE_TIMEOUT_MS 无 agent 活动（action_log_sync 等）
@@ -716,6 +719,13 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         `[record] phase #${phase.phaseNumber} self-reported success with 0 persisted steps — downgraded to unknown`,
       );
     }
+    // 假成功防线 v2：自报 success=true 且 0 业务步的阶段即嫌疑（与上面阶段级
+    // 降级同一判据），终局门闩对其做双源复核，仍 0 则整轨降级。
+    try {
+      if (explicitSuccess === true) {
+        runtime.phaseBusinessCounts.set(phase.phaseNumber, countBusinessStepsByPhase(tid, phase.phaseNumber));
+      }
+    } catch {}
     const textFromDone = String(donePayload?.text || donePayload?.summary || '').trim();
     const phaseOutcome = {
       // Only explicit true/false; missing success on phase_done → unknown (null).
@@ -903,7 +913,53 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         console.warn('[record] async gate recount failed:', err?.message || err);
       }
       console.log(`[record] async gate finalize traj=${tid}: copy=${copySteps} db=${dbSteps}`);
-      if (copySteps === 0 && dbSteps === 0) {
+      // 假成功防线 v2：快照为 0 业务步的阶段（关键写阶段假完成）→ 重取副本计数 + DB 复核，
+      // 双源仍 0 → 整轨降级 failure。总数>0 但关键阶段 0 步（#612/#614：几步树点击
+      // 掩盖写阶段 0 步）由该分支拦截，不再只卡全轨总数。
+      let zeroPhaseSuspects = [];
+      try {
+        zeroPhaseSuspects = [...(runtime.phaseBusinessCounts || new Map())]
+          .filter(([, n]) => !n)
+          .map(([pn]) => pn);
+      } catch {}
+      if (zeroPhaseSuspects.length) {
+        const zeroPhaseDb = [];
+        try {
+          const rows = await trajectoryStepDao.listByTrajectory(tid);
+          const business = rows.filter((r) => {
+            const at = String(r.actionType || '').trim();
+            return at && !META_STEP_ACTIONS.includes(at) && !isEngineeringStepAction(at);
+          });
+          for (const pn of zeroPhaseSuspects) {
+            if (!business.some((r) => Number(r.phaseNumber) === Number(pn))) zeroPhaseDb.push(pn);
+          }
+        } catch (err) {
+          console.warn('[record] per-phase recount failed:', err?.message || err);
+        }
+        const zeroPhaseCopy = zeroPhaseSuspects.filter((pn) => countBusinessStepsByPhase(tid, pn) === 0);
+        // 与总数门闩同语义：降级须双源一致（副本缺失时 copyCount 恒 0，此时以 DB 为准）
+        const zeroPhaseBoth = zeroPhaseSuspects.filter(
+          (pn) => zeroPhaseCopy.includes(pn) && zeroPhaseDb.includes(pn),
+        );
+        console.log(
+          `[record] async gate per-phase traj=${tid}: suspects=[${zeroPhaseSuspects}] copy0=[${zeroPhaseCopy}] db0=[${zeroPhaseDb}]`,
+        );
+        if (zeroPhaseBoth.length) {
+          try {
+            await trajectoryDao.finishTransientRecording(tid, 'failure');
+            await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
+            broadcast('fake_success_detected', {
+              trajectoryDbId: tid,
+              zeroStepPhases: zeroPhaseBoth,
+            });
+            console.warn(
+              `[record] traj #${tid} downgraded recorded→failure: zero-step phases [${zeroPhaseBoth}] after finalization window`,
+            );
+          } catch (err) {
+            console.warn('[record] async gate per-phase downgrade failed:', err?.message || err);
+          }
+        }
+      } else if (copySteps === 0 && dbSteps === 0) {
         try {
           await trajectoryDao.finishTransientRecording(tid, 'failure');
           await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });

@@ -64,6 +64,26 @@ export function countBusinessSteps(trajectoryDbId) {
 }
 
 /**
+ * Count business steps of ONE phase in the copy (fake-success gate, per-phase
+ * variant of countBusinessSteps). Copy entries carry `phase` = phase number from
+ * the Python _ACTION_LOG dump; steps without a phase number never match.
+ * @param {number} trajectoryDbId trajectory DB id
+ * @param {number} phaseNumber 1-based phase number
+ * @returns {number} business step count within that phase (0 when copy absent)
+ */
+export function countBusinessStepsByPhase(trajectoryDbId, phaseNumber) {
+  const copy = getActionLogCopy(trajectoryDbId);
+  if (!copy) return 0;
+  const pn = Number(phaseNumber);
+  if (!Number.isFinite(pn)) return 0;
+  return copy.entries.filter((e) => {
+    const action = String(e?.action || e?.actionType || '').trim();
+    if (!action || META_STEP_ACTIONS.includes(action) || isEngineeringStepAction(action)) return false;
+    return Number(e?.phase) === pn;
+  }).length;
+}
+
+/**
  * Drop the copy once DB persistence has caught up (query side falls back to DB).
  * @param {number} trajectoryDbId trajectory DB id
  * @returns {void} nothing; copy is removed in-module

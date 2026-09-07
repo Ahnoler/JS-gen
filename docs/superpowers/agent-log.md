@@ -8,6 +8,19 @@
 - 禁入：`scripts/session_runner.py`（他线未提交 probe 改动在身）、`data/kb/**`、产品线文件（tmp/product-mgmt 只读）、R4-R6 在途 traj、`config/.env*`
 - 方式：systematic-debugging 四阶段；修后跑 `bash scripts/refactor/verify-all.sh`（注意 3 存量红基线）；子智能体不 commit，主会话验收后代提交
 
+## 2026-09-07 14:05 · ZCode 引擎线 — 收工：假成功门闩 v2 落地（回链 13:20 开工条目）
+- **根因（Phase 1 实证）**：三层门闩各有一个洞，#612/#614 打穿路径=「2 步树点击过零动作门闩 → 写阶段跳过必填 el-select 直接点保存 → form_save 无反馈分支记 save_ok → 错误门闩被 save_ok 豁免 → 终局门闩只卡全轨总数 0」：
+  1. **Python 零动作门闩**（recorder_emitters.py:411）：拒绝 1 次后二次 done 放行——几步树点击即绕过；
+  2. **错误门闩 save_ok 豁免**（recorder_emitters.py:646 原判据）：save_ok=True（含 form_save.py:479 静默保存分支：无 toast/无报错/无跳转一律记成功）时页面校验红字完全不拦；
+  3. **服务端终局门闩**（trajectory-recording-runner.js:914 原行）：仅全轨总数 0 才降级——#612 总步 1、#614 总步 2，直接 `isSuccessful:1`。
+- **修复（三处，均最小改动）**：
+  - `src/services/trajectory/action-log-copy.js`：新增 `countBusinessStepsByPhase(tid, phaseNumber)`（副本按阶段业务步计数）；
+  - `src/services/trajectory/trajectory-recording-runner.js`：①recordPhaseResult 对自报 success=true 阶段快照其业务步数（`runtime.phaseBusinessCounts`）；②终局门闩新增按阶段降级——0 步嫌疑阶段双源（副本+DB `trajectory_phase_id` 复核）仍 0 → 整轨 failure + `fake_success_detected` 广播（带 zeroStepPhases），原总数降级分支保留；
+  - `scripts/agent/recorder_emitters.py`：`_guard_done_reject_errors` 拆判据——**form_errors（.el-form-item__error 校验红字）不再被 save_ok/introduce_ok 豁免**（未跳转时必拒，契约宽松也拦）；error_notifs 维持原语义。
+- **验收**：node --check ×2 + ast.parse ×1 过；countBusinessStepsByPhase 模块级 import 冒烟（5 断言）过；eslint 0；`verify-all.sh` **ALL GREEN**。
+- **零动作门闩（移交 C 项）维持现状**：二次放行防 max_steps 死循环保留；服务端 v2 按阶段降级已覆盖同模式。
+- **遗留移交**：①「跳过必填 el-select 直接保存」的行为面根治（done 前 DOM 回读必填空）未做，属 B 层；产品线按移交验收口径 1-2 复录验证本轮门闩是否足够；②控制面/执行机重启后生效（.env 无需改）；③#612/#614 仍须修后重录（本轮只保未来轨迹）。
+
 ## 2026-09-07 12:10 · ZCode Lead — R4 全部达成（606/607/608 三轨迹）+ G5 派发（R5 批复查看+R6 用信打包棒）
 - **G4 完成（R4 棒 2，主链审批段闭环）**：①WN0001 账号补建（systemAccountId=26）②traj 607=评级二次调查录制，**PJ20260907016009 状态=通过（评级生效，bsnSt=5）**③traj 608=授信二次调查录制，**DGSX20260907056033 通过（applyState=5）→批复自动生成 DGSXPF20260907020005 已生效**（R5 对象）。注意：评级/授信列表按经办人数据域强过滤（WN0001 名下恒 0 条），pageBsnInf 等 API 可按 bsnNo 直查；curl 中文 body 须 UTF-8 文件 --data-binary。
 - **G5 已派发（R5+R6 打包棒，进行中）**：R5=批复查看录制（fid=9000000057，DGSXPF20260907020005 要素核对，只读）；R6=对公用信申请录制（批复 DGSXPF20260907020005→方案品种命中分项→10 万/12 月→保证+引入保证人→利率→提交→黄亮；credit_usage 卡配方 P3-B 实证）。
