@@ -574,8 +574,14 @@ async def run_session(args):
             # phase_done / phase_error / phase_state_key. None when absent
             # (legacy control plane).
             try:
-                from .state import set_current_run_id
-                set_current_run_id(data.get("runId") or None)
+                from .state import set_current_run_id, get_current_run_id
+                _incoming_run_id = data.get("runId") or None
+                if _incoming_run_id != get_current_run_id():
+                    # 新 run（runId 变化）：复位 phase_state_key 发射守卫，否则
+                    # 新 run 首阶段号撞上一 run 末阶段号时会漏发「开组即采第一张」。
+                    global _last_phase_state_key_phase
+                    _last_phase_state_key_phase = None
+                set_current_run_id(_incoming_run_id)
             except Exception:
                 pass
 
