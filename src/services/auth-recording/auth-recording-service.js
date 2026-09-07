@@ -190,14 +190,14 @@ function buildCanonicalAuthTexts({ authKind, task, account, password }) {
   void account;
   void password;
   if (authKind === 'login') {
-    const description = '调用 login 动作完成登录（账号/密码使用业务数据注入值，验证码留空）。预期结果：离开登录页进入系统首页。';
+    const description = '依次填写账号与密码（值使用业务数据注入值，验证码留空），点击登录按钮完成登录。预期结果：离开登录页进入系统首页。';
     const text = [
-      '1、在登录页调用 login 动作完成登录。',
+      '1、在登录页依次完成：输入账号 → 输入密码 → 点击登录。',
       '账号/密码经业务数据通道注入（键=账号、密码，用 read_business_data 读取），禁止编造或尝试其他任何账号。',
       '',
       '【硬性成功门闩——任一门闩未满足不得结束本阶段】',
       '- 凭据只使用业务数据注入值（read_business_data 键=账号/密码），禁止编造或尝试其他任何账号（如 admin 类）。',
-      '- 出现验证码拦截：不要猜测或绕过，立即如实报告「出现验证码，无法自动登录」并退出。',
+      '- 验证码/短信验证码字段留空不填；出现验证码拦截：不要猜测或绕过，立即如实报告「出现验证码，无法自动登录」并退出。',
       '- 登录失败（错误提示、仍在登录页）时如实报告失败原因，不得伪造成功、不得重试超过 2 次。',
     ].join('\n');
     return { task: text, description };
