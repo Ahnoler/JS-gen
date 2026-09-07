@@ -1,7 +1,7 @@
 # 需求切片 → 原子草稿交易 — 设计
 
 > 日期：2026-09-07  
-> 状态：方案 1 已拍板（控制面两段式 API）；待实现计划  
+> 状态：已实现（SDD `a029bb03..c044387f`，characterize OK 19）；待 migrate + 湿测  
 > Lead：Cursor brainstorming（会话确认）  
 > 相关：`scripts/prompts/skills/req-doc-to-kb/`；`/api/v2/kb/req-modules`；`analyzeRequirementToPhases`
 
