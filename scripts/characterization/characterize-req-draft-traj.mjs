@@ -5,7 +5,7 @@
  *   node scripts/characterization/characterize-req-draft-traj.mjs
  */
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -101,6 +101,72 @@ async function main() {
     assert.ok(chapter && /chapters\//.test(chapter.replace(/\\/g, '/')));
   });
 
+  run('extractZjjkCodes keeps ordered unique real codes', () => {
+    assert.deepEqual(
+      provMod.extractZjjkCodes('ZJJK00136564 / ZJJK00136733'),
+      ['ZJJK00136564', 'ZJJK00136733'],
+    );
+    assert.deepEqual(provMod.extractZjjkCodes('—'), []);
+    assert.deepEqual(provMod.extractZjjkCodes('主页'), []);
+  });
+
+  run('fillTaskDraftProvenancePlaceholders replaces markers', () => {
+    const filled = provMod.fillTaskDraftProvenancePlaceholders(
+      '步骤\n\n来源：<sourceDoc> / <sourceChapter>',
+      'demo.docx',
+      'chapters/01-product-library.md#产品库管理',
+    );
+    assert.equal(filled.includes('<sourceDoc>'), false);
+    assert.equal(filled.includes('<sourceChapter>'), false);
+    assert.match(filled, /demo\.docx/);
+    assert.match(filled, /chapters\/01-product-library\.md/);
+  });
+
+  await runAsync('resolveChapterRef multi-ZJJK picks defining chapter over 复用/overview', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-chapters-'));
+    const chaptersDir = join(tmp, 'chapters');
+    mkdirSync(chaptersDir, { recursive: true });
+    writeFileSync(join(chaptersDir, '01-总体概述.md'), '# 总体概述\n\n功能列表提及 ZJJK00136564\n', 'utf8');
+    writeFileSync(
+      join(chaptersDir, '03-配置产品信息.md'),
+      '# 产品信息管理 → 配置产品信息\n\n产品信息配置页签 ZJJK00136564 主定义\n',
+      'utf8',
+    );
+    writeFileSync(
+      join(chaptersDir, '06-查询产品.md'),
+      '# 产品信息管理 → 查询产品\n\n详情复用 ZJJK00136564（复用）\n',
+      'utf8',
+    );
+    const chapter = await provMod.resolveChapterRef({
+      chaptersDir,
+      chapterHint: '§配置产品信息 → §产品详细信息（ZJJK00107304/136564）',
+      zjjk: 'ZJJK00136564 / ZJJK00136733',
+      actionHint: '公共要素配置保存',
+    });
+    assert.match(String(chapter), /03-配置产品信息/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('resolveChapterRef ignores placeholder ZJJK and uses chapterHint', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-chapters-'));
+    const chaptersDir = join(tmp, 'chapters');
+    mkdirSync(chaptersDir, { recursive: true });
+    writeFileSync(join(chaptersDir, '01-总体概述.md'), '# 总体概述\n\n无操作正文\n', 'utf8');
+    writeFileSync(
+      join(chaptersDir, '03-配置产品信息.md'),
+      '# 产品信息管理 → 配置产品信息\n\n上移/下移：同层排序\n启用规则\n',
+      'utf8',
+    );
+    const chapter = await provMod.resolveChapterRef({
+      chaptersDir,
+      chapterHint: '§配置产品信息 → §产品库管理；启用规则见主页【启用】',
+      zjjk: '—',
+      actionHint: '同层节点排序',
+    });
+    assert.match(String(chapter), /03-配置产品信息/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   run('assertAtomProvenance rejects empty sourceDoc', () => {
     const parsed = parseMod.parseThroughChainsMarkdown(md);
     const key = parseMod.buildAtomKey({
@@ -130,7 +196,7 @@ async function main() {
           chainId: 'chain-a',
           stepIndexes: [2],
           title: '新增一级分类',
-          taskDraft: '1、进入产品库。\n2、点击新增一级分类，名称填「KB测一级」，序号填「1」，确定。\n\n来源：demo.docx / chapters/01-product-library.md\n\n关键数据\n分类名称：KB测一级\n序号：1\n',
+          taskDraft: '1、进入产品库。\n2、点击新增一级分类，名称填「KB测一级」，序号填「1」，确定。\n\n来源：<sourceDoc> / <sourceChapter>\n\n关键数据\n分类名称：KB测一级\n序号：1\n',
           phaseHints: ['进入产品库', '新增一级分类并确定'],
           suggestedFunctionId: 9000000740,
         },
@@ -146,6 +212,10 @@ async function main() {
     assert.ok(out.atoms.length >= 1);
     assert.ok(out.atoms.every((a) => a.sourceDoc && a.sourceChapter && a.atomKey));
     assert.ok(!out.atoms.some((a) => !a.sourceChapter));
+    assert.equal(out.atoms[0].taskDraft.includes('<sourceDoc>'), false);
+    assert.equal(out.atoms[0].taskDraft.includes('<sourceChapter>'), false);
+    assert.ok(out.atoms[0].taskDraft.includes(out.atoms[0].sourceDoc));
+    assert.ok(out.atoms[0].taskDraft.includes(out.atoms[0].sourceChapter));
     const cachePath = join(tmp, 'demo-mod', '.draft-traj-propose.json');
     assert.ok(existsSync(cachePath));
     rmSync(tmp, { recursive: true, force: true });

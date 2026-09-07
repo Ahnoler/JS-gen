@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 02:55 · Cursor Reviewer — 收工：req-draft-traj 质量修复 + Zcode 复测移交（回链 02:50）
+
+- 完成：`extractZjjkCodes` + 多命中评分（概述降权 / 复用降权 / hint·action 加权）；占位 ZJJK（`—`/`主页`）忽略改走 hint；`fillTaskDraftProvenancePlaceholders` 在 materialize 替换；characterize **OK 25**；离线 product-mgmt chain-a 步 5/7/8/9 均 → `03-配置产品信息`；移交 [`plans/2026-09-08-req-draft-traj-quality-rerun-handoff.md`](plans/2026-09-08-req-draft-traj-quality-rerun-handoff.md)；todo ⑧ 已更新
+- 验收：`node scripts/characterization/characterize-req-draft-traj.mjs` → OK 25；未触轨迹查询 WIP / 未 record
+- 遗留移交：Zcode 按复测移交单重跑 propose/commit（**须重启控制面**）；旧 681/682 task 仍含占位符属历史数据，不回溯改库；businessEntries 的 `- ` key 前缀属 analyze 解析，本轮未动
+
 ## 2026-09-08 02:50 · Cursor Reviewer — 开工：req-draft-traj 原子草稿质量修复（回链湿测质量审）
 
 - 开工：02:50。用户要求 reviewer 修一轮后出报告，交 Zcode 复跑 product-mgmt propose/commit

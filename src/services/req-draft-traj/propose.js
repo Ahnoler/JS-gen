@@ -13,6 +13,7 @@ import { parseLlmJsonObject } from '../operation-component-signature.js';
 import { buildAtomKey, parseThroughChainsMarkdown } from './parse-through-chains.js';
 import {
   assertAtomProvenance,
+  fillTaskDraftProvenancePlaceholders,
   loadSourceDoc,
   resolveChapterRef,
 } from './provenance.js';
@@ -313,11 +314,17 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     title,
   });
 
+  const provenanceStep = findStepByIndex(chain, atomKeyStepIndex) || primaryStep;
   const sourceChapter = await resolveChapterRef({
     chaptersDir: join(modDir, 'chapters'),
     chapterHint: chain.chapterHint,
-    zjjk: primaryStep?.zjjk || '',
+    zjjk: provenanceStep?.zjjk || '',
+    actionHint: title || provenanceStep?.action || '',
   });
+
+  const resolvedChapter = sourceChapter || '';
+  const rawTaskDraft = String(llmAtom.taskDraft || '').trim();
+  const taskDraft = fillTaskDraftProvenancePlaceholders(rawTaskDraft, sourceDoc, resolvedChapter);
 
   /** @type {DraftAtom} */
   const atom = {
@@ -325,8 +332,8 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     title,
     suggestedFunctionId: parseSuggestedFunctionId(llmAtom.suggestedFunctionId),
     sourceDoc,
-    sourceChapter: sourceChapter || '',
-    taskDraft: String(llmAtom.taskDraft || '').trim(),
+    sourceChapter: resolvedChapter,
+    taskDraft,
     phaseHints: Array.isArray(llmAtom.phaseHints)
       ? llmAtom.phaseHints.map((h) => String(h))
       : [],

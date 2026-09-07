@@ -6,6 +6,8 @@ export {
   loadSourceDoc,
   resolveChapterRef,
   assertAtomProvenance,
+  extractZjjkCodes,
+  fillTaskDraftProvenancePlaceholders,
 } from './provenance.js';
 export { readProposeCache, writeProposeCache, PROPOSE_CACHE_FILENAME } from './propose-cache.js';
 export { proposeDraftTrajectories } from './propose.js';

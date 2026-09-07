@@ -8,12 +8,14 @@
 
 ## 当前工作线（2026-09-06 起）
 
-### ⑧ 需求切片 → 原子草稿交易（2026-09-07 · 已落地待湿测）
+### ⑧ 需求切片 → 原子草稿交易（2026-09-07 · 已落地；质量复测待跑）
 
-- **已合入**：两段式 API `draft-traj/propose|commit`；provenance 四字段迁移；propose cache；characterize OK 19（`c044387f`）。
+- **已合入**：两段式 API `draft-traj/propose|commit`；provenance 四字段迁移；propose cache；characterize **OK 25**（质量修复后）。
 - 规格/计划：[`specs/2026-09-07-req-to-draft-traj-design.md`](specs/2026-09-07-req-to-draft-traj-design.md) / [`plans/2026-09-07-req-to-draft-traj.md`](plans/2026-09-07-req-to-draft-traj.md)
-- **湿测 PASS（2026-09-08 凌晨 Zcode 夜班）**：migrate 已落（四列在库）；product-mgmt propose 8 atoms 出处/粒度合格；commit traj 681/682=draft + provenance 四字段 GET 验证；幂等/假 key/无-cache/missing_fnId 四负例过；报告 `tmp/req-draft-traj/through-report-wet.md`。suggestedFunctionId 越界遗留已由闲时审查线修复（`3b03e231` FK guard）；Git Bash 中文 body 须 `--data-binary @file`
-- **待做**：SPA 勾选入口后补（前端仓库）。
+- **湿测通路 PASS（2026-09-08 凌晨）**：traj 681/682；报告 `tmp/req-draft-traj/through-report-wet.md`；FK guard `3b03e231`
+- **质量审 + 修复（2026-09-08 Cursor Reviewer）**：章节挂错（概述/复用章）+ task 占位未替换 → 已修 `provenance.js`/`propose.js`；离线 chain-a 10 步 resolve 均指向 `03-配置产品信息`
+- **待 Zcode 复测**：[`plans/2026-09-08-req-draft-traj-quality-rerun-handoff.md`](plans/2026-09-08-req-draft-traj-quality-rerun-handoff.md)（须重启控制面加载新代码）
+- **待做（非阻塞）**：SPA 勾选入口（前端仓库）
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 
