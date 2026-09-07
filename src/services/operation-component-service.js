@@ -451,10 +451,13 @@ export async function registerAuthComponent({
       const params = step.params && typeof step.params === 'object' ? step.params : {};
       for (const value of Object.values(params)) {
         if (typeof value !== 'string') continue;
-        if (usernameStepNumber == null && value === account) {
+        // Placeholder forms count too: re-registration from an already-masked
+        // trajectory (step params hold __AUTH_USERNAME__/__AUTH_PASSWORD__)
+        // must still resolve the injection points.
+        if (usernameStepNumber == null && (value === account || value === AUTH_USERNAME_PLACEHOLDER)) {
           usernameStepNumber = Number(step.stepNumber);
         }
-        if (passwordStepNumber == null && value === password) {
+        if (passwordStepNumber == null && (value === password || value === AUTH_PASSWORD_PLACEHOLDER)) {
           passwordStepNumber = Number(step.stepNumber);
         }
       }
