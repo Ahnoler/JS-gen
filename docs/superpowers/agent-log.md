@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 19:47 · Cursor Lead — 收工：需求→原子草稿交易设计 spec（回链本条开工）
+
+- 完成：brainstorming 拍板方案 1；规格 `docs/superpowers/specs/2026-09-07-req-to-draft-traj-design.md`；todo ⑧ 本版 + ⑧′ 未来（组件扫描/推送改推组件）
+- 验收：四节设计用户确认「可以写 spec」；硬约束=草稿出处（文档+章节）+ 人勾选后才建 draft + 本版不录制
+- 遗留：待用户审 spec 后写 implementation plan（writing-plans）；实现未开工
+
+## 2026-09-07 19:47 · Cursor Lead — 开工：需求切片→草稿交易 brainstorming→spec
+
+- 开工：19:47。用户要「需求文档+KB 生成交易」免手工新增；粒度原子化；先草稿不录制
+- 范围：`docs/superpowers/specs/2026-09-07-req-to-draft-traj-design.md`、`docs/superpowers/todo-list.md`、本文件；**不改引擎/业务代码**
+- 禁入：session_runner WIP；V3/auth 他线；勿恢复 save_section
+- 方式：brainstorming 对话定案后写 spec + commit；不写计划直至用户审过 spec
+
 ## 2026-09-07 19:55 · Cursor Lead — 收工：#614 重录部分通过（回链 19:26）
 
 - 完成：stamp `20260907-1926` 重录 session `e72482e4`；p2/p3 **序号=1 已落库**（create 合约修复湿测成立）；p4 有 select_option×5 + 日期/描述 stamp，但 **QUALITY FAIL：pending_fields=法人行社 + missing_success_token**，无基本信息保存 toast；轨迹仍标 `recorded/isSuccessful=1`（不可信）
