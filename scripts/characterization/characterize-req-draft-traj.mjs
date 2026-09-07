@@ -123,6 +123,66 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  await runAsync('proposeDraftTrajectories rejects empty taskDraft', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        {
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '   ',
+          phaseHints: ['新增一级分类'],
+        },
+      ],
+    });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+    });
+    assert.equal(out.atoms.length, 0);
+    assert.ok(out.rejected.some((r) => r.reason === 'empty_task_draft'));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('proposeDraftTrajectories truncates atoms with maxAtoms', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        {
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n',
+          phaseHints: ['新增一级分类'],
+        },
+        {
+          chainId: 'chain-a',
+          stepIndexes: [3],
+          title: '选中分类下新增子分类',
+          taskDraft: '1、选中分类下新增子分类。\n\n来源：demo.docx\n',
+          phaseHints: ['新增子分类'],
+        },
+      ],
+    });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      maxAtoms: 1,
+      callLLM: fakeLLM,
+    });
+    assert.equal(out.atoms.length, 1);
+    assert.equal(out.atoms[0].title, '新增一级分类');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   await runAsync('proposeDraftTrajectories rejects missing through-chains', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
     cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });

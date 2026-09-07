@@ -132,12 +132,14 @@ export async function resolveChapterRef({ chaptersDir, chapterHint = '', zjjk = 
  * @param {string} [atom.atomKey] Stable atom key
  * @param {string} [atom.sourceDoc] Source document path
  * @param {string} [atom.sourceChapter] Chapter reference
+ * @param {string} [atom.taskDraft] Task text for analyze
  * @returns {{ ok: true } | { ok: false, reason: string }} Validation result with reason when invalid
  */
 export function assertAtomProvenance(atom) {
   const atomKey = String(atom?.atomKey || '').trim();
   const sourceDoc = String(atom?.sourceDoc || '').trim();
   const sourceChapter = String(atom?.sourceChapter || '').trim();
+  const taskDraft = String(atom?.taskDraft || '').trim();
 
   if (!atomKey) {
     return { ok: false, reason: 'missing_atom_key' };
@@ -147,6 +149,9 @@ export function assertAtomProvenance(atom) {
   }
   if (!sourceChapter) {
     return { ok: false, reason: 'missing_source_chapter' };
+  }
+  if (!taskDraft) {
+    return { ok: false, reason: 'empty_task_draft' };
   }
   return { ok: true };
 }
