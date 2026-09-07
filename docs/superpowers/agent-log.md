@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 05:00 · Zcode — 收工：through-chains 可 propose 化 P0 完成（回链 04:55 开工）
+
+- 完成：customer-corp / rating 两模块 `through-chains.md` 改写为金标表式（10 链 45 步 / 8 链 38 步；业务口径零删减，ZJJK 从原文抽列、多码 ` / `、无码 `—`；旁路/Out 保持非主链标题）
+- 验收：`parseThroughChainsMarkdown` 离线解析两文件 **proposeable=true**、各链 steps>0；重启 4097（加载 `aa4ca8a8` 门控代码）后 `GET /api/v2/kb/req-modules` 实测 **canProposeAtoms=true：customer-corp, product-mgmt, rating** 三模块；向导可点选
+- 注意：①未跑 propose（留待向导/业务），未提交任何 `.draft-traj-propose.json`（各模块目录已有 SPA 湿测产生的缓存，均未入库）②本次为加载 04:45 门控代码又重启了一次 4097，现进程为最新 HEAD；后续会话无需再重启 ③P1 批（loan-corp / credit-corp 等散文态模块）待下一批移交单
+- 提交：两 md + 本条，hash 见 git log
+
 ## 2026-09-08 04:57 · Zcode — 开工+收工：夜班长线任务迁入闲时管线（cron 已删，指令全文迁入 guides）
 
 - 完成（用户指令「这个任务改到闲时任务中」）：删除定时任务 automation-99c0d73a「每晚23:00夜班长线任务」（该任务 09-07 晚曾跑一轮=报文捞取 Tasks 7-9 那班）；指令全文迁入 `docs/superpowers/guides/night-shift-prompt.md` 作为闲时 dispatch 产物，与 idle-review-prompt 同规格（头部管线说明：只走闲时管线不建 cron，时机由派发方决定）
