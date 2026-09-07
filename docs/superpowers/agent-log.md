@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 03:45 · Zcode 闲时 — 收工：文档清理批次二（回链 03:20 开工）
+
+- 完成：四 commit——`9b324c94` 归档第二波（specs×24 + plans×18 + todos 目录 3 篇，git mv 保留历史；活目录仅留 capture 族/req-to-draft-traj 线/orchestration/engine-actions-contract/phase-done(湿测§5 未闭)/kb-i5/backfill-assessment 等 31 篇在途未闭集合）+ archive/README 重建批次索引；`22610514` 入库 untracked 的 unify-save-action 计划与 replay-pipeline-handover 调研；`daba1e87` docs/README 标注 830 已收官/报文捞取已搁置；另两份散文档（gitignore 本地件）已加状态横幅不入库
+- 验收证据：移动后 ls 核对（archive/specs=86、archive/plans=85、todos=3）；活文档断链扫描（todo-list/guides/AGENTS/docs-README 对 10 个归档名零引用；agent-log 命中均为历史条目记录，不改写）；`rm` 后 ls 确认 `rate-save-after.yml`、`step2.yml`、`docs/reasonix/` 均不存在；每 commit 暂存区均不含他线文件
+- 遗留移交：①`config/update-db-whitelist.cmd/.ps1` + `.db-whitelist-lastip` 归属未拍板（NAT 白名单运维脚本），留 untracked 待定入库或注明；②散文档横幅为本地件（docs/* 仅白名单入库），换机即失，若需持久须扩白名单；③docs/ 天阳需求文档等原始材料目录仍未入 docs/README 索引（未核实内容，不猜述）；④archive 内约 129 篇旧存档的文内相对链接未逐一修复（README 已有「以本目录实际路径为准」通则）
+
 ## 2026-09-08 03:08 · Zcode 闲时审查 — 收工：characterization 目录瘦身（回链 02:58 开工）
 
 - 完成：孤儿对账落地四步，4 commits——①`a1d9416f` 删 4 个死/过期孤儿（agent-stderr-log 钉已删除的 executor/stderr-prefix.js[18d9b585 删]、batch-task-name 钉已不存在 batch-job-name.js、l2-todo-region/partition-compose 期望过期于语义变更）；②`f95e7a06` 收编 6 个高价值孤儿入 verify-all（save-section 负向 pin 守恢复禁令 / phase-reviewer+flow [reviewer.py 合约热区，过往「PASS」实为手动跑] / real-click / tree-check-confirm / session-lifecycle）；③`97fcad54` 其余 67 个绿孤儿 `git mv` 至 `scripts/characterization/cold/` + 路径深度 codemod（parents[2]→[3]、'../..'→'../../..'、import 前缀、单 '..' join×4 手补）+ cold/README.md（分层/运行约定/收编政策）；④menu-nine-rules **只读归因未改**：09-04 18/18 后菜单扫描/导入被 intermediate_flag 语义线改动 6 commit（ed0a8c7b→85b7533c，叶子一律 intermediate/扫描跳过），FAIL 5/18 判**期望过期非回归**（该检查写库，未复跑确认），移交菜单线更新期望
