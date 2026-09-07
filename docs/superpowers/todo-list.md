@@ -12,8 +12,8 @@
 
 - **已合入**：两段式 API `draft-traj/propose|commit`；provenance 四字段迁移；propose cache；characterize OK 19（`c044387f`）。
 - 规格/计划：[`specs/2026-09-07-req-to-draft-traj-design.md`](specs/2026-09-07-req-to-draft-traj-design.md) / [`plans/2026-09-07-req-to-draft-traj.md`](plans/2026-09-07-req-to-draft-traj.md)
-- **湿测 PASS（2026-09-08 凌晨 Zcode 夜班）**：migrate 已落（四列在库）；product-mgmt propose 8 atoms 出处/粒度合格；commit traj 681/682=draft + provenance 四字段 GET 验证；幂等/假 key/无-cache 三负例过；报告 `tmp/req-draft-traj/through-report-wet.md`。遗留：propose suggestedFunctionId 越界 FK（`90000107304` 非 system.id，需 propose 侧校验，见报告遗留①）；Git Bash 中文 body 须 `--data-binary @file`
-- **待做**：SPA 勾选入口后补；suggestedFunctionId 校验修复。
+- **湿测 PASS（2026-09-08 凌晨 Zcode 夜班）**：migrate 已落（四列在库）；product-mgmt propose 8 atoms 出处/粒度合格；commit traj 681/682=draft + provenance 四字段 GET 验证；幂等/假 key/无-cache/missing_fnId 四负例过；报告 `tmp/req-draft-traj/through-report-wet.md`。suggestedFunctionId 越界遗留已由闲时审查线修复（`3b03e231` FK guard）；Git Bash 中文 body 须 `--data-binary @file`
+- **待做**：SPA 勾选入口后补（前端仓库）。
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 
@@ -72,11 +72,11 @@
 - **同名弹窗 title 回退歧义**：popupKey（含 anchor）对齐正常；仅控件缺 `popup_level_key` 回退 title 查找时可能挂错实例——**待湿测证据**再定改法。
 - **rect 非法值照推**：rect 已改 JSON 字符串并新增 `rect_norm` 归一化（0~1）；`noRectControls` 仅统计可见，是否升级为构建失败待消费方反馈。
 
-### ② 报文捞取 MVP：Tasks 7-10（抓取 + 持久化）
+### ② 报文捞取 MVP（已验证 · 2026-09-08 用户确认收官）
 
-- 已完成：click_button 统一改名（Tasks 1-6，`dfb5c9e`）、elk-msg-extract CLI（`8148f72`）、契约对齐+回填验证（`1fcd1b9`/`b837d67`）、SUT 三接口请求文档产出、字段映射 122/122 评估（100% 支持）。
-- **Tasks 7-9 已落地（2026-09-08 凌晨 Zcode 夜班，`2e359ef6`/`314be568`/`f2cbc9f3`/`7bb59b8c`）**：api-capture.mjs E2E 抓取工具 + network_capture.py 监听 + 录制接线（全 try/except 不炸录制）+ network_captured→system_ref_data 持久化（method+normalizedUrl 去重）+ characterize OK 6 入 verify-all。**live 管线未验**：须重启控制面（Node 侧加载新代码）后跑一次真实录制冒烟验证落表。
-- 待执行：控制面重启后真实录制冒烟；非消费型过滤与四边界场景 JS-gen 侧兜底（设计决策待输入）。
+- 已完成：click_button 统一改名（Tasks 1-6，`dfb5c9e`）、elk-msg-extract CLI（`8148f72`）、契约对齐+回填验证（`1fcd1b9`/`b837d67`）、SUT 三接口请求文档产出、字段映射 122/122 评估（100% 支持）；Tasks 7-9 报文捕获框架（2026-09-08 凌晨 Zcode 夜班，`2e359ef6`/`314be568`/`f2cbc9f3`/`7bb59b8c`：api-capture.mjs + network_capture.py + 录制接线 + network_captured→system_ref_data 持久化 + characterize OK 6 入 verify-all）。
+- **MVP 验证：用户 2026-09-08 确认已验证**。行级核验工具保留备查：`tmp/capture-live-smoke/check-capture.mjs`（只读查 system_capture 行；本地库 09:50 时点未见行、验证证据以用户侧为准）。
+- 剩余（按需，非阻塞）：非消费型过滤与四边界场景 JS-gen 侧兜底（设计决策待输入）。
 - 设计：[报文日志捞取接口设计.md](../报文日志捞取接口设计.md)；原则：JS-gen 侧逻辑优先于 SUT 增强，接口契约维持最小集。
 
 ### ③ 菜单切换：推送链路（已收官 · 2026-09-04）

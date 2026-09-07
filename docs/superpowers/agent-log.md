@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 09:55 · Zcode 夜班续 — 收工：Task 9 live 冒烟按用户确认关闭（回链 09:40）
+
+- 完成：用户指示「报文捞取 MVP 已经验证过了」——**live 验证以用户 09-08 确认为准**，本会话不再重复跑录制冒烟；todo ② 已更新为收官态
+- 注意（证据面如实记录）：本机只读探针 09:50 时点=system_ref_data 无 system_capture 行、今日无新轨迹、`tmp/server-main.log` 无 network_captured 行（该日志 mtime 停在 02:31，用户重启若走其他启动方式则日志在别处）——验证证据可能在服务器侧/用户侧，行级核验工具保留：`node tmp/capture-live-smoke/check-capture.mjs`（只读，随时可复查）
+- 顺带核实：湿测遗留① suggestedFunctionId 越界已由闲时审查线修复（`3b03e231` propose 侧 systemDao 校验+commit 侧干净 skip，引用本线湿测报告）；todo ⑧ 同步更新——两份移交单（`req-draft-traj-wet-handoff` / `req-to-draft-traj-wet-test-handoff`）范围内事项**全部闭环**，仅剩 SPA 勾选入口（前端仓库，非本仓）
+- 遗留移交：② 剩非消费型过滤/四边界场景兜底（设计决策待输入，非阻塞）
+
 ## 2026-09-08 09:40 · Zcode 夜班续 — 开工：Task 9 报文捕获 live 冒烟（用户已重启控制面）
 
 - 开工：09:40。执行 `tmp/capture-live-smoke/README.md` 交棒包——验 `network_captured → system_ref_data` 全链落表
