@@ -24,6 +24,11 @@ _CAPTURE_SCREENSHOTS: bool = False
 # (`pageKey|dialog:<title>@@anchor:<xpath>`).
 _PAGE_LEVEL_SHOTS: dict[str, dict] = {}
 _CURRENT_PAGE_KEY: str = ''
+# 当前打开弹窗的完整 level_key（含 @@anchor 后缀）。register_popup_screenshot 写入、
+# 页面切换/会话重置清除；overlay 元素 stamp popup_level_key 时优先用它——
+# 同标题多实例弹窗（如连开三次「产品」弹窗）仅靠标题无法区分，缺 anchor 会让
+# 导出侧标题兜底全部落到最后一个弹窗（traj 499 实证）。
+_CURRENT_POPUP_KEY: str = ''
 
 # Actions that never become replay steps — skip before/after capture.
 # Shared with scripts/script_assembler.py (imported there).
@@ -67,7 +72,9 @@ def set_current_phase(n: int):
 
 def set_current_page_key(page_key: str):
     """Set the page-level key for subsequently recorded actions."""
-    global _CURRENT_PAGE_KEY
+    global _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY
+    if page_key != _CURRENT_PAGE_KEY:
+        _CURRENT_POPUP_KEY = ''
     _CURRENT_PAGE_KEY = page_key or ''
 
 
@@ -85,9 +92,10 @@ def set_capture_screenshots(enabled: bool):
 
 def reset_page_level_shots():
     """Clear the page-level screenshot registry when a recording session (re)starts."""
-    global _PAGE_LEVEL_SHOTS, _CURRENT_PAGE_KEY
+    global _PAGE_LEVEL_SHOTS, _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY
     _PAGE_LEVEL_SHOTS = {}
     _CURRENT_PAGE_KEY = ''
+    _CURRENT_POPUP_KEY = ''
 
 
 def capture_screenshots_enabled() -> bool:
@@ -375,8 +383,10 @@ async def register_page_screenshot_if_changed(
 
     Returns the post-action (page_key, page_name).
     """
-    global _CURRENT_PAGE_KEY
+    global _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY
     after_key, after_name = await current_page_level(browser_context)
+    if after_key != _CURRENT_PAGE_KEY:
+        _CURRENT_POPUP_KEY = ''
     if before_key and before_b64 and before_key != after_key:
         meta = {'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'before-leave'}
         if isinstance(before_dims, dict) and before_dims.get('contentWidth') and before_dims.get('contentHeight'):
@@ -434,6 +444,8 @@ async def register_popup_screenshot(
         png_b64=dialog_b64,
         meta=meta,
     )
+    global _CURRENT_POPUP_KEY
+    _CURRENT_POPUP_KEY = popup_key
     _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS[popup_key])
     return popup_key
 
@@ -739,7 +751,9 @@ def _record_action(action_name, params, result, element=None, source=None):
             el['region_id'] = _CURRENT_PAGE_KEY + (f'|{rid}' if rid else '')
         overlay_label = _overlay_label_in_region(rid)
         if overlay_label:
-            el['popup_level_key'] = f"{_CURRENT_PAGE_KEY}|dialog:{overlay_label}"
+            # 同标题多实例弹窗靠 anchor 区分：优先用当前打开弹窗的完整 key（含 @@anchor，
+            # register_popup_screenshot 维护），无在册弹窗时回退标题 key（旧行为）
+            el['popup_level_key'] = _CURRENT_POPUP_KEY or f"{_CURRENT_PAGE_KEY}|dialog:{overlay_label}"
         _stamp_rect_norm(el)
     removed_ids: list[str] = []
 
