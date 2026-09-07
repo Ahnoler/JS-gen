@@ -15,7 +15,8 @@ export const GROUP_KB = [{
   name: 'KB 洞察',
   description:
     '信贷知识库：洞察只读面（流程卡溯源与失效检测，与 data/kb/flows 单向只读）'
-    + '；需求作业区登记（data/kb/req/<moduleKey>/ manifest + chapters/drafts 工作区）。',
+    + '；需求作业区登记（data/kb/req/<moduleKey>/ manifest + chapters/drafts 工作区）'
+    + '；需求切片→draft 交易两段式（draft-traj/propose 原子候选 → commit 建 draft，全程不录制）。',
   endpoints: [
     {
       method: 'GET', path: '/api/v2/kb/cards',
@@ -118,6 +119,61 @@ export const GROUP_KB = [{
         { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
       ],
       notes: ['v1 固定返回 HTTP 501（multipart upload not implemented in v1）'],
+    },
+    {
+      method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/propose',
+      summary: '从 through-chains 生成可勾选原子候选（写 .draft-traj-propose.json）',
+      desc: '解析模块 through-chains.md，LLM 原子化后仅返回出处齐全的可选原子；出处不可解析的进 rejected。',
+      params: [
+        { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
+        { name: 'chainIds', type: 'string[]', in: 'body', desc: '可选，限定主链 id 子集' },
+        { name: 'maxAtoms', type: 'number', in: 'body', desc: '可选，截断返回原子数上限' },
+      ],
+      reqExample: J({ chainIds: ['chain-a'], maxAtoms: 5 }),
+      respExample: J({
+        code: 200,
+        message: 'ok',
+        data: {
+          atoms: [{
+            atomKey: 'product-mgmt:chain-a:2:新增一级分类',
+            title: '新增一级分类',
+            suggestedFunctionId: 9000000740,
+            sourceDoc: 'product-mgmt.docx',
+            sourceChapter: 'chapters/01-product-library.md#产品库管理',
+            taskDraft: '1、进入产品库。\n2、点击新增一级分类…\n\n来源：product-mgmt.docx / chapters/01-product-library.md\n',
+            phaseHints: ['进入产品库', '新增一级分类并确定'],
+          }],
+          rejected: [{ atomKey: 'product-mgmt:chain-a:1:进入产品库', reason: 'empty_task_draft' }],
+        },
+      }),
+      notes: ['模块未登记或缺 through-chains.md → 400 VALIDATION', '不建交易、不录制'],
+    },
+    {
+      method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/commit',
+      summary: '勾选原子 analyze→建 draft 交易（写出处字段，不录制）',
+      desc: '从 propose 缓存读取 atomKeys 子集，analyze 后创建 recordStatus=draft 的交易；默认同 req_atom_key 已有草稿则 skip。',
+      params: [
+        { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
+        { name: 'atomKeys', type: 'string[]', required: true, in: 'body', desc: '勾选的原子键列表' },
+        { name: 'systemAccountId', type: 'number', in: 'body', desc: '可选，系统账号 id' },
+        { name: 'functionIdOverrides', type: 'object', in: 'body', desc: '可选，按 atomKey 覆盖 functionId' },
+        { name: 'force', type: 'boolean', in: 'body', desc: '可选，true 时跳过重复草稿检查' },
+      ],
+      reqExample: J({
+        atomKeys: ['product-mgmt:chain-a:2:新增一级分类'],
+        systemAccountId: 1,
+        functionIdOverrides: { 'product-mgmt:chain-a:2:新增一级分类': 9000000740 },
+        force: false,
+      }),
+      respExample: J({
+        code: 200,
+        message: 'ok',
+        data: {
+          created: [{ trajectoryId: 4242, atomKey: 'product-mgmt:chain-a:2:新增一级分类', name: '新增一级分类' }],
+          skipped: [{ atomKey: 'product-mgmt:chain-a:9:不存在', reason: 'unknown or stale atomKey' }],
+        },
+      }),
+      notes: ['atomKeys 必填且非空', '未先 propose → 400', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
     },
   ],
 }];

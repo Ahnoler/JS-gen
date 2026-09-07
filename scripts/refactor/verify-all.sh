@@ -128,6 +128,7 @@ run "characterize-kb-actions" "$PY" scripts/characterization/characterize-kb-act
 run "characterize-kb-recall" "$PY" scripts/characterization/characterize-kb-recall.py
 run "characterize-kb-insights" node scripts/characterization/characterize-kb-insights.mjs
 run "characterize-kb-req-modules" node scripts/characterization/characterize-kb-req-modules.mjs
+run "characterize-req-draft-traj" node scripts/characterization/characterize-req-draft-traj.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

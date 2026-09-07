@@ -4,6 +4,7 @@ import { listFlowCards } from '../../services/kb-flow-cards.js';
 import { detectStaleCards } from '../../services/change-impact-service.js';
 import * as systemDao from '../../dao/system-dao.js';
 import * as reqModules from '../../services/kb-req-modules.js';
+import * as reqDraftTraj from '../../services/req-draft-traj/index.js';
 
 /**
  * KB routes: flow-card insights (read-only) and req-module workspace registration.
@@ -52,5 +53,32 @@ export default function registerKbRoutes(app) {
   /** POST /api/v2/kb/req-modules/:moduleKey/source — 源文档上传（v1 未实现）。 */
   app.post('/api/v2/kb/req-modules/:moduleKey/source', asyncHandler(async (_req, res) => {
     throw new AppError('multipart upload not implemented in v1', { status: 501 });
+  }));
+
+  /** POST /api/v2/kb/req-modules/:moduleKey/draft-traj/propose — LLM 原子化候选（写 propose 缓存）。 */
+  app.post('/api/v2/kb/req-modules/:moduleKey/draft-traj/propose', asyncHandler(async (req, res) => {
+    const { chainIds, maxAtoms } = req.body || {};
+    const result = await reqDraftTraj.proposeDraftTrajectories({
+      moduleKey: req.params.moduleKey,
+      chainIds,
+      maxAtoms,
+    });
+    sendOk(res, result);
+  }));
+
+  /** POST /api/v2/kb/req-modules/:moduleKey/draft-traj/commit — 勾选原子建 draft 交易（不录制）。 */
+  app.post('/api/v2/kb/req-modules/:moduleKey/draft-traj/commit', asyncHandler(async (req, res) => {
+    const { atomKeys, systemAccountId, functionIdOverrides, force } = req.body || {};
+    if (!Array.isArray(atomKeys) || !atomKeys.length) {
+      throw new AppError('atomKeys required', { code: 'VALIDATION' });
+    }
+    const result = await reqDraftTraj.commitDraftTrajectories({
+      moduleKey: req.params.moduleKey,
+      atomKeys,
+      systemAccountId,
+      functionIdOverrides,
+      force: Boolean(force),
+    });
+    sendOk(res, result);
   }));
 }
