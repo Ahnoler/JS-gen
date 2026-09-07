@@ -297,7 +297,9 @@ export async function runDefaultLogin(runtime, account, system = null) {
       });
       const failed = Number(result?.failed || 0);
       const okCount = Number(result?.ok || 0);
-      if (result?.error || failed > 0) {
+      // okCount floor: a silent 0-ok/0-failed executor result must not count
+      // as a completed component login (hardcoded branch requires ok>=2).
+      if (result?.error || failed > 0 || okCount < 1) {
         throw new Error(result?.error || `auth component login replay failed (ok=${okCount} failed=${failed})`);
       }
       await markConsumedActionLog(runtime);

@@ -187,17 +187,16 @@ function injectAuthCredentials(promptText, account, password) {
  */
 function buildCanonicalAuthTexts({ authKind, task, account, password }) {
   void task;
+  void account;
+  void password;
   if (authKind === 'login') {
     const description = '调用 login 动作完成登录（账号/密码使用业务数据注入值，验证码留空）。预期结果：离开登录页进入系统首页。';
     const text = [
       '1、在登录页调用 login 动作完成登录。',
-      '',
-      '业务数据：',
-      `账号：${account}`,
-      `密码：${password}`,
+      '账号/密码经业务数据通道注入（键=账号、密码，用 read_business_data 读取），禁止编造或尝试其他任何账号。',
       '',
       '【硬性成功门闩——任一门闩未满足不得结束本阶段】',
-      '- 凭据只使用业务数据注入值（账号/密码见上），禁止编造或尝试其他任何账号（如 admin 类）。',
+      '- 凭据只使用业务数据注入值（read_business_data 键=账号/密码），禁止编造或尝试其他任何账号（如 admin 类）。',
       '- 出现验证码拦截：不要猜测或绕过，立即如实报告「出现验证码，无法自动登录」并退出。',
       '- 登录失败（错误提示、仍在登录页）时如实报告失败原因，不得伪造成功、不得重试超过 2 次。',
     ].join('\n');
@@ -252,7 +251,44 @@ async function createAuthTrajectory({ functionNodeId, authKind, name, task, acco
     status: 'pending',
     description: canonical.description,
   });
+  // Credentials are injected through the business-data channel, NOT the task
+  // text (trajectory.task is free text served by trajectory search/detail APIs
+  // — persisting the password there would leak it). Seeded here so
+  // prepareBusinessDataInjection picks the flat entries up at record time.
+  if (authKind === 'login') {
+    const { replaceEntriesForTrajectory } = await import('../../dao/business-data-dao.js');
+    await replaceEntriesForTrajectory(Number(tid), [
+      { fieldKey: '账号', fieldValue: String(account ?? '') },
+      { fieldKey: '密码', fieldValue: String(password ?? '') },
+    ]);
+  }
   return Number(tid);
+}
+
+/**
+ * Mask the account password inside a trajectory's persisted step params
+ * (auth-recording login steps contain the real password in `login` action
+ * params; the component snapshot is masked separately at registration).
+ * Replaces exact password occurrences with the __AUTH_PASSWORD__ placeholder
+ * so a re-registration from the masked trajectory still resolves.
+ * @param {number} tid trajectory id
+ * @param {string} password real account password to scrub
+ * @returns {Promise<void>}
+ */
+async function maskTrajectoryStepSecrets(tid, password) {
+  const pwd = String(password ?? '');
+  if (!pwd || pwd.length < 2) return;
+  const db = getDB();
+  const rows = await db('trajectory_step')
+    .where('trajectory_id', Number(tid))
+    .whereLike('params_json', `%${pwd}%`);
+  for (const row of rows) {
+    const raw = String(row.params_json ?? '');
+    if (!raw.includes(pwd)) continue;
+    await db('trajectory_step').where('id', row.id).update({
+      params_json: raw.split(pwd).join('__AUTH_PASSWORD__'),
+    });
+  }
 }
 
 /**
@@ -502,6 +538,9 @@ async function runAuthRecordingJob(ctx) {
       account,
       password,
     });
+    // Component registration reads the real password; scrub the source
+    // trajectory's persisted step params afterwards (never re-read for replay).
+    await maskTrajectoryStepSecrets(loginTid, password);
     if (logoutTid) {
       await registerAuthComponent({
         systemId,

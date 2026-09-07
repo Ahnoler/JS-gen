@@ -31,9 +31,11 @@ export function phaseNeedsBusinessData(phaseText) {
   const t = stripBusinessDataBlock(phaseText);
   if (!t) return false;
 
-  // Phase text explicitly referencing 业务数据 wins over the login/query
-  // gates (auth-recording login task says「账号/密码使用业务数据注入值」).
-  if (/业务数据/.test(t)) return true;
+  // Phase text explicitly referencing 业务数据 credential keys wins over the
+  // login/query gates (auth-recording login task says「账号/密码…业务数据通道
+  // 注入」). Narrow co-occurrence so ordinary prose that merely mentions
+  // 业务数据 doesn't flip fill/query/navigate phases.
+  if (/业务数据/.test(t) && /账号|密码|username|password/i.test(t)) return true;
 
   const isLogin = /登录|登入/i.test(t)
     && !/新增|创建|录入|填写|修改|编辑|引入|校验/.test(t);
@@ -112,7 +114,7 @@ export function extractBusinessEntriesFromRequirement(text) {
       continue;
     }
 
-    const headerInline = t.match(/^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]\s*(.+)$/i);
+    const headerInline = t.match(/^(业务数据|案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]\s*(.+)$/i);
     if (headerInline) {
       inBlock = true;
       const rest = headerInline[2].trim();

@@ -27,10 +27,13 @@ export default function (app) {
     const system = await hierarchyService.createSystem(name, description, url);
     // Fire-and-forget: auto-trigger auth recording on system create (type=1).
     // Never affects the create response — failures are logged only.
-    // Spec: docs/superpowers/specs/2026-09-07-auth-recording-design.md
-    startAuthRecording(system.id).catch((err) => {
-      console.warn(`[auth-recording] auto-trigger for system #${system.id} failed: ${err?.message || err}`);
-    });
+    // Skip when url is empty (prerequisite the service would 400 on anyway) —
+    // avoids a noise `failed` job row per url-less system create.
+    if (String(url || '').trim()) {
+      startAuthRecording(system.id).catch((err) => {
+        console.warn(`[auth-recording] auto-trigger for system #${system.id} failed: ${err?.message || err}`);
+      });
+    }
     res.status(201).json(system);
   }));
 
