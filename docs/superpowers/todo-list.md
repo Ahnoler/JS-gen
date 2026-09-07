@@ -72,12 +72,12 @@
 - **同名弹窗 title 回退歧义**：popupKey（含 anchor）对齐正常；仅控件缺 `popup_level_key` 回退 title 查找时可能挂错实例——**待湿测证据**再定改法。
 - **rect 非法值照推**：rect 已改 JSON 字符串并新增 `rect_norm` 归一化（0~1）；`noRectControls` 仅统计可见，是否升级为构建失败待消费方反馈。
 
-### ② 报文捞取 MVP（已验证 · 2026-09-08 用户确认收官）
+### ② 报文捞取 MVP（**已搁置** · 2026-09-08 用户定盘：SUT 无法提供三接口）
 
-- 已完成：click_button 统一改名（Tasks 1-6，`dfb5c9e`）、elk-msg-extract CLI（`8148f72`）、契约对齐+回填验证（`1fcd1b9`/`b837d67`）、SUT 三接口请求文档产出、字段映射 122/122 评估（100% 支持）；Tasks 7-9 报文捕获框架（2026-09-08 凌晨 Zcode 夜班，`2e359ef6`/`314be568`/`f2cbc9f3`/`7bb59b8c`：api-capture.mjs + network_capture.py + 录制接线 + network_captured→system_ref_data 持久化 + characterize OK 6 入 verify-all）。
-- **MVP 验证：用户 2026-09-08 确认已验证**。行级核验工具保留备查：`tmp/capture-live-smoke/check-capture.mjs`（只读查 system_capture 行；本地库 09:50 时点未见行、验证证据以用户侧为准）。
-- 剩余（按需，非阻塞）：非消费型过滤与四边界场景 JS-gen 侧兜底（设计决策待输入）。
-- 设计：[报文日志捞取接口设计.md](../报文日志捞取接口设计.md)；原则：JS-gen 侧逻辑优先于 SUT 增强，接口契约维持最小集。
+- **状态：搁置**。阻塞=被测系统开发人员无法提供三接口（页面元素定义/接口结构定义/日志文件获取）。**可行性已验证**：拿到接口信息即可捞取对应数据——ELK 实测 3 天 2186 条解析 0 失败、saveCustCorporat 命中、有效回填潜力 92%、`el-form-item[prop]` 122/122 全覆盖；字段映射结构化方法与回填评估结论均成立。
+- **已落地资产（保留，复活零改造）**：click_button 统一改名（`dfb5c9e`）、elk-msg-extract CLI（`8148f72`/`1fcd1b9`/`b837d67`）、被动捕获框架 Tasks 7-9（`2e359ef6`/`314be568`/`f2cbc9f3`/`7bb59b8c`：api-capture.mjs + network_capture.py 录制时被动监听——**不依赖 SUT 三接口**——+ network_captured→system_ref_data 持久化 + characterize OK 6 入 verify-all）；核验器 `tmp/capture-live-smoke/check-capture.mjs`。
+- 触发条件：SUT 排期提供接口后重启此线；届时剩余=非消费型过滤/四边界场景兜底（设计决策）。
+- 设计：[报文日志捞取接口设计.md](../报文日志捞取接口设计.md)、[docs/sut-api-request.md](../sut-api-request.md)（可直接发 SUT 团队的三接口请求文档）。
 
 ### ③ 菜单切换：推送链路（已收官 · 2026-09-04）
 
