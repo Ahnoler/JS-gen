@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 23:59 · ZCode Lead — 收工：auth 交易禁跑 Type B 表单自愈 + 重录 job27 修复「只剩登录步」（回链 22:30 收工）
+- 完成（5602b3b6）：排查用户报告「登录演练只剩 1 步」——根因是我方验证回放触发 Type B 表单结构自愈：点完登录页跳 #/home 后 verifyFormStructure 报 用户名/密码 字段 missing，自愈将 traj 668 两条 fill 步删除。双防护落地：① registerAuthComponent 注册时从组件快照剔除 save_form_snapshot；② prepareReplayBatch 对 auth_kind 轨迹剔除 save_form_snapshot 元步（Type B 永不触发）。
+- 重录：job27 success（系统1，账号 2）——traj 671 登录 3 步（fill账号/fill密码/点击登录，密码已掩码 __AUTH_PASSWORD__）、traj 672 登出 3 步（672.step_count 字段漏刷已修正=3）；组件 57（login，paramSchema username=1/password=3）与 58（logout）confirmed。
+- 验收：回放 671 accepted 仅含 3 真实步（快照步被剔除✓）、凭据经 system_account 解析注入真实值、登录达 #/home、全部步保留无一删除；record/stop 后 671 恢复 recorded。
+- 注意：4097 控制面已带新代码重启（PID 5336），孤儿 CDP Chrome(19242) 已清；点步 confirmed 状态（fill=1/click=0）为回放侧标记，待用户 UI 确认流程处置。
+- 遗留移交：SPA 侧 authKind 徽标+推送确认入口（前次移交不变）；终审 minors m2/m5 不变。
+
 ## 2026-09-07 23:10 · ZCode 引擎线 — 开工声明：phase_done 跨 run 串台修复实施（runId 归属隔离）
 - 开工：23:10。承接 reviewer 检出的 `docs/spec-phase-done-cross-run-fix.md`（录制中误弹「AI 录制结束」），实施计划已产出：`docs/superpowers/plans/2026-09-07-phase-done-cross-run-fix.md`（6 任务 TDD：归属纯函数模块 → runner runId 下发+owned 等待 → 订阅过滤+finally cancel_step → Python 回带/canceled/new-step 叫停 → verify-all 注册 → 湿测移交）
 - 范围：`src/services/trajectory/run-event-ownership.js`（新）、`trajectory-recording-runner.js`（runId 接线段）、`scripts/state.py`、`scripts/session_runner.py`（main loop/_run_step/_stdin_reader）、`scripts/agent/service.py`（phase_error emit 两处）、`scripts/characterization/characterize-run-event-ownership.mjs` + `characterize-phase-done-runid.py`（新）、`scripts/refactor/verify-all.sh`、本文件
