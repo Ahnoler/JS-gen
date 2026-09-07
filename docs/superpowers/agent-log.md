@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 22:30 · ZCode Lead — 收工补充：终审 FIX-FIRST 整改完成，凭据不落库双验证（回链 13:05 开工）
+
+- **完成**：whole-branch 终审（0020bbe..HEAD，22 commits）判 FIX-FIRST（C1=明文密码落库 trajectory.task 可被轨迹搜索 API 读出）。整改提交链 ebadece→b75dbe4→7b56f4d→4e53d56：①canonical task 不再内嵌账密，真实值播种 business_data_entry，agent 走 read_business_data 通道；②组件注册后掩码源轨迹步骤 params（password→__AUTH_PASSWORD__，解析对象精确值匹配）；③Node 侧「业务数据」放行收窄为凭据键共现；④inline 头词表/无 url 系统跳过触发/组件回放 ok>=1 三个 minor。
+- **验收**：湿测 job20 全 PASS（4098）——登录组件+登出组件注册 confirmed、traj recorded；**task 无凭据 + 步骤 params password=__AUTH_PASSWORD__ + 组件快照掩码三重不落库实证**；eslint 0 errors、characterize 全过。湿测数据（9000001715 全套）清理清零，库内无凭据残留。
+- **坑**：4098 重启时旧进程未死致 EADDRINUSE，job15/16 曾被旧代码实例服务——重启后必须核 grep EADDRINUSE；mysql2 对 JSON 列返回对象，String() 掩码曾空转。
+- **注意**：主控制面 4097/主执行机 LMY/第二执行机 proxy 已恢复（用户会话中断后重启过）；4098 湿测实例仍在跑，可停。
+
 ## 2026-09-07 17:40 · ZCode Lead — 收工：登录/登出自动化录制全链完成（回链 13:05 开工）
 
 - **完成**：T1-T9 全部落地，提交链 0020bbe→c6aa33c8（迁移/T2 store/T3 prompts/T4 组件注册/T5 service/T6 路由+文档/T7 运行时组件登录/T8 dashboard/湿测修复 r1-r9）。**湿测 job13 全 PASS**：登录组件（1 步 login 单步落库，param_schema 记注入步号）+ 登出组件（3 步：点头像→退出→确定）注册成功，traj recorded 待人工确认；**job14 运行时验证**：组件已注册的系统再触发，登录段走组件路径（server log `auth component hit`），同名幂等复用无重复行。
