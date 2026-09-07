@@ -470,16 +470,26 @@ export async function registerAuthComponent({
 
   const snapshot = stepsToSnapshot(steps).map((item) => ({
     ...item,
-    // Logout steps normally carry no credentials, but mask defensively too:
-    // if any step value happens to equal account/password it gets shadowed.
+    // Mask credentials in the snapshot. Login keeps the account placeholder in
+    // params (runtime injection re-substitutes it); logout only masks the
+    // password — its account string is the avatar click-target text shown in
+    // the UI (masking it displayed a raw __AUTH_USERNAME__ token) while
+    // elementJson keeps the real text anyway.
     params: item.params
-      ? deepReplaceStringValues(item.params, new Map([
-        [account, AUTH_USERNAME_PLACEHOLDER],
-        [password, AUTH_PASSWORD_PLACEHOLDER],
-      ]))
+      ? deepReplaceStringValues(item.params, isLogout
+        ? new Map([[password, AUTH_PASSWORD_PLACEHOLDER]])
+        : new Map([
+          [account, AUTH_USERNAME_PLACEHOLDER],
+          [password, AUTH_PASSWORD_PLACEHOLDER],
+        ]))
       : item.params,
   }));
   const signature = computePhaseSignature(steps).signature;
+
+  // Source phase for the 来源阶段/出现次数 UI (occurrence provenance).
+  const phaseRow = await db('trajectory_phase')
+    .where({ trajectory_id: tid, phase_number: 1 })
+    .first();
 
   const db = getDB();
   await db('operation_component')
@@ -503,8 +513,19 @@ export async function registerAuthComponent({
     stepsJson: JSON.stringify(snapshot),
     signature,
     sourceTrajectoryId: tid,
+    sourcePhaseId: phaseRow?.id ?? null,
     occurrenceCount: 0,
   }));
+
+  if (phaseRow?.id) {
+    await occurrenceDao.create({
+      componentId,
+      trajectoryId: tid,
+      trajectoryPhaseId: phaseRow.id,
+      similarity: 1,
+    });
+    await refreshOccurrenceCount(componentId);
+  }
 
   return { componentId };
 }
