@@ -2,6 +2,8 @@
  * Operation component CRUD: create from phase, list, patch, confirm, deprecate, delete.
  * Does not write trajectory_phase.component_id (reserved for later phases).
  */
+import { getDB } from '../../config/database.js';
+import { toDbRow, fromDbRow } from '../dao/helpers.js';
 import * as componentDao from '../dao/operation-component-dao.js';
 import * as occurrenceDao from '../dao/operation-component-occurrence-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
@@ -329,4 +331,217 @@ export async function collectFunctionIdsForSystem(systemId) {
     for (const fn of fns) ids.push(Number(fn.id));
   }
   return ids;
+}
+
+const AUTH_COMPONENT_TYPES = new Set(['login', 'logout']);
+
+const AUTH_FILL_ACTIONS = new Set([
+  'fill_form_field',
+  'fill_input',
+  'type_text',
+  'input_text',
+]);
+
+const AUTH_USERNAME_PLACEHOLDER = '__AUTH_USERNAME__';
+const AUTH_PASSWORD_PLACEHOLDER = '__AUTH_PASSWORD__';
+
+/**
+ * Recursively replace exact-match string values inside a params structure.
+ * @param {unknown} value params value (object / array / primitive)
+ * @param {Map<string, string>} replacements exact string value → replacement map
+ * @returns {unknown} deep-copied structure with replacements applied
+ */
+function deepReplaceStringValues(value, replacements) {
+  if (typeof value === 'string') {
+    return replacements.get(value) ?? value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => deepReplaceStringValues(item, replacements));
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = deepReplaceStringValues(v, replacements);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Recursively replace placeholder strings with current credentials.
+ * @param {unknown} value params value (object / array / primitive)
+ * @param {Map<string, string>} replacements placeholder → credential map
+ * @returns {unknown} deep-copied structure with placeholders resolved
+ */
+function deepResolvePlaceholders(value, replacements) {
+  if (typeof value === 'string') {
+    let out = value;
+    for (const [needle, replacement] of replacements) {
+      if (out.includes(needle)) out = out.split(needle).join(replacement);
+    }
+    return out;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => deepResolvePlaceholders(item, replacements));
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = deepResolvePlaceholders(v, replacements);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Register a login/logout auth component from a recorded trajectory: snapshot all steps
+ * with credentials masked by placeholders and mark the injection step numbers.
+ * Deprecates previous active auth components of the same (systemId, componentType).
+ * @param {object} payload registration payload
+ * @param {number} payload.systemId system node id
+ * @param {string} payload.componentType 'login' or 'logout'
+ * @param {number} payload.trajectoryId source trajectory id
+ * @param {number|null} [payload.accountId] associated system account id (unused in snapshot)
+ * @param {string} payload.account username as typed during recording
+ * @param {string} payload.password password as typed during recording
+ * @returns {Promise<{ componentId: number }>} created component id
+ */
+export async function registerAuthComponent({
+  systemId,
+  componentType,
+  trajectoryId,
+  accountId,
+  account,
+  password,
+}) {
+  if (!AUTH_COMPONENT_TYPES.has(componentType)) {
+    throw svcError(`componentType must be 'login' or 'logout', got=${componentType}`, 400);
+  }
+  if (!account || !password) {
+    throw svcError('account and password are required', 400);
+  }
+  const sid = Number(systemId);
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(sid) || !Number.isFinite(tid)) {
+    throw svcError('systemId and trajectoryId must be numbers', 400);
+  }
+
+  const rawSteps = await trajectoryStepDao.listByTrajectory(tid);
+  if (!rawSteps.length) {
+    throw svcError(`Trajectory ${tid} has no steps`, 400);
+  }
+  const steps = rawSteps.map(parseStepParams);
+
+  let usernameStepNumber = null;
+  let passwordStepNumber = null;
+  for (const step of steps) {
+    const actionType = String(step.actionType || '').trim();
+    if (!AUTH_FILL_ACTIONS.has(actionType)) continue;
+    const params = step.params && typeof step.params === 'object' ? step.params : {};
+    for (const value of Object.values(params)) {
+      if (typeof value !== 'string') continue;
+      if (usernameStepNumber == null && value === account) {
+        usernameStepNumber = Number(step.stepNumber);
+      }
+      if (passwordStepNumber == null && value === password) {
+        passwordStepNumber = Number(step.stepNumber);
+      }
+    }
+  }
+  if (usernameStepNumber == null || passwordStepNumber == null) {
+    throw svcError(
+      `Cannot locate credential injection points in trajectory ${tid}`
+      + ` (usernameStepNumber=${usernameStepNumber}, passwordStepNumber=${passwordStepNumber})`,
+      400,
+    );
+  }
+
+  const snapshot = stepsToSnapshot(steps).map((item) => ({
+    ...item,
+    params: item.params
+      ? deepReplaceStringValues(item.params, new Map([
+        [account, AUTH_USERNAME_PLACEHOLDER],
+        [password, AUTH_PASSWORD_PLACEHOLDER],
+      ]))
+      : item.params,
+  }));
+  const signature = computePhaseSignature(steps).signature;
+
+  const db = getDB();
+  await db('operation_component')
+    .where({ system_id: sid, component_type: componentType })
+    .whereNot('status', 'deprecated')
+    .update({ status: 'deprecated', updated_at: db.fn.now(3) });
+
+  // Re-registering a structurally identical trajectory collides with
+  // uk_oc_system_signature against the just-deprecated row; drop it.
+  await db('operation_component')
+    .where({ system_id: sid, component_type: componentType, status: 'deprecated', signature })
+    .del();
+
+  const [componentId] = await db('operation_component').insert(toDbRow({
+    name: componentType === 'login' ? '登录组件' : '登出组件',
+    grain: 'phase',
+    systemId: sid,
+    componentType,
+    status: 'confirmed',
+    paramSchema: { usernameStepNumber, passwordStepNumber },
+    stepsJson: JSON.stringify(snapshot),
+    signature,
+    sourceTrajectoryId: tid,
+    occurrenceCount: 0,
+  }));
+
+  return { componentId };
+}
+
+/**
+ * Find the latest active (non-deprecated) auth component for a system and type.
+ * @param {number} systemId system node id
+ * @param {string} componentType 'login' or 'logout'
+ * @returns {Promise<object|null>} component row (parsed paramSchema/stepsJson) or null
+ */
+export async function findActiveAuthComponent(systemId, componentType) {
+  const row = await getDB()('operation_component')
+    .where({
+      system_id: Number(systemId),
+      component_type: componentType,
+    })
+    .whereNot('status', 'deprecated')
+    .orderBy([{ column: 'id', order: 'desc' }])
+    .first();
+  if (!row) return null;
+  const obj = fromDbRow(row);
+  obj.paramSchema = typeof obj.paramSchema === 'string'
+    ? JSON.parse(obj.paramSchema)
+    : obj.paramSchema;
+  obj.stepsJson = typeof obj.stepsJson === 'string'
+    ? JSON.parse(obj.stepsJson)
+    : (obj.stepsJson ?? []);
+  return obj;
+}
+
+/**
+ * Resolve a stored auth component into replay actions with current credentials
+ * substituted for the placeholders.
+ * @param {object} component auth component row (stepsJson snapshot with placeholders)
+ * @param {object} creds current credentials
+ * @param {string} creds.account username to inject at the username step
+ * @param {string} creds.password password to inject at the password step
+ * @returns {Array<{ action: string, params: object|null }>} replay action list
+ */
+export function resolveAuthComponentSteps(component, { account, password }) {
+  const replacements = new Map([
+    [AUTH_USERNAME_PLACEHOLDER, String(account ?? '')],
+    [AUTH_PASSWORD_PLACEHOLDER, String(password ?? '')],
+  ]);
+  const snapshot = Array.isArray(component?.stepsJson) ? component.stepsJson : [];
+  return snapshot.map((item) => ({
+    action: String(item.actionType ?? item.action ?? '').trim(),
+    params: item.params && typeof item.params === 'object'
+      ? deepResolvePlaceholders(item.params, replacements)
+      : item.params,
+  }));
 }
