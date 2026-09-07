@@ -10,11 +10,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDB } from '../../../config/database.js';
 import { fromDbRow } from '../../dao/helpers.js';
+import * as execSession from '../../executor-session-client.js';
 import * as store from './auth-recording-store.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as systemAccountDao from '../../dao/system-account-dao.js';
 import { registerAuthComponent } from '../operation-component-service.js';
+import { runReplayActions } from '../replay-actions.js';
+import { getTrajectoryRuntime } from '../trajectory/trajectory-runtime.js';
 import {
   prepareTrajectoryRecording,
   detachTrajectoryLive,
@@ -194,18 +197,53 @@ async function waitForRecordingFinish(tid, timeoutMs = RECORD_TIMEOUT_MS) {
 }
 
 /**
- * Run one recording segment: prepare → start → wait finish → criteria check.
- * Always detaches live resources afterwards.
+ * Run one recording segment: prepare → (login segment only: navigate to the
+ * login page via suppressed replay and arm skipDefaultLogin) → start → wait
+ * finish → criteria check. Always detaches live resources afterwards.
  * @param {number} tid trajectory id
  * @param {object} opts segment options
  * @param {number|null} [opts.accountId] login account id override
  * @param {string} opts.loginUrl system login URL (criteria base)
  * @param {function(object, string): boolean} opts.criteria pure criteria function
  * @param {string} opts.segmentLabel label for error messages
+ * @param {string|null} [opts.navigateUrl] when set (login segment), navigate the
+ *   browser to this URL before starting the agent rehearsal and skip the
+ *   prepare-time default login (one-shot runtime.skipDefaultLogin)
  * @returns {Promise<{ traj: object }>} recorded trajectory entity
  */
-async function runSegment(tid, { accountId, loginUrl, criteria, segmentLabel }) {
+async function runSegment(tid, { accountId, loginUrl, criteria, segmentLabel, navigateUrl = null }) {
   await prepareTrajectoryRecording(tid);
+  if (navigateUrl) {
+    const runtime = getTrajectoryRuntime(tid);
+    if (!runtime) {
+      throw new Error(`${segmentLabel} runtime not attached after prepare`);
+    }
+    runtime.skipDefaultLogin = true;
+    runtime.suppressStepPersist = true;
+    runtime.isReplay = true;
+    try {
+      const { result } = await runReplayActions({
+        execSession,
+        sessionId: runtime.sessionId,
+        nodeUuid: runtime.executorNodeUuid,
+        actions: [
+          { action: 'go_to_url', params: { url: navigateUrl } },
+          // 演练开始前确认页面处于登录页（等待跳转/加载完成）
+          { action: 'wait_for_loading' },
+        ],
+        timeoutMs: 120000,
+        stopOnFail: true,
+        isReplay: true,
+      });
+      const failed = Number(result?.failed || 0);
+      if (result?.error || failed > 0) {
+        throw new Error(result?.error || `${segmentLabel} navigate to login page failed (failed=${failed})`);
+      }
+    } finally {
+      runtime.suppressStepPersist = false;
+      runtime.isReplay = false;
+    }
+  }
   await startTrajectoryRecording(tid, { accountId: accountId ?? null });
   const wait = await waitForRecordingFinish(tid);
   await detachTrajectoryLive(tid, { reason: 'auth_record_segment' }).catch(() => {});
@@ -249,6 +287,7 @@ async function runAuthRecordingJob(ctx) {
         loginUrl,
         criteria: checkLoginCriteria,
         segmentLabel: '登录段',
+        navigateUrl: loginUrl,
       });
     } catch (err) {
       await detachTrajectoryLive(loginTid, { reason: 'auth_record_failed' }).catch(() => {});
