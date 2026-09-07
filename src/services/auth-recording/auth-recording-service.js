@@ -277,7 +277,7 @@ async function createAuthTrajectory({ functionNodeId, authKind, name, task, acco
  */
 async function maskTrajectoryStepSecrets(tid, password) {
   const pwd = String(password ?? '');
-  if (!pwd || pwd.length < 2) return;
+  if (!pwd) return;
   const db = getDB();
   const rows = await db('trajectory_step')
     .where('trajectory_id', Number(tid))
