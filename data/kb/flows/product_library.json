@@ -235,7 +235,7 @@
     },
     {
       "keyword": "新增分类",
-      "rule": "工具栏有两个 a.el-icon-folder-add：① tooltip/aria=「新增一级分类」→恒造顶层一级（#504）；② tooltip/aria=「新增分类」→选中父后挂子级（#506：KB测子挂-20260905-0015 depth=1 在 KB测一级-20260904-1925 下；须展开父才见）。**无**「新增子分类」——click_button('新增子分类')→err-icon-label-miss。用完整 tooltip 区分两个 folder-add"
+      "rule": "工具栏有两个 a.el-icon-folder-add：① tooltip/aria=「新增一级分类」→恒造顶层一级（#504；I2b traj675 stamp 1835）；② tooltip/aria=「新增分类」→选中父后挂子级（#506；I2b traj676 挂 KB测一级-20260907-1835）。**无**「新增子分类」——click_button('新增子分类')→err-icon-label-miss。用完整 tooltip 区分两个 folder-add；#499 新粒度=一级/子分类/产品三笔串行（砍启用）"
     },
     {
       "keyword": "图标工具栏",
@@ -288,5 +288,5 @@
     "选中父节点后再点「新增一级分类」仍造顶层一级（#504 证伪「选父即落子」）；子级必须点第二个 folder-add「新增分类」",
     "agent 可能误报「父下已见子节点」——须 CDP/树 depth 核对，勿信 done 文案 alone（#504 P3）"
   ],
-  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用；I3 #500 克隆→启用；I4 #502 禁用；I6 #504 证伪选父+一级分类；I7 #506 选父+「新增分类」挂子 depth=1（KB测子挂-20260905-0015）；recall 535d6d7；I11 #614 基本信息保存重录（20260907-1235，引擎假成功门闩 v2 后）：recorded stepCount=22 + select_option×3 + toast 操作成功；详见 tmp/product-mgmt/through-report-basicinfo-rerecord.md"
+  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用（旧单交易四阶段）；I2b #499 新粒度串行（20260907-1835）：traj 675 一级分类 / 676 子分类(「新增分类」) / 678 新增产品，均 recorded+序号步，砍启用；报告 tmp/product-mgmt/split-499/through-report.md；I3 #500 克隆→启用；I4 #502 禁用；I6 #504 证伪选父+一级分类；I7 #506 选父+「新增分类」挂子 depth=1（KB测子挂-20260905-0015）；recall 535d6d7；I11 #614 基本信息保存重录（20260907-1235，引擎假成功门闩 v2 后）：recorded stepCount=22 + select_option×3 + toast 操作成功；详见 tmp/product-mgmt/through-report-basicinfo-rerecord.md"
 }
