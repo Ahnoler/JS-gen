@@ -206,7 +206,11 @@ function main() {
   run('DAO list/listByFunction filter on paasUserId (empty = all visible)', () => {
     const dao = read('src/dao/trajectory-dao.js');
     assert.ok(/list\(\{[^}]*paasUserId = null/.test(dao), 'list accepts paasUserId');
-    assert.ok(/listByFunction\([^,]+,\s*\{[^}]*paasUserId = null/.test(dao), 'listByFunction accepts paasUserId');
+    // 17b4a512 后 listByFunction 是薄壳，转发 options（含 paasUserId）给 listByFunctionIds；
+    // 实际过滤在 listByFunctionIds 的解构里。
+    assert.ok(/listByFunction\(functionId, options = \{\}\)\s*\{\s*return listByFunctionIds\(\[functionId\], options\);/.test(dao),
+      'listByFunction forwards options to listByFunctionIds');
+    assert.ok(/listByFunctionIds\(functionIds,\s*\{[^}]*paasUserId = null/.test(dao), 'listByFunctionIds accepts paasUserId');
     assert.ok(dao.includes("if (paasUserId) query.where('t.paas_user_id', paasUserId)"), 'conditional filter (empty=no-op)');
   });
 
@@ -218,7 +222,7 @@ function main() {
     assert.ok(/export async function countByRecordStatus[\s\S]{0,900}?if \(paasUserId\) base\.where\('t\.paas_user_id', paasUserId\)/.test(dao),
       'countByRecordStatus filters by t.paas_user_id on its own base');
     // And both callers thread paasUserId into the stats call.
-    assert.ok(dao.includes('countByRecordStatus({ functionId, keyword, recordStatus, batchTaskName, paasUserId, isExport })'), 'listByFunction threads paasUserId to stats');
+    assert.ok(dao.includes('countByRecordStatus({ functionIds: ids, keyword, recordStatus, batchTaskName, paasUserId, isExport })'), 'listByFunctionIds threads paasUserId to stats');
     assert.ok(dao.includes('countByRecordStatus({ keyword, recordStatus, batchTaskName, paasUserId, isExport })'), 'list threads paasUserId to stats');
   });
 
