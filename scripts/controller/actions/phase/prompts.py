@@ -58,9 +58,12 @@ def login_task_hint() -> str:
     return (
         '\n\n【任务类型：登录】\n'
         '本阶段只做登录，不是表单填写。\n'
-        '1. 使用 login(username, password, …) 完成登录（必要时填验证码）。\n'
-        '2. 登录成功进入系统后立刻 done(success=true)。\n'
-        '3. 不要 get_pending_tasks、不要找业务表单、不要把本阶段当成「新增/录入」。\n'
+        '1. 若【当前任务】明确给出三步形态（输入账号 → 输入密码 → 点击登录），'
+        '按该指令用 fill_form_field 逐字段填写（值取业务数据「账号/密码」），再点击登录按钮；'
+        '此时不要使用一步式 login(...)。\n'
+        '2. 否则使用 login(username, password, …) 一步完成登录（必要时填验证码）。\n'
+        '3. 登录成功进入系统后立刻 done(success=true)。\n'
+        '4. 不要 get_pending_tasks、不要找业务表单、不要把本阶段当成「新增/录入」。\n'
     )
 
 

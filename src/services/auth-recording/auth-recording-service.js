@@ -190,7 +190,7 @@ function buildCanonicalAuthTexts({ authKind, task, account, password }) {
   void account;
   void password;
   if (authKind === 'login') {
-    const description = '依次填写账号与密码（值使用业务数据注入值，验证码留空），点击登录按钮完成登录。预期结果：离开登录页进入系统首页。';
+    const description = '三步登录：用 fill_form_field 填写账号与密码（值使用业务数据注入值，验证码留空），再点击登录按钮完成登录。预期结果：离开登录页进入系统首页。';
     const text = [
       '1、在登录页依次完成：输入账号 → 输入密码 → 点击登录。',
       '账号/密码经业务数据通道注入（键=账号、密码，用 read_business_data 读取），禁止编造或尝试其他任何账号。',
