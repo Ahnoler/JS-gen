@@ -8,6 +8,7 @@
 import * as execSession from '../../executor-session-client.js';
 import * as memoryService from '../../memory/memory-service.js';
 import { broadcast } from '../../ws-server.js';
+import { waitForSessionEventOwned } from './run-event-ownership.js';
 
 const REPLAY_TIMEOUT_MS = 300000;
 const HEAL_TIMEOUT_MS = 300000;
@@ -112,77 +113,91 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, heal
     console.warn('[replay] heal decision ingest skipped:', err?.message || err);
   }
 
-  await new Promise((resolve, reject) => {
-    let settled = false;
-    let sawAgentStopped = false;
+  // runId 归属（2a30fc6c 教训的遗留面）：本轮 heal 唯一 runId，随 step 下发、
+  // 等待按归属过滤——旧 run 的 phase_done / cancel_step 回声（canceled）不再被
+  // 当成 heal 完成。legacy 执行机不回带 runId 时按 missing_runid 放行（spec 4.4）。
+  const healRunId = runtime.currentRunId
+    || (await import('node:crypto')).randomUUID();
+  runtime.currentRunId = healRunId;
 
-    const rejectAbort = () => {
-      cleanup();
-      reject(makeUserAbortError());
-    };
+  let resolveP;
+  let rejectP;
+  const done = new Promise((res, rej) => { resolveP = res; rejectP = rej; });
+  let settled = false;
+  let sawAgentStopped = false;
 
-    const unsubDone = execSession.onSessionEvent(runtime.sessionId, 'phase_done', () => {
-      if (settled) return;
-      if (runtime.abortReplay || sawAgentStopped) {
-        rejectAbort();
-        return;
-      }
-      cleanup();
-      resolve();
-    });
-    const unsubErr = execSession.onSessionEvent(runtime.sessionId, 'phase_error', (payload) => {
-      if (settled) return;
-      if (runtime.abortReplay || sawAgentStopped) {
-        rejectAbort();
-        return;
-      }
-      cleanup();
-      reject(new Error(payload?.message || 'phase_error'));
-    });
-    const unsubStopped = execSession.onSessionEvent(runtime.sessionId, 'agent_stopped', () => {
-      if (settled) return;
-      sawAgentStopped = true;
-      runtime.abortReplay = true;
-      rejectAbort();
-    });
-    const timer = setTimeout(() => {
-      if (settled) return;
-      if (runtime.abortReplay || sawAgentStopped) {
-        rejectAbort();
-        return;
-      }
-      cleanup();
-      reject(new Error('Timeout waiting for heal phase_done'));
-    }, HEAL_TIMEOUT_MS);
-
-    function cleanup() {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try { unsubDone(); } catch { /* ignore */ }
-      try { unsubErr(); } catch { /* ignore */ }
-      try { unsubStopped(); } catch { /* ignore */ }
-    }
-
-    if (runtime.abortReplay) {
-      rejectAbort();
-      return;
-    }
-
-    execSession.forwardStdin({
-      nodeUuid: runtime.executorNodeUuid,
-      sessionId: runtime.sessionId,
-      event: 'step',
-      data: {
-        instruction,
-        max_steps: maxSteps,
-        phase_number: 0,
-        heal_type: healType,
-        healType,
-        ...(healContract ? { heal_contract: healContract } : {}),
-      },
-    });
+  const ownedDoneP = waitForSessionEventOwned({
+    addListener: (type, handler) => execSession.onSessionEvent(runtime.sessionId, type, handler),
+    type: 'phase_done',
+    runId: healRunId,
+    onIgnored: (payload, reason) => {
+      console.log(`[replay] heal wait ignored phase_done (${reason}) session=${runtime.sessionId}`);
+    },
   });
+  const unsubErr = execSession.onSessionEvent(runtime.sessionId, 'phase_error', (payload) => {
+    if (settled) return;
+    cleanup();
+    if (runtime.abortReplay || sawAgentStopped) rejectP(makeUserAbortError());
+    else rejectP(new Error(payload?.message || 'phase_error'));
+  });
+  const unsubStopped = execSession.onSessionEvent(runtime.sessionId, 'agent_stopped', () => {
+    if (settled) return;
+    sawAgentStopped = true;
+    runtime.abortReplay = true;
+    cleanup();
+    rejectP(makeUserAbortError());
+  });
+  const timer = setTimeout(() => {
+    if (settled) return;
+    cleanup();
+    rejectP(new Error('Timeout waiting for heal phase_done'));
+  }, HEAL_TIMEOUT_MS);
+
+  function cleanup() {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    try { ownedDoneP.cancel(); } catch { /* ignore */ }
+    try { unsubErr(); } catch { /* ignore */ }
+    try { unsubStopped(); } catch { /* ignore */ }
+  }
+
+  if (runtime.abortReplay) {
+    cleanup();
+    rejectP(makeUserAbortError());
+    return done;
+  }
+
+  execSession.forwardStdin({
+    nodeUuid: runtime.executorNodeUuid,
+    sessionId: runtime.sessionId,
+    event: 'step',
+    data: {
+      instruction,
+      max_steps: maxSteps,
+      phase_number: 0,
+      heal_type: healType,
+      healType,
+      runId: healRunId,
+      ...(healContract ? { heal_contract: healContract } : {}),
+    },
+  });
+
+  const donePayload = await ownedDoneP;
+  if (settled) return done;
+  cleanup();
+  if (runtime.abortReplay || sawAgentStopped) {
+    rejectP(makeUserAbortError());
+    return done;
+  }
+  if (donePayload?.success === false) {
+    // Type A 证据缺口（09-08 审查）：heal 自报失败不得当「已治愈」，
+    // Type B 仍有 newEntries diff 复核兜底。
+    rejectP(new Error(`heal phase_done reported success=false${donePayload?.text ? `: ${donePayload.text}` : ''}`));
+    return done;
+  }
+  resolveP();
+  return done;
 }
 
 export {
