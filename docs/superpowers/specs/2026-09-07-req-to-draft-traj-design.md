@@ -81,7 +81,7 @@ data/kb/req/<moduleKey>/
 | `req_atom_key` | propose 稳定键（幂等 / 对账） |
 
 - 任务正文可附「来源：…」展示行，**不得替代**结构化字段。
-- 缺任一出处 → 该原子不可 commit（或整条 commit 请求中该原子进 `skipped`）。
+- 缺任一出处 → 不得进入 propose 的 `atoms`；若仍被塞进 commit → 该条 `skipped`。
 - 列表/详情 API 回传上述字段。
 
 ## 6. API 契约
