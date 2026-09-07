@@ -159,6 +159,7 @@ export async function save(trajectory, trx = null) {
       isSuccessful: trajectory.isSuccessful,
       url: trajectory.url,
       functionId: trajectory.functionId ?? null,
+      authKind: trajectory.authKind ?? null,
       systemAccountId: trajectory.systemAccountId ?? null,
       remoteSessionId: trajectory.remoteSessionId ?? null,
       batchJobId: trajectory.batchJobId ?? null,
