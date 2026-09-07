@@ -203,6 +203,122 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  const { writeProposeCache } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
+  const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
+
+  const GOOD_ATOM_KEY = 'demo-mod:chain-a:2:新增一级分类';
+  const GOOD_ATOM = {
+    atomKey: GOOD_ATOM_KEY,
+    title: '新增一级分类',
+    suggestedFunctionId: 9000000740,
+    sourceDoc: 'demo.docx',
+    sourceChapter: 'chapters/01-product-library.md#产品库管理',
+    taskDraft: '1、进入产品库。\n2、点击新增一级分类，名称填「KB测一级」，序号填「1」，确定。\n\n来源：demo.docx / chapters/01-product-library.md\n\n关键数据\n分类名称：KB测一级\n序号：1\n',
+  };
+
+  async function seedCache(tmp, atoms) {
+    const modDir = join(tmp, 'demo-mod');
+    cpSync(fixtureRoot, modDir, { recursive: true });
+    await writeProposeCache(modDir, { atoms, rejected: [] });
+    return tmp;
+  }
+
+  await runAsync('commitDraftTrajectories skips unknown atomKey', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: ['demo-mod:chain-a:9:不存在'],
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async () => ({ id: 1 }),
+      findDraftFn: async () => null,
+    });
+    assert.equal(out.created.length, 0);
+    assert.equal(out.skipped.length, 1);
+    assert.match(out.skipped[0].reason, /unknown|stale/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commitDraftTrajectories creates draft with provenance', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    let createOpts;
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => ({
+        phases: [
+          '进入产品库。预期结果：抵达产品库管理页面。',
+          '新增一级分类。预期结果：出现操作成功。',
+        ],
+        businessEntries: [{ fieldKey: '分类名称', fieldValue: 'KB测一级' }],
+      }),
+      createFn: async (opts) => {
+        createOpts = opts;
+        return { id: 4242, name: opts.name };
+      },
+      findDraftFn: async () => null,
+    });
+    assert.equal(out.created[0].trajectoryId, 4242);
+    assert.equal(createOpts.reqModuleKey, 'demo-mod');
+    assert.ok(createOpts.reqSourcePath);
+    assert.ok(createOpts.reqChapterRef);
+    assert.equal(createOpts.reqAtomKey, GOOD_ATOM_KEY);
+    assert.equal(createOpts.recordStatus ?? 'draft', 'draft');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commitDraftTrajectories skips duplicate draft without force', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    let callCount = 0;
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async () => {
+        callCount += 1;
+        return { id: 4242 };
+      },
+      findDraftFn: async () => ({ id: 4242 }),
+    });
+    assert.equal(out.created.length, 0);
+    assert.equal(out.skipped.length, 1);
+    assert.match(out.skipped[0].reason, /duplicate/);
+    assert.equal(callCount, 0);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commitDraftTrajectories skips atom missing provenance in cache', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    const badAtom = { ...GOOD_ATOM, sourceDoc: '' };
+    await seedCache(tmp, [badAtom]);
+
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async () => ({ id: 1 }),
+      findDraftFn: async () => null,
+    });
+    assert.equal(out.created.length, 0);
+    assert.equal(out.skipped.length, 1);
+    assert.ok(out.skipped[0].reason);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commitDraftTrajectories exported from index', async () => {
+    const idx = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/index.js')).href);
+    assert.equal(typeof idx.commitDraftTrajectories, 'function');
+  });
+
   console.log(`OK ${passed}`);
 }
 

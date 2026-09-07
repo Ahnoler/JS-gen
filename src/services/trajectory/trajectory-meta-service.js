@@ -259,6 +259,10 @@ export async function createEmptyTrajectory({
  * @param {boolean} [opts.requireFunctionId] 禁止静默回退默认功能节点
  * @param {number|null} [opts.batchJobId] 批量任务 id
  * @param {string|null} [opts.paasUserId] PaaS 用户 id
+ * @param {string|null} [opts.reqModuleKey] KB req module key (provenance)
+ * @param {string|null} [opts.reqSourcePath] KB source document path (provenance)
+ * @param {string|null} [opts.reqChapterRef] KB chapter reference (provenance)
+ * @param {string|null} [opts.reqAtomKey] Stable propose atom key (provenance)
  * @param {import('knex').Knex|null} [opts.trx] 可选事务
  * @returns {Promise<object>} 创建的轨迹实体（含阶段）
  */
@@ -274,6 +278,10 @@ export async function createTransactionWithPhases({
   requireFunctionId = false,
   batchJobId = null,
   paasUserId = null,
+  reqModuleKey = null,
+  reqSourcePath = null,
+  reqChapterRef = null,
+  reqAtomKey = null,
   trx = null,
 } = {}) {
   let resolvedFunctionId;
@@ -311,6 +319,10 @@ export async function createTransactionWithPhases({
       recordStatus: 'draft',
       batchJobId: batchJobId ?? null,
       paasUserId,
+      reqModuleKey,
+      reqSourcePath,
+      reqChapterRef,
+      reqAtomKey,
       steps: [],
     }, client);
 
