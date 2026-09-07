@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 20:45 · Cursor Lead — 收工：req→draft-traj SDD 六任务落地（回链 20:08）
+
+- 完成：`propose`/`commit` API + provenance 四字段 + propose cache + characterize OK 19；终审 Important 已修（`c044387f`）；提交链 `a029bb03..c044387f`
+- 验收：characterization OK 19；终审 r2 Approved；verify-all 已注册 characterize-req-draft-traj；**需本机 `knex migrate:latest` 落 provenance 列**
+- 遗留：湿测 propose→勾选→commit 未跑；commit 对未登记 module 仍 400（非 404）；⑧′ 组件扫描/推送仍未来
+
 ## 2026-09-07 20:08 · Cursor Lead — 开工：req→draft-traj SDD 实施（6 tasks）
 
 - 开工：20:08。执行 `plans/2026-09-07-req-to-draft-traj.md`；Subagent-Driven；工作区本仓 `uara_V1.2`（非 main）

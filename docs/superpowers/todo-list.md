@@ -9,12 +9,11 @@
 
 ## 当前工作线（2026-09-06 起）
 
-### ⑧ 需求切片 → 原子草稿交易（2026-09-07 设计拍板 · 计划已写）
+### ⑧ 需求切片 → 原子草稿交易（2026-09-07 · 已落地待湿测）
 
-- **本版**：控制面两段式 API（`draft-traj/propose` → 人勾选 → `commit` 仅建 draft）；粒度=原子化（登录级）；草稿必须结构化标注需求文档 + 章节；不开自动录制。
-- 规格：[`specs/2026-09-07-req-to-draft-traj-design.md`](specs/2026-09-07-req-to-draft-traj-design.md)
-- 计划：[`plans/2026-09-07-req-to-draft-traj.md`](plans/2026-09-07-req-to-draft-traj.md)（6 tasks；propose cache 解决 commit 只传 atomKeys）
-- **待执行**：按计划实现；未开工代码。
+- **已合入**：两段式 API `draft-traj/propose|commit`；provenance 四字段迁移；propose cache；characterize OK 19（`c044387f`）。
+- 规格/计划：[`specs/2026-09-07-req-to-draft-traj-design.md`](specs/2026-09-07-req-to-draft-traj-design.md) / [`plans/2026-09-07-req-to-draft-traj.md`](plans/2026-09-07-req-to-draft-traj.md)
+- **待做**：`knex migrate:latest`；对真实 sliced 模块湿测 propose→勾选 1～2→commit；SPA 入口后补。
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 
