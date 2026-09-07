@@ -91,8 +91,8 @@ data/kb/req/<moduleKey>/
 `POST /api/v2/kb/req-modules/:moduleKey/draft-traj/propose`
 
 - Body（可选）：`{ chainIds?, maxAtoms? }`
-- 200：`{ atoms: [{ atomKey, title, suggestedFunctionId, sourceDoc, sourceChapter, taskDraft, phaseHints, wetTestHint?, selectable }] }`
-- 无章节出处的候选：`selectable=false` 或不入列表。
+- 200：`{ atoms: [{ atomKey, title, suggestedFunctionId, sourceDoc, sourceChapter, taskDraft, phaseHints, wetTestHint? }], rejected?: [{ atomKey?, reason }] }`
+- `atoms` 仅含出处齐全、可勾选的候选；出处不可解析的进 `rejected`，不得出现在 `atoms`。
 - 模块未登记 / 缺 `through-chains.md` → 400。
 
 ### 6.2 Commit
