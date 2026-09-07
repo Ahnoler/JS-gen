@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 00:05 · Zcode 夜班 — 收工：draft-traj 湿测 PASS（回链 23:05 开工）
+
+- 完成：**首通 PASS，DoD 6/6**——characterize OK 19；migrate 无需执行（四列已在库）；product-mgmt propose 8 atoms+1 rejected（出处全非空、粒度原子）；commit traj **681/682** draft + provenance 四字段 GET 验证过；负例 duplicate_draft / unknown_or_stale_atom / 无-cache 400 三发全过；todo ⑧ 已勾销湿测段
+- 验收证据：`tmp/req-draft-traj/through-report-wet.md`（+wet-propose-night / wet-commit-night{,2}.json）
+- 遗留移交：①**propose suggestedFunctionId 越界真 bug**（90000107304 非 system.id → commit FK 拒，需 propose 侧校验后置 null，改 src/services/req-draft-traj 需另开工）；②Git Bash 中文 JSON 内联变 GBK → 必须 --data-binary @file（假负例教训已写报告）；③负例 3 body code=500 与 HTTP 400 不一致（低优）；④SPA 勾选入口/⑧′ 组件扫描仍未来
+- 注意：全程未调用 record/prepare/start，未占执行机槽，未动 R1-R6 在途交易与轨迹查询 WIP
+
 ## 2026-09-07 23:05 · Zcode 夜班 — 开工：draft-traj 湿测移交单（migrate + propose→commit）
 
 - 开工：23:05。执行 `plans/2026-09-07-req-draft-traj-wet-handoff.md`（+复检 `2026-09-07-req-to-draft-traj-wet-test-handoff.md`）；⑧ 线遗留「需本机 migrate + 湿测 propose→勾选→commit」

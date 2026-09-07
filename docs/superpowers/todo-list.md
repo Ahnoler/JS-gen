@@ -13,7 +13,8 @@
 
 - **已合入**：两段式 API `draft-traj/propose|commit`；provenance 四字段迁移；propose cache；characterize OK 19（`c044387f`）。
 - 规格/计划：[`specs/2026-09-07-req-to-draft-traj-design.md`](specs/2026-09-07-req-to-draft-traj-design.md) / [`plans/2026-09-07-req-to-draft-traj.md`](plans/2026-09-07-req-to-draft-traj.md)
-- **待做**：`knex migrate:latest`；对真实 sliced 模块湿测 propose→勾选 1～2→commit；SPA 入口后补。
+- **湿测 PASS（2026-09-08 凌晨 Zcode 夜班）**：migrate 已落（四列在库）；product-mgmt propose 8 atoms 出处/粒度合格；commit traj 681/682=draft + provenance 四字段 GET 验证；幂等/假 key/无-cache 三负例过；报告 `tmp/req-draft-traj/through-report-wet.md`。遗留：propose suggestedFunctionId 越界 FK（`90000107304` 非 system.id，需 propose 侧校验，见报告遗留①）；Git Bash 中文 body 须 `--data-binary @file`
+- **待做**：SPA 勾选入口后补；suggestedFunctionId 校验修复。
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 
