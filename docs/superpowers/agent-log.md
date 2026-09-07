@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 00:55 · Zcode 闲时 — 开工：文档一致性审计（README/docs/配置说明/使用示例）
+
+- 开工：00:55。用户指令：基于当前代码与最近提交核查 README、docs、配置说明与使用示例是否过时，只改能从代码/配置/提交记录直接确认的内容，不改结构/术语/文风
+- 范围：`README.md`、`docs/README.md`、`docs/jsdoc-convention.md`、`.env.example`、`executor/.env.example`、docs/ 内面向使用者的说明文档；只读核对 `src/routes/v2/*`、`package.json`、`eslint.config.js`、`server.mjs`（不修改业务代码）
+- 禁入：轨迹查询未提交 WIP（trajectory-dao / v2 trajectory / trajectory-service / trajectory-query-service）；capture 工具线文件（api-capture.mjs / network_capture.py / session_runner.py / memory\* / system-ref-\*）；`data/kb/**`；`docs/superpowers/` 过程文档（除本文件与 todo 头部纠错）
+- 方式：先读文档全文 → 逐条对照代码/路由/配置取证据 → 只落已证实的最小修订 → 每处修订在收工条列出依据 → commit
+
 ## 2026-09-08 00:25 · Zcode 夜班 — 开工：报文捞取 Tasks 7-10（capture + persistence，回链 23:05 湿测已收口）
 
 - 开工：00:25。draft-traj 湿测已收口（见 00:05 收工条）；候补任务按 todo ② 执行 `plans/2026-08-25-capture-persistence.md`（Task 7-9；Task 10 CHANGELOG 段废止不执行）

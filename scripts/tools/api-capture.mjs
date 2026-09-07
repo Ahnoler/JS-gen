@@ -33,7 +33,11 @@ if (!TARGET_URL) {
   process.exit(1);
 }
 
-/** Strip query/hash and replace numeric path segments with {id}. */
+/**
+ * Strip query/hash and replace numeric path segments with {id}.
+ * @param {string} url - Absolute or relative URL to normalize.
+ * @returns {string} Normalized URL path.
+ */
 function normalizeUrl(url) {
   try {
     const u = new URL(url);
@@ -43,7 +47,11 @@ function normalizeUrl(url) {
   }
 }
 
-/** Parse body as JSON when possible, else truncate text to 4KB. */
+/**
+ * Parse body as JSON when possible, else truncate text to 4KB.
+ * @param {Buffer|null} bodyBytes - Raw body bytes.
+ * @returns {Object|string|null} Parsed JSON, truncated text, or null.
+ */
 function safeBody(bodyBytes) {
   if (bodyBytes == null) return null;
   const text = bodyBytes.toString('utf8');
@@ -51,7 +59,11 @@ function safeBody(bodyBytes) {
   return text.length > 4096 ? text.slice(0, 4096) + '…[truncated]' : text;
 }
 
-/** Filesystem-safe name fragment. */
+/**
+ * Filesystem-safe name fragment.
+ * @param {string} s - Arbitrary string (URL fragment, method).
+ * @returns {string} Sanitized fragment truncated to 80 chars.
+ */
 function safeName(s) {
   return s.replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 80).replace(/^_+|_+$/g, '') || 'x';
 }
