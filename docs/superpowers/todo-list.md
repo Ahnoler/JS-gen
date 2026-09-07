@@ -75,7 +75,8 @@
 ### ② 报文捞取 MVP：Tasks 7-10（抓取 + 持久化）
 
 - 已完成：click_button 统一改名（Tasks 1-6，`dfb5c9e`）、elk-msg-extract CLI（`8148f72`）、契约对齐+回填验证（`1fcd1b9`/`b837d67`）、SUT 三接口请求文档产出、字段映射 122/122 评估（100% 支持）。
-- 待执行：录制链路报文抓取接入 + 报文/映射持久化（Tasks 7-10）；非消费型过滤与四边界场景 JS-gen 侧兜底。
+- **Tasks 7-9 已落地（2026-09-08 凌晨 Zcode 夜班，`2e359ef6`/`314be568`/`f2cbc9f3`/`7bb59b8c`）**：api-capture.mjs E2E 抓取工具 + network_capture.py 监听 + 录制接线（全 try/except 不炸录制）+ network_captured→system_ref_data 持久化（method+normalizedUrl 去重）+ characterize OK 6 入 verify-all。**live 管线未验**：须重启控制面（Node 侧加载新代码）后跑一次真实录制冒烟验证落表。
+- 待执行：控制面重启后真实录制冒烟；非消费型过滤与四边界场景 JS-gen 侧兜底（设计决策待输入）。
 - 设计：[报文日志捞取接口设计.md](../报文日志捞取接口设计.md)；原则：JS-gen 侧逻辑优先于 SUT 增强，接口契约维持最小集。
 
 ### ③ 菜单切换：推送链路（已收官 · 2026-09-04）

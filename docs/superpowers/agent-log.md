@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 02:10 · Zcode 夜班 — 收工：报文捞取 Tasks 7-9 落地（回链 00:25 开工）
+
+- 完成：Task 7 `api-capture.mjs`（`2e359ef6`+JSDoc `a5620ee0`，子智能体验证+本地 smoke 2 captures，修 URL 遮蔽真 bug）；Task 8 `network_capture.py`（`314be568`，11/11 断言+便携 python 真实 import）；Task 9 接线持久化（`f2cbc9f3`，session_runner attach/finally-cleanup 全 try/except + protocol 事件类型 + memory-service 摄取分支 + system-ref findByUrlPattern/persistCapturedInterface + characterize-network-capture）；verify-all 注册 `7bb59b8c`。Task 10 CHANGELOG 段按 09-04 约定废止未执行
+- 验收：eslint 0/0；characterize-network-capture OK 6 已入 verify-all；全量 verify-all 仅 `characterize-sso-auth` 2 断言红——根因=轨迹查询线**未提交 WIP** 把 `listByFunction` 重构为 `listByFunctionIds` 破坏源码 pin（trajectory-dao.js diff 实证），非本单回归；子智能体编队 A（Task7 验证）/B（Task8 实现）/C（Task9 实现，白名单 6 文件 120+ 行 0 删除），主会话验收代提交
+- 注意（事故记录）：本轮一次 `git commit --amend` 与文档审计线并发提交相撞，把 api-capture JSDoc 修复混进其开工条提交 `aa33aa29`（该 commit 故保留不重写，内容在树正确；新线=闲时审查 `0807a847` 起正常）。教训：活跃多会话期禁用 amend
+- 遗留移交：①**live 管线未验**——Task 9 只到形状级，Node 侧（memory-service/protocol）须重启控制面加载，Python 侧随下次录制会话加载；建议白天做一次真实录制冒烟验证 `network_captured → system_ref_data` 落表（顺路=挂起表「录制链路报文抓取接入」实证）②非消费型过滤/四边界场景兜底未做（设计决策需输入）③sso-auth 存量红随轨迹查询 WIP 提交后自愈，若其改法不定需回调 pin
+
 ## 2026-09-08 01:20 · Zcode 闲时 — 收工：文档一致性审计（回链 00:55 开工）
 
 - 完成：5 文件最小修订，全部为代码/配置/提交记录可直接证实的不一致——①`README.md`：环境要求 MySQL 8.0+→5.7+（迁移 99606717/7b56f4d8 已移除 5.7 不支持的 utf8mb4_0900_ai_ci）+ 根路径行为改为「直接返回 api-docs.html」（server.mjs:40 现为 sendFile，非跳转）；②`docs/README.md`：索引重建——CHANGELOG 引用改 git commit 历史（23eed6d0 已删档），清除 8 处死链（backlog-visible-editable-controls/superpowers-README/T4-P0 spec+plan/5 个战略文档均已不在盘上），活文档表改指现存 todo-list/agent-log/guides/jsdoc-convention；③`docs/superpowers/todo-list.md` 头部：CHANGELOG 引用修正 + 删除 backlog 死链行；④`docs/superpowers/archive/README.md`：活待办死链改指 `../todo-list.md`；⑤`docs/jsdoc-convention.md`：5 处示例引用漂移修正——checkScriptErrors/executeScript 已随组装引擎移除不存在（全仓 grep 证实），模板 A/B/C 示例换为现存真实代码（broadcasts.js:12 / llm-utils.js:15-20 / executor-session-client.js:312-320），模板 D 与路由示例行号更新（trajectory-dao.js:91-103 / trajectory.js:15，附 asyncHandler 实形）
