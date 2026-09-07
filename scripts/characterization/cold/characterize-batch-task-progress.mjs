@@ -10,13 +10,13 @@ import {
   parseDoneLogs,
   appendDoneLogEntry,
   DONE_LOG_TEXT_MAX,
-} from '../../src/models/phase-done-logs.js';
+} from '../../../src/models/phase-done-logs.js';
 import {
   computeBatchItemProgress,
   summarizePhases,
-} from '../../src/services/trajectory/batch-item-progress.js';
+} from '../../../src/services/trajectory/batch-item-progress.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const phaseSvc = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-phase-service.js'), 'utf-8');
 assert.match(phaseSvc, /export async function appendPhaseDoneLog/);
 assert.match(phaseSvc, /done_logs: JSON\.stringify\(\[\]\)/);

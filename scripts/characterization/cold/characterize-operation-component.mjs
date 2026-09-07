@@ -10,7 +10,7 @@ import {
   parseLlmJsonObject,
   stepsToSnapshot,
   stepSignatureFragment,
-} from '../../src/services/operation-component-signature.js';
+} from '../../../src/services/operation-component-signature.js';
 
 function section(name) {
   console.log(`\n== ${name} ==`);

@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const helpers = readFileSync(join(root, 'src/cdp/page-locator-helpers.js'), 'utf8');
 function ok(n) { console.log(`ok: ${n}`); }
 

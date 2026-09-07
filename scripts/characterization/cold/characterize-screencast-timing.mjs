@@ -17,10 +17,10 @@ import {
   resolveScreencastTiming,
   resolveScreencastStreamConfig,
   createAckPacer,
-} from '../../src/cdp/screencast-timing.js';
+} from '../../../src/cdp/screencast-timing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, '../..');
+const root = path.resolve(__dirname, '../../..');
 
 assert.equal(TARGET_FPS, 30);
 assert.equal(DEFAULT_MIN_FORWARD_MS, 33);

@@ -9,9 +9,9 @@ import { dirname, join } from 'path';
 import {
   TRAJECTORY_RECORD_STATUSES,
   TRAJECTORY_RECORD_STATUS_LABELS,
-} from '../../src/models/constants.js';
+} from '../../../src/models/constants.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 let failed = 0;
 function ok(name) { console.log(`  ✓ ${name}`); }

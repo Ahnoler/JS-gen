@@ -9,13 +9,13 @@ import { fileURLToPath } from 'node:url';
 import {
   normalizeSystemAccounts,
   assertAccountNamesAvailable,
-} from '../../src/services/hierarchy-service.js';
+} from '../../../src/services/hierarchy-service.js';
 import {
   MASKED_PASSWORD,
   maskAccountPassword,
-} from '../../src/dao/system-account-dao.js';
+} from '../../../src/dao/system-account-dao.js';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 function testNormalize() {
   const accounts = normalizeSystemAccounts([

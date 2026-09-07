@@ -7,7 +7,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 function ok(n) { console.log(`ok: ${n}`); }
 
 {
@@ -48,7 +48,7 @@ function ok(n) { console.log(`ok: ${n}`); }
 {
   const { chromium } = await import('playwright');
   const { buildPhaseScreenshotCollectExpression, buildPhaseScreenshotCleanExpression } =
-    await import('../../src/cdp/phase-screenshot-page.js');
+    await import('../../../src/cdp/phase-screenshot-page.js');
   const html = `<!DOCTYPE html><html><body>
   <div class="el-main" style="height:200px;overflow:auto">
     <div class="el-form-item"><label>客户编号</label><input id="no"></div>
@@ -78,7 +78,7 @@ function ok(n) { console.log(`ok: ${n}`); }
 
 {
   const { PNG } = await import('pngjs');
-  const { stitchPngSlices } = await import('../../src/cdp/png-stitch.js');
+  const { stitchPngSlices } = await import('../../../src/cdp/png-stitch.js');
   function solidPng(w, h, r, g, b) {
     const p = new PNG({ width: w, height: h });
     for (let y = 0; y < h; y++) {
@@ -115,7 +115,7 @@ function ok(n) { console.log(`ok: ${n}`); }
 
 {
   const { chromium } = await import('playwright');
-  const { runPhaseScreenshotCapture } = await import('../../src/cdp/phase-screenshot-capture.js');
+  const { runPhaseScreenshotCapture } = await import('../../../src/cdp/phase-screenshot-capture.js');
   const html = `<!DOCTYPE html><html><body>
   <div class="el-main" style="height:200px;overflow:auto">
     <div class="el-form-item"><label>客户编号</label><input id="no"></div>
@@ -149,7 +149,7 @@ function ok(n) { console.log(`ok: ${n}`); }
 
 {
   const { chromium } = await import('playwright');
-  const { runPhaseScreenshotCapture } = await import('../../src/cdp/phase-screenshot-capture.js');
+  const { runPhaseScreenshotCapture } = await import('../../../src/cdp/phase-screenshot-capture.js');
   const html = `<!DOCTYPE html><html><body style="margin:0">
   <div class="el-main" style="height:200px;overflow:auto">
     <div class="el-form-item"><label>客户编号</label><input id="no"></div>
@@ -183,7 +183,7 @@ function ok(n) { console.log(`ok: ${n}`); }
   // 视口 400×400、.el-main 400px 满视口、内容总高 1600（maxScroll=1200，非 352 整数倍）、
   // 按钮放内容 y≈1250。旧实现：contentHeight=1808（重复条带）、此块必 FAIL。
   const { chromium } = await import('playwright');
-  const { runPhaseScreenshotCapture } = await import('../../src/cdp/phase-screenshot-capture.js');
+  const { runPhaseScreenshotCapture } = await import('../../../src/cdp/phase-screenshot-capture.js');
   const html = `<!DOCTYPE html><html><body style="margin:0">
   <div class="el-main" style="height:400px;overflow:auto">
     <div style="height:1250px"></div>
@@ -219,7 +219,7 @@ function ok(n) { console.log(`ok: ${n}`); }
   // （条带间隙 [200,352) 内元素收不到/图带进根外背景）。视口 400×400、.el-main 高 200、
   // 按钮 y≈300 与 y≈2200；body 红色背景用于断言拼接图无根外条带。
   const { chromium } = await import('playwright');
-  const { runPhaseScreenshotCapture } = await import('../../src/cdp/phase-screenshot-capture.js');
+  const { runPhaseScreenshotCapture } = await import('../../../src/cdp/phase-screenshot-capture.js');
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#f00">
   <div class="el-main" style="height:200px;overflow:auto;background:#fff">
     <div class="el-form-item"><label>客户编号</label><input id="no"></div>
@@ -272,7 +272,7 @@ function ok(n) { console.log(`ok: ${n}`); }
   // Playwright headless 即使 deviceScaleFactor=1.5 仍返回 CSS 像素，无法复现。
   // 用假 CDP 模拟 Chrome：scale=1 时片高=600；若把 PNG 高当 CSS 步进，拼接高≈1800 且漏缝。
   const { PNG } = await import('pngjs');
-  const { runPhaseScreenshotCapture } = await import('../../src/cdp/phase-screenshot-capture.js');
+  const { runPhaseScreenshotCapture } = await import('../../../src/cdp/phase-screenshot-capture.js');
   const dpr = 1.5;
   const clientHeight = 400;
   const scrollHeight = 1600;
@@ -336,7 +336,7 @@ function ok(n) { console.log(`ok: ${n}`); }
 }
 
 {
-  const { wrapCaptureError } = await import('../../src/services/trajectory/phase-highlight-screenshot.js');
+  const { wrapCaptureError } = await import('../../../src/services/trajectory/phase-highlight-screenshot.js');
   assert.deepEqual(wrapCaptureError(new Error('cdp')), { ok: false, skipped: 'cdp' });
   ok('wrapCaptureError fail-soft');
 }

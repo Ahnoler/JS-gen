@@ -4,7 +4,7 @@ action registration, aggregator import, prompt section. Fails non-zero on mismat
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def needle(path, *texts):

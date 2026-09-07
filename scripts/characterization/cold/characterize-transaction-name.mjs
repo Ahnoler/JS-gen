@@ -11,10 +11,10 @@
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { sanitizeTranscationName } from '../../src/services/transaction-name.js';
+import { sanitizeTranscationName } from '../../../src/services/transaction-name.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(here, '..', '..');
+const ROOT = join(here, '..', '..', '..');
 
 let failures = 0;
 function check(cond, msg) {

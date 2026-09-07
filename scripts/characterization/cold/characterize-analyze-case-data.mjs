@@ -6,7 +6,7 @@
 import {
   extractBusinessDataBlock,
   extractBusinessEntriesFromRequirement,
-} from '../../src/services/trajectory/trajectory-meta-service.js';
+} from '../../../src/services/trajectory/trajectory-meta-service.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);

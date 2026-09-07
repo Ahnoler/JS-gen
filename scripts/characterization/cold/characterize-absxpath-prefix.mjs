@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { PAGE_LOCATOR_HELPERS } from '../../src/cdp/locator-candidates.js';
+import { PAGE_LOCATOR_HELPERS } from '../../../src/cdp/locator-candidates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -61,7 +61,7 @@ function ok(name) {
 
 // 3. enrich.py resolveByXpath → resolveXpathAny normalization fallback.
 {
-  const enrichPath = join(__dirname, '..', 'controller', 'actions', 'js_snippets', 'enrich.py');
+  const enrichPath = join(__dirname, '..', '..', 'controller', 'actions', 'js_snippets', 'enrich.py');
   const src = readFileSync(enrichPath, 'utf8');
 
   assert.ok(
@@ -95,7 +95,7 @@ function ok(name) {
 
 // 4. The generated Python mirror (_locator_helpers_js.py) carries the same fix.
 {
-  const mirrorPath = join(__dirname, '..', 'controller', 'actions', 'js_snippets', '_locator_helpers_js.py');
+  const mirrorPath = join(__dirname, '..', '..', 'controller', 'actions', 'js_snippets', '_locator_helpers_js.py');
   const mirror = readFileSync(mirrorPath, 'utf8');
   assert.ok(
     mirror.includes('cur !== document.documentElement'),

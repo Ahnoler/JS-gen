@@ -9,8 +9,8 @@ import {
   buildFormFieldXPathSmart,
   buildPlaceholderXPathSmart,
   PAGE_LOCATOR_HELPERS,
-} from '../../src/cdp/locator-candidates.js';
-import { scopedXPath } from '../../src/cdp/locator-builders/scope.js';
+} from '../../../src/cdp/locator-candidates.js';
+import { scopedXPath } from '../../../src/cdp/locator-builders/scope.js';
 
 const FIXTURE = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>locator parity</title>

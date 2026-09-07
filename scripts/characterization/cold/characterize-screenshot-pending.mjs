@@ -20,7 +20,7 @@ const {
   listPendingFiles,
   cleanupPendingFiles,
   getPendingDir,
-} = await import('../../src/services/screenshot-pending-store.js');
+} = await import('../../../src/services/screenshot-pending-store.js');
 
 const buf = Buffer.from('fake-png-bytes');
 

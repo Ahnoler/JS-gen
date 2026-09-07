@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { buildResolveExpression } from '../../src/cdp/resolve-by-label.js';
+import { buildResolveExpression } from '../../../src/cdp/resolve-by-label.js';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const helpers = readFileSync(join(root, 'src/cdp/page-locator-helpers.js'), 'utf8');
 const resolveSrc = readFileSync(join(root, 'src/cdp/resolve-by-label.js'), 'utf8');
 

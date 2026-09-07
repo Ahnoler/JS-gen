@@ -7,7 +7,7 @@ import {
   mapStepToTransactionEvent,
   buildTransactionPayload,
   EVENT_TYPE_NAME,
-} from '../../src/services/transaction-export.js';
+} from '../../../src/services/transaction-export.js';
 
 function testFillInput() {
   const ev = mapStepToTransactionEvent({

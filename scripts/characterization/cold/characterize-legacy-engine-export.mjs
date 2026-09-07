@@ -13,7 +13,7 @@ import {
   pickExportTarget,
   pickRelativeTarget,
   buildOperationName,
-} from '../../src/services/legacy-engine-export.js';
+} from '../../../src/services/legacy-engine-export.js';
 
 function testSchema() {
   const keys = LEGACY_ENGINE_FIELD_SCHEMA.map((f) => f.key);

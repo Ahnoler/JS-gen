@@ -8,7 +8,7 @@ import {
   getRecordStatus,
   isPushableRecordStatus,
   PUSHABLE_RECORD_STATUSES,
-} from '../../src/services/export-push-gate.js';
+} from '../../../src/services/export-push-gate.js';
 
 assert.deepEqual([...PUSHABLE_RECORD_STATUSES], ['completed']);
 

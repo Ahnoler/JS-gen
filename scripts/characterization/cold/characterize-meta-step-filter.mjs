@@ -8,7 +8,7 @@ import {
   isMetaStepAction,
   isMetaStep,
   filterMetaSteps,
-} from '../../src/models/meta-step-actions.js';
+} from '../../../src/models/meta-step-actions.js';
 
 assert.ok(META_STEP_ACTIONS.includes('save_form_snapshot'));
 assert.equal(isMetaStepAction('save_form_snapshot'), true);
@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const root = join(here, '../..');
+const root = join(here, '../../..');
 const querySrc = readFileSync(join(root, 'src/services/trajectory/trajectory-query-service.js'), 'utf8');
 const stepSrc = readFileSync(join(root, 'src/services/trajectory/trajectory-step-service.js'), 'utf8');
 const persistSrc = readFileSync(join(root, 'src/routes/browser-session/persist-live.js'), 'utf8');

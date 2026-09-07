@@ -3,14 +3,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 let buildMenuPushPayload;
 let formatSourceSystemId;
 let formatSourceSystemName;
 let modOk = false;
 try {
-  const mod = await import('../../src/services/menu-push.js');
+  const mod = await import('../../../src/services/menu-push.js');
   buildMenuPushPayload = mod.buildMenuPushPayload;
   formatSourceSystemId = mod.formatSourceSystemId;
   formatSourceSystemName = mod.formatSourceSystemName;

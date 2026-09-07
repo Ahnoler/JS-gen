@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 JS = (ROOT / "scripts/controller/actions/replay_js.py").read_text(encoding="utf-8")
 
 

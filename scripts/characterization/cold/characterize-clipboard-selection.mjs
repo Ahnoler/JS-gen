@@ -5,9 +5,9 @@ import path from 'node:path';
 import {
   CLIPBOARD_GET_SELECTION_EXPRESSION,
   normalizeClipboardSelectionResult,
-} from '../../src/cdp/clipboard-selection.js';
+} from '../../../src/cdp/clipboard-selection.js';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const bib = readFileSync(path.join(root, 'executor/bib-bridge.js'), 'utf8');
 const agent = readFileSync(path.join(root, 'executor/agent.mjs'), 'utf8');
 assert.match(bib, /kind\s*===\s*['"]clipboard['"]|kind === \"clipboard\"/);

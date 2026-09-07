@@ -10,9 +10,9 @@ import {
   featureSignature,
   shouldLlmClassify,
   classifyRegions,
-} from '../../src/services/region-classify.js';
+} from '../../../src/services/region-classify.js';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const helpers = readFileSync(join(root, 'src/cdp/page-locator-helpers.js'), 'utf8');
 function ok(n) { console.log(`ok: ${n}`); }
 
@@ -94,7 +94,7 @@ function ok(n) { console.log(`ok: ${n}`); }
 }
 
 {
-  const { displayGroupOf, uniquifyDisplayGroups, isTaxonomyRegionToken } = await import('../../src/cdp/display-group.js');
+  const { displayGroupOf, uniquifyDisplayGroups, isTaxonomyRegionToken } = await import('../../../src/cdp/display-group.js');
   assert.equal(isTaxonomyRegionToken('section'), true);
   assert.equal(isTaxonomyRegionToken('tab'), true);
   assert.equal(isTaxonomyRegionToken('wizard'), true);

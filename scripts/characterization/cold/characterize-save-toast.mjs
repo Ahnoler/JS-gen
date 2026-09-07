@@ -16,7 +16,7 @@ function assert(cond, msg) {
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(here, '..', '..');
+const ROOT = join(here, '..', '..', '..');
 const SNIPPETS = join(ROOT, 'scripts', 'controller', 'actions', 'js_snippets', 'save.py');
 
 const source = readFileSync(SNIPPETS, 'utf8');
