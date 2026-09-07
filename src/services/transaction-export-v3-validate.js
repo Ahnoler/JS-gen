@@ -37,7 +37,7 @@ export function validatePageLevelCoverage(entry) {
     || String(p.realLabel || '').trim()
   );
   for (const p of props) {
-    if (p.type !== 'object') continue;
+    if (p.type !== 'element') continue;
     if (!isLocatable(p)) {
       exempt.push({
         propertiesID: p.propertiesID || '',
@@ -72,7 +72,7 @@ export function validateFieldCompleteness(entry) {
   const missing = [];
   for (const p of props) {
     const issues = [];
-    if (p.type === 'object') {
+    if (p.type === 'element') {
       if (!String(p.elementType || '').trim() && !String(p.realLabel || '').trim())
         issues.push('missingElementTypeAndLabel');
       if (String(p.propertiesPID || '0') === '0')

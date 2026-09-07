@@ -351,7 +351,7 @@ export function buildV3Properties({
       }
       const node = {
         ...publicEv,
-        type: 'object',
+        type: 'element',
         screenshot: [],
         propertiesID: String(nextId),
         propertiesPID: elePid,
@@ -372,7 +372,7 @@ export function buildV3Properties({
       noRectControls += 1;
       const node = {
         ...publicEv,
-        type: 'object',
+        type: 'element',
         screenshot: [],
         propertiesID: String(nextId),
         propertiesPID: elePid,

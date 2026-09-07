@@ -12,7 +12,7 @@ function check(label, cond) { if (!cond) failures.push(label); }
 // validateFieldCompleteness: object 缺 elementType+realLabel → issue
 const entry1 = { transcationProperties: [
   { type: 'page', propertiesID: '1', propertiesPID: '0', screenshot: ['url'], propertiesName: 'page' },
-  { type: 'object', propertiesID: '2', propertiesPID: '1', elementType: '', realLabel: '', propertiesName: 'orphan', regionId: 'x', rect: '{"x1":1,"y1":1,"x2":2,"y2":2}' },
+  { type: 'element', propertiesID: '2', propertiesPID: '1', elementType: '', realLabel: '', propertiesName: 'orphan', regionId: 'x', rect: '{"x1":1,"y1":1,"x2":2,"y2":2}' },
 ]};
 const c1 = validateFieldCompleteness(entry1);
 check('object missing elementType+label', c1.missing.some(m => m.issues.includes('missingElementTypeAndLabel')));
@@ -21,7 +21,7 @@ check('object missing elementType+label', c1.missing.some(m => m.issues.includes
 const entry2 = { transcationProperties: [
   { type: 'page', propertiesID: '1', propertiesPID: '0', screenshot: ['url'], propertiesName: 'page' },
   { type: 'section', propertiesID: '2', propertiesPID: '1', screenshot: [], propertiesName: 'tab1', elementType: '', realLabel: 'tab1' },
-  { type: 'object', propertiesID: '3', propertiesPID: '2', elementType: '//x', realLabel: 'btn', propertiesName: 'btn', regionId: 'x', rect: '' },
+  { type: 'element', propertiesID: '3', propertiesPID: '2', elementType: '//x', realLabel: 'btn', propertiesName: 'btn', regionId: 'x', rect: '' },
 ]};
 const c2 = validateFieldCompleteness(entry2);
 check('section no issue', !c2.missing.some(m => m.propertiesID === '2'));
@@ -57,7 +57,7 @@ const builtTrunc = buildTransactionEntryV3(longTraj, {
   phases: [{ id: 1, phaseNumber: 1, description: '点击客户管理' }],
   phaseScreenshots: [{ id: 101, trajectoryPhaseId: 1, imageUrl: 'http://minio/x.png' }],
 });
-const truncEle = builtTrunc.entry.transcationProperties.find((p) => p.type === 'object');
+const truncEle = builtTrunc.entry.transcationProperties.find((p) => p.type === 'element');
 check('propertiesName truncated', String(truncEle.propertiesName).length === 100 && String(truncEle.propertiesName).endsWith('...truncated'));
 check('truncatedFields stats counted', builtTrunc.stats.truncatedFields?.propertiesName >= 1);
 // attr 结构化布尔透传（element_json.attr → object 节点 attr；三键归一化布尔）

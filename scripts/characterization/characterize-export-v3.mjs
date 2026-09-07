@@ -98,7 +98,7 @@ function testBuildV3Properties() {
 
   // partition-via-pid：页面分区（region_id='tab:客户管理'，role=tab）生成 type=tab 中间节点；弹窗 overlay 段不生成
   const sections = properties.filter((p) => p.type === 'tab');
-  const eles = properties.filter((p) => p.type === 'object');
+  const eles = properties.filter((p) => p.type === 'element');
   check(sections.length === 1, `页面分区 tab 节点 = 1（实际 ${sections.length}）`);
   const sectionNode = sections[0];
   check(sectionNode.propertiesPID === String(pageShotId), 'tab pid 指向页面截图');
@@ -114,7 +114,7 @@ function testBuildV3Properties() {
   check(first.id === undefined && first.pid === undefined && first.label === undefined, '不再输出 id/pid/label（改 propertiesID/propertiesPID/realLabel）');
   check(first.regionId === 'tab:客户管理' && first.regionLabel === '客户管理', 'regionId/regionLabel');
   check(JSON.stringify(first.rect) === '{"x1":1,"y1":2,"x2":30,"y2":20}', 'rect 输出');
-  check(first.type === 'object', 'type=object');
+  check(first.type === 'element', 'type=object');
   check(Array.isArray(first.screenshot) && first.screenshot.length === 0, '控件 screenshot 空数组');
   check(first.url === undefined, '控件不输出 url（用 screenshot 数组）');
   check(first.recorded === undefined && first.manualRecord === undefined, '已删除 recorded/manualRecord');
@@ -259,9 +259,9 @@ function testPageLevelScreenshots() {
   check(!!pageSection && !!dialogSection, '页面/弹窗分区各 1 个中间节点（card/popup）');
   check(pageSection.propertiesName === '产品目录', '页面分区 card label=产品目录');
   check(dialogSection.propertiesName === '地址选择器', '弹窗分区 popup label=地址选择器');
-  const pageCtrl = properties.find((p) => p.type === 'object' && p.propertiesPID === pageSection.propertiesID);
-  const popupCtrl = properties.find((p) => p.type === 'object' && p.propertiesPID === dialogSection.propertiesID);
-  const noElement = properties.find((p) => p.type === 'object' && p.propertiesPID === pageShot.propertiesID);
+  const pageCtrl = properties.find((p) => p.type === 'element' && p.propertiesPID === pageSection.propertiesID);
+  const popupCtrl = properties.find((p) => p.type === 'element' && p.propertiesPID === dialogSection.propertiesID);
+  const noElement = properties.find((p) => p.type === 'element' && p.propertiesPID === pageShot.propertiesID);
   check(properties.length === 5, `页面级控件 + 中间节点 = 5（含无 element_json 可导出步骤，实际 ${properties.length}）`);
   check(noElement.propertiesPID === pageShot.propertiesID, '无 element_json 步骤经页面上下文继承 pid（不再 0）');
   check(pageCtrl.propertiesPID === pageSection.propertiesID, '页面控件 pid 指向页面 card 节点');
@@ -296,7 +296,7 @@ function testPageLevelScreenshots() {
       idByPhase: new Map(),
     });
     const ctxSections = ctxProps.properties.filter((p) => p.type === 'section');
-    const ctxEles = ctxProps.properties.filter((p) => p.type === 'object');
+    const ctxEles = ctxProps.properties.filter((p) => p.type === 'element');
     const ctxManual = ctxEles[1]; // 人工/抓取步骤（region_id=table）
     check(ctxSections.length === 1 && ctxSections[0].propertiesName === 'table', 'region_id=table 生成 table section 节点');
     check(ctxManual.propertiesPID === ctxSections[0].propertiesID, '人工/抓取步骤 pid 指向 table section（页面上下文继承归属）');
@@ -368,7 +368,7 @@ function testPayloadStructure() {
   check(Array.isArray(props[0].screenshot) && props[0].screenshot.length === 1, '截图条目 screenshot 数组有值');
   check(props[1].type === 'tab' && props[1].propertiesPID === props[0].propertiesID, 'tab 条目 propertiesPID 指向截图条目 propertiesID');
   check(Array.isArray(props[1].screenshot) && props[1].screenshot.length === 0, 'tab 条目 screenshot 空数组');
-  check(props[2].type === 'object' && props[2].propertiesPID === props[1].propertiesID, '控件条目 propertiesPID 指向 tab 条目 propertiesID');
+  check(props[2].type === 'element' && props[2].propertiesPID === props[1].propertiesID, '控件条目 propertiesPID 指向 tab 条目 propertiesID');
   check(Array.isArray(props[2].screenshot) && props[2].screenshot.length === 0, '控件条目 screenshot 空数组');
   check(props[0].rect === '', 'payload 截图条目 rect 空字符串');
   check(props[2].rect === '{"x1":1,"y1":2,"x2":30,"y2":20}', 'payload 控件条目 rect 为 JSON 字符串');
@@ -400,7 +400,7 @@ function testPayloadStructure() {
     };
     const normBuilt = buildTransactionEntryV3(normTraj, { systemId: '98', projectId: '31', phases, phaseScreenshots: shots });
     const normProps = normBuilt.entry.transcationProperties;
-    const normCtrl = normProps.find((p) => p.type === 'object');
+    const normCtrl = normProps.find((p) => p.type === 'element');
     check(normCtrl.rect === '{"x1":0.1,"y1":0.2,"x2":0.3,"y2":0.4}', `rect_norm 直出归一化值（实际 ${normCtrl.rect}）`);
     check(normBuilt.stats.normalizedRects >= 1, `stats.normalizedRects >= 1（实际 ${normBuilt.stats.normalizedRects}）`);
   }
@@ -424,7 +424,7 @@ async function testRealData() {
     check(props.length >= 1, `transcationProperties >= 1（实际 ${props.length}）`);
     const withRect = props.filter((p) => typeof p.rect === 'string' && p.rect.trim() !== '').length;
     check(withRect >= 1, `带非空 rect 属性 >= 1（实际 ${withRect}）`);
-    const controls = props.filter((p) => p.type === 'object');
+    const controls = props.filter((p) => p.type === 'element');
     const controlsWithPid = controls.filter((p) => p.propertiesPID !== '0' && p.propertiesPID !== undefined).length;
     check(controlsWithPid === controls.length, `控件条目都有 propertiesPID（${controlsWithPid}/${controls.length}）`);
     const pageShotsWithZeroPid = props.filter((p) => p.type === 'page' && p.propertiesPID === '0').length;
@@ -443,7 +443,7 @@ async function testRealData() {
     // 期望集收三种坐标形态（与导出侧文档化优先级 rect_norm → page_bbox → bbox 对应）：
     // traj 33 存量数据已被新录制链重写（115/115 带 page_bbox、112 带 rect_norm），
     // 旧检查只收 bbox 导致 42/115 误红（2026-09-02 排查：导出 miss=0，检查期望过时）。
-    const controlProps = props.filter((p) => p.type === 'object');
+    const controlProps = props.filter((p) => p.type === 'element');
     const bboxCounts = new Map();
     for (const s of stepRows) {
       let el = null;

@@ -66,7 +66,7 @@ assert.equal(e.projectId, '9');
       pageId: 'pdCmpt123',
       transcationProperties: [
         { type: 'page', regionId: 'page:x', regionLabel: '首页', screenshot: ['http://a/1.png', 'http://a/2.png'] },
-        { type: 'object', regionId: '', regionLabel: '', screenshot: ['http://a/3.png'], rect: '{"x1":1}', propertiesName: '点击', attr: { disabled: true, required: false, readonly: false } },
+        { type: 'element', regionId: '', regionLabel: '', screenshot: ['http://a/3.png'], rect: '{"x1":1}', propertiesName: '点击', attr: { disabled: true, required: false, readonly: false } },
         { type: 'popup', screenshot: ['http://a/4.png'] },
         null,
       ],
@@ -85,9 +85,9 @@ assert.equal(e.projectId, '9');
     assert.equal('screenshot' in p, false, `${p.type} screenshot 已删除（V3 契约改 screenCapture）`);
   }
   assert.equal(byType.page.screenCapture, 'http://a/1.png,http://a/2.png', 'page 截图并入 screenCapture 逗号串');
-  assert.equal(byType.object.screenCapture, 'http://a/3.png', 'object 截图并入 screenCapture');
+  assert.equal(byType.element.screenCapture, 'http://a/3.png', 'element 截图并入 screenCapture');
   assert.equal(byType.popup.screenCapture, 'http://a/4.png', 'popup 截图并入 screenCapture');
-  assert.equal(byType.object.rect, '{"x1":1}');
+  assert.equal(byType.element.rect, '{"x1":1}');
   assert.equal(out.transcationEventTypeList[0].transcId, 1);
   assert.equal(out.transcationEventTypeList[0].pageId, 'pdCmpt123', 'entry 级 pageId 透传（与 transcId 同级，驼峰命名）');
 }
@@ -104,7 +104,7 @@ assert.deepEqual(toPartnerImportPayload({ transcationEventTypeList: 'nope' }), {
       transcationProperties: [
         { propertiesID: '1', propertiesPID: '0', type: 'page', screenshot: ['http://x/p.png'], propertiesName: 'page' },
         { propertiesID: '2', propertiesPID: '1', type: 'section', screenshot: [], propertiesName: 'tab1', elementType: '', realLabel: 'tab1' },
-        { propertiesID: '3', propertiesPID: '2', type: 'object', screenshot: [], propertiesName: '保存', elementType: '//xpath', realLabel: '保存' },
+        { propertiesID: '3', propertiesPID: '2', type: 'element', screenshot: [], propertiesName: '保存', elementType: '//xpath', realLabel: '保存' },
       ],
     }],
   };
