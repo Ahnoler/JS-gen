@@ -172,13 +172,14 @@ function injectAuthCredentials(promptText, account, password) {
  * @param {number} args.functionNodeId mount function node id
  * @param {string} args.authKind 'login' or 'logout'
  * @param {string} args.name trajectory name
- * @param {string} args.phaseName phase description (「登录」/「登出」)
- * @param {string} args.task phase task prompt text
+ * @param {string} args.task phase task prompt text (credential-injected); the
+ *   agent's task channel is phase.description (trajectory-recording-runner
+ *   passes `instruction: phase.description`), so the full prompt must live here
  * @param {string} args.url system login URL (trajectory.url initial value)
  * @param {number|null} args.systemAccountId bound system account id
  * @returns {Promise<number>} created trajectory id
  */
-async function createAuthTrajectory({ functionNodeId, authKind, name, phaseName, task, url, systemAccountId }) {
+async function createAuthTrajectory({ functionNodeId, authKind, name, task, url, systemAccountId }) {
   const tid = await trajectoryDao.save({
     name,
     task,
@@ -197,7 +198,7 @@ async function createAuthTrajectory({ functionNodeId, authKind, name, phaseName,
     phaseNumber: 1,
     trajectoryId: Number(tid),
     status: 'pending',
-    description: phaseName,
+    description: task,
   });
   return Number(tid);
 }
