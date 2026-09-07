@@ -141,12 +141,41 @@ async function main() {
       moduleKey: 'demo-mod',
       rootDir: tmp,
       callLLM: fakeLLM,
+      functionIdExists: async () => true,
     });
     assert.ok(out.atoms.length >= 1);
     assert.ok(out.atoms.every((a) => a.sourceDoc && a.sourceChapter && a.atomKey));
     assert.ok(!out.atoms.some((a) => !a.sourceChapter));
     const cachePath = join(tmp, 'demo-mod', '.draft-traj-propose.json');
     assert.ok(existsSync(cachePath));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('proposeDraftTrajectories nulls unknown suggestedFunctionId (FK guard)', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        {
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n',
+          phaseHints: ['新增一级分类'],
+          suggestedFunctionId: 90000107304,
+        },
+      ],
+    });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      functionIdExists: async () => false,
+    });
+    assert.equal(out.atoms.length, 1);
+    assert.equal(out.atoms[0].suggestedFunctionId, null);
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -289,6 +318,7 @@ async function main() {
         return { id: 4242, name: opts.name };
       },
       findDraftFn: async () => null,
+      functionIdExists: async () => true,
     });
     assert.equal(out.created[0].trajectoryId, 4242);
     assert.equal(createOpts.reqModuleKey, 'demo-mod');
@@ -377,9 +407,34 @@ async function main() {
       analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
       createFn: async () => ({ id: 4242 }),
       findDraftFn: async () => null,
+      functionIdExists: async () => true,
     });
     assert.equal(out.created.length, 1);
     assert.equal(out.created[0].trajectoryId, 4242);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commitDraftTrajectories skips unknown_function_id when existence check fails', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    let analyzeCalled = false;
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => {
+        analyzeCalled = true;
+        return { phases: ['x'], businessEntries: [] };
+      },
+      createFn: async () => ({ id: 1 }),
+      findDraftFn: async () => null,
+      functionIdExists: async () => false,
+    });
+    assert.equal(out.created.length, 0);
+    assert.equal(out.skipped.length, 1);
+    assert.equal(out.skipped[0].reason, 'unknown_function_id');
+    assert.equal(analyzeCalled, false);
     rmSync(tmp, { recursive: true, force: true });
   });
 

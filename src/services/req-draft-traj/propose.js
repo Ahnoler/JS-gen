@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as systemDao from '../../dao/system-dao.js';
 import { AppError } from '../../http/app-error.js';
 import { callLLM as defaultCallLLM } from '../../llm-utils.js';
 import { getReqModule, moduleDir } from '../kb-req-modules.js';
@@ -344,6 +345,44 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
 }
 
 /**
+ * Validate atom suggestedFunctionId values against the system table and null
+ * out ids that do not exist there (LLM may hallucinate ids — e.g. 90000107304 —
+ * that would violate the trajectory function FK at commit time).
+ * Fail-safe: when the DB lookup itself errors, warn and treat the id as valid
+ * (skip validation) so a lookup outage never blocks the propose main flow.
+ * @param {DraftAtom[]} atoms Atoms to normalize in place
+ * @param {((id: number) => Promise<boolean>)|null} [existsFn] Optional injected
+ *   existence check (offline characterization stubs); defaults to systemDao.
+ * @returns {Promise<void>} Resolves after in-place normalization completes
+ */
+async function normalizeSuggestedFunctionIds(atoms, existsFn = null) {
+  const ids = [...new Set(
+    atoms.map((a) => a.suggestedFunctionId).filter((id) => id != null),
+  )];
+  if (ids.length === 0) {
+    return;
+  }
+  const exists = existsFn || ((id) => systemDao.getById(id));
+  const results = await Promise.all(ids.map(async (id) => {
+    try {
+      return { id, exists: Boolean(await exists(id)) };
+    } catch (e) {
+      console.warn('[req-draft-traj] suggested functionId %s check failed (%s) — skip validation', id, e.message);
+      return { id, exists: true };
+    }
+  }));
+  const unknown = new Set(results.filter((r) => !r.exists).map((r) => r.id));
+  for (const id of unknown) {
+    console.warn('[req-draft-traj] suggested functionId %s not found in system — nulled', id);
+  }
+  for (const atom of atoms) {
+    if (atom.suggestedFunctionId != null && unknown.has(atom.suggestedFunctionId)) {
+      atom.suggestedFunctionId = null;
+    }
+  }
+}
+
+/**
  * Propose atomic draft trajectory candidates for a req module.
  * @param {object} opts Propose options
  * @param {string} opts.moduleKey Req module key
@@ -351,6 +390,8 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
  * @param {string[]} [opts.chainIds] Optional chain id filter
  * @param {number} [opts.maxAtoms] Max selectable atoms to return
  * @param {(text: string) => Promise<string>} [opts.callLLM] Injectable LLM caller (offline tests)
+ * @param {(id: number) => Promise<boolean>} [opts.functionIdExists] Injectable function-id
+ *   existence check (offline characterization stubs; defaults to system table lookup)
  * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }> }>} Accepted and rejected atoms
  */
 export async function proposeDraftTrajectories({
@@ -359,6 +400,7 @@ export async function proposeDraftTrajectories({
   chainIds,
   maxAtoms,
   callLLM,
+  functionIdExists = null,
 }) {
   const mod = await getReqModule({ rootDir, moduleKey });
   if (!mod.hasThroughChains) {
@@ -413,6 +455,8 @@ export async function proposeDraftTrajectories({
   const capped = Number.isFinite(maxAtoms) && maxAtoms > 0
     ? atoms.slice(0, maxAtoms)
     : atoms;
+
+  await normalizeSuggestedFunctionIds(capped, functionIdExists);
 
   await writeProposeCache(modDir, { atoms: capped, rejected });
 

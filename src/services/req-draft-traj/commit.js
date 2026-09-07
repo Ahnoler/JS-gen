@@ -1,6 +1,7 @@
 /**
  * Commit propose-cache atoms to draft trajectories (analyze → create + provenance).
  */
+import * as systemDao from '../../dao/system-dao.js';
 import { findDraftByReqAtomKey } from '../../dao/trajectory-dao.js';
 import { AppError } from '../../http/app-error.js';
 import { moduleDir } from '../kb-req-modules.js';
@@ -10,6 +11,27 @@ import {
 } from '../trajectory/trajectory-meta-service.js';
 import { assertAtomProvenance } from './provenance.js';
 import { readProposeCache } from './propose-cache.js';
+
+/**
+ * Check that a function id exists in the system table (FK guard before
+ * trajectory create — hallucinated ids would be rejected by the FK anyway,
+ * but with a cryptic create_failed error instead of a clean skip reason).
+ * Fail-safe: when the lookup itself errors, warn and return true so a
+ * validation outage never blocks commit.
+ * @param {number|string} functionId Function id candidate (override or suggestion)
+ * @param {((id: number) => Promise<boolean>)|null} [existsFn] Optional injected
+ *   existence check (offline characterization stubs); defaults to systemDao.
+ * @returns {Promise<boolean>} True when the id exists or the check failed open
+ */
+async function isKnownFunctionId(functionId, existsFn = null) {
+  const exists = existsFn || ((id) => systemDao.getById(id));
+  try {
+    return Boolean(await exists(Number(functionId)));
+  } catch (e) {
+    console.warn('[req-draft-traj] functionId %s existence check failed (%s) — fail-open', functionId, e.message);
+    return true;
+  }
+}
 
 /**
  * Commit selected propose-cache atoms to draft trajectories.
@@ -24,6 +46,8 @@ import { readProposeCache } from './propose-cache.js';
  * @param {typeof analyzeRequirementToPhases} [opts.analyzeFn] Analyze override (characterization)
  * @param {typeof createTransactionWithPhases} [opts.createFn] Create override (characterization)
  * @param {typeof findDraftByReqAtomKey} [opts.findDraftFn] Duplicate lookup override
+ * @param {(id: number) => Promise<boolean>} [opts.functionIdExists] Injectable
+ *   function-id existence check (offline characterization stubs; defaults to system table)
  * @returns {Promise<{ created: Array<{ trajectoryId: number, atomKey: string, name: string }>, skipped: Array<{ atomKey: string, reason: string, trajectoryId?: number }> }>} Commit result with created and skipped atoms
  */
 export async function commitDraftTrajectories({
@@ -36,6 +60,7 @@ export async function commitDraftTrajectories({
   analyzeFn,
   createFn,
   findDraftFn,
+  functionIdExists = null,
 } = {}) {
   const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
     ? functionIdOverrides
@@ -73,6 +98,10 @@ export async function commitDraftTrajectories({
     const functionId = overrides[atomKey] ?? atom.suggestedFunctionId;
     if (!Number(functionId)) {
       skipped.push({ atomKey, reason: 'missing_function_id' });
+      continue;
+    }
+    if (!(await isKnownFunctionId(functionId, functionIdExists))) {
+      skipped.push({ atomKey, reason: 'unknown_function_id' });
       continue;
     }
     let analyzed;
