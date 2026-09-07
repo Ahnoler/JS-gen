@@ -279,9 +279,11 @@ async function maskTrajectoryStepSecrets(tid, password) {
   const pwd = String(password ?? '');
   if (!pwd) return;
   const db = getDB();
+  // JS-side filtering: MySQL 5.7 rejects whereLike's implicit utf8_bin COLLATE
+  // on utf8mb4 columns, and step rows per trajectory are few.
   const rows = await db('trajectory_step')
     .where('trajectory_id', Number(tid))
-    .whereLike('params_json', `%${pwd}%`);
+    .select('id', 'params_json');
   for (const row of rows) {
     const raw = String(row.params_json ?? '');
     if (!raw.includes(pwd)) continue;
