@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 03:55 · Zcode 闲时 — 开工：入库 MySQL 白名单同步脚本（用户拍板）
+
+- 开工：03:55。用户指令「config/update-db-whitelist.cmd/.ps1 提交」；回链 03:45 收工条遗留①
+- 范围：新增跟踪 `config/update-db-whitelist.cmd`、`config/update-db-whitelist.ps1`；`.gitignore` 增两行（`config/.db-whitelist-lastip`、`config/.db-whitelist-sync.log`，ps1 的运行时状态/日志不入库）；本文件
+- 禁入：轨迹查询未提交 WIP；capture 在途线文件；`data/kb/**`；R1-R6 在途交易；不重启控制面/执行机
+- 方式：已读两脚本全文确认无密钥（SSH key 认证，服务器 IP 本已在 README 等公开文档）；提交前核暂存区仅含上述文件
+
 ## 2026-09-08 03:45 · Zcode 闲时 — 收工：文档清理批次二（回链 03:20 开工）
 
 - 完成：四 commit——`9b324c94` 归档第二波（specs×24 + plans×18 + todos 目录 3 篇，git mv 保留历史；活目录仅留 capture 族/req-to-draft-traj 线/orchestration/engine-actions-contract/phase-done(湿测§5 未闭)/kb-i5/backfill-assessment 等 31 篇在途未闭集合）+ archive/README 重建批次索引；`22610514` 入库 untracked 的 unify-save-action 计划与 replay-pipeline-handover 调研；`daba1e87` docs/README 标注 830 已收官/报文捞取已搁置；另两份散文档（gitignore 本地件）已加状态横幅不入库
