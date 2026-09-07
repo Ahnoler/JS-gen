@@ -2,7 +2,17 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 17:40 · ZCode Lead — 收工：登录/登出自动化录制全链完成（回链 13:05 开工）
+
+- **完成**：T1-T9 全部落地，提交链 0020bbe→c6aa33c8（迁移/T2 store/T3 prompts/T4 组件注册/T5 service/T6 路由+文档/T7 运行时组件登录/T8 dashboard/湿测修复 r1-r9）。**湿测 job13 全 PASS**：登录组件（1 步 login 单步落库，param_schema 记注入步号）+ 登出组件（3 步：点头像→退出→确定）注册成功，traj recorded 待人工确认；**job14 运行时验证**：组件已注册的系统再触发，登录段走组件路径（server log `auth component hit`），同名幂等复用无重复行。
+- **验收证据**：verify-all ALL GREEN（101 ok）；eslint 0 errors、本分支 0 新 warning；SDD ledger `.superpowers/sdd/2026-09-07-auth-recording/progress.md` 含 9 轮湿测根因链与 job13/14 实证。
+- **湿测修复要点（最后一轮）**：①executor 侧 `classify.py` login 阶段按凭据键（含中文别名）放行业务数据（0c649bd0）②Node 侧 `trajectory-text-extract.js` 头词表补「业务数据」+ 显式业务数据引用优先于 login/query 闸（c6aa33c8）——双闸齐修后 agent 才能经 read_business_data 拿到注入账密。
+- **移交（产品 SPA 侧，非本仓）**：①系统详情 authKind 徽标、推送列表人工确认入口需在 SPA 落地；②交易状态 recorded=待确认，用户确认（→completed）后方可手动勾选推送，推送闸门既有语义不变。
+- **湿测数据**：已清理（系统 9000001712/挂载节点/junk 轨迹/组件/jobs 清零；主体疑似用户产品侧手动级联删除，我方复核收尾）。
+- **注意**：4098 湿测实例与独立 executor 仍在跑（tmp/auth-wet-*.log），确认无用后可停；4097 共享实例未动。
+
 ## 2026-09-07 15:10 · ZCode 引擎线 — 开工+收工：create 弹窗合约矛盾矫正（#614 二次移交，回链本条=开工）
+
 - **开工**：15:10。范围=`scripts/controller/actions/phase/reviewer.py`（sanitize 矫正）+ `scripts/characterization/characterize-phase-reviewer.py`（断言）+ 本文件；禁入=session_runner.py（他线 WIP）/data/kb/**/产品线文件/auth-recording SDD 九文件集。
 - **根因（Phase 1 实证）**：#614 阶段 2 stderr `e468a25a` 合约 `mode=create allow_assistant=False refill=touched`——reviewer 把「只点名字段」判成部分点名语义；`sanitize_contract_for_mode` 对 create/modify 提前 return 不矫正；落地链 `refill=touched`→boundary `requires_write_all_editable=False`→pending-write 门闩失效，且 `allow_form_assistant=False` 直接封 run_form_assistant（form_scan_actions.py:208）——agent 只填名称即点确定，序号漏填。
 - **修复（reviewer.py sanitize_contract_for_mode）**：create 一律强制 `allow_form_assistant=True + refill=all_editable`（与 phase-reviewer-prompt 规则 2/3 对齐）；modify 仅在矛盾组合（touched+assistant=false）时矫正；submit/success 令牌原样保留。TDD：先加失败断言再修；旧断言「create+"false"字符串透传」与硬规则冲突，改用 modify+all_editable 显式组合承载 coerce_bool 测试意图。
