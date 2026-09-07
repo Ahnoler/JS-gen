@@ -46,6 +46,22 @@ auth-recording job（一系统一 job，登录段+登出段串行）
   - 登录段 = 登录后特征达成：URL 离开 `login_url`，或出现登录后首页特征（菜单/工作台元素）。
   - 登出段 = 回到登录页（URL 回到 `login_url` 或出现登录表单特征）。
 
+### 2.1 交易挂载与确认（系统树）
+
+两条产出轨迹必须挂载到该系统名下的固定位置，走既有系统树（`system` 表统一层级：type=1 系统 / 2 模块 / 3 功能，`src/models/hierarchy-constants.js`）与轨迹挂载字段 `trajectory.function_id`：
+
+```
+系统（type=1）
+  └─ 自动化任务（type=2 模块，固定名）
+       └─ 登录与登出（type=3 功能，固定名）
+            ├─ 登录交易（trajectory.function_id → 该功能节点）
+            └─ 登出交易（同上）
+```
+
+- job 开始时确保挂载点存在：按系统查「自动化任务」模块及其下「登录与登出」功能，不存在则创建（幂等，已存在直接复用；不重名不重复建）。
+- 交易状态 = **待确认(recorded)**（录制成功 V3 默认态，`trajectory-meta-service.js:429` 既有语义），**不自动确认**；用户在前端查看交易详情后自行人工确认（recorded → completed 既有确认动作）。
+- 推送闸门（仅 completed 可推，`export-push-gate.js`）不动：用户确认后交易自然变为可推送，导出页手动勾选推送（见 §6）。
+
 ## 3. 数据模型
 
 ### 3.1 新表 `auth_recording_jobs`
@@ -77,9 +93,10 @@ auth-recording job（一系统一 job，登录段+登出段串行）
    - 自动：系统创建成功（system-mgmt 创建路径）且 `system.url` 与默认账号齐备 → 入队 job。
    - 手动：`POST /api/v2/systems/:id/auth-recording`（重录同入口，需确认覆盖）。
 2. 串行执行两段：登录段（go_to_url + agent 演练 + 判据校验）→ 登出段（agent 演练 + 判据校验）。登录失败则登出段不执行（无意义）。
-3. 每段产出一条真实 trajectory；两段通过后注册两条组件、回写 job 成功。
-4. 失败：job 置 failed + error；已产生的轨迹保留（供排查），组件不落库。
-5. 超时与浏览器崩溃处理沿用 batch record 既有机制；job 支持重试（重录 = 新 job）。
+3. 每段产出一条真实 trajectory：**先确保挂载点（§2.1 自动化任务/登录与登出）存在，创建轨迹时 function_id 指向该功能节点**；状态保持待确认(recorded)，不自动确认。
+4. 两段通过后注册两条组件、回写 job 成功。
+5. 失败：job 置 failed + error；已产生的轨迹保留（供排查，同样挂载在功能节点下），组件不落库。
+6. 超时与浏览器崩溃处理沿用 batch record 既有机制；job 支持重试（重录 = 新 job）。
 
 ## 5. 运行时：替换 runDefaultLogin
 
@@ -92,7 +109,7 @@ auth-recording job（一系统一 job，登录段+登出段串行）
 
 ## 6. 伙伴平台推送
 
-- 不自动推送。登录/登出轨迹与普通交易一致，满足既有闸门（completed + 确认，`src/services/export-push-gate.js:35`）后，走导出页既有手动/批量推送。
+- 不自动推送。登录/登出轨迹录制后为**待确认(recorded)**，用户查看后人工确认为已确认(completed)，满足既有闸门（`export-push-gate.js:35`）后在导出页手动勾选/批量推送。
 - V3 payload 构建不特殊化（auth 轨迹就是普通轨迹）。
 - 推送列表 UI 给 auth_kind 轨迹加类型标识（登录/登出徽标），推送与否由人决定。
 
@@ -108,7 +125,7 @@ auth-recording job（一系统一 job，登录段+登出段串行）
 | 层 | 改动 |
 |---|---|
 | 迁移 | 新表 `auth_recording_jobs`；`operation_component` +2 列；`trajectory` +1 列 |
-| 服务 | 新增 `src/services/auth-recording-service.js`（job 编排 + 判据校验）；`operation-component-service.js` 扩展注册/按系统查询；`trajectory-record-lifecycle.js` / `trajectory-recording-runner.js` 登录准备段改造 |
+| 服务 | 新增 `src/services/auth-recording-service.js`（job 编排 + 判据校验 + 挂载点 ensure）；`operation-component-service.js` 扩展注册/按系统查询；`trajectory-record-lifecycle.js` / `trajectory-recording-runner.js` 登录准备段改造 |
 | 路由 | `POST /api/v2/systems/:id/auth-recording`（触发/重录）、`GET /api/v2/systems/:id/auth-recording`（状态/历史） |
 | 前端 dashboard | 系统详情页：触发/重录按钮、job 状态展示、账密变更提示；推送列表 auth 徽标 |
 | Python | `scripts/prompts/` 新增登录演练、登出演练两份 prompt；复用现有动作集，无引擎改动 |
@@ -117,11 +134,12 @@ auth-recording job（一系统一 job，登录段+登出段串行）
 ## 9. 验收标准
 
 1. 新增一个系统（配置真实地址+账密）后自动触发 job，产出登录/登出两条轨迹（步骤齐全）并注册两条组件。
-2. 对该系统再次发起任意录制，登录准备段走组件 replay（日志可见组件调用，非硬编码配方）。
-3. 修改账密后不重录组件，录制登录仍成功（运行时注入生效）。
-4. 演练失败（如密码错误）→ job failed + 可读 error，组件未落库；重录成功后组件替换。
-5. 登录/登出轨迹在导出页可见、可手动推送，payload 与普通交易同构。
-6. `bash scripts/refactor/verify-all.sh` 无新增红项。
+2. 两条轨迹挂在「系统 → 自动化任务 → 登录与登出」功能节点下，状态为待确认；自动挂载节点幂等（job 重跑不重复建节点）。
+3. 对该系统再次发起任意录制，登录准备段走组件 replay（日志可见组件调用，非硬编码配方）。
+4. 修改账密后不重录组件，录制登录仍成功（运行时注入生效）。
+5. 演练失败（如密码错误）→ job failed + 可读 error，组件未落库；重录成功后组件替换。
+6. 待确认交易人工确认后，在导出页可见、可手动推送，payload 与普通交易同构。
+7. `bash scripts/refactor/verify-all.sh` 无新增红项。
 
 ## 10. 明确不做（本期边界）
 
