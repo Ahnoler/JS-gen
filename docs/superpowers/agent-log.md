@@ -2,6 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 11:00 · ZCode Lead — 开工声明：登录/登出自动化录制 spec 设计（brainstorming）
+- **范围（本任务单元）**：仅 `docs/superpowers/specs/2026-09-07-auth-recording-design.md`（新建）+ 本日志条目。设计与方案文档，**不动任何代码**。
+- **禁入区**：他线热区（R4 审批棒在途、rating/credit_application 卡面、tmp/kb-mainchain）、工作区 WIP（scripts/session_runner.py 修改属他线）。
+- **方式**：brainstorming 流程，澄清问答已毕（录制=A agent 自主演练、运行时=A 替换 runDefaultLogin、载体=A 双载体轨迹+组件、账号=单账号一套组件、推送=A 不自动走既有链路）。产出 spec 后提交，待用户评审。
+
 ## 2026-09-07 10:20 · ZCode Lead — R3 授信业务闭环 PASS（G1 救援完成）+ G2 卡面回写已提交（ccc0c2ca）+ G3 审批棒派发
 - **G1 完成（R3=PASS）**：DGSX20260907056033 走完向导（影像跳过/风险阻断通过/意见/流程提交/选人黄亮）→**审批中**（经办日期 2026-09-07）。树选择配方实证：**有效搜索框=树 popover 自带搜索框+【查询】按钮（两段式非实时过滤）**，「流动资金贷款」叶子名实为「流动资金贷款额度」；分项「已在列表中」报错=服务端查重（前次手工已落库，前端列表回显缺陷）。配方文档 tmp/kb-mainchain/R3-credit/picker-recipe.md（tmp 短寿命，精华已入 credit_application 卡）。
 - **G2 完成（ccc0c2ca 已推送）**：customer_onboarding +预客户缺口规则+建档 pendingStep；credit_application +分项品种树缺口/方案自动保存 2 规则。JSON 校验通过。
