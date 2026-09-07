@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 04:28 · Zcode 闲时审查 — 收工：sso-auth pin 回调完成，verify-all ALL GREEN（回链 04:20 开工）
+
+- 完成：`b99e61b2` characterize-sso-auth 两条断言按 17b4a512 新形状重写——①listByFunction 改钉「薄壳转发契约」（正则钉 `listByFunctionIds([functionId], options)` 转发 + `listByFunctionIds` 解构 `paasUserId = null`）；②stats 透传文本改钉 `countByRecordStatus({ functionIds: ids, …, paasUserId, isExport })`。**改 pin 前已核功能完好**：paasUserId 过滤与 stats 隔离在新函数体内完整在位（纯形状失配，非行为回归）
+- 验收：sso-auth 单跑 all ok；verify-all 全量 **ALL GREEN（117 ok / 0 failed）**——自门禁诞生以来首次全绿收官（此前的轨迹查询 WIP 红与 17b4a512 形状红均已清零）
+- 遗留移交：无新增。既有在案项不变：menu-nine-rules 期望更新（菜单线）、stop-busy-race 重评估（挂起表 P3）、门闩 v3 实战验证待下次真实录制
+- 注意：全程只动了 characterization 断言，未触碰轨迹查询线任何文件；每周一 03:30 的闲时审查定时任务（automation-cb2a608d）下轮起会自动盯住此类形状漂移
+
 ## 2026-09-08 04:20 · Zcode 闲时审查 — 开工：收尾轨迹查询线 17b4a512 的 sso-auth pin 回调（用户委托）
 
 - 开工：04:20。用户确认轨迹查询线按需求改动（17b4a512 listByFunction→listByFunctionIds 重构），委托收尾遗留问题
