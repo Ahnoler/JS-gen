@@ -178,13 +178,15 @@ export function buildTreeFromV3Flat(properties) {
     if (p.type === 'page') {
       const node = nodeMap.get(String(p.propertiesID ?? ''));
       if (node) root.children.push(node);
-    } else if (p.type === 'popup' || V3_INTERMEDIATE_TYPES.has(p.type)) {
+    } else if (V3_INTERMEDIATE_TYPES.has(p.type)) {
       const node = nodeMap.get(String(p.propertiesID ?? ''));
       const parent = nodeMap.get(String(p.propertiesPID ?? ''));
       if (node && parent) parent.children.push(node);
       else if (node) root.children.push(node);
     }
   }
+  // 第三遍：控件条目建 items；记录 eleId → { item, owner }，供 popup 挂触发按钮行内
+  const eleItemById = new Map();
   let eleNo = 0;
   for (const p of properties || []) {
     if (p.type !== 'ele') continue;
@@ -197,7 +199,10 @@ export function buildTreeFromV3Flat(properties) {
       actionValue: String(p.eventTypeValue || '').trim(),
       regionId: String(p.regionId || '').trim(),
       hasBbox: !!(p.rect && p.rect.x2 > p.rect.x1 && p.rect.y2 > p.rect.y1),
+      eleId: String(p.propertiesID ?? ''),
+      children: [],
     };
+    eleItemById.set(item.eleId, item);
     // PID 链已表达分区层级：pid 命中中间节点（section/tab/wizard/card）则直接挂，不再 regionId 拆段
     if (parent !== root && V3_INTERMEDIATE_ROLES.has(parent.role)) {
       parent.items.push(item);
@@ -229,6 +234,21 @@ export function buildTreeFromV3Flat(properties) {
       cur = child;
     }
     cur.items.push(item);
+  }
+  // 第四遍：popup 挂父子——父命中节点直接挂（旧结构 pid 指向 page）；否则挂触发按钮
+  // ele 条目行内（触发链导出：弹窗 propertiesPID 指向触发图标按钮的 propertiesID）
+  for (const p of properties || []) {
+    if (p.type !== 'popup') continue;
+    const node = nodeMap.get(String(p.propertiesID ?? ''));
+    if (!node) continue;
+    const parentNode = nodeMap.get(String(p.propertiesPID ?? ''));
+    if (parentNode) {
+      parentNode.children.push(node);
+      continue;
+    }
+    const triggerItem = eleItemById.get(String(p.propertiesPID ?? ''));
+    if (triggerItem) triggerItem.children.push(node);
+    else root.children.push(node);
   }
   return root;
 }
@@ -335,7 +355,10 @@ function treeToHtml(node, depth) {
     + `<span class="tree-object-tag">${esc(it.action)}</span>`
     + `<span class="tree-name">${esc(it.name)}</span>`
     + (it.hasBbox ? `<span class="tree-bbox-tag">bbox</span>` : '')
-    + `</div>`;
+    + `</div>`
+    + (Array.isArray(it.children) && it.children.length
+      ? `<div class="tree-children">` + it.children.map((c) => treeToHtml(c, depth + 1)).join('') + `</div>`
+      : '');
   let html = `<div class="tree-node tree-branch" data-depth="${depth}" style="padding-left:${pad}px">`
     + chev
     + `<span class="tree-level-type ${cls}">${esc(label)}</span>`
