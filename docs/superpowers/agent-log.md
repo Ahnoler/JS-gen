@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-07 11:15 · Cursor Lead — 开工声明：产品库「基本信息保存」补录
+- 开工：11:15。补 PM 验收缺口：在 #499（一级分类+新增产品）之外，录一条「选中未启用产品 → 基本信息填写 → 保存」贯通交易
+- 范围：`tmp/product-mgmt/`（任务/analyze/create/through-report）、`data/kb/flows/product_library.json`（仅 source/rules 回写）、本文件
+- 禁入：他线 WIP（`scripts/session_runner.py` 等）、R4 审批棒占用的 traj/卡、`save_section.py` 恢复、引擎大改
+- 方式：主会话按 `guides/ui-record-through-line-agent-prompt.md`；fid=9000000740；account=2；不抢已 busy 的 slot1/2/3 会话本体（新 prepare 另占空闲槽）
+
 ## 2026-09-07 10:35 · ZCode Lead — R4 棒 1 完成（traj 606）+ G4 棒 2 派发（WN0001 双二次调查）
 - **G3 完成（R4 棒 1）**：traj 606 recorded（fid=9000000269 待办任务叶子，5 步：待办定位+任务详情翻页），DGSX20260907056033 流转至 002 二次调查（WN0001 待处理）——**门闩达成**。G3 诚实标注：流程轨迹处理时间（09:51:49）早于轨迹创建（09:54:38），同意动作疑由更早在途会话完成、本次录制只录到定位+翻页。坑位：待办真实路由 #/portal/wfPendTask（#/index/todoTask 404）；detach 后立即断言 stepCount 会读 0（异步持久化+副本 TTL）。
 - **WN0001 账号解锁**：SUT 测试环境统一密码=1（MCP 实测 WN0001/1 登录成功进首页）；控制面 system-accounts 无 WN0001 条目。
