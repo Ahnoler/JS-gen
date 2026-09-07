@@ -9,9 +9,9 @@
 - 方式：主线程直接改（小改动）→ node 重建 499 payload 验证树 → lint + characterize-export-v3 回归 → commit + 收工
 
 ## 2026-09-08 00:40 · ZCode V3导出线 — 收工：popup 触发链挂载落地（回链 00:15 开工）
-- 完成（90cc6f1a）：transaction-export-v3-properties.js 触发链规则（anchor↔步骤元素匹配、同页同标题弹窗 trigger 最晚且 ≤ stepIdx 优先，精确 key 链回退保存量兼容）+ popup propertiesPID 挂触发对象节点 + stats.popupTriggerLinked 双级透传；transaction-export-v3.js 解构/stats 汇总接线。
-- 验收：traj 499 重建 payload 树全对——popup 产品(2)←图标新增一级分类(5)、popup 产品3(4)←图标新增产品(15)、各弹窗内容对象归位、行内编辑留 page；popupTriggerLinked=2；eslint exit 0；characterize-export-v3 OK（122/122 PID、115/115 rect 三形态）。
-- 交付：C:/Users/water/Desktop/transaction-499-push.json（internal_v3+partner_wire）、transaction-499-layer-tree.html（分层静态页，可交互树）。
+- 完成（90cc6f1a + 补丁 c33b764c）：transaction-export-v3-properties.js 触发链规则（anchor↔步骤元素匹配、同页同标题弹窗 trigger 最晚且 ≤ stepIdx 优先，精确 key 链回退保存量兼容）+ popup propertiesPID 挂触发对象节点 + stats.popupTriggerLinked 双级透传；transaction-export-v3.js 解构/stats 汇总接线。**c33b764c：控件节点 type object→element**（同事实测伙伴格式控件条目 type=element 非 object；校验器/特征化 6 篇/layer-tree+lightup 工具同步）。
+- 验收：traj 499 重建 payload 树全对——popup 产品(2)←图标新增一级分类(5)、popup 产品3(4)←图标新增产品(15)、各弹窗内容对象归位、行内编辑留 page；popupTriggerLinked=2；18 控件全 type=element；eslint exit 0；characterize-export-v3/pid/field-completeness/page-level/partner-platform/layer-tree 全绿（115/115 rect 三形态）。
+- 交付：C:/Users/water/Desktop/transaction-499-push.json（internal_v3+partner_wire，已含 element 类型）、transaction-499-layer-tree.html（分层静态页，可交互树）。
 - 遗留移交：①popup「产品2」(id3, anchor=新增分类) 今日录制未开此弹窗、无触发步骤，暂挂 page（符合规则）；②存量旧弹窗截图行（13466-13511，09-04）created_at 旧但 replacePageLevel upsert 已换新图 URL，无碍；③伙伴平台侧「前端不显示产品内部数据」解析问题+token 过期（401）待同事换 token 联调；④tmp/build-499-*.mjs、check-499-mount.mjs 一次性验证脚本留 tmp/。
 
 
