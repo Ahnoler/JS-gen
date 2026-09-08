@@ -20,6 +20,7 @@ import {
   registerTrajectorySession,
 } from './trajectory-runtime.js';
 import { resolveModelId } from '../../runtime/resolve-model.js';
+import { applyPageLevelScreenshot } from '../../routes/browser-session/persist-live.js';
 import { prepareTrajectoryRecordingUnlocked } from './trajectory-attach-runner.js';
 
 /**
@@ -202,6 +203,14 @@ export function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
   else runtime.persistedActionIds = session.persistedActionIds;
 
   session._trajPersistUnsub = execSession.subscribeSessionEvents(sessionId, async (type, payload) => {
+    // 人工录制同样消费页面级截图（Python wrap 器对弹窗打开/页面切换发 page_level_screenshot，
+    // 此前该链只消费 manual_action_recorded，弹窗截图事件无人接 → 导出无 popup 节点）
+    if (type === 'page_level_screenshot') {
+      applyPageLevelScreenshot(trajectoryId, payload || {}).catch((err) => {
+        console.warn('[trajectory-manual] page_level_screenshot persist failed:', err?.message || err);
+      });
+      return;
+    }
     if (type !== 'manual_action_recorded') return;
     if (runtime.suppressStepPersist || runtime.isReplay) return;
     if (session._persistUnsub && session.autoPersist !== false) return;
