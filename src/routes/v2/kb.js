@@ -68,7 +68,7 @@ export default function registerKbRoutes(app) {
 
   /** POST /api/v2/kb/req-modules/:moduleKey/draft-traj/commit — 勾选原子建 draft 交易（不录制）。 */
   app.post('/api/v2/kb/req-modules/:moduleKey/draft-traj/commit', asyncHandler(async (req, res) => {
-    const { atomKeys, systemAccountId, functionIdOverrides, flowRefOverrides, force } = req.body || {};
+    const { atomKeys, systemAccountId, paasUserId, functionIdOverrides, flowRefOverrides, force } = req.body || {};
     if (!Array.isArray(atomKeys) || !atomKeys.length) {
       throw new AppError('atomKeys required', { code: 'VALIDATION' });
     }
@@ -82,10 +82,29 @@ export default function registerKbRoutes(app) {
       moduleKey: req.params.moduleKey,
       atomKeys,
       systemAccountId,
+      paasUserId: paasUserId != null ? String(paasUserId) : null,
       functionIdOverrides: overrides,
       flowRefOverrides: flowOverrides,
       force: Boolean(force),
     });
     sendOk(res, result);
+  }));
+
+  /** POST /api/v2/kb/req-modules/:moduleKey/draft-traj/validate — commit 预校验（不写库、不调 LLM）。 */
+  app.post('/api/v2/kb/req-modules/:moduleKey/draft-traj/validate', asyncHandler(async (req, res) => {
+    const { atomKeys, functionIdOverrides, force } = req.body || {};
+    if (!Array.isArray(atomKeys) || !atomKeys.length) {
+      throw new AppError('atomKeys required', { code: 'VALIDATION' });
+    }
+    const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
+      ? functionIdOverrides
+      : {};
+    const result = await reqDraftTraj.validateCommitAtoms({
+      moduleKey: req.params.moduleKey,
+      atomKeys,
+      functionIdOverrides: overrides,
+      force: Boolean(force),
+    });
+    sendOk(res, { ok: result.ok, problems: result.problems });
   }));
 }

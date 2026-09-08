@@ -170,6 +170,7 @@ export const GROUP_KB = [{
         { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
         { name: 'atomKeys', type: 'string[]', required: true, in: 'body', desc: '勾选的原子键列表' },
         { name: 'systemAccountId', type: 'number', in: 'body', desc: '可选，系统账号 id' },
+        { name: 'paasUserId', type: 'string', in: 'body', desc: '可选，操作人 PaaS 用户 id（审计透传到轨迹）' },
         { name: 'functionIdOverrides', type: 'object', in: 'body', desc: '可选，按 atomKey 覆盖 functionId' },
         { name: 'flowRefOverrides', type: 'object', in: 'body', desc: '可选，按 atomKey 覆盖 kbFlowRef/kbFlowNodeId' },
         { name: 'force', type: 'boolean', in: 'body', desc: '可选，true 时跳过重复草稿检查' },
@@ -177,6 +178,7 @@ export const GROUP_KB = [{
       reqExample: J({
         atomKeys: ['product-mgmt:chain-a:2'],
         systemAccountId: 1,
+        paasUserId: '1900000000000000001',
         functionIdOverrides: { 'product-mgmt:chain-a:2': 9000000740 },
         flowRefOverrides: { 'product-mgmt:chain-a:2': { kbFlowRef: 'product_library', kbFlowNodeId: 'add_category' } },
         force: false,
@@ -189,7 +191,34 @@ export const GROUP_KB = [{
           skipped: [{ atomKey: 'product-mgmt:chain-a:9', reason: 'unknown_or_stale_atom' }],
         },
       }),
-      notes: ['atomKeys 必填且非空', '未先 propose → 400', '缺 functionId 且无 override → skipped missing_function_id', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
+      notes: ['atomKeys 必填且非空', '未先 propose → 400', '缺 functionId 且无 override → skipped missing_function_id', '同键已有任意状态轨迹（draft/recorded…）→ skipped duplicate_draft；force 时 req_atom_seq 递增重建', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
+    },
+    {
+      method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/validate',
+      summary: 'commit 预校验（dry-run，不写库、不调 LLM）',
+      desc: '与 commit 共用同一校验函数：缓存存在性、出处齐全、任意状态重复、functionId 存在性；返回会成功/会失败清单。',
+      params: [
+        { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
+        { name: 'atomKeys', type: 'string[]', required: true, in: 'body', desc: '待提交的原子键列表' },
+        { name: 'functionIdOverrides', type: 'object', in: 'body', desc: '可选，按 atomKey 覆盖 functionId' },
+        { name: 'force', type: 'boolean', in: 'body', desc: '可选，true 时不报 duplicate_draft' },
+      ],
+      reqExample: J({
+        atomKeys: ['product-mgmt:chain-a:2', 'product-mgmt:chain-a:3'],
+        functionIdOverrides: {},
+        force: false,
+      }),
+      respExample: J({
+        code: 200,
+        message: 'ok',
+        data: {
+          ok: ['product-mgmt:chain-a:2'],
+          problems: [
+            { atomKey: 'product-mgmt:chain-a:3', code: 'missing_function_id', message: 'no suggestedFunctionId and no override' },
+          ],
+        },
+      }),
+      notes: ['与 commit 同输入时 problems 与 commit 的 skipped 同源（analyze/create 失败不可预知）', '未先 propose → 400'],
     },
   ],
 }];

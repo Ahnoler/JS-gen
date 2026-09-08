@@ -34,6 +34,78 @@ async function isKnownFunctionId(functionId, existsFn = null) {
 }
 
 /**
+ * Dry-run validation shared by commit and the validate endpoint: every check
+ * that does not need analyze/create (cache lookup, provenance, any-state
+ * duplicate, functionId presence/existence). No writes, no LLM.
+ * @param {object} [opts] Validation options (same shape as commitDraftTrajectories minus analyze/create)
+ * @param {string} opts.moduleKey KB req module key
+ * @param {string[]} [opts.atomKeys] Atom keys to validate
+ * @param {string} [opts.rootDir] Module workspace root (default data/kb/req)
+ * @param {Record<string, number|string>} [opts.functionIdOverrides] Per-atom function id overrides
+ * @param {boolean} [opts.force] When true, duplicate rows do not block (seq increments at commit)
+ * @param {typeof findDraftByReqAtomKey} [opts.findDraftFn] Duplicate lookup override
+ * @param {(id: number) => Promise<boolean>} [opts.functionIdExists] Injectable
+ *   function-id existence check (offline characterization stubs)
+ * @returns {Promise<{ ok: string[], problems: Array<{ atomKey: string, code: string, message: string, trajectoryId?: number }>, cache: object }>} Keys that would commit and why the rest would not
+ */
+export async function validateCommitAtoms({
+  moduleKey,
+  atomKeys,
+  rootDir,
+  functionIdOverrides = {},
+  force = false,
+  findDraftFn,
+  functionIdExists = null,
+} = {}) {
+  const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
+    ? functionIdOverrides
+    : {};
+  const keys = Array.isArray(atomKeys) ? atomKeys.map(String) : [];
+  const cache = await readProposeCache(moduleDir(moduleKey, rootDir));
+  if (!cache?.atoms?.length) {
+    throw new AppError('propose cache missing — run draft-traj/propose first', { code: 'VALIDATION' });
+  }
+  const byKey = new Map(cache.atoms.map((a) => [a.atomKey, a]));
+  const findDraft = findDraftFn || findDraftByReqAtomKey;
+
+  const ok = [];
+  const problems = [];
+  for (const atomKey of keys) {
+    const atom = byKey.get(atomKey);
+    if (!atom) {
+      problems.push({ atomKey, code: 'unknown_or_stale_atom', message: 'atom not in propose cache' });
+      continue;
+    }
+    const prov = assertAtomProvenance(atom);
+    if (!prov.ok) {
+      problems.push({ atomKey, code: prov.reason, message: 'atom provenance incomplete' });
+      continue;
+    }
+    const existing = await findDraft(moduleKey, atomKey);
+    if (existing && !force) {
+      problems.push({
+        atomKey,
+        code: 'duplicate_draft',
+        message: `trajectory ${existing.id} already carries this atom`,
+        trajectoryId: existing.id,
+      });
+      continue;
+    }
+    const functionId = overrides[atomKey] ?? atom.suggestedFunctionId;
+    if (!Number(functionId)) {
+      problems.push({ atomKey, code: 'missing_function_id', message: 'no suggestedFunctionId and no override' });
+      continue;
+    }
+    if (!(await isKnownFunctionId(functionId, functionIdExists))) {
+      problems.push({ atomKey, code: 'unknown_function_id', message: `functionId ${functionId} not found` });
+      continue;
+    }
+    ok.push(atomKey);
+  }
+  return { ok, problems, cache };
+}
+
+/**
  * Commit selected propose-cache atoms to draft trajectories.
  * Does not call record/prepare or record/start.
  * @param {object} [opts] Commit options
@@ -41,6 +113,7 @@ async function isKnownFunctionId(functionId, existsFn = null) {
  * @param {string[]} opts.atomKeys Atom keys to commit
  * @param {string} [opts.rootDir] Module workspace root (default data/kb/req)
  * @param {number|null} [opts.systemAccountId] Optional system account id
+ * @param {string|null} [opts.paasUserId] Operator PaaS user id (audit passthrough)
  * @param {Record<string, number|string>} [opts.functionIdOverrides] Per-atom function id overrides
  * @param {Record<string, { kbFlowRef?: string|null, kbFlowNodeId?: string|null }>} [opts.flowRefOverrides] Per-atom flow ref overrides
  * @param {boolean} [opts.force] When true, bypass the duplicate skip and take
@@ -58,6 +131,7 @@ export async function commitDraftTrajectories({
   atomKeys,
   rootDir,
   systemAccountId = null,
+  paasUserId = null,
   functionIdOverrides = {},
   flowRefOverrides = {},
   force = false,
@@ -66,50 +140,35 @@ export async function commitDraftTrajectories({
   findDraftFn,
   functionIdExists = null,
 } = {}) {
-  const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
-    ? functionIdOverrides
-    : {};
   const flowOverrides = (flowRefOverrides && typeof flowRefOverrides === 'object')
     ? flowRefOverrides
     : {};
-  const keys = Array.isArray(atomKeys) ? atomKeys.map(String) : [];
-  const cache = await readProposeCache(moduleDir(moduleKey, rootDir));
-  if (!cache?.atoms?.length) {
-    throw new AppError('propose cache missing — run draft-traj/propose first', { code: 'VALIDATION' });
-  }
-  const byKey = new Map(cache.atoms.map((a) => [a.atomKey, a]));
   const analyze = analyzeFn || analyzeRequirementToPhases;
   const create = createFn || createTransactionWithPhases;
   const findDraft = findDraftFn || findDraftByReqAtomKey;
 
+  const { ok, problems, cache } = await validateCommitAtoms({
+    moduleKey,
+    atomKeys,
+    rootDir,
+    functionIdOverrides,
+    force,
+    findDraftFn,
+    functionIdExists,
+  });
+  const skipped = problems.map(({ atomKey, code, trajectoryId }) => (
+    trajectoryId != null ? { atomKey, reason: code, trajectoryId } : { atomKey, reason: code }
+  ));
+  const byKey = new Map(cache.atoms.map((a) => [a.atomKey, a]));
+
   const created = [];
-  const skipped = [];
-  for (const atomKey of keys) {
+  for (const atomKey of ok) {
     const atom = byKey.get(atomKey);
-    if (!atom) {
-      skipped.push({ atomKey, reason: 'unknown_or_stale_atom' });
-      continue;
-    }
-    const prov = assertAtomProvenance(atom);
-    if (!prov.ok) {
-      skipped.push({ atomKey, reason: prov.reason });
-      continue;
-    }
-    const existing = await findDraft(moduleKey, atomKey);
-    if (existing && !force) {
-      skipped.push({ atomKey, reason: 'duplicate_draft', trajectoryId: existing.id });
-      continue;
-    }
-    const reqAtomSeq = force && existing ? Number(existing.reqAtomSeq ?? 0) + 1 : 0;
-    const functionId = overrides[atomKey] ?? atom.suggestedFunctionId;
-    if (!Number(functionId)) {
-      skipped.push({ atomKey, reason: 'missing_function_id' });
-      continue;
-    }
-    if (!(await isKnownFunctionId(functionId, functionIdExists))) {
-      skipped.push({ atomKey, reason: 'unknown_function_id' });
-      continue;
-    }
+    const functionId = (functionIdOverrides && typeof functionIdOverrides === 'object'
+      ? functionIdOverrides[atomKey]
+      : undefined) ?? atom.suggestedFunctionId;
+    const existing = force ? await findDraft(moduleKey, atomKey) : null;
+    const reqAtomSeq = existing ? Number(existing.reqAtomSeq ?? 0) + 1 : 0;
     let analyzed;
     try {
       analyzed = await analyze({ description: atom.taskDraft });
@@ -128,6 +187,7 @@ export async function commitDraftTrajectories({
         phases: analyzed.phases,
         businessEntries: analyzed.businessEntries,
         systemAccountId,
+        paasUserId,
         requireFunctionId: true,
         reqModuleKey: moduleKey,
         reqSourcePath: atom.sourceDoc,

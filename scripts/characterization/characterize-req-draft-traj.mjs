@@ -648,6 +648,67 @@ async function main() {
     assert.match(src, /commitDraftTrajectories|reqDraftTraj\.commit/);
   });
 
+  const { validateCommitAtoms } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
+
+  await runAsync('validateCommitAtoms exported from index', async () => {
+    const idx = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/index.js')).href);
+    assert.equal(typeof idx.validateCommitAtoms, 'function');
+  });
+
+  await runAsync('validate problems match commit skipped for same input', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-validate-'));
+    const noFnAtom = { ...GOOD_ATOM, atomKey: 'demo-mod:chain-a:3', title: '无功能', suggestedFunctionId: null };
+    await seedCache(tmp, [GOOD_ATOM, noFnAtom]);
+
+    const findDraftStub = async (_mk, ak) => (ak === 'demo-mod:chain-a:2' ? { id: 9, recordStatus: 'recorded', reqAtomSeq: 0 } : null);
+    const analyzeFn = async () => ({ phases: ['x'], businessEntries: [] });
+    const createFn = async () => ({ id: 4242 });
+    const common = {
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: ['demo-mod:chain-a:2', 'demo-mod:chain-a:3', 'demo-mod:chain-a:8:不存在'],
+      analyzeFn,
+      createFn,
+      findDraftFn: findDraftStub,
+      functionIdExists: async () => true,
+    };
+    const committed = await commitDraftTrajectories(common);
+    const validated = await validateCommitAtoms(common);
+    const skippedKeys = committed.skipped.map((s) => `${s.atomKey}:${s.reason}`).sort();
+    const problemKeys = validated.problems.map((p) => `${p.atomKey}:${p.code}`).sort();
+    assert.deepEqual(problemKeys, skippedKeys);
+    assert.deepEqual(validated.ok, committed.created.map((c) => c.atomKey));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commit passes paasUserId through to create', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    let createOpts;
+    await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      paasUserId: 'u-12345',
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async (opts) => {
+        createOpts = opts;
+        return { id: 4242 };
+      },
+      findDraftFn: async () => null,
+      functionIdExists: async () => true,
+    });
+    assert.equal(createOpts.paasUserId, 'u-12345');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('kb.js wires draft-traj validate route', async () => {
+    const src = readFileSync(join(ROOT, 'src/routes/v2/kb.js'), 'utf8');
+    assert.match(src, /draft-traj\/validate/);
+    assert.match(src, /validateCommitAtoms/);
+  });
+
   console.log(`OK ${passed}`);
 }
 
