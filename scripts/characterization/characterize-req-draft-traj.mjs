@@ -255,6 +255,7 @@ async function main() {
       moduleKey: 'demo-mod',
       rootDir: tmp,
       callLLM: fakeLLM,
+      listSystemsFn: async () => [],
     });
     assert.equal(out.atoms.length, 1);
     assert.ok(Array.isArray(out.atoms[0].pageCodes));
@@ -285,6 +286,7 @@ async function main() {
       rootDir: tmp,
       callLLM: fakeLLM,
       functionIdExists: async () => false,
+      listSystemsFn: async () => [],
     });
     assert.equal(out.atoms.length, 1);
     assert.equal(out.atoms[0].suggestedFunctionId, null);
@@ -345,6 +347,7 @@ async function main() {
       rootDir: tmp,
       maxAtoms: 1,
       callLLM: fakeLLM,
+      listSystemsFn: async () => [],
     });
     assert.equal(out.atoms.length, 1);
     assert.equal(out.atoms[0].title, '新增一级分类');
@@ -468,7 +471,7 @@ async function main() {
         { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
       ],
     });
-    await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM });
+    await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM, listSystemsFn: async () => [] });
     const cache = JSON.parse(readFileSync(join(tmp, 'demo-mod', '.draft-traj-propose.json'), 'utf8'));
     const md = readFileSync(join(tmp, 'demo-mod', 'through-chains.md'), 'utf8');
     assert.equal(cache.cacheVersion, 1);
@@ -848,6 +851,72 @@ async function main() {
     const src = readFileSync(join(ROOT, 'src/routes/v2/kb.js'), 'utf8');
     assert.match(src, /draft-traj\/validate/);
     assert.match(src, /validateCommitAtoms/);
+  });
+
+  const { computeFunctionIdCandidates } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href);
+
+  run('computeFunctionIdCandidates ranks page_code over name_match', () => {
+    const nodes = [
+      { id: 7, type: 3, name: '对公客户管理', pdCmptEcd: 'ZJJK00066153', umlEcd: '', menuXpath: '' },
+      { id: 21, type: 3, name: '产品库管理', pdCmptEcd: '', umlEcd: '', menuXpath: '' },
+      { id: 22, type: 2, name: '非功能节点', pdCmptEcd: 'ZJJK00066153', umlEcd: '', menuXpath: '' },
+    ];
+    const out = computeFunctionIdCandidates({
+      title: '在产品库管理新增一级分类',
+      taskDraft: '1、在产品库管理新增一级分类。',
+      pageCodes: ['ZJJK00066153'],
+      sourceChapter: 'chapters/01-产品库管理.md#产品库管理',
+    }, nodes);
+    assert.deepEqual(out.map((c) => `${c.id}:${c.reason}`), ['7:page_code', '21:name_match']);
+    assert.ok(out.every((c) => typeof c.id === 'number' && c.name && typeof c.score === 'number'));
+    assert.ok(out.length <= 3);
+  });
+
+  await runAsync('propose attaches functionIdCandidates when suggestedFunctionId null', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+      ],
+    });
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [
+        { id: 9000000740, type: 3, name: '产品库管理', pdCmptEcd: 'ZJJK00094361', umlEcd: '', menuXpath: '' },
+      ],
+    });
+    assert.equal(out.atoms.length, 1);
+    const cand = out.atoms[0].functionIdCandidates || [];
+    assert.ok(cand.some((c) => c.id === 9000000740 && c.reason === 'page_code'),
+      `expected page_code candidate 9000000740, got ${JSON.stringify(cand)}`);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose omits candidates when suggestedFunctionId present', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'], suggestedFunctionId: 9000000740 },
+      ],
+    });
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      functionIdExists: async () => true,
+      listSystemsFn: async () => [
+        { id: 9000000740, type: 3, name: '产品库管理', pdCmptEcd: 'ZJJK00094361', umlEcd: '', menuXpath: '' },
+      ],
+    });
+    assert.equal(out.atoms.length, 1);
+    assert.equal(out.atoms[0].functionIdCandidates, undefined);
+    rmSync(tmp, { recursive: true, force: true });
   });
 
   console.log(`OK ${passed}`);

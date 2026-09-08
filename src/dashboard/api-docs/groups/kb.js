@@ -148,6 +148,9 @@ export const GROUP_KB = [{
             taskDraft: '1、进入产品库。\n2、点击新增一级分类…\n\n来源：product-mgmt.docx / chapters/01-product-library.md\n',
             phaseHints: ['进入产品库', '新增一级分类并确定'],
             pageCodes: ['ZJJK00107304'],
+            functionIdCandidates: [
+              { id: 9000000740, name: '产品库管理', score: 100, reason: 'page_code' },
+            ],
             suggestedFlowRef: 'product_library',
             suggestedNodeId: 'add_category',
           }],
@@ -161,6 +164,7 @@ export const GROUP_KB = [{
         'chainIds 过滤后为空 → 400 VALIDATION "matched no chains"（附可用 chainId）',
         '不建交易、不录制',
         'atomKey 形如 <module>:<chain>:<step>，与步骤标题无关（LLM 重跑稳定）',
+        'suggestedFunctionId 为空时附 functionIdCandidates（≤3，reason=page_code/menu_path/name_match），commit 仍以 functionIdOverrides 为准',
         'pageCodes 为页面/组件编号元数据；关键数据块不应再堆 ZJJK 表',
       ],
     },

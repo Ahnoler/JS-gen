@@ -32,6 +32,7 @@ const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
  * @property {string} atomKey Stable atom key for idempotency
  * @property {string} title Human-readable atom title
  * @property {number|null} suggestedFunctionId Guessed function id or null
+ * @property {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} [functionIdCandidates] Deterministic candidates when suggestedFunctionId is null
  * @property {string} sourceDoc Source document path
  * @property {string} sourceChapter Chapter reference under module
  * @property {string} taskDraft Task text for analyze
@@ -409,6 +410,55 @@ async function normalizeSuggestedFunctionIds(atoms, existsFn = null) {
 }
 
 /**
+ * Compute ≤3 deterministic functionId candidates for one atom from the system
+ * tree (F-08: suggestedFunctionId is empirically null for most atoms, so the
+ * wizard needs hints instead of per-atom manual overrides).
+ * Priority: page_code (pdCmptEcd/umlEcd exactly in atom pageCodes) >
+ * name_match (function name occurs in title/taskDraft) > menu_path (function
+ * name occurs in the source chapter file stem). Duplicate ids collapse.
+ * @param {DraftAtom} atom Atom with title/taskDraft/pageCodes/sourceChapter
+ * @param {Array<{id: number, type: number, name: string, pdCmptEcd?: string, umlEcd?: string, removedFlag?: number}>} functionNodes Flat system nodes (function type filtered here)
+ * @returns {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} Ranked candidates (max 3)
+ */
+export function computeFunctionIdCandidates(atom, functionNodes) {
+  /** @type {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} */
+  const out = [];
+  const seen = new Set();
+  const push = (node, score, reason) => {
+    if (!node || seen.has(node.id)) return;
+    seen.add(node.id);
+    out.push({ id: node.id, name: node.name, score, reason });
+  };
+  const fns = (Array.isArray(functionNodes) ? functionNodes : [])
+    .filter((n) => Number(n.type) === 3 && !n.removedFlag);
+
+  const codes = new Set((atom.pageCodes || []).map((c) => String(c).toUpperCase()));
+  for (const n of fns) {
+    const pd = String(n.pdCmptEcd || '').toUpperCase();
+    const uml = String(n.umlEcd || '').toUpperCase();
+    if ((pd && codes.has(pd)) || (uml && codes.has(uml))) {
+      push(n, 100, 'page_code');
+    }
+  }
+  const hayTitle = String(atom.title || '');
+  const hayDraft = String(atom.taskDraft || '');
+  for (const n of fns) {
+    const name = String(n.name || '').trim();
+    if (name.length >= 2 && (hayTitle.includes(name) || hayDraft.includes(name))) {
+      push(n, 50, 'name_match');
+    }
+  }
+  const chapterStem = String(atom.sourceChapter || '').replace(/\\/g, '/').split('/').pop() || '';
+  for (const n of fns) {
+    const name = String(n.name || '').trim();
+    if (name.length >= 2 && chapterStem.includes(name)) {
+      push(n, 30, 'menu_path');
+    }
+  }
+  return out.slice(0, 3);
+}
+
+/**
  * Propose atomic draft trajectory candidates for a req module.
  * @param {object} opts Propose options
  * @param {string} opts.moduleKey Req module key
@@ -418,6 +468,8 @@ async function normalizeSuggestedFunctionIds(atoms, existsFn = null) {
  * @param {(text: string) => Promise<string>} [opts.callLLM] Injectable LLM caller (offline tests)
  * @param {(id: number) => Promise<boolean>} [opts.functionIdExists] Injectable function-id
  *   existence check (offline characterization stubs; defaults to system table lookup)
+ * @param {() => Promise<Array<object>>} [opts.listSystemsFn] Injectable system-tree loader
+ *   (offline characterization stubs; defaults to systemDao.listAll)
  * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }> }>} Accepted and rejected atoms
  */
 export async function proposeDraftTrajectories({
@@ -427,6 +479,7 @@ export async function proposeDraftTrajectories({
   maxAtoms,
   callLLM,
   functionIdExists = null,
+  listSystemsFn = null,
 }) {
   const mod = await getReqModule({ rootDir, moduleKey });
   if (!mod.hasThroughChains) {
@@ -494,6 +547,25 @@ export async function proposeDraftTrajectories({
     : atoms;
 
   await normalizeSuggestedFunctionIds(capped, functionIdExists);
+
+  // Only hit the system tree when at least one atom would use candidates —
+  // keeps offline runs (all ids present) free of DB connections.
+  let systems = null;
+  if (capped.some((a) => a.suggestedFunctionId == null)) {
+    try {
+      systems = await (listSystemsFn ? listSystemsFn() : systemDao.listAll());
+    } catch (e) {
+      console.warn('[req-draft-traj] system tree load failed (%s) — skip functionIdCandidates', e.message);
+      systems = null;
+    }
+  }
+  if (systems) {
+    for (const atom of capped) {
+      if (atom.suggestedFunctionId == null) {
+        atom.functionIdCandidates = computeFunctionIdCandidates(atom, systems);
+      }
+    }
+  }
 
   const cards = await listFlowCardsDetailed({});
   for (const atom of capped) {
