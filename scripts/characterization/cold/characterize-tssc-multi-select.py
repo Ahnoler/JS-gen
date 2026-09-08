@@ -43,6 +43,7 @@ checks = [
         ".tssc-multi-select",
         ".select-table",
         "el-table__row",
+        "force 精确查询 OFF",
     )),
     ("scripts/controller/actions/_js_snippets.py", ("tssc_multi_select", "JS_TSSC_MULTI_SELECT")),
     ("scripts/controller/actions/_form.py", (
@@ -60,12 +61,16 @@ checks = [
         "JS_TSSC_MULTI_SELECT",
         "lookup_field_kind",
         "tssc-multi-select",
+        "err-use-tssc-multi-select",
+        "Do NOT fill_form_field",
     )),
     ("scripts/prompts/agent-tools-tssc-multi-select.md", (
         "tssc_multi_select(label_text, option_text)",
         "no-tssc-multi-select",
         "err-no-echo",
         "TsscMultiSelect",
+        "option_text=\"first\"",
+        "禁止改用 `fill_form_field`",
     )),
     ("scripts/prompts/agent-prompt.md", ("agent-tools-tssc-multi-select.md",)),
     ("scripts/agent_utils.py", ("agent-tools-tssc-multi-select.md",)),
@@ -77,6 +82,7 @@ checks = [
     ("scripts/controller/actions/result_protocol.py", (
         '"tssc-multi-select"',
         "tssc_multi_select(label_text",
+        "fi.querySelector('.tssc-multi-select')",
     )),
     ("scripts/controller/actions/_llm_values.py", (
         "kind == 'tssc-multi-select'",

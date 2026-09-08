@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 22:05 · Cursor Lead — 收工：修 tssc_multi_select fill 退化（回链 21:55）
+
+- 完成：fill 拒写 tssc/tree；option-not-found 禁 fill/精确查询并指引 `first`；搜索强制精确 OFF；affordances/prompt/pin
+- 验收：`characterize-tssc-multi-select` + `characterize-agent-prompt-packs` PASS；根因 sid `5b463582` step3→fill 链
+- 遗留：需重启 executor 后重录 #696；任务文案勿把 stamp 当数据项名
+
 ## 2026-09-08 21:55 · Cursor Lead — 开工：修 tssc_multi_select 录制退化为 fill（sid 5b463582）
 
 - 进行中：21:55。用户反馈 #696 类录制「不好用」：日志 step3 `tssc_multi_select(要素名称, 20260908-elem)`→option-not-found 后反复 `fill_form_field` 假成功 + 误开精确查询 → 无匹配数据

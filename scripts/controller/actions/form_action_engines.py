@@ -364,6 +364,60 @@ class FillEngine(_FormActionEngineBase):
             sys.stderr.flush()
             return _ok(_with_submit_cue(absent_field_skip_result(), self.business_data_store))
 
+        # TsscMultiSelect/TsscMultiTree: typing into the trigger looks like a
+        # successful fill (filterable input) but never selects a row/node and
+        # falsely marks task_done — seen on traj #696 / sid 5b463582.
+        kind = lookup_field_kind(self.business_data_store, label_text)
+        if kind not in ('tssc-multi-select', 'tree-select'):
+            try:
+                live = await page.evaluate(
+                    '''(label) => {
+                        const norm = (s) => String(s || '').replace(/\\s+/g, ' ').trim();
+                        const want = norm(label);
+                        const items = [...document.querySelectorAll('.el-form-item')];
+                        let fi = null;
+                        for (const it of items) {
+                            const t = norm((it.querySelector('.el-form-item__label') || {}).textContent);
+                            if (t && (t === want || t.includes(want))) { fi = it; break; }
+                        }
+                        if (!fi) return '';
+                        if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
+                        if (fi.querySelector(
+                            '.tree-popover, .tsscTree, .el-tree-select,'
+                            + ' [class*="tsscmultitree"], [class*="TsscMultiTree"]'
+                        )) return 'tree-select';
+                        return '';
+                    }''',
+                    [label_text],
+                )
+                if live in ('tssc-multi-select', 'tree-select'):
+                    kind = live
+            except Exception:
+                pass
+        if kind == 'tssc-multi-select':
+            from .result_protocol import err_with
+            nxt = (
+                f'tssc_multi_select(label_text="{resolved.label or label_text}", '
+                f'option_text="first" 或表行中文名原文)'
+            )
+            return err_with(
+                "err-use-tssc-multi-select",
+                "「要素名称」类字段是 TsscMultiSelect（弹层表格行选），禁止 fill_form_field 文本直填",
+                observed=f"label={resolved.label or label_text} kind=tssc-multi-select",
+                next_action=nxt,
+            )
+        if kind == 'tree-select':
+            from .result_protocol import err_with, recommend_action_for_kind
+            nxt = recommend_action_for_kind(kind).replace(
+                '<此字段label>', resolved.label or label_text,
+            )
+            return err_with(
+                "err-use-select-tree-option",
+                "该字段是 TsscMultiTree，禁止 fill_form_field 文本直填",
+                observed=f"label={resolved.label or label_text} kind=tree-select",
+                next_action=nxt,
+            )
+
         strict_xpath = xpath_smart_fill_only_enabled()
         use_label_fallback = (
             (not strict_xpath)
@@ -1559,6 +1613,14 @@ class SelectEngine(_FormActionEngineBase):
         if res_s.startswith('err-no-echo'):
             return (
                 res_s + ' Do NOT blindly retry. check_field_value or report.'
+            )
+        if res_s.startswith('option-not-found') or res_s.startswith('no-items'):
+            return (
+                res_s
+                + ' | Do NOT fill_form_field / real_click「精确查询」.'
+                + ' 任务写「任一/任意」或 stamp/组件名不是数据项时用'
+                + f' tssc_multi_select(label_text="{label_text}", option_text="first")；'
+                + ' 否则 option_text 必须是弹层表格「中文名」列原文。'
             )
         return res_s
 

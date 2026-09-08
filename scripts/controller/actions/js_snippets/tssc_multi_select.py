@@ -220,18 +220,20 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
                 s.call(searchInput, optNorm);
                 searchInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
                 searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-                for (const sw of dd.querySelectorAll('.el-switch, [class*="exact"]')) {
+                // Prefer fuzzy: force 精确查询 OFF. Enabling exact for stamp/partial
+                // keywords yields empty「无匹配数据」(sid 5b463582). Only leave ON
+                // when already checked AND exact match later succeeds.
+                for (const sw of dd.querySelectorAll('.el-switch')) {
                     const lbl = sw.closest('.el-form-item, label, span, div')?.textContent || sw.textContent || '';
-                    if (lbl.includes('精确')) {
-                        const inner = sw.querySelector('.el-switch__core') || sw;
-                        if (!sw.classList.contains('is-checked')) inner.click();
-                        break;
-                    }
+                    if (!lbl.includes('精确')) continue;
+                    const inner = sw.querySelector('.el-switch__core') || sw;
+                    if (sw.classList.contains('is-checked')) inner.click();
+                    break;
                 }
-                await sleep(400);
+                await sleep(500);
                 rows = collectRows();
                 pool = visiblePool(rows);
-                target = findExact(pool, optNorm);
+                target = findExact(pool, optNorm) || findFuzzy(pool, optNorm);
                 if (target) break;
             }
         }
