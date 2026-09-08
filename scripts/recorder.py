@@ -14,6 +14,7 @@ from .agent.recorder_emitters import (  # noqa: E402
     _emit_duplicate_failure_cue,
     _emit_empty_act_cue,
     _emit_navigation_cue,
+    _emit_step_notice_scan,
     _emit_memory_action_event,
     _guard_done_on_step_end,
 )
@@ -180,6 +181,13 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
             _emit_navigation_cue(business_data_store, agent)
         except Exception as e:
             sys.stderr.write(f'[recorder] navigation cue error: {e}\n')
+            sys.stderr.flush()
+
+        # Per-step toast/notification scan → 【页面通知】 (steering-only)
+        try:
+            await _emit_step_notice_scan(agent, business_data_store)
+        except Exception as e:
+            sys.stderr.write(f'[recorder] step-notice error: {e}\n')
             sys.stderr.flush()
 
         # P1：动作事件打点（fill_before_save 建模用）——异步旁路，失败不阻塞
