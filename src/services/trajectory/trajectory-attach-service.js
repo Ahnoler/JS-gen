@@ -457,6 +457,20 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
       sessionId,
     });
 
+    // runtime 缺失（控制面重启后只恢复了 BiB 绑定、没有重建 runtime）时，执行机会话 id
+    // 只能从 remote_session 行取——否则「释放浏览器」只关数据库行，执行机上的 Chrome/Python
+    // 原样存活成孤儿，又被下一次 attach 当空闲 Chrome 复用（2026-09-08 #699 循环根因）。
+    let agentSessionId = sessionId;
+    let agentNodeUuid = runtime?.executorNodeUuid || null;
+    if (!agentSessionId && remoteSessionId) {
+      const row = await remoteSessionDao.getById(remoteSessionId).catch(() => null);
+      agentSessionId = row?.agentSessionId || null;
+      if (!agentNodeUuid && row?.executorNodeId != null) {
+        const node = await executorNodeDao.getById(row.executorNodeId).catch(() => null);
+        agentNodeUuid = node?.nodeUuid || null;
+      }
+    }
+
     // Stop BiB for THIS traj only (never clear global map blindly)
     try {
       await remoteSessionService.detachLive({
@@ -470,15 +484,15 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     await hardCloseRemoteSession(remoteSessionId);
 
     // Also close any occupied remote row still bound to this agent session
-    if (sessionId) {
-      const occupied = await remoteSessionDao.getOccupiedByAgentSession(sessionId).catch(() => null);
+    if (agentSessionId) {
+      const occupied = await remoteSessionDao.getOccupiedByAgentSession(agentSessionId).catch(() => null);
       if (occupied && Number(occupied.id) !== Number(remoteSessionId)) {
         await hardCloseRemoteSession(occupied.id);
       }
     }
 
-    if (sessionId) {
-      const session = state.sessions.get(sessionId);
+    if (agentSessionId) {
+      const session = state.sessions.get(agentSessionId);
       if (session?._trajPersistUnsub) {
         try { session._trajPersistUnsub(); } catch {}
         session._trajPersistUnsub = null;
@@ -489,14 +503,17 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
       // removeSessionHub at the end of closeSession cleans it afterwards.
       try {
         await execSession.closeSession({
-          nodeUuid: runtime?.executorNodeUuid,
-          sessionId,
+          nodeUuid: agentNodeUuid,
+          sessionId: agentSessionId,
           keepBrowser: false,
+          // runtime 缺失时执行机多半已无此会话（_closeLocked 对未知会话不回
+          // session.closed），缩短等待避免释放接口白等满超时。
+          ...(runtime ? {} : { timeoutMs: 3000 }),
         });
       } catch {
-        slotLease.releaseBySession(sessionId);
+        slotLease.releaseBySession(agentSessionId);
       }
-      state.sessions.delete(sessionId);
+      state.sessions.delete(agentSessionId);
     }
     slotLease.releaseByTrajectory(tid);
     deleteTrajectoryRuntime(tid);
@@ -593,9 +610,17 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
       closed = true;
       if (rs.agentSessionId) {
         try {
+          // nodeUuid 必须解析后传入：sendToExecutor(undefined) 必抛「not connected」，
+          // 关闭被 catch 吞掉 → 执行机浏览器永远关不掉（2026-09-08 同类根因）。
+          const node = rs.executorNodeId != null
+            ? await executorNodeDao.getById(rs.executorNodeId).catch(() => null)
+            : null;
           await execSession.closeSession({
+            nodeUuid: node?.nodeUuid || null,
             sessionId: rs.agentSessionId,
             keepBrowser: false,
+            // 重启后执行机多半已无此会话（不回 session.closed），缩短等待。
+            timeoutMs: 3000,
           });
         } catch {
           slotLease.releaseBySession(rs.agentSessionId);

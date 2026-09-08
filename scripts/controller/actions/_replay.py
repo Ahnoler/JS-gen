@@ -124,6 +124,72 @@ async def _direct_read_page_component_code(page, params, entry):
     return 'ok', {'pageCode': payload}
 
 
+# 登录前探测：判定浏览器当前是否已处于登录态。
+# 与 form_action_engines 里硬编码 login 的登录后探测同源（home/token/left-login 三签名），
+# 但返回契约更细——'login-form' 表示确有登录表单（未登录），'blank' 表示页面还没渲染出内容
+# （无法判定）；两者都按未登录继续登录回放，避免把空白页误判成已登录而跳过登录。
+# 判定顺序刻意「先登录表单、后 token」：token 可能已过期而页面仍停在登录页，
+# 先判表单可避免用过期 token 误跳过登录。按钮文案「登 录」带空格，故用 \s* 容忍；
+# 已登录页面的「退出登录」按钮同样含「登录」二字，须排除，否则会把首页误判成登录页。
+_LOGIN_PRE_PROBE_JS = """() => {
+  const visible = (el) => {
+    if (!el) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden' && el.offsetParent !== null;
+  };
+  const isLoginBtn = (t) => /登\\s*录|登\\s*陆|login|sign\\s?in/i.test(t) && !/退出|注销|logout|sign\\s?out/i.test(t);
+  const pwd = [...document.querySelectorAll('input[type=password]')].some(visible);
+  const btn = [...document.querySelectorAll('button, .el-button, input[type=submit], [class*=login]')].find((b) => visible(b) && isLoginBtn(b.textContent || b.value || ''));
+  if (pwd || btn) return 'login-form';
+  if ((location.hash || '').includes('#/home')) return 'home';
+  if (!!localStorage.getItem('_usertoken')) return 'token';
+  const stores = [localStorage, sessionStorage];
+  for (const s of stores) {
+    for (let i = 0; i < s.length; i++) {
+      const k = (s.key(i) || '').toLowerCase();
+      if (/(token|authorization|session|jwt|loginsession)/.test(k) && (s.getItem(s.key(i)) || '').trim()) return 'token';
+    }
+  }
+  const root = document.querySelector('#app') || document.body;
+  if (!root || (!root.children.length && !(root.innerText || '').trim())) return 'blank';
+  return 'left-login';
+}"""
+
+# 轮询到这些签名即可停止等待（home/token/left-login=已登录，login-form=未登录）
+_LOGIN_PRE_PROBE_TERMINAL = ('home', 'token', 'left-login', 'login-form')
+
+
+@_direct_replay('login_probe', set())
+async def _direct_login_probe(page, params, entry):
+    """直派回放 login_probe：登录前探测是否已登录（复用孤儿 Chrome / 断开画面保留浏览器场景）。
+
+    浏览器已登录时组件登录步骤必然全找不到（label-not-found + click-failed），
+    使 prepare 反复失败；调用方据本结果跳过登录回放。
+    页面未渲染（blank）时轮询至超时仍返回 blank，调用方按未登录继续（fail-safe）。
+    返回 ``ok-probe:<sig>`` 恒计 ok，探测本身不拖垮回放批次。
+    """
+    try:
+        timeout_ms = int((params or {}).get('timeout_ms') or 10000)
+    except (TypeError, ValueError):
+        timeout_ms = 10000
+    deadline = time.monotonic() + max(0, timeout_ms) / 1000.0
+    sig = ''
+    while True:
+        try:
+            sig = str(await page.evaluate(_LOGIN_PRE_PROBE_JS) or '')
+        except Exception:
+            sig = ''
+        if sig in _LOGIN_PRE_PROBE_TERMINAL:
+            break
+        if time.monotonic() >= deadline:
+            break
+        await page.wait_for_timeout(500)
+    result = f'ok-probe:{sig or "blank"}'
+    sys.stderr.write(f'[replay] login_probe → {result}\n')
+    sys.stderr.flush()
+    return result, None
+
+
 async def _dismiss_menu_overlay(page):
     """菜单点击后在安全空白点补一次真实 mousedown，收起门户 mega-menu（best-effort，失败静默）。
 
