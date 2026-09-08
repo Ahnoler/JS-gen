@@ -529,7 +529,6 @@ async function main() {
 
   // Cleanup: release the knex pool / hub / registry so the process exits.
   try { hub?.removeSessionHub('rb-char-session'); } catch { /* ignore */ }
-  try { registry?.clearAll?.(); } catch { /* ignore */ }
   try { await closeDB?.(); } catch { /* ignore */ }
 
   console.log(failed ? '\nFAIL' : '\nOK');

@@ -151,11 +151,3 @@ export function isConnected(nodeUuid) {
   const entry = nodes.get(nodeUuid);
   return !!(entry?.ws && entry.ws.readyState === 1);
 }
-
-/** Clear all entries (shutdown). */
-export function clearAll() {
-  for (const entry of nodes.values()) {
-    if (entry.graceTimer) clearTimeout(entry.graceTimer);
-  }
-  nodes.clear();
-}
