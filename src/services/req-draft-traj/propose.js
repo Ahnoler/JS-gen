@@ -31,6 +31,7 @@ const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
  * @typedef {object} DraftAtom
  * @property {string} atomKey Stable atom key for idempotency
  * @property {string} title Human-readable atom title
+ * @property {'write'|'nav'} [kind] Step granularity: write mutation vs navigation
  * @property {number|null} suggestedFunctionId Guessed function id or null
  * @property {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} [functionIdCandidates] Deterministic candidates when suggestedFunctionId is null
  * @property {string} sourceDoc Source document path
@@ -45,6 +46,11 @@ const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
 
 const WRITE_ACTION_RE = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交|启用|禁用|克隆|删除/;
 const NAV_ACTION_RE = /进入|加载|刷树|打开|导航|切换|刷新/;
+/**
+ * Reference-style steps defer to another chain's steps and are not
+ * independently recordable atoms (spec F-10; e.g. `回主链 A 第 6-9 步…`).
+ */
+const REF_STEP_RE = /回主链|同主链|见主链|同上|参照/;
 
 /**
  * Load atomize system prompt template from disk.
@@ -321,6 +327,9 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   });
 
   const provenanceStep = findStepByIndex(chain, atomKeyStepIndex) || primaryStep;
+  if (REF_STEP_RE.test(`${title} ${provenanceStep?.action || ''}`)) {
+    return { rejected: { atomKey, reason: 'reference_step' } };
+  }
   const sourceChapter = await resolveChapterRef({
     chaptersDir: join(modDir, 'chapters'),
     chapterHint: chain.chapterHint,
@@ -349,6 +358,7 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   const atom = {
     atomKey,
     title,
+    kind: provenanceStep && isWriteStep(provenanceStep.action) ? 'write' : 'nav',
     suggestedFunctionId: parseSuggestedFunctionId(llmAtom.suggestedFunctionId),
     sourceDoc,
     sourceChapter: resolvedChapter,
@@ -470,7 +480,7 @@ export function computeFunctionIdCandidates(atom, functionNodes) {
  *   existence check (offline characterization stubs; defaults to system table lookup)
  * @param {() => Promise<Array<object>>} [opts.listSystemsFn] Injectable system-tree loader
  *   (offline characterization stubs; defaults to systemDao.listAll)
- * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }> }>} Accepted and rejected atoms
+ * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }>, truncated: { dropped: number, requestedMax: number|null } }>} Accepted and rejected atoms with truncation facts
  */
 export async function proposeDraftTrajectories({
   moduleKey,
@@ -542,9 +552,20 @@ export async function proposeDraftTrajectories({
     }
   }
 
-  const capped = Number.isFinite(maxAtoms) && maxAtoms > 0
-    ? atoms.slice(0, maxAtoms)
-    : atoms;
+  const requestedMax = Number.isFinite(maxAtoms) && maxAtoms > 0 ? maxAtoms : null;
+  let capped = atoms;
+  if (requestedMax != null && atoms.length > requestedMax) {
+    // Prefer keeping write atoms; fill leftover budget with nav atoms in
+    // original order, then hard-cap (F-11: callers must see what was dropped).
+    const writeCount = atoms.filter((a) => a.kind !== 'nav').length;
+    const navBudget = Math.max(0, requestedMax - writeCount);
+    let usedNav = 0;
+    capped = atoms.filter((a) => a.kind !== 'nav' || (usedNav += 1) <= navBudget);
+    if (capped.length > requestedMax) {
+      capped = capped.slice(0, requestedMax);
+    }
+  }
+  const truncated = { dropped: atoms.length - capped.length, requestedMax };
 
   await normalizeSuggestedFunctionIds(capped, functionIdExists);
 
@@ -587,11 +608,8 @@ export async function proposeDraftTrajectories({
     rejected,
     sourceHash,
     inputHash,
-    truncated: {
-      dropped: atoms.length - capped.length,
-      requestedMax: Number.isFinite(maxAtoms) && maxAtoms > 0 ? maxAtoms : null,
-    },
+    truncated,
   });
 
-  return { atoms: capped, rejected };
+  return { atoms: capped, rejected, truncated };
 }

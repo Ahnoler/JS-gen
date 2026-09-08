@@ -896,8 +896,58 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  await runAsync('propose omits candidates when suggestedFunctionId present', async () => {
+  await runAsync('propose rejects reference-style steps (reference_step)', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        {
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '回主链 A 第 6-9 步按需调整并启用',
+          taskDraft: '1、回主链 A 第 6-9 步。\n\n来源：demo.docx\n',
+          phaseHints: ['x'],
+        },
+      ],
+    });
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+    });
+    assert.equal(out.atoms.length, 0);
+    assert.ok(out.rejected.some((r) => r.reason === 'reference_step'));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose marks atoms kind and truncation prefers write', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        { chainId: 'chain-a', stepIndexes: [1], title: '进入产品库，加载产品树', taskDraft: '1、进入产品库。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+        { chainId: 'chain-a', stepIndexes: [3], title: '选中分类下新增子分类', taskDraft: '1、选中分类下新增子分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+      ],
+    });
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      maxAtoms: 2,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+    });
+    assert.equal(out.atoms.length, 2);
+    assert.ok(out.atoms.every((a) => a.kind === 'write' || a.kind === 'nav'));
+    assert.equal(out.atoms.some((a) => a.title === '新增一级分类'), true);
+    assert.deepEqual(out.truncated, { dropped: 1, requestedMax: 2 });
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose omits candidates when suggestedFunctionId present', async () => {    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
     cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
 
     const fakeLLM = async () => JSON.stringify({

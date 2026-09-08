@@ -142,6 +142,7 @@ export const GROUP_KB = [{
           atoms: [{
             atomKey: 'product-mgmt:chain-a:2',
             title: '新增一级分类',
+            kind: 'write',
             suggestedFunctionId: 9000000740,
             sourceDoc: 'product-mgmt.docx',
             sourceChapter: 'chapters/01-product-library.md#产品库管理',
@@ -154,7 +155,8 @@ export const GROUP_KB = [{
             suggestedFlowRef: 'product_library',
             suggestedNodeId: 'add_category',
           }],
-          rejected: [{ atomKey: 'product-mgmt:chain-a:1', reason: 'empty_task_draft' }],
+          rejected: [{ atomKey: 'product-mgmt:chain-a:1', reason: 'empty_task_draft' }, { atomKey: 'product-mgmt:chain-b:4', reason: 'reference_step' }],
+          truncated: { dropped: 0, requestedMax: null },
         },
       }),
       notes: [
@@ -164,6 +166,8 @@ export const GROUP_KB = [{
         'chainIds 过滤后为空 → 400 VALIDATION "matched no chains"（附可用 chainId）',
         '不建交易、不录制',
         'atomKey 形如 <module>:<chain>:<step>，与步骤标题无关（LLM 重跑稳定）',
+        '引用型步骤（回主链/同上/参照等）→ rejected reference_step，不产原子',
+        'atoms[].kind=write|nav；maxAtoms 截断优先保留 write，dropped 计入 truncated；rejected 不受 maxAtoms 影响',
         'suggestedFunctionId 为空时附 functionIdCandidates（≤3，reason=page_code/menu_path/name_match），commit 仍以 functionIdOverrides 为准',
         'pageCodes 为页面/组件编号元数据；关键数据块不应再堆 ZJJK 表',
       ],
