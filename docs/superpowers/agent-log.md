@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 · ZCode V3导出线 — 收工：V3 推送白名单扩容（32578e3d）
+
+- 完成：ACTION_TO_ENGINE_TYPE 新增 picker_dialog_query→input / picker_dialog_select→select:click / workspace_tabs→click / tree_picker_click→click；workspace_tabs 仅放行 activate；Node 别名 click_icon_button→click_button；操作名/取值（弹窗查询:/弹窗选择:/树选:/页签:）
+- 验收：verify-all ALL GREEN；traj 201 实测新增条目正确（弹窗查询 value=公司、页签、图标）；存量 14 步 click_icon_button 已 DB 订正为 click_button（traj 56/61/68）
+- 遗留：引擎专用动作（picker/tree/workspace）录制时 element_json 无定位信息→推送 locator=null，需 Python `_record_action` 补元素采集；partner 侧需确认 select:click 的 objectValue=row_text 语义；4097 重启生效
+- 注意：文件集 = src/models/action-name.js + src/services/{legacy-engine-export,transaction-export}.js，与他线不相交
+
 ## 2026-09-08 11:52 · Cursor Lead — 收工：SDD atom-record flow-card recall 实施闭环（回链 10:07 开工）
 
 - 完成：Task 1–7 全落地——`1ad954fe` migrate/DAO、`b96d5840` recall helpers、`5430cb68` propose suggest、`b7274dff` commit 落库、`0b450207` prepare 注入、`5cca1e8d` preview API；docs close-out 见本 commit
