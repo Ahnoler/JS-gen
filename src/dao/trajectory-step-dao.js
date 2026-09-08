@@ -86,16 +86,6 @@ export async function listByPhase(trajectoryPhaseId) {
 }
 
 /**
- * List steps of a trajectory filtered by source.
- * @param {number} trajectoryId 轨迹 id
- * @param {string} source source filter
- * @returns {Promise<object[]>} step entities
- */
-export async function listBySource(trajectoryId, source) {
-  return listByTrajectory(trajectoryId, { source });
-}
-
-/**
  * Delete all steps of a trajectory and mark parent export-dirty.
  * @param {number} trajectoryId 轨迹 id
  * @returns {Promise<number>} number of deleted rows

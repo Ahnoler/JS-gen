@@ -726,15 +726,6 @@ export async function remove(id) {
 }
 
 /**
- * Remove a trajectory by trajectory ID (alias for remove).
- * @param {number} id The trajectory ID to remove
- * @returns {Promise<number>} Number of affected rows
- */
-export async function removeByTrajectoryId(id) {
-  return remove(+id);
-}
-
-/**
  * 统计一组功能节点 id 下存在的交易数量。
  * @param {number[]} functionIds 功能节点 id 数组
  * @returns {Promise<number>} 交易数量

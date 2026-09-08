@@ -204,20 +204,6 @@ export async function listItemsByBatch(batchId, {
 }
 
 /**
- * List all items in a batch ordered by row_number (no pagination).
- * @param {string} batchId Job ID
- * @param {import('knex').Knex|null} [trx] Optional transaction
- * @returns {Promise<Array<object>>} Item entities
- */
-export async function listAllItemsByBatch(batchId, trx = null) {
-  const db = trx || getDB();
-  const rows = await db(ITEM_TABLE)
-    .where({ batch_id: String(batchId) })
-    .orderBy('row_number', 'asc');
-  return shapeItems(rows);
-}
-
-/**
  * Count items grouped by status within a batch.
  * @param {string} batchId Job ID
  * @param {import('knex').Knex|null} [trx] Optional transaction

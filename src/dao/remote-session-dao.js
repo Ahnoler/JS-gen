@@ -234,20 +234,6 @@ export async function close(id, { crashed = false } = {}) {
 }
 
 /**
- * Crash all occupied sessions on a node (active|idle).
- * @param {number} nodeId executor node id
- * @returns {Promise<number>} number of updated rows
- */
-export async function crashOccupiedOnNode(nodeId) {
-  const db = getDB();
-  const now = new Date();
-  return db(TABLE)
-    .where({ executor_node_id: Number(nodeId) })
-    .whereIn('status', [...REMOTE_SESSION_OCCUPIED])
-    .update({ status: 'crashed', closed_at: now, trajectory_id: null });
-}
-
-/**
  * Crash occupied rows whose executor node is offline / missing.
  * @returns {Promise<number>} number of updated rows
  */
