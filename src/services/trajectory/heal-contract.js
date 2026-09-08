@@ -41,7 +41,7 @@ function pickOptionText(action, params) {
     || '',
   ).trim();
   if (explicit) return explicit;
-  if (['select_option', 'select_tree_option', 'click_radio'].includes(action)) {
+  if (['select_option', 'select_tree_option', 'tssc_multi_select', 'click_radio'].includes(action)) {
     return String(params?.value || params?.option || params?.text || '').trim();
   }
   return '';

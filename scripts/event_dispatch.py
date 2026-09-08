@@ -25,6 +25,7 @@ _REPLAY_ACTION_SIGNATURES = {
     "click_adjacent_button": {"label_text"},
     "click_radio": {"label_text", "option_text"},
     "select_tree_option": {"label_text", "option_text"},
+    "tssc_multi_select": {"label_text", "option_text"},
     "switch_tab": {"tab_name"},
     "close_dialog": set(),
     "go_to_url": {"url"},

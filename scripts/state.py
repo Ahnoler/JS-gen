@@ -51,7 +51,7 @@ _SKIP_SCREENSHOT_ACTIONS = frozenset({
 # Action → old-format command mapping (legacy, mirrors models/action.py:ACTION_TO_COMMAND)
 _ACTION_TO_COMMAND = {
     'fill_form_field': 'input',
-    'select_option': 'select', 'select_tree_option': 'select',
+    'select_option': 'select', 'select_tree_option': 'select', 'tssc_multi_select': 'select',
     'click_element_by_index': 'click', 'click_menu_item': 'click',
     'click_table_row_button': 'click', 'click_table_row_radio': 'click',
     'click_adjacent_button': 'click', 'click_radio': 'click',
@@ -64,7 +64,7 @@ _ACTION_TO_COMMAND = {
 # Consecutive ops on the same page element coalesce → keep the later step.
 _FIELD_COALESCE_ACTIONS = frozenset({
     'fill_form_field',
-    'select_option', 'select_tree_option', 'click_radio',
+    'select_option', 'select_tree_option', 'tssc_multi_select', 'click_radio',
 })
 
 

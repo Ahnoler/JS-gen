@@ -12,6 +12,7 @@ const FIELD_ACTIONS = new Set([
   'fill_form_field',
   'select_option',
   'select_tree_option',
+  'tssc_multi_select',
   'click_radio',
 ]);
 

@@ -41,6 +41,7 @@ export const SINGLE_TARGET_ACTIONS = Object.freeze([
   'fill_form_field',
   'select_option',
   'select_tree_option',
+  'tssc_multi_select',
   'click_radio',
   'click_element_by_index',
   'click_menu_item',
@@ -257,7 +258,8 @@ export function prepareElementJson({
               : action === 'click_adjacent_button' ? 'adjacent_button'
                 : action === 'close_dialog' ? 'dialog_close'
                   : action === 'select_tree_option' ? 'form_tree_select'
-                    : action.startsWith('fill_') || action === 'select_option'
+                    : action === 'tssc_multi_select' ? 'form_tssc_multi_select'
+                      : action.startsWith('fill_') || action === 'select_option'
                       || action === 'click_radio'
                       ? 'form_input'
                       : '');

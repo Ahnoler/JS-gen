@@ -45,6 +45,7 @@ const FILL_ACTION_TYPES = new Set([
   'select_option',
   'click_radio',
   'select_tree_option',
+  'tssc_multi_select',
 ]);
 
 function parseFormStructureResult(raw) {

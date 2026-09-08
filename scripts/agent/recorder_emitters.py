@@ -198,7 +198,7 @@ def _emit_memory_action_event(agent, _actions, _last_result_str):
                     parsed = {}
                 name = str(parsed.get('action') or '')
                 if name in ('fill_form_field', 'select_option', 'click_radio',
-                            'select_tree_option', 'fill_input'):
+                            'select_tree_option', 'tssc_multi_select', 'fill_input'):
                     lab = str(parsed.get('label') or parsed.get('label_text') or '').strip()
                     if lab:
                         fill_labels.append(lab)
