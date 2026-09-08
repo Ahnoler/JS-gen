@@ -140,7 +140,7 @@ export const GROUP_KB = [{
         message: 'ok',
         data: {
           atoms: [{
-            atomKey: 'product-mgmt:chain-a:2:新增一级分类',
+            atomKey: 'product-mgmt:chain-a:2',
             title: '新增一级分类',
             suggestedFunctionId: 9000000740,
             sourceDoc: 'product-mgmt.docx',
@@ -151,13 +151,14 @@ export const GROUP_KB = [{
             suggestedFlowRef: 'product_library',
             suggestedNodeId: 'add_category',
           }],
-          rejected: [{ atomKey: 'product-mgmt:chain-a:1:进入产品库', reason: 'empty_task_draft' }],
+          rejected: [{ atomKey: 'product-mgmt:chain-a:1', reason: 'empty_task_draft' }],
         },
       }),
       notes: [
         '模块未登记 → NOT_FOUND/404',
         '缺 through-chains.md → 400 VALIDATION',
         '不建交易、不录制',
+        'atomKey 形如 <module>:<chain>:<step>，与步骤标题无关（LLM 重跑稳定）',
         'pageCodes 为页面/组件编号元数据；关键数据块不应再堆 ZJJK 表',
       ],
     },
@@ -174,18 +175,18 @@ export const GROUP_KB = [{
         { name: 'force', type: 'boolean', in: 'body', desc: '可选，true 时跳过重复草稿检查' },
       ],
       reqExample: J({
-        atomKeys: ['product-mgmt:chain-a:2:新增一级分类'],
+        atomKeys: ['product-mgmt:chain-a:2'],
         systemAccountId: 1,
-        functionIdOverrides: { 'product-mgmt:chain-a:2:新增一级分类': 9000000740 },
-        flowRefOverrides: { 'product-mgmt:chain-a:2:新增一级分类': { kbFlowRef: 'product_library', kbFlowNodeId: 'add_category' } },
+        functionIdOverrides: { 'product-mgmt:chain-a:2': 9000000740 },
+        flowRefOverrides: { 'product-mgmt:chain-a:2': { kbFlowRef: 'product_library', kbFlowNodeId: 'add_category' } },
         force: false,
       }),
       respExample: J({
         code: 200,
         message: 'ok',
         data: {
-          created: [{ trajectoryId: 4242, atomKey: 'product-mgmt:chain-a:2:新增一级分类', name: '新增一级分类' }],
-          skipped: [{ atomKey: 'product-mgmt:chain-a:9:不存在', reason: 'unknown_or_stale_atom' }],
+          created: [{ trajectoryId: 4242, atomKey: 'product-mgmt:chain-a:2', name: '新增一级分类' }],
+          skipped: [{ atomKey: 'product-mgmt:chain-a:9', reason: 'unknown_or_stale_atom' }],
         },
       }),
       notes: ['atomKeys 必填且非空', '未先 propose → 400', '缺 functionId 且无 override → skipped missing_function_id', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],

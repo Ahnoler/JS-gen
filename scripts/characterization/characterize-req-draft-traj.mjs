@@ -91,6 +91,18 @@ async function main() {
     assert.match(key, /^demo-mod:/);
   });
 
+  run('buildAtomKey is title-independent and stable', () => {
+    assert.equal(
+      parseMod.buildAtomKey({ moduleKey: 'product-mgmt', chainId: 'chain-a', stepIndex: 2 }),
+      'product-mgmt:chain-a:2',
+    );
+    assert.equal(parseMod.buildAtomKey({ moduleKey: 'product-mgmt', chainId: 'chain-a' }), 'product-mgmt:chain-a:0');
+    assert.equal(
+      parseMod.buildAtomKey({ moduleKey: 'product-mgmt', chainId: 'chain-a', stepIndex: 2, title: '完全不同的标题' }),
+      'product-mgmt:chain-a:2',
+    );
+  });
+
   await runAsync('resolveChapterRef finds chapter by ZJJK', async () => {
     const parsed = parseMod.parseThroughChainsMarkdown(md);
     const chapter = await provMod.resolveChapterRef({

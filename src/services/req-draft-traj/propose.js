@@ -308,7 +308,6 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
       moduleKey,
       chainId: chain.chainId,
       stepIndex: atomKeyStepIndex,
-      title,
     });
     return { rejected: { atomKey, reason: 'multi_write_atom' } };
   }
@@ -317,7 +316,6 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     moduleKey,
     chainId: chain.chainId,
     stepIndex: atomKeyStepIndex,
-    title,
   });
 
   const provenanceStep = findStepByIndex(chain, atomKeyStepIndex) || primaryStep;
