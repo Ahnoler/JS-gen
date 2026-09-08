@@ -344,23 +344,6 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                 )
                 if not xpath_smart and not is_tree and not is_tssc:
                     result = resolve_error or 'xpath-not-found'
-                elif kind in ('fill_input', 'fill', 'input'):
-                    if field_kind == 'date':
-                        result = await page.evaluate(
-                            JS_FILL_DATE_BY_XPATH, [xpath_smart, value],
-                        )
-                    else:
-                        result = await page.evaluate(
-                            JS_FILL_BY_XPATH, [xpath_smart, value, placeholder],
-                        )
-                elif field_kind == 'radio' or kind in ('click_radio', 'radio'):
-                    result = await page.evaluate(
-                        JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
-                    )
-                elif field_kind == 'checkbox' or kind == 'checkbox':
-                    result = await page.evaluate(
-                        JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
-                    )
                 elif is_tssc:
                     result = await page.evaluate(JS_TSSC_MULTI_SELECT, [label, value])
                 elif is_tree:
@@ -405,6 +388,23 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                                     element = await _capture_element(
                                         page, label, target_kind='form_select',
                                     )
+                elif kind in ('fill_input', 'fill', 'input'):
+                    if field_kind == 'date':
+                        result = await page.evaluate(
+                            JS_FILL_DATE_BY_XPATH, [xpath_smart, value],
+                        )
+                    else:
+                        result = await page.evaluate(
+                            JS_FILL_BY_XPATH, [xpath_smart, value, placeholder],
+                        )
+                elif field_kind == 'radio' or kind in ('click_radio', 'radio'):
+                    result = await page.evaluate(
+                        JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
+                    )
+                elif field_kind == 'checkbox' or kind == 'checkbox':
+                    result = await page.evaluate(
+                        JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
+                    )
                 elif kind in ('select_option', 'select', 'option'):
                     result = await _select_by_xpath(page, value, xpath_smart, label)
                 else:
@@ -434,7 +434,9 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                         element=element,
                         before_b64=before_b64,
                     )
-                elif kind in ('fill_input', 'fill', 'input') and field_kind != 'tree-select':
+                elif kind in ('fill_input', 'fill', 'input') and field_kind not in (
+                    'tree-select', 'tssc-multi-select',
+                ):
                     await record_action_with_screenshots(
                         page,
                         'fill_form_field',

@@ -67,6 +67,19 @@ checks = [
     ("scripts/state.py", ("tssc_multi_select",)),
     ("src/models/action-name.js", ("tssc_multi_select",)),
     ("src/cdp/page-locator-helpers.js", ("form_tssc_multi_select", ".tssc-multi-select")),
+    ("scripts/controller/actions/result_protocol.py", (
+        '"tssc-multi-select"',
+        "tssc_multi_select(label_text",
+    )),
+    ("scripts/controller/actions/_llm_values.py", (
+        "kind == 'tssc-multi-select'",
+        "'action': 'tssc_multi_select'",
+    )),
+    ("scripts/controller/actions/autofill_round.py", (
+        "elif is_tssc:",
+        "field_kind not in (",
+        "'tssc-multi-select'",
+    )),
 ]
 
 ok = all(needle(path, *texts) for path, texts in checks) and classify_before_el_select()
