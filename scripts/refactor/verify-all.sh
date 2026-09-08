@@ -147,6 +147,8 @@ run "characterize-req-draft-fk-guard" node scripts/characterization/characterize
 run "characterize-flow-card-recall" node scripts/characterization/characterize-flow-card-recall.mjs
 run "characterize-atom-keydata" node scripts/characterization/characterize-atom-keydata.mjs
 run "characterize-network-capture" node scripts/characterization/characterize-network-capture.mjs
+run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-staging.py
+run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
@@ -154,5 +156,3 @@ if [ "$FAILED" -ne 0 ]; then
   exit 1
 fi
 echo "verify-all: ALL GREEN"
-run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-staging.py
-run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py
