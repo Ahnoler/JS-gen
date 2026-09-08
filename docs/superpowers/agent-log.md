@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 10:07 · Cursor Lead — 开工：SDD 执行 atom-record flow-card recall 计划（用户选 Subagent-Driven）
+
+- 进行中：计划 `docs/superpowers/plans/2026-09-08-atom-record-flow-card-recall.md`；workspace `.superpowers/sdd/2026-09-08-atom-record-flow-card-recall/`；Task 1→7
+- 范围：migrations + trajectory-dao/meta + kb-flow-cards + req-draft-traj recall/propose/commit + prepare inject + preview API + docs
+- 禁入：轨迹查询 WIP、Vue RecordingDialog/vite WIP、propose-cache JSON、未批准不 migrate/重启
+- 方式：每 Task 子代理实现 + 任务审查；本文件仅声明
+
 ## 2026-09-08 10:03 · Cursor — 开工+收工：原子录制召回流程卡实现计划
 
 - 完成：用户 OK spec；计划 → `docs/superpowers/plans/2026-09-08-atom-record-flow-card-recall.md`（7 Task：migrate/DAO → recall helpers → propose suggest → commit 落库 → prepare 注入 → preview API → docs）
