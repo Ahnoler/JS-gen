@@ -833,7 +833,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       await trajectoryPhaseDao.updateStatus(phase.id, 'running');
       if (session) session.activePhaseId = phase.id;
 
-      const { idleP } = startPhaseWatchdog(phase);
+      const idleP = startPhaseWatchdog(phase);
 
       // phase_done / phase_error have no fixed timeout — the activity watchdog above
       // is the only timeout, so a long auto-fill phase cannot be killed at 300s.
