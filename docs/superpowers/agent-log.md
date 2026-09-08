@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 23:10 · ZCode KB 加固线 — 开工：KB 链路加固 Task 0 + 四线（A/B/C/D）连续执行
+
+- 进行中：23:10。按已批准 spec（`specs/2026-09-08-kb-remediation-design.md`）+ plan（`plans/2026-09-08-kb-remediation.md`）实施 Task 0→A(1/2/9)→B(3/4/8/13)→C(6/7)→D(5/10/11/12/14 连续执行)。开工本条目顺带把 spec/plan 两份未入库文档 carry 进 commit
+- 范围：`scripts/refactor/verify-all.sh`、`src/services/req-draft-traj/**`（parse-through-chains/propose/propose-cache/commit/provenance/flow-card-recall/atom-keydata）、`src/dao/trajectory-dao.js`、`src/services/trajectory/trajectory-meta-service.js`、`src/routes/v2/kb.js`、`src/dashboard/api-docs/groups/kb.js`、`src/http/upload-xlsx.js`（只读复用）、`migrations/`（新增三笔）、`.gitignore`、`scripts/characterization/characterize-req-draft-traj.mjs|characterize-flow-card-recall.mjs|characterize-kb-recall.py|fixtures/kb-recall-golden.json`、`scripts/kb/recall.py|promote_draft.mjs|propose-stats.mjs`、`scripts/prompts/skills/req-doc-to-kb/SKILL.md`（仅登记）、`AGENTS.md`（跨语言单源补一行）、`data/kb/staging/`（运行期 JSONL）；本文件
+- 禁入区：`config/update-db-whitelist.ps1`（他线 M 态）、`data/kb/req/**/.draft-traj-propose.json`（禁止手改，Task 3 只加 gitignore）、`data/kb/flows/**`（禁止手改）、`src/services/trajectory/**` 除 `trajectory-meta-service.js` 一处透传、`scripts/controller/**`（引擎热区）、其余他线 WIP
+- 方式：主会话连续执行（不派子智能体改文件）；每 Task 先 pin 后实现后复跑 verify-all；全程禁 `prepare`/`record/start`/`detach`；迁移 up/down 成对 + hasColumn 守卫；api-docs 同步每笔
+
 ## 2026-09-08 23:00 · Cursor Lead — 收工：轻量每步末扫通知（回链 22:50）
 
 - 完成：AI_STEP_NOTICE_SCAN（默认开）；JS_SCAN_STEP_NOTICES；on_step_end 注入【页面通知】去重 cue；成功 toast 顺带 toast_ok；复用既有 JS_NOTIFY_HOOK 兜底短命通知
