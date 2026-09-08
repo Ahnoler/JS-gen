@@ -1,7 +1,7 @@
 # 知识库链路加固 — 设计（切片 / 存储 / 召回 / 草稿交易）
 
 > 日期：2026-09-08  
-> 状态：**已确认**（2026-09-08 决策按推荐全部采纳，进入 [`plans/2026-09-08-kb-remediation.md`](../plans/2026-09-08-kb-remediation.md) 实施）  
+> 状态：**已实施**（2026-09-08 Task 0+四线 13 任务落地，commit 区间 `fb9f3a5b..9caadef9`，终轮 verify-all ALL GREEN；证据 `tmp/kb-remediation/`。遗留：§6.4 前端派单未做、F-15 需 Lead 另批、py 召回 5 条分歧待收敛、服务器部署跑三笔迁移 20260908231500/233000/235000）  
 > 审查者：DeepSeek Harness（reviewer）  
 > 被审快照：HEAD `93cd430f`（审查期间由 `475328d4` 推进而来）→ 现行快照 `e8127000`（pageCodes 特性 `atom-keydata.js` 与死代码清理线已落地，基线 characterization 25 → 26）  
 > 相关：[`2026-09-07-req-to-draft-traj-design.md`](./2026-09-07-req-to-draft-traj-design.md)、[`2026-09-08-atom-record-flow-card-recall-design.md`](./2026-09-08-atom-record-flow-card-recall-design.md)、[`2026-09-08-req-draft-wizard-ui-design.md`](./2026-09-08-req-draft-wizard-ui-design.md)  

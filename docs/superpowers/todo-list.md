@@ -20,6 +20,9 @@
 - **余（可选 polish）**：前端 dev 下手工/Playwright 四步湿测 + DevTools 确认无录制 API；`npm run build`（vue-tsc）例行门闩
 - **现状（2026-09-08 用户）**：SPA 已过完，**⑧ 整线进入 bug 测试期**——测试发现的 bug 随测随派修复单；各会话接到 ⑧ 相关 bug 单先看本节与两份报告（wet/quality-rerun）再动手
 - **流程卡召回 prepare 注入已合入（2026-09-08 SDD）**：`1ad954fe`→`5cca1e8d`；spec [`specs/2026-09-08-atom-record-flow-card-recall-design.md`](specs/2026-09-08-atom-record-flow-card-recall-design.md) / plan [`plans/2026-09-08-atom-record-flow-card-recall.md`](plans/2026-09-08-atom-record-flow-card-recall.md)；⑧ 测试缺 `【流程卡模板】`→查 migrate + traj `kbFlowRef` + 卡文件
+- **KB 链路加固已落地（2026-09-08 加固线，13 任务 ALL GREEN，`fb9f3a5b..9caadef9`）**：atomKey 稳定化+回填、幂等全状态+`req_atom_seq` 唯一索引、propose 缓存 cacheVersion/sourceHash 失效、4xx 错误语义、出处锚点 `req_source_hash`/`req_chunk_id`+commit 回查、召回 idf 重写（800 字 654ms→2ms）+跨语言金样例契约、validate 端点、paasUserId、functionIdCandidates、reference_step 守卫+truncated、观测 JSONL、source 上传、promotedAt；spec [`specs/2026-09-08-kb-remediation-design.md`](specs/2026-09-08-kb-remediation-design.md)
+- **待办：前端派单（spec §6.4）**：向导禁用条件 `hasThroughChains`→`canProposeAtoms` + `functionIdCandidates` 候选下拉（commit 仍以 functionIdOverrides 为准）；api-docs 契约已就绪，Vue 仓另改
+- **待办：服务器部署**跑三笔新迁移 `20260908231500_req_atom_key_stable` / `20260908233000_req_atom_seq_unique`（遇历史重复会显式报错，人工合并后重跑）/ `20260908235000_req_source_anchor`
 - **through-chains 全量 proposeable（2026-09-08 Zcode 连续执行）**：29/29 模块 `canProposeAtoms=true`（P0 customer-corp+rating → P1 两波 25 模块子智能体编队 → credit-retail 补漏 + product-mgmt B-G 链表格化）；每模块机械核对原文 ZJJK 码/「」短语零缺失；接口型/无码模块（limit-ctrl-api/portal/system-mgmt/meeting-mgmt 等）ZJJK 列如实 `—`；业务口径零删减。commit `3c9b5d39`/`17b1cd6d`/`c35f2983`+补漏。规范=[`guides/through-chains-proposeable-format.md`](guides/through-chains-proposeable-format.md)
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
