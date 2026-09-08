@@ -1,7 +1,7 @@
 # 需求草稿向导：关键数据分层 + 候选假流式 UX — 设计
 
 > 日期：2026-09-08  
-> 状态：待用户审阅（会话已口头认可方向）  
+> 状态：已批准（会话 OK）  
 > 前置：[`2026-09-08-req-draft-wizard-ui-design.md`](./2026-09-08-req-draft-wizard-ui-design.md)；atomize：`scripts/prompts/req-draft-traj-atomize-prompt.md`  
 > 前端：`vue-project` 录制向导；后端：propose/commit（本版 **不** 改 SSE）
 
