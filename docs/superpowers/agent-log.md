@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 10:03 · Cursor — 开工+收工：原子录制召回流程卡实现计划
+
+- 完成：用户 OK spec；计划 → `docs/superpowers/plans/2026-09-08-atom-record-flow-card-recall.md`（7 Task：migrate/DAO → recall helpers → propose suggest → commit 落库 → prepare 注入 → preview API → docs）
+- 验收：计划对照 spec §5–§12 覆盖自检通过；禁入轨迹查询 WIP / Vue 手改 UI
+- 遗留：待用户选 Subagent-Driven 或 Inline 执行
+- 注意：仅文档；未动业务代码
+
 ## 2026-09-08 09:53 · Cursor — 开工+收工：原子录制召回流程卡设计（方案 A 落库列）
 
 - 完成：用户确认注入时机=prepare/record；落库=trajectory 新列 `kb_flow_ref`/`kb_flow_node_id`。spec → `docs/superpowers/specs/2026-09-08-atom-record-flow-card-recall-design.md`（待用户审阅后再 writing-plans）
