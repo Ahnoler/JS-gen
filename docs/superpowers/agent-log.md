@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 21:12 · OpenCode — 收工：Windows 执行机 CDP IPv6 localhost 连接修复
+
+- 完成：回链 20:28 开工条目；`factory.py` 在 Windows 下将 browser_use 的本地 CDP 连接端点固定为 `127.0.0.1`，并优先选择可用系统 Chrome，规避 Chromium 1208 在本机启动即退出
+- 验收：`python -m py_compile scripts/browser/factory.py` 通过；`git diff --check` 通过；独立 CDP 启动烟测输出 `CDP_IPV4_SMOKE_OK port=19377 session=BrowserSession`
+- 遗留移交：需重启当前执行机进程后再从控制面发起一次真实 session；若用户必须使用 Playwright Chromium，可通过 `CHROME_PATH` 显式指定可启动的浏览器
+- 注意：提交仅包含 `scripts/browser/factory.py` 与本日志；`config/*` 的既有未提交改动未触碰
+
 ## 2026-09-08 20:28 · OpenCode — 开工：Windows 执行机 CDP IPv6 localhost 连接修复
 
 - 进行中：修复本地执行机启动 Chromium 后 `browser_use` 通过 `localhost` 解析到 `::1`、无法连接仅监听 IPv4 的 CDP 端口问题

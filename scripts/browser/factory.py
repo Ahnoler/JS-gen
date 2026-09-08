@@ -19,6 +19,40 @@ from ..cdp_ports import _pick_free_cdp_port
 _dialog_task_refs: set[asyncio.Task] = set()
 
 
+class _Ipv4BrowserTypeProxy:
+    """Rewrite browser_use's hard-coded localhost CDP URL to IPv4."""
+
+    def __init__(self, browser_type):
+        self._browser_type = browser_type
+
+    def __getattr__(self, name):
+        return getattr(self._browser_type, name)
+
+    async def connect_over_cdp(self, endpoint_url, *args, **kwargs):
+        endpoint_url = str(endpoint_url).replace('://localhost:', '://127.0.0.1:')
+        return await self._browser_type.connect_over_cdp(endpoint_url, *args, **kwargs)
+
+
+class _Ipv4PlaywrightProxy:
+    """Expose an IPv4-safe Chromium BrowserType to browser_use."""
+
+    def __init__(self, playwright):
+        self._playwright = playwright
+        self.chromium = _Ipv4BrowserTypeProxy(playwright.chromium)
+
+    def __getattr__(self, name):
+        return getattr(self._playwright, name)
+
+
+class _LocalChromeBrowser(Browser):
+    """Keep browser_use launch behavior while fixing Windows CDP resolution."""
+
+    async def _setup_user_provided_browser(self, playwright):
+        if os.name == 'nt':
+            playwright = _Ipv4PlaywrightProxy(playwright)
+        return await super()._setup_user_provided_browser(playwright)
+
+
 # System browsers used when the Playwright-managed Chromium build is missing.
 _SYSTEM_CHROME_CANDIDATES = [
     r'C:\Program Files\Google\Chrome\Application\chrome.exe',
@@ -67,11 +101,13 @@ async def _resolve_chromium_executable() -> str | None:
 
     Priority:
       1. CHROME_PATH env override (explicit user choice)
-      2. Playwright-bundled Chromium — only if the file actually exists
+      2. System Chrome / Edge on Windows (Playwright Chromium may exit immediately
+         on some Windows installations when launched with a remote debugging port)
+      3. Playwright-bundled Chromium — only if the file actually exists
          (pw.chromium.executable_path is the *expected* path; it can point to a
-         missing build when playwright was upgraded without `playwright install`)
-      3. Any installed ms-playwright chromium-*/ build (covers build mismatch)
-      4. System Chrome / Edge
+          missing build when playwright was upgraded without `playwright install`)
+      4. Any installed ms-playwright chromium-*/ build (covers build mismatch)
+      5. System Chrome / Edge on non-Windows platforms
 
     Returns None when nothing usable is found (caller falls back to builtin
     launch, which then surfaces Playwright's own install hint).
@@ -82,6 +118,13 @@ async def _resolve_chromium_executable() -> str | None:
             return override
         sys.stderr.write(f'WARN: CHROME_PATH={override} does not exist; ignoring\n')
         sys.stderr.flush()
+
+    if sys.platform == 'win32':
+        for cand in _SYSTEM_CHROME_CANDIDATES:
+            if Path(cand).is_file():
+                sys.stderr.write(f'Using system browser: {cand}\n')
+                sys.stderr.flush()
+                return cand
 
     try:
         from playwright.async_api import async_playwright
@@ -355,7 +398,7 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
             f"port={port} exe={exe} headless={headless}\n"
         )
         sys.stderr.flush()
-        browser = Browser(config=BrowserConfig(
+        browser = _LocalChromeBrowser(config=BrowserConfig(
             browser_binary_path=exe,
             chrome_remote_debugging_port=port,
             headless=headless,
