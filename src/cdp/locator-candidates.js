@@ -20,7 +20,6 @@ export {
   classTokenPred,
   hasClassToken,
   isGeneratedId,
-  isGeneratedName,
 } from './locator-builders/text.js';
 export { detectContainerKind, withOccurrence } from './locator-builders/scope.js';
 export {
@@ -35,11 +34,9 @@ export {
   buildAdjacentButtonXPathSmart,
   buildTreeNodeXPathSmart,
   buildPlaceholderXPathSmart,
-  isMenuLike,
 } from './locator-builders/controls.js';
 export { buildXPathSmart } from './locator-builders/dispatcher.js';
 export {
-  buildCandidates,
   sanitizeAttributes,
   enrichLocatorFields,
 } from './locator-builders/candidates.js';
