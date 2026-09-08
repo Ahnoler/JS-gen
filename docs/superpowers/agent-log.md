@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 17:42 · Cursor Lead — 开工：TsscMultiSelect 专用动作设计（对标 select_tree_option）
+
+- 进行中：17:42。用户确认专用动作，并要求契约参考已注册 tree-select 族
+- 范围：`docs/superpowers/specs/2026-09-08-tssc-multi-select-action-design.md`；本文件；审过后再写 plan / 动 `scripts/controller/actions/**`、prompts、characterize（未开工代码）
+- 禁入：遗留 #61/#66/#503；`config/update-db-whitelist.ps1`；`data/kb/req/**/.draft-traj-propose.json`；trajectory-dao 他线 WIP；不改 introduce_pick 门闩
+- 方式：spec → 用户审文件 → writing-plans → 实现；扫描分流须在 `.el-select` 之前；匹配键修「只认第一列英文」
+
 ## 2026-09-08 17:21 · Cursor Lead — 收工：产品要素库原子重录湿测（回链 16:10 / 16:28 / 16:40 / 16:45）
 
 - 完成：T2 #694 recorded PASS；T3 #695 / T4 #696 业务有保存成功证据但轨迹 failed；T1 #693 废止；顺带修 page-bind 关窗 `93112677` + idleP 竞态 `a01b7461`
