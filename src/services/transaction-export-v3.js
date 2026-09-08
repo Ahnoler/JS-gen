@@ -45,6 +45,61 @@ function rectToString(rect) {
     : '';
 }
 
+/**
+ * 弹窗子树重排：把每个已挂触发链的 popup 条目（连同其 PID 子树）移动到触发图标行
+ * 紧后面（同层级展示，产品经理定版），随后按新数组顺序重编 propertiesID 并同步改写
+ * propertiesPID 引用。未挂触发链的 popup 保持原位（page 之后）。
+ * @param {Array<object>} properties 合并后的 transcationProperties（原地修改）
+ * @param {Array<{popupId: string, afterId: string}>} popupOrder 弹窗→触发行锚点清单
+ * @returns {void}
+ */
+function reorderPopupSubtrees(properties, popupOrder) {
+  if (!Array.isArray(popupOrder) || !popupOrder.length) return;
+  const propsById = new Map(properties.map((p) => [String(p.propertiesID), p]));
+  const childrenByPid = new Map();
+  for (const p of properties) {
+    const pid = String(p.propertiesPID || '0');
+    if (pid === '0') continue;
+    if (!childrenByPid.has(pid)) childrenByPid.set(pid, []);
+    childrenByPid.get(pid).push(p);
+  }
+  const movedIds = new Set();
+  for (const { popupId, afterId } of popupOrder) {
+    const popup = propsById.get(String(popupId));
+    const anchor = propsById.get(String(afterId));
+    if (!popup || !anchor || movedIds.has(String(popupId))) continue;
+    // 收集 popup 子树（含自身）
+    const subtree = [];
+    const queue = [popup];
+    const seen = new Set();
+    while (queue.length) {
+      const cur = queue.shift();
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      subtree.push(cur);
+      for (const child of childrenByPid.get(String(cur.propertiesID)) || []) queue.push(child);
+    }
+    const anchorIdx = properties.indexOf(anchor);
+    if (anchorIdx < 0) continue;
+    for (const node of subtree) {
+      const idx = properties.indexOf(node);
+      if (idx >= 0) properties.splice(idx, 1);
+    }
+    const insertAt = properties.indexOf(anchor) + 1;
+    properties.splice(insertAt, 0, ...subtree);
+    for (const node of subtree) movedIds.add(String(node.propertiesID));
+  }
+  if (!movedIds.size) return;
+  // 按新数组顺序重编 ID，并同步改写所有 PID 引用（'0' 根引用不变）
+  const idRemap = new Map();
+  properties.forEach((p, idx) => idRemap.set(String(p.propertiesID), String(idx + 1)));
+  for (const p of properties) {
+    const oldPid = String(p.propertiesPID || '0');
+    p.propertiesID = idRemap.get(String(p.propertiesID)) || String(p.propertiesID);
+    if (oldPid !== '0') p.propertiesPID = idRemap.get(oldPid) || oldPid;
+  }
+}
+
 /** 超长字段截断上限（消费方单列存储长度约束）；未列字段不截断。 */
 const FIELD_LENGTH_LIMITS = Object.freeze({
   elementType: 2000,
@@ -125,6 +180,7 @@ export function buildTransactionEntryV3(traj, {
     noRectControls,
     normalizedRects,
     popupTriggerLinked,
+    popupOrder,
   } = buildV3Properties({
     traj,
     phases,
@@ -138,6 +194,7 @@ export function buildTransactionEntryV3(traj, {
 
   // 合并：截图在前，控件在后；rect 统一序列化为 JSON 字符串（空给 ""）；一起参与 propertiesName 去重
   const properties = [...screenshotEntries, ...controlProperties];
+  reorderPopupSubtrees(properties, popupOrder);
   for (const p of properties) {
     p.rect = rectToString(p.rect);
   }

@@ -187,8 +187,11 @@ export function buildTreeFromV3Flat(properties) {
   }
   // 第三遍：控件条目建 items；记录 eleId → { item, owner }，供 popup 挂触发按钮行内
   const eleItemById = new Map();
+  const itemBySrc = new Map(); // srcIdx → { item, owner }（弹窗交错渲染用）
   let eleNo = 0;
-  for (const p of properties || []) {
+  const propList = properties || [];
+  for (let pIdx = 0; pIdx < propList.length; pIdx++) {
+    const p = propList[pIdx];
     if (p.type !== 'ele') continue;
     eleNo += 1;
     const parent = nodeMap.get(String(p.propertiesPID ?? '')) || root;
@@ -200,12 +203,14 @@ export function buildTreeFromV3Flat(properties) {
       regionId: String(p.regionId || '').trim(),
       hasBbox: !!(p.rect && p.rect.x2 > p.rect.x1 && p.rect.y2 > p.rect.y1),
       eleId: String(p.propertiesID ?? ''),
+      srcIdx: pIdx,
       children: [],
     };
     eleItemById.set(item.eleId, item);
     // PID 链已表达分区层级：pid 命中中间节点（section/tab/wizard/card）则直接挂，不再 regionId 拆段
     if (parent !== root && V3_INTERMEDIATE_ROLES.has(parent.role)) {
       parent.items.push(item);
+      itemBySrc.set(pIdx, { item, owner: parent });
       continue;
     }
     // fallback（旧数据无中间节点 / pid 直指 page-popup / pid 未命中）：regionId 拆段建中间层
@@ -234,22 +239,50 @@ export function buildTreeFromV3Flat(properties) {
       cur = child;
     }
     cur.items.push(item);
+    itemBySrc.set(pIdx, { item, owner: cur });
   }
-  // 第四遍：popup 挂父子——父命中节点直接挂（旧结构 pid 指向 page）；否则挂触发按钮
-  // ele 条目行内（触发链导出：弹窗 propertiesPID 指向触发图标按钮的 propertiesID）
-  for (const p of properties || []) {
+  // 第四遍：popup 挂父子——新导出弹窗与触发图标行同层级（pid 指向触发行父节点），
+  // 按数组顺序把弹窗节点挂到前一个控件行所属节点、entries 交错渲染在触发行紧后面；
+  // 旧数据 pid 指向触发按钮 ele 条目时仍行内嵌套。
+  for (let pIdx = 0; pIdx < propList.length; pIdx++) {
+    const p = propList[pIdx];
     if (p.type !== 'popup') continue;
     const node = nodeMap.get(String(p.propertiesID ?? ''));
     if (!node) continue;
     const parentNode = nodeMap.get(String(p.propertiesPID ?? ''));
     if (parentNode) {
-      parentNode.children.push(node);
+      // 交错定位：数组顺序中位于本弹窗之前、最近的控件行及其所属节点
+      let anchor = null;
+      for (let j = pIdx - 1; j >= 0; j--) {
+        if (itemBySrc.has(j)) { anchor = itemBySrc.get(j); break; }
+      }
+      const owner = anchor?.owner || parentNode;
+      if (!owner.children.includes(node)) owner.children.push(node);
+      if (anchor) (anchor.item._afterPopups ||= []).push(node);
       continue;
     }
     const triggerItem = eleItemById.get(String(p.propertiesPID ?? ''));
     if (triggerItem) triggerItem.children.push(node);
     else root.children.push(node);
   }
+  // 交错渲染序列：有 _afterPopups 的节点按 entries（item/child 交错）输出
+  // （递归遍历，regionId 拆段产生的动态节点不在 nodeMap 中）
+  const visit = (nd) => {
+    if (Array.isArray(nd?.items) && nd.items.some((it) => Array.isArray(it._afterPopups) && it._afterPopups.length)) {
+      nd.entries = [];
+      nd.items.forEach((it, iIdx) => {
+        nd.entries.push({ kind: 'item', index: iIdx });
+        for (const popNode of it._afterPopups || []) {
+          const cIdx = nd.children.indexOf(popNode);
+          if (cIdx >= 0) nd.entries.push({ kind: 'child', index: cIdx });
+        }
+      });
+    }
+    for (const c of nd?.children || []) {
+      if (c && c.items) visit(c);
+    }
+  };
+  visit(root);
   return root;
 }
 

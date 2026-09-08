@@ -55,7 +55,7 @@ function isLegalRect(bbox) {
  * @param {Map<string,number>} [opts.idByPageLevel] - pageKey/popupKey → entryId 映射
  * @param {Map<string,number>} [opts.idByPageLevelNorm] - 规范化 pageKey/popupKey → entryId 映射
  * @param {Map<string,object>} [opts.pageLevelById] - entryId → 截图条目映射
- * @returns {{properties: Array, metaActions: number, absoluteFallback: number, missingOptions: number, noRectControls: number, normalizedRects: number, popupTriggerLinked: number}}
+ * @returns {{properties: Array, metaActions: number, absoluteFallback: number, missingOptions: number, noRectControls: number, normalizedRects: number, popupTriggerLinked: number, popupOrder: Array<{popupId: string, afterId: string}>}}
  *   properties - 控件 properties 数组
  *   metaActions - 元操作计数
  *   absoluteFallback - 绝对回退计数
@@ -391,17 +391,20 @@ export function buildV3Properties({
       };
       properties.push(node);
     }
-    objectIdByStepIdx.set(stepIdx, String(nextId));
+    objectIdByStepIdx.set(stepIdx, { id: String(nextId), pid: String(elePid || '0') });
   }
 
-  // popup 挂触发对象：popup 的父从 page 改为触发图标按钮的 object 节点（弹窗挂在按钮后面）
+  // popup 挂触发链：popup 的父指向触发图标按钮的父节点（分区/页面）——与触发图标行
+  // 同层级且紧随其后（产品经理定版：同层级比嵌在图标行内更美观；条目顺序仍表达触发关系）
+  const popupOrder = [];
   for (const info of popupInfos) {
     if (info.triggerIdx == null) continue;
-    const triggerObjId = objectIdByStepIdx.get(info.triggerIdx);
-    if (!triggerObjId) continue;
+    const triggerObj = objectIdByStepIdx.get(info.triggerIdx);
+    if (!triggerObj) continue;
     const popupEntry = pageLevelById?.get(info.entryId);
     if (!popupEntry) continue;
-    popupEntry.propertiesPID = triggerObjId;
+    popupEntry.propertiesPID = triggerObj.pid || '0';
+    popupOrder.push({ popupId: String(popupEntry.propertiesID), afterId: triggerObj.id });
     popupTriggerLinked += 1;
   }
 
@@ -416,6 +419,7 @@ export function buildV3Properties({
     noRectControls,
     normalizedRects,
     popupTriggerLinked,
+    popupOrder,
   };
 }
 
