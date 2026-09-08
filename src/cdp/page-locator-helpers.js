@@ -283,6 +283,7 @@ export const PAGE_LOCATOR_HELPERS = `
     if (navRoot && node.closest('li, a')) return 'menu';
     if (node.closest('.el-form-item') && node.closest('button, .el-button')) return 'adjacent_button';
     if (node.closest('.el-date-editor')) return 'form_date';
+    if (node.closest('.tssc-multi-select')) return 'form_tssc_multi_select';
     if (node.closest('.el-select')) return 'form_select';
     if (node.closest('.el-radio-group')) return 'form_radio';
     if (node.closest('.el-tree-select, .el-cascader')) return 'form_tree_select';
@@ -1126,7 +1127,7 @@ export const PAGE_LOCATOR_HELPERS = `
       if (el.closest && el.closest('.el-checkbox-group, .el-checkbox')) return 'form_checkbox';
       const k = detectTargetKind(el);
       if (k === 'form_input' || k === 'form_select' || k === 'form_date' || k === 'form_radio'
-        || k === 'form_checkbox' || k === 'form_tree_select') return k;
+        || k === 'form_checkbox' || k === 'form_tree_select' || k === 'form_tssc_multi_select') return k;
       if (k === 'menu' || k === 'submenu') return 'menu';
       if (k === 'icon') return 'icon';
       if (k === 'tree_node') return 'tree_node';
@@ -1209,7 +1210,7 @@ export const PAGE_LOCATOR_HELPERS = `
     function kindsForAction(action) {
       const a = String(action || '');
       if (a === 'fill_form_field') {
-        return { form_input: 1, form_date: 1, form_radio: 1, form_checkbox: 1, form_tree_select: 1 };
+        return { form_input: 1, form_date: 1, form_radio: 1, form_checkbox: 1, form_tree_select: 1, form_tssc_multi_select: 1 };
       }
       if (a === 'select_option') return { form_select: 1 };
       if (a === 'click_menu_item') return { menu: 1 };
@@ -1369,7 +1370,7 @@ export const PAGE_LOCATOR_HELPERS = `
       const formXp = formFieldXpathSmartOf(node, formLabel);
       if (formXp) return formXp;
     }
-    if (formLabel && (kind === 'form_input' || kind === 'form_date' || kind === 'form_select' || kind === 'form_radio' || kind === 'form_tree_select')) {
+    if (formLabel && (kind === 'form_input' || kind === 'form_date' || kind === 'form_select' || kind === 'form_radio' || kind === 'form_tree_select' || kind === 'form_tssc_multi_select')) {
       const formXp = formFieldXpathSmartOf(node, formLabel);
       if (formXp) return formXp;
     }

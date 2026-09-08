@@ -25,6 +25,18 @@ JS_CLASSIFY_FIELD = '''(item) => {
             v = v.$parent;
         }
     }
+    if (item.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
+    {
+        const hosts = item.querySelectorAll('[class*="tssc"], .el-select');
+        for (const host of hosts) {
+            let v = host.__vue__;
+            while (v) {
+                const n = (v.$options && v.$options.name) ? String(v.$options.name) : '';
+                if (n.includes('TsscMultiSelect')) return 'tssc-multi-select';
+                v = v.$parent;
+            }
+        }
+    }
     if (item.querySelector('.el-select')) return 'select';
     if (item.querySelector('.el-radio')) return 'radio';
     if (item.querySelector('.el-checkbox')) return 'checkbox';
