@@ -24,6 +24,7 @@ from .js_snippets.select_trigger import (
 )
 from .js_snippets.select_option import JS_SELECT_OPTION, JS_READ_SELECT_OPTIONS
 from .js_snippets.select_tree import JS_CLICK_RADIO, JS_SELECT_TREE_OPTION, JS_EXPAND_ALL_EL_TREE
+from .js_snippets.tssc_multi_select import JS_TSSC_MULTI_SELECT
 from .js_snippets.vue_model import JS_SET_VUE_MODEL
 from .js_snippets.scan_utils import JS_CLASSIFY_FIELD, JS_FIELD_REQUIRED, JS_READ_CURRENT_VALUE, JS_SECTION_ATTACH_BLOCK, JS_SCROLL_TO_FIRST_ERROR, JS_READ_REFERENCE_DATE, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS
 from .js_snippets.scan_form import JS_SCAN_FORM_FIELDS, JS_CHECK_SINGLE_FIELD
