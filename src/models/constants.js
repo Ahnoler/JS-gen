@@ -14,29 +14,15 @@
 
 /** @typedef {'pending'|'running'|'completed'|'failed'} TrajectoryPhaseStatus */
 
-/** @typedef {'phase'|'step_seq'} OperationComponentGrain */
-
 /** @typedef {'draft'|'confirmed'|'deprecated'} OperationComponentStatus */
-
-/** @type {readonly OperationComponentGrain[]} */
-export const OPERATION_COMPONENT_GRAINS = Object.freeze(['phase', 'step_seq']);
 
 /** @type {readonly OperationComponentStatus[]} */
 export const OPERATION_COMPONENT_STATUSES = Object.freeze(['draft', 'confirmed', 'deprecated']);
 
 /** @typedef {'css'|'xpath_full'|'xpath_smart'} LocatorCandidateType */
 
-/** @type {readonly StepSource[]} */
-export const STEP_SOURCES = Object.freeze(['agent', 'manual', 'cdp']);
-
-/** @type {readonly RemoteSessionStatus[]} */
-export const REMOTE_SESSION_STATUSES = Object.freeze(['active', 'idle', 'closed', 'crashed']);
-
 /** Statuses that still occupy an executor slot / browser. */
 export const REMOTE_SESSION_OCCUPIED = Object.freeze(['active', 'idle']);
-
-/** @type {readonly RemoteSessionIsolation[]} */
-export const REMOTE_SESSION_ISOLATIONS = Object.freeze(['context', 'target']);
 
 /** @type {readonly ApiOverrideMatchType[]} */
 export const API_OVERRIDE_MATCH_TYPES = Object.freeze(['exact', 'prefix', 'regex']);
@@ -44,16 +30,7 @@ export const API_OVERRIDE_MATCH_TYPES = Object.freeze(['exact', 'prefix', 'regex
 /** @type {readonly ApiOverrideScope[]} */
 export const API_OVERRIDE_SCOPES = Object.freeze(['global', 'system', 'process', 'function']);
 
-/** @type {readonly LocatorCandidateType[]} */
-export const LOCATOR_CANDIDATE_TYPES = Object.freeze(['css', 'xpath_full', 'xpath_smart']);
-
 /** @typedef {'xpath_smart'|'xpath_full'} LocatorStrategy */
-
-/** @type {readonly LocatorStrategy[]} */
-export const LOCATOR_STRATEGIES = Object.freeze(['xpath_smart', 'xpath_full']);
-
-/** @type {readonly ExecutorNodeStatus[]} */
-export const EXECUTOR_NODE_STATUSES = Object.freeze(['online', 'draining', 'offline']);
 
 /** @type {readonly TrajectoryRecordStatus[]} */
 export const TRAJECTORY_RECORD_STATUSES = Object.freeze(['draft', 'recording', 'failed', 'recorded', 'completed']);
