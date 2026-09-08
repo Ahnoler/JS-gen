@@ -1,11 +1,65 @@
 /**
  * Req→draft-traj provenance helpers: chapter resolution and atom validation.
  */
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 
 /** Match real page codes like ZJJK00107304 (ignore placeholders such as — / 主页). */
 const ZJJK_CODE_RE = /ZJJK\d{5,}/gi;
+
+/**
+ * Chapter scoring weights (named per spec §7.3 — explainable, ordered
+ * ZJJK hit > title hit > filename hit > content hit; penalties documented inline).
+ */
+const SCORE_ZJJK_HIT = 100;
+const SCORE_TITLE_HIT = 100;
+const SCORE_FILE_HIT = 80;
+const SCORE_CONTENT_HIT = 60;
+const PENALTY_WEAK_OVERVIEW_ZJJK = 50;
+const PENALTY_WEAK_OVERVIEW_HINT = 40;
+const PENALTY_REUSE_MENTION = 25;
+const BOOST_ZJJK_HINT_MAX = 30;
+const BOOST_ZJJK_ACTION_HINT = 15;
+const BOOST_HINT_ACTION_HINT = 20;
+
+/** Chapter content cache: chaptersDir → { signature, files }; bounded LRU. */
+const CHAPTER_CACHE_LIMIT = 64;
+/** @type {Map<string, { signature: string, files: Array<{ fileName: string, content: string, title: string|null }> }>} */
+const chapterCache = new Map();
+
+/**
+ * List chapter .md files with content, cached per chapters directory keyed by
+ * file-name+mtime signature (propose resolves one chapter per atom — without
+ * the cache that is N atoms × M chapter file reads, spec F-16).
+ * @param {string} chaptersDir Absolute path to chapters/
+ * @returns {Promise<Array<{ fileName: string, content: string, title: string|null }>>} Chapter entries sorted by file name
+ */
+async function listChapterFiles(chaptersDir) {
+  const entries = await readdir(chaptersDir);
+  const mdNames = entries.filter((name) => name.endsWith('.md')).sort();
+  const stats = await Promise.all(mdNames.map((name) => stat(join(chaptersDir, name)).catch(() => null)));
+  const signature = mdNames.map((name, i) => `${name}:${stats[i] ? stats[i].mtimeMs : 'x'}`).join('|');
+
+  const cached = chapterCache.get(chaptersDir);
+  if (cached && cached.signature === signature) {
+    chapterCache.delete(chaptersDir);
+    chapterCache.set(chaptersDir, cached);
+    return cached.files;
+  }
+
+  const files = [];
+  for (let i = 0; i < mdNames.length; i += 1) {
+    if (!stats[i]) continue;
+    const content = await readFile(join(chaptersDir, mdNames[i]), 'utf-8');
+    files.push({ fileName: mdNames[i], content, title: extractChapterTitle(content) });
+  }
+  chapterCache.set(chaptersDir, { signature, files });
+  if (chapterCache.size > CHAPTER_CACHE_LIMIT) {
+    const oldest = chapterCache.keys().next().value;
+    chapterCache.delete(oldest);
+  }
+  return files;
+}
 
 /**
  * Extract ordered unique ZJJK codes from a through-chains ZJJK cell
@@ -93,11 +147,11 @@ function scoreChapterHintMatch(fileName, content, chapterHint) {
 
   let score = 0;
   if (normalizedTitle && (normalizedTitle.includes(hint) || hint.includes(normalizedTitle))) {
-    score = 100;
+    score = SCORE_TITLE_HIT;
   } else if (normalizedFile && (normalizedFile.includes(hint) || hint.includes(normalizedFile))) {
-    score = 80;
+    score = SCORE_FILE_HIT;
   } else if (normalizedContent.includes(hint) || hint.includes(normalizedContent.slice(0, hint.length + 20))) {
-    score = 60;
+    score = SCORE_CONTENT_HIT;
   }
 
   // Multi-§ chain hints: score the best fragment (e.g. "配置产品信息" beats overview noise).
@@ -111,17 +165,17 @@ function scoreChapterHintMatch(fileName, content, chapterHint) {
       const fragHint = normalizeHint(frag);
       if (!fragHint) continue;
       if (normalizedTitle && (normalizedTitle.includes(fragHint) || fragHint.includes(normalizedTitle))) {
-        score = Math.max(score, 100);
+        score = Math.max(score, SCORE_TITLE_HIT);
       } else if (normalizedFile && (normalizedFile.includes(fragHint) || fragHint.includes(normalizedFile))) {
-        score = Math.max(score, 80);
+        score = Math.max(score, SCORE_FILE_HIT);
       } else if (normalizedContent.includes(fragHint)) {
-        score = Math.max(score, 60);
+        score = Math.max(score, SCORE_CONTENT_HIT);
       }
     }
   }
 
   if (score > 0 && isWeakOverviewChapter(fileName, title)) {
-    score -= 40;
+    score -= PENALTY_WEAK_OVERVIEW_HINT;
   }
   return score;
 }
@@ -138,27 +192,27 @@ function scoreChapterHintMatch(fileName, content, chapterHint) {
  */
 function scoreZjjkChapterHit(fileName, content, code, chapterHint = '', actionHint = '') {
   const title = extractChapterTitle(content) || '';
-  let score = 100;
+  let score = SCORE_ZJJK_HIT;
   if (isWeakOverviewChapter(fileName, title)) {
-    score -= 50;
+    score -= PENALTY_WEAK_OVERVIEW_ZJJK;
   }
   // "复用" mentions in query chapters should lose to the defining chapter.
   const codeIdx = content.indexOf(code);
   if (codeIdx >= 0) {
     const window = content.slice(Math.max(0, codeIdx - 40), codeIdx + code.length + 40);
     if (/复用/.test(window)) {
-      score -= 25;
+      score -= PENALTY_REUSE_MENTION;
     }
   }
   if (chapterHint) {
     const hintBoost = scoreChapterHintMatch(fileName, content, chapterHint);
-    if (hintBoost > 0) score += Math.min(30, Math.floor(hintBoost / 4));
+    if (hintBoost > 0) score += Math.min(BOOST_ZJJK_HINT_MAX, Math.floor(hintBoost / 4));
   }
   if (actionHint) {
     const actionNorm = normalizeHint(actionHint);
     const contentNorm = normalizeHint(content);
     if (actionNorm.length >= 2 && contentNorm.includes(actionNorm.slice(0, Math.min(8, actionNorm.length)))) {
-      score += 15;
+      score += BOOST_ZJJK_ACTION_HINT;
     }
   }
   return score;
@@ -192,9 +246,10 @@ export async function resolveChapterRef({
   zjjk = '',
   actionHint = '',
 }) {
-  let entries;
+  /** @type {Array<{ fileName: string, content: string, title: string|null }>} */
+  let chapterFiles;
   try {
-    entries = await readdir(chaptersDir);
+    chapterFiles = await listChapterFiles(chaptersDir);
   } catch (e) {
     if (e.code === 'ENOENT') {
       return null;
@@ -202,21 +257,13 @@ export async function resolveChapterRef({
     throw e;
   }
 
-  const mdFiles = entries.filter((name) => name.endsWith('.md')).sort();
-  /** @type {Map<string, string>} */
-  const contentByFile = new Map();
-  for (const fileName of mdFiles) {
-    contentByFile.set(fileName, await readFile(join(chaptersDir, fileName), 'utf-8'));
-  }
-
   const codes = extractZjjkCodes(zjjk);
   /** @type {{ fileName: string, title: string|null, score: number }|null} */
   let bestZjjk = null;
   for (const code of codes) {
-    for (const fileName of mdFiles) {
-      const content = contentByFile.get(fileName) || '';
+    for (const chapter of chapterFiles) {
+      const { fileName, content, title } = chapter;
       if (!content.includes(code)) continue;
-      const title = extractChapterTitle(content);
       const score = scoreZjjkChapterHit(fileName, content, code, chapterHint, actionHint);
       if (!bestZjjk || score > bestZjjk.score) {
         bestZjjk = { fileName, title, score };
@@ -231,14 +278,13 @@ export async function resolveChapterRef({
   let bestFile = null;
   let bestTitle = null;
   let bestScore = 0;
-  for (const fileName of mdFiles) {
-    const content = contentByFile.get(fileName) || '';
+  for (const { fileName, content } of chapterFiles) {
     let score = scoreChapterHintMatch(fileName, content, chapterHint);
     if (actionHint) {
       const actionNorm = normalizeHint(actionHint);
       const contentNorm = normalizeHint(content);
       if (actionNorm.length >= 2 && contentNorm.includes(actionNorm.slice(0, Math.min(8, actionNorm.length)))) {
-        score += 20;
+        score += BOOST_HINT_ACTION_HINT;
       }
     }
     if (score > bestScore) {
