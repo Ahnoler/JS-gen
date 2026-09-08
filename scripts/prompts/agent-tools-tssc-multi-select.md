@@ -1,0 +1,7 @@
+- **tssc_multi_select(label_text, option_text) — 仅用于真正的 TsscMultiSelect（`.tssc-multi-select`，弹层内 `.select-table`/`el-table` 行选，如产品要素「要素名称」、评级「客户名称」）。按任意单元格 / 显示列匹配 `option_text`（不要假设第一列）；`option_text="first"`/`第一个` 选当前页首行。成功码 `ok*` / `ok-already` / `ok-echo`：信任，勿重选。**
+- **🚨 `disabled`：只读（如回填的要素编码）— 禁止再调本动作或 select_option，跳过。**
+- **🚨 `no-tssc-multi-select`：不是本组件 — 禁止重试；改用 `select_option`（真 el-option）或上报。**
+- **🚨 `err-no-echo`：行已点但触发器未回显 — 勿盲目重试；`check_field_value` 或上报。**
+- **🚨 `no-items`：工具已尽力等行 — 最多再调一次；禁止 `click_element_by_index` 点表行。**
+- **本动作只填字段；外层弹窗「确定/确 定」由你 `click_save` / 任务指定按钮点击。**
+- **与 select_option / select_tree_option 分工：TsscMultiSelect 表行选 = tssc_multi_select；普通 el-option = select_option；TsscMultiTree = select_tree_option / tree_picker_click / tree_check_confirm。**
