@@ -142,7 +142,6 @@ run "characterize-kb-req-modules" node scripts/characterization/characterize-kb-
 run "characterize-req-draft-traj" node scripts/characterization/characterize-req-draft-traj.mjs
 run "characterize-req-draft-fk-guard" node scripts/characterization/characterize-req-draft-fk-guard.mjs
 run "characterize-flow-card-recall" node scripts/characterization/characterize-flow-card-recall.mjs
-run "characterize-atom-keydata" node scripts/characterization/characterize-atom-keydata.mjs
 run "characterize-network-capture" node scripts/characterization/characterize-network-capture.mjs
 
 if [ "$FAILED" -ne 0 ]; then
