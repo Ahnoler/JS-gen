@@ -68,18 +68,22 @@ export default function registerKbRoutes(app) {
 
   /** POST /api/v2/kb/req-modules/:moduleKey/draft-traj/commit — 勾选原子建 draft 交易（不录制）。 */
   app.post('/api/v2/kb/req-modules/:moduleKey/draft-traj/commit', asyncHandler(async (req, res) => {
-    const { atomKeys, systemAccountId, functionIdOverrides, force } = req.body || {};
+    const { atomKeys, systemAccountId, functionIdOverrides, flowRefOverrides, force } = req.body || {};
     if (!Array.isArray(atomKeys) || !atomKeys.length) {
       throw new AppError('atomKeys required', { code: 'VALIDATION' });
     }
     const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
       ? functionIdOverrides
       : {};
+    const flowOverrides = (flowRefOverrides && typeof flowRefOverrides === 'object')
+      ? flowRefOverrides
+      : {};
     const result = await reqDraftTraj.commitDraftTrajectories({
       moduleKey: req.params.moduleKey,
       atomKeys,
       systemAccountId,
       functionIdOverrides: overrides,
+      flowRefOverrides: flowOverrides,
       force: Boolean(force),
     });
     sendOk(res, result);

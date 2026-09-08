@@ -125,6 +125,91 @@ async function main() {
       assert.match(src, /matchFlowForAtom/);
     });
 
+    const { writeProposeCache } = await import(
+      pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href,
+    );
+    const { commitDraftTrajectories } = await import(
+      pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href,
+    );
+
+    await runAsync('commitDraftTrajectories persists suggestedFlowRef as kbFlowRef', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'flow-card-commit-'));
+      const modDir = join(tmp, 'demo-mod');
+      mkdirSync(modDir, { recursive: true });
+      const atomKey = 'demo-mod:chain-a:1:客户转正';
+      await writeProposeCache(modDir, {
+        atoms: [{
+          atomKey,
+          title: '客户转正',
+          suggestedFunctionId: 9000000740,
+          suggestedFlowRef: 'customer_onboarding',
+          suggestedNodeId: 'convert',
+          sourceDoc: 'demo.docx',
+          sourceChapter: 'chapters/01-customer.md#对公客户管理',
+          taskDraft: '在对公客户主页点击【客户转正】。',
+        }],
+        rejected: [],
+      });
+
+      let createOpts;
+      const out = await commitDraftTrajectories({
+        moduleKey: 'demo-mod',
+        rootDir: tmp,
+        atomKeys: [atomKey],
+        analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+        createFn: async (opts) => {
+          createOpts = opts;
+          return { id: 4242 };
+        },
+        findDraftFn: async () => null,
+        functionIdExists: async () => true,
+      });
+      assert.equal(out.created.length, 1);
+      assert.equal(createOpts.kbFlowRef, 'customer_onboarding');
+      assert.equal(createOpts.kbFlowNodeId, 'convert');
+      rmSync(tmp, { recursive: true, force: true });
+    });
+
+    await runAsync('commitDraftTrajectories flowRefOverrides win over atom suggestions', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'flow-card-commit-'));
+      const modDir = join(tmp, 'demo-mod');
+      mkdirSync(modDir, { recursive: true });
+      const atomKey = 'demo-mod:chain-a:1:客户转正';
+      await writeProposeCache(modDir, {
+        atoms: [{
+          atomKey,
+          title: '客户转正',
+          suggestedFunctionId: 9000000740,
+          suggestedFlowRef: 'customer_onboarding',
+          suggestedNodeId: 'convert',
+          sourceDoc: 'demo.docx',
+          sourceChapter: 'chapters/01-customer.md#对公客户管理',
+          taskDraft: '在对公客户主页点击【客户转正】。',
+        }],
+        rejected: [],
+      });
+
+      let createOpts;
+      await commitDraftTrajectories({
+        moduleKey: 'demo-mod',
+        rootDir: tmp,
+        atomKeys: [atomKey],
+        flowRefOverrides: {
+          [atomKey]: { kbFlowRef: 'product_library', kbFlowNodeId: 'add_category' },
+        },
+        analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+        createFn: async (opts) => {
+          createOpts = opts;
+          return { id: 4242 };
+        },
+        findDraftFn: async () => null,
+        functionIdExists: async () => true,
+      });
+      assert.equal(createOpts.kbFlowRef, 'product_library');
+      assert.equal(createOpts.kbFlowNodeId, 'add_category');
+      rmSync(tmp, { recursive: true, force: true });
+    });
+
     console.log(`\ncharacterize-flow-card-recall: ${passed} passed`);
   } finally {
     rmSync(tmpFlows, { recursive: true, force: true });

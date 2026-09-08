@@ -42,6 +42,7 @@ async function isKnownFunctionId(functionId, existsFn = null) {
  * @param {string} [opts.rootDir] Module workspace root (default data/kb/req)
  * @param {number|null} [opts.systemAccountId] Optional system account id
  * @param {Record<string, number|string>} [opts.functionIdOverrides] Per-atom function id overrides
+ * @param {Record<string, { kbFlowRef?: string|null, kbFlowNodeId?: string|null }>} [opts.flowRefOverrides] Per-atom flow ref overrides
  * @param {boolean} [opts.force] When true, skip duplicate-draft check
  * @param {typeof analyzeRequirementToPhases} [opts.analyzeFn] Analyze override (characterization)
  * @param {typeof createTransactionWithPhases} [opts.createFn] Create override (characterization)
@@ -56,6 +57,7 @@ export async function commitDraftTrajectories({
   rootDir,
   systemAccountId = null,
   functionIdOverrides = {},
+  flowRefOverrides = {},
   force = false,
   analyzeFn,
   createFn,
@@ -64,6 +66,9 @@ export async function commitDraftTrajectories({
 } = {}) {
   const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
     ? functionIdOverrides
+    : {};
+  const flowOverrides = (flowRefOverrides && typeof flowRefOverrides === 'object')
+    ? flowRefOverrides
     : {};
   const keys = Array.isArray(atomKeys) ? atomKeys.map(String) : [];
   const cache = await readProposeCache(moduleDir(moduleKey, rootDir));
@@ -111,6 +116,9 @@ export async function commitDraftTrajectories({
       skipped.push({ atomKey, reason: `analyze_failed:${e.message}` });
       continue;
     }
+    const ov = flowOverrides[atomKey] || {};
+    const kbFlowRef = ov.kbFlowRef ?? atom.suggestedFlowRef ?? null;
+    const kbFlowNodeId = ov.kbFlowNodeId ?? atom.suggestedNodeId ?? null;
     try {
       const traj = await create({
         functionId: Number(functionId),
@@ -124,6 +132,8 @@ export async function commitDraftTrajectories({
         reqSourcePath: atom.sourceDoc,
         reqChapterRef: atom.sourceChapter,
         reqAtomKey: atom.atomKey,
+        kbFlowRef,
+        kbFlowNodeId,
       });
       const trajectoryId = typeof traj === 'number' ? traj : traj.id;
       created.push({ trajectoryId, atomKey, name: atom.title });

@@ -164,12 +164,14 @@ export const GROUP_KB = [{
         { name: 'atomKeys', type: 'string[]', required: true, in: 'body', desc: '勾选的原子键列表' },
         { name: 'systemAccountId', type: 'number', in: 'body', desc: '可选，系统账号 id' },
         { name: 'functionIdOverrides', type: 'object', in: 'body', desc: '可选，按 atomKey 覆盖 functionId' },
+        { name: 'flowRefOverrides', type: 'object', in: 'body', desc: '可选，按 atomKey 覆盖 kbFlowRef/kbFlowNodeId' },
         { name: 'force', type: 'boolean', in: 'body', desc: '可选，true 时跳过重复草稿检查' },
       ],
       reqExample: J({
         atomKeys: ['product-mgmt:chain-a:2:新增一级分类'],
         systemAccountId: 1,
         functionIdOverrides: { 'product-mgmt:chain-a:2:新增一级分类': 9000000740 },
+        flowRefOverrides: { 'product-mgmt:chain-a:2:新增一级分类': { kbFlowRef: 'product_library', kbFlowNodeId: 'add_category' } },
         force: false,
       }),
       respExample: J({
