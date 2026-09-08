@@ -4,7 +4,7 @@
 
 ## 2026-09-08 22:40 · Cursor Lead — 收工：tssc 推送并进 select:click + first 打戳（回链 22:35）
 
-- 完成：ACTION_TO_ENGINE_TYPE tssc_multi_select→select:click；成功路径 resolve_recorded_option_text(ok-first 回显)；pin legacy/transaction/stamp/tssc；spec/plan 备注
+- 完成：442665eb — ACTION_TO_ENGINE_TYPE tssc_multi_select→select:click；成功路径 resolve_recorded_option_text(ok-first 回显)；pin legacy/transaction/stamp/tssc；spec/plan 备注
 - 验收：characterize-tssc-multi-select / characterize-select-option-stamp / characterize-legacy-engine-export / characterize-transaction-export PASS
 - 遗留：重启 executor 后重录才有具体 option_text；存量 first 步需重录或手工改库
 
