@@ -43,10 +43,8 @@ export async function withTrajectoryLock(trajectoryId, fn) {
 }
 
 export {
-  getLiveBindingByRemoteSessionId,
   getLiveBindingByTrajectory,
   getLiveBindingByAgentSession,
-  getLiveBindingByUuid,
   resolveLiveBinding,
   clearExecutorLive,
   clearExecutorLiveForNode,
@@ -93,21 +91,6 @@ export async function updateViewport(id, { viewportW, viewportH, deviceScaleFact
     viewportW,
     viewportH,
     deviceScaleFactor,
-  });
-}
-
-/**
- * Attach browser context + target ids to an existing remote session.
- * @param {number} id remote_session DB id
- * @param {object} root0 target fields
- * @param {string} root0.browserContextId browser context id
- * @param {string} root0.targetId CDP target id
- * @returns {Promise<object>} updated remote_session row
- */
-export async function attachTarget(id, { browserContextId, targetId }) {
-  return remoteSessionDao.update(id, {
-    browserContextId: browserContextId || '',
-    targetId: targetId || '',
   });
 }
 
@@ -188,18 +171,6 @@ export async function closeSession(id, { crashed = false } = {}) {
   if (!session) return null;
   if (session.status === 'closed' || session.status === 'crashed') return session;
   return remoteSessionDao.close(id, { crashed });
-}
-
-/**
- * Close a remote session by its session UUID.
- * @param {string} sessionUuid remote session UUID
- * @param {object} [opts] close options (crashed, …)
- * @returns {Promise<object|null>} updated session row, or null if not found
- */
-export async function closeByUuid(sessionUuid, opts) {
-  const session = await remoteSessionDao.getByUuid(sessionUuid);
-  if (!session) return null;
-  return closeSession(session.id, opts);
 }
 
 /**
