@@ -470,6 +470,12 @@
 - **本轮全部推送**：最新 4ac2e28e→e9648bfb（含 G1-G6 子代理产物与全部阶段回报）。另：DB 直连方案（用户解决）替代 SSH 隧道=落库延迟真凶根治；并行会话 auth-recording spec 线条目已随 commit 携带。
 - **挂起移交**：R6/R7 等 SUT 管理员给 X0018 角色配用户（建议 WN0001）；恢复即 R6 v2 一棒收尾→审批段→R7→T3.1 heal live→P6-4 终验。
 
+## 2026-09-08 10:50 · ZCode Lead — R6 卡点验证定案：切角色不能绕过（G7 判定 b），搁置维持+规则补强（ad342594）
+- 用户发现 701994 可切换角色（截图）→ Lead 实测切换到「客户经理」角色成功 → G7 验证：G6 confirmSubmit 直调法复现成功（Vue2 el.__vue__+$children BFS 定位意见组件 ZJJK00068204→formData.pcsMnpltCd=nextTask+nextNodeAprvPsn=WN0001-9881-X0018→i18n 桩→直调），submitProcess HTTP 200 发出，**服务端拒单逐字一致**（「请配置[客户经理]角色的用户」）。
+- 旁证：workflowTree API 返回「下一步审批人员为空，下一步：{}」——租户 9881 下 X0018 角色无人员映射。
+- **定论**：流程引擎节点候选解析与提交人会话激活角色无关（按租户级角色-用户映射查），切角色不能绕过；credit_usage 卡「用信提交角色配置卡点」规则已补强验证结论（ad342594）。R6/R7 搁置维持，恢复条件不变（SUT 管理员配 X0018 候选用户，含数字用户 ID 映射）。
+- 配方资产：G6/G7 两棒验证的 confirmSubmit 直调法+意见组件定位法已完整记录（rate-field-recipe.md 第 5 节+卡面），恢复后直接可用。
+
 ## 2026-09-07 11:15 · Cursor Lead — 开工声明：产品库「基本信息保存」补录
 - 开工：11:15。补 PM 验收缺口：在 #499（一级分类+新增产品）之外，录一条「选中未启用产品 → 基本信息填写 → 保存」贯通交易
 - 范围：`tmp/product-mgmt/`（任务/analyze/create/through-report）、`data/kb/flows/product_library.json`（仅 source/rules 回写）、本文件
