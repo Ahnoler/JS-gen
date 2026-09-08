@@ -10,7 +10,16 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 # ── Field kind ──────────────────────────────────────────────────────────────
-FieldKind = Literal["input", "select", "date", "radio", "checkbox", "tree-select", "unknown"]
+FieldKind = Literal[
+    "input",
+    "select",
+    "date",
+    "radio",
+    "checkbox",
+    "tree-select",
+    "tssc-multi-select",
+    "unknown",
+]
 
 # ── Container kind ──────────────────────────────────────────────────────────
 ContainerKind = Literal["main", "dialog", "drawer", "tab", "unknown"]
@@ -46,7 +55,10 @@ class ScannedField(BaseModel):
     )
     kind: FieldKind = Field(
         default="unknown",
-        description="Classified by DOM element presence (input/select/date/radio/checkbox/unknown)",
+        description=(
+            "Classified by DOM element presence "
+            "(input/select/date/radio/checkbox/tree-select/tssc-multi-select/unknown)"
+        ),
     )
     currentValue: str = Field(
         default="",

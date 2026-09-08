@@ -49,10 +49,17 @@ checks = [
         "tssc_multi_select(label_text, option_text",
         "tssc_multi_select",
     )),
+    ("scripts/models/field.py", (
+        '"tssc-multi-select"',
+        "FieldKind",
+        "ScannedField",
+    )),
     ("scripts/controller/actions/form_action_engines.py", (
         "async def tssc_multi_select",
         "form_tssc_multi_select",
         "JS_TSSC_MULTI_SELECT",
+        "lookup_field_kind",
+        "tssc-multi-select",
     )),
     ("scripts/prompts/agent-tools-tssc-multi-select.md", (
         "tssc_multi_select(label_text, option_text)",
@@ -83,6 +90,15 @@ checks = [
 ]
 
 ok = all(needle(path, *texts) for path, texts in checks) and classify_before_el_select()
+# Runtime pin: ScannedField must accept DOM kind tssc-multi-select (traj 696 crash).
+try:
+    sys.path.insert(0, str(ROOT))
+    from scripts.models.field import ScannedField
+
+    ScannedField(label="要素名称", kind="tssc-multi-select", currentValue="")
+except Exception as e:
+    print("FAIL: ScannedField rejects kind=tssc-multi-select: %s" % e)
+    ok = False
 # form.md must NOT still tell agents to use select_option for TsscMultiSelect table rows
 form = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
 if "必须用 select_option" in form and "TsscMultiSelect" in form:

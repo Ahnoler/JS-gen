@@ -509,6 +509,24 @@ def _resolve_control(business_data_store, label_text: str, xpath_hint: str = "")
     return _resolve_control_by_label(business_data_store, label_text)
 
 
+def lookup_field_kind(business_data_store, label_text: str) -> str:
+    """Return scanned/task-list kind for an exact label, or '' when unknown."""
+    label = (label_text or "").strip()
+    if not label:
+        return ""
+    for f in business_data_store.get("_scan_fields") or []:
+        if isinstance(f, dict) and (f.get("label") or "").strip() == label:
+            return (f.get("kind") or "").strip()
+    try:
+        tl = TaskList.from_store(business_data_store.get("task_list"))
+    except Exception:
+        return ""
+    for item in list(tl.pending) + list(tl.done):
+        if (item.label or "").strip() == label:
+            return (item.kind or "").strip()
+    return ""
+
+
 def _resolve_control_by_label(business_data_store, label_text: str) -> ResolvedControl:
     matches: list[tuple[str, str]] = []
     seen_xp: set[str] = set()

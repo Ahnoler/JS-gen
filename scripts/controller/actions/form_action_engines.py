@@ -54,7 +54,7 @@ from .form_scan_utils import (
     _pack_select_record, resolve_recorded_option_text, select_option_already_matched,
     match_select_option_candidate,
     _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
-    ResolvedControl, _resolve_control, resolve_select_fallback, _task_xpath_smart, _task_done_impl,
+    ResolvedControl, _resolve_control, lookup_field_kind, resolve_select_fallback, _task_xpath_smart, _task_done_impl,
     _submit_ready_hint, _switch_task_list_container, _with_submit_cue, _query_not_form_payload,
 )
 
@@ -1047,6 +1047,10 @@ class SelectEngine(_FormActionEngineBase):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
+        # TsscMultiSelect is classified as tssc-multi-select; select_option's
+        # el-select path cannot pick remote table rows — hand off early.
+        if lookup_field_kind(self.business_data_store, label_text) == 'tssc-multi-select':
+            return await self.tssc_multi_select(label_text, option_text, xpath_smart)
 
         async def _final_select_failure(result_text: str, xpath_for_log: str = '') -> str:
             diag = await reset_select_ui(page)
