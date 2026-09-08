@@ -1,7 +1,8 @@
 # 原子录制召回完整流程卡（起点指引注入）— 设计
 
 > 日期：2026-09-08  
-> 状态：待用户审阅 spec 后进入计划/实现  
+> 状态：已实现（SDD `1ad954fe..5cca1e8d`：`1ad954fe` migrate/DAO → `b96d5840` recall → `5430cb68` propose → `b7274dff` commit → `0b450207` prepare → `5cca1e8d` preview；characterize OK 11）；待 migrate + 湿测  
+> 计划：[`plans/2026-09-08-atom-record-flow-card-recall.md`](../plans/2026-09-08-atom-record-flow-card-recall.md)  
 > 决策来源：用户确认「原子 = 流程卡中的一段」；注入时机采用 **prepare/record 召回**（非 propose 写死正文）；落库采用 **方案 A：trajectory 独立列**  
 > 相关：`specs/2026-09-07-req-to-draft-traj-design.md`；`src/services/kb-flow-cards.js`；`data/kb/flows/*.json`
 

@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 11:52 · Cursor Lead — 收工：SDD atom-record flow-card recall 实施闭环（回链 10:07 开工）
+
+- 完成：Task 1–7 全落地——`1ad954fe` migrate/DAO、`b96d5840` recall helpers、`5430cb68` propose suggest、`b7274dff` commit 落库、`0b450207` prepare 注入、`5cca1e8d` preview API；docs close-out 见本 commit
+- 验收：characterize-flow-card-recall **11 OK**；spec 标已实现并链计划 `docs/superpowers/plans/2026-09-08-atom-record-flow-card-recall.md`
+- 遗留：migrate + 4097 重启 + 湿测（prepare 见 `【流程卡模板】`、GET `/api/v2/trajectories/:id/flow-template-hint`）；Task 4 前 commit 的 traj 无 `kbFlowRef` 需重 commit
+- 注意：未做 Vue 手改 flowRef UI；未 commit propose-cache JSON；与 V3 导出线文件集不相交
+
 ## 2026-09-08 11:10 · ZCode V3导出线 — 收工补充三：人工录制接入页面级截图（03e5254d）
 - 完成：trajectory-attach-service.js bindTrajectoryManualPersist 订阅补 page_level_screenshot 分支 → applyPageLevelScreenshot。根因实证：产品人工链只消费 manual_action_recorded，Python wrap 器发的页面/弹窗截图事件无人接（traj 677 stamps 在而 screenshots=0；组件录制 668/671 走 listener #3 有 page_level 行佐证管线可用）。
 - 验收：eslint 0、模块 import ok；效果=人工重录后弹窗有真实截图（coverageMode=page_level），8e76fde8 合成兜底转存量。
