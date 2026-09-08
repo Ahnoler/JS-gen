@@ -78,6 +78,7 @@ run "characterize-field-value-match" "$PY" scripts/characterization/characterize
 run "characterize-dual-save-section" "$PY" scripts/characterization/characterize-dual-save-section.py
 run "characterize-form-assistant" "$PY" scripts/characterization/characterize-form-assistant.py
 run "characterize-introduce-query-fill" "$PY" scripts/characterization/characterize-introduce-query-fill.py
+run "characterize-introduce-dialog-close" "$PY" scripts/characterization/cold/characterize-introduce-dialog-close.py
 run "characterize-select-state-boundary" "$PY" scripts/characterization/characterize-select-state-boundary.py
 run "characterize-replay-params-xpath" "$PY" scripts/characterization/characterize-replay-params-xpath.py
 run "characterize-tree-select-record" "$PY" scripts/characterization/characterize-tree-select-record.py
