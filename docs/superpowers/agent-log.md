@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 22:55 · Cursor Lead — 收工：introduce_pick 成功令牌（回链 22:45）
+
+- 完成：sanitize introduce_pick 合并 toast_ok/dialog_close/picker_closed；click_save toast+确定 补记 picker_closed/dialog_close；phase_done_ok 关闭类别名；pin characterize-introduce-dialog-close + verify-all
+- 验收：characterize-introduce-dialog-close / phase-boundary / phase-reviewer / done-accept-reason PASS
+- 遗留：重启 executor 后重录；全局通知 hook 不做
+
 ## 2026-09-08 22:45 · Cursor Lead — 开工：introduce_pick 成功令牌（dialog_close vs toast_ok）
 
 - 进行中：22:45。sid 0975ed13：click_save 已 ok-save-success/toast_ok，但 success_when=[dialog_close] 反复 Premature done 空转

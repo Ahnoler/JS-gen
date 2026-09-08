@@ -17,6 +17,17 @@ _VALID_REFILL = frozenset({'none', 'touched', 'all_editable'})
 # Modes that must not require form-submit success tokens (done() after login/nav/query).
 _NO_SUBMIT_TOKEN_MODES = frozenset({'login', 'navigate', 'query'})
 
+# introduce_pick: LLM often invents only dialog_close; toast / picker close must also count
+# (sid 0975ed13 Premature done loop after ok-save-success).
+_INTRODUCE_SUCCESS_KINDS = (
+    'picker_closed',
+    'dialog_confirmed',
+    'introduced_backfilled',
+    'confirm_click',
+    'dialog_close',
+    'toast_ok',
+)
+
 # 文本含保存/提交 cue 的误分类升级护栏（D1）：
 # LLM 评审器把「新增…点击保存」误判为 navigate 时，promote_contract_for_save_cues
 # 依据确定性 classify_task_mode + 本 cue 将合约升级为 create/modify（2026-08-27 d3943e89）。
@@ -112,6 +123,27 @@ def sanitize_contract_for_mode(contract: dict[str, Any]) -> dict[str, Any]:
     """
     c = dict(contract)
     mode = c.get('mode') or 'other'
+    if mode == 'introduce_pick':
+        submit = dict(c.get('submit') or {})
+        if submit.get('required') is None:
+            submit['required'] = True
+        if not submit.get('via'):
+            submit['via'] = 'any'
+        if 'button_text' not in submit:
+            submit['button_text'] = ''
+        c['submit'] = submit
+        success = dict(c.get('success') or {})
+        kinds: list[str] = []
+        for k in list(success.get('kinds') or []) + list(_INTRODUCE_SUCCESS_KINDS):
+            s = str(k or '').strip()
+            if s and s not in kinds:
+                kinds.append(s)
+        success['kinds'] = kinds
+        success['evidence'] = list(success.get('evidence') or [])[:8]
+        c['success'] = success
+        if c.get('refill') not in _VALID_REFILL:
+            c['refill'] = 'none'
+        return c
     if mode not in _NO_SUBMIT_TOKEN_MODES:
         if mode in ('create', 'modify'):
             touched_only = c.get('refill') == 'touched' and not c.get('allow_form_assistant')

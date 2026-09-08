@@ -393,6 +393,34 @@ class SaveEngine(_FormActionEngineBase):
                 self.business_data_store['_last_save_ok'] = True
                 self.business_data_store.pop('_submit_ready', None)
             record_success_token(self.business_data_store, 'toast_ok', success_notifs[0])
+            # Picker/introduce 确定 often yields 操作成功 toast AND closes the dialog.
+            # Do not early-return with only toast_ok — LLM success_when may be dialog_close
+            # (sid 0975ed13 Premature done loop).
+            if is_picker_confirm:
+                record_success_token(
+                    self.business_data_store, 'confirm_click', button_text or '确定',
+                )
+                try:
+                    from ._phase_boundary import maybe_record_picker_closed, record_evidence
+                    parent = (
+                        (self.business_data_store or {}).get('_parent_container_before_picker')
+                        or 'main'
+                    )
+                    maybe_record_picker_closed(
+                        self.business_data_store,
+                        still_query_ui=False,
+                        parent_container=parent,
+                    )
+                    record_evidence(
+                        self.business_data_store,
+                        'dialog_close',
+                        success_notifs[0],
+                    )
+                    if self.business_data_store is not None:
+                        self.business_data_store.pop('_query_ui', None)
+                except Exception as e:
+                    sys.stderr.write(f'[click_save] picker close after toast: {e}\n')
+                    sys.stderr.flush()
             toast = success_notifs[0]
             sys.stderr.write(f'[click_save] SUCCESS: {toast[:80]}\n')
             sys.stderr.flush()
