@@ -13,8 +13,6 @@ import {
 } from '../models/hierarchy-constants.js';
 
 export {
-  exportTree,
-  getTreeTemplate,
   getTreeTemplateExcel,
   exportTreeExcel,
   importTreeExcel,
@@ -22,10 +20,7 @@ export {
 
 export {
   getTree,
-  ensureRootTree,
-  nestToChildrenTree,
   resolveAncestorSystemId,
-  buildPath,
 } from './hierarchy-tree-query.js';
 
 export { importTree } from './hierarchy-tree-import.js';
