@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans or subagent-driven-development. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** 按 spec 创建 T1–T4 原子草稿并串行湿测录制（fid=9000000468）。
+**Goal:** 按 spec（修订 A）创建 T2–T4 原子草稿并串行湿测录制（fid=9000000468）；T1 废止。
 
-**Architecture:** 参考遗留 → 写 task → analyze/create draft → prepare/start/detach ×4 → through-report。
+**Architecture:** 参考遗留 → 写 task → analyze/create draft → prepare/start/detach ×3 → through-report。
 
 **Tech Stack:** `/api/v2/trajectories/analyze|POST|record/*`，account=2，stamp `20260908-elem`。
 
@@ -12,21 +12,23 @@
 
 - 只读 #61/#66/#503；不改引擎；不录产品侧 0740 要素配置。
 - 图标新增走 tooltip；验收认 stamp/toast。
+- **不重录 #693**；不擅自关「天元相关配置」。
 
 ---
 
-### Task 1: 任务文案 + 建 4 条 draft
+### Task 1: 任务文案 + 建 draft（已做；A 修订中）
 
-**Files:** Create `tmp/product-element/task-T1.md` … `task-T4.md`；API 建 traj
+**Files:** `tmp/product-element/task-T*.md`；API 建 traj
 
-- [ ] 写 T1–T4 task（含硬门闩、stamp、图标纪律）
-- [ ] 各 `POST /analyze` → `POST /trajectories`（functionId=9000000468, systemAccountId=2）
-- [ ] 记下 traj ids → `tmp/product-element/traj-ids.json`
+- [x] 写 T1–T4 task；建 #693–#696
+- [x] `traj-ids.json`
+- [ ] **A：** 废 `task-T1`；改写 `task-T2`（进入+双根前导）；PATCH #694 task + 重 analyze/sync phases
 
-### Task 2: 串行录制 T1→T4
+### Task 2: 串行录制 T2→T3→T4
 
-- [ ] 每笔：prepare（timeout≥600）→ start 全 phaseIds → 轮询 stderr/phases → detach
-- [ ] 失败则停该笔、写报告，不盲开下一笔（T2 失败则 T3/T4 改用已有类型或中止）
+- [ ] #694 prepare → start → detach（stepCount>0 + stamp 类型）
+- [ ] #695 → #696 同上
+- [ ] 失败则停该笔、写报告，不盲开下一笔
 
 ### Task 3: 验收报告 + agent-log 收工
 
@@ -37,7 +39,7 @@
 
 | Spec | Task |
 |---|---|
-| T1–T4 原子 | 1–2 |
+| T2–T4 原子（T1 废） | 1–2 |
 | 0468 挂载 | 1 |
 | 护栏/验收 | 2–3 |
 | 不碰遗留 | Global |

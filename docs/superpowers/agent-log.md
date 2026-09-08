@@ -2,12 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 16:28 · Cursor Lead — 修订：废 T1（方案 A），续录 T2=#694
+
+- 修订：16:28。用户选 A；#693 failed（天元弹窗 pause + zero-actions done 拒）；独立进入原子废止
+- 范围：同 16:10；改 `task-T2`/`specs|plans/*product-element-atomic*`；串行 **694→695→696**
+- 禁入：重录 #693；擅自关「天元相关配置」（未授权 C）；遗留 61/66/503；他线 WIP
+- 方式：PATCH #694 任务+phases → prepare/start/detach；T3/T4 依赖 T2 stamp 类型
+
 ## 2026-09-08 16:10 · Cursor Lead — 开工：产品要素库原子交易重切湿测（参考 #61/#66/#503）
 
 - 开工：16:10。用户确认方案 B；仅以 #61/#66/#503 为参考；spec `2026-09-08-product-element-atomic-rerecord-design.md`
 - 范围：`tmp/product-element/`（task/analyze/create/prepare/start/through-report）、`docs/superpowers/specs|plans/*product-element-atomic*`、本文件；建 draft 挂 **9000000468**
 - 禁入：改/删遗留 61/66/503；产品库侧 688/689/670 要素配置录制；引擎大改；trajectory-dao 等他线 WIP
-- 方式：T1→T4 串行 analyze/create → prepare/start/detach；stamp `20260908-elem`；account=2
+- 方式：T1→T4 串行 analyze/create → prepare/start/detach；stamp `20260908-elem`；account=2（**已由 16:28 修订为 T2→T4**）
 
 ## 2026-09-08 16:05 · Cursor — 开工+收工：关键数据分层 + 候选假流式 UX 设计
 
