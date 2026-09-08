@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 23:59 · ZCode KB 加固线 — 收工：KB 链路加固 Task 0+四线 13 任务全落地，verify-all ALL GREEN（回链 23:10）
+
+- 完成：Task 0 门禁（`38142025` kb-staging/kb-promote 移到横幅前+自证故意失败 exit=1）；A 线 T1 稳定 atomKey+回填迁移（`9ca808f3`，dev 库 0 行存量=No-op）、T2 幂等全状态+req_atom_seq 唯一索引（`55bce80c`，真库 ER_DUP_ENTRY 实证）、T9 validate 端点+paasUserId（`e04c72ec`）；B 线 T3 缓存 cacheVersion/sourceHash/原子写+gitignore（`f09635e7`，10 个盘上缓存保留判过期）、T4 propose 4xx 语义（`712e40fd`，4098 独立实例 HTTP 实证）、T8 functionIdCandidates（`941b00b2`，product-mgmt 28/28=100%）、T13 reference_step+truncated（`4e13dd98`，chain-b:4/c:2 出局）；C 线 T6 召回 idf 重写（`359809cb`，800 字 2ms 基线 654ms；金样例 24/24；provenance 具名权重+章节 mtime+size 缓存）、T7 跨语言金样例契约（`4cf1827f`，py 19/24 直配+5 条 divergenceAccepted 登记；AGENTS.md 补唯一跨语言契约行）；D 线 T5 出处锚点 req_source_hash/req_chunk_id+commit 回查（`f6f34f54`）、T10 观测 JSONL+propose-stats（`d967367b`）、T11 source 上传复用 multer（`35a0fbe1`，HTTP 端到端 sourceDoc=副本相对路径）、T12 promotedAt 打标（`dbe12376`，沙箱实证）、T14 F-15 登记（`4693e5cb`）
+- 验收：终轮 `bash scripts/refactor/verify-all.sh` **ALL GREEN**（tmp/kb-remediation/gate-final.txt）；spec §9 逐条——§9.2 门禁自证（D0/gate-selfproof-fail exit=1）、§9.3 金样例两侧断言入 verify-all、§9.4 product-mgmt 副本两次 propose 26/26 键全同（final/probe-spec9-out.txt）+同键重复由 T2 真库唯一索引拦截；characterize-req-draft-traj 26→**52**、flow-card-recall 12→**14**（金样例+性能断言）；lint 全程 0 新增 warning（存量 23 条未动）；三笔迁移已 apply（Batch 42/43/44）；全程零 prepare/record/start/detach
+- 注意：⑧ 线 API 契约有增量（validate 端点/functionIdCandidates/kind/truncated/stale 语义），**前端仓库待派单**：向导禁用条件改 `canProposeAtoms` + 候选下拉（spec §6.4，本线未动前端仓）；py 召回 5 条分歧在 fixture 内登记待 D3 另议收敛；`data/kb/staging/*.jsonl` 观测已 gitignore
+- 遗留移交：①spec §6.4 前端派单（上）；②F-15 readonly-partial 待 Lead 批准（todo ⑧′ 已登记）；③服务器库迁移部署时须跑三笔新迁移（20260908231500/233000/2350000）；④propose 真实 LLM 路径湿测未跑（本线全离线桩/4098 隔离实例，避免网关挂起）；⑤观察 `data/kb/staging/recall-events.jsonl` py 侧运行期增长
+- 状态：本线全部任务闭环，状态以本条目为准；工作区仅剩他线 `config/update-db-whitelist.ps1`（M 态，未触碰）
+
 ## 2026-09-08 23:10 · ZCode KB 加固线 — 开工：KB 链路加固 Task 0 + 四线（A/B/C/D）连续执行
 
 - 进行中：23:10。按已批准 spec（`specs/2026-09-08-kb-remediation-design.md`）+ plan（`plans/2026-09-08-kb-remediation.md`）实施 Task 0→A(1/2/9)→B(3/4/8/13)→C(6/7)→D(5/10/11/12/14 连续执行)。开工本条目顺带把 spec/plan 两份未入库文档 carry 进 commit
