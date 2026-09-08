@@ -509,21 +509,6 @@ export async function listDialogScreenshotsByTrajectory(trajectoryId) {
 }
 
 /**
- * Get a presigned/relative URL for a screenshot by id.
- * @param {number} id screenshot DB id
- * @returns {Promise<string|null>} image URL or null if not found
- */
-export async function getScreenshotUrl(id) {
-  const row = await screenshotDao.getImage(id);
-  if (!row) return null;
-  if (row.storage_type === 'minio' && row.storage_path) {
-    const presigned = await getPresignedUrl(row.storage_path).catch(() => null);
-    return presigned || row.image_url || `/api/v2/screenshots/${id}/image`;
-  }
-  return row.image_url || `/api/v2/screenshots/${id}/image`;
-}
-
-/**
  * Delete a screenshot (MinIO object or local pending file) + DB row.
  * @param {number} id screenshot DB id
  * @returns {Promise<boolean>} true if deleted, false if not found

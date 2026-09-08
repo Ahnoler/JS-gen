@@ -59,8 +59,3 @@ export async function getAccessUser(accessToken) {
     return null;
   }
 }
-
-/** 测试/热重载辅助：清空密钥缓存（配置变更后立即生效）。 */
-export function resetJwtSecretCache() {
-  jwtSecretCache = { value: null, at: 0 };
-}

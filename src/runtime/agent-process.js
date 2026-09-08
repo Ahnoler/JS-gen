@@ -54,21 +54,6 @@ foreach ($p in $procs) {
 }
 
 /**
- * Flush leftover stdout JSON lines from the pending buffer to a message handler.
- * @param {string} pendingBuffer raw concatenated stdout text
- * @param {(msg: object) => void} onMessage callback for each parsed JSON message
- * @returns {void} 无返回值
- */
-export function flushPendingBuffer(pendingBuffer, onMessage) {
-  const trimmed = pendingBuffer.trim();
-  if (!trimmed) return;
-  for (const line of trimmed.split('\n')) {
-    if (!line.trim()) continue;
-    try { onMessage(JSON.parse(line)); } catch {}
-  }
-}
-
-/**
  * Wait for the Python agent to emit a `ready` event on stdout.
  * @param {import('child_process').ChildProcess} child spawned agent process
  * @param {number} [timeout] max wait in ms (default 15000)

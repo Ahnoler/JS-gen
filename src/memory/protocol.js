@@ -23,20 +23,6 @@ export const KNOWN_EVENT_TYPES = new Set([
   'system',
 ]);
 
-/** 事实来源（reliability 基准见 weight-engine.js）。 */
-export const FACT_SOURCES = new Set([
-  'requirement', // 需求/业务数据（base_weight 1.0，不可被 LLM 覆盖）
-  'user',
-  'page',
-  'rule',
-  'llm',
-  'observer',
-  'system',
-  'human',
-  'agent',
-  'history', // P2-2 同 function 历史成功交易复用（低权重，stance=inferred）
-]);
-
 /** 事实立场。 */
 export const STANCES = new Set(['authoritative', 'inferred', 'disputed', 'neutral']);
 

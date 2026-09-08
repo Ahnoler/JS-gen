@@ -193,20 +193,6 @@ export async function insertDecision(decision, trx = null) {
 }
 
 /**
- * 更新决策审计状态。
- * @param {number} id Decision id.
- * @param {{ auditStatus?: string }} [opts] Audit status payload.
- * @returns {Promise<boolean>} True if a row was updated.
- */
-export async function updateDecisionAudit(id, { auditStatus } = {}) {
-  if (!Number.isFinite(Number(id))) return false;
-  const n = await getDB()(DECISION_TABLE)
-    .where({ id: Number(id) })
-    .update({ audit_status: String(auditStatus || 'pending') });
-  return n > 0;
-}
-
-/**
  * 事件列表（按交易/会话/阶段/类型过滤）。
  * @param {object} [opts] Query options.
  * @param {number} [opts.trajectoryId] Trajectory id filter.
