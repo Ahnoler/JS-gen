@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 16:05 · Cursor — 开工+收工：关键数据分层 + 候选假流式 UX 设计
+
+- 完成：用户认可方向；spec → `docs/superpowers/specs/2026-09-08-req-draft-keydata-and-streaming-ux-design.md`（关键数据 A/B/C 分层；向导三步合并勾选；假流式非 SSE）
+- 验收：设计自检覆盖 prompt/UI/兼容旧缓存；真流式明确 Out
+- 遗留：用户审阅后 writing-plans + 实现
+- 注意：仅文档；未动 Vue/propose 代码
+
 ## 2026-09-08 15:31 · Cursor — 收工：人工录制 el-radio 去掉码值 fill 重复步（回链 15:16 开工）
 
 - 完成：`emitFill` 跳过 native radio/checkbox 与 `.el-radio`/`.el-switch` 容器；点单选只记 `click_radio`（`567312e0`）
