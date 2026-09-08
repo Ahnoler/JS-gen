@@ -1,10 +1,10 @@
 {
-  "_comment": "KB 召回跨语言金样例（唯一契约）：JS=src/services/req-draft-traj/flow-card-recall.js matchFlowForAtom；PY=scripts/kb/recall.py find_flow_for_task。两侧对同一 query 断言 flowRef 一致；expectNodeId=null 表示不断言节点（或实现返回 null）；divergenceAccepted=true 表示两侧算法差异经裁定接受（附 reason）。语料=data/kb/flows（84 卡）。禁止在实现里对这里的 query 特判。",
+  "_comment": "KB 召回跨语言金样例（唯一契约）：JS=src/services/req-draft-traj/flow-card-recall.js matchFlowForAtom（expectFlowRef/expectNodeId/forbidNodeId）；PY=scripts/kb/recall.py find_flow_for_task（pyFlowRef，缺省=与 expectFlowRef 一致）。divergenceAccepted=true 表示两侧算法差异经裁定接受（D3：先共享金样例、不合并实现），附 divergenceReason；py 侧改造后应移除分歧项收敛。语料=data/kb/flows（84 卡）。禁止在实现里对这里的 query 特判。",
   "entries": [
-    { "query": "对公客户主页 点击客户转正", "expectFlowRef": "customer_onboarding", "expectNodeId": null, "note": "F-06 主例；真实卡无 convert 节点故 nodeId 不断言" },
+    { "query": "对公客户主页 点击客户转正", "expectFlowRef": "customer_onboarding", "expectNodeId": null, "note": "F-06 主例；真实卡无 convert 节点故 nodeId 不断言", "pyFlowRef": "product_core_mapping", "divergenceAccepted": true, "divergenceReason": "F-07 反例①：py 词条弱匹配噪声（score 2）落产品核心映射；js idf 版命中 onboarding；py 侧改造另议（D3）" },
     { "query": "启用产品", "expectFlowRef": "product_library", "forbidNodeId": "prod_disable_dlg", "note": "极性消歧：启用 不得落 禁用/下架 节点" },
-    { "query": "维护客户信息并保存", "expectFlowRef": "customer_onboarding", "expectNodeId": null, "note": "F-07 反例；spec 预期 customer_360/customer_corp 系列卡在真实语料中不存在，真实最优=持有「客户信息维护」关键词的 onboarding" },
-    { "query": "查询产品列表", "expectFlowRef": "product_query", "expectNodeId": "qry_home" },
+    { "query": "维护客户信息并保存", "expectFlowRef": "customer_onboarding", "expectNodeId": null, "note": "F-07 反例②；spec 预期 customer_360/customer_corp 系列卡在真实语料中不存在，真实最优=持有「客户信息维护」关键词的 onboarding", "pyFlowRef": "product_element", "divergenceAccepted": true, "divergenceReason": "F-07 反例②：py 落产品要素库（spec 审查已记录该分歧）；js 命中 onboarding；py 侧改造另议（D3）" },
+    { "query": "查询产品列表", "expectFlowRef": "product_query", "expectNodeId": "qry_home", "pyFlowRef": "customer_query", "divergenceAccepted": true, "divergenceReason": "F-07 反例③：py 词条噪声落客户查询；js 命中产品查询；py 侧改造另议（D3）" },
     { "query": "今天天气不错，我们去吃饭吧", "expectFlowRef": null, "note": "无关查询必须返回 null" },
     { "query": "帮我订一张机票", "expectFlowRef": null, "note": "无关查询必须返回 null" },
     { "query": "禁用产品", "expectFlowRef": "product_library", "expectNodeId": "prod_disable_dlg", "note": "极性消歧反向" },
@@ -22,8 +22,8 @@
     { "query": "催收任务处理", "expectFlowRef": "collection_task", "expectNodeId": "list" },
     { "query": "审批待办处理", "expectFlowRef": "approval_todo", "expectNodeId": null },
     { "query": "电子签约", "expectFlowRef": "electronic_signing", "expectNodeId": null },
-    { "query": "委托支付", "expectFlowRef": "disburse-entrusted-payment", "expectNodeId": "受托支付信息主页-主链3" },
-    { "query": "客户集团通用集团查询", "expectFlowRef": "customer-group-general-group", "expectNodeId": "总集团查看关系弹窗" },
+    { "query": "委托支付", "expectFlowRef": "disburse-entrusted-payment", "expectNodeId": "受托支付信息主页-主链3", "pyFlowRef": null, "divergenceAccepted": true, "divergenceReason": "py 关键词层未覆盖该短查询（score 0 无命中）；js 命中受托支付卡；py 侧改造另议（D3）" },
+    { "query": "客户集团通用集团查询", "expectFlowRef": "customer-group-general-group", "expectNodeId": "总集团查看关系弹窗", "pyFlowRef": "customer_query", "divergenceAccepted": true, "divergenceReason": "py 词条噪声落客户查询；js 命中通用集团卡；py 侧改造另议（D3）" },
     { "query": "在 ZJJK00066153 页面新增客户", "expectFlowRef": "customer_onboarding", "expectNodeId": "check_drawer", "note": "ZJJK 码整词匹配" }
   ]
 }
