@@ -17,9 +17,7 @@ const {
   commitPendingFile,
   readPendingFile,
   deletePendingFile,
-  listPendingFiles,
   cleanupPendingFiles,
-  getPendingDir,
 } = await import('../../../src/services/screenshot-pending-store.js');
 
 const buf = Buffer.from('fake-png-bytes');
@@ -30,14 +28,9 @@ assert.equal(existsSync(pending.filePath), true, 'temp pending file should exist
 assert.deepEqual(await readPendingFile('__not_exist__'), null, 'missing file returns null');
 
 // commit to final id file
-await commitPendingFile(pending.filePath, 424242);
-const finalPath = path.join(getPendingDir(), '424242.png');
+const finalPath = await commitPendingFile(pending.filePath, 424242);
 assert.equal(existsSync(finalPath), true, 'committed pending file should exist');
 assert.deepEqual(await readPendingFile(424242), buf, 'committed file content matches');
-
-// list contains final file
-const files = await listPendingFiles();
-assert.ok(files.includes('424242.png'), 'listPendingFiles should include committed file');
 
 // cleanup orphan removes it
 await cleanupPendingFiles([]);
