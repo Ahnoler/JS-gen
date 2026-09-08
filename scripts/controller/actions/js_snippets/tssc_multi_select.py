@@ -1,9 +1,12 @@
 """
-JS snippet constants: JS_TSSC_MULTI_SELECT (extracted for TsscMultiSelect table-row pick).
-Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
+JS snippet constants: JS_TSSC_MULTI_SELECT.
 
-Single-select row pick for TsscMultiSelect (.tssc-multi-select + .select-table rows).
-Not select_option; not tree; outer confirm dialog is the caller's job.
+TsscMultiSelect (.tssc-multi-select) has two dropdown shapes:
+- remote table: `.select-table` / `tr.el-table__row` (e.g. 要素名称)
+- dict options: `.el-select-dropdown__item` (e.g. 要素类型)
+
+Prefer table rows when present; otherwise fall back to el-option.
+Not tree; outer confirm dialog is the caller's job.
 """
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER
@@ -130,6 +133,20 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         }
         return out;
     };
+    // Dict-mode (要素类型): el-option list, no .select-table (CDP 19242).
+    const collectOptions = () => {
+        const out = [];
+        const seen = new Set();
+        for (const dd of openDropdowns()) {
+            if (dd.querySelector('.select-table')) continue;
+            for (const li of dd.querySelectorAll('.el-select-dropdown__item')) {
+                if (seen.has(li)) continue;
+                seen.add(li);
+                out.push(li);
+            }
+        }
+        return out;
+    };
 
     let rows = collectRows();
     if (rows.length === 0) {
@@ -137,35 +154,46 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
             await sleep(250);
             rows = collectRows();
             if (rows.length) break;
+            if (collectOptions().length) break;
         }
     }
-    if (rows.length === 0) return 'no-items';
+    let mode = 'table';
+    let items = rows;
+    if (items.length === 0) {
+        items = collectOptions();
+        mode = 'option';
+    }
+    if (items.length === 0) return 'no-items';
 
-    const rowLabels = (tr) => {
-        const cells = [];
-        for (const cell of tr.querySelectorAll('td .cell, td')) {
-            const t = norm(cell.textContent);
-            if (t) cells.push(t);
+    const itemLabel = (el) => {
+        if (!el) return { cells: [], full: '' };
+        if (el.tagName === 'TR') {
+            const cells = [];
+            for (const cell of el.querySelectorAll('td .cell, td')) {
+                const t = norm(cell.textContent);
+                if (t) cells.push(t);
+            }
+            return { cells, full: norm(el.textContent) };
         }
-        const full = norm(tr.textContent);
-        return { cells, full };
+        const full = norm(el.textContent);
+        return { cells: full ? [full] : [], full };
     };
 
-    const rowSummary = (tr) => {
-        const { cells, full } = rowLabels(tr);
+    const rowSummary = (el) => {
+        const { cells, full } = itemLabel(el);
         return cells.length ? cells.join('|') : full;
     };
 
-    const exactMatchRow = (tr, want) => {
-        const { cells, full } = rowLabels(tr);
+    const exactMatchItem = (el, want) => {
+        const { cells, full } = itemLabel(el);
         for (const c of cells) {
             if (c === want) return true;
         }
         return full === want;
     };
 
-    const fuzzyMatchRow = (tr, want) => {
-        const { cells, full } = rowLabels(tr);
+    const fuzzyMatchItem = (el, want) => {
+        const { cells, full } = itemLabel(el);
         let best = Infinity;
         if (full.includes(want)) best = Math.min(best, full.length);
         for (const c of cells) {
@@ -175,19 +203,19 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
     };
 
     const visiblePool = (list) => {
-        const vis = [...list].filter(tr => {
-            if (tr.classList.contains('is-disabled')) return false;
-            const r = tr.getBoundingClientRect();
+        const vis = [...list].filter(el => {
+            if (el.classList.contains('is-disabled')) return false;
+            const r = el.getBoundingClientRect();
             if (r.width > 0 && r.height > 0) return true;
-            const dd = tr.closest('.el-select-dropdown');
+            const dd = el.closest && el.closest('.el-select-dropdown');
             return !!(dd && dd.getBoundingClientRect().width > 0);
         });
         return vis.length ? vis : [...list];
     };
 
     const findExact = (pool, want) => {
-        for (const tr of pool) {
-            if (exactMatchRow(tr, want)) return tr;
+        for (const el of pool) {
+            if (exactMatchItem(el, want)) return el;
         }
         return null;
     };
@@ -195,21 +223,21 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
     const findFuzzy = (pool, want) => {
         let best = null;
         let bestLen = Infinity;
-        for (const tr of pool) {
-            const score = fuzzyMatchRow(tr, want);
-            if (score < bestLen) { best = tr; bestLen = score; }
+        for (const el of pool) {
+            const score = fuzzyMatchItem(el, want);
+            if (score < bestLen) { best = el; bestLen = score; }
         }
         return bestLen < Infinity ? best : null;
     };
 
-    let pool = visiblePool(rows);
+    let pool = visiblePool(items);
     let target = null;
 
     if (wantFirst) {
         target = pool[0];
     } else {
         target = findExact(pool, optNorm);
-        if (!target) {
+        if (!target && mode === 'table') {
             for (const dd of openDropdowns()) {
                 const searchInput = dd.querySelector(
                     '.select-table input:not([type="hidden"]), .select-table .el-input__inner,'
@@ -220,9 +248,7 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
                 s.call(searchInput, optNorm);
                 searchInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
                 searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-                // Prefer fuzzy: force 精确查询 OFF. Enabling exact for stamp/partial
-                // keywords yields empty「无匹配数据」(sid 5b463582). Only leave ON
-                // when already checked AND exact match later succeeds.
+                // Prefer fuzzy: force 精确查询 OFF (sid 5b463582 empty rows).
                 for (const sw of dd.querySelectorAll('.el-switch')) {
                     const lbl = sw.closest('.el-form-item, label, span, div')?.textContent || sw.textContent || '';
                     if (!lbl.includes('精确')) continue;
@@ -231,8 +257,8 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
                     break;
                 }
                 await sleep(500);
-                rows = collectRows();
-                pool = visiblePool(rows);
+                items = collectRows();
+                pool = visiblePool(items);
                 target = findExact(pool, optNorm) || findFuzzy(pool, optNorm);
                 if (target) break;
             }
@@ -242,21 +268,23 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
 
     if (!target) {
         const summaries = pool.slice(0, 5).map(rowSummary).join('; ');
-        return 'option-not-found:' + optNorm + ' | rows: ' + summaries;
+        return 'option-not-found:' + optNorm + ' | mode:' + mode + ' | rows: ' + summaries;
     }
 
     target.scrollIntoView({ block: 'nearest' });
-    const clickCell = target.querySelector('td .cell, td') || target;
-    clickCell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    clickCell.click();
-    if (clickCell !== target) target.click();
+    const clickEl = (target.tagName === 'TR')
+        ? (target.querySelector('td .cell, td') || target)
+        : target;
+    clickEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    clickEl.click();
+    if (target.tagName === 'TR' && clickEl !== target) target.click();
 
     await sleep(250);
     const after = readback();
 
     if (wantFirst) {
         if (after) return 'ok-first:' + after;
-        return 'err-no-echo: clicked first row, readback empty';
+        return 'err-no-echo: clicked first ' + mode + ', readback empty';
     }
     if (readbackMatches(after, optNorm)) {
         if (after === optNorm) return 'ok:' + after;

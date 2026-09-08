@@ -44,6 +44,9 @@ checks = [
         ".select-table",
         "el-table__row",
         "force 精确查询 OFF",
+        "collectOptions",
+        "el-select-dropdown__item",
+        "mode === 'table'",
     )),
     ("scripts/controller/actions/_js_snippets.py", ("tssc_multi_select", "JS_TSSC_MULTI_SELECT")),
     ("scripts/controller/actions/_form.py", (

@@ -540,18 +540,18 @@ git commit -m "feat(prompts): route TsscMultiSelect to tssc_multi_select"
 - Modify: `docs/superpowers/agent-log.md` — 收工 or progress note with commit hashes
 - Manual: wet dry-run only if SUT + control plane available (optional checkpoint)
 
-- [ ] **Step 1: Mark spec implemented** when Tasks 1–5 green.
+- [x] **Step 1: Mark spec implemented** when Tasks 1–5 green.
 
-- [ ] **Step 2: Optional wet check** (not blocking cold green)
+- [x] **Step 2: Optional wet check** — SKIP (control plane not verified this session)
 
 With control plane + 选择要素 dialog open:
 
 - Agent or evaluate path: `tssc_multi_select('要素名称', '部署方式')` → `ok*`, trigger shows 部署方式.
 - Plain `el-select` field → `no-tssc-multi-select`.
 
-- [ ] **Step 3: Agent-log 收工** back-link 17:42 start; list hashes; leave #695/#696 re-record as follow-up.
+- [x] **Step 3: Agent-log 收工** back-link 17:42 start; list hashes; leave #695/#696 re-record as follow-up.
 
-- [ ] **Step 4: Commit docs**
+- [x] **Step 4: Commit docs**
 
 ```powershell
 git add docs/superpowers/specs/2026-09-08-tssc-multi-select-action-design.md docs/superpowers/agent-log.md

@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 22:25 · Cursor Lead — 收工：tssc_multi_select 字典 el-option 回退（回链 22:15）
+
+- 完成：无 .select-table 行时回退收集 .el-select-dropdown__item（跳过含表弹层）；统一匹配/点击/回显；搜索精确 OFF 仅 table mode；prompt 双形态；pin collectOptions / el-select-dropdown__item / mode === table
+- 验收：characterize-tssc-multi-select + characterize-agent-prompt-packs PASS。收工时 CDP 19242 ECONNREFUSED（浏览器已关），湿测未复跑；先前同会话已证手点 option 可回显
+- 遗留：重启 executor 后重录要素类型用 tssc_multi_select(..., first|原文)；选项窥探不做，统一 first
+
+## 2026-09-08 22:15 · Cursor Lead — 开工：tssc_multi_select 支持字典 el-option（要素类型）
+
+- 进行中：22:15。CDP 19242 实证：「要素类型」亦为 TsscMultiSelect，但弹层是 el-option（下拉数据字典/阈值）非 `.select-table`；现片段只收集表行 → no-items；点 el-option 可选中
+- 范围：`scripts/controller/actions/js_snippets/tssc_multi_select.py`、prompt/pin、本文件
+- 禁入：whitelist / draft-traj-propose / 他线 WIP
+- 方式：无表行时回退 `.el-select-dropdown__item`；CDP 已验证点选项可回显
+
 ## 2026-09-08 22:05 · Cursor Lead — 收工：修 tssc_multi_select fill 退化（回链 21:55）
 
 - 完成：fill 拒写 tssc/tree；option-not-found 禁 fill/精确查询并指引 `first`；搜索强制精确 OFF；affordances/prompt/pin
