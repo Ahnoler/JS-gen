@@ -283,5 +283,53 @@ export function buildScreenshotEntries({
     if (name) idByDialog.set(name, entryId);
   }
 
+  // ── 合成弹窗条目（人工录制兜底）──
+  // 人工录制不发页面级截图事件，但步骤 element 同样被 stamp 了 popup_level_key
+  // （含 @@anchor）。从步骤 key 分组成弹窗节点，让弹窗内控件有 popup 可挂、
+  // 触发链（properties 侧）能找到触发图标把弹窗挂到按钮行下。无需截图、无需重录。
+  const syntheticPopups = new Map(); // levelKey → entry
+  for (const step of traj.steps || []) {
+    const el = parseJson(step?.elementJson);
+    const key = String(el?.popup_level_key || el?.popupLevelKey || '').trim();
+    if (!key || !key.includes('|dialog:') || syntheticPopups.has(key)) continue;
+    if (idByPageLevel.has(key) || idByPageLevelNorm.has(stripVolatileQuery(key))) continue;
+    const m = key.match(/^(.*)\|dialog:([^@|]*)(?:@@anchor:(.*))?$/);
+    if (!m) continue;
+    syntheticPopups.set(key, {
+      propertiesName: m[2].trim() || '弹窗',
+      anchor: (m[3] || '').trim(),
+      parentKey: m[1],
+    });
+  }
+  for (const [key, info] of syntheticPopups) {
+    const parentEntry = idByPageLevel.get(info.parentKey)
+      || idByPageLevelNorm.get(stripVolatileQuery(info.parentKey));
+    const entryId = nextId;
+    nextId += 1;
+    const entry = {
+      propertiesName: info.propertiesName,
+      eventTypeValue: 'click',
+      eventTypeName: '点击',
+      elementType: '',
+      mothed: '',
+      options: '',
+      objectValue: '',
+      transcationType: 'playwright',
+      type: 'popup',
+      screenshot: [],
+      propertiesID: String(entryId),
+      propertiesPID: parentEntry ? String(parentEntry) : '0',
+      realLabel: '',
+      regionId: key,
+      regionLabel: info.propertiesName,
+      rect: {},
+    };
+    entries.push(entry);
+    rememberPageLevelKey(key, entryId);
+    pageLevelById.set(String(entryId), entry);
+    const scopedTitleKey = info.parentKey ? `${info.parentKey}|dialog:${info.propertiesName}` : '';
+    if (scopedTitleKey && !idByDialog.has(scopedTitleKey)) idByDialog.set(scopedTitleKey, entryId);
+  }
+
   return { entries, idByPhase, idByDialog, idByPageLevel, idByPageLevelNorm, pageLevelById, usedPageLevelScreenshots: false };
 }
