@@ -499,24 +499,3 @@ export async function timeline(trajectoryId) {
   ]);
   return { trajectoryId: tid, events, facts, decisions };
 }
-
-/**
- * 删除某交易的全部记忆（测试/维护用；不常用）。
- * @param {number} trajectoryId Trajectory id.
- * @returns {Promise<number>} Total rows removed.
- */
-export async function deleteByTrajectory(trajectoryId) {
-  const tid = Number(trajectoryId);
-  if (!Number.isFinite(tid) || tid <= 0) return 0;
-  const db = getDB();
-  const factIds = (await db(FACT_TABLE).where({ trajectory_id: tid }).select('id')).map((r) => r.id);
-  let removed = 0;
-  if (factIds.length) {
-    await db(RELATION_TABLE).where('from_fact_id', 'in', factIds).del();
-    await db(RELATION_TABLE).where('to_fact_id', 'in', factIds).del();
-  }
-  removed += await db(FACT_TABLE).where({ trajectory_id: tid }).del();
-  removed += await db(EVENT_TABLE).where({ trajectory_id: tid }).del();
-  removed += await db(DECISION_TABLE).where({ trajectory_id: tid }).del();
-  return removed;
-}
