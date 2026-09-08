@@ -161,12 +161,15 @@ JS_MANUAL_PART_B = r'''
           ingest(vm.$data && vm.$data.options);
         }
       } catch (e) {}
+      // 元素对齐 AI 录制形态：存页面内 .el-select 容器（option 在 body 挂载的下拉面板里，
+      // 存 opt 会让 region 分类落到 other、脱离 tab/section 分层）
+      const selContainer = open && open.closest ? open.closest('.el-select') : null;
       emit(Object.assign({
         kind: 'select_option',
         label_text: label,
         option_text: optionText,
         options: options,
-      }, elMeta(opt, optionText, 'form_select')));
+      }, elMeta(selContainer || opt, optionText, 'form_select')));
       return;
     }
 

@@ -168,6 +168,8 @@ export function buildV3Properties({
   // 页面上下文：步骤无页面锚点（人工/抓取步骤，region 常为 table 等区域标记）时，
   // 继承前序最近步骤所在页面 —— 步骤按执行顺序流转，操作发生在该页面，归属同一页面截图
   let lastPageKey = '';
+  // 分区上下文：'other' 段步骤（下拉面板兜底态）沿用前序分区段（见主循环内注释）
+  let lastPartitionSegments = [];
 
   // ── 弹窗触发链（同标题多弹窗消歧 + popup 挂触发对象）──
   // 录制侧 stamp 的 popup_level_key 有两类失真：①填表早于弹窗截图注册 → key 缺 @@anchor；
@@ -298,8 +300,13 @@ export function buildV3Properties({
     const label = el ? String(el.formLabel ?? el.text ?? el.matchedLabel ?? '').trim() : '';
 
     // 分区段 → 中间节点（§8 type 按 role 映射）；object pid 指向最近中间节点（无分区段则用原 pid）
+    // 分区段仅为 'other'（人工录制抓到 body 挂载下拉面板等区域分类兜底态）时，
+    // 沿用前序步骤的分区段 —— 步骤按时间流转，表单内操作应跟随所在 tab/section
     const segments = extractPartitionSegments(rawRegionId);
-    const sectionPid = ensureSectionNodes(segments, pid);
+    const otherOnly = segments.length === 1 && segmentRole(segments[0]) === 'other';
+    const effectiveSegments = otherOnly && lastPartitionSegments.length ? lastPartitionSegments : segments;
+    if (segments.length && !otherOnly) lastPartitionSegments = segments;
+    const sectionPid = ensureSectionNodes(effectiveSegments, pid);
     const elePid = sectionPid || pid;
 
     nextId += 1;
