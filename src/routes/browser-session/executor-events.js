@@ -7,18 +7,6 @@ import {
   stashOrApplyStepScreenshot,
   applyPageLevelScreenshot,
 } from './persist-live.js';
-import { writeAgentEvent } from './agent-io.js';
-
-/**
- * Enable/disable Python before/after page screenshots for a session.
- * @param {object} session target session state
- * @param {boolean} enabled whether to enable page-level screenshots
- * @returns {boolean} whether the event was successfully written
- */
-export function setSessionCaptureScreenshots(session, enabled) {
-  if (!session) return false;
-  return writeAgentEvent(session, 'capture_screenshots', { enabled: !!enabled });
-}
 
 /**
  * Durable executor → control-plane event hook for a session (persist + broadcast).

@@ -380,10 +380,3 @@ export function initExecutorWs() {
   console.log('[executor-ws] Executor WebSocket ready at /ws/executor (noServer mode)');
   return wss;
 }
-
-/**
- * @returns {import('ws').WebSocketServer|null} result
- */
-export function getExecutorWss() {
-  return wss;
-}

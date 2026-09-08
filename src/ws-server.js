@@ -296,10 +296,3 @@ export function initWebSocket() {
   console.log('[ws-server] WebSocket server ready at /ws (noServer mode)');
   return wss;
 }
-
-/**
- * @returns {import('ws').WebSocketServer|null} result
- */
-export function getDashboardWss() {
-  return wss;
-}
