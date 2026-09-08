@@ -2,6 +2,34 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 15:31 · Cursor — 收工：人工录制 el-radio 去掉码值 fill 重复步（回链 15:16 开工）
+
+- 完成：`emitFill` 跳过 native radio/checkbox 与 `.el-radio`/`.el-switch` 容器；点单选只记 `click_radio`（`567312e0`）
+- 验收：`characterize-manual-radio-fill` OK；用户湿测通过
+- 遗留：无
+
+## 2026-09-08 15:31 · Cursor — 收工：批量推送业务对象名去掉动词（回链 15:00 开工）
+
+- 完成：`propertiesName` 改为字段名（`buildBusinessObjectName`）；不再拼填写/选择/点击；legacy-engine 操作名未改（`f1728b38`）
+- 验收：characterize-transaction-export / export-region / export-v3 / legacy-engine-export OK；用户湿测通过
+- 遗留：无
+
+## 2026-09-08 15:16 · Cursor — 开工：人工录制 el-radio 去掉码值 fill 重复步
+
+- 进行中：点 Element UI radio 只记 click_radio，不再因原生 input change/blur 多记 fill（码值 0/1）
+- 范围：`scripts/manual_recorder/js_parts/b.py`（`emitFill`）；characterization `characterize-manual-radio-fill.py`
+- 禁入：V3 导出 / transaction-export.js 动词名改动；Python RadioEngine 回放路径
+- 方式：TDD 先红后绿；根因=emitFill 已跳过 .el-select 未跳过 .el-radio
+- 注意：已收工，见上方 15:31 条目
+
+## 2026-09-08 15:00 · Cursor — 开工：批量推送业务对象名去掉动词
+
+- 进行中：伙伴 `propertiesName` 改为字段名（与真实名称对齐），不再拼「填写/选择/点击」等动词
+- 范围：`src/services/transaction-export.js`；characterization `characterize-transaction-export.mjs` + `characterize-transaction-export-region.mjs`
+- 禁入：legacy-engine `buildOperationName`（操作名仍带动词）；V3 截图/分区组装；Vue SPA
+- 方式：TDD 改 characterization 期望 → 改 `mapStepToTransactionEvent`；V2/V3 推送共用此函数
+- 注意：已收工，见上方 15:31 条目
+
 ## 2026-09-08 · ZCode V3导出线 — 收工：弹窗与触发行同层级（2475f9fb）
 
 - 完成：弹窗 propertiesPID 改指触发 ele 的父节点（同级展示）+ reorderPopupSubtrees 弹窗子树移到触发行后并重编 ID；layer-tree 工具交错渲染同步
