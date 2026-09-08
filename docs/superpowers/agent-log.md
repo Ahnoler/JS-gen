@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 19:42 · ZCode 死代码清理线 — 收工：全仓死代码清理 534 行落库，verify-all ALL GREEN（回链 18:55）
+
+- 完成：10 个原子 commit（`376fa2b1`→`9440dae8`）fast-forward 合入 uara_V1.2，31 文件 **+1/−534**。C1 整文件孤儿 ×6（models/index barrel、models/sys-msg shim、services/sys-msg/index barrel、playwright-runner/lib/helpers.js、scripts/count_steps.py、scripts/tools/_gen_locator_helpers_py.mjs 过期副本）；C2-C9 零引用符号 ×30 + 死转发行 ×11 组（trajectory-store ×4 含传导死亡 getTrajectoryRecord、ws 层 ×3、remote-session/state ×4、杂项导出 ×7、hierarchy 模板+转发行 ×6、locator-candidates ×3、constants ×7、DAO 方法 ×9）
+- 验收：①worktree 干净基线 vs 编辑后 verify-all ok 行逐一相同（115 ok，唯一红=characterize-network-capture 的 Python 探针 import，实证为 worktree 环境特异性、主检出绿）；②合并后主检出 **verify-all ALL GREEN 120 项零失败**；③5 个只读子智能体全程（侦查 ×3、kill list 对抗复核 ×1〔37 项 36 确认 1 修正〕、分支 diff 审查 ×1〔PASS：无裹挟删除、36 被删符号 HEAD 零引用、保留项 REMOTE_SESSION_OCCUPIED/EVENT_SOURCES/isGeneratedId 等全部完好〕）
+- 遗留移交：CAUTION（生产零引用但被 pin，删除须同步改 pin）×9 清单在清理报告（clearAll、screenshot-pending ×2、findPhaseGroupByStateGroup、listPageLevelScreenshotsByTrajectory、constants 4 个状态表、memory deleteByTrajectory、KNOWN_EVENT_TYPES、runtime/script-runner.js 整文件）；人工 CLI CAUTION ×11 未动（api-capture 是报文捞取线资产明示保留）；DANGER 零项未删。发现：`src/dao/trajectory-dao.js:630` 存量 18 条 jsdoc warning（1ad954fe 引入，主检出现存，宜由该线补 @param）；pack-control-plane.sh 打包缺 executor/（运维不一致）；「export 收窄」候选清单在报告
+- 注意：worktree D:\dev\JS-gen-deadcode 已拆除（node_modules junction 先摘再删，防递归误删主检出依赖），分支 cleanup/dead-code-20260908 已合并删除；本线全程未触碰禁入区与他线 WIP
+
 ## 2026-09-08 18:55 · ZCode 死代码清理线 — 开工：全仓死代码清理（用户模板任务）
 
 - 开工：18:55。用户下发死代码清理流程：SAFE 直接删、CAUTION/DANGER 只报告不动代码
