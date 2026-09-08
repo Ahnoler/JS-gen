@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 22:50 · Cursor Lead — 开工：轻量每步末扫通知注入 agent
+
+- 进行中：22:50。用户选定轻量方案：每步末扫可见 toast/error（非常驻业务 hook），塞进 agent 观察；可复用 __notify_log
+- 范围：feature_flags、js snippet、recorder on_step_end cue、characterize pin；本文件
+- 禁入：whitelist / draft-traj / kb-remediation / 常驻 MutationObserver 新架构
+- 方式：TDD pin → step_end 扫+去重注入 HumanMessage；成功文案顺带 toast_ok → 收工
+
 ## 2026-09-08 22:55 · Cursor Lead — 收工：introduce_pick 成功令牌（回链 22:45）
 
 - 完成：sanitize introduce_pick 合并 toast_ok/dialog_close/picker_closed；click_save toast+确定 补记 picker_closed/dialog_close；phase_done_ok 关闭类别名；pin characterize-introduce-dialog-close + verify-all
