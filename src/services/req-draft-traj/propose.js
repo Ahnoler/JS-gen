@@ -1,6 +1,7 @@
 /**
  * Propose atomic draft trajectory candidates from req-module through-chains.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
@@ -496,7 +497,20 @@ export async function proposeDraftTrajectories({
     if (hit.nodeId) atom.suggestedNodeId = hit.nodeId;
   }
 
-  await writeProposeCache(modDir, { atoms: capped, rejected });
+  const sourceHash = createHash('sha256').update(md, 'utf8').digest('hex');
+  const inputHash = createHash('sha256')
+    .update(JSON.stringify({ chainIds: chainIds ?? null, maxAtoms: maxAtoms ?? null }), 'utf8')
+    .digest('hex');
+  await writeProposeCache(modDir, {
+    atoms: capped,
+    rejected,
+    sourceHash,
+    inputHash,
+    truncated: {
+      dropped: atoms.length - capped.length,
+      requestedMax: Number.isFinite(maxAtoms) && maxAtoms > 0 ? maxAtoms : null,
+    },
+  });
 
   return { atoms: capped, rejected };
 }

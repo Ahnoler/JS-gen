@@ -58,5 +58,8 @@ config/.db-whitelist-lastip
 data/kb/dicts_normalized.json
 data/kb/staging/
 
+# req→draft-traj propose 运行期缓存（commit 侧按 cacheVersion/sourceHash 判过期）
+data/kb/req/*/.draft-traj-propose.json
+
 # 控制面打包产物
 dist/

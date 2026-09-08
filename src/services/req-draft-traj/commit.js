@@ -1,6 +1,9 @@
 /**
  * Commit propose-cache atoms to draft trajectories (analyze → create + provenance).
  */
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import * as systemDao from '../../dao/system-dao.js';
 import { findDraftByReqAtomKey } from '../../dao/trajectory-dao.js';
 import { AppError } from '../../http/app-error.js';
@@ -10,7 +13,37 @@ import {
   createTransactionWithPhases,
 } from '../trajectory/trajectory-meta-service.js';
 import { assertAtomProvenance } from './provenance.js';
-import { readProposeCache } from './propose-cache.js';
+import { readProposeCache, PROPOSE_CACHE_VERSION } from './propose-cache.js';
+
+/**
+ * Load the propose cache and refuse stale shapes: missing cache → VALIDATION;
+ * cacheVersion mismatch or through-chains.md hash drift → STALE_PROPOSE_CACHE
+ * (the source changed since propose — re-run propose, never silently reuse).
+ * @param {string} moduleKey KB req module key
+ * @param {string|undefined} rootDir Module workspace root override
+ * @returns {Promise<object>} Validated cache payload
+ */
+async function loadFreshProposeCache(moduleKey, rootDir) {
+  const modDir = moduleDir(moduleKey, rootDir);
+  const cache = await readProposeCache(modDir);
+  if (!cache?.atoms?.length) {
+    throw new AppError('propose cache missing — run draft-traj/propose first', { code: 'VALIDATION' });
+  }
+  if (cache.cacheVersion !== PROPOSE_CACHE_VERSION) {
+    throw new AppError('propose cache outdated — run draft-traj/propose again', { code: 'STALE_PROPOSE_CACHE' });
+  }
+  let md;
+  try {
+    md = await readFile(join(modDir, 'through-chains.md'), 'utf-8');
+  } catch {
+    throw new AppError('through-chains.md missing — run draft-traj/propose again', { code: 'STALE_PROPOSE_CACHE' });
+  }
+  const hash = createHash('sha256').update(md, 'utf8').digest('hex');
+  if (hash !== cache.sourceHash) {
+    throw new AppError('through-chains changed — run draft-traj/propose again', { code: 'STALE_PROPOSE_CACHE' });
+  }
+  return cache;
+}
 
 /**
  * Check that a function id exists in the system table (FK guard before
@@ -61,10 +94,7 @@ export async function validateCommitAtoms({
     ? functionIdOverrides
     : {};
   const keys = Array.isArray(atomKeys) ? atomKeys.map(String) : [];
-  const cache = await readProposeCache(moduleDir(moduleKey, rootDir));
-  if (!cache?.atoms?.length) {
-    throw new AppError('propose cache missing — run draft-traj/propose first', { code: 'VALIDATION' });
-  }
+  const cache = await loadFreshProposeCache(moduleKey, rootDir);
   const byKey = new Map(cache.atoms.map((a) => [a.atomKey, a]));
   const findDraft = findDraftFn || findDraftByReqAtomKey;
 

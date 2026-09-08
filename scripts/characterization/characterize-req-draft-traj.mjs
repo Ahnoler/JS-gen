@@ -5,6 +5,7 @@
  *   node scripts/characterization/characterize-req-draft-traj.mjs
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -372,6 +373,7 @@ async function main() {
 
   const { writeProposeCache } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
+  const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 
   const GOOD_ATOM_KEY = 'demo-mod:chain-a:2:新增一级分类';
   const GOOD_ATOM = {
@@ -386,9 +388,102 @@ async function main() {
   async function seedCache(tmp, atoms) {
     const modDir = join(tmp, 'demo-mod');
     cpSync(fixtureRoot, modDir, { recursive: true });
-    await writeProposeCache(modDir, { atoms, rejected: [] });
+    const md = readFileSync(join(modDir, 'through-chains.md'), 'utf8');
+    await writeProposeCache(modDir, { atoms, rejected: [], sourceHash: sha256(md) });
     return tmp;
   }
+
+  await runAsync('writeProposeCache emits cacheVersion+hashes atomically', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-cache-'));
+    const modDir = join(tmp, 'demo-mod');
+    mkdirSync(modDir, { recursive: true });
+    const body = await writeProposeCache(modDir, {
+      atoms: [],
+      rejected: [],
+      sourceHash: 'a'.repeat(64),
+      inputHash: 'b'.repeat(64),
+      truncated: { dropped: 0, requestedMax: null },
+    });
+    assert.equal(body.cacheVersion, 1);
+    assert.ok(body.sourceHash && body.inputHash);
+    const raw = JSON.parse(readFileSync(join(modDir, '.draft-traj-propose.json'), 'utf8'));
+    assert.equal(raw.cacheVersion, 1);
+    assert.equal(raw.sourceHash, 'a'.repeat(64));
+    assert.equal(existsSync(join(modDir, '.draft-traj-propose.json.tmp')), false);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose writes cache with through-chains sourceHash', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+      ],
+    });
+    await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM });
+    const cache = JSON.parse(readFileSync(join(tmp, 'demo-mod', '.draft-traj-propose.json'), 'utf8'));
+    const md = readFileSync(join(tmp, 'demo-mod', 'through-chains.md'), 'utf8');
+    assert.equal(cache.cacheVersion, 1);
+    assert.equal(cache.sourceHash, sha256(md));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commit rejects cache without cacheVersion (STALE_PROPOSE_CACHE)', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    const modDir = join(tmp, 'demo-mod');
+    cpSync(fixtureRoot, modDir, { recursive: true });
+    writeFileSync(join(modDir, '.draft-traj-propose.json'), JSON.stringify({
+      updatedAt: new Date().toISOString(),
+      atoms: [GOOD_ATOM],
+      rejected: [],
+    }), 'utf8');
+
+    let err;
+    try {
+      await commitDraftTrajectories({
+        moduleKey: 'demo-mod',
+        rootDir: tmp,
+        atomKeys: [GOOD_ATOM_KEY],
+        analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+        createFn: async () => ({ id: 1 }),
+        findDraftFn: async () => null,
+      });
+    } catch (e) {
+      err = e;
+    }
+    assert.ok(err);
+    assert.equal(err.code, 'STALE_PROPOSE_CACHE');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commit rejects stale through-chains sourceHash', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    const modDir = join(tmp, 'demo-mod');
+    cpSync(fixtureRoot, modDir, { recursive: true });
+    const md = readFileSync(join(modDir, 'through-chains.md'), 'utf8');
+    await writeProposeCache(modDir, { atoms: [GOOD_ATOM], rejected: [], sourceHash: sha256(md) });
+    // mutate through-chains after propose → hash no longer matches
+    writeFileSync(join(modDir, 'through-chains.md'), `${md}\n| 9 | 新增的步骤 | 页面 | ZJJK00000000 | 按钮 |\n`, 'utf8');
+
+    let err;
+    try {
+      await commitDraftTrajectories({
+        moduleKey: 'demo-mod',
+        rootDir: tmp,
+        atomKeys: [GOOD_ATOM_KEY],
+        analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+        createFn: async () => ({ id: 1 }),
+        findDraftFn: async () => null,
+      });
+    } catch (e) {
+      err = e;
+    }
+    assert.ok(err);
+    assert.equal(err.code, 'STALE_PROPOSE_CACHE');
+    rmSync(tmp, { recursive: true, force: true });
+  });
 
   await runAsync('commitDraftTrajectories skips unknown atomKey', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));

@@ -128,7 +128,7 @@ export const GROUP_KB = [{
     {
       method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/propose',
       summary: '从 through-chains 生成可勾选原子候选（写 .draft-traj-propose.json）',
-      desc: '解析模块 through-chains.md，LLM 原子化后仅返回出处齐全的可选原子；出处不可解析的进 rejected。',
+      desc: '解析模块 through-chains.md，LLM 原子化后仅返回出处齐全的可选原子；出处不可解析的进 rejected。缓存带 cacheVersion/sourceHash/inputHash，源文件变更后旧缓存会被 commit 判过期。',
       params: [
         { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
         { name: 'chainIds', type: 'string[]', in: 'body', desc: '可选，限定主链 id 子集' },
@@ -191,7 +191,7 @@ export const GROUP_KB = [{
           skipped: [{ atomKey: 'product-mgmt:chain-a:9', reason: 'unknown_or_stale_atom' }],
         },
       }),
-      notes: ['atomKeys 必填且非空', '未先 propose → 400', '缺 functionId 且无 override → skipped missing_function_id', '同键已有任意状态轨迹（draft/recorded…）→ skipped duplicate_draft；force 时 req_atom_seq 递增重建', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
+      notes: ['atomKeys 必填且非空', '未先 propose → 400', 'propose 缓存版本过期或 through-chains.md 已变更 → 4xx STALE_PROPOSE_CACHE（须重新 propose）', '缺 functionId 且无 override → skipped missing_function_id', '同键已有任意状态轨迹（draft/recorded…）→ skipped duplicate_draft；force 时 req_atom_seq 递增重建', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
     },
     {
       method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/validate',
