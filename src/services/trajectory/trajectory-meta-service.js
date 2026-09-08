@@ -282,6 +282,8 @@ export async function createTransactionWithPhases({
   reqSourcePath = null,
   reqChapterRef = null,
   reqAtomKey = null,
+  kbFlowRef = null,
+  kbFlowNodeId = null,
   trx = null,
 } = {}) {
   let resolvedFunctionId;
@@ -323,6 +325,8 @@ export async function createTransactionWithPhases({
       reqSourcePath,
       reqChapterRef,
       reqAtomKey,
+      kbFlowRef,
+      kbFlowNodeId,
       steps: [],
     }, client);
 

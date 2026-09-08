@@ -173,6 +173,8 @@ export async function save(trajectory, trx = null) {
       reqSourcePath: trajectory.reqSourcePath ?? null,
       reqChapterRef: trajectory.reqChapterRef ?? null,
       reqAtomKey: trajectory.reqAtomKey ?? null,
+      kbFlowRef: trajectory.kbFlowRef ?? null,
+      kbFlowNodeId: trajectory.kbFlowNodeId ?? null,
     }));
 
     if (trajectory.steps?.length) {
