@@ -1,5 +1,6 @@
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryService from '../../services/trajectory-service.js';
+import { getFlowTemplateHintForTrajectory } from '../../services/req-draft-traj/flow-card-recall.js';
 import { TRAJECTORY_RECORD_STATUSES } from '../../models/constants.js';
 import { asyncHandler, AppError } from '../../http/app-error.js';
 import { asyncHandler as asyncHandlerSendErr } from './trajectory-shared.js';
@@ -323,5 +324,14 @@ export default function (app) {
   app.get('/api/v2/trajectories/:id/login-context', asyncHandlerSendErr(async (req, res) => {
     const ctx = await trajectoryService.getTrajectoryLoginContext(+req.params.id);
     res.json(ctx);
+  }));
+
+  /**
+   * Preview flow-card template hint for an atomic trajectory (read-only).
+   * GET /api/v2/trajectories/:id/flow-template-hint
+   */
+  app.get('/api/v2/trajectories/:id/flow-template-hint', asyncHandlerSendErr(async (req, res) => {
+    const data = await getFlowTemplateHintForTrajectory(+req.params.id);
+    res.json(data);
   }));
 }

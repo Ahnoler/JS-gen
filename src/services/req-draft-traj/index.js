@@ -17,4 +17,5 @@ export {
   matchFlowForAtom,
   buildFlowTemplateHint,
   applyFlowTemplateHintToDescription,
+  getFlowTemplateHintForTrajectory,
 } from './flow-card-recall.js';

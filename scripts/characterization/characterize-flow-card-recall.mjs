@@ -72,6 +72,7 @@ async function main() {
       matchFlowForAtom,
       buildFlowTemplateHint,
       applyFlowTemplateHintToDescription,
+      getFlowTemplateHintForTrajectory,
     } = recallMod;
 
     await runAsync('getFlowCard reads card from temp dir', async () => {
@@ -130,6 +131,42 @@ async function main() {
       const attachRunnerSrc = readFileSync(attachRunnerPath, 'utf8');
       assert.match(attachRunnerSrc, /injectFlowTemplateHintIfNeeded|buildFlowTemplateHint/);
       assert.match(attachRunnerSrc, /kbFlowRef/);
+    });
+
+    run('trajectory route registers flow-template-hint preview', () => {
+      const routePath = join(ROOT, 'src/routes/v2/trajectory.js');
+      const routeSrc = readFileSync(routePath, 'utf8');
+      assert.match(routeSrc, /flow-template-hint/);
+      assert.match(routeSrc, /getFlowTemplateHintForTrajectory/);
+    });
+
+    await runAsync('getFlowTemplateHintForTrajectory builds hint from traj fixture', async () => {
+      const out = await getFlowTemplateHintForTrajectory(99, {
+        getById: async () => ({
+          id: 99,
+          kbFlowRef: 'customer_onboarding',
+          kbFlowNodeId: 'convert',
+          task: '在对公客户主页点击【客户转正】',
+        }),
+      });
+      assert.equal(out.kbFlowRef, 'customer_onboarding');
+      assert.equal(out.kbFlowNodeId, 'convert');
+      assert.match(out.hint, /【流程卡模板】/);
+      assert.match(out.hint, /【本原子任务】/);
+    });
+
+    await runAsync('getFlowTemplateHintForTrajectory null hint when no ref', async () => {
+      const out = await getFlowTemplateHintForTrajectory(1, {
+        getById: async () => ({
+          id: 1,
+          kbFlowRef: null,
+          kbFlowNodeId: null,
+          task: '无关任务',
+        }),
+      });
+      assert.equal(out.hint, null);
+      assert.equal(out.kbFlowRef, null);
+      assert.equal(out.kbFlowNodeId, null);
     });
 
     const { writeProposeCache } = await import(

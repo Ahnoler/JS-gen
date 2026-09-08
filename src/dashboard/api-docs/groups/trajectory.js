@@ -104,6 +104,21 @@ export const GROUP_TRAJECTORY = [
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
+        method: 'GET', path: '/api/v2/trajectories/{id}/flow-template-hint',
+        summary: '预览流程卡模板前言（只读）',
+        desc: '根据 trajectory 上已落库的 kbFlowRef / kbFlowNodeId 拼装与 prepare 注入相同的前言；不写库。无 ref 或卡文件缺失时 hint 为 null。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        respExample: J({
+          code: 200,
+          message: 'ok',
+          data: {
+            hint: '【流程卡模板】对公客户建档\n菜单：客户管理→对公客户管理\n前置条件：\n- 入口：客户管理→对公客户管理\n【本段起点】（node=convert 客户转正场景）\n到达：列表选信贷预客户→【修改】→对公客户主页→【客户转正】\n【本原子任务】\n在对公客户主页点击【客户转正】',
+            kbFlowRef: 'customer_onboarding',
+            kbFlowNodeId: 'convert',
+          },
+        }),
+      },
+      {
         method: 'PATCH', path: '/api/v2/trajectories/{id}',
         summary: '更新元数据 / 绑定账号 / 业务数据',
         desc: '录制前须绑定 systemAccountId。账号须属于该交易所属系统。可同时传 businessEntries 替换业务 KV。',

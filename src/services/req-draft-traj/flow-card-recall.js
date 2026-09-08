@@ -1,6 +1,8 @@
 /**
  * Flow-card recall: deterministic match + template hint builders for atom recording.
  */
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import { getFlowCard } from '../kb-flow-cards.js';
 
 export const FLOW_TEMPLATE_MARKER = '【流程卡模板】';
 
@@ -196,4 +198,41 @@ export function applyFlowTemplateHintToDescription(description, hint) {
   if (!hint) return String(description ?? '');
   const base = stripFlowTemplateHint(description);
   return base ? `${hint}\n${base}` : hint;
+}
+
+/**
+ * Preview flow-template hint for a trajectory row (no DB write).
+ * @param {object|null} traj trajectory row from trajectoryDao.getById
+ * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>}
+ */
+async function flowTemplateHintFromTrajectory(traj) {
+  const kbFlowRef = traj?.kbFlowRef ?? null;
+  const kbFlowNodeId = traj?.kbFlowNodeId ?? null;
+  if (!kbFlowRef) {
+    return { hint: null, kbFlowRef, kbFlowNodeId };
+  }
+  const card = await getFlowCard({ stem: kbFlowRef });
+  const hint = buildFlowTemplateHint({
+    card,
+    nodeId: kbFlowNodeId,
+    atomTask: String(traj?.task || '').trim(),
+  });
+  return { hint, kbFlowRef, kbFlowNodeId };
+}
+
+/**
+ * Load trajectory by id and preview the flow-card template hint (no DB write).
+ * @param {number|string} trajectoryId
+ * @param {{ getById?: (id: number) => Promise<object|null> }} [deps] test hooks
+ * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>}
+ */
+export async function getFlowTemplateHintForTrajectory(trajectoryId, { getById = trajectoryDao.getById } = {}) {
+  const tid = Number(trajectoryId);
+  const traj = await getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return flowTemplateHintFromTrajectory(traj);
 }
