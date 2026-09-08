@@ -263,6 +263,7 @@ export async function createEmptyTrajectory({
  * @param {string|null} [opts.reqSourcePath] KB source document path (provenance)
  * @param {string|null} [opts.reqChapterRef] KB chapter reference (provenance)
  * @param {string|null} [opts.reqAtomKey] Stable propose atom key (provenance)
+ * @param {number} [opts.reqAtomSeq] Force re-commit sequence within (module, atom)
  * @param {import('knex').Knex|null} [opts.trx] 可选事务
  * @returns {Promise<object>} 创建的轨迹实体（含阶段）
  */
@@ -282,6 +283,7 @@ export async function createTransactionWithPhases({
   reqSourcePath = null,
   reqChapterRef = null,
   reqAtomKey = null,
+  reqAtomSeq = 0,
   kbFlowRef = null,
   kbFlowNodeId = null,
   trx = null,
@@ -325,6 +327,7 @@ export async function createTransactionWithPhases({
       reqSourcePath,
       reqChapterRef,
       reqAtomKey,
+      reqAtomSeq,
       kbFlowRef,
       kbFlowNodeId,
       steps: [],

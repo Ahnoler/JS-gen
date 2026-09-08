@@ -463,6 +463,91 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  await runAsync('findDraftByReqAtomKey matches non-draft rows too', async () => {
+    const src = readFileSync(join(ROOT, 'src/dao/trajectory-dao.js'), 'utf8');
+    const start = src.indexOf('export async function findDraftByReqAtomKey');
+    const fn = src.slice(start, src.indexOf('\n}', start) + 2);
+    assert.ok(fn.length > 0);
+    assert.equal(fn.includes("record_status: 'draft'"), false);
+  });
+
+  await runAsync('commit duplicate skip covers any record_status (recorded row)', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    let createCalls = 0;
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async () => {
+        createCalls += 1;
+        return { id: 1 };
+      },
+      findDraftFn: async () => ({ id: 77, recordStatus: 'recorded', reqAtomSeq: 0 }),
+      functionIdExists: async () => true,
+    });
+    assert.equal(out.created.length, 0);
+    assert.equal(out.skipped.length, 1);
+    assert.match(out.skipped[0].reason, /duplicate/);
+    assert.equal(createCalls, 0);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commit force increments req_atom_seq beyond existing', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    const createdSeqs = [];
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      force: true,
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async (opts) => {
+        createdSeqs.push(opts.reqAtomSeq);
+        return { id: 100 + createdSeqs.length };
+      },
+      findDraftFn: async () => ({ id: 42, recordStatus: 'recorded', reqAtomSeq: 3 }),
+      functionIdExists: async () => true,
+    });
+    assert.equal(out.created.length, 1);
+    assert.deepEqual(createdSeqs, [4]);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commit converts ER_DUP_ENTRY to skipped duplicate_draft', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
+    await seedCache(tmp, [GOOD_ATOM]);
+
+    const dupErr = new Error('Duplicate entry');
+    dupErr.code = 'ER_DUP_ENTRY';
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async () => {
+        throw dupErr;
+      },
+      findDraftFn: async () => null,
+      functionIdExists: async () => true,
+    });
+    assert.equal(out.created.length, 0);
+    assert.equal(out.skipped.length, 1);
+    assert.equal(out.skipped[0].reason, 'duplicate_draft');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('save/createTransactionWithPhases pass reqAtomSeq through', async () => {
+    const metaSrc = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-meta-service.js'), 'utf8');
+    assert.match(metaSrc, /opts\.reqAtomSeq/);
+    const daoSrc = readFileSync(join(ROOT, 'src/dao/trajectory-dao.js'), 'utf8');
+    assert.match(daoSrc, /reqAtomSeq: trajectory\.reqAtomSeq \?\? 0/);
+  });
+
   await runAsync('commitDraftTrajectories skips atom missing provenance in cache', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-commit-'));
     const badAtom = { ...GOOD_ATOM, sourceDoc: '' };

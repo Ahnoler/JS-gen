@@ -173,6 +173,7 @@ export async function save(trajectory, trx = null) {
       reqSourcePath: trajectory.reqSourcePath ?? null,
       reqChapterRef: trajectory.reqChapterRef ?? null,
       reqAtomKey: trajectory.reqAtomKey ?? null,
+      reqAtomSeq: trajectory.reqAtomSeq ?? 0,
       kbFlowRef: trajectory.kbFlowRef ?? null,
       kbFlowNodeId: trajectory.kbFlowNodeId ?? null,
     }));
@@ -570,10 +571,11 @@ export async function getMaxPhaseNumber(trajectoryDbId) {
 }
 
 /**
- * Find an existing draft trajectory for a req atom (idempotency).
+ * Find the latest trajectory row for a req atom in ANY lifecycle state
+ * (idempotency guard — draft/recorded/paused all block re-commit).
  * @param {string} moduleKey KB req moduleKey
  * @param {string} atomKey Stable propose atom key
- * @returns {Promise<object|null>} Draft trajectory entity or null
+ * @returns {Promise<object|null>} Latest matching trajectory entity or null
  */
 export async function findDraftByReqAtomKey(moduleKey, atomKey) {
   const mk = String(moduleKey || '').trim();
@@ -583,7 +585,6 @@ export async function findDraftByReqAtomKey(moduleKey, atomKey) {
     .where({
       req_module_key: mk,
       req_atom_key: ak,
-      record_status: 'draft',
     })
     .orderBy('id', 'desc')
     .first();

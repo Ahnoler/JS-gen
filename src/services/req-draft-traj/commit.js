@@ -43,7 +43,9 @@ async function isKnownFunctionId(functionId, existsFn = null) {
  * @param {number|null} [opts.systemAccountId] Optional system account id
  * @param {Record<string, number|string>} [opts.functionIdOverrides] Per-atom function id overrides
  * @param {Record<string, { kbFlowRef?: string|null, kbFlowNodeId?: string|null }>} [opts.flowRefOverrides] Per-atom flow ref overrides
- * @param {boolean} [opts.force] When true, skip duplicate-draft check
+ * @param {boolean} [opts.force] When true, bypass the duplicate skip and take
+ *   the next req_atom_seq for that (module, atom); the DB unique index still
+ *   converts concurrent races into skipped duplicate_draft
  * @param {typeof analyzeRequirementToPhases} [opts.analyzeFn] Analyze override (characterization)
  * @param {typeof createTransactionWithPhases} [opts.createFn] Create override (characterization)
  * @param {typeof findDraftByReqAtomKey} [opts.findDraftFn] Duplicate lookup override
@@ -93,13 +95,12 @@ export async function commitDraftTrajectories({
       skipped.push({ atomKey, reason: prov.reason });
       continue;
     }
-    if (!force) {
-      const existing = await findDraft(moduleKey, atomKey);
-      if (existing) {
-        skipped.push({ atomKey, reason: 'duplicate_draft', trajectoryId: existing.id });
-        continue;
-      }
+    const existing = await findDraft(moduleKey, atomKey);
+    if (existing && !force) {
+      skipped.push({ atomKey, reason: 'duplicate_draft', trajectoryId: existing.id });
+      continue;
     }
+    const reqAtomSeq = force && existing ? Number(existing.reqAtomSeq ?? 0) + 1 : 0;
     const functionId = overrides[atomKey] ?? atom.suggestedFunctionId;
     if (!Number(functionId)) {
       skipped.push({ atomKey, reason: 'missing_function_id' });
@@ -132,12 +133,17 @@ export async function commitDraftTrajectories({
         reqSourcePath: atom.sourceDoc,
         reqChapterRef: atom.sourceChapter,
         reqAtomKey: atom.atomKey,
+        reqAtomSeq,
         kbFlowRef,
         kbFlowNodeId,
       });
       const trajectoryId = typeof traj === 'number' ? traj : traj.id;
       created.push({ trajectoryId, atomKey, name: atom.title });
     } catch (e) {
+      if (e && e.code === 'ER_DUP_ENTRY') {
+        skipped.push({ atomKey, reason: 'duplicate_draft' });
+        continue;
+      }
       skipped.push({ atomKey, reason: `create_failed:${e.message}` });
     }
   }
