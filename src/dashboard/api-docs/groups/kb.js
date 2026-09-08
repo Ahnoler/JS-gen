@@ -119,11 +119,24 @@ export const GROUP_KB = [{
     },
     {
       method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/source',
-      summary: '上传源文档到作业区（v1 未实现）',
+      summary: '上传源文档副本到作业区（自包含；D4 复用 multer）',
+      desc: 'multipart 字段 file（.docx/.doc/.md/.txt/.pdf，≤20MB）；落盘 data/kb/req/<module>/source/<原文件名>，source.link.json 增 localCopy/sha256/bytes/uploadedAt（保留 sourcePath 兼容）。propose 的 sourceDoc 优先用本地副本相对路径。',
       params: [
         { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
+        { name: 'file', type: 'file', required: true, in: 'body', desc: 'multipart 文件字段' },
       ],
-      notes: ['v1 固定返回 HTTP 501（multipart upload not implemented in v1）'],
+      respExample: J({
+        code: 200,
+        message: 'ok',
+        data: {
+          moduleKey: 'product-mgmt',
+          localCopy: 'source/product-mgmt.docx',
+          sha256: '3a5f…（64 hex）',
+          bytes: 1048576,
+          uploadedAt: '2026-09-08T16:00:00.000Z',
+        },
+      }),
+      notes: ['模块不存在 → NOT_FOUND', '非文档扩展名 → 400', '无本地副本的旧模块行为不变（回退 sourcePath）'],
     },
     {
       method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/propose',

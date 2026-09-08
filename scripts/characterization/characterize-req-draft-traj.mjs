@@ -935,8 +935,33 @@ async function main() {
     assert.match(src, /validateCommitAtoms/);
   });
 
-  await runAsync('propose appends observation lines to staging JSONL', async () => {
-    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-obs-'));
+  await runAsync('kb.js source upload implemented (no 501) and prefers local copy', async () => {
+    const src = readFileSync(join(ROOT, 'src/routes/v2/kb.js'), 'utf8');
+    assert.match(src, /uploadFileSingle/);
+    assert.doesNotMatch(src, /not implemented in v1/);
+
+    const tmp = mkdtempSync(join(tmpdir(), 'req-source-'));
+    const modDir = join(tmp, 'demo-mod');
+    mkdirSync(modDir, { recursive: true });
+    writeFileSync(join(modDir, 'source.link.json'), JSON.stringify({
+      sourcePath: 'C:/外部路径/demo.docx',
+      localCopy: 'source/demo.docx',
+    }), 'utf8');
+    mkdirSync(join(modDir, 'source'), { recursive: true });
+    writeFileSync(join(modDir, 'source', 'demo.docx'), 'doc-bytes', 'utf8');
+    const doc = await provMod.loadSourceDoc(modDir);
+    assert.equal(doc, 'source/demo.docx');
+
+    writeFileSync(join(modDir, 'source.link.json'), JSON.stringify({
+      sourcePath: 'C:/外部路径/demo.docx',
+      localCopy: 'source/已被删除.docx',
+    }), 'utf8');
+    const fallback = await provMod.loadSourceDoc(modDir);
+    assert.equal(fallback, 'C:/外部路径/demo.docx');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose appends observation lines to staging JSONL', async () => {    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-obs-'));
     cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
     const fakeLLM = async () => JSON.stringify({
       atoms: [

@@ -2,7 +2,7 @@
  * Req→draft-traj provenance helpers: chapter resolution and atom validation.
  */
 import { createHash } from 'node:crypto';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 
 /** Match real page codes like ZJJK00107304 (ignore placeholders such as — / 主页). */
@@ -86,13 +86,24 @@ export function extractZjjkCodes(raw) {
 }
 
 /**
- * Read source document path from a module directory.
+ * Read source document path from a module directory. Prefers the local copy
+ * uploaded via POST …/source (relative `source/<name>` path keeps the module
+ * self-contained); falls back to the legacy sourcePath when no copy exists.
  * @param {string} moduleDir Absolute module workspace path
- * @returns {Promise<string>} sourcePath from source.link.json
+ * @returns {Promise<string>} Relative local-copy path or legacy sourcePath
  */
 export async function loadSourceDoc(moduleDir) {
   const raw = await readFile(join(moduleDir, 'source.link.json'), 'utf-8');
   const parsed = JSON.parse(raw);
+  const localCopy = String(parsed.localCopy || '').trim();
+  if (localCopy) {
+    try {
+      await access(join(moduleDir, localCopy));
+      return localCopy;
+    } catch {
+      // fall through to legacy sourcePath
+    }
+  }
   return String(parsed.sourcePath || '').trim();
 }
 

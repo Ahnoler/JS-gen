@@ -1,10 +1,14 @@
 import { asyncHandler, AppError } from '../../http/app-error.js';
 import { sendOk } from '../../http/api-response.js';
+import { uploadFileSingle, multerHttpStatus } from '../../http/upload-file.js';
 import { listFlowCards } from '../../services/kb-flow-cards.js';
 import { detectStaleCards } from '../../services/change-impact-service.js';
 import * as systemDao from '../../dao/system-dao.js';
 import * as reqModules from '../../services/kb-req-modules.js';
 import * as reqDraftTraj from '../../services/req-draft-traj/index.js';
+import { createHash } from 'node:crypto';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { join, basename } from 'node:path';
 
 /**
  * KB routes: flow-card insights (read-only) and req-module workspace registration.
@@ -50,10 +54,59 @@ export default function registerKbRoutes(app) {
     sendOk(res, await reqModules.getReqModule({ moduleKey: req.params.moduleKey }));
   }));
 
-  /** POST /api/v2/kb/req-modules/:moduleKey/source — 源文档上传（v1 未实现）。 */
-  app.post('/api/v2/kb/req-modules/:moduleKey/source', asyncHandler(async (_req, res) => {
-    throw new AppError('multipart upload not implemented in v1', { status: 501 });
-  }));
+  /** POST /api/v2/kb/req-modules/:moduleKey/source — 源文档上传（自包含副本，D4 复用 multer）。 */
+  app.post('/api/v2/kb/req-modules/:moduleKey/source', (req, res) => {
+    uploadFileSingle(req, res, async (err) => {
+      if (err) {
+        const status = multerHttpStatus(err) ?? 500;
+        return res.status(status).json({ error: err.message });
+      }
+      try {
+        const moduleKey = req.params.moduleKey;
+        const mod = await reqModules.getReqModule({ moduleKey });
+        if (!mod) {
+          throw new AppError(`req module not found: ${moduleKey}`, { code: 'NOT_FOUND' });
+        }
+        const file = req.file;
+        if (!file || !file.buffer?.length) {
+          throw new AppError('multipart field "file" required', { code: 'VALIDATION' });
+        }
+        const safeName = basename(String(file.originalname || '')).replace(/[\\/:*?"<>|]/g, '_');
+        if (!safeName) {
+          throw new AppError('upload filename invalid', { code: 'VALIDATION' });
+        }
+        const modDir = reqModules.moduleDir(moduleKey);
+        const sourceDir = join(modDir, 'source');
+        await mkdir(sourceDir, { recursive: true });
+        await writeFile(join(sourceDir, safeName), file.buffer);
+        const sha256 = createHash('sha256').update(file.buffer).digest('hex');
+
+        let link = {};
+        try {
+          link = JSON.parse(await readFile(join(modDir, 'source.link.json'), 'utf-8'));
+        } catch {
+          link = {};
+        }
+        link.localCopy = `source/${safeName}`;
+        link.sha256 = sha256;
+        link.bytes = file.buffer.length;
+        link.uploadedAt = new Date().toISOString();
+        if (!link.sourcePath) link.sourcePath = safeName;
+        await writeFile(join(modDir, 'source.link.json'), `${JSON.stringify(link, null, 2)}\n`, 'utf-8');
+
+        return sendOk(res, {
+          moduleKey,
+          localCopy: link.localCopy,
+          sha256,
+          bytes: link.bytes,
+          uploadedAt: link.uploadedAt,
+        });
+      } catch (e) {
+        const ae = e instanceof AppError ? e : new AppError(e.message || 'upload failed', { code: 'VALIDATION' });
+        return res.status(ae.status).json({ error: ae.message, code: ae.code });
+      }
+    });
+  });
 
   /** POST /api/v2/kb/req-modules/:moduleKey/draft-traj/propose — LLM 原子化候选（写 propose 缓存）。 */
   app.post('/api/v2/kb/req-modules/:moduleKey/draft-traj/propose', asyncHandler(async (req, res) => {
