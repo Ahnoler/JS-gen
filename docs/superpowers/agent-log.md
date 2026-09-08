@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 · ZCode V3导出线 — 收工：弹窗与触发行同层级（2475f9fb）
+
+- 完成：弹窗 propertiesPID 改指触发 ele 的父节点（同级展示）+ reorderPopupSubtrees 弹窗子树移到触发行后并重编 ID；layer-tree 工具交错渲染同步
+- 验收：verify-all ALL GREEN；traj 499 顺序/挂载正确（图标→弹窗同级相邻，字段嵌弹窗下）；桌面 transaction-499-push.json + layer-tree.html 已刷新
+- 遗留：伙伴平台需确认同级渲染效果；4097 重启生效
+- 注意：文件集 = transaction-export-v3{,-properties}.js + scripts/tools/layer-tree-from-properties.mjs
+
 ## 2026-09-08 · ZCode V3导出线 — 收工：V3 推送白名单扩容（32578e3d）
 
 - 完成：ACTION_TO_ENGINE_TYPE 新增 picker_dialog_query→input / picker_dialog_select→select:click / workspace_tabs→click / tree_picker_click→click；workspace_tabs 仅放行 activate；Node 别名 click_icon_button→click_button；操作名/取值（弹窗查询:/弹窗选择:/树选:/页签:）
