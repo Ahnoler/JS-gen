@@ -5,6 +5,7 @@ import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import { getFlowCard } from '../kb-flow-cards.js';
 
 export const FLOW_TEMPLATE_MARKER = '【流程卡模板】';
+const FLOW_TEMPLATE_END_MARKER = '【/流程卡模板】';
 
 const CJK_RUN_RE = /[\u3400-\u9fff\u3040-\u30ff]+/g;
 const FS_CODE_RE = /FS\d+/gi;
@@ -164,6 +165,7 @@ export function buildFlowTemplateHint({ card, nodeId, atomTask } = {}) {
 
   lines.push('【本原子任务】');
   lines.push(String(atomTask || '').trim());
+  lines.push(FLOW_TEMPLATE_END_MARKER);
 
   return lines.join('\n');
 }
@@ -177,6 +179,15 @@ function stripFlowTemplateHint(description) {
   const text = String(description ?? '');
   if (!text.startsWith(FLOW_TEMPLATE_MARKER)) return text;
 
+  const endIdx = text.indexOf(FLOW_TEMPLATE_END_MARKER);
+  if (endIdx !== -1) {
+    const afterEnd = endIdx + FLOW_TEMPLATE_END_MARKER.length;
+    if (afterEnd >= text.length) return '';
+    const nextNewline = text.indexOf('\n', afterEnd);
+    return nextNewline === -1 ? '' : text.slice(nextNewline + 1);
+  }
+
+  // Legacy hints (no closing sentinel): assume single-line atom task body.
   const atomIdx = text.indexOf('【本原子任务】');
   if (atomIdx === -1) return text;
 

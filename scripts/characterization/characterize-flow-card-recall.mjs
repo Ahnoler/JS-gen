@@ -102,11 +102,43 @@ async function main() {
       assert.match(hint, /客户转正：选择一个信贷预客户/);
       assert.match(hint, /【本段起点】/);
       assert.match(hint, /【本原子任务】/);
+      assert.match(hint, /【\/流程卡模板】/);
 
       const once = applyFlowTemplateHintToDescription('原阶段描述', hint);
       const twice = applyFlowTemplateHintToDescription(once, hint);
       assert.equal(once, twice);
       assert.ok(once.startsWith('【流程卡模板】'));
+    });
+
+    await runAsync('applyFlowTemplateHint idempotent for multi-line atomTask', async () => {
+      const card = await getFlowCard({ stem: 'customer_onboarding', dir: tmpFlows });
+      const atomTask = [
+        '1、在对公客户主页点击【客户转正】，进入 FS00004007。',
+        '2、填写必填项并提交。',
+        '来源：demo.docx / chapters/01-customer.md#对公客户管理',
+      ].join('\n');
+      const hint = buildFlowTemplateHint({
+        card,
+        nodeId: 'convert',
+        atomTask,
+      });
+      const phaseText = '原阶段描述';
+
+      const once = applyFlowTemplateHintToDescription(phaseText, hint);
+      const twice = applyFlowTemplateHintToDescription(once, hint);
+      assert.equal(once, twice);
+      assert.equal((once.match(/来源：/g) || []).length, 1);
+      assert.ok(once.endsWith(phaseText));
+
+      const hint2 = buildFlowTemplateHint({
+        card,
+        nodeId: 'list',
+        atomTask,
+      });
+      const reapplied = applyFlowTemplateHintToDescription(once, hint2);
+      assert.match(reapplied, /node=list/);
+      assert.equal((reapplied.match(/来源：/g) || []).length, 1);
+      assert.ok(reapplied.endsWith(phaseText));
     });
 
     run('null card hint and no-match flowRef', () => {
