@@ -2,41 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
-## 2026-09-08 05:30 · Zcode — 收工：through-chains 可 propose 化全量完成 29/29（回链 05:17 开工）
-
-- 完成：**全部 29 个 req 作业区模块 `canProposeAtoms=true`（服务端 GET 实测）**——P1 两波 25 模块（子智能体 8 个并行、文件集互不相交、主会话机械验收）+ credit-retail 主线程补漏（波次清单漏派，自纠）+ product-mgmt 主链 B-G 表格化（1→7 链可解析）
-- 验收口径（每模块三关）：①`parseThroughChainsMarkdown` proposeable=true 且各链 steps>0 ②**机械覆盖核对**：原文 ZJJK 码与「」短语 vs 改写版 **0 缺失**（12+13+1 全查）③服务端 GET /api/v2/kb/req-modules 门控字段
-- 注意：①波1 有一个子智能体报告举例失实（声称保留 repay「TK+yyMMdd」冲正规则——原文本无此项），内容经机械核对无损，已记为「报告虚报、内容无损」教训：子智能体自证举例不可信，覆盖核对必须脚本化 ②无码模块（limit-ctrl-api 接口型/portal/system-mgmt/meeting-mgmt/collateral-* ）ZJJK 列如实 `—` 未灌水 ③`.draft-traj-propose.json` 缓存均未入库 ④4097 未再重启（canProposeAtoms 实时读文件）
-- 提交：`3c9b5d39`(P0)/`17b1cd6d`(波1)/`c35f2983`(波2)/补漏+product-mgmt commit 见 git log；todo ⑧ 已记
-- 遗留移交：全库 propose/勾选由业务在向导自选（人未勾选不建交易不变）；后续新增模块按 guide SOP 走
-
-## 2026-09-08 05:17 · Zcode — 开工：through-chains 可 propose 化 P1 全量（26 模块，连续执行模式）
-
-- 开工：05:17。用户指令连续执行做完剩余全部；按 `guides/through-chains-proposeable-format.md` SOP 把 26 个散文态模块改写为表式
-- 范围：`data/kb/req/{asset-preserve-npl,asset-preserve-ops,collateral-func,collateral-info,collection,credit-corp,credit-group,credit-interbank,credit-retail,customer-common,customer-group,digital-loan-desk,digital-mobile,disburse,limit-ctrl-api,limit-quota,loan-corp,loan-retail,meeting-mgmt,portal,postloan-check,postloan-risk-class,postloan-warn,repay,smart-ctrl,system-mgmt}/through-chains.md`（26 文件）+ product-mgmt 主链 B+ 表格化 + 本文件 + todo
-- 禁入：解析器/propose/Vue 代码；轨迹查询 WIP 四文件；录制/回放；DB；`.draft-traj-propose.json` 一律不入库；不为过门控灌水（无闭环链的模块如实报 false）
-- 方式：子智能体编队分 2 波并行（文件集互不相交，主会话代声明、子不 commit），每波主会话验收（离线解析+抽查业务内容保留）后按波 commit；全部完成后 GET req-modules 全量核对 canProposeAtoms + 收工条
-
-## 2026-09-08 05:00 · Zcode — 收工：through-chains 可 propose 化 P0 完成（回链 04:55 开工）
-
-- 完成：customer-corp / rating 两模块 `through-chains.md` 改写为金标表式（10 链 45 步 / 8 链 38 步；业务口径零删减，ZJJK 从原文抽列、多码 ` / `、无码 `—`；旁路/Out 保持非主链标题）
-- 验收：`parseThroughChainsMarkdown` 离线解析两文件 **proposeable=true**、各链 steps>0；重启 4097（加载 `aa4ca8a8` 门控代码）后 `GET /api/v2/kb/req-modules` 实测 **canProposeAtoms=true：customer-corp, product-mgmt, rating** 三模块；向导可点选
-- 注意：①未跑 propose（留待向导/业务），未提交任何 `.draft-traj-propose.json`（各模块目录已有 SPA 湿测产生的缓存，均未入库）②本次为加载 04:45 门控代码又重启了一次 4097，现进程为最新 HEAD；后续会话无需再重启 ③P1 批（loan-corp / credit-corp 等散文态模块）待下一批移交单
-- 提交：两 md + 本条，hash 见 git log
-
-## 2026-09-08 04:57 · Zcode — 开工+收工：夜班长线任务迁入闲时管线（cron 已删，指令全文迁入 guides）
-
-- 完成（用户指令「这个任务改到闲时任务中」）：删除定时任务 automation-99c0d73a「每晚23:00夜班长线任务」（该任务 09-07 晚曾跑一轮=报文捞取 Tasks 7-9 那班）；指令全文迁入 `docs/superpowers/guides/night-shift-prompt.md` 作为闲时 dispatch 产物，与 idle-review-prompt 同规格（头部管线说明：只走闲时管线不建 cron，时机由派发方决定）
-- 增值：正文补「夜班守则补充」节——把 09-07/08 夜班实战教训固化（4097 StartTime 核验 / 多会话期禁 amend / 中文 JSON --data-binary / 离线 characterization 禁触真实 DB / verify-all ALL GREEN 基线与红归因 / 长跑只读 CDP 实时探测 / agent-log 提交只带自己条目）
-- 验收：CronList 无该 automation；guide 为纯文档新增，不涉代码与门禁；与 04:55 through-chains 文档线（data/kb/req/**）文件集不相交
-- 遗留：无。派发方式=晚间把 guide 的提示词正文交给闲时会话
-
-## 2026-09-08 04:55 · Zcode — 开工：through-chains 可 propose 化 P0（customer-corp + rating，纯文档）
-
-- 开工：04:55。执行 `guides/through-chains-proposeable-format.md` SOP §4，P0 两模块
-- 范围：`data/kb/req/customer-corp/through-chains.md`、`data/kb/req/rating/through-chains.md`、本文件、todo ⑧ 关联段；**仅文档 diff**
-- 禁入：`parse-through-chains.js`/propose/Vue（边界 §6）；轨迹查询 WIP 四文件；录制/回放；DB；不提交 `.draft-traj-propose.json` 缓存；不为过门控空表灌水（步骤全部来自现有需求口径，业务信息不删）
-- 方式：金标=product-mgmt 主链 A 表式；每条候选链 `### 主链 X` + `|#|步骤|页面/弹窗|ZJJK|关键按钮|` 表；ZJJK 从原文抽列、多码 ` / `、暂无写 `—`；旁路/Out 保持非 `### 主链` 开头；改完跑 §4 单文件解析自检（离线）+ GET req-modules 看 canProposeAtoms
+## 2026-09-08 10:00 · ZCode V3导出线 — 收工补充：人工录制 select_option 分层修复（18b0a2b8）
+- 完成：①录制侧 js_parts/b.py——el-select 下拉面板挂 body（popper），人工录制存 option 面板元素致 region=other、导出脱离 tab 分层；改为与 AI 同形态存页面内 .el-select 容器（is-focus 定位），option 文本走参数。②导出侧 transaction-export-v3-properties.js——分区段仅为 other 的步骤沿用前序分区段（存量人工数据兜底）。
+- 验收：traj 679（人工）重建 payload「选择额度类型」← tab基本信息；assembled manual JS 含补丁（30480 字节）；eslint 0；characterize-export-v3/pid/layer-tree 全绿。
+- 注意：需执行机重启生效（嵌入 Python）；traj 679 步骤 9-12 为用户 UI 手删（级联删截图已随 197ea073 生效）。
+- 遗留：date-picker/cascader 面板元素同为 body 挂载，若后续暴露同类分层问题按同思路修。
 
 ## 2026-09-08 04:45 · Cursor — 开工+收工：listReqModules 提前标 canProposeAtoms（散文主链不可选）
 
