@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 20:28 · OpenCode — 开工：Windows 执行机 CDP IPv6 localhost 连接修复
+
+- 进行中：修复本地执行机启动 Chromium 后 `browser_use` 通过 `localhost` 解析到 `::1`、无法连接仅监听 IPv4 的 CDP 端口问题
+- 范围：`scripts/browser/factory.py`、对应 characterization（如需新增）、本文件
+- 禁入：V3 导出线、req-draft/KB、轨迹查询及其他工作区 WIP；不修改 site-packages 第三方源码
+- 方式：项目侧最小覆盖 CDP 启动连接端点为 `127.0.0.1`，离线回归后运行 Python 启动冒烟
+
 ## 2026-09-08 · ZCode V3导出线 — 收工：弹窗与触发行同层级（2475f9fb）
 
 - 完成：弹窗 propertiesPID 改指触发 ele 的父节点（同级展示）+ reorderPopupSubtrees 弹窗子树移到触发行后并重编 ID；layer-tree 工具交错渲染同步
