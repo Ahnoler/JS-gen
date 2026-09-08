@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 16:10 · Cursor Lead — 开工：产品要素库原子交易重切湿测（参考 #61/#66/#503）
+
+- 开工：16:10。用户确认方案 B；仅以 #61/#66/#503 为参考；spec `2026-09-08-product-element-atomic-rerecord-design.md`
+- 范围：`tmp/product-element/`（task/analyze/create/prepare/start/through-report）、`docs/superpowers/specs|plans/*product-element-atomic*`、本文件；建 draft 挂 **9000000468**
+- 禁入：改/删遗留 61/66/503；产品库侧 688/689/670 要素配置录制；引擎大改；trajectory-dao 等他线 WIP
+- 方式：T1→T4 串行 analyze/create → prepare/start/detach；stamp `20260908-elem`；account=2
+
 ## 2026-09-08 16:05 · Cursor — 开工+收工：关键数据分层 + 候选假流式 UX 设计
 
 - 完成：用户认可方向；spec → `docs/superpowers/specs/2026-09-08-req-draft-keydata-and-streaming-ux-design.md`（关键数据 A/B/C 分层；向导三步合并勾选；假流式非 SSE）
