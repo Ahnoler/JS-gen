@@ -66,6 +66,7 @@ checks = [
         "tssc-multi-select",
         "err-use-tssc-multi-select",
         "Do NOT fill_form_field",
+        "resolve_recorded_option_text",
     )),
     ("scripts/prompts/agent-tools-tssc-multi-select.md", (
         "tssc_multi_select(label_text, option_text)",
@@ -82,6 +83,9 @@ checks = [
     ("scripts/state.py", ("tssc_multi_select",)),
     ("src/models/action-name.js", ("tssc_multi_select",)),
     ("src/cdp/page-locator-helpers.js", ("form_tssc_multi_select", ".tssc-multi-select")),
+    ("src/services/legacy-engine-export.js", (
+        "tssc_multi_select: 'select:click'",
+    )),
     ("scripts/controller/actions/result_protocol.py", (
         '"tssc-multi-select"',
         "tssc_multi_select(label_text",

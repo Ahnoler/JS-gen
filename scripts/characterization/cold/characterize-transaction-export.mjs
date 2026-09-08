@@ -57,6 +57,18 @@ function testSelectOptionsJson() {
   assert.equal(ev.options, JSON.stringify(['启用', '停用']));
 }
 
+function testTsscMultiSelectAsSelectClick() {
+  const ev = mapStepToTransactionEvent({
+    actionType: 'tssc_multi_select',
+    params: { label_text: '要素名称', option_text: '部署方式' },
+    element: { xpath_smart: "//div[contains(@class,'tssc-multi-select')]" },
+  });
+  assert.equal(ev.eventTypeValue, 'select:click');
+  assert.equal(ev.eventTypeName, EVENT_TYPE_NAME['select:click']);
+  assert.equal(ev.propertiesName, '要素名称');
+  assert.equal(ev.objectValue, '部署方式');
+}
+
 function testSkipMeta() {
   assert.equal(mapStepToTransactionEvent({ actionType: 'wait_for_loading', params: {} }), null);
   assert.equal(mapStepToTransactionEvent({ actionType: 'go_to_url', params: { url: 'http://x' } }), null);
@@ -152,6 +164,7 @@ function testUniquePropertiesName() {
 testFillInput();
 testClickNoVerb();
 testSelectOptionsJson();
+testTsscMultiSelectAsSelectClick();
 testSkipMeta();
 testEnvelope();
 testRequireIds();

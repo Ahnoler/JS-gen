@@ -21,7 +21,8 @@ export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   fill_form_field: 'input',
   select_option: 'select:click',
   select_tree_option: 'select:tree',
-  tssc_multi_select: 'select:tssc-multi',
+  // Partner ATP: same runner as plain el-select (open + pick by text / table cell).
+  tssc_multi_select: 'select:click',
   click_element_by_index: 'click',
   click_menu_item: 'click',
   click_table_row_button: 'click',

@@ -1570,6 +1570,11 @@ class SelectEngine(_FormActionEngineBase):
         )
         result = await page.evaluate(JS_TSSC_MULTI_SELECT, [label_text, option_text])
         if _is_ok_result(result):
+            # ok-first:部署方式 / ok:… / ok-echo:… / ok-already:… → stamp concrete
+            # option_text (never persist sentinel "first" for replay/partner push).
+            res_s = str(result or '')
+            echo = res_s.split(':', 1)[1].strip() if ':' in res_s else ''
+            stamped = resolve_recorded_option_text(option_text, echo)
             if element is None and xp:
                 element = await _capture_element(
                     page, label_text, target_kind='form_tssc_multi_select', xpath_smart=xp,
@@ -1581,22 +1586,25 @@ class SelectEngine(_FormActionEngineBase):
                     'xpath_smart': xp or '',
                     'formLabel': label_text,
                     'target_kind': 'form_tssc_multi_select',
-                    'text': (option_text or '')[:80],
+                    'text': (stamped or option_text or '')[:80],
                     'attributes': {},
                     'candidates': (
                         [{'type': 'xpath_smart', 'value': xp}] if xp else []
                     ),
                 }
+            elif isinstance(element, dict) and stamped:
+                element = dict(element)
+                element['text'] = (stamped or '')[:80]
             xp_inv = stamp_recorded_xpath_smart(element, xp)
             _record_action(
                 'tssc_multi_select',
-                {'label_text': label_text, 'option_text': option_text},
+                {'label_text': label_text, 'option_text': stamped},
                 result,
                 element=element,
             )
             _task_done_impl(
                 label_text, self.business_data_store,
-                value=option_text, xpath_smart=xp_inv,
+                value=stamped or option_text, xpath_smart=xp_inv,
             )
             return _ok(result)
         res_s = str(result or '')

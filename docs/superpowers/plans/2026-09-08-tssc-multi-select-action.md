@@ -319,7 +319,7 @@ git commit -m "feat(scan): classify TsscMultiSelect before el-select"
 - Modify: `scripts/controller/actions/_form.py`
 - Modify: `scripts/models/action.py`, `scripts/state.py`, `scripts/event_dispatch.py`
 - Modify: `src/models/action-name.js`, `src/models/element.js`, `src/dedup.js`
-- Modify: `src/services/legacy-engine-export.js` (map `tssc_multi_select: 'select:tssc-multi'`, case branches parallel to `select_tree_option`)
+- Modify: `src/services/legacy-engine-export.js` (map `tssc_multi_select: 'select:click'` — partner 并进普通下拉；case branches parallel to `select_option`)
 - Modify: `src/services/trajectory/heal-contract.js` / `form-structure-heal.js` if they list select actions (add name alongside `select_tree_option`)
 - Modify: `scripts/agent/recorder_emitters.py` if the field-write allowlist should include the new action
 
@@ -415,7 +415,7 @@ Import `JS_TSSC_MULTI_SELECT` in `form_action_engines.py` the same way `JS_SELEC
 - `src/models/action-name.js`: add to `CANONICAL`; aliases e.g. `tsscMultiSelect`, `select_tssc_multi`.
 - `src/models/element.js`: map action → `form_tssc_multi_select` like tree → `form_tree_select`.
 - `src/dedup.js`: include action name in consecutive-dedup allowlist if select_tree is listed.
-- `legacy-engine-export.js`: `tssc_multi_select: 'select:tssc-multi'` + case branches copying tree’s param shape (`label_text` / `option_text`).
+- `legacy-engine-export.js`: `tssc_multi_select: 'select:click'` + case branches copying tree’s param shape (`label_text` / `option_text`).
 
 - [ ] **Step 4: Run pin + existing select/tree cold pins**
 
@@ -579,5 +579,5 @@ git commit -m "docs: close tssc_multi_select action implementation line"
 - Action name consistent: `tssc_multi_select` everywhere (not `select_tssc_multi` except optional alias).
 - Locator kind: `form_tssc_multi_select`.
 - Scan kind: `tssc-multi-select`.
-- Export command: `select:tssc-multi`.
+- Export command: `select:click`.
 - `introduce_pick` gets the prompt pack (required for 选择要素).

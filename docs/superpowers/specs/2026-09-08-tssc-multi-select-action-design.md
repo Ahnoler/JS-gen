@@ -89,7 +89,7 @@ tssc_multi_select(label_text: str, option_text: str, xpath_smart: str = "")
 
 - `_record_action('tssc_multi_select', {label_text, option_text}, …, element=…)`
 - `target_kind='form_tssc_multi_select'`；`stamp_recorded_xpath_smart` + `_task_done_impl` 与 tree 同路径
-- 挂入：`ACTION_TO_COMMAND` / `state.py` 字段类表 / `event_dispatch` 参数白名单 / `src/models/action-name.js` 别名 / export `select:tssc-multi`（命名与 `select:tree` 平行）
+- 挂入：`ACTION_TO_COMMAND` / `state.py` 字段类表 / `event_dispatch` 参数白名单 / `src/models/action-name.js` 别名 / export **并进** `select:click`（与 `select_option` 同伙伴类型；落库须把 `first`/`ok-first:` 打成具体 `option_text`）
 
 ## 5. 交互序列（JS 单次注入）
 

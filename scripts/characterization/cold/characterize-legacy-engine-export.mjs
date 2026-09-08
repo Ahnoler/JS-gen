@@ -24,6 +24,7 @@ function testSchema() {
     ['click', 'date', 'input', 'radio', 'select:click', 'select:tree'],
   );
   assert.equal(ACTION_TO_ENGINE_TYPE.select_option, 'select:click');
+  assert.equal(ACTION_TO_ENGINE_TYPE.tssc_multi_select, 'select:click');
   assert.ok(!('fill_date_field' in ACTION_TO_ENGINE_TYPE));
   assert.equal(ACTION_TO_ENGINE_TYPE.click_radio, 'radio');
   assert.ok(!('wait_for_loading' in ACTION_TO_ENGINE_TYPE));
@@ -78,6 +79,15 @@ function testEngineTypeVariants() {
   });
   assert.equal(sel.type, 'select:click');
   assert.equal(sel.value, '启用');
+
+  const tssc = mapStepToLegacyEngineOp({
+    actionType: 'tssc_multi_select',
+    params: { label_text: '要素名称', option_text: '部署方式' },
+    element: { xpath_smart: "//div[contains(@class,'tssc-multi-select')]" },
+  });
+  assert.equal(tssc.type, 'select:click');
+  assert.equal(tssc.value, '部署方式');
+  assert.equal(tssc.name, '选择:要素名称');
 
   const tree = mapStepToLegacyEngineOp({
     actionType: 'select_tree_option',
