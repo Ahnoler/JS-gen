@@ -262,6 +262,8 @@ export async function createEmptyTrajectory({
  * @param {string|null} [opts.reqModuleKey] KB req module key (provenance)
  * @param {string|null} [opts.reqSourcePath] KB source document path (provenance)
  * @param {string|null} [opts.reqChapterRef] KB chapter reference (provenance)
+ * @param {string|null} [opts.reqSourceHash] sha256 anchor of the resolved chapter (provenance)
+ * @param {string|null} [opts.reqChunkId] `<file-stem>#<h1-slug>` chapter anchor (provenance)
  * @param {string|null} [opts.reqAtomKey] Stable propose atom key (provenance)
  * @param {number} [opts.reqAtomSeq] Force re-commit sequence within (module, atom)
  * @param {import('knex').Knex|null} [opts.trx] 可选事务
@@ -282,6 +284,8 @@ export async function createTransactionWithPhases({
   reqModuleKey = null,
   reqSourcePath = null,
   reqChapterRef = null,
+  reqSourceHash = null,
+  reqChunkId = null,
   reqAtomKey = null,
   reqAtomSeq = 0,
   kbFlowRef = null,
@@ -326,6 +330,8 @@ export async function createTransactionWithPhases({
       reqModuleKey,
       reqSourcePath,
       reqChapterRef,
+      reqSourceHash,
+      reqChunkId,
       reqAtomKey,
       reqAtomSeq,
       kbFlowRef,

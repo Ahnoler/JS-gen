@@ -201,7 +201,7 @@ export const GROUP_KB = [{
           skipped: [{ atomKey: 'product-mgmt:chain-a:9', reason: 'unknown_or_stale_atom' }],
         },
       }),
-      notes: ['atomKeys 必填且非空', '未先 propose → 400', 'propose 缓存版本过期或 through-chains.md 已变更 → 4xx STALE_PROPOSE_CACHE（须重新 propose）', '缺 functionId 且无 override → skipped missing_function_id', '同键已有任意状态轨迹（draft/recorded…）→ skipped duplicate_draft；force 时 req_atom_seq 递增重建', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
+      notes: ['atomKeys 必填且非空', '未先 propose → 400', 'propose 缓存版本过期或 through-chains.md 已变更 → 4xx STALE_PROPOSE_CACHE（须重新 propose）', '章节文件缺失/内容漂移（sha256 不符）→ skipped stale_chapter_ref', '缺 functionId 且无 override → skipped missing_function_id', '同键已有任意状态轨迹（draft/recorded…）→ skipped duplicate_draft；force 时 req_atom_seq 递增重建', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
     },
     {
       method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/validate',

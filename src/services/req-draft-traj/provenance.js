@@ -1,6 +1,7 @@
 /**
  * Req→draft-traj provenance helpers: chapter resolution and atom validation.
  */
+import { createHash } from 'node:crypto';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 
@@ -38,7 +39,9 @@ async function listChapterFiles(chaptersDir) {
   const entries = await readdir(chaptersDir);
   const mdNames = entries.filter((name) => name.endsWith('.md')).sort();
   const stats = await Promise.all(mdNames.map((name) => stat(join(chaptersDir, name)).catch(() => null)));
-  const signature = mdNames.map((name, i) => `${name}:${stats[i] ? stats[i].mtimeMs : 'x'}`).join('|');
+  const signature = mdNames
+    .map((name, i) => `${name}:${stats[i] ? stats[i].mtimeMs : 'x'}:${stats[i] ? stats[i].size : 'x'}`)
+    .join('|');
 
   const cached = chapterCache.get(chaptersDir);
   if (cached && cached.signature === signature) {
@@ -221,7 +224,7 @@ function scoreZjjkChapterHit(fileName, content, code, chapterHint = '', actionHi
 /**
  * Format `chapters/<file>#<title>` when title is available.
  * @param {string} fileName Chapter file name
- * @param {string|null} title H1 title
+ * @param {string|null} title Chapter H1 title
  * @returns {string} Chapter ref string
  */
 function formatChapterRef(fileName, title) {
@@ -232,13 +235,32 @@ function formatChapterRef(fileName, title) {
 }
 
 /**
+ * Build the full provenance anchor: human ref plus stable machine anchor
+ * (chunkId = `<file-stem>#<h1-slug>` with normalizeHint rules; sourceHash =
+ * sha256 of the chapter content at resolution time — spec D2 Phase 1).
+ * @param {string} fileName Chapter file name
+ * @param {string|null} title Chapter H1 title
+ * @param {string} content Chapter file content
+ * @returns {{ ref: string, chunkId: string, sourceHash: string }} Anchor object
+ */
+function chapterAnchor(fileName, title, content) {
+  const stem = basename(fileName, '.md');
+  const slug = normalizeHint(title || stem) || stem;
+  return {
+    ref: formatChapterRef(fileName, title),
+    chunkId: `${stem}#${slug}`,
+    sourceHash: createHash('sha256').update(content, 'utf8').digest('hex'),
+  };
+}
+
+/**
  * Resolve a chapter reference under a module's chapters directory.
  * @param {object} opts Lookup options
  * @param {string} opts.chaptersDir Absolute path to chapters/
  * @param {string} [opts.chapterHint] Hint from through-chains bullet
  * @param {string} [opts.zjjk] Preferred ZJJK cell (may contain multiple codes / placeholders)
  * @param {string} [opts.actionHint] Step action or atom title for tie-break
- * @returns {Promise<string|null>} `chapters/<file>#<title>` or null
+ * @returns {Promise<{ ref: string, chunkId: string, sourceHash: string }|null>} Anchor to the resolved chapter or null
  */
 export async function resolveChapterRef({
   chaptersDir,
@@ -271,7 +293,8 @@ export async function resolveChapterRef({
     }
     // First code that hits any chapter wins (preserve step primary page).
     if (bestZjjk) {
-      return formatChapterRef(bestZjjk.fileName, bestZjjk.title);
+      const best = chapterFiles.find((c) => c.fileName === bestZjjk.fileName);
+      return chapterAnchor(bestZjjk.fileName, bestZjjk.title, best ? best.content : '');
     }
   }
 
@@ -295,7 +318,8 @@ export async function resolveChapterRef({
   }
 
   if (bestFile && bestScore > 0) {
-    return formatChapterRef(bestFile, bestTitle);
+    const best = chapterFiles.find((c) => c.fileName === bestFile);
+    return chapterAnchor(bestFile, bestTitle, best ? best.content : '');
   }
 
   return null;

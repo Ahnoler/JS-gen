@@ -36,6 +36,8 @@ const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
  * @property {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} [functionIdCandidates] Deterministic candidates when suggestedFunctionId is null
  * @property {string} sourceDoc Source document path
  * @property {string} sourceChapter Chapter reference under module
+ * @property {string} [sourceHash] sha256 of the resolved chapter file (anchor)
+ * @property {string} [chunkId] `<file-stem>#<h1-slug>` chapter anchor
  * @property {string} taskDraft Task text for analyze
  * @property {string[]} phaseHints Short phase titles
  * @property {string} [wetTestHint] Optional wet-test hint
@@ -337,7 +339,7 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     actionHint: title || provenanceStep?.action || '',
   });
 
-  const resolvedChapter = sourceChapter || '';
+  const resolvedChapter = sourceChapter ? sourceChapter.ref : '';
   const rawTaskDraft = String(llmAtom.taskDraft || '').trim();
   const filled = fillTaskDraftProvenancePlaceholders(rawTaskDraft, sourceDoc, resolvedChapter);
   const { taskDraft: cleanedDraft, extractedCodes } = sanitizeTaskDraftKeyData(filled);
@@ -362,6 +364,8 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     suggestedFunctionId: parseSuggestedFunctionId(llmAtom.suggestedFunctionId),
     sourceDoc,
     sourceChapter: resolvedChapter,
+    sourceHash: sourceChapter ? sourceChapter.sourceHash : undefined,
+    chunkId: sourceChapter ? sourceChapter.chunkId : undefined,
     taskDraft: cleanedDraft,
     phaseHints: Array.isArray(llmAtom.phaseHints)
       ? llmAtom.phaseHints.map((h) => String(h))

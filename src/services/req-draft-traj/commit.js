@@ -19,12 +19,10 @@ import { readProposeCache, PROPOSE_CACHE_VERSION } from './propose-cache.js';
  * Load the propose cache and refuse stale shapes: missing cache → VALIDATION;
  * cacheVersion mismatch or through-chains.md hash drift → STALE_PROPOSE_CACHE
  * (the source changed since propose — re-run propose, never silently reuse).
- * @param {string} moduleKey KB req module key
- * @param {string|undefined} rootDir Module workspace root override
+ * @param {string} modDir Absolute module workspace directory
  * @returns {Promise<object>} Validated cache payload
  */
-async function loadFreshProposeCache(moduleKey, rootDir) {
-  const modDir = moduleDir(moduleKey, rootDir);
+async function loadFreshProposeCache(modDir) {
   const cache = await readProposeCache(modDir);
   if (!cache?.atoms?.length) {
     throw new AppError('propose cache missing — run draft-traj/propose first', { code: 'VALIDATION' });
@@ -67,9 +65,39 @@ async function isKnownFunctionId(functionId, existsFn = null) {
 }
 
 /**
+ * Re-check an atom's chapter anchor: the referenced chapter file must still
+ * exist and hash to the propose-time sourceHash (spec F-05 — chapter renames
+ * or re-slicing must surface as stale_chapter_ref, not silent wrong provenance).
+ * @param {object} atom Cache atom
+ * @param {string} modDir Module workspace directory
+ * @returns {Promise<{ ok: true } | { ok: false, message: string }>} Recheck result
+ */
+async function recheckChapterAnchor(atom, modDir) {
+  if (!atom.sourceHash) {
+    return { ok: true };
+  }
+  const ref = String(atom.sourceChapter || '').replace(/\\/g, '/');
+  const fileName = ref.replace(/^chapters\//, '').split('#')[0];
+  if (!fileName) {
+    return { ok: false, message: 'sourceChapter has no chapter file' };
+  }
+  let content;
+  try {
+    content = await readFile(join(modDir, 'chapters', fileName), 'utf-8');
+  } catch {
+    return { ok: false, message: `chapter file missing: ${fileName}` };
+  }
+  const hash = createHash('sha256').update(content, 'utf8').digest('hex');
+  if (hash !== atom.sourceHash) {
+    return { ok: false, message: `chapter content drifted: ${fileName}` };
+  }
+  return { ok: true };
+}
+
+/**
  * Dry-run validation shared by commit and the validate endpoint: every check
  * that does not need analyze/create (cache lookup, provenance, any-state
- * duplicate, functionId presence/existence). No writes, no LLM.
+ * duplicate, chapter anchor, functionId presence/existence). No writes, no LLM.
  * @param {object} [opts] Validation options (same shape as commitDraftTrajectories minus analyze/create)
  * @param {string} opts.moduleKey KB req module key
  * @param {string[]} [opts.atomKeys] Atom keys to validate
@@ -94,7 +122,8 @@ export async function validateCommitAtoms({
     ? functionIdOverrides
     : {};
   const keys = Array.isArray(atomKeys) ? atomKeys.map(String) : [];
-  const cache = await loadFreshProposeCache(moduleKey, rootDir);
+  const modDir = moduleDir(moduleKey, rootDir);
+  const cache = await loadFreshProposeCache(modDir);
   const byKey = new Map(cache.atoms.map((a) => [a.atomKey, a]));
   const findDraft = findDraftFn || findDraftByReqAtomKey;
 
@@ -109,6 +138,11 @@ export async function validateCommitAtoms({
     const prov = assertAtomProvenance(atom);
     if (!prov.ok) {
       problems.push({ atomKey, code: prov.reason, message: 'atom provenance incomplete' });
+      continue;
+    }
+    const anchor = await recheckChapterAnchor(atom, modDir);
+    if (!anchor.ok) {
+      problems.push({ atomKey, code: 'stale_chapter_ref', message: anchor.message });
       continue;
     }
     const existing = await findDraft(moduleKey, atomKey);
@@ -222,6 +256,8 @@ export async function commitDraftTrajectories({
         reqModuleKey: moduleKey,
         reqSourcePath: atom.sourceDoc,
         reqChapterRef: atom.sourceChapter,
+        reqSourceHash: atom.sourceHash ?? null,
+        reqChunkId: atom.chunkId ?? null,
         reqAtomKey: atom.atomKey,
         reqAtomSeq,
         kbFlowRef,

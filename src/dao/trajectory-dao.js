@@ -172,6 +172,8 @@ export async function save(trajectory, trx = null) {
       reqModuleKey: trajectory.reqModuleKey ?? null,
       reqSourcePath: trajectory.reqSourcePath ?? null,
       reqChapterRef: trajectory.reqChapterRef ?? null,
+      reqSourceHash: trajectory.reqSourceHash ?? null,
+      reqChunkId: trajectory.reqChunkId ?? null,
       reqAtomKey: trajectory.reqAtomKey ?? null,
       reqAtomSeq: trajectory.reqAtomSeq ?? 0,
       kbFlowRef: trajectory.kbFlowRef ?? null,

@@ -111,7 +111,26 @@ async function main() {
       chapterHint: parsed.chains[0].chapterHint,
       zjjk: 'ZJJK00094361',
     });
-    assert.ok(chapter && /chapters\//.test(chapter.replace(/\\/g, '/')));
+    assert.ok(chapter && /chapters\//.test(chapter.ref.replace(/\\/g, '/')));
+  });
+
+  await runAsync('resolveChapterRef returns stable chunkId and content-bound sourceHash', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-anchor-'));
+    const chaptersDir = join(tmp, 'chapters');
+    mkdirSync(chaptersDir, { recursive: true });
+    const body = '# 产品信息管理 → 配置产品信息\n\n产品信息配置页签 ZJJK00136564 主定义\n';
+    writeFileSync(join(chaptersDir, '03-配置产品信息.md'), body, 'utf8');
+    const opts = { chaptersDir, chapterHint: '§配置产品信息', zjjk: 'ZJJK00136564', actionHint: '配置' };
+    const a = await provMod.resolveChapterRef(opts);
+    const b = await provMod.resolveChapterRef(opts);
+    assert.equal(a.chunkId, b.chunkId);
+    assert.equal(a.chunkId, '03-配置产品信息#产品信息管理→配置产品信息');
+    assert.equal(a.sourceHash.length, 64);
+    writeFileSync(join(chaptersDir, '03-配置产品信息.md'), body + '\n新增段落\n', 'utf8');
+    const c = await provMod.resolveChapterRef(opts);
+    assert.equal(c.chunkId, a.chunkId);
+    assert.notEqual(c.sourceHash, a.sourceHash);
+    rmSync(tmp, { recursive: true, force: true });
   });
 
   run('extractZjjkCodes keeps ordered unique real codes', () => {
@@ -156,7 +175,7 @@ async function main() {
       zjjk: 'ZJJK00136564 / ZJJK00136733',
       actionHint: '公共要素配置保存',
     });
-    assert.match(String(chapter), /03-配置产品信息/);
+    assert.match(String(chapter?.ref || ''), /03-配置产品信息/);
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -176,7 +195,7 @@ async function main() {
       zjjk: '—',
       actionHint: '同层节点排序',
     });
-    assert.match(String(chapter), /03-配置产品信息/);
+    assert.match(String(chapter?.ref || ''), /03-配置产品信息/);
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -690,6 +709,69 @@ async function main() {
     assert.match(metaSrc, /opts\.reqAtomSeq/);
     const daoSrc = readFileSync(join(ROOT, 'src/dao/trajectory-dao.js'), 'utf8');
     assert.match(daoSrc, /reqAtomSeq: trajectory\.reqAtomSeq \?\? 0/);
+  });
+
+  await runAsync('commit skips atom whose chapter drifted (stale_chapter_ref)', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-anchor-'));
+    const modDir = join(tmp, 'demo-mod');
+    cpSync(fixtureRoot, modDir, { recursive: true });
+    const chapterPath = join(modDir, 'chapters', '01-product-library.md');
+    const chapterBody = readFileSync(chapterPath, 'utf8');
+    const anchoredAtom = {
+      ...GOOD_ATOM,
+      sourceHash: createHash('sha256').update(chapterBody, 'utf8').digest('hex'),
+      chunkId: '01-product-library#产品库管理',
+    };
+    const md = readFileSync(join(modDir, 'through-chains.md'), 'utf8');
+    await writeProposeCache(modDir, { atoms: [anchoredAtom], rejected: [], sourceHash: sha256(md) });
+    // drift the chapter after propose
+    writeFileSync(chapterPath, `${chapterBody}\n新增段落\n`, 'utf8');
+
+    const out = await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async () => ({ id: 1 }),
+      findDraftFn: async () => null,
+      functionIdExists: async () => true,
+    });
+    assert.equal(out.created.length, 0);
+    assert.equal(out.skipped.length, 1);
+    assert.equal(out.skipped[0].reason, 'stale_chapter_ref');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('commit passes sourceHash/chunkId into create', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-anchor-'));
+    const modDir = join(tmp, 'demo-mod');
+    cpSync(fixtureRoot, modDir, { recursive: true });
+    const chapterPath = join(modDir, 'chapters', '01-product-library.md');
+    const chapterBody = readFileSync(chapterPath, 'utf8');
+    const anchoredAtom = {
+      ...GOOD_ATOM,
+      sourceHash: createHash('sha256').update(chapterBody, 'utf8').digest('hex'),
+      chunkId: '01-product-library#产品库管理',
+    };
+    const md = readFileSync(join(modDir, 'through-chains.md'), 'utf8');
+    await writeProposeCache(modDir, { atoms: [anchoredAtom], rejected: [], sourceHash: sha256(md) });
+
+    let createOpts;
+    await commitDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      atomKeys: [GOOD_ATOM_KEY],
+      analyzeFn: async () => ({ phases: ['x'], businessEntries: [] }),
+      createFn: async (opts) => {
+        createOpts = opts;
+        return { id: 4242 };
+      },
+      findDraftFn: async () => null,
+      functionIdExists: async () => true,
+    });
+    assert.equal(createOpts.reqSourceHash, anchoredAtom.sourceHash);
+    assert.equal(createOpts.reqChunkId, anchoredAtom.chunkId);
+    rmSync(tmp, { recursive: true, force: true });
   });
 
   await runAsync('commitDraftTrajectories skips atom missing provenance in cache', async () => {
