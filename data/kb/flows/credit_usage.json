@@ -159,7 +159,7 @@
     },
     {
       "keyword": "用信提交角色配置卡点",
-      "rule": "流程提交选人后服务端拒「下一节点没有可处理的用户，请配置[客户经理]角色的用户！」——wf_usecredit_001_002 节点 nextCandidateRoles=[X0018]、nodeSelMode=byLastTask，测试环境 X0018 角色人员配置漂移（P3-B 时代 YXPC20260905012041 可通）。选人弹窗「确定」无声失效（handleDialogBtnClick 不发请求）绕行=直调组件 confirmSubmit()。该卡点需 SUT 管理员在系统管理给 X0018 角色配用户（如 WN0001），非客户端可修（2026-09-07 traj 616 续棒 3 种 payload 均拒实证）。",
+      "rule": "流程提交选人后服务端拒「下一节点没有可处理的用户，请配置[客户经理]角色的用户！」——wf_usecredit_001_002 节点 nextCandidateRoles=[X0018]、nodeSelMode=byLastTask，测试环境 X0018 角色人员配置漂移（P3-B 时代 YXPC20260905012041 可通）。选人弹窗「确定」无声失效（handleDialogBtnClick 不发请求）绕行=直调组件 confirmSubmit()。该卡点需 SUT 管理员在系统管理给 X0018 角色配用户（如 WN0001），非客户端可修（2026-09-07 traj 616 续棒 3 种 payload 均拒实证）。【09-08 验证补强】701994 切换到客户经理角色后重试，submitProcess 成功发出（G6 confirmSubmit 直调法复现：Vue2 el.__vue__+$children BFS 定位意见组件 ZJJK00068204，formData.pcsMnpltCd=nextTask+nextNodeAprvPsn=WN0001-9881-X0018，i18n 桩）——服务端拒单逐字一致；旁证 workflowTree API 返回「下一步审批人员为空，下一步：{}」。结论：流程引擎节点候选解析与提交人会话激活角色无关，按租户级角色-用户映射查，切换角色不能绕过，唯一恢复途径=SUT 管理员配置 X0018 候选用户。",
       "source": "traj 616 续棒服务端拒单原文"
     }
   ],
