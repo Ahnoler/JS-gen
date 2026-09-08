@@ -5,7 +5,7 @@
  *   node scripts/characterization/characterize-flow-card-recall.mjs
  */
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -116,6 +116,13 @@ async function main() {
         cards: [{ ...CUSTOMER_ONBOARDING_CARD, _stem: 'customer_onboarding' }],
       });
       assert.equal(hit.flowRef, null);
+    });
+
+    run('propose.js attaches suggestedFlowRef via matchFlowForAtom', () => {
+      const proposePath = join(ROOT, 'src/services/req-draft-traj/propose.js');
+      const src = readFileSync(proposePath, 'utf8');
+      assert.match(src, /suggestedFlowRef/);
+      assert.match(src, /matchFlowForAtom/);
     });
 
     console.log(`\ncharacterize-flow-card-recall: ${passed} passed`);

@@ -17,6 +17,8 @@ import {
   loadSourceDoc,
   resolveChapterRef,
 } from './provenance.js';
+import { listFlowCardsDetailed } from '../kb-flow-cards.js';
+import { matchFlowForAtom } from './flow-card-recall.js';
 import { writeProposeCache } from './propose-cache.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +35,8 @@ const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
  * @property {string} taskDraft Task text for analyze
  * @property {string[]} phaseHints Short phase titles
  * @property {string} [wetTestHint] Optional wet-test hint
+ * @property {string} [suggestedFlowRef] Matched kb flow card stem
+ * @property {string} [suggestedNodeId] Matched flow card node id
  */
 
 const WRITE_ACTION_RE = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交|启用|禁用|克隆|删除/;
@@ -466,6 +470,17 @@ export async function proposeDraftTrajectories({
     : atoms;
 
   await normalizeSuggestedFunctionIds(capped, functionIdExists);
+
+  const cards = await listFlowCardsDetailed({});
+  for (const atom of capped) {
+    const hit = matchFlowForAtom({
+      title: atom.title,
+      taskDraft: atom.taskDraft,
+      cards,
+    });
+    if (hit.flowRef) atom.suggestedFlowRef = hit.flowRef;
+    if (hit.nodeId) atom.suggestedNodeId = hit.nodeId;
+  }
 
   await writeProposeCache(modDir, { atoms: capped, rejected });
 

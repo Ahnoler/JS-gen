@@ -147,6 +147,8 @@ export const GROUP_KB = [{
             sourceChapter: 'chapters/01-product-library.md#产品库管理',
             taskDraft: '1、进入产品库。\n2、点击新增一级分类…\n\n来源：product-mgmt.docx / chapters/01-product-library.md\n',
             phaseHints: ['进入产品库', '新增一级分类并确定'],
+            suggestedFlowRef: 'product_library',
+            suggestedNodeId: 'add_category',
           }],
           rejected: [{ atomKey: 'product-mgmt:chain-a:1:进入产品库', reason: 'empty_task_draft' }],
         },
