@@ -125,6 +125,13 @@ async function main() {
       assert.match(src, /matchFlowForAtom/);
     });
 
+    run('prepare injects flow template hint into first phase', () => {
+      const attachRunnerPath = join(ROOT, 'src/services/trajectory/trajectory-attach-runner.js');
+      const attachRunnerSrc = readFileSync(attachRunnerPath, 'utf8');
+      assert.match(attachRunnerSrc, /injectFlowTemplateHintIfNeeded|buildFlowTemplateHint/);
+      assert.match(attachRunnerSrc, /kbFlowRef/);
+    });
+
     const { writeProposeCache } = await import(
       pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href,
     );

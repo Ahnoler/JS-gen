@@ -21,6 +21,35 @@ import { runDefaultLogin } from './trajectory-record-lifecycle.js';
 import { bindRecordingPageId } from './recording-page-bind.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import { attachTrajectoryLive } from './trajectory-attach-service.js';
+import { getFlowCard } from '../kb-flow-cards.js';
+import {
+  buildFlowTemplateHint,
+  applyFlowTemplateHintToDescription,
+} from '../req-draft-traj/flow-card-recall.js';
+
+/**
+ * Prefix the first phase description with a flow-card template hint when the
+ * trajectory carries kbFlowRef (idempotent via applyFlowTemplateHintToDescription).
+ * @param {object} traj trajectory row from resolveTrajectoryAccount
+ */
+async function injectFlowTemplateHintIfNeeded(traj) {
+  const flowRef = traj?.kbFlowRef;
+  if (!flowRef) return;
+  const card = await getFlowCard({ stem: flowRef });
+  if (!card) return;
+  const hint = buildFlowTemplateHint({
+    card,
+    nodeId: traj.kbFlowNodeId || null,
+    atomTask: String(traj.task || '').trim(),
+  });
+  if (!hint) return;
+  const phases = await trajectoryPhaseDao.listByTrajectory(traj.id);
+  const first = phases.slice().sort((a, b) => Number(a.phaseNumber) - Number(b.phaseNumber))[0];
+  if (!first?.id) return;
+  const next = applyFlowTemplateHintToDescription(first.description || '', hint);
+  if (next === (first.description || '')) return;
+  await trajectoryPhaseDao.update(first.id, { description: next });
+}
 
 /**
  * Prepare a trajectory for recording after the session lock is acquired.
@@ -34,6 +63,8 @@ import { attachTrajectoryLive } from './trajectory-attach-service.js';
  */
 export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin = false } = {}) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
+
+  await injectFlowTemplateHintIfNeeded(traj);
 
   // A fresh prepare must not inherit a stale "recording" signal: reset any phase
   // left as running by a previous interrupted recording.
