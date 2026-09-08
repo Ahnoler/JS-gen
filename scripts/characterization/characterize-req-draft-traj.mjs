@@ -216,8 +216,37 @@ async function main() {
     assert.equal(out.atoms[0].taskDraft.includes('<sourceChapter>'), false);
     assert.ok(out.atoms[0].taskDraft.includes(out.atoms[0].sourceDoc));
     assert.ok(out.atoms[0].taskDraft.includes(out.atoms[0].sourceChapter));
+    assert.ok(Array.isArray(out.atoms[0].pageCodes));
     const cachePath = join(tmp, 'demo-mod', '.draft-traj-propose.json');
     assert.ok(existsSync(cachePath));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('proposeDraftTrajectories sanitizes ZJJK from 关键数据 into pageCodes', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        {
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n\n关键数据\nZJJK00107304\n',
+          phaseHints: ['新增一级分类'],
+        },
+      ],
+    });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+    });
+    assert.equal(out.atoms.length, 1);
+    assert.ok(Array.isArray(out.atoms[0].pageCodes));
+    assert.ok(out.atoms[0].pageCodes.includes('ZJJK00107304'));
+    assert.equal(out.atoms[0].taskDraft.includes('关键数据\nZJJK'), false);
     rmSync(tmp, { recursive: true, force: true });
   });
 

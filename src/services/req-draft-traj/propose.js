@@ -20,6 +20,7 @@ import {
 import { listFlowCardsDetailed } from '../kb-flow-cards.js';
 import { matchFlowForAtom } from './flow-card-recall.js';
 import { writeProposeCache } from './propose-cache.js';
+import { collectPageCodes, sanitizeTaskDraftKeyData } from './atom-keydata.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
@@ -35,6 +36,7 @@ const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
  * @property {string} taskDraft Task text for analyze
  * @property {string[]} phaseHints Short phase titles
  * @property {string} [wetTestHint] Optional wet-test hint
+ * @property {string[]} [pageCodes] Ordered unique ZJJK page/component codes (not in 关键数据)
  * @property {string} [suggestedFlowRef] Matched kb flow card stem
  * @property {string} [suggestedNodeId] Matched flow card node id
  */
@@ -328,7 +330,20 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
 
   const resolvedChapter = sourceChapter || '';
   const rawTaskDraft = String(llmAtom.taskDraft || '').trim();
-  const taskDraft = fillTaskDraftProvenancePlaceholders(rawTaskDraft, sourceDoc, resolvedChapter);
+  const filled = fillTaskDraftProvenancePlaceholders(rawTaskDraft, sourceDoc, resolvedChapter);
+  const { taskDraft: cleanedDraft, extractedCodes } = sanitizeTaskDraftKeyData(filled);
+
+  const zjjkCells = [];
+  for (const idx of (stepIndexes.length ? stepIndexes : [atomKeyStepIndex])) {
+    const st = findStepByIndex(chain, idx);
+    if (st?.zjjk) zjjkCells.push(st.zjjk);
+  }
+
+  const pageCodes = collectPageCodes({
+    llmPageCodes: llmAtom.pageCodes,
+    taskDraft: cleanedDraft,
+    zjjkCells: [...zjjkCells, ...extractedCodes],
+  });
 
   /** @type {DraftAtom} */
   const atom = {
@@ -337,10 +352,11 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     suggestedFunctionId: parseSuggestedFunctionId(llmAtom.suggestedFunctionId),
     sourceDoc,
     sourceChapter: resolvedChapter,
-    taskDraft,
+    taskDraft: cleanedDraft,
     phaseHints: Array.isArray(llmAtom.phaseHints)
       ? llmAtom.phaseHints.map((h) => String(h))
       : [],
+    pageCodes,
   };
 
   if (llmAtom.wetTestHint != null && String(llmAtom.wetTestHint).trim()) {
