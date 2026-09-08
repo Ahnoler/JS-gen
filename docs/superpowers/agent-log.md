@@ -2,6 +2,15 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 18:45 · Cursor Subagent — 收工：TsscMultiSelect 专用动作实现线（回链 17:42）
+
+- 完成：Tasks 1–5 绿；spec 状态 → 已实现；docs 收工（本 commit）
+- 验收：`characterize-tssc-multi-select.py` PASS（dry）
+- 实现 commits：`9ac615a8` pin · `2c19b731` JS snippet · `0a2de736` scan · `b303394b` engine/registries · `93cd430f` replay/heal · `ba63c84c` prompts/autofill
+- 注意：`effdc8fb` 为 keydata restore，与本线无关
+- 遗留：#695/#696 重录；`introduce_pick` toast_ok vs dialog_close 门闩（spec Out，另案）
+- 湿测：SKIP（本 session 未验控制面 4097 + 选择要素弹窗）
+
 ## 2026-09-08 17:50 · Cursor Lead — 进度：TsscMultiSelect 设计已批，实现计划已落盘（回链 17:42）
 
 - 进行中：spec 已批准；plan `docs/superpowers/plans/2026-09-08-tssc-multi-select-action.md`（Task1 pin → JS → scan → engine → prompts/autofill → 收工）
