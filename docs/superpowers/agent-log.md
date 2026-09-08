@@ -4,7 +4,7 @@
 
 ## 2026-09-08 22:25 · Cursor Lead — 收工：tssc_multi_select 字典 el-option 回退（回链 22:15）
 
-- 完成：无 .select-table 行时回退收集 .el-select-dropdown__item（跳过含表弹层）；统一匹配/点击/回显；搜索精确 OFF 仅 table mode；prompt 双形态；pin collectOptions / el-select-dropdown__item / mode === table
+- 完成：84db48e5 — 无 select-table 行时回退 el-option；统一匹配/点击/回显；精确 OFF 仅 table；prompt/pin；策略统一 first
 - 验收：characterize-tssc-multi-select + characterize-agent-prompt-packs PASS。收工时 CDP 19242 ECONNREFUSED（浏览器已关），湿测未复跑；先前同会话已证手点 option 可回显
 - 遗留：重启 executor 后重录要素类型用 tssc_multi_select(..., first|原文)；选项窥探不做，统一 first
 
