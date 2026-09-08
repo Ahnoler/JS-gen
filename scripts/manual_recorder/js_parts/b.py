@@ -439,6 +439,10 @@ JS_MANUAL_PART_B = r'''
     const tag = (el.tagName || '').toLowerCase();
     if (tag !== 'input' && tag !== 'textarea') return;
     if (el.closest('.el-select')) return; // select handled via option click
+    // Element UI radio/checkbox/switch: click already recorded click_radio (or generic click).
+    // Native input change/blur would emit fill with the code value (0/1), duplicating the step.
+    if (el.type === 'radio' || el.type === 'checkbox') return;
+    if (el.closest('.el-radio, .el-radio-button, .el-radio-group, .el-checkbox, .el-checkbox-button, .el-switch')) return;
     // Date: prefer calendar pick recording; only emit typed non-empty values.
     // TODO(date-leave-backup): blur/change 到其他字段时，若日期 input 已有非空值则补录
     // fill_date（与 src/cdp/inspect.js resolveFocusedFillPayload 同需求）。选天主路径够用前不实现。
