@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import {
   TRAJECTORY_RECORD_STATUSES,
-  TRAJECTORY_RECORD_STATUS_LABELS,
 } from '../../../src/models/constants.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -25,14 +24,9 @@ async function main() {
       ['draft', 'recording', 'failed', 'recorded', 'completed'],
     );
   });
-  run('chinese labels', () => {
-    assert.deepStrictEqual(TRAJECTORY_RECORD_STATUS_LABELS, {
-      draft: '未录制',
-      recording: '录制中',
-      failed: '录制异常',
-      recorded: '待确认',
-      completed: '已确认',
-    });
+  run('chinese labels (migration comment)', () => {
+    const mig = readFileSync(join(ROOT, 'migrations', '20260814120000_trajectory_record_status_v2.js'), 'utf8');
+    assert.ok(mig.includes('draft=未录制; recording=录制中; failed=录制异常; recorded=待确认; completed=已确认'), 'new comment');
   });
   run('migration: live→recording + enum', () => {
     const mig = readFileSync(join(ROOT, 'migrations', '20260814120000_trajectory_record_status_v2.js'), 'utf8');

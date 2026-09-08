@@ -70,52 +70,12 @@ export function resolvePostRecordingStatus(base, outcome) {
   return isPersistentRecordStatus(base) ? base : 'draft';
 }
 
-/** 轨迹状态中文文案（产品/文档/Vue 对齐的单一事实源） */
-export const TRAJECTORY_RECORD_STATUS_LABELS = Object.freeze({
-  draft: '未录制',
-  recording: '录制中',
-  failed: '录制异常',
-  recorded: '待确认',
-  completed: '已确认',
-});
-
-/** @type {readonly TrajectoryPhaseStatus[]} */
-export const TRAJECTORY_PHASE_STATUSES = Object.freeze(['pending', 'running', 'completed', 'failed']);
-
 /** @typedef {'accepted'|'running'|'waiting_executor'|'cancelling'|'cancelled'|'completed'|'completed_with_errors'|'failed'} BatchJobStatus */
 
 /** @typedef {'record'|'draft'} BatchJobMode */
 export const BATCH_JOB_MODES = Object.freeze(['record', 'draft']);
 
 /** @typedef {'pending'|'analyzing'|'analyzed'|'queued'|'waiting_executor'|'preparing'|'recording'|'recorded'|'drafted'|'failed'|'rejected'|'cancelled'} BatchItemStatus */
-
-/** @type {readonly BatchJobStatus[]} */
-export const BATCH_JOB_STATUSES = Object.freeze([
-  'accepted',
-  'running',
-  'waiting_executor',
-  'cancelling',
-  'cancelled',
-  'completed',
-  'completed_with_errors',
-  'failed',
-]);
-
-/** @type {readonly BatchItemStatus[]} */
-export const BATCH_ITEM_STATUSES = Object.freeze([
-  'pending',
-  'analyzing',
-  'analyzed',
-  'queued',
-  'waiting_executor',
-  'preparing',
-  'recording',
-  'recorded',
-  'drafted',
-  'failed',
-  'rejected',
-  'cancelled',
-]);
 
 /** Item statuses that can still be scheduled / recovered after restart. */
 export const BATCH_ITEM_RESUMABLE = Object.freeze([
