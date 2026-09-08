@@ -2,6 +2,18 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 16:40 · Cursor Lead — 开工：page-bind empty-config 关天元弹窗 + 重录 #694
+
+- 开工：16:40。用户纠正：导航后天元应自行关闭；根因=prepare `read_page_component_code` 在 `empty-config`/`timeout` 早退未点确定关窗，agent 见可见弹窗按 prompt 暂停
+- 范围：`scripts/controller/actions/js_snippets/page_id.py`、characterize-page-bind（若加固）、`tmp/product-element/` 重录、spec/plan/task 去掉等 C 文案、本文件
+- 禁入：遗留 61/66/503；trajectory-dao 他线 WIP；不改 agent-tools-common 全局纪律（修源头关窗即可）
+- 方式：补关窗 → pin → clear/prepare/start #694→695→696
+
+## 2026-09-08 16:35 · Cursor Lead — #694 误判等 C（已由 16:40 纠正）
+
+- 现象：A 已落地（`da1d081e`）；#694 prepare+start 后 agent 自停；`steps=0`（已 clear→draft）；session `08369de8`
+- 误判：当成需授权关窗；实为 page-bind 读码早退未关窗
+
 ## 2026-09-08 16:28 · Cursor Lead — 修订：废 T1（方案 A），续录 T2=#694
 
 - 修订：16:28。用户选 A；#693 failed（天元弹窗 pause + zero-actions done 拒）；独立进入原子废止

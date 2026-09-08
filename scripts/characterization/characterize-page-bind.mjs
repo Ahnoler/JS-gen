@@ -111,6 +111,14 @@ function testWiringPageIdPy() {
   assert.match(py, /await sleep\(1000\)/, 'waits for SPA route settle before opening help');
   // 仅有场景编号的页面：等待条件不能只认「组件编号：」
   assert.match(py, /场景编号/, 'wait/parse path includes 场景编号');
+  // empty-config / timeout 早退也必须关窗，否则录制 agent 见可见「天元相关配置」即暂停
+  assert.match(py, /closeTianyuanDialogs/, 'defines closeTianyuanDialogs helper');
+  const emptyIdx = py.indexOf("reason: 'empty-config'");
+  const timeoutIdx = py.indexOf("reason: 'timeout-or-mismatch'");
+  assert.ok(emptyIdx > 0 && py.lastIndexOf('closeTianyuanDialogs()', emptyIdx) > 0,
+    'empty-config path closes 天元 before return');
+  assert.ok(timeoutIdx > 0 && py.lastIndexOf('closeTianyuanDialogs()', timeoutIdx) > 0,
+    'timeout-or-mismatch path closes 天元 before return');
 }
 
 function testWiringReplayPy() {
