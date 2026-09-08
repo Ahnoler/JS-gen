@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 22:45 · Cursor Lead — 开工：introduce_pick 成功令牌（dialog_close vs toast_ok）
+
+- 进行中：22:45。sid 0975ed13：click_save 已 ok-save-success/toast_ok，但 success_when=[dialog_close] 反复 Premature done 空转
+- 范围：form_save.py（toast 路径补记 picker_closed）、phase/boundary_gates.py 或 reviewer sanitize、characterize；本文件
+- 禁入：whitelist / draft-traj / kb-remediation / tssc 无关改动
+- 方式：TDD — introduce_pick 合并成功 kinds（含 toast_ok/dialog_close）；toast+确定 补记关闭证据 → 收工
+
 ## 2026-09-08 22:40 · Cursor Lead — 收工：tssc 推送并进 select:click + first 打戳（回链 22:35）
 
 - 完成：442665eb — ACTION_TO_ENGINE_TYPE tssc_multi_select→select:click；成功路径 resolve_recorded_option_text(ok-first 回显)；pin legacy/transaction/stamp/tssc；spec/plan 备注
