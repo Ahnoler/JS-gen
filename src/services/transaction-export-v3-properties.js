@@ -62,7 +62,7 @@ function isLegalRect(bbox) {
  *   missingOptions - 缺少选项计数
  *   noRectControls - 无 rect 控件计数
  *   normalizedRects - 归一化 rect 计数
- *   popupTriggerLinked - popup 挂上触发对象节点的计数
+ *   popupTriggerLinked - popup 挂上触发链（父指向触发行父节点、条目移至触发行后）的计数
  */
 export function buildV3Properties({
   traj = {},

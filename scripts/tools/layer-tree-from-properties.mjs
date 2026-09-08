@@ -203,7 +203,6 @@ export function buildTreeFromV3Flat(properties) {
       regionId: String(p.regionId || '').trim(),
       hasBbox: !!(p.rect && p.rect.x2 > p.rect.x1 && p.rect.y2 > p.rect.y1),
       eleId: String(p.propertiesID ?? ''),
-      srcIdx: pIdx,
       children: [],
     };
     eleItemById.set(item.eleId, item);
