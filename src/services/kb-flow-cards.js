@@ -44,3 +44,54 @@ export async function listFlowCards({ dir = DEFAULT_FLOWS_DIR } = {}) {
   }
   return cards;
 }
+
+/**
+ * Read one flow card by filename stem (full JSON object).
+ * @param {{ stem?: string, dir?: string }} [opts]
+ * @returns {Promise<object|null>}
+ */
+export async function getFlowCard({ stem, dir = DEFAULT_FLOWS_DIR } = {}) {
+  const name = String(stem || '').trim();
+  if (!name || name.includes('..') || name.includes('/') || name.includes('\\')) return null;
+  const path = join(dir, `${name}.json`);
+  try {
+    const card = JSON.parse(await readFile(path, 'utf-8'));
+    if (!card || typeof card !== 'object' || !card.flow) return null;
+    return card;
+  } catch (e) {
+    if (e.code === 'ENOENT') return null;
+    console.warn(`[kb-flow-cards] getFlowCard failed: ${name} (${e.message})`);
+    return null;
+  }
+}
+
+/**
+ * List full flow cards with `_stem` for matching (sorted by filename).
+ * @param {{ dir?: string }} [opts]
+ * @returns {Promise<object[]>}
+ */
+export async function listFlowCardsDetailed({ dir = DEFAULT_FLOWS_DIR } = {}) {
+  let names;
+  try {
+    names = (await readdir(dir)).filter((n) => n.endsWith('.json')).sort();
+  } catch (e) {
+    if (e.code === 'ENOENT') return [];
+    throw e;
+  }
+  const cards = [];
+  for (const name of names) {
+    let card;
+    try {
+      card = JSON.parse(await readFile(join(dir, name), 'utf-8'));
+    } catch (e) {
+      console.warn(`[kb-flow-cards] skip unparseable card: ${name} (${e.message})`);
+      continue;
+    }
+    if (!card || typeof card !== 'object' || !card.flow) {
+      console.warn(`[kb-flow-cards] skip card missing flow key: ${name}`);
+      continue;
+    }
+    cards.push({ ...card, _stem: name.replace(/\.json$/, '') });
+  }
+  return cards;
+}

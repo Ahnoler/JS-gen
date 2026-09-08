@@ -12,3 +12,9 @@ export {
 export { readProposeCache, writeProposeCache, PROPOSE_CACHE_FILENAME } from './propose-cache.js';
 export { proposeDraftTrajectories } from './propose.js';
 export { commitDraftTrajectories } from './commit.js';
+export {
+  FLOW_TEMPLATE_MARKER,
+  matchFlowForAtom,
+  buildFlowTemplateHint,
+  applyFlowTemplateHintToDescription,
+} from './flow-card-recall.js';
