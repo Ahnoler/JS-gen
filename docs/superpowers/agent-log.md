@@ -5,7 +5,7 @@
 ## 2026-09-08 11:10 · ZCode V3导出线 — 收工补充三：人工录制接入页面级截图（03e5254d）
 - 完成：trajectory-attach-service.js bindTrajectoryManualPersist 订阅补 page_level_screenshot 分支 → applyPageLevelScreenshot。根因实证：产品人工链只消费 manual_action_recorded，Python wrap 器发的页面/弹窗截图事件无人接（traj 677 stamps 在而 screenshots=0；组件录制 668/671 走 listener #3 有 page_level 行佐证管线可用）。
 - 验收：eslint 0、模块 import ok；效果=人工重录后弹窗有真实截图（coverageMode=page_level），8e76fde8 合成兜底转存量。
-- 遗留：①manual 链 step_screenshot（before/after）未接（stash 依赖 persistLiveActionEntries 映射，需单独接线）；②需重启 4097 server 生效。
+- 遗留：①manual 链 step_screenshot（before/after）**用户裁决不做**——人工录制不需要每步截图，页面/弹窗级（页面切换+弹窗开关时机）仅服务 V3 导出；②需重启 4097 server 生效。
 
 ## 2026-09-08 10:40 · ZCode V3导出线 — 收工补充二：人工录制弹窗合成（8e76fde8）
 - 完成：transaction-export-v3-screenshot.js legacy 链尾部——按步骤 stamp 的 popup_level_key（含 @@anchor）分组合成 popup 条目（父=page、无截图空数组、regionId=key），挂载复用触发链。人工录制不发页面级截图事件（traj 677 screenshots=0）的兜底。
