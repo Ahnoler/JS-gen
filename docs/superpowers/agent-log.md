@@ -2,6 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 10:40 · ZCode V3导出线 — 收工补充二：人工录制弹窗合成（8e76fde8）
+- 完成：transaction-export-v3-screenshot.js legacy 链尾部——按步骤 stamp 的 popup_level_key（含 @@anchor）分组合成 popup 条目（父=page、无截图空数组、regionId=key），挂载复用触发链。人工录制不发页面级截图事件（traj 677 screenshots=0）的兜底。
+- 验收：traj 677 重建 payload——popup 产品 ← 图标新增产品、序号/产品名称/产品描述/确定 ← popup；popupTriggerLinked=1；eslint 0；五篇 characterize 全绿。注意：characterize-partner-platform.mjs 已被他线 fa2e5be9 移除，回归清单剩五篇。
+- 遗留：与 Cursor 10:07 SDD 计划文件集（kb-flow-cards/req-draft-traj）不相交，无冲突。
+
 ## 2026-09-08 10:07 · Cursor Lead — 开工：SDD 执行 atom-record flow-card recall 计划（用户选 Subagent-Driven）
 
 - 进行中：计划 `docs/superpowers/plans/2026-09-08-atom-record-flow-card-recall.md`；workspace `.superpowers/sdd/2026-09-08-atom-record-flow-card-recall/`；Task 1→7
