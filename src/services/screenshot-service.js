@@ -243,16 +243,6 @@ export async function replacePhaseGroupScreenshot(trajectoryPhaseId, {
 }
 
 /**
- * Find the phase-group screenshot row for one phase × state-group.
- * @param {number} phaseId phase DB id
- * @param {string} stateGroup state-group key
- * @returns {Promise<object|null>} screenshot row or null
- */
-export async function findPhaseGroupByStateGroup(phaseId, stateGroup) {
-  return screenshotDao.findByPhaseAndStateGroup(phaseId, stateGroup);
-}
-
-/**
  * List phase-group screenshots of a trajectory (kind='phase_group'), ordered by id.
  * @param {number} trajectoryId trajectory DB id
  * @returns {Promise<Array<object>>} phase-group screenshot rows
@@ -339,15 +329,6 @@ export async function replacePageLevelScreenshot({
       ...storageFields,
     }),
   });
-}
-
-/**
- * List page-level screenshots for a trajectory.
- * @param {number} trajectoryId trajectory DB id
- * @returns {Promise<Array<object>>} page-level screenshot rows
- */
-export async function listPageLevelScreenshotsByTrajectory(trajectoryId) {
-  return screenshotDao.listPageLevelByTrajectory(trajectoryId);
 }
 
 /**

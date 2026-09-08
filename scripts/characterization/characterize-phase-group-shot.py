@@ -62,7 +62,7 @@ def test_screenshot_dao() -> None:
 
 def test_screenshot_service() -> None:
     src = read("src/services/screenshot-service.js")
-    for cue in ("replacePhaseGroupScreenshot", "findPhaseGroupByStateGroup", "listPhaseGroupsByTrajectory"):
+    for cue in ("replacePhaseGroupScreenshot", "listPhaseGroupsByTrajectory"):
         assert_true(cue in src, f"screenshot-service missing: {cue!r}")
 
 
