@@ -935,6 +935,33 @@ async function main() {
     assert.match(src, /validateCommitAtoms/);
   });
 
+  await runAsync('propose appends observation lines to staging JSONL', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-obs-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+      ],
+    });
+    let before = 0;
+    try {
+      before = readFileSync(join(ROOT, 'data/kb/staging/propose-runs.jsonl'), 'utf8').split('\n').filter((l) => l.trim()).length;
+    } catch {
+      before = 0;
+    }
+    await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM, listSystemsFn: async () => [] });
+    await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM, listSystemsFn: async () => [] });
+    const lines = readFileSync(join(ROOT, 'data/kb/staging/propose-runs.jsonl'), 'utf8').split('\n').filter((l) => l.trim());
+    assert.equal(lines.length, before + 2);
+    const last = JSON.parse(lines[lines.length - 1]);
+    for (const field of ['ts', 'moduleKey', 'atoms', 'rejected', 'truncated', 'cacheVersion', 'sourceHash', 'durationMs', 'flowRefHits', 'functionIdCandidateHits']) {
+      assert.ok(field in last, `observation missing field ${field}`);
+    }
+    assert.equal(last.moduleKey, 'demo-mod');
+    assert.equal(last.cacheVersion, 1);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   const { computeFunctionIdCandidates } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href);
 
   run('computeFunctionIdCandidates ranks page_code over name_match', () => {

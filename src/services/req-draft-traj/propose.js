@@ -3,7 +3,7 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as systemDao from '../../dao/system-dao.js';
@@ -26,6 +26,24 @@ import { collectPageCodes, sanitizeTaskDraftKeyData } from './atom-keydata.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
 const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
+const OBSERVE_DIR = join(__dirname, '../../../data/kb/staging');
+
+/**
+ * Append one JSONL observation line under data/kb/staging (append-only,
+ * spec D5). Observability must never break the propose main flow — all
+ * write failures are swallowed.
+ * @param {string} file JSONL file name under the staging dir
+ * @param {object} line Payload (JSON-serializable)
+ * @returns {Promise<void>} Resolves after append (or after a swallowed error)
+ */
+async function appendObservation(file, line) {
+  try {
+    await mkdir(OBSERVE_DIR, { recursive: true });
+    await appendFile(join(OBSERVE_DIR, file), `${JSON.stringify(line)}\n`, 'utf-8');
+  } catch {
+    // swallowed by design
+  }
+}
 
 /**
  * @typedef {object} DraftAtom
@@ -495,6 +513,7 @@ export async function proposeDraftTrajectories({
   functionIdExists = null,
   listSystemsFn = null,
 }) {
+  const startedAt = Date.now();
   const mod = await getReqModule({ rootDir, moduleKey });
   if (!mod.hasThroughChains) {
     throw new AppError('through-chains.md required', { code: 'VALIDATION' });
@@ -614,6 +633,31 @@ export async function proposeDraftTrajectories({
     inputHash,
     truncated,
   });
+
+  const flowRefHits = capped.filter((a) => a.suggestedFlowRef).length;
+  const functionIdCandidateHits = capped.filter((a) => (a.functionIdCandidates || []).length > 0).length;
+  await appendObservation('propose-runs.jsonl', {
+    ts: new Date().toISOString(),
+    moduleKey,
+    atoms: capped.length,
+    rejected: rejected.length,
+    truncated,
+    cacheVersion: 1,
+    sourceHash,
+    durationMs: Date.now() - startedAt,
+    flowRefHits,
+    functionIdCandidateHits,
+  });
+  for (const atom of capped) {
+    if (!atom.suggestedFlowRef) continue;
+    await appendObservation('recall-events.jsonl', {
+      ts: new Date().toISOString(),
+      query: atom.title,
+      flowRef: atom.suggestedFlowRef,
+      nodeId: atom.suggestedNodeId ?? null,
+      source: 'js',
+    });
+  }
 
   return { atoms: capped, rejected, truncated };
 }

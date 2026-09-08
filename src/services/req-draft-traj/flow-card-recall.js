@@ -211,20 +211,20 @@ function nodeExcludedByPolarity(node, title) {
  * bigram/code tokens + longest semantic match, idf × len scoring, relative
  * coverage floor and polarity disambiguation.
  * @param {{ title?: string, taskDraft?: string, cards?: object[] }} opts
- * @returns {{ flowRef: string|null, nodeId: string|null }}
+ * @returns {{ flowRef: string|null, nodeId: string|null, score: number|null }} Winning card score exposed for observability
  */
 export function matchFlowForAtom({ title, taskDraft, cards } = {}) {
   if (!cards?.length) {
-    return { flowRef: null, nodeId: null };
+    return { flowRef: null, nodeId: null, score: null };
   }
   const corpus = corpusProfile(cards);
   const tokens = extractQueryTokens(`${title || ''}${taskDraft || ''}`, corpus.semanticDict);
   if (!tokens.size) {
-    return { flowRef: null, nodeId: null };
+    return { flowRef: null, nodeId: null, score: null };
   }
   const { weights, maxPossible } = tokenWeights(tokens, corpus);
   if (maxPossible <= 0) {
-    return { flowRef: null, nodeId: null };
+    return { flowRef: null, nodeId: null, score: null };
   }
 
   let bestEntry = null;
@@ -249,7 +249,7 @@ export function matchFlowForAtom({ title, taskDraft, cards } = {}) {
 
   if (!bestEntry || bestCardScore < MIN_CARD_SCORE
     || bestCardScore / maxPossible < MIN_CARD_COVERAGE) {
-    return { flowRef: null, nodeId: null };
+    return { flowRef: null, nodeId: null, score: null };
   }
 
   const flowRef = bestEntry.stem;
