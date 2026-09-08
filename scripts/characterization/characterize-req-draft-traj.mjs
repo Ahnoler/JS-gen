@@ -371,6 +371,52 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  await runAsync('proposeDraftTrajectories rejects prose-only through-chains (no step table)', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    writeFileSync(
+      join(tmp, 'demo-mod', 'through-chains.md'),
+      '# 需求\n\n散文体描述，没有步骤表。\n',
+      'utf8',
+    );
+
+    let err;
+    try {
+      await proposeDraftTrajectories({
+        moduleKey: 'demo-mod',
+        rootDir: tmp,
+        callLLM: async () => '{"atoms":[]}',
+      });
+    } catch (e) {
+      err = e;
+    }
+    assert.ok(err instanceof AppError);
+    assert.equal(err.code, 'VALIDATION');
+    assert.match(err.message, /no parseable step table/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('proposeDraftTrajectories rejects chainIds matching no chains', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    let err;
+    try {
+      await proposeDraftTrajectories({
+        moduleKey: 'demo-mod',
+        rootDir: tmp,
+        chainIds: ['nope'],
+        callLLM: async () => '{"atoms":[]}',
+      });
+    } catch (e) {
+      err = e;
+    }
+    assert.ok(err instanceof AppError);
+    assert.equal(err.code, 'VALIDATION');
+    assert.match(err.message, /matched no chains/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   const { writeProposeCache } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');

@@ -11,7 +11,7 @@ import { AppError } from '../../http/app-error.js';
 import { callLLM as defaultCallLLM } from '../../llm-utils.js';
 import { getReqModule, moduleDir } from '../kb-req-modules.js';
 import { parseLlmJsonObject } from '../operation-component-signature.js';
-import { buildAtomKey, parseThroughChainsMarkdown } from './parse-through-chains.js';
+import { buildAtomKey, parseThroughChainsMarkdown, hasProposeableChainSteps } from './parse-through-chains.js';
 import {
   assertAtomProvenance,
   fillTaskDraftProvenancePlaceholders,
@@ -435,6 +435,9 @@ export async function proposeDraftTrajectories({
 
   const modDir = moduleDir(moduleKey, rootDir);
   const md = await readFile(join(modDir, 'through-chains.md'), 'utf-8');
+  if (!hasProposeableChainSteps(md)) {
+    throw new AppError('through-chains.md has no parseable step table', { code: 'VALIDATION' });
+  }
   const { chains: allChains } = parseThroughChainsMarkdown(md);
 
   const chainIdSet = Array.isArray(chainIds) && chainIds.length > 0
@@ -443,6 +446,12 @@ export async function proposeDraftTrajectories({
   const chains = chainIdSet
     ? allChains.filter((c) => chainIdSet.has(c.chainId))
     : allChains;
+  if (chainIdSet && chains.length === 0) {
+    throw new AppError(
+      `chainIds matched no chains (available: ${allChains.map((c) => c.chainId).join(', ')})`,
+      { code: 'VALIDATION' },
+    );
+  }
 
   const sourceDoc = await loadSourceDoc(modDir);
   const llmFn = callLLM || defaultCallLLM;

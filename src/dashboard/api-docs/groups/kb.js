@@ -157,6 +157,8 @@ export const GROUP_KB = [{
       notes: [
         '模块未登记 → NOT_FOUND/404',
         '缺 through-chains.md → 400 VALIDATION',
+        'through-chains.md 无可解析步骤表（散文体）→ 400 VALIDATION "no parseable step table"',
+        'chainIds 过滤后为空 → 400 VALIDATION "matched no chains"（附可用 chainId）',
         '不建交易、不录制',
         'atomKey 形如 <module>:<chain>:<step>，与步骤标题无关（LLM 重跑稳定）',
         'pageCodes 为页面/组件编号元数据；关键数据块不应再堆 ZJJK 表',
