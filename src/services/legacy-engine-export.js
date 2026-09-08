@@ -31,6 +31,10 @@ export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   switch_tab: 'click',
   close_dialog: 'click',
   expand_all_el_tree: 'click',
+  picker_dialog_query: 'input',
+  picker_dialog_select: 'select:click',
+  workspace_tabs: 'click',
+  tree_picker_click: 'click',
 });
 
 /** Types we emit today (derived from ACTION_TO_ENGINE_TYPE). */
@@ -194,6 +198,14 @@ export function buildOperationName(action, params = {}, element = {}) {
       return p.url ? `打开:${String(p.url).slice(0, 60)}` : '打开页面';
     case 'expand_all_el_tree':
       return '展开树';
+    case 'picker_dialog_query':
+      return p.dialog_name ? `弹窗查询:${p.dialog_name}` : '弹窗查询';
+    case 'picker_dialog_select':
+      return p.dialog_name ? `弹窗选择:${p.dialog_name}` : '弹窗选择';
+    case 'tree_picker_click':
+      return label ? `树选:${label}` : '树选择';
+    case 'workspace_tabs':
+      return text ? `页签:${text}` : '切换页签';
     default:
       return action || 'unknown';
   }
@@ -216,6 +228,12 @@ export function pickOperationValue(action, params = {}) {
       return String(p.option_text ?? p.value ?? p.option ?? '');
     case 'go_to_url':
       return String(p.url ?? '');
+    case 'picker_dialog_query':
+      return Array.isArray(p.fields)
+        ? p.fields.map((f) => String(f?.value ?? '')).filter(Boolean).join(',')
+        : '';
+    case 'picker_dialog_select':
+      return String(p.row_text ?? '');
     default:
       return '';
   }

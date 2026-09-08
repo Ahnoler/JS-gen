@@ -76,8 +76,10 @@ export function mapStepToTransactionEvent(step) {
   if (!action || SKIP_ACTIONS.has(action)) return null;
   const eventTypeValue = ACTION_TO_ENGINE_TYPE[action];
   if (!eventTypeValue) return null;
-
   const params = entry.params || {};
+
+  // workspace_tabs 的 list/close 是引擎扫描/辅助语义，只有 activate（真实页签切换）推送
+  if (action === 'workspace_tabs' && String(params.action || '') !== 'activate') return null;
   const element = entry.element || {};
   const { target, source } = pickExportTarget(entry);
   const options = resolveOptions(entry);
