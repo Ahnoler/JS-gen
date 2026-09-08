@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 09:53 · Cursor — 开工+收工：原子录制召回流程卡设计（方案 A 落库列）
+
+- 完成：用户确认注入时机=prepare/record；落库=trajectory 新列 `kb_flow_ref`/`kb_flow_node_id`。spec → `docs/superpowers/specs/2026-09-08-atom-record-flow-card-recall-design.md`（待用户审阅后再 writing-plans）
+- 验收：设计与既有 req 出处列风格对齐；明确 propose 不写长前置、无命中不挡录制
+- 遗留：用户审阅 §5/§8/§9 后出实现计划
+- 注意：未动业务代码；勿与轨迹查询 WIP / V3 导出线交叉
+
 ## 2026-09-08 10:00 · ZCode V3导出线 — 收工补充：人工录制 select_option 分层修复（18b0a2b8）
 - 完成：①录制侧 js_parts/b.py——el-select 下拉面板挂 body（popper），人工录制存 option 面板元素致 region=other、导出脱离 tab 分层；改为与 AI 同形态存页面内 .el-select 容器（is-focus 定位），option 文本走参数。②导出侧 transaction-export-v3-properties.js——分区段仅为 other 的步骤沿用前序分区段（存量人工数据兜底）。
 - 验收：traj 679（人工）重建 payload「选择额度类型」← tab基本信息；assembled manual JS 含补丁（30480 字节）；eslint 0；characterize-export-v3/pid/layer-tree 全绿。
