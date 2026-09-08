@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-08 18:50 · Cursor Subagent — 收工：关键数据分层 + 候选假流式 UX（回链 16:05）
+
+- 完成：Tasks 1–5 绿；plan `docs/superpowers/plans/2026-09-08-req-draft-keydata-and-streaming-ux.md`（`5ac588bf`）；spec 状态 → 已实现；docs 收工（本 commit）
+- 验收：characterize-atom-keydata OK；characterize-req-draft-traj OK（pageCodes + sanitize pin）；Vue `vue-tsc` OK
+- JS-gen：`475328d4` prompt · `af756fa4` atom-keydata · `01794542` propose wire
+- Vue dev：`8788ee9` atom-display/types · `00c62ca` 3-step fake-stream wizard
+- 湿测：SKIP — 待用户重启 4097 + 冒烟录制向导（product-mgmt 生成 → 勾选 → 创建）
+
 ## 2026-09-08 18:45 · Cursor Subagent — 收工：TsscMultiSelect 专用动作实现线（回链 17:42）
 
 - 完成：Tasks 1–5 绿；spec 状态 → 已实现；docs 收工（本 commit）

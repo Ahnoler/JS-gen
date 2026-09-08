@@ -1,7 +1,7 @@
 # 需求草稿向导：关键数据分层 + 候选假流式 UX — 设计
 
 > 日期：2026-09-08  
-> 状态：已批准（会话 OK）  
+> 状态：已实现（SDD `475328d4..01794542` JS-gen · Vue `8788ee9..00c62ca`；characterize OK）；待 4097 重启 + 向导湿测  
 > 前置：[`2026-09-08-req-draft-wizard-ui-design.md`](./2026-09-08-req-draft-wizard-ui-design.md)；atomize：`scripts/prompts/req-draft-traj-atomize-prompt.md`  
 > 前端：`vue-project` 录制向导；后端：propose/commit（本版 **不** 改 SSE）
 
@@ -113,10 +113,16 @@
 
 ## 6. 验收
 
-- [ ] 新 propose 样例：`taskDraft`「关键数据」无纯 ZJJK 表；`pageCodes` 或步骤内括号可见编号。  
-- [ ] 点生成立即进入候选页；列表逐条出现；进度到 100% 后可创建。  
-- [ ] 同页勾选 + 展开可读步骤/业务数据/页面编号。  
-- [ ] 旧四步路由深链：重定向或兼容到新三步（实现时二选一，默认兼容旧 step 号映射）。
+### 代码（characterization / 静态）
+
+- [x] 新 propose 样例：`taskDraft`「关键数据」无纯 ZJJK 表；`pageCodes` 或步骤内括号可见编号。（`475328d4`/`af756fa4`/`01794542`；characterize-atom-keydata · characterize-req-draft-traj OK）  
+- [x] 点生成立即进入候选页；列表逐条出现；进度到 100% 后可创建。（Vue `00c62ca`；`handleGenerate` → step 2 + `startReveal` + `canCreate` 门闩）  
+- [x] 同页勾选 + 展开可读步骤/业务数据/页面编号。（Vue `8788ee9`/`00c62ca`；`atom-display` 三分栏 + 遗留 ZJJK 弱提示）  
+- [x] 旧四步路由深链：兼容到新三步（step 2+3→2、4→3 映射，`index.vue` onMounted）。
+
+### 湿测（待用户）
+
+- [ ] 重启控制面 **4097**，product-mgmt 录制向导冒烟：生成候选 → 假流式揭示 → 勾选 → 创建；确认 UI 与 §4 一致。
 
 ## 7. 实现分期（供计划）
 
