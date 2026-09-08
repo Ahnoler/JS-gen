@@ -28,7 +28,7 @@ function ok(n) { console.log(`ok: ${n}`); }
   assert.equal(ev1.regionId, undefined, 'regionId removed (slim V2)');
   assert.equal(ev1.parentRegionId, undefined, 'parentRegionId removed (slim V2)');
   assert.equal(ev1.elementType, "//input[@id='a']", 'old fields unchanged');
-  assert.equal(ev1.propertiesName, '填写客户名称', 'propertiesName intact');
+  assert.equal(ev1.propertiesName, '客户名称', 'propertiesName is field name without verb');
 
   const ev2 = mapStepToTransactionEvent({
     actionType: 'select_option',
@@ -58,7 +58,7 @@ function ok(n) { console.log(`ok: ${n}`); }
   );
   assert.equal(built.entry.phases, undefined, 'entry.phases removed (slim V2)');
   assert.equal(built.entry.transcationProperties.length, 1);
-  assert.equal(built.entry.transcationProperties[0].propertiesName, '点击保存');
+  assert.equal(built.entry.transcationProperties[0].propertiesName, '保存');
   assert.equal(built.count, 1);
   ok('buildTransactionEntry slim (no phases)');
 }

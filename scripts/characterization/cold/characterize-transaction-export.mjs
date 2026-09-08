@@ -22,13 +22,23 @@ function testFillInput() {
   });
   assert.equal(ev.eventTypeValue, 'input');
   assert.equal(ev.eventTypeName, '文本框输入');
-  assert.equal(ev.propertiesName, '填写用户名');
+  assert.equal(ev.propertiesName, '用户名');
   assert.equal(ev.objectValue, '701994');
   assert.equal(ev.elementType, '//input[@placeholder="请输入您的用户名"]');
   assert.equal(ev.options, '');
   assert.equal(ev.mothed, 'By.XPATH');
   assert.equal(ev.transcationType, 'playwright');
   assert.equal(Object.prototype.hasOwnProperty.call(ev, 'placeholder'), false);
+}
+
+function testClickNoVerb() {
+  const ev = mapStepToTransactionEvent({
+    actionType: 'click_element_by_index',
+    params: { text: '产品名称' },
+    element: { xpath_smart: "//span[normalize-space()='产品名称']" },
+  });
+  assert.equal(ev.eventTypeValue, 'click');
+  assert.equal(ev.propertiesName, '产品名称');
 }
 
 function testSelectOptionsJson() {
@@ -42,6 +52,7 @@ function testSelectOptionsJson() {
   });
   assert.equal(ev.eventTypeValue, 'select:click');
   assert.equal(ev.eventTypeName, EVENT_TYPE_NAME['select:click']);
+  assert.equal(ev.propertiesName, '状态');
   assert.equal(ev.objectValue, '启用');
   assert.equal(ev.options, JSON.stringify(['启用', '停用']));
 }
@@ -134,11 +145,12 @@ function testUniquePropertiesName() {
     { systemId: '1', projectId: '1' },
   );
   const names = payload.transcationEventTypeList[0].transcationProperties.map((p) => p.propertiesName);
-  assert.deepEqual(names, ['填写客户名称', '填写客户名称2', '填写客户名称3']);
+  assert.deepEqual(names, ['客户名称', '客户名称2', '客户名称3']);
   assert.equal(new Set(names).size, names.length);
 }
 
 testFillInput();
+testClickNoVerb();
 testSelectOptionsJson();
 testSkipMeta();
 testEnvelope();
