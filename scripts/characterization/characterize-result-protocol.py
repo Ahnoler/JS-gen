@@ -50,7 +50,7 @@ def test_recommend_action_for_kind():
     assert_true(rec("select").startswith("select_option"), "select -> select_option")
     assert_true(rec("date").startswith("fill_form_field") and "YYYY-MM-DD" in rec("date"), "date hint")
     assert_true(rec("tree-select").startswith("select_tree_option"), "tree-select")
-    assert_true(rec("tssc-multi-select").startswith("tssc_multi_select"), "tssc-multi-select")
+    assert_true(rec("tssc-multi-select").startswith("select_option"), "tssc-multi-select")
     assert_true(rec("radio") == "click_radio", "radio")
 
 

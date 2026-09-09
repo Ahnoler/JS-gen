@@ -140,12 +140,12 @@ checks = [
     )),
     ("scripts/controller/actions/result_protocol.py", (
         '"tssc-multi-select"',
-        "tssc_multi_select(label_text",
+        "select_option(label_text",
         "fi.querySelector('.tssc-multi-select')",
     )),
     ("scripts/controller/actions/_llm_values.py", (
         "kind == 'tssc-multi-select'",
-        "'action': 'tssc_multi_select'",
+        "'action': 'select_option'",
     )),
     ("scripts/controller/actions/autofill_round.py", (
         "elif is_tssc:",
