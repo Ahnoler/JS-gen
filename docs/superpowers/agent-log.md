@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 11:02 · Cursor Lead — 开工：tssc v2 implementation plan
+
+- 进行中：11:02；spec 已批准（含 D6）；写 plan，不实现
+- 范围：docs/superpowers/plans/2026-09-09-tssc-multi-select-v2.md；agent-log
+- 禁入区：snippet/引擎本单元不改；whitelist；他线 bib-bridge 已收工
+- 方式：writing-plans → 用户选执行方式后再实现
+
 ## 2026-09-09 10:36 · ZCode 引擎线 — 开工：bib-bridge 地址栏跳转补丁（navigate action=url）
 
 ## 2026-09-09 10:50 · ZCode 引擎线 — 收工：bib-bridge 地址栏跳转补丁 PASS（回链 10:36）
@@ -19,9 +26,10 @@
 
 ## 2026-09-09 10:55 · Cursor Lead — 收工：修订 tssc v2 spec D6（回链 10:54）
 
-- 完成：`2026-09-09-tssc-multi-select-v2-design.md` 增补 §2.1 / D6——agent 只调 `select_option`；controller 不向 agent 注册 `tssc_multi_select`；handoff 录制改记 `select_option`；失败文案禁止引导直调
+- 完成：`2026-09-09-tssc-multi-select-v2-design.md` 增补 §2.1 / D6——agent 只调 `select_option`；controller 不向 agent 注册 `tssc_multi_select`；handoff 录制改记 `select_option`；失败文案禁止引导直调；spec commit `470b50e9`
 - 验收：用户口述裁决已写入决议表 D6 与 In/Out/Prompt/验收 C6–C7
 - 遗留：用户终审后 writing-plans → 实现（含反注册 + JS v2）
+- 注意：本收工条目提交若工作区含他线已写入未入本 commit 的 agent-log 行，message 注明；bib-bridge 线条目为他线已提交内容
 
 ## 2026-09-09 10:54 · Cursor Lead — 开工：修订 tssc v2 spec（select_option 唯一对外面）
 

@@ -1,7 +1,7 @@
 # Design: `tssc_multi_select` v2 — table 模式三阶段（P0→P1→P2）
 
 **日期**：2026-09-09  
-**状态**：待用户审阅（设计已拍板；实现未开始；10:54 增补「仅 select_option 对外」）  
+**状态**：已批准（2026-09-09）；实现计划 [`../plans/2026-09-09-tssc-multi-select-v2.md`](../plans/2026-09-09-tssc-multi-select-v2.md)  
 **前置**：[`2026-09-08-tssc-multi-select-action-design.md`](./2026-09-08-tssc-multi-select-action-design.md)（v1 已实现）  
 **湿测**：2026-09-09 Playwright MCP @ 产品要素库「选择要素」→「要素名称」；对公客户评级申请「客户名称」（同为 `TsscMultiSelect` + `.select-table`）  
 **用户裁决**：P2 故意兜底任意第一项（A）；无/`first` 文案跳过 P1；**仅 table 模式**走本 v2；实现取向=**单次 JS 内跑完三阶段**；**agent 面只暴露 `select_option`，内部转调本实现（D6）**
