@@ -294,6 +294,102 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  await runAsync('propose fallback folds open-drawer entry into next save atom', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    writeFileSync(
+      join(tmp, 'demo-mod', 'chapters', '02-客户信息维护.md'),
+      '# 客户信息维护\n\n对公客户主页 ZJJK00066153\n新增对公客户主页 ZJJK00066158\n',
+      'utf8',
+    );
+    writeFileSync(
+      join(tmp, 'demo-mod', 'through-chains.md'),
+      [
+        '# through-chains',
+        '',
+        '### 主链 A：对公客户新增',
+        '',
+        '- **章节出处**：章2 客户信息维护',
+        '',
+        '| # | 步骤 | 页面/弹窗 | ZJJK | 关键按钮 |',
+        '|---|------|-----------|------|----------|',
+        '| 1 | 对公客户主页，点【新增】打开向导抽屉 | 对公客户主页 | ZJJK00066153 | 【新增】 |',
+        '| 2 | 新增对公客户主页：选类型→录证件→【保存】 | 新增对公客户主页 | ZJJK00066158 | 【保存】 |',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: async () => { throw new Error('force fallback'); },
+      listSystemsFn: async () => [],
+    });
+    assert.equal(out.atoms.length, 1, `expected 1 atom, got ${out.atoms.length}: ${out.atoms.map((a) => a.title).join(' | ')} rejected=${JSON.stringify(out.rejected)}`);
+    assert.match(out.atoms[0].taskDraft, /打开向导抽屉/);
+    assert.match(out.atoms[0].taskDraft, /【保存】|保存/);
+    assert.equal(out.atoms[0].kind, 'write');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose folds LLM open-drawer atom into following write atom', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    writeFileSync(
+      join(tmp, 'demo-mod', 'chapters', '02-客户信息维护.md'),
+      '# 客户信息维护\n\n对公客户主页 ZJJK00066153\n新增对公客户主页 ZJJK00066158\n',
+      'utf8',
+    );
+    writeFileSync(
+      join(tmp, 'demo-mod', 'through-chains.md'),
+      [
+        '# through-chains',
+        '',
+        '### 主链 A：对公客户新增',
+        '',
+        '- **章节出处**：章2 客户信息维护',
+        '',
+        '| # | 步骤 | 页面/弹窗 | ZJJK | 关键按钮 |',
+        '|---|------|-----------|------|----------|',
+        '| 1 | 对公客户主页，点【新增】打开向导抽屉 | 对公客户主页 | ZJJK00066153 | 【新增】 |',
+        '| 2 | 新增对公客户主页：选类型→录证件→【保存】 | 新增对公客户主页 | ZJJK00066158 | 【保存】 |',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [
+        {
+          chainId: 'chain-a',
+          stepIndexes: [1],
+          title: '对公客户主页，点【新增】打开向导抽屉',
+          taskDraft: '1、对公客户主页，点【新增】打开向导抽屉\n\n来源：demo.docx\n',
+          phaseHints: ['打开向导抽屉'],
+        },
+        {
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增对公客户并保存',
+          taskDraft: '1、选类型→录证件→【保存】\n\n来源：demo.docx\n',
+          phaseHints: ['保存'],
+        },
+      ],
+    });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+    });
+    assert.equal(out.atoms.length, 1, `expected 1 folded atom, got ${out.atoms.length} rejected=${JSON.stringify(out.rejected)}`);
+    assert.match(out.atoms[0].taskDraft, /打开向导抽屉/);
+    assert.match(out.atoms[0].taskDraft, /【保存】|保存/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   await runAsync('proposeDraftTrajectories nulls unknown suggestedFunctionId (FK guard)', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
     cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
@@ -1085,10 +1181,14 @@ async function main() {
       callLLM: fakeLLM,
       listSystemsFn: async () => [],
     });
+    // LLM emitted nav + 2 writes; entry/nav fold merges nav into first write → 2 atoms, nothing dropped.
     assert.equal(out.atoms.length, 2);
     assert.ok(out.atoms.every((a) => a.kind === 'write' || a.kind === 'nav'));
     assert.equal(out.atoms.some((a) => a.title === '新增一级分类'), true);
-    assert.deepEqual(out.truncated, { dropped: 1, requestedMax: 2 });
+    const firstWrite = out.atoms.find((a) => a.title === '新增一级分类');
+    assert.ok(firstWrite);
+    assert.match(firstWrite.taskDraft, /进入产品库/);
+    assert.deepEqual(out.truncated, { dropped: 0, requestedMax: 2 });
     rmSync(tmp, { recursive: true, force: true });
   });
 

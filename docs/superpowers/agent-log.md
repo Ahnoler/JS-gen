@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
+## 2026-09-09 22:20 · Cursor Lead — 收工：原子化入口步骤并入下一写（回链 22:11）
+
+- 完成：`isEntryOnlyStep`（打开抽屉/向导且无保存）→ 当导航；LLM `foldEntryOnlyLlmAtoms`；prompt 禁单独入口 atom；表征 +2（fallback/LLM fold）；`characterize-req-draft-traj` **OK 55**
+- 验收：customer-corp 样例「点【新增】打开向导抽屉」+「…【保存】」→ 1 个 write atom，taskDraft 含两步
+- 遗留：用户需对 customer-corp **重新生成候选**（旧 propose 缓存会保留拆开的两笔）；重启 4097 加载新 propose.js
+
 ## 2026-09-09 22:11 · Cursor Lead — 开工：原子化入口步骤并入下一写（打开抽屉≠交易）
 
 - 进行中：22:11；用户确认「打开向导抽屉」不得单独成 atom，应并入下一保存原子

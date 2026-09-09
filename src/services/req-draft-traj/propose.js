@@ -78,6 +78,12 @@ async function appendObservation(file, line) {
 const WRITE_ACTION_RE = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交|启用|禁用|克隆|删除/;
 const NAV_ACTION_RE = /进入|加载|刷树|打开|导航|切换|刷新/;
 /**
+ * Open drawer / wizard entry without persistence — not a standalone atom
+ * (e.g. 「点【新增】打开向导抽屉」; still matches 新增 in WRITE_ACTION_RE).
+ */
+const ENTRY_ONLY_RE = /打开\s*.{0,16}(抽屉|向导)|点[击]?\s*【新增】\s*.*打开/;
+const PERSIST_WRITE_RE = /保存|提交/;
+/**
  * Reference-style steps defer to another chain's steps and are not
  * independently recordable atoms (spec F-10; e.g. `回主链 A 第 6-9 步…`).
  */
@@ -95,21 +101,36 @@ function loadAtomizePrompt() {
 }
 
 /**
+ * True when the step only opens an entry UI (drawer/wizard) with no save/submit.
+ * @param {string} action Step action text
+ * @returns {boolean} True when this is entry-only (fold into next write)
+ */
+function isEntryOnlyStep(action) {
+  const text = String(action || '');
+  if (!text) return false;
+  if (PERSIST_WRITE_RE.test(text)) return false;
+  return ENTRY_ONLY_RE.test(text);
+}
+
+/**
  * True when a step action is a write/mutation operation.
  * @param {string} action Step action text
  * @returns {boolean} True when the step action is a write/mutation operation
  */
 function isWriteStep(action) {
-  return WRITE_ACTION_RE.test(String(action || ''));
+  const text = String(action || '');
+  if (isEntryOnlyStep(text)) return false;
+  return WRITE_ACTION_RE.test(text);
 }
 
 /**
- * True when a step action is navigation-only (no write).
+ * True when a step action is navigation-only or entry-only (no persist write).
  * @param {string} action Step action text
  * @returns {boolean} True when the step action is navigation-only (no write)
  */
 function isNavigationStep(action) {
   const text = String(action || '');
+  if (isEntryOnlyStep(text)) return true;
   return NAV_ACTION_RE.test(text) && !isWriteStep(text);
 }
 
@@ -216,6 +237,90 @@ function buildFallbackLlmAtoms(chains, sourceDoc) {
   }
 
   return atoms;
+}
+
+/**
+ * Whether every stepIndex on an LLM atom is entry-only or navigation (no write).
+ * @param {Record<string, unknown>} llmAtom Raw LLM atom
+ * @param {import('./parse-through-chains.js').ThroughChain[]} chains Parsed chains
+ * @returns {boolean} True when the atom has no write step
+ */
+function atomStepsAreEntryOrNavOnly(llmAtom, chains) {
+  const chainId = String(llmAtom.chainId || '').trim();
+  const chain = chains.find((c) => c.chainId === chainId);
+  const title = String(llmAtom.title || '');
+  if (!chain) {
+    return isEntryOnlyStep(title) || isNavigationStep(title);
+  }
+  const stepIndexes = Array.isArray(llmAtom.stepIndexes)
+    ? llmAtom.stepIndexes.map((v) => Number(v)).filter((n) => Number.isFinite(n) && n > 0)
+    : [];
+  if (stepIndexes.length === 0) {
+    return isEntryOnlyStep(title) || isNavigationStep(title);
+  }
+  return stepIndexes.every((idx) => {
+    const step = findStepByIndex(chain, idx);
+    const action = step?.action || title;
+    return isEntryOnlyStep(action) || isNavigationStep(action);
+  });
+}
+
+/**
+ * Prepend entry/nav taskDraft step lines onto the next write atom's draft.
+ * @param {string} preambleDraft Entry atom taskDraft
+ * @param {string} mainDraft Write atom taskDraft
+ * @returns {string} Merged taskDraft
+ */
+function mergeTaskDraftPreamble(preambleDraft, mainDraft) {
+  const preLines = String(preambleDraft || '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => /^\d+[\.、\)]\s*/.test(l));
+  const main = String(mainDraft || '').trim();
+  if (preLines.length === 0) return main ? `${main}\n` : '';
+  if (!main) return `${preLines.join('\n')}\n`;
+  return `${preLines.join('\n')}\n${main}\n`;
+}
+
+/**
+ * Fold LLM atoms that are entry/nav-only into the next write atom on the same chain.
+ * @param {Array<Record<string, unknown>>} llmAtoms Raw LLM atoms
+ * @param {import('./parse-through-chains.js').ThroughChain[]} chains Parsed chains
+ * @returns {Array<Record<string, unknown>>} Folded list
+ */
+function foldEntryOnlyLlmAtoms(llmAtoms, chains) {
+  /** @type {Array<Record<string, unknown>>} */
+  const out = [];
+  const list = llmAtoms.slice();
+  for (let i = 0; i < list.length; i += 1) {
+    const atom = list[i];
+    if (!atomStepsAreEntryOrNavOnly(atom, chains)) {
+      out.push(atom);
+      continue;
+    }
+    let folded = false;
+    for (let j = i + 1; j < list.length; j += 1) {
+      if (String(list[j].chainId || '') !== String(atom.chainId || '')) continue;
+      if (atomStepsAreEntryOrNavOnly(list[j], chains)) continue;
+      list[j] = {
+        ...list[j],
+        taskDraft: mergeTaskDraftPreamble(
+          String(atom.taskDraft || ''),
+          String(list[j].taskDraft || ''),
+        ),
+        phaseHints: [
+          ...(Array.isArray(atom.phaseHints) ? atom.phaseHints.map((h) => String(h)) : []),
+          ...(Array.isArray(list[j].phaseHints) ? list[j].phaseHints.map((h) => String(h)) : []),
+        ].slice(0, 4),
+      };
+      folded = true;
+      break;
+    }
+    if (!folded) {
+      out.push(atom);
+    }
+  }
+  return out;
 }
 
 /**
@@ -566,6 +671,9 @@ export async function proposeDraftTrajectories({
     // Deterministic fallback: each write step → one atom; nav merges into next write preamble.
     llmAtoms = buildFallbackLlmAtoms(chains, sourceDoc);
   }
+
+  // LLM may still emit open-drawer entry as its own atom — fold into next write.
+  llmAtoms = foldEntryOnlyLlmAtoms(llmAtoms, chains);
 
   /** @type {DraftAtom[]} */
   const atoms = [];
