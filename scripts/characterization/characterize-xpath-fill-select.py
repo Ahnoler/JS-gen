@@ -89,25 +89,40 @@ def test_fill_by_xpath_prefers_form_label_hint() -> None:
 
 
 def test_replay_fill_passes_label_as_xpath_hint() -> None:
-    src = (
+    engines_src = (
+        ROOT / "scripts/controller/actions/form_action_engines.py"
+    ).read_text(encoding="utf-8")
+    fill_replay = engines_src.split("async def _fill_form_field_replay_impl", 1)[1].split(
+        "async def check_field_value", 1
+    )[0]
+    replay_src = (
         (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
         + "\n"
         + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
             encoding="utf-8"
         )
     )
-    chunk = src.split("if action_name == 'fill_form_field':", 1)[1].split(
+    fill_fn = replay_src.split("if action_name == 'fill_form_field':", 1)[1].split(
         "if action_name == 'select_tree_option':", 1
     )[0]
-    assert_true("JS_FILL_BY_XPATH" in chunk, "replay fill uses JS_FILL_BY_XPATH")
-    assert_true(
-        "hint = label or ph" in chunk or "hint=label or ph" in chunk.replace(" ", ""),
-        "replay fill builds hint from label_text before placeholder",
+    dispatch = (ROOT / "scripts/controller/actions/fill_dispatch.py").read_text(
+        encoding="utf-8"
     )
     assert_true(
-        "JS_FILL_BY_XPATH, [xpath, value, hint]" in chunk
-        or "JS_FILL_BY_XPATH,[xpath,value,hint]" in chunk.replace(" ", ""),
-        "replay fill third arg is label-preferring hint",
+        "FillEngine.fill_form_field_for_replay" in fill_fn,
+        "replay fill delegates to FillEngine",
+    )
+    assert_true(
+        "JS_FILL_BY_XPATH" in fill_replay,
+        "FillEngine replay uses JS_FILL_BY_XPATH",
+    )
+    assert_true(
+        "att.hint" in fill_replay,
+        "FillEngine replay passes attempt hint to JS_FILL_BY_XPATH",
+    )
+    assert_true(
+        "hint=lab or ph" in dispatch,
+        "fill_dispatch builds xpath hint from label before placeholder",
     )
 
 

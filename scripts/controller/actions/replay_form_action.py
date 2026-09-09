@@ -14,13 +14,11 @@ from ._helpers import (
 )
 from ._js_snippets import (
     JS_CLICK_RADIO,
-    JS_FILL_BY_XPATH,
-    JS_FILL_FORM_FIELD,
     JS_FIND_LABELED_SELECT,
     JS_SELECT_VALUE_BY_XPATH,
     JS_TSSC_MULTI_SELECT,
 )
-from .form_action_engines import SelectEngine, TreeEngine
+from .form_action_engines import FillEngine, SelectEngine, TreeEngine
 from .replay_js import _JS_LOCATE_BY_XPATH, _JS_READ_VALUE_BY_XPATH
 from .replay_timing import WAIT_200_MS, WAIT_300_MS, WAIT_400_MS, WAIT_500_MS
 from .select_dispatch import resolve_select_dispatch
@@ -65,79 +63,15 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
     await _wait_if_loading(page)
 
     if action_name == 'fill_form_field':
-        from .fill_dispatch import resolve_fill_attempt_order
-
-        ph = placeholder
-        element_xp = _element_xpath_smart(entry) if use_relative else ''
-
-        async def _try_xpath_fill(xpath: str, locate_src: str) -> str | None:
-            # Prefer label_text so shared placeholder xpaths disambiguate form-items
-            # (traj 130: //input[@placeholder='请输入'][1] + last-visible → 名称).
-            # Also exact-match prefix labels (财务部联系人 vs …手机号码).
-            hint = label or ph
-            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, hint])
-            action_ok = isinstance(result, str) and result.startswith('ok')
-            # Primary read: by the fill xpath.
-            actual = await _read_value_by_xpath(page, xpath, hint) if (xpath and action_ok) else ''
-            # Robust fallback: if the fill reported ok but the recorded xpath read
-            # back empty, the xpath is stale or points at the wrong node — the fill
-            # likely landed via the label/placeholder branch. Read by the same hint
-            # so the verify sees the input the fill actually wrote, not an empty /
-            # sibling node. Only when BOTH reads are empty is it a genuine false_ok.
-            if action_ok and not actual:
-                actual = await _read_value_by_label(page, label, ph)
-            classified = _classify_fill_result(action_ok, value, actual)
-            if classified == 'ok':
-                await page.wait_for_timeout(WAIT_300_MS)
-                return f'ok:locate={locate_src}'
-            if classified.startswith('false_ok'):
-                await page.wait_for_timeout(WAIT_300_MS)
-                return classified
-            return None
-
-        xp, src = _resolve_replay_xpath(entry, params)
-        full = _element_xpath_full(entry) if use_relative else ''
-        attempts = resolve_fill_attempt_order(
-            label=label,
+        xp, _src = _resolve_replay_xpath(entry, params)
+        return await FillEngine.fill_form_field_for_replay(
+            page,
+            label,
+            value,
+            xpath_smart=xp or '',
+            element=el,
             placeholder=placeholder,
-            xpath_smart=xp,
-            xpath_smart_src=src,
-            xpath_full=full if use_relative else '',
         )
-        result = 'label-not-found'
-
-        for att in attempts:
-            if att.js_kind == 'by_xpath':
-                if not att.xpath:
-                    result = await page.evaluate(JS_FILL_BY_XPATH, ['', value, att.hint])
-                    if isinstance(result, str) and result.startswith('ok'):
-                        await page.wait_for_timeout(WAIT_300_MS)
-                        return str(result)
-                    continue
-                xpath_result = await _try_xpath_fill(att.xpath, att.locate_src)
-                if xpath_result:
-                    return xpath_result
-                continue
-            result = await page.evaluate(JS_FILL_FORM_FIELD, [att.hint, value])
-            if isinstance(result, str) and result.startswith('ok'):
-                await page.wait_for_timeout(WAIT_300_MS)
-                if element_xp:
-                    actual = await _read_value_by_xpath(page, element_xp, label)
-                    classified = _classify_fill_result(True, value, actual)
-                    if classified.startswith('false_ok'):
-                        return classified
-                    if classified == 'ok':
-                        return 'ok:locate=label'
-                return _annotate_label_result(str(result))
-
-        final = _annotate_label_result(str(result))
-        if is_absent_field_result(final) or is_absent_field_result(result):
-            sys.stderr.write(
-                f'[replay-fill] skip absent label={label!r} result={result!r}\n'
-            )
-            sys.stderr.flush()
-            return absent_field_skip_result()
-        return final
 
     # Widget ops: prefer confirming xpath_smart host, then label JS, then xpath_full confirm.
     async def _with_xpath_first(label_js_coro):

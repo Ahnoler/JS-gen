@@ -32,16 +32,13 @@ def main() -> int:
     if "resolve_fill_attempt_order" not in engines:
         print("FAIL: form_action_engines.py must call resolve_fill_attempt_order")
         return 1
-    if "resolve_fill_attempt_order" not in replay:
-        print("FAIL: replay_form_action.py must call resolve_fill_attempt_order")
-        return 1
 
-    # Replay fill branch must not keep a private full ladder copy as the only strategy.
+    # Phase B: replay routes through FillEngine; attempt order lives in engines.
     fill_body = replay.split("if action_name == 'fill_form_field':", 1)[1].split(
         "# Widget ops:", 1
     )[0]
-    if "resolve_fill_attempt_order" not in fill_body:
-        print("FAIL: fill branch must invoke resolve_fill_attempt_order")
+    if "fill_form_field_for_replay" not in fill_body:
+        print("FAIL: replay fill branch must call fill_form_field_for_replay")
         return 1
 
     sys.path.insert(0, str(ROOT))
