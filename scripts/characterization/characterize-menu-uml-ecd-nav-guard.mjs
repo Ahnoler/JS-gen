@@ -1,0 +1,49 @@
+/**
+ * Characterization: navigable uml_ecd guard (xpath+uml unique).
+ * Run: node scripts/characterization/characterize-menu-uml-ecd-nav-guard.mjs
+ *
+ * Task 1 (red): import + pure isNavigableUmlPair pins; module missing → FAIL.
+ * Task 4 adds apply/import wiring asserts (not in this pin).
+ */
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { isNavigableUmlPair } from '../../src/services/menu-uml-ecd-nav-guard.js';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const GUARD_PATH = path.join(ROOT, 'src/services/menu-uml-ecd-nav-guard.js');
+
+function testGuardModuleExists() {
+  assert.ok(fs.existsSync(GUARD_PATH), 'missing menu-uml-ecd-nav-guard.js');
+}
+
+function testIsNavigableUmlPair() {
+  assert.equal(isNavigableUmlPair('UML1', "//li[@data-id='1']"), true);
+  assert.equal(isNavigableUmlPair('UML1', ''), false);
+  assert.equal(isNavigableUmlPair('', "//li"), false);
+  assert.equal(isNavigableUmlPair('  ', '  /x  '), false);
+  assert.equal(isNavigableUmlPair(' UML1 ', ' /x '), true);
+}
+
+function main() {
+  console.log('\n=== menu-uml-ecd-nav-guard characterization ===\n');
+  const tests = [
+    ['guard module exists', testGuardModuleExists],
+    ['isNavigableUmlPair', testIsNavigableUmlPair],
+  ];
+  let failed = 0;
+  for (const [name, fn] of tests) {
+    try {
+      fn();
+      console.log(`  ✓ ${name}`);
+    } catch (e) {
+      failed += 1;
+      console.error(`  ✗ ${name}:`, e.message);
+    }
+  }
+  console.log(failed ? '\nFAIL' : '\nOK');
+  process.exitCode = failed ? 1 : 0;
+}
+
+main();
