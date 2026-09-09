@@ -2,6 +2,81 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 12:24 · DSH reviewer — 开工：KB 加固验收修复（F-A~F-D + R-3/R-4）
+
+- 进行中：2026-09-09 12:24。reviewer 验收结论 DONE_WITH_CONCERNS（3 必须修复 + 4 登记风险），本轮只修不扩范围
+- 范围：`src/services/req-draft-traj/flow-card-recall.js`（F-A/F-C）、`src/services/req-draft-traj/propose.js`（F-B 观测隔离）、`scripts/characterization/fixtures/kb-recall-golden.json`（F-D note）、`scripts/characterization/characterize-kb-recall.py`（R-3 绊线）、`scripts/characterization/characterize-req-draft-traj.mjs` / `characterize-flow-card-recall.mjs`（F-B pin）、`src/dashboard/api-docs/groups/trajectory.js`（R-4 出处列）、`data/kb/staging/*.jsonl`（清污）、`docs/superpowers/reports/2026-09-09-kb-remediation-reviewer-verdict.md`、本文件
+- 禁入区：`config/update-db-whitelist.ps1`；`.cursor/`；tssc 线文件（`scripts/controller/actions/**`、`form_action_engines.py`、`_form.py`、tssc prompts）；`data/kb/req/**`、`data/kb/flows/**`（不改语料）
+- 方式：逐项修复 → 复跑 lint 归因 + 五条基线 + 全量 gate → 出 reviewer 结论文档 → 收工条目
+
+## 2026-09-09 12:00 · Cursor Lead — 收工：tssc v2 实现 Subagent-Driven（回链 11:07）
+
+- 完成：T1–T4 落地 — commits `02f6d1f6..32c1352d`（pin → JS P0–P2 → 引擎录 `select_option` → D6 反注册+prompt/autofill/wizard/_llm_values）；`characterize-tssc-multi-select` / `select-option-stamp` / `agent-prompt-packs` **GREEN**
+- 验收：核心 cold pin 全绿；`bash scripts/refactor/verify-all.sh` 本轮 **FAILED**（与本线无关环境噪：`characterize-step-highlight` / `layer-tree` MySQL `ETIMEDOUT`；`network-capture` WSL 临时路径 python probe）——tssc 相关步骤在同次 gate 内为 ok
+- 遗留：重启 executor 后湿测要素名称/客户名称；verify-all 环境噪可另开；SDD workspace `.superpowers/sdd/2026-09-09-tssc-multi-select-v2/` 可删
+
+## 2026-09-09 11:07 · Cursor Lead — 开工：tssc v2 实现（Subagent-Driven T1–T5）
+
+- 进行中：11:07；按 `docs/superpowers/plans/2026-09-09-tssc-multi-select-v2.md` 派子智能体逐任务；子智能体不 commit，主会话验收后代提交；子智能体不写 agent-log
+- 范围：`scripts/controller/actions/js_snippets/tssc_multi_select.py`、`form_action_engines.py`、`_form.py`、`autofill_round.py`、prompts（form/tssc/agent-prompt/agent_utils）、characterization pins、verify-all 若需、agent-log 由主会话收工
+- 禁入区：`config/update-db-whitelist.ps1`；kb drafts；deadcode/引擎 P0 修复线；`.cursor/`
+- 方式：SDD ledger `.superpowers/sdd/2026-09-09-tssc-multi-select-v2/progress.md`
+
+## 2026-09-09 11:05 · Cursor Lead — 收工：tssc v2 implementation plan（回链 11:02）
+
+- 完成：`docs/superpowers/plans/2026-09-09-tssc-multi-select-v2.md`（T1–T5）；spec 标已批准；plan commit `5b6c7773`
+- 验收：D1–D6 覆盖表齐全
+- 遗留：用户选 Subagent-Driven 或 Inline 后实现
+
+## 2026-09-09 11:02 · Cursor Lead — 开工：tssc v2 implementation plan
+
+- 进行中：11:02；spec 已批准（含 D6）；写 plan，不实现
+- 范围：docs/superpowers/plans/2026-09-09-tssc-multi-select-v2.md；agent-log
+- 禁入区：snippet/引擎本单元不改；whitelist；他线 bib-bridge 已收工
+- 方式：writing-plans → 用户选执行方式后再实现
+
+## 2026-09-09 10:36 · ZCode 引擎线 — 开工：bib-bridge 地址栏跳转补丁（navigate action=url）
+
+## 2026-09-09 10:50 · ZCode 引擎线 — 收工：bib-bridge 地址栏跳转补丁 PASS（回链 10:36）
+
+- 完成：`executor/bib-bridge.js` navigate 分支补 `action==='url'` → `Page.navigate`（trim 后空 url 拒绝 `empty_url`；`Page.enable` 已在 _bindPageTarget 开启）——commit `c8573939`
+- 验收：新增冷区行为 pin `scripts/characterization/cold/characterize-bib-navigate-input.mjs`（stub CDP client 六例：url 跳转/空 url 拒绝/reload/back/forward/unknown_navigate_action 不回归），注册 verify-all 后全量 **ALL GREEN**，ok 行 124→**125**（唯一增量=本 pin）；`executor/bib-bridge.js` 单文件 eslint 0 问题
+- 遗留移交：**执行机重启待协调**（4097 进程仍跑旧代码，需不打断在途录制时重启 server+executor——先 server 后 executor）；真机湿测=前端录制详情页地址栏输 URL 回车页面跳转；前端无需改动（800ms 后自动拉 tabs 刷新地址栏）；未触碰他线 `config/update-db-whitelist.ps1`（M 态 WIP 未携带）
+
+## 2026-09-09 10:36 · ZCode 引擎线 — 开工：bib-bridge 地址栏跳转补丁（navigate action=url）
+
+- 进行中：10:36。前端线已定位：地址栏回车 `remote:input {kind:'navigate',action:'url'}` → 控制面 ws-router 转发正常 → `executor/bib-bridge.js` handleInput navigate 分支只实现 reload/back/forward，`action==='url'` 落 441 行 `unknown_navigate_action` 静默丢弃（前端/控制面/入口三环均无恙）
+- 范围：`executor/bib-bridge.js`（navigate 分支加 url case，约 5 行）、`scripts/characterization/cold/characterize-bib-navigate-input.mjs`（新建行为 pin：stub client 断言 url→Page.navigate/空 url 拒绝/reload+back+forward+unknown 不回归）、`scripts/refactor/verify-all.sh`（注册一行）、agent-log 本文件
+- 禁入区：`config/update-db-whitelist.ps1`（他线 M 态）、`.cursor/`、Cursor tssc_multi_select v2 线文件（10:31/10:32 声明）、`scripts/controller/**`、`src/services/trajectory/**`、引擎 P0/P1 修复线（报告已入库待用户拍板，另开工）
+- 方式：主线程直接实施（小改动不派子智能体）；验证=新冷区行为 pin + verify-all + lint；执行机重启需协调（不打断在途录制），本单元只交付代码不改运行进程
+
+## 2026-09-09 10:55 · Cursor Lead — 收工：修订 tssc v2 spec D6（回链 10:54）
+
+- 完成：`2026-09-09-tssc-multi-select-v2-design.md` 增补 §2.1 / D6——agent 只调 `select_option`；controller 不向 agent 注册 `tssc_multi_select`；handoff 录制改记 `select_option`；失败文案禁止引导直调；spec commit `470b50e9`
+- 验收：用户口述裁决已写入决议表 D6 与 In/Out/Prompt/验收 C6–C7
+- 遗留：用户终审后 writing-plans → 实现（含反注册 + JS v2）
+- 注意：本收工条目提交若工作区含他线已写入未入本 commit 的 agent-log 行，message 注明；bib-bridge 线条目为他线已提交内容
+
+## 2026-09-09 10:54 · Cursor Lead — 开工：修订 tssc v2 spec（select_option 唯一对外面）
+
+- 进行中：10:54；用户裁决——agent 不直接调 tssc_multi_select；controller 不向 agent 注册该动作；一律 select_option 转调内部实现
+- 范围：仅 `docs/superpowers/specs/2026-09-09-tssc-multi-select-v2-design.md` + agent-log
+- 禁入区：snippet/引擎实现本单元不改；whitelist / kb / 死代码线
+- 方式：改 spec + commit；实现另开
+
+## 2026-09-09 10:32 · Cursor Lead — 收工：tssc_multi_select v2 设计 spec（回链 10:31）
+
+- 完成：湿测拍板写入 `docs/superpowers/specs/2026-09-09-tssc-multi-select-v2-design.md`；v1 spec 加 v2 指针；决议 D1–D5（P2 兜底任意首项 / 无文案跳过 P1 / 仅 table / 单次 JS / P1 关精确查询）
+- 验收：用户已确认方案 1 + A + 跳过 P1 + table-only；spec 自检无 TBD 矛盾
+- 遗留：用户审阅本 spec 后 → writing-plans → 实现；浏览器会话可继续湿测
+
+## 2026-09-09 10:31 · Cursor Lead — 开工：tssc_multi_select v2 设计文档
+
+- 进行中：10:31；Playwright 湿测后写 design spec（不实现）
+- 范围：`docs/superpowers/specs/2026-09-09-tssc-multi-select-v2-design.md`；可选回链改 `2026-09-08-tssc-multi-select-action-design.md`；agent-log
+- 禁入区：`scripts/controller/actions/js_snippets/tssc_multi_select.py` 本单元不改；`config/update-db-whitelist.ps1`；kb draft；死代码/引擎 P0 修复线
+- 方式：brainstorming → 用户确认 → 写 spec + commit；实现另开单元
+
 ## 2026-09-09 · ZCode 死代码清理线 — 开工：CAUTION 待裁 9 项执行移除（用户裁决）
 
 ## 2026-09-09 · ZCode 死代码清理线+引擎review线 — 收工：CAUTION ×9 全删（-233 行）+ 三路对抗 review 漏洞报告入库（回链开工）

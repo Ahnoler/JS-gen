@@ -397,7 +397,7 @@ class FillEngine(_FormActionEngineBase):
         if kind == 'tssc-multi-select':
             from .result_protocol import err_with
             nxt = (
-                f'tssc_multi_select(label_text="{resolved.label or label_text}", '
+                f'select_option(label_text="{resolved.label or label_text}", '
                 f'option_text="first" 或表行中文名原文)'
             )
             return err_with(
@@ -1597,7 +1597,7 @@ class SelectEngine(_FormActionEngineBase):
                 element['text'] = (stamped or '')[:80]
             xp_inv = stamp_recorded_xpath_smart(element, xp)
             _record_action(
-                'tssc_multi_select',
+                'select_option',
                 {'label_text': label_text, 'option_text': stamped},
                 result,
                 element=element,
@@ -1611,11 +1611,11 @@ class SelectEngine(_FormActionEngineBase):
         if res_s == 'disabled' or res_s.startswith('disabled'):
             return (
                 f'disabled | Field "{label_text}" is read-only (TsscMultiSelect). '
-                f'Do NOT retry tssc_multi_select or select_option — skip this field.'
+                f'Do NOT retry select_option — skip this field.'
             )
         if res_s.startswith('no-tssc-multi-select'):
             return (
-                res_s + ' Do NOT retry tssc_multi_select. '
+                res_s + ' Field is not TsscMultiSelect. '
                 'Use select_option for plain el-select, or report.'
             )
         if res_s.startswith('err-no-echo'):
@@ -1627,7 +1627,7 @@ class SelectEngine(_FormActionEngineBase):
                 res_s
                 + ' | Do NOT fill_form_field / real_click「精确查询」.'
                 + ' 任务写「任一/任意」或 stamp/组件名不是数据项时用'
-                + f' tssc_multi_select(label_text="{label_text}", option_text="first")；'
+                + f' select_option(label_text="{label_text}", option_text="first")；'
                 + ' 否则 option_text 必须是弹层表格「中文名」列原文。'
             )
         return res_s

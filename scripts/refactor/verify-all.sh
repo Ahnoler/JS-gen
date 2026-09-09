@@ -41,6 +41,7 @@ run() {
 
 run "characterize-dedup"       node scripts/characterization/characterize-dedup.mjs
 run "characterize-trajectory"  node scripts/characterization/characterize-trajectory.mjs
+run "characterize-bib-navigate-input" node scripts/characterization/cold/characterize-bib-navigate-input.mjs
 run "characterize-run-event-ownership" node scripts/characterization/characterize-run-event-ownership.mjs
 run "characterize-owned-wait-shape" node scripts/characterization/characterize-owned-wait-shape.mjs
 run "characterize-quality-final-gate" node scripts/characterization/characterize-quality-final-gate.mjs

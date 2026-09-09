@@ -1,7 +1,7 @@
 # Design: `tssc_multi_select` 专用动作（对标 tree-select 族）
 
 **日期**：2026-09-08  
-**状态**：已实现（2026-09-08）；实现计划见 [`../plans/2026-09-08-tssc-multi-select-action.md`](../plans/2026-09-08-tssc-multi-select-action.md)  
+**状态**：已实现（2026-09-08）；实现计划见 [`../plans/2026-09-08-tssc-multi-select-action.md`](../plans/2026-09-08-tssc-multi-select-action.md)。**Table 模式交互序列已被 v2 取代**：见 [`2026-09-09-tssc-multi-select-v2-design.md`](./2026-09-09-tssc-multi-select-v2-design.md)（dict / 门控 / 签名仍以本文为准）  
 **触发**：产品要素库「选择要素」→「要素名称」；Playwright 实证为 Vue2 `TsscMultiSelect`（`.tssc-multi-select` → `.el-select.search-select` → 弹层 `.select-table` + `el-table` 行选）  
 **对标**：已注册树族 `select_tree_option` / `tree_picker_click` / `tree_check_confirm`（`scripts/prompts/agent-tools-tree.md`、`js_snippets/select_tree.py`、`_tree.py`、`TreeEngine`）
 

@@ -173,15 +173,6 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
         return await _tree_engine.select_tree_option(label_text, option_text, xpath_smart)
 
     @controller.action(
-        'Select a row in a TsscMultiSelect remote table dropdown (e.g. 要素名称, 客户名称). '
-        'Opens the select, matches option_text against any table cell (not el-option), '
-        'verifies trigger echo. If result starts with no-tssc-multi-select, do NOT retry — '
-        'use select_option for plain el-select. Do not click the outer dialog 确定; only fill the field.'
-    )
-    async def tssc_multi_select(label_text: str, option_text: str, xpath_smart: str = ""):
-        return await _select_engine.tssc_multi_select(label_text, option_text, xpath_smart)
-
-    @controller.action(
         'Directly write a Vue model field (label_text + field_name + value) by walking '
         'the __vue__ chain to the object holding field_name, assigning the value string, '
         'and calling $forceUpdate. Purpose: disabled+required fields (e.g. 数字产业分类 '

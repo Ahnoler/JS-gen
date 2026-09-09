@@ -478,7 +478,7 @@ def _llm_generate_values(llm, items, business_data_store=None,
                 _append_action({'action': 'select_tree_option', 'label': label, 'option': val}, item)
                 continue
             elif kind == 'tssc-multi-select':
-                _append_action({'action': 'tssc_multi_select', 'label': label, 'option': val}, item)
+                _append_action({'action': 'select_option', 'label': label, 'option': val}, item)
                 continue
             else:
                 _append_action({'action': 'fill_input', 'label': label, 'value': val}, item)
@@ -526,7 +526,7 @@ def _llm_generate_values(llm, items, business_data_store=None,
                 # tree-select needs tree navigation via JS_SELECT_TREE_OPTION.
                 _append_action({'action': 'select_tree_option', 'label': label, 'option': 'first'}, item)
             elif kind == 'tssc-multi-select':
-                _append_action({'action': 'tssc_multi_select', 'label': label, 'option': 'first'}, item)
+                _append_action({'action': 'select_option', 'label': label, 'option': 'first'}, item)
             elif kind == 'date':
                 _append_action({'action': 'fill_input', 'label': label, 'value': _date_val}, item)
             else:
@@ -643,7 +643,7 @@ def _llm_generate_values(llm, items, business_data_store=None,
             elif kind == 'tree-select':
                 _append_action({'action': 'select_tree_option', 'label': label, 'option': 'first'}, item)
             elif kind == 'tssc-multi-select':
-                _append_action({'action': 'tssc_multi_select', 'label': label, 'option': 'first'}, item)
+                _append_action({'action': 'select_option', 'label': label, 'option': 'first'}, item)
             else:
                 _append_action(
                     {'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'},

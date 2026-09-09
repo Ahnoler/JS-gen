@@ -21,6 +21,19 @@ def assert_true(cond: bool, msg: str) -> None:
         raise AssertionError(msg)
 
 
+def assert_d6_tssc_guidance(msg: str, context: str) -> None:
+    """D6: agents use select_option for TsscMultiSelect; no callable tssc_multi_select."""
+    assert_true("select_option" in msg, f"{context} must include select_option")
+    assert_true(
+        "tssc-multi-select" in msg or ".tssc-multi-select" in msg or "TsscMultiSelect" in msg,
+        f"{context} must include TsscMultiSelect / tssc-multi-select guidance",
+    )
+    assert_true(
+        "tssc_multi_select(label_text" not in msg,
+        f"{context} must not steer agents to tssc_multi_select(label_text call shape",
+    )
+
+
 def test_build_agent_system_message_assembles_by_mode() -> None:
     nav = build_agent_system_message({"mode": "navigate"})
     assert_true(
@@ -34,7 +47,7 @@ def test_build_agent_system_message_assembles_by_mode() -> None:
     assert_true("run_form_assistant" in form, "create must include form assistant")
     assert_true("needs_agent" in form, "create must include needs_agent")
     assert_true("select_tree_option" in form, "create must include tree")
-    assert_true("tssc_multi_select" in form, "create must include tssc_multi_select")
+    assert_d6_tssc_guidance(form, "create")
 
     full = build_agent_system_message(None)
     assert_true(
@@ -59,7 +72,7 @@ def test_introduce_pick_includes_full_form() -> None:
     intro = build_agent_system_message({"mode": "introduce_pick"})
     assert_true("run_form_assistant" in intro, "introduce_pick gets full form pack")
     assert_true("needs_agent" in intro, "introduce_pick gets needs_agent rules")
-    assert_true("tssc_multi_select" in intro, "introduce_pick must include tssc_multi_select")
+    assert_d6_tssc_guidance(intro, "introduce_pick")
 
 
 def test_agent_prompt_shim_is_full_assembly() -> None:
@@ -69,7 +82,7 @@ def test_agent_prompt_shim_is_full_assembly() -> None:
     full = build_agent_system_message(None)
     assert_true("run_form_assistant" in shim, "shim must include form assistant")
     assert_true("select_tree_option" in shim, "shim must include tree")
-    assert_true("tssc_multi_select" in shim, "shim must include tssc_multi_select")
+    assert_d6_tssc_guidance(shim, "shim")
     assert_true(len(shim) >= len(full) * 0.9, "shim approximates full assembly")
 
 
