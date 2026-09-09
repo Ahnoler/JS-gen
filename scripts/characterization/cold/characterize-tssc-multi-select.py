@@ -152,12 +152,11 @@ checks = [
         "field_kind not in (",
         "'tssc-multi-select'",
     )),
-    # D6 replay: select_option + form_tssc_multi_select → JS_TSSC (not el-select)
+    # D6 replay: select_option + form_tssc_multi_select → JS_TSSC via dispatch (not el-select)
     ("scripts/controller/actions/replay_form_action.py", (
-        "form_tssc_multi_select",
+        "resolve_select_dispatch",
         "JS_TSSC_MULTI_SELECT",
-        "_tssc_via_select_option",
-        ".tssc-multi-select",
+        'path == "tssc"',
     )),
 ]
 
