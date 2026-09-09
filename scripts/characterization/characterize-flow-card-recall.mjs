@@ -74,6 +74,7 @@ async function main() {
     const { getFlowCard } = kbMod;
     const {
       matchFlowForAtom,
+      rankFlowCards,
       buildFlowTemplateHint,
       applyFlowTemplateHintToDescription,
       getFlowTemplateHintForTrajectory,
@@ -323,6 +324,26 @@ async function main() {
       const miss = matchFlowForAtom({ title: '今天天气不错，我们去吃饭吧', taskDraft: '', cards: realCards });
       assert.equal(miss.flowRef, null);
       assert.equal(miss.score, null);
+    });
+
+    await runAsync('rankFlowCards top-1 matches matchFlowForAtom', async () => {
+      const ranked = rankFlowCards({ title: '查询产品列表', taskDraft: '', cards: realCards, k: 5 });
+      const single = matchFlowForAtom({ title: '查询产品列表', taskDraft: '', cards: realCards });
+      assert.equal(ranked.flowRef, single.flowRef);
+      assert.equal(ranked.nodeId, single.nodeId);
+      assert.equal(ranked.score, single.score);
+      assert.equal(ranked.candidates[0].flowRef, single.flowRef);
+      assert.equal(ranked.candidates[0].score, single.score);
+      assert.ok(ranked.candidates.length <= 5);
+      const scores = ranked.candidates.map((c) => c.score);
+      assert.deepEqual(scores, scores.slice().sort((a, b) => b - a), 'candidates must be score-desc');
+    });
+
+    await runAsync('rankFlowCards returns empty candidates on no-hit', async () => {
+      const r = rankFlowCards({ title: '写一首关于春天的诗', taskDraft: '', cards: realCards, k: 5 });
+      assert.equal(r.flowRef, null);
+      assert.equal(r.score, null);
+      assert.deepEqual(r.candidates, []);
     });
 
     await runAsync('recall perf: 800-char single query under 200ms', async () => {

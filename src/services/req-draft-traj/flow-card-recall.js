@@ -211,57 +211,20 @@ function nodeExcludedByPolarity(node, title) {
 }
 
 /**
- * Deterministic flow-card recall for atom recording (spec §7.2):
- * bigram/code tokens + longest semantic match, idf × len scoring, relative
- * coverage floor and polarity disambiguation.
- * @param {{ title?: string, taskDraft?: string, cards?: object[] }} opts
- * @returns {{ flowRef: string|null, nodeId: string|null, score: number|null }} Winning card score exposed for observability
+ * Best node for a scored card under the given query weights (spec §7.2):
+ * node must clear MIN_NODE_SCORE and cover NODE_SCORE_RATIO of the card score.
+ * @param {{ card: object, stem: string|null, haystack: string, tokens: Set<string>, semanticTerms: string[] }} entry Corpus entry
+ * @param {Map<string, number>} weights Query token weights
+ * @param {number} cardScore Winning card score
+ * @param {string} title Query title (polarity disambiguation)
+ * @returns {string|null} Node id or null
  */
-export function matchFlowForAtom({ title, taskDraft, cards } = {}) {
-  if (!cards?.length) {
-    return { flowRef: null, nodeId: null, score: null };
-  }
-  const corpus = corpusProfile(cards);
-  const tokens = extractQueryTokens(`${title || ''}${taskDraft || ''}`, corpus.semanticDict);
-  if (!tokens.size) {
-    return { flowRef: null, nodeId: null, score: null };
-  }
-  const { weights, maxPossible } = tokenWeights(tokens, corpus);
-  if (maxPossible <= 0) {
-    return { flowRef: null, nodeId: null, score: null };
-  }
-
-  let bestEntry = null;
-  let bestCardScore = -1;
-  for (const entry of corpus.cards) {
-    let score = 0;
-    for (const [token, weight] of weights) {
-      const hit = token.length <= 2
-        ? entry.tokens.has(token)
-        : entry.haystack.includes(token);
-      if (hit) score += weight;
-    }
-    // Tie-break: shorter flow name is the more specific card (mirrors the
-    // Python recall rule so the two implementations converge).
-    if (score > bestCardScore
-      || (score === bestCardScore && bestEntry
-        && normFlowName(entry.card).length < normFlowName(bestEntry.card).length)) {
-      bestCardScore = score;
-      bestEntry = entry;
-    }
-  }
-
-  if (!bestEntry || bestCardScore < MIN_CARD_SCORE
-    || bestCardScore / maxPossible < MIN_CARD_COVERAGE) {
-    return { flowRef: null, nodeId: null, score: null };
-  }
-
-  const flowRef = bestEntry.stem;
+function bestNodeIdFor(entry, weights, cardScore, title) {
   let bestNodeId = null;
   let bestNodeScore = 0;
 
-  for (const node of bestEntry.card.nodes || []) {
-    if (nodeExcludedByPolarity(node, `${title || ''}`)) continue;
+  for (const node of entry.card.nodes || []) {
+    if (nodeExcludedByPolarity(node, title)) continue;
     const nodeHay = buildNodeHaystack(node);
     const nodeTokens = profileTokens(nodeHay);
     let nodeScore = 0;
@@ -277,12 +240,85 @@ export function matchFlowForAtom({ title, taskDraft, cards } = {}) {
     }
   }
 
-  const nodeId = bestNodeScore >= MIN_NODE_SCORE
-    && bestNodeScore >= bestCardScore * NODE_SCORE_RATIO
+  return bestNodeScore >= MIN_NODE_SCORE
+    && bestNodeScore >= cardScore * NODE_SCORE_RATIO
     ? bestNodeId
     : null;
+}
 
-  return { flowRef, nodeId, score: bestCardScore };
+/**
+ * Ranked flow-card candidates (spec 2026-09-09-kb-recall-eval-design §7):
+ * same scoring and threshold semantics as matchFlowForAtom, exposed as a
+ * score-descending list so eval metrics (MRR/nDCG) can consume real rankings.
+ * candidates only contain cards that clear the score floors; empty result
+ * returns candidates: [].
+ * @param {{ title?: string, taskDraft?: string, cards?: object[], k?: number }} opts Match options: query text (title + taskDraft), flow-card corpus, candidate list length
+ * @returns {{ flowRef: string|null, nodeId: string|null, score: number|null, candidates: Array<{ flowRef: string|null, score: number, nodeId: string|null }> }} Top-1 mirror of matchFlowForAtom plus the top-k candidate list
+ */
+export function rankFlowCards({ title, taskDraft, cards, k = 5 } = {}) {
+  if (!cards?.length) {
+    return { flowRef: null, nodeId: null, score: null, candidates: [] };
+  }
+  const corpus = corpusProfile(cards);
+  const tokens = extractQueryTokens(`${title || ''}${taskDraft || ''}`, corpus.semanticDict);
+  if (!tokens.size) {
+    return { flowRef: null, nodeId: null, score: null, candidates: [] };
+  }
+  const { weights, maxPossible } = tokenWeights(tokens, corpus);
+  if (maxPossible <= 0) {
+    return { flowRef: null, nodeId: null, score: null, candidates: [] };
+  }
+
+  /** @type {Array<{ entry: object, score: number }>} */
+  const scored = [];
+  for (const entry of corpus.cards) {
+    let score = 0;
+    for (const [token, weight] of weights) {
+      const hit = token.length <= 2
+        ? entry.tokens.has(token)
+        : entry.haystack.includes(token);
+      if (hit) score += weight;
+    }
+    // Score floors are absolute + relative to maxPossible, so filtering each
+    // card independently keeps the top-1 identical to the previous single-best
+    // check (both floors are monotone in score).
+    if (score >= MIN_CARD_SCORE && score / maxPossible >= MIN_CARD_COVERAGE) {
+      scored.push({ entry, score });
+    }
+  }
+
+  // Tie-break: shorter flow name is the more specific card (mirrors the
+  // Python recall rule so the two implementations converge); stable sort keeps
+  // first-seen order on full ties, matching the previous single-pass loop.
+  scored.sort((a, b) => b.score - a.score
+    || normFlowName(a.entry.card).length - normFlowName(b.entry.card).length);
+  scored.length = Math.min(scored.length, Math.max(1, k));
+
+  const candidates = scored.map(({ entry, score }) => ({
+    flowRef: entry.stem,
+    score,
+    nodeId: bestNodeIdFor(entry, weights, score, `${title || ''}`),
+  }));
+
+  const top = candidates[0] || null;
+  return {
+    flowRef: top ? top.flowRef : null,
+    nodeId: top ? top.nodeId : null,
+    score: top ? top.score : null,
+    candidates,
+  };
+}
+
+/**
+ * Deterministic flow-card recall for atom recording (spec §7.2):
+ * bigram/code tokens + longest semantic match, idf × len scoring, relative
+ * coverage floor and polarity disambiguation.
+ * @param {{ title?: string, taskDraft?: string, cards?: object[] }} opts Match options: query text (title + taskDraft) and flow-card corpus
+ * @returns {{ flowRef: string|null, nodeId: string|null, score: number|null }} Winning card score exposed for observability
+ */
+export function matchFlowForAtom({ title, taskDraft, cards } = {}) {
+  const { flowRef, nodeId, score } = rankFlowCards({ title, taskDraft, cards, k: 1 });
+  return { flowRef, nodeId, score };
 }
 
 /**
