@@ -2,6 +2,15 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 12:50 · DSH reviewer — 收工：KB 加固验收修复（回链 12:24）
+
+- 完成：验收结论 **PASS**（初次 DONE_WITH_CONCERNS → 修复后复验全绿）；修复 6 项 — F-A 新增 lint warning×3、F-B 观测落盘隔离（`KB_STAGING_DIR`）+清污（**保留 4 条真实 py 召回**，测试行归档 `tmp/review-observability-archive/`）、F-C `matchFlowForAtom` 返回 `score`、F-D 金样例 note 事实更正、R-3 py 绊线改「不得有已收敛却仍登记的分歧」、R-4 出处列入 api-docs
+- 验收：全量门禁 **ALL GREEN exit=0**；基线 req-draft **OK 53** / flow-card-recall **15 passed** / fk-guard 11/11 / kb-req-modules 11 / py golden 24+5div；lint **68→65（0 errors）**；DB Batch 42/43/44 + `traj_req_atom_uq` 唯一索引核实；探针 15 断言；报告 `docs/superpowers/reports/2026-09-09-kb-remediation-reviewer-verdict.md`
+- ⚠️ **未提交（阻塞）**：沙箱禁止写 `.git/`（`index.lock` Permission denied），升级提交两次均等待审批超时 → 工作区 7 个修复文件 + 1 份报告 + 本文件/待办清单为**完整但未提交**状态。请在场会话代提交（勿带他线 `config/update-db-whitelist.ps1` / `.cursor/`）：
+  - `git add src/services/req-draft-traj/propose.js src/services/req-draft-traj/flow-card-recall.js src/dashboard/api-docs/groups/trajectory.js scripts/characterization/characterize-req-draft-traj.mjs scripts/characterization/characterize-flow-card-recall.mjs scripts/characterization/characterize-kb-recall.py scripts/characterization/fixtures/kb-recall-golden.json` → `git commit -m "fix(kb): reviewer follow-ups — observability isolation, JSDoc/lint, score contract, golden note, py tripwire"`
+  - `git add docs/superpowers/reports/2026-09-09-kb-remediation-reviewer-verdict.md docs/superpowers/todo-list.md docs/superpowers/agent-log.md` → `git commit -m "docs: KB 加固 reviewer 结论 PASS + 待办/收工"`
+- 遗留移交：R-1 生产库迁移演练（回填+唯一索引联合路径未行使，生产若存在 F-01 漂移会按设计中止）；R-2 真实 LLM 路径未湿测；R-5 前端 §6.4 派单
+
 ## 2026-09-09 12:24 · DSH reviewer — 开工：KB 加固验收修复（F-A~F-D + R-3/R-4）
 
 - 进行中：2026-09-09 12:24。reviewer 验收结论 DONE_WITH_CONCERNS（3 必须修复 + 4 登记风险），本轮只修不扩范围
