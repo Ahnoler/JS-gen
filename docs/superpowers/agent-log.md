@@ -1,6 +1,13 @@
 # Agent 协作日志
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
+
+## 2026-09-09 16:15 · Cursor Lead — 收工：fill 录放统一 SDD A→B（回链 15:40）
+
+- 完成：Phase A（`fill_dispatch` + 双接线 + 契约）+ Phase B（`FillEngine.mode=replay` + `fill_form_field_for_replay`）；关键 commits `471b42d3` / `741e57cc` / `cee9519d` / `f991f2a8` / `739bd35a` / `c763511e`；verify-all 注册 fill-dispatch + fill-replay-engine
+- 验收：fill-dispatch / fill-replay-engine / xpath-fill-select / select-dispatch / select-replay-engine **GREEN**
+- 遗留：湿测 fill；点击族 / radio 另开；login 内 fill 直调未动；SDD workspace 可删
+
 ## 2026-09-09 16:05 · Cursor Subagent — 收工：§6.4 功能候选下拉 Vue 实现 + docs 收口（回链 15:48 设计 / 15:50 plan）
 
 - 完成：Vue `a1ac7d1`（`FunctionIdCandidate` + `fn-pick.ts` + selfcheck）→ `587f30c`（表列功能下拉、`fnPickByAtomKey`、`canCreate` 不依赖左侧、`runCommit` 按行 overrides）；JS-gen spec 标已实现 + §6 代码项勾选 + todo §6.4 前端派单关闭
