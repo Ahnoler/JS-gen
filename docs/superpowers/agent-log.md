@@ -4,6 +4,14 @@
 
 ## 2026-09-09 10:36 · ZCode 引擎线 — 开工：bib-bridge 地址栏跳转补丁（navigate action=url）
 
+## 2026-09-09 10:50 · ZCode 引擎线 — 收工：bib-bridge 地址栏跳转补丁 PASS（回链 10:36）
+
+- 完成：`executor/bib-bridge.js` navigate 分支补 `action==='url'` → `Page.navigate`（trim 后空 url 拒绝 `empty_url`；`Page.enable` 已在 _bindPageTarget 开启）——commit `c8573939`
+- 验收：新增冷区行为 pin `scripts/characterization/cold/characterize-bib-navigate-input.mjs`（stub CDP client 六例：url 跳转/空 url 拒绝/reload/back/forward/unknown_navigate_action 不回归），注册 verify-all 后全量 **ALL GREEN**，ok 行 124→**125**（唯一增量=本 pin）；`executor/bib-bridge.js` 单文件 eslint 0 问题
+- 遗留移交：**执行机重启待协调**（4097 进程仍跑旧代码，需不打断在途录制时重启 server+executor——先 server 后 executor）；真机湿测=前端录制详情页地址栏输 URL 回车页面跳转；前端无需改动（800ms 后自动拉 tabs 刷新地址栏）；未触碰他线 `config/update-db-whitelist.ps1`（M 态 WIP 未携带）
+
+## 2026-09-09 10:36 · ZCode 引擎线 — 开工：bib-bridge 地址栏跳转补丁（navigate action=url）
+
 - 进行中：10:36。前端线已定位：地址栏回车 `remote:input {kind:'navigate',action:'url'}` → 控制面 ws-router 转发正常 → `executor/bib-bridge.js` handleInput navigate 分支只实现 reload/back/forward，`action==='url'` 落 441 行 `unknown_navigate_action` 静默丢弃（前端/控制面/入口三环均无恙）
 - 范围：`executor/bib-bridge.js`（navigate 分支加 url case，约 5 行）、`scripts/characterization/cold/characterize-bib-navigate-input.mjs`（新建行为 pin：stub client 断言 url→Page.navigate/空 url 拒绝/reload+back+forward+unknown 不回归）、`scripts/refactor/verify-all.sh`（注册一行）、agent-log 本文件
 - 禁入区：`config/update-db-whitelist.ps1`（他线 M 态）、`.cursor/`、Cursor tssc_multi_select v2 线文件（10:31/10:32 声明）、`scripts/controller/**`、`src/services/trajectory/**`、引擎 P0/P1 修复线（报告已入库待用户拍板，另开工）
