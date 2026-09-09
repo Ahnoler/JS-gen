@@ -1106,7 +1106,54 @@ def _unwrap_action_result(result) -> str:
     return str(result)
 
 
+class _ReplayPageAdapter:
+    """Minimal browser_context for page-only replay (no full agent session)."""
+
+    def __init__(self, page):
+        self._page = page
+
+    async def get_current_page(self):
+        return self._page
+
+
+class _ReplayAutofillStub:
+    """No-op autofill for replay-only engine construction."""
+
+    async def ensure_scanned(self, label_text: str, *, allow_autofill: bool = False):
+        pass
+
+
+def _replay_engine_store(business_data_store: dict | None) -> dict:
+    return business_data_store if isinstance(business_data_store, dict) else {}
+
+
 class SelectEngine(_FormActionEngineBase):
+    @classmethod
+    async def select_option_for_replay(
+        cls,
+        page,
+        label_text: str,
+        option_text: str,
+        *,
+        xpath_smart: str = "",
+        element: dict | None = None,
+        exact_option: bool | None = True,
+        business_data_store: dict | None = None,
+    ):
+        """Replay entry: construct engine with page adapter and run mode=replay."""
+        store = _replay_engine_store(business_data_store)
+        bc = _ReplayPageAdapter(page)
+        autofill = _ReplayAutofillStub()
+        engine = cls(bc, store, autofill)
+        return await engine.select_option(
+            label_text,
+            option_text,
+            xpath_smart,
+            mode="replay",
+            exact_option=exact_option,
+            element=element,
+        )
+
     async def select_option(
         self,
         label_text: str,
@@ -1803,6 +1850,28 @@ class RadioEngine(_FormActionEngineBase):
 
 
 class TreeEngine(_FormActionEngineBase):
+    @classmethod
+    async def select_tree_option_for_replay(
+        cls,
+        page,
+        label_text: str,
+        option_text: str,
+        *,
+        xpath_smart: str = "",
+        business_data_store: dict | None = None,
+    ):
+        """Replay entry: construct engine with page adapter and run mode=replay."""
+        store = _replay_engine_store(business_data_store)
+        bc = _ReplayPageAdapter(page)
+        autofill = _ReplayAutofillStub()
+        engine = cls(bc, store, autofill)
+        return await engine.select_tree_option(
+            label_text,
+            option_text,
+            xpath_smart,
+            mode="replay",
+        )
+
     async def expand_all_el_tree(self):
         page = await self.browser_context.get_current_page()
         total = 0

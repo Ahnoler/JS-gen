@@ -282,7 +282,7 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
         "return f'unknown-form-action", 1
     )[0]
 
-    for name, block, trigger_needle in (
+    for name, block, action_needle in (
         ("autofill xpath", autofill, "JS_SELECT_TRIGGER_BY_XPATH"),
         (
             "autofill label",
@@ -292,22 +292,26 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
             "JS_FIND_LABELED_SELECT",
         ),
         (
-            "replay xpath retrigger",
-            replay_select.split("async def _select_by_xpath", 1)[1].split("async def _select_by_label", 1)[0],
-            "JS_SELECT_TRIGGER_BY_XPATH",
+            "replay xpath engine",
+            replay_select.split("async def _select_by_xpath", 1)[1].split(
+                "async def _select_by_label", 1
+            )[0],
+            "select_option_for_replay",
         ),
         (
-            "replay label retrigger",
-            replay_select.split("async def _select_by_label", 1)[1].split("xp, src = _resolve_replay_xpath", 1)[0],
-            "JS_FIND_LABELED_SELECT",
+            "replay label engine",
+            replay_select.split("async def _select_by_label", 1)[1].split(
+                "xp, src = _resolve_replay_xpath", 1
+            )[0],
+            "select_option_for_replay",
         ),
     ):
-        trigger_pos = block.rfind(trigger_needle)
-        assert_true(trigger_pos != -1, f"{name} trigger present")
-        gate_chunk = block[:trigger_pos]
+        action_pos = block.rfind(action_needle)
+        assert_true(action_pos != -1, f"{name} action present")
+        gate_chunk = block[:action_pos]
         assert_true(
             "closed" in gate_chunk and "no-items" in gate_chunk,
-            f"{name} gates trigger when reset not closed",
+            f"{name} gates engine call when reset not closed",
         )
 
 
@@ -375,11 +379,19 @@ def test_recording_and_replay_use_reset_boundary() -> None:
 
     assert_true("_replay_select_final_failure" in replay_select, "replay final failure helper")
     assert_true(
-        "return await _replay_select_final_failure(f'option-mismatch" in replay_select,
+        "select_option_for_replay" in replay_select,
+        "replay select_option routes through SelectEngine",
+    )
+    map_fn = replay_select.split("async def _map_engine_select_result", 1)[1].split(
+        "async def _select_by_xpath", 1
+    )[0]
+    assert_true(
+        "option-mismatch:want=" in map_fn
+        and "_replay_select_final_failure" in map_fn,
         "replay option-mismatch resets",
     )
     assert_true(
-        "return await _replay_select_final_failure(classified)" in replay_select,
+        "return await _replay_select_final_failure(classified)" in map_fn,
         "replay false_ok resets",
     )
 
