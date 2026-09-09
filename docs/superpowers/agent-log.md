@@ -54,6 +54,13 @@
 - 注意：本条与 17:20 Cursor 开工条目同以本文件为声明面，存在顶部追加交叠——本单元仅做归档切分与冲突修正，不改写他线条目内容；该线后续插入条目请基于本 commit 之后的文件
 - 方式：开工 commit → pwsh 行级切分（分界 1027/1028 已 grep 校验干净）→ 修正保留区两处结构冲突（bib-bridge 重复空头、deadcode 开工正文错位）→ 收工条目一并提交
 
+## 2026-09-09 21:57 · Cursor Lead — 开工：有 xpath 的 uml_ecd 唯一设计
+
+- 进行中：21:57；用户选 A（生成列 UNIQUE + 写入拒绝）；冲突拒绝已确认
+- 范围：`docs/superpowers/specs/2026-09-09-uml-ecd-nav-unique-design.md`、本文件；通过后 writing-plans
+- 禁入区：整表 UNIQUE(uml_ecd)；自动合并节点；fill/select；`.cursor/`
+- 方式：brainstorming 落盘 → 请用户审 spec
+
 ## 2026-09-09 17:30 · Cursor Subagent — 收工：菜单活动级 umlEcd adopt SDD 实现（回链 17:08）
 
 - 完成：T1–T5 SDD 全链；关键 commits `043db591` / `132ce54a` / `150829a8` / `04524603` + docs `619a8cbe`（`docs: close menu activity umlEcd adopt design`）
