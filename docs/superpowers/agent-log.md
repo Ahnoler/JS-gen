@@ -4,7 +4,7 @@
 
 ## 2026-09-09 17:30 · Cursor Subagent — 收工：菜单活动级 umlEcd adopt SDD 实现（回链 17:08）
 
-- 完成：T1–T5 SDD 全链；关键 commits `043db591` / `132ce54a` / `150829a8` / `04524603` + docs `pending`（`docs: close menu activity umlEcd adopt design`）
+- 完成：T1–T5 SDD 全链；关键 commits `043db591` / `132ce54a` / `150829a8` / `04524603` + docs `619a8cbe`（`docs: close menu activity umlEcd adopt design`）
 - 验收：`characterize-menu-scan-uml-adopt.mjs` OK；`characterize-system-import-json.mjs` OK
 - 遗留（湿测）：部署迁移 → `systemId=1` 再导入同份建模 JSON → 触发扫描 apply 或调用 `adoptModelingUmlEcdUnderSystem` → 核对产品四叶表（spec §4.2）；同事已手工改码可作对照
 
@@ -243,11 +243,11 @@
 ## 2026-09-09 · ZCode 死代码清理线 — 开工：CAUTION 待裁 9 项执行移除（用户裁决）
 
 ## 2026-09-09 · ZCode 死代码清理线+引擎review线 — 收工：CAUTION ×9 全删（-233 行）+ 三路对抗 review 漏洞报告入库（回链开工）
-- **deadcode 收工**：8 原子 commit（d9f76259→23a90df2）ff 合入 uara_V1.2，17 文件 +20/−233，整文件删 src/runtime/script-runner.js；每单元同 commit 改 pin（replay-batch teardown 行/cold screenshot-pending/phase-group-shot cue/page-level 断言/trajectory+batch-import+cold record-status-v2 三处收窄/smoke-memory-ingest 内联 knex 清理 23/23 过/network-capture step1/dedup replay-marker 段）。验收=主检出 verify-all 前后基线比对：124 ok 行全同（唯一差异=dedup 日志文案有意改）；worktree 法全程（junction 先摘非递归删、branch 已删、主检出 node_modules 完好 278 项）。教训两笔：①smoke 目录 gitignore 但文件被跟踪——git add 须 -f；②amend 落错 HEAD（叠到后一笔上）——soft reset 重排两笔修复；C6 曾漏删 dao 函数本体，分支级零引用复核抓到
+- **deadcode 收工**：8 原子 commit（d9f76259→23a90df2）ff 合入 uara_V1.2，17 文件 +20/−233，整文件删 src/runtime/script-runner.js；每单元同 commit 改 pin（replay-batch teardown 行/cold screenshot-619a8cbe/phase-group-shot cue/page-level 断言/trajectory+batch-import+cold record-status-v2 三处收窄/smoke-memory-ingest 内联 knex 清理 23/23 过/network-capture step1/dedup replay-marker 段）。验收=主检出 verify-all 前后基线比对：124 ok 行全同（唯一差异=dedup 日志文案有意改）；worktree 法全程（junction 先摘非递归删、branch 已删、主检出 node_modules 完好 278 项）。教训两笔：①smoke 目录 gitignore 但文件被跟踪——git add 须 -f；②amend 落错 HEAD（叠到后一笔上）——soft reset 重排两笔修复；C6 曾漏删 dao 函数本体，分支级零引用复核抓到
 - **引擎 review 交付**：三路只读子智能体（JS 管线/Python 执行机/跨端 hub）对抗审查完毕，合并去重后 **P0×3 + P1×4 + P2×10**，全部带 file:line 与失效时序，报告入库 `docs/superpowers/reports/2026-09-09-engine-pipeline-adversarial-review.md`。头条：**runId 在 executor-session-client.js 与 executor/session-handler.js 两道字段白名单被丢，runId 归属隔离上线即失效（生产全走 legacy 路径）**；stop→重录级联误杀（stale runner 10min 后写 failure+砍新 agent）；90s 终局门闩对 detach→重附场景守卫失效。子智能体由本会话代声明，未写本文件未 commit（read-only）
 - 遗留移交：报告内 P0/P1 修复排序建议待用户拍板后实施；旧 execute-env 红的 worktree 判据不变
-- 开工：09-09（时刻以 commit 为准）。用户裁决首轮清理的 CAUTION ×9（生产零引用但被 pin）执行移除：①executor-registry.clearAll ②③screenshot-pending-store getPendingDir/listPendingFiles ④screenshot-service findPhaseGroupByStateGroup ⑤screenshot-service listPageLevelScreenshotsByTrajectory ⑥constants 4 状态表 ⑦memory-dao deleteByTrajectory ⑧protocol.KNOWN_EVENT_TYPES ⑨runtime/script-runner.js 整文件——每项同 commit 同步改 pin
-- 范围：src/services/executor-registry.js、src/services/screenshot-pending-store.js、src/services/screenshot-service.js、src/models/constants.js、src/memory/memory-dao.js、src/memory/protocol.js、src/runtime/script-runner.js（删）、对应 pin：scripts/characterization/characterize-replay-batch*、cold/screenshot-pending*、phase-group-shot.py、page-level-screenshot*、record-status-v2/trajectory/batch-import 相关、smoke-memory-ingest、network-capture、characterize-dedup；agent-log 本文件
+- 开工：09-09（时刻以 commit 为准）。用户裁决首轮清理的 CAUTION ×9（生产零引用但被 pin）执行移除：①executor-registry.clearAll ②③screenshot-619a8cbe-store get619a8cbeDir/list619a8cbeFiles ④screenshot-service findPhaseGroupByStateGroup ⑤screenshot-service listPageLevelScreenshotsByTrajectory ⑥constants 4 状态表 ⑦memory-dao deleteByTrajectory ⑧protocol.KNOWN_EVENT_TYPES ⑨runtime/script-runner.js 整文件——每项同 commit 同步改 pin
+- 范围：src/services/executor-registry.js、src/services/screenshot-619a8cbe-store.js、src/services/screenshot-service.js、src/models/constants.js、src/memory/memory-dao.js、src/memory/protocol.js、src/runtime/script-runner.js（删）、对应 pin：scripts/characterization/characterize-replay-batch*、cold/screenshot-619a8cbe*、phase-group-shot.py、page-level-screenshot*、record-status-v2/trajectory/batch-import 相关、smoke-memory-ingest、network-capture、characterize-dedup；agent-log 本文件
 - 禁入区：引擎 review 热区（src/services/trajectory/**、scripts/session_runner.py、scripts/state.py、scripts/agent/service.py、src/executor-event-hub.js、remote-session-service/replay-actions/form-structure-heal/auth-recording/trajectory-manual-record/phase-highlight-screenshot——三路只读 review 在途）；人工 CLI ×11（api-capture 报文捞取线资产）不动；migrations/** 不动；config/update-db-whitelist.ps1 他线 WIP
 - 方式：worktree 独立分支 `cleanup/deadcode-caution-20260909`（D:\dev\JS-gen-deadcode，junction+.env 模板法）；先逐项复核 09-08 后仍零引用，再删+改 pin+原子 commit；worktree verify-all 比对基线（network-capture 探针 worktree 环境特异红除外）→ 合并回 uara_V1.2 主检出终验 ALL GREEN；只读侦查/审查子智能体由本会话代声明
 
@@ -335,7 +335,7 @@
 
 - 完成：10 个原子 commit（`376fa2b1`→`9440dae8`）fast-forward 合入 uara_V1.2，31 文件 **+1/−534**。C1 整文件孤儿 ×6（models/index barrel、models/sys-msg shim、services/sys-msg/index barrel、playwright-runner/lib/helpers.js、scripts/count_steps.py、scripts/tools/_gen_locator_helpers_py.mjs 过期副本）；C2-C9 零引用符号 ×30 + 死转发行 ×11 组（trajectory-store ×4 含传导死亡 getTrajectoryRecord、ws 层 ×3、remote-session/state ×4、杂项导出 ×7、hierarchy 模板+转发行 ×6、locator-candidates ×3、constants ×7、DAO 方法 ×9）
 - 验收：①worktree 干净基线 vs 编辑后 verify-all ok 行逐一相同（115 ok，唯一红=characterize-network-capture 的 Python 探针 import，实证为 worktree 环境特异性、主检出绿）；②合并后主检出 **verify-all ALL GREEN 120 项零失败**；③5 个只读子智能体全程（侦查 ×3、kill list 对抗复核 ×1〔37 项 36 确认 1 修正〕、分支 diff 审查 ×1〔PASS：无裹挟删除、36 被删符号 HEAD 零引用、保留项 REMOTE_SESSION_OCCUPIED/EVENT_SOURCES/isGeneratedId 等全部完好〕）
-- 遗留移交：CAUTION（生产零引用但被 pin，删除须同步改 pin）×9 清单在清理报告（clearAll、screenshot-pending ×2、findPhaseGroupByStateGroup、listPageLevelScreenshotsByTrajectory、constants 4 个状态表、memory deleteByTrajectory、KNOWN_EVENT_TYPES、runtime/script-runner.js 整文件）；人工 CLI CAUTION ×11 未动（api-capture 是报文捞取线资产明示保留）；DANGER 零项未删。发现：`src/dao/trajectory-dao.js:630` 存量 18 条 jsdoc warning（1ad954fe 引入，主检出现存，宜由该线补 @param）；pack-control-plane.sh 打包缺 executor/（运维不一致）；「export 收窄」候选清单在报告
+- 遗留移交：CAUTION（生产零引用但被 pin，删除须同步改 pin）×9 清单在清理报告（clearAll、screenshot-619a8cbe ×2、findPhaseGroupByStateGroup、listPageLevelScreenshotsByTrajectory、constants 4 个状态表、memory deleteByTrajectory、KNOWN_EVENT_TYPES、runtime/script-runner.js 整文件）；人工 CLI CAUTION ×11 未动（api-capture 是报文捞取线资产明示保留）；DANGER 零项未删。发现：`src/dao/trajectory-dao.js:630` 存量 18 条 jsdoc warning（1ad954fe 引入，主检出现存，宜由该线补 @param）；pack-control-plane.sh 打包缺 executor/（运维不一致）；「export 收窄」候选清单在报告
 - 注意：worktree D:\dev\JS-gen-deadcode 已拆除（node_modules junction 先摘再删，防递归误删主检出依赖），分支 cleanup/dead-code-20260908 已合并删除；本线全程未触碰禁入区与他线 WIP
 
 ## 2026-09-08 18:55 · ZCode 死代码清理线 — 开工：全仓死代码清理（用户模板任务）
@@ -595,7 +595,7 @@
 ## 2026-09-08 03:20 · Zcode 闲时 — 开工：文档清理批次二（归档积压 + 未入库文档 + 状态横幅 + 杂物移除）
 
 - 开工：03:20。用户三项拍板（归档批次按工作线 / 根目录 yml 移除 / reasonix 删除）；承接 00:55 审计线收工条目的清理建议
-- 范围：①`docs/superpowers/specs|plans` 42 篇已闭环工作线文件 `git mv` 至 `archive/specs|plans`（830 冲刺/xpath 统一/菜单切换推送链/Z1-Z8/KB 战役/auth-recording/ghost-pending-prune）+ `todos/` 3 篇 Done 移 `archive/todos/`；②重建 `archive/README.md` 批次索引；③入库 untracked 的 `plans/2026-09-05-unify-save-action.md`、`research/2026-09-01-replay-pipeline-handover.md`；④`docs/报文日志捞取接口设计.md` 加搁置横幅、`docs/830格式对齐改造spec.md` 加收官横幅、`docs/README.md` 对应标注；⑤移除 untracked 杂物：根目录 `rate-save-after.yml`、`step2.yml`（Playwright aria 快照残留）、`docs/reasonix/`（gitignored，被 superpowers/plans 取代）
+- 范围：①`docs/superpowers/specs|plans` 42 篇已闭环工作线文件 `git mv` 至 `archive/specs|plans`（830 冲刺/xpath 统一/菜单切换推送链/Z1-Z8/KB 战役/auth-recording/ghost-619a8cbe-prune）+ `todos/` 3 篇 Done 移 `archive/todos/`；②重建 `archive/README.md` 批次索引；③入库 untracked 的 `plans/2026-09-05-unify-save-action.md`、`research/2026-09-01-replay-pipeline-handover.md`；④`docs/报文日志捞取接口设计.md` 加搁置横幅、`docs/830格式对齐改造spec.md` 加收官横幅、`docs/README.md` 对应标注；⑤移除 untracked 杂物：根目录 `rate-save-after.yml`、`step2.yml`（Playwright aria 快照残留）、`docs/reasonix/`（gitignored，被 superpowers/plans 取代）
 - 禁入：capture 在途线文件（api-capture.mjs / network_capture.py / session_runner.py / memory\* / system-ref-\* / 其 plans×3 + sut-three-interfaces 等 capture 族 specs 留活区）；轨迹查询未提交 WIP；`data/kb/**`；`docs/report/**`；`config/update-db-whitelist.*`（归属未拍板，不动）；R1-R6 在途交易
 - 方式：git mv 保留历史；归档批次单独 commit，入库 commit、横幅 commit 分开；untracked 删除无 git 记录，以收工条 + ls 为证；每批 commit 前核暂存区不含他线文件
 
@@ -727,27 +727,27 @@
 
 ## 2026-09-07 22:50 · Cursor Lead — 收工：#614 湿测 PASS（ghost prune 生效，回链 22:40）
 
-- 完成：stamp `20260907-2240` session `e35683db`；p2/p3 序号=1；p4 stderr **`pruned ghost pending: ['法人机构:not-visible']` → `SUCCESS: 操作成功`**；p4/p5 outcome success=True；detach 200；报告 `tmp/product-mgmt/through-report-basicinfo-rerecord-2240.md`
+- 完成：stamp `20260907-2240` session `e35683db`；p2/p3 序号=1；p4 stderr **`pruned ghost 619a8cbe: ['法人机构:not-visible']` → `SUCCESS: 操作成功`**；p4/p5 outcome success=True；detach 200；报告 `tmp/product-mgmt/through-report-basicinfo-rerecord-2240.md`
 - 验收：tree 含序号 fill + select_option×5 + p4 `ok-clicked-save:保存` + stamp 2240；不认仅 isSuccessful
 - 遗留：方案 B 扫描准入；多线 NAT 白名单需跟新 IP（本轮 `113.246.107.11`）；KB source 可另补
 
-## 2026-09-07 22:40 · Cursor Lead — 开工：#614 湿测重录（ghost-pending prune 后）
+## 2026-09-07 22:40 · Cursor Lead — 开工：#614 湿测重录（ghost-619a8cbe prune 后）
 
-- 开工：22:40。方案 A 已合入 `00c5f1bf`；本单清空 #614 用新 stamp 重录，验收 stderr `pruned ghost pending` + p4 保存 toast
+- 开工：22:40。方案 A 已合入 `00c5f1bf`；本单清空 #614 用新 stamp 重录，验收 stderr `pruned ghost 619a8cbe` + p4 保存 toast
 - 范围：`tmp/product-mgmt/`（task/patch/clear/prepare/start/through-report）、本文件；不改引擎
 - 禁入：trajectory-dao 等未提交 WIP；session_runner；方案 B/C
 - 方式：fid=9000000740 account=2；stamp `20260907-2240`；控制面已带新代码；执行机 LMY 本地重连
 
-## 2026-09-07 21:50 · Cursor Lead — 收工：click_save 幽灵 pending 活体剪枝（回链 21:35）
+## 2026-09-07 21:50 · Cursor Lead — 收工：click_save 幽灵 619a8cbe 活体剪枝（回链 21:35）
 
-- 完成：`JS_CHECK_SINGLE_FIELD` +`visible`；`form_save` prune `not-found`/`not-visible` + stderr `pruned ghost pending`；characterize-ghost-pending-prune + verify-all 注册；plan `docs/superpowers/plans/2026-09-07-ghost-pending-prune.md`
-- 验收：`characterize-ghost-pending-prune: OK`；verify-all 见本收工 commit 证据
+- 完成：`JS_CHECK_SINGLE_FIELD` +`visible`；`form_save` prune `not-found`/`not-visible` + stderr `pruned ghost 619a8cbe`；characterize-ghost-619a8cbe-prune + verify-all 注册；plan `docs/superpowers/plans/2026-09-07-ghost-619a8cbe-prune.md`
+- 验收：`characterize-ghost-619a8cbe-prune: OK`；verify-all 见本收工 commit 证据
 - 遗留移交：#614 湿测重录另开；方案 B 扫描准入 / isSuccessful 假成功未做
 
-## 2026-09-07 21:35 · Cursor Lead — 开工：click_save 幽灵 pending 活体剪枝（方案 A）
+## 2026-09-07 21:35 · Cursor Lead — 开工：click_save 幽灵 619a8cbe 活体剪枝（方案 A）
 
 - 开工：21:35。用户确认方案 A；先落 spec，审阅通过后写 plan 再改代码
-- 范围：`docs/superpowers/specs/2026-09-07-ghost-pending-prune-design.md`；随后 `scripts/controller/actions/js_snippets/scan_form.py`（`JS_CHECK_SINGLE_FIELD`+visible）、`form_save.py`（ghost prune）、相关 characterization、本文件
+- 范围：`docs/superpowers/specs/2026-09-07-ghost-619a8cbe-prune-design.md`；随后 `scripts/controller/actions/js_snippets/scan_form.py`（`JS_CHECK_SINGLE_FIELD`+visible）、`form_save.py`（ghost prune）、相关 characterization、本文件
 - 禁入：session_runner WIP；轨迹查询未提交改动（trajectory-dao / v2 trajectory / trajectory-service / trajectory-query-service）；方案 B/C；isSuccessful 假成功；本单不重录 #614
 - 方式：spec → 用户审阅 → writing-plans → TDD pin + 实现 + verify-all；证据锚 #614 stderr `e72482e4`（法人机构）
 
@@ -785,7 +785,7 @@
 
 ## 2026-09-07 19:55 · Cursor Lead — 收工：#614 重录部分通过（回链 19:26）
 
-- 完成：stamp `20260907-1926` 重录 session `e72482e4`；p2/p3 **序号=1 已落库**（create 合约修复湿测成立）；p4 有 select_option×5 + 日期/描述 stamp，但 **QUALITY FAIL：pending_fields=法人行社 + missing_success_token**，无基本信息保存 toast；轨迹仍标 `recorded/isSuccessful=1`（不可信）
+- 完成：stamp `20260907-1926` 重录 session `e72482e4`；p2/p3 **序号=1 已落库**（create 合约修复湿测成立）；p4 有 select_option×5 + 日期/描述 stamp，但 **QUALITY FAIL：619a8cbe_fields=法人行社 + missing_success_token**，无基本信息保存 toast；轨迹仍标 `recorded/isSuccessful=1`（不可信）
 - 验收证据：`tmp/product-mgmt/through-report-basicinfo-rerecord-1926.md`、`steps-614-1926.json`、stderr `e72482e4-*.log`；已 detach
 - 遗留移交：①法人行社硬门 vs optional 需产品/引擎裁决后再清 #614 重录；②QUALITY FAIL 后不应标成功；③本轮不写 KB；SUT 留 stamp 1926 节点可清
 - 注意：未改引擎/KB；控制面曾因 arity fix 重启（PID 39220）
@@ -863,7 +863,7 @@
 ## 2026-09-07 15:10 · ZCode 引擎线 — 开工+收工：create 弹窗合约矛盾矫正（#614 二次移交，回链本条=开工）
 
 - **开工**：15:10。范围=`scripts/controller/actions/phase/reviewer.py`（sanitize 矫正）+ `scripts/characterization/characterize-phase-reviewer.py`（断言）+ 本文件；禁入=session_runner.py（他线 WIP）/data/kb/**/产品线文件/auth-recording SDD 九文件集。
-- **根因（Phase 1 实证）**：#614 阶段 2 stderr `e468a25a` 合约 `mode=create allow_assistant=False refill=touched`——reviewer 把「只点名字段」判成部分点名语义；`sanitize_contract_for_mode` 对 create/modify 提前 return 不矫正；落地链 `refill=touched`→boundary `requires_write_all_editable=False`→pending-write 门闩失效，且 `allow_form_assistant=False` 直接封 run_form_assistant（form_scan_actions.py:208）——agent 只填名称即点确定，序号漏填。
+- **根因（Phase 1 实证）**：#614 阶段 2 stderr `e468a25a` 合约 `mode=create allow_assistant=False refill=touched`——reviewer 把「只点名字段」判成部分点名语义；`sanitize_contract_for_mode` 对 create/modify 提前 return 不矫正；落地链 `refill=touched`→boundary `requires_write_all_editable=False`→619a8cbe-write 门闩失效，且 `allow_form_assistant=False` 直接封 run_form_assistant（form_scan_actions.py:208）——agent 只填名称即点确定，序号漏填。
 - **修复（reviewer.py sanitize_contract_for_mode）**：create 一律强制 `allow_form_assistant=True + refill=all_editable`（与 phase-reviewer-prompt 规则 2/3 对齐）；modify 仅在矛盾组合（touched+assistant=false）时矫正；submit/success 令牌原样保留。TDD：先加失败断言再修；旧断言「create+"false"字符串透传」与硬规则冲突，改用 modify+all_editable 显式组合承载 coerce_bool 测试意图。
 - **验收**：characterize-phase-reviewer PASS、save-cue-promote PASS、**verify-all ALL GREEN**。
 - **「清空步骤(5)」排查结论（另报项，非缺陷）**：与 `POST /clear` 无耦合——路径=编辑弹窗 AI 重分析把阶段置为全新列表（`RecordingDialog.vue:163` 注释明示「无 phaseId → 保存时删除旧阶段及步骤」）→ `PUT /phases` → `syncTrajectoryPhaseDescriptions`（trajectory-phase-service.js:292-305）删除不在清单中的阶段及其步骤。前端有意设计；产品线若嫌突兀应在重分析时提示「将作废已录步骤」，引擎侧不动。
@@ -967,14 +967,14 @@
 
 ## 2026-09-07 10:20 · ZCode Lead — R3 授信业务闭环 PASS（G1 救援完成）+ G2 卡面回写已提交（ccc0c2ca）+ G3 审批棒派发
 - **G1 完成（R3=PASS）**：DGSX20260907056033 走完向导（影像跳过/风险阻断通过/意见/流程提交/选人黄亮）→**审批中**（经办日期 2026-09-07）。树选择配方实证：**有效搜索框=树 popover 自带搜索框+【查询】按钮（两段式非实时过滤）**，「流动资金贷款」叶子名实为「流动资金贷款额度」；分项「已在列表中」报错=服务端查重（前次手工已落库，前端列表回显缺陷）。配方文档 tmp/kb-mainchain/R3-credit/picker-recipe.md（tmp 短寿命，精华已入 credit_application 卡）。
-- **G2 完成（ccc0c2ca 已推送）**：customer_onboarding +预客户缺口规则+建档 pendingStep；credit_application +分项品种树缺口/方案自动保存 2 规则。JSON 校验通过。
+- **G2 完成（ccc0c2ca 已推送）**：customer_onboarding +预客户缺口规则+建档 619a8cbeStep；credit_application +分项品种树缺口/方案自动保存 2 规则。JSON 校验通过。
 - **G3 已派发（R4 审批棒，进行中）**：产品管线录制「授信审批任务页操作」——待办任务定位 DGSX20260907056033 信贷调查→同意→流程提交→核验流转；附加侦查 system-accounts 清单（棒 2 需 WN0001 账号身份录制评级二次调查 PJ20260907016009）。
 - 主链计分板：R1 ✅（595）→ R2 ✅（604，审批中）→ R3 ✅（DGSX…033，审批中）→ **R4 进行中** → R5 批复 → R6 用信 → R7 合同。
 - G1/G2 均未 commit（纪律），Lead 代提交：ccc0c2ca（G2 卡面）；G1 产物在 tmp（不入库）。
 
 ## 2026-09-07 09:55 · ZCode Lead — 派工声明：R3 授信救援+卡面回写（两子代理并行，Lead 只编排）
 - **G1（general-purpose，MCP 浏览器）**：救援授信单 DGSX20260907056033（贯通验证企业190416，待发起）——分项品种树定位「流动资金贷款」→填分项（100 万/否/人民币）→保存→向导提交→选人黄亮→核验审批中；产出树选择配方 tmp/kb-mainchain/R3-credit/picker-recipe.md。背景：traj 605 实证标准动作集无法操作 TsscMultiTree 品种树（115 节点，树内中文搜索无效）。
-- **G2（general-purpose，文本）**：customer_onboarding.json 补「信贷预客户不在评级/授信可选范围」+完整建档 pendingSteps；credit_application.json 补「品种树缺口」+「方案保存即生成 DGSX 号」两条实证规则。文件集：仅此两卡。
+- **G2（general-purpose，文本）**：customer_onboarding.json 补「信贷预客户不在评级/授信可选范围」+完整建档 619a8cbeSteps；credit_application.json 补「品种树缺口」+「方案保存即生成 DGSX 号」两条实证规则。文件集：仅此两卡。
 - 禁入（全体）：commit、他线 WIP、其他客户单据、影像/OCR。
 - Lead 后续：G1 回报后验收配方文档+单据状态→commit 卡面与文档→R4 审批分段派发。
 
@@ -998,7 +998,7 @@
 - **削 RTT（3488d03c）**：每步 persist 7-9 远程往返→1-2（步号内存化/幂等查短路/trustPhaseId/batchSave 返回 insertIds 免回查/counts 延迟阶段收尾）；顺带修门闩误读 `.steps`（应为 `.stepCount`，594 误降级根因）。
 - **R1 客户新增=三证 PASS（traj 595）**：recorded+副本即时 stepCount、回放 11/12 confirmed（1 环境条件步=弹窗关闭）、stamp「KB主链R1-20260907-0545」+客户编号 26090701521085645 落库（stamp 跨轮保持修复实证生效）。
 - **R2 评级 4 轮（596-599）深入实证**：①596/597 卡「选择客户」抽屉——根因=**R1 建的是信贷预客户，不在评级可选范围**（需完整建档转正=主链前置缺口）；②598 偏航操作 MBP 客户撞「已有待发起评级流程」风险阻断（未落库无脏数据），严格查询文案（v4）后修正；③**599 深入 90%**：重评向导→大页面（**PJ20260907016009** 生成）→测算→结论→签署→流程提交，被「请先进行测算」「请先维护客户综合评价」两道业务闸门拦——**配方缺口=评级大页面「客户综合评价」区块**（section 结构 wizard:基本信息|section:客户综合评价|titlebox:股东信息，rating 卡无此 cue）。R2=BLOCKED（配方缺口），录制管线本身全绿（39 步落库+副本即时+门闩正确放行）。
-- 下轮移交：①从 599 form_snapshot 挖综合评价区块字段清单→补 rating.json 配方→v5 重跑（PJ20260907016009 待发起单还在可续操作）；②R1 建档链扩展（预客户→正式客户）补 R1 卡 pendingSteps；③R2 过后 R3-R7 顺序不变；④大页面区块多时 save_form_snapshot 密集（599 共 7 个），落库体积可观察。
+- 下轮移交：①从 599 form_snapshot 挖综合评价区块字段清单→补 rating.json 配方→v5 重跑（PJ20260907016009 待发起单还在可续操作）；②R1 建档链扩展（预客户→正式客户）补 R1 卡 619a8cbeSteps；③R2 过后 R3-R7 顺序不变；④大页面区块多时 save_form_snapshot 密集（599 共 7 个），落库体积可观察。
 - 提交：3488d03c/e0420001/bb01f05a/136221e9 已推送；本轮 detach+验证为主，无新代码。
 
 ## 2026-09-07 01:16 · ZCode Lead — 阶段回报：P6-0 修路完成（三 commits）+ R1 跑车 8 轮实证，sync 管道产品级缺陷定性，收口待用户定夺
@@ -1097,7 +1097,7 @@
 
 ## 2026-09-06 03:10 · ZCode Lead — 阶段回报：loan-corp + loan-retail 双模块收口（流水线第七/八循环，用信域过半）
 - 完成（常驻窗口首两循环，流水线重叠运行：B(N)+A(N+1) 并行）：**loan-corp 48/48（28 match/7 drift/10 blocked/3 not-found）** + **loan-retail 84/84（43 match/7 drift/34 blocked）**；提交 `e0009f3`/`cafae84`
-- Lead 验收：checker 双模块 0 FAIL（checker 修复 2 处：斜杠组行全编号计数/pending 行豁免日期）；抽 loan-retail 叶1（按钮行+自动加载 18 行）+loan-corp 叶1（38 条自动加载+按钮组）页面复核吻合 ✓
+- Lead 验收：checker 双模块 0 FAIL（checker 修复 2 处：斜杠组行全编号计数/619a8cbe 行豁免日期）；抽 loan-retail 叶1（按钮行+自动加载 18 行）+loan-corp 叶1（38 条自动加载+按钮组）页面复核吻合 ✓
 - **loan-corp 关键披露**：B 组验证叶8 时向导【下一步】按产品设计自动创建草稿流程 YXPC20260906012042（待发起、未提交、本账号名下）——非违规，已在 wet-test/chapters 双处标注为引擎自动化关键行为（点下一步=建草稿）
 - 用信域价值发现：①向导【下一步】建草稿行为；②api-contract 疑点 3（批复已用金额负值/委托人列表口径/列头缺字）；③用信域列表全部自动加载（与授信/评级相反）；④not-found 3 叶=新增贷款场景无关联合同/借据分区（文档多写）；⑤loan-retail 三合一 57 叶经 look 态任务页一次承载核验（产品子页仅渲染当前记录——数据覆盖受限记 blocked）
 - checker 能力增强：斜杠组兼容验证通过（loan-retail 84 叶空表干跑 0 FAIL）
@@ -1124,10 +1124,10 @@
 - 后续棒：T1-exec 按 plan 执行（staging→人工审→flows），另开声明
 
 ## 2026-09-06 16:40 · ZCode Lead — 收官：草稿卡阶段 174/174 全产出（C 阶段闭环）
-- 完成：**174 张草稿卡**（draftFrom:"req"）覆盖 30 模块全部主链/业务块，gate 合规 100%（steps 仅 match/drift、blocked→pendingSteps、sourceRefs→wet-test 叶号、coverage 对平）；分 7 波推送（53cbb05/9a4294d/5ae5105a/60845874/fd5105f5/1bf3e1bc/451936f2）
-- 形态扩展：digital-mobile 产 NOT-FOUND 特殊卡（cardType="NOT-FOUND"，环境不可达五层探测）；limit-ctrl-api 按接口闭环产卡（trdlog 映射）；portal/meeting-mgmt/collateral 三模块无编号 leafRef=行号+页面名；纯 blocked 链（loan-retail 主链7/8、credit-retail C2/C7）按级联归并 pendingSteps 不产卡
+- 完成：**174 张草稿卡**（draftFrom:"req"）覆盖 30 模块全部主链/业务块，gate 合规 100%（steps 仅 match/drift、blocked→619a8cbeSteps、sourceRefs→wet-test 叶号、coverage 对平）；分 7 波推送（53cbb05/9a4294d/5ae5105a/60845874/fd5105f5/1bf3e1bc/451936f2）
+- 形态扩展：digital-mobile 产 NOT-FOUND 特殊卡（cardType="NOT-FOUND"，环境不可达五层探测）；limit-ctrl-api 按接口闭环产卡（trdlog 映射）；portal/meeting-mgmt/collateral 三模块无编号 leafRef=行号+页面名；纯 blocked 链（loan-retail 主链7/8、credit-retail C2/C7）按级联归并 619a8cbeSteps 不产卡
 - 验收：全量 JSON.parse 174/174 通过、steps 零 blocked/not-found 引用、coverage 与 wet-test 判定逐模块对平
-- 遗留：①drafts→正式卡晋升（promote）待用户另立项；②blocked 686 叶补测后可升级对应 pendingSteps→steps 重出卡；③SKILL 第 5 轮素材（NOT-FOUND 特殊卡/IFACE 卡形态契约化）
+- 遗留：①drafts→正式卡晋升（promote）待用户另立项；②blocked 686 叶补测后可升级对应 619a8cbeSteps→steps 重出卡；③SKILL 第 5 轮素材（NOT-FOUND 特殊卡/IFACE 卡形态契约化）
 - 注意：他线 docs/superpowers 三删除仍未提交（隔离不动）
 
 ## 2026-09-06 15:55 · ZCode Lead — 收工：SKILL 第 4 轮修订（回链 15:38 开工）
@@ -1144,7 +1144,7 @@
 - 方式：SKILL 主线程直笔（战役上下文在 Lead），杂项盘点派 worker 并行；推送在收尾全绿后执行
 
 ## 2026-09-06 12:00 · ZCode Lead — 收官：req 作业区逐模块逐叶湿测战役 30/30 全闭环（回链 02:25 常驻窗口）
-- 完成：**30 模块 / 1958 叶全部真机湿测收口**（checker 权威口径：match 1006 / drift 118 / blocked 686 / not-found 148 / pending 0，checker 0 FAIL）；全部 drift 按分类学回填 chapters（双源标注）；blocked 686 叶入 `_blocked-backlog.md` 台账（A 审批链/B 零数据/黑名单/look 态四类成因）；跨模块观察（17 错误名拦截族全集/加载域规律/半译码/旧流程代际/SUT 多出页 30+）汇总 `_cross-module-observations.md`
+- 完成：**30 模块 / 1958 叶全部真机湿测收口**（checker 权威口径：match 1006 / drift 118 / blocked 686 / not-found 148 / 619a8cbe 0，checker 0 FAIL）；全部 drift 按分类学回填 chapters（双源标注）；blocked 686 叶入 `_blocked-backlog.md` 台账（A 审批链/B 零数据/黑名单/look 态四类成因）；跨模块观察（17 错误名拦截族全集/加载域规律/半译码/旧流程代际/SUT 多出页 30+）汇总 `_cross-module-observations.md`
 - 收官批提交：postloan-check 150/150（最大模块，同构批验）、collection 52/52（dymbdjy SUT 缺陷+数据错位铁证）、product-mgmt 24/24（新增分类定案）、archive 71/71、smart-ctrl 44/44（接力续跑）、portal 33/33（**无编号模块首例+卡片删除事故披露并还原**）、asset-ops 183/183 两棒（旧流程代际共存）、asset-npl 181/181 两棒（i18n 阻断性反差）、digital-mobile 93/93 全 not-found（**PC 环境无移动端入口，五层探测实证**）、digital-loan-desk 84/84（Bearer 菜单树最硬证据）、limit-quota 13/13（组合新增即落库副作用）、limit-ctrl-api 17/17（**trdlog 1031 笔报文映射法**）、meeting-mgmt 15/15（级联 blocked）、collateral-info 56/56（价格指数菜单缺失+押品准入 BizException 铁证）、collateral-func 56/56（南宁城市下拉缺失）、system-mgmt 53/53（收官）、customer-group 45/45（**44 match 全战役最佳**，补做被漏排的第 30 模块）
 - checker 能力终态：23 模块回归 + IFACE 接口号叶（接口分册）/NOZJJK 占行叶（无编号模块）/relCmpts 括注剥离/判定格宽容解析（词+子类+日期同格），30/30 ALL GREEN
 - **本战役累计**：切片 30/30 → 湿测 30/30 → drift 回填全覆盖；SKILL 协议 v1→v4 全部实战长出；发现文档笔误/滞后/矛盾多处（详见各模块 chapters 双源标注）；SUT 级缺陷 5+（白屏/dymbdjy/response undefined/504/裸码）
@@ -1202,14 +1202,14 @@
 - 方式：子代理不 commit 不写日志，Lead 验收（checker→截图 mtime→抽 2-3 叶→blocked 证据）后代提交
 
 ## 2026-09-06 01:45 · ZCode Lead — 收工：req-doc-to-kb SKILL 第 3 轮修订（回链 01:20 开工）
-- 完成：①`scripts/kb/wet-test-check.mjs` 机械验收 checker（叶集 diff/判定统计/行级证据校验/drift 回填覆盖；lint 0 warning）——**上线即抓到 credit-corp 主表 12 行 pending 残留+引用行缺日期+判定词带括号注记**（账目已全部修复）、customer-common 叶40 drift 漏汇报漏回填（已补 ch05），三模块现 ALL GREEN；②USAGE 补 B 湿测代理蒸馏卡模板+验收线第 0 步机械闸门+§8 命令；③双台账定家 `data/kb/req/_cross-module-observations.md`（错误族/行为对照/公共组件状态/SUT 多出页面含用户挂起裁定）+ `_blocked-backlog.md`（57 blocked 按条件分类 A-D）；④SKILL：description 触发面/生命周期一览/pending 词表行/blocked「黑名单禁止」子类/复合叶规则/跨视图复用口径/through-chains 时效声明契约/坑清单分层（硬协议与 situational 分表）/协议版本史 v1-v4
+- 完成：①`scripts/kb/wet-test-check.mjs` 机械验收 checker（叶集 diff/判定统计/行级证据校验/drift 回填覆盖；lint 0 warning）——**上线即抓到 credit-corp 主表 12 行 619a8cbe 残留+引用行缺日期+判定词带括号注记**（账目已全部修复）、customer-common 叶40 drift 漏汇报漏回填（已补 ch05），三模块现 ALL GREEN；②USAGE 补 B 湿测代理蒸馏卡模板+验收线第 0 步机械闸门+§8 命令；③双台账定家 `data/kb/req/_cross-module-observations.md`（错误族/行为对照/公共组件状态/SUT 多出页面含用户挂起裁定）+ `_blocked-backlog.md`（57 blocked 按条件分类 A-D）；④SKILL：description 触发面/生命周期一览/619a8cbe 词表行/blocked「黑名单禁止」子类/复合叶规则/跨视图复用口径/through-chains 时效声明契约/坑清单分层（硬协议与 situational 分表）/协议版本史 v1-v4
 - 验收：checker 3 模块 ALL GREEN；characterize-kb-req-modules OK 11；listReqModules=30（_*.md 台账文件不影响模块列表）；30 存量 through-chains 时效声明行 30/30
 - 用户裁定落实：SUT 多出菜单群=边缘功能挂起不扩叶（记 _cross-module-observations.md §4）
 - 遗留：rating chapters 清单行契约化未做（checker 会 FAIL 提示回补，留其湿测窗口预备阶段处理）；D 类提交通道待用户将来明示
 - 提交：本条 commit（checker/SKILL/USAGE/双台账/30 through-chains/本文件）
 
 ## 2026-09-06 01:20 · ZCode Lead — 开工声明：req-doc-to-kb SKILL 第 3 轮修订（skill-creator 评审 8 条 + 观察池 2 条）
-- 开工：01:20。用户携外部 skill-creator 规范评审意见拍板"现在做"。核心=①`scripts/kb/wet-test-check.mjs` 机械验收 checker（叶集 diff/判定统计/blocked-drift 证据校验/drift 回填覆盖，防假完成闸门）②USAGE 补 B 湿测代理可粘贴模板③双台账定家 `data/kb/req/_cross-module-observations.md` + `_blocked-backlog.md`④description 触发面/生命周期一览/坑清单分层/pending 词表⑤through-chains 时效声明（契约+30 存量批补）⑥协议版本史
+- 开工：01:20。用户携外部 skill-creator 规范评审意见拍板"现在做"。核心=①`scripts/kb/wet-test-check.mjs` 机械验收 checker（叶集 diff/判定统计/blocked-drift 证据校验/drift 回填覆盖，防假完成闸门）②USAGE 补 B 湿测代理可粘贴模板③双台账定家 `data/kb/req/_cross-module-observations.md` + `_blocked-backlog.md`④description 触发面/生命周期一览/坑清单分层/619a8cbe 词表⑤through-chains 时效声明（契约+30 存量批补）⑥协议版本史
 - 并入观察池 2 条契约缺口：blocked 第 4 子类「黑名单禁止」（提交类叶与只读黑名单矛盾）、复合叶判定粒度（拆叶或判最严重）；跨视图复用口径（一处一行）落契约
 - 用户裁定：SUT 多出菜单群=边缘功能挂起不扩叶，记入观察台账
 - 范围：`scripts/kb/wet-test-check.mjs`（新建）、`scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`USAGE.md`、`data/kb/req/_*.md`（新建 2）、`data/kb/req/*/through-chains.md`（批补一行）、本文件；改后跑 lint+pin+checker 三模块验证
@@ -1217,7 +1217,7 @@
 
 ## 2026-09-06 00:55 · ZCode Lead — 阶段回报：customer-common 逐叶湿测收口 141/141（流水线第三循环，Phase E v2 首跑）
 - 完成：A 预备 141 叶+8 章清单行回补契约格式 → B 湿测 **match 104 / drift 12 / blocked 25 / not-found 0**（41 截图，23 分钟）→ C 回填 12 条 drift 全部落 chapters。提交 `653f672`/`22eebe2`/`f61a77e`
-- Lead 验收线：0 pending；41 截图落执行窗口；抽叶1（黑名单主页按钮/条件/自动加载）+叶9（灰名单菜单 wording，当场复核菜单名=「潜在风险客户名单管理」）均吻合 ✓
+- Lead 验收线：0 619a8cbe；41 截图落执行窗口；抽叶1（黑名单主页按钮/条件/自动加载）+叶9（灰名单菜单 wording，当场复核菜单名=「潜在风险客户名单管理」）均吻合 ✓
 - 本模块重量级发现：①客户放大镜（ZJJK00109101）查询恒失败=环境级组件故障（错误族根因，五入口 0 可用，引擎需备降级路径）；②权限申请查看页白屏（923174.js TypeError，功能缺陷待研发）；③360 三视图头部模板文档套写错误（仅对公/对私有）；④文档「已知缺陷」当前版本不复现（同业台账筛选）；⑤征信报告查看链路入口缺失
 - **观察池第 3 轮素材已凑满（9 条）**：A 组 3（清单行 lint 前置/切片计数校验/跨视图复用口径落契约）；B 组 4（SUT 多出菜单群补叶策略/360 头部分列内容修订/查看入口两态风险/征信链路缺失）；Lead 验收 2（**blocked 第 4 子类「黑名单禁止」**——提交类叶与只读黑名单根本矛盾需判定词表扩；**复合叶判定粒度**——叶105 主页 match 但查看页白屏，判定行放不下需拆叶或判最严重）
 - 遗留：blocked 25 叶补测条件见 wet-test.md（多角色账号+在途流程+暂存通道）；SUT 多出菜单群（合作方七页/客户进件四页/综合查询台账群等）待 Lead 裁定是否扩叶
@@ -1246,7 +1246,7 @@
 
 ## 2026-09-05 23:40 · ZCode Lead — 阶段回报：customer-corp 逐叶湿测收口 55/55（流水线第二循环）
 - 完成：B 组重派浏览器子代理 55 叶全回填——**match 39 / drift 4 / blocked 11 / not-found 1**，37 张截图。首派代理走完 55 叶后死于回传通道（mm_items bug，产物考古：截图编号至 55 且 90 秒无新增），按预案重派并在提示词中加入**链组增量写回**要求（防回传丢失，验证有效）
-- Lead 验收：0 pending；27 张新截图落本轮窗口；抽叶1（对公主页六按钮+默认自动加载 292 条）页面复核吻合 ✓；not-found（叶22 现关联人）含导航尝试记录 ✓
+- Lead 验收：0 619a8cbe；27 张新截图落本轮窗口；抽叶1（对公主页六按钮+默认自动加载 292 条）页面复核吻合 ✓；not-found（叶22 现关联人）含导航尝试记录 ✓
 - 湿测要点：对公主页列表默认自动加载（与 credit-corp/rating 的"需手动查询"相反——behavior 逐模块差异实锤）；「信贷预客户」vs 文档「信贷潜在客户」措辞；担保场景缺「新增对私信贷潜在客户」按钮疑似文档滞后于 SUT；wf_cust_005/006 分流类叶只读不可验属常态（blocked+补测条件）
 - C 组已派：customer-corp 4 条 drift + wording 双源标注回填 chapters（credit-corp 3 条已由上一批 C 组回填完毕）
 - SKILL 增补第 7 条协议条款：文档复用页（无独立 ZJJK）不新增编号行、运行记录逐页记存在性
