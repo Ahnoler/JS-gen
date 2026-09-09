@@ -65,6 +65,8 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
     await _wait_if_loading(page)
 
     if action_name == 'fill_form_field':
+        from .fill_dispatch import resolve_fill_attempt_order
+
         ph = placeholder
         element_xp = _element_xpath_smart(entry) if use_relative else ''
 
@@ -94,24 +96,29 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             return None
 
         xp, src = _resolve_replay_xpath(entry, params)
-        if xp:
-            xpath_result = await _try_xpath_fill(xp, src)
-            if xpath_result:
-                return xpath_result
+        full = _element_xpath_full(entry) if use_relative else ''
+        attempts = resolve_fill_attempt_order(
+            label=label,
+            placeholder=placeholder,
+            xpath_smart=xp,
+            xpath_smart_src=src,
+            xpath_full=full if use_relative else '',
+        )
+        result = 'label-not-found'
 
-        result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
-        if isinstance(result, str) and result.startswith('ok'):
-            await page.wait_for_timeout(WAIT_300_MS)
-            if element_xp:
-                actual = await _read_value_by_xpath(page, element_xp, label)
-                classified = _classify_fill_result(True, value, actual)
-                if classified.startswith('false_ok'):
-                    return classified
-                if classified == 'ok':
-                    return 'ok:locate=label'
-            return _annotate_label_result(str(result))
-        if placeholder and placeholder != label:
-            result = await page.evaluate(JS_FILL_FORM_FIELD, [placeholder, value])
+        for att in attempts:
+            if att.js_kind == 'by_xpath':
+                if not att.xpath:
+                    result = await page.evaluate(JS_FILL_BY_XPATH, ['', value, att.hint])
+                    if isinstance(result, str) and result.startswith('ok'):
+                        await page.wait_for_timeout(WAIT_300_MS)
+                        return str(result)
+                    continue
+                xpath_result = await _try_xpath_fill(att.xpath, att.locate_src)
+                if xpath_result:
+                    return xpath_result
+                continue
+            result = await page.evaluate(JS_FILL_FORM_FIELD, [att.hint, value])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(WAIT_300_MS)
                 if element_xp:
@@ -122,16 +129,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                     if classified == 'ok':
                         return 'ok:locate=label'
                 return _annotate_label_result(str(result))
-        if not label and placeholder:
-            result = await page.evaluate(JS_FILL_BY_XPATH, ['', value, placeholder])
-            if isinstance(result, str) and result.startswith('ok'):
-                await page.wait_for_timeout(WAIT_300_MS)
-                return str(result)
-        xpath_full = _element_xpath_full(entry) if use_relative else ''
-        if xpath_full and xpath_full != xp:
-            xpath_result = await _try_xpath_fill(xpath_full, 'full')
-            if xpath_result:
-                return xpath_result
+
         final = _annotate_label_result(str(result))
         if is_absent_field_result(final) or is_absent_field_result(result):
             sys.stderr.write(
