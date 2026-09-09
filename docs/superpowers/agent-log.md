@@ -12,6 +12,16 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
+## 2026-09-10 00:50 · ZCode — 收工：本周收尾——结构梳理+文档+死代码+漏洞（回链 00:10 开工 fe7a500c）
+
+- 完成（6 commits，三路 Explore 研究→五路子智能体并行实施→主线程验收代提交）：
+  - **漏洞**（09-09 对抗 review P0×3+P1×4 离线修复，报告=reports/2026-09-09-engine-pipeline-adversarial-review.md）：`583ddeb0` P0-1 runId 两跳白名单透传+新端到端门禁 characterize-runid-bridge（已入 verify-all）；`9eb94716` P0-2 own-run canceled 改 settle+catch/finally runId 归属守卫、P0-3 90s 门闩三重活性+CAS+runId 提前铸造、P2#2 requestId 过滤/P2#6 failedPhases 报 phaseNumber/P2#7 forwardStdin 泄漏、P1-7 skipDefaultLogin 消费旧 _ACTION_LOG；`239711cf` P1-4 state.get_current_phase 统一事件归属+两条静默路径补发 phase_error；`1eecf87` P1-5 batch 409「已在录」重归类（per-tid 互斥未做）
+  - **死代码第三轮**：`74f8829a` 18 死符号/17 文件净 -427 行（截图删除族/会话生命周期死方法/config 孤儿常量/form_rules 备用生成器），B 组 3 符号连同 4 个 pin 同步删针；**src/dedup.js 生产零引用仅门禁消费——删除待产品侧确认，登记 dedup-deletion**
+  - **文档**：`125c426e` CLAUDE/README 死命令修正+结构树补全、package.json description 去 assemble、api-docs 补登记 5 个真实端点+`{param}` 占位符统一（app.js Try-it 只认花括号）、superpowers 第三波归档 7 篇+批次索引；gitignored 本地件 AI记忆方案/phase-done spec 已加状态横幅（不入库）
+- 验收：合并工作区复跑关键 pin 16 套全绿（runid-bridge 4 passed / run-event-ownership / owned-wait-shape 5/5 / quality-final-gate 4/4 / record-status / trajectory / phase-done-runid / recorder-phase-reset 39 / form-rules / batch-import / heal-locate 39 / dedup / 4 个删针 pin）；`verify-all` 132 ok / 6 failed 全为存量（xpath-fill-select/form-assistant/tree-select-record/step-highlight/layer-tree/export-v3，源+pin 与 HEAD 逐字节一致=文本断言过期+DB 数据漂移，**零新增红**）；`npm run lint` 0 error / 65 warning 与基线持平
+- 注意：①并行 Cursor 线 flow-card-guided-propose / search-then-click 在本线执行期间收工（`b927a170`/`88b0772e` 等），文件集零交集；flow-card spec 状态行编辑（未提交）仍留工作区，本线未携带未动。②修复的**真机湿测未做**——挂起表新增 `engine-wet-trio`（P1）等 6 行移交。③4097 控制面仍运行旧代码，**需择机重启加载本批修复**（涉及录制管线，重启前勿跑主链录制）
+- 遗留移交：engine-wet-trio（真机三件套）/ p1-6-replayid / p2-batch-lease / p2-toast-cursor（js_snippets 副本在他线热区）/ dedup-deletion / p2-async-actionlog，均已入 todo-list 挂起表
+
 ## 2026-09-10 00:10 · ZCode — 开工：本周收尾——结构梳理 + 文档更新 + 死代码清理 + 漏洞处理（agent team 连续执行）
 
 - 进行中：00:10；用户指令「本周收尾：项目结构梳理、更新文档、清理死代码、处理程序漏洞，带 agent team，连续执行」
