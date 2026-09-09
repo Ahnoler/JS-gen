@@ -4,7 +4,7 @@
 
 ## 2026-09-09 14:05 · Cursor Lead — 收工：回放 select_option→tssc 路由（回链 13:55）
 
-- 完成：`replay_form_action` 在 `select_option` 分支按 `target_kind=form_tssc_multi_select` 或 live `.tssc-multi-select` 转 `JS_TSSC_MULTI_SELECT`；cold pin 增补；提交 **`922d3a65`**
+- 完成：`replay_form_action` 在 `select_option` 分支按 `target_kind=form_tssc_multi_select` 或 live `.tssc-multi-select` 转 `JS_TSSC_MULTI_SELECT`；cold pin 增补；提交 **`6e618d8f`**
 - 验收：`characterize-tssc-multi-select` / `characterize-select-state-boundary` / `characterize-select-option-stamp` **GREEN**
 - 遗留：重启 executor 后复放「要素名称→部署方式」；用户自行 push
 
