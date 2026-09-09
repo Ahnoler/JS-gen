@@ -4,7 +4,7 @@
 
 ## 2026-09-09 17:30 · Cursor Subagent — 收工：菜单活动级 umlEcd adopt SDD 实现（回链 17:08）
 
-- 完成：T1–T5 SDD 全链；关键 commits `043db591` / `132ce54a` / `150829a8` / `04524603` + docs `pending`（`docs: close menu activity umlEcd adopt design`）
+- 完成：T1–T5 SDD 全链；关键 commits `043db591` / `132ce54a` / `150829a8` / `04524603` + docs `619a8cbe`（`docs: close menu activity umlEcd adopt design`）
 - 验收：`characterize-menu-scan-uml-adopt.mjs` OK；`characterize-system-import-json.mjs` OK
 - 遗留（湿测）：部署迁移 → `systemId=1` 再导入同份建模 JSON → 触发扫描 apply 或调用 `adoptModelingUmlEcdUnderSystem` → 核对产品四叶表（spec §4.2）；同事已手工改码可作对照
 
