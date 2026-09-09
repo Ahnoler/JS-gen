@@ -1,7 +1,7 @@
 # Design: 有 xpath 的菜单 `uml_ecd` 唯一（生成列 + 写入校验）
 
 **日期**：2026-09-09  
-**状态**：设计已确认；实现计划 [`../plans/2026-09-09-uml-ecd-nav-unique.md`](../plans/2026-09-09-uml-ecd-nav-unique.md)  
+**状态**：已落地 — 计划 [`../plans/2026-09-09-uml-ecd-nav-unique.md`](../plans/2026-09-09-uml-ecd-nav-unique.md)  
 **前置**：菜单活动级 adopt [`2026-09-09-menu-activity-uml-adopt-design.md`](./2026-09-09-menu-activity-uml-adopt-design.md)；`system.uml_ecd` 现仅为普通索引 `idx_uml_ecd`  
 **用户裁决**：仅保证「有非空 `menu_xpath` 且非空 `uml_ecd`」的行之间 `uml_ecd` 唯一；库约束用生成列 UNIQUE；写入冲突**拒绝**，不静默改码。
 

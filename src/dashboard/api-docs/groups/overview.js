@@ -176,7 +176,7 @@ export const GROUP_OVERVIEW = [
         tryable: false,
         reqExample: 'form-data: file=@全部领域-建模组件关系.json',
         respExample: J({ created: 120, updated: 0, adopted: 24, markedOffline: 0, pagesImported: 411, tree: [] }),
-        notes: [':id 必须是系统类型节点 (type=1)', '非顶层叶子子领域一律 intermediateFlag=1（全量 system_page 目录；不按活动拆导航叶；无按系统白名单）；SUT 同名可点菜单扫描后可升格为可导航（intermediateFlag=0，source 保持 json_import）；异名叶仍 create(source=ai)；扫描后同名/pageId 可回填建模 umlEcd；guidePages 不入库', 'JSON 中消失的旧 json_import 菜单会保留并标记 removedFlag（版本下线）；unmatchedFlag 归扫描'],
+        notes: [':id 必须是系统类型节点 (type=1)', '非顶层叶子子领域一律 intermediateFlag=1（全量 system_page 目录；不按活动拆导航叶；无按系统白名单）；SUT 同名可点菜单扫描后可升格为可导航（intermediateFlag=0，source 保持 json_import）；异名叶仍 create(source=ai)；扫描后同名/pageId 可回填建模 umlEcd；guidePages 不入库', 'JSON 中消失的旧 json_import 菜单会保留并标记 removedFlag（版本下线）；unmatchedFlag 归扫描', '可导航（非空 menu_xpath + 非空 umlEcd）时 umlEcd 全库唯一；与另一可导航节点撞码 → 409 code=CONFLICT（中文提示含占用节点 id/name），不静默改码'],
       },
         {
           method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/scan-menu',
@@ -185,7 +185,7 @@ export const GROUP_OVERVIEW = [
           tryable: false,
           reqExample: 'POST /api/v2/system-mgmt/nodes/1/scan-menu',
           respExample: J({ scanId: '<uuid>' }),
-          notes: ['系统节点需已配置 url 与登录账号（system_account）', '状态轮询：GET /api/v2/system-mgmt/menu-scan/:scanId'],
+          notes: ['系统节点需已配置 url 与登录账号（system_account）', '状态轮询：GET /api/v2/system-mgmt/menu-scan/:scanId', 'apply 写入 xpath/umlEcd 时校验可导航 umlEcd 唯一（与 import-json 同 guard）；冲突时任务 status=failed，error 含占用节点信息，不脏写'],
         },
         {
           method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/fill-pageid',
