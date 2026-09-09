@@ -24,6 +24,7 @@ from ..agent_utils import (
     make_step_callback,
     resolve_max_actions_per_step,
 )
+from ..state import get_current_phase
 
 _last_agent = None
 
@@ -399,7 +400,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
             emit_json({
                 "event": "phase_intent_obs",
                 "data": {
-                    "phase": step_index,
+                    "phase": get_current_phase() or step_index,
                     "phase_intent": contract,
                     "phase_boundary": boundary,
                     "recovery": (contract or {}).get('recovery') if contract else None,
@@ -416,7 +417,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                 emit_json({
                     "event": "phase_boundary_obs",
                     "data": {
-                        "phase": step_index,
+                        "phase": get_current_phase() or step_index,
                         "phase_boundary": boundary,
                         "evidence_observed": list((business_data_ref or {}).get('_evidence_observed') or []),
                         "recovery": (contract or {}).get('recovery') if contract else None,
@@ -426,12 +427,12 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
             emit_json({
                 "event": "phase_intent_obs",
                 "data": {
-                    "phase": step_index,
+                    "phase": get_current_phase() or step_index,
                     "heal_mode": heal_mode,
                     "phase_intent": None,
                 },
             })
-        phase_start_payload = {"phase": step_index, "total": -1, "name": task_text[:60]}
+        phase_start_payload = {"phase": get_current_phase() or step_index, "total": -1, "name": task_text[:60]}
         if contract:
             phase_start_payload["phase_intent"] = contract
         if business_data_ref and business_data_ref.get('_phase_boundary'):
@@ -445,7 +446,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
     except Exception as e:
         sys.stderr.write(f"phase preamble skipped: {e}\n")
         sys.stderr.flush()
-        emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
+        emit_json({"event": "phase_start", "data": {"phase": get_current_phase() or step_index, "total": -1, "name": task_text[:60]}})
     if not max_steps_resolved:
         ceiling, max_steps = _resolve_phase_budget(max_steps, contract, heal_mode)
     try:
@@ -564,7 +565,7 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
         max_actions_per_step=max_actions_per_step,
         planner_llm=llm, planner_interval=3,
         extend_planner_system_message=PLANNER_SYSTEM_PROMPT,
-        register_new_step_callback=make_step_callback(step_index * 100),
+        register_new_step_callback=make_step_callback((get_current_phase() or step_index) * 100),
         register_done_callback=make_done_callback(output_path, business_data_ref),
     )
     _last_agent = agent
@@ -644,7 +645,7 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
             _run_id = get_current_run_id()
         except Exception:
             _run_id = None
-        _phase_err_data = {"phase": step_index, "name": task_text[:60], "message": "Agent run cancelled"}
+        _phase_err_data = {"phase": get_current_phase() or step_index, "name": task_text[:60], "message": "Agent run cancelled"}
         if _run_id:
             _phase_err_data["runId"] = _run_id
         emit_json({"event": "phase_error", "data": _phase_err_data})
@@ -654,7 +655,7 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
             _run_id = get_current_run_id()
         except Exception:
             _run_id = None
-        _phase_err_data = {"phase": step_index, "name": task_text[:60], "message": str(e)}
+        _phase_err_data = {"phase": get_current_phase() or step_index, "name": task_text[:60], "message": str(e)}
         if _run_id:
             _phase_err_data["runId"] = _run_id
         emit_json({"event": "phase_error", "data": _phase_err_data})
@@ -695,7 +696,7 @@ async def _run_agent_step_post(step_index, task_text, business_data_ref,
                     f"semantic_doubt_fields:{','.join(list(doubts)[:8])}",
                 )
             emit_phase_observability(business_data_ref, emit_json)
-            phase_payload = {"phase": step_index, "name": task_text[:60]}
+            phase_payload = {"phase": get_current_phase() or step_index, "name": task_text[:60]}
             phase_payload["maxActionsPerStep"] = max_actions_per_step
             if budget_extensions:
                 phase_payload["budgetExtensions"] = budget_extensions

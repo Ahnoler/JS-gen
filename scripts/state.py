@@ -85,6 +85,18 @@ def set_current_phase(n: int):
     _CURRENT_PHASE = n
 
 
+def get_current_phase():
+    """Return the current phase number, or None when no phase has been set.
+
+    Symmetric with set_current_phase: _CURRENT_PHASE starts at 0 (= unset),
+    which is reported as None so phase-event emitters can fall back to the
+    session step index. Phase events must use this (phase-owned number) rather
+    than the session-cumulative step_index, or the control plane's owned wait
+    (filtered by phaseNumber) drops them as cross-run noise (P1-4).
+    """
+    return _CURRENT_PHASE if _CURRENT_PHASE else None
+
+
 def set_current_page_key(page_key: str):
     """Set the page-level key for subsequently recorded actions."""
     global _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY

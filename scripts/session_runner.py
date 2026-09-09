@@ -417,7 +417,7 @@ async def run_session(args):
         """Execute one agent step with the given data."""
         nonlocal cumulative_path
         from .state import register_current_page_screenshot, set_current_phase
-        from .state import get_current_run_id
+        from .state import get_current_run_id, get_current_phase
         # Prefer client-provided phase_number (matches 【阶段N】); fallback to step_idx
         phase_num = data.get("phase_number")
         if phase_num is None:
@@ -471,6 +471,18 @@ async def run_session(args):
         finally:
             agent_running_ref['value'] = False
         if output_path is None:
+            # P1-4: silent early return used to hang the control plane's owned
+            # phase wait (no phase_done/phase_error ever arrived). Emit a
+            # phase_error attributed to the current phase so the runner fails
+            # fast; shape mirrors the phase_error emitters in agent/service.py.
+            _early_err = {
+                "phase": get_current_phase() or step_idx,
+                "name": (task_text or '')[:60],
+                "message": "agent step produced no output (preparation failed or instruction missing)",
+            }
+            if get_current_run_id():
+                _early_err["runId"] = get_current_run_id()
+            emit_json({"event": "phase_error", "data": _early_err})
             return
         # Native AgentHistory accumulate disabled (scripts/trajectories/*.json no longer saved).
         # Temp per-step history files may still exist under %TEMP%; not copied to repo.
@@ -639,6 +651,24 @@ async def run_session(args):
             sys.stderr.write(f"Unexpected error in main loop: {type(e).__name__}: {e}\n");
             sys.stderr.flush()
             emit_json({"event": "error", "data": {"message": f"Unexpected error: {type(e).__name__}: {e}"}})
+            # P1-4: the generic error event above is invisible to the control
+            # plane's owned phase wait (it filters phase_done/phase_error by
+            # runId+phaseNumber) — a BaseException here hung the watchdog for
+            # the full idle timeout. Emit a phase_error attributed to the
+            # current phase, same shape as agent/service.py's emitters.
+            try:
+                from .state import get_current_phase, get_current_run_id
+                _base_err = {
+                    "phase": get_current_phase() or step_index,
+                    "name": '',
+                    "message": f"Unexpected error: {type(e).__name__}: {e}",
+                }
+                _rid = get_current_run_id()
+                if _rid:
+                    _base_err["runId"] = _rid
+                emit_json({"event": "phase_error", "data": _base_err})
+            except Exception:
+                pass
 
     await _teardown_session(browser, browser_context, reader_task, cdp_task, cdp_port, cdp_url, keep_browser)
 
