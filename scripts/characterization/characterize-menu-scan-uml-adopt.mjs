@@ -17,8 +17,8 @@ function testIsModelingUmlEcd() {
 
 function testPickByName() {
   const inter = [
-    { name: '对公客户管理', umlEcd: 'UML00005556', pageIds: ['ZJJK1'] },
-    { name: '产品要素管理', umlEcd: 'UML00092663', pageIds: ['ZJJK_E'] },
+    { name: '对公客户管理', umlEcd: 'UML00005556', pages: [{ pageId: 'ZJJK1', activityUmlEcd: 'UML_ACT_1' }] },
+    { name: '产品要素管理', umlEcd: 'UML00092663', pages: [{ pageId: 'ZJJK_E', activityUmlEcd: 'UML00031596' }] },
   ];
   assert.equal(
     pickUmlEcdFromIntermediates({ name: '对公客户管理', umlEcd: '9001' }, inter),
@@ -31,18 +31,57 @@ function testPickByName() {
   );
 }
 
-function testPickByPageId() {
+function testPickByPageIdUniqueActivity() {
   const inter = [
-    { name: '产品信息管理', umlEcd: 'UML00092662', pageIds: ['ZJJK_A', 'ZJJK_B'] },
+    {
+      name: '产品信息管理',
+      umlEcd: 'UML00092662',
+      pages: [
+        { pageId: 'ZJJK00110131', activityUmlEcd: 'UML00057701' },
+        { pageId: 'ZJJK00095454', activityUmlEcd: 'UML00031743' },
+      ],
+    },
   ];
   assert.equal(
-    pickUmlEcdFromIntermediates({ name: '产品库管理', pageId: 'ZJJK_A', umlEcd: '1' }, inter),
-    'UML00092662',
+    pickUmlEcdFromIntermediates({ name: '产品库管理', pageId: 'ZJJK00110131', umlEcd: '1' }, inter),
+    'UML00057701',
+    'pageId adopt uses activity code, not subdomain UML00092662',
+  );
+}
+
+function testPickByPageIdAmbiguous() {
+  const inter = [
+    {
+      name: '公告',
+      umlEcd: 'UML_GROUP',
+      pages: [
+        { pageId: 'ZJJK00109712', activityUmlEcd: '' }, // cleared at import for 1:N
+      ],
+    },
+  ];
+  assert.equal(
+    pickUmlEcdFromIntermediates({ name: '查看公告', pageId: 'ZJJK00109712', umlEcd: '9' }, inter),
+    '',
+  );
+  // Also: two non-empty different codes for same pageId across pages arrays
+  const inter2 = [
+    {
+      name: 'G',
+      umlEcd: 'UML_G',
+      pages: [
+        { pageId: 'ZJJK_SHARE', activityUmlEcd: 'UML_A' },
+        { pageId: 'ZJJK_SHARE', activityUmlEcd: 'UML_B' },
+      ],
+    },
+  ];
+  assert.equal(
+    pickUmlEcdFromIntermediates({ name: 'X', pageId: 'ZJJK_SHARE', umlEcd: '1' }, inter2),
+    '',
   );
 }
 
 function testDoNotOverwriteModelingUml() {
-  const inter = [{ name: 'X', umlEcd: 'UML_NEW', pageIds: [] }];
+  const inter = [{ name: 'X', umlEcd: 'UML_NEW', pages: [] }];
   assert.equal(
     pickUmlEcdFromIntermediates({ name: 'X', umlEcd: 'UML_OLD' }, inter),
     '',
@@ -54,7 +93,8 @@ function main() {
   const tests = [
     ['isModelingUmlEcd', testIsModelingUmlEcd],
     ['pick by name', testPickByName],
-    ['pick by pageId', testPickByPageId],
+    ['pick by pageId unique activity', testPickByPageIdUniqueActivity],
+    ['pick by pageId ambiguous', testPickByPageIdAmbiguous],
     ['do not overwrite existing UML…', testDoNotOverwriteModelingUml],
   ];
   let failed = 0;
