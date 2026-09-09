@@ -94,12 +94,24 @@ def test_tssc_multi_select_stamps_concrete() -> None:
         "tssc_multi_select stamps via resolve_recorded_option_text",
     )
     assert_true(
-        "ok-first" in body or "split(':', 1)" in body,
-        "tssc_multi_select reads echo from ok-first:/ok: result",
+        "split(':', 1)" in body,
+        "tssc_multi_select reads echo from ok-p1:/ok-p2:/ok: result",
+    )
+    snippet = (
+        ROOT / "scripts/controller/actions/js_snippets/tssc_multi_select.py"
+    ).read_text(encoding="utf-8")
+    assert_true(
+        "ok-p1:" in body or "ok-p2:" in body or "ok-p1:" in snippet or "ok-p2:" in snippet,
+        "ok-p1/ok-p2 echo prefixes present in engine or JS snippet",
     )
     # Must not record raw option_text without stamp on success path
     rec = body.find("_record_action(")
     assert_true(rec > 0, "tssc_multi_select records")
+    assert_true(
+        "'select_option'" in body[rec : rec + 120]
+        or '"select_option"' in body[rec : rec + 120],
+        "tssc_multi_select records as select_option (D6 replay contract)",
+    )
     assert_true(
         "stamped" in body[rec : rec + 200],
         "record params use stamped option_text",
