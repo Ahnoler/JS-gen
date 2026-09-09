@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 17:02 · Cursor Lead — 收工：菜单活动级 umlEcd implementation plan（回链 16:58）
+
+- 完成：plan `docs/superpowers/plans/2026-09-09-menu-activity-uml-adopt.md`（T1 红 pin → T2 迁移/DAO → T3 collectPages → T4 adopt 绿 → T5 docs）；spec 链 plan
+- 验收：覆盖表对照 spec §1–§4；1:N clear 写进 collectPages
+- 遗留：用户选 Subagent-Driven 或 Inline 后实现
+
+## 2026-09-09 17:02 · Cursor Lead — 开工：菜单活动级 umlEcd implementation plan
+
+- 进行中：17:02；用户审过 design「继续」；writing-plans，不实现
+- 范围：plan 文件、spec 状态行、本文件
+- 禁入区：实现代码直至用户选执行方式
+- 方式：writing-plans → 请用户选执行方式
+
 ## 2026-09-09 16:58 · Cursor Lead — 开工：菜单活动级 umlEcd 回填设计
 
 - 进行中：16:58；用户确认方案 1 + 1:N 仅唯一；同事已手工纠产品四叶
