@@ -174,6 +174,27 @@ async function runRecord(item, token) {
     await maybeFinalizeJob(batchId);
   } catch (err) {
     const msg = String(err.message || err);
+    // 409「已在录制」（startTrajectoryRecording: isAiRecordingActive）≠ 无空槽：
+    // 同一轨迹在批次里出现两次 / 并发录制时，回 waiting_executor 重试只会 409 循环
+    // 且轨迹被录两遍 —— 单独归类为跳过该 item（终态 failed + 明确 reason），不重试。
+    // 此时 prepare 复用的是在录 run 的 runtime，禁止 detach（会拆掉在录会话）。
+    const isAlreadyRecording = err.statusCode === 409 && /already in progress/i.test(msg);
+    if (isAlreadyRecording
+      && !(await batchDao.getJobById(batchId))?.status?.startsWith('cancel')) {
+      const fresh = await batchDao.getItemById(item.id);
+      await batchDao.markItemFailed(item.id, ['preparing', 'recording'], {
+        version: fresh?.version,
+        expectedWorkerToken: token,
+        errorCode: 'ALREADY_RECORDING',
+        errorMessage:
+          `Skipped: trajectory is already being recorded (409), `
+          + `duplicate/concurrent recording item: ${msg.slice(0, 500)}`,
+      });
+      await emitProgress(batchId);
+      await maybeFinalizeJob(batchId);
+      return;
+    }
+
     const isNoSlot = err.statusCode === 409
       || /no free|无可用执行资源|No executor agent online/i.test(msg);
 
