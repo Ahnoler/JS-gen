@@ -170,6 +170,15 @@ class _FormActionEngineBase:
         # e.g. JS_CHECK_SINGLE_FIELD with self._button_keywords().
         self._button_keywords = button_keywords
 
+    async def _maybe_ensure_scanned(self, label_text: str, mode: str = "record"):
+        """Record: full ensure_scanned. Replay: only if store already warm."""
+        if mode != "replay":
+            await self._ensure_scanned(label_text)
+            return
+        store = self.business_data_store or {}
+        if store.get("_scan_fields") or store.get("task_list"):
+            await self._ensure_scanned(label_text)
+
 
 class LoginEngine(_FormActionEngineBase):
     async def login(self, username: str, password: str, captcha: str = '', sms_code: str = ''):
@@ -1081,10 +1090,42 @@ JS_SELECT_TRIGGER_MAIN_AREA = r'''([labelText]) => {
 }'''
 
 
+def _select_replay_uses_exact(exact_option: bool | None, mode: str) -> bool:
+    if exact_option is not None:
+        return bool(exact_option)
+    return mode == "replay"
+
+
+def _select_js_option_arg(option_text: str, use_exact: bool):
+    return [option_text, True] if use_exact else option_text
+
+
+def _unwrap_action_result(result) -> str:
+    if hasattr(result, "extracted_content"):
+        return str(result.extracted_content)
+    return str(result)
+
+
 class SelectEngine(_FormActionEngineBase):
-    async def select_option(self, label_text: str, option_text: str, xpath_smart: str = ""):
+    async def select_option(
+        self,
+        label_text: str,
+        option_text: str,
+        xpath_smart: str = "",
+        *,
+        mode: str = "record",
+        exact_option: bool | None = None,
+        element: dict | None = None,
+    ):
         try:
-            return await self._select_option_impl(label_text, option_text, xpath_smart)
+            return await self._select_option_impl(
+                label_text,
+                option_text,
+                xpath_smart,
+                mode=mode,
+                exact_option=exact_option,
+                element=element,
+            )
         except Exception as exc:
             import traceback as _tb
             sys.stderr.write(
@@ -1094,18 +1135,30 @@ class SelectEngine(_FormActionEngineBase):
             sys.stderr.flush()
             raise
 
-    async def _select_option_impl(self, label_text: str, option_text: str, xpath_smart: str = ""):
+    async def _select_option_impl(
+        self,
+        label_text: str,
+        option_text: str,
+        xpath_smart: str = "",
+        *,
+        mode: str = "record",
+        exact_option: bool | None = None,
+        element: dict | None = None,
+    ):
         # N4 paged fallback budgets itself against the select_option action
         # budget measured from here (session_runner enforces the same budget
         # via asyncio.wait_for — overrun = budget-timeout).
+        is_replay = mode == "replay"
+        use_exact = _select_replay_uses_exact(exact_option, mode)
+        replay_element = element if isinstance(element, dict) else None
         impl_started = time.monotonic()
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
-        await self._ensure_scanned(label_text)
+        await self._maybe_ensure_scanned(label_text, mode)
         field_kind = lookup_field_kind(self.business_data_store, label_text)
         dispatch = await resolve_select_dispatch(
             label=label_text,
-            element=None,
+            element=replay_element,
             field_kind=field_kind,
             page=page,
         )
@@ -1114,7 +1167,13 @@ class SelectEngine(_FormActionEngineBase):
         )
         sys.stderr.flush()
         if dispatch.path == "tssc":
-            return await self.tssc_multi_select(label_text, option_text, xpath_smart)
+            return await self.tssc_multi_select(
+                label_text,
+                option_text,
+                xpath_smart,
+                mode=mode,
+                element=replay_element,
+            )
         # tree path: select_option does not handle tree today — fall through to el-select.
 
         async def _final_select_failure(result_text: str, xpath_for_log: str = '') -> str:
@@ -1131,6 +1190,8 @@ class SelectEngine(_FormActionEngineBase):
             sys.stderr.write(f'[select] preflight reset incomplete: {reset_diag}\n')
             sys.stderr.flush()
             failed = await _final_select_failure('no-items')
+            if is_replay:
+                return failed
             return err_with(
                 "err-select-option-unresolved",
                 "下拉无可见选项",
@@ -1174,6 +1235,8 @@ class SelectEngine(_FormActionEngineBase):
                 # dropdown (re-selecting first can cascade-reset dependent fields).
                 # Exact match only — substring (非金融 ⊂ 其他非金融) must re-select.
                 if select_option_already_matched(option_text, cur_val):
+                    if is_replay:
+                        return already
                     stamped = resolve_recorded_option_text(option_text, cur_val)
                     params, element = await _pack_select_record(
                         page, self.business_data_store, label_text, stamped, element,
@@ -1190,7 +1253,8 @@ class SelectEngine(_FormActionEngineBase):
                         already + ' | already-matched | SKIP — field already set; do not re-select',
                         self.business_data_store,
                     ))
-            self.business_data_store['_already_matched_streak'] = 0
+            if not is_replay:
+                self.business_data_store['_already_matched_streak'] = 0
 
             trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
         else:
@@ -1205,6 +1269,8 @@ class SelectEngine(_FormActionEngineBase):
                     )
                     sys.stderr.flush()
                     failed = await _final_select_failure('no-items', xp)
+                    if is_replay:
+                        return failed
                     return err_with(
                         "err-select-option-unresolved",
                         "下拉无可见选项",
@@ -1248,12 +1314,15 @@ class SelectEngine(_FormActionEngineBase):
             'field-disabled',
         ):
             if is_absent_field_result(trigger_result):
-                if not _is_query_mode(self.business_data_store):
+                if not is_replay and not _is_query_mode(self.business_data_store):
                     _task_done_impl(label_text, self.business_data_store)
                 sys.stderr.write(f'[select] skip absent label={label_text!r}\n')
-                sys.stderr.flush()
+                if is_replay:
+                    return absent_field_skip_result()
                 return _ok(_with_submit_cue(absent_field_skip_result(), self.business_data_store))
             failed = await _final_select_failure(str(trigger_result), xp)
+            if is_replay:
+                return failed
             if trigger_result == 'no-select-found':
                 return err_with(
                     "err-select-option-unresolved",
@@ -1271,12 +1340,17 @@ class SelectEngine(_FormActionEngineBase):
         await page.wait_for_timeout(WAIT_500_MS)
 
         # Capture full option list while dropdown is open (before pick)
-        params, element = await _pack_select_record(
-            page, self.business_data_store, label_text, option_text, element,
-        )
+        params: dict = {}
         xp_inv = stamp_recorded_xpath_smart(element, xp)
+        if not is_replay:
+            params, element = await _pack_select_record(
+                page, self.business_data_store, label_text, option_text, element,
+            )
+            xp_inv = stamp_recorded_xpath_smart(element, xp)
 
-        select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
+        select_result = await page.evaluate(
+            JS_SELECT_OPTION, _select_js_option_arg(option_text, use_exact),
+        )
         if _is_ok_result(select_result):
             # Reject any JS result that silently picked the first item when the
             # wanted option was absent (pseudo-success) — never record / task_done.
@@ -1284,6 +1358,8 @@ class SelectEngine(_FormActionEngineBase):
             # defense-in-depth against a regression from any other click path.
             if 'fallback-first' in str(select_result):
                 failed = await _final_select_failure(str(select_result), xp)
+                if is_replay:
+                    return failed
                 return err_with(
                     'err-select-option-unresolved',
                     '引擎拒绝首项兜底伪成功结果（wanted 不在下拉项中）',
@@ -1291,6 +1367,8 @@ class SelectEngine(_FormActionEngineBase):
                     next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
                 )
             matched_text = select_result.split(':', 1)[1] if ':' in select_result else select_result
+            if is_replay:
+                return str(select_result)
             self.business_data_store.pop(f'_sel_retry_{label_text}', None)
             stamped = resolve_recorded_option_text(option_text, matched_text)
             params['option_text'] = stamped
@@ -1304,6 +1382,8 @@ class SelectEngine(_FormActionEngineBase):
             # Xpath recheck — treat already-set field as success (no labeled JS).
             recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, label_text])
             if str(recheck).startswith('ok-already:'):
+                if is_replay:
+                    return recheck
                 cur = recheck.split(':', 1)[1]
                 stamped = resolve_recorded_option_text(option_text, cur)
                 params['option_text'] = stamped
@@ -1311,6 +1391,8 @@ class SelectEngine(_FormActionEngineBase):
                 _record_action('select_option', params, recheck, element=element)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', self.business_data_store))
             failed = await _final_select_failure('no-items', xp)
+            if is_replay:
+                return failed
             return err_with(
                 "err-select-option-unresolved",
                 "下拉无可见选项",
@@ -1318,6 +1400,9 @@ class SelectEngine(_FormActionEngineBase):
                 next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
             )
         elif str(select_result).startswith('value-mismatch'):
+            if is_replay:
+                failed = await _final_select_failure(str(select_result), xp)
+                return failed
             # SELECT_VERIFY_READBACK — JS_SELECT_OPTION clicked an option but the
             # trigger input read back a different value (same-prefix field wrote
             # the wrong select, e.g. 国民经济部门 option into 国民经济部门类别).
@@ -1458,6 +1543,9 @@ class SelectEngine(_FormActionEngineBase):
                 next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
             )
         elif select_result.startswith('option-not-found:'):
+            if is_replay and use_exact:
+                failed = await _final_select_failure(str(select_result), xp)
+                return failed
             # Fuzzy: pick listed option that contains / is contained by option_text
             listed = [x.strip() for x in select_result.split(':', 1)[1].split(',') if x.strip()]
             # Prefer union of live dropdown preview + stored options
@@ -1472,9 +1560,13 @@ class SelectEngine(_FormActionEngineBase):
             if not fuzzy and want in ('中国', '中国大陆'):
                 fuzzy = next((o for o in stored if '中国' in o), None)
             if fuzzy:
-                fuzzy_result = await page.evaluate(JS_SELECT_OPTION, fuzzy)
+                fuzzy_result = await page.evaluate(
+                    JS_SELECT_OPTION, _select_js_option_arg(fuzzy, use_exact),
+                )
                 if _is_ok_result(fuzzy_result):
                     matched_text = fuzzy_result.split(':', 1)[1] if ':' in fuzzy_result else fuzzy_result
+                    if is_replay:
+                        return str(fuzzy_result)
                     self.business_data_store.pop(f'_sel_retry_{label_text}', None)
                     params['option_text'] = matched_text
                     _record_action('select_option', params, matched_text, element=element)
@@ -1496,6 +1588,8 @@ class SelectEngine(_FormActionEngineBase):
             ))
             if str(paged_result).startswith('ok-select-paged'):
                 matched_text = paged_result.split(':', 1)[1] if ':' in paged_result else want
+                if is_replay:
+                    return str(paged_result)
                 self.business_data_store.pop(f'_sel_retry_{label_text}', None)
                 stamped = resolve_recorded_option_text(option_text, matched_text)
                 params['option_text'] = stamped
@@ -1521,6 +1615,8 @@ class SelectEngine(_FormActionEngineBase):
                 failed = await _final_select_failure(
                     str(select_result) + ' | select-paged:' + paged_result, xp,
                 )
+                if is_replay:
+                    return failed
                 return err_with(
                     "err-select-option-unresolved",
                     f"无法稳定选中「{option_text}」",
@@ -1533,6 +1629,8 @@ class SelectEngine(_FormActionEngineBase):
             filterable_result = str(await page.evaluate(JS_SELECT_FILTERABLE_TYPED, want))
             if _is_ok_result(filterable_result):
                 matched_text = filterable_result.split(':', 1)[1] if ':' in filterable_result else want
+                if is_replay:
+                    return str(filterable_result)
                 self.business_data_store.pop(f'_sel_retry_{label_text}', None)
                 stamped = resolve_recorded_option_text(option_text, matched_text)
                 params['option_text'] = stamped
@@ -1554,6 +1652,8 @@ class SelectEngine(_FormActionEngineBase):
                 str(select_result) + ' | filterable-typed:' + filterable_result
                 + ' | select-paged:' + paged_result, xp,
             )
+            if is_replay:
+                return failed
             return err_with(
                 "err-select-option-unresolved",
                 f"无法稳定选中「{option_text}」",
@@ -1562,6 +1662,8 @@ class SelectEngine(_FormActionEngineBase):
             )
         else:
             failed = await _final_select_failure(str(select_result), xp)
+            if is_replay:
+                return failed
             return err_with(
                 "err-select-option-unresolved",
                 f"无法稳定选中「{option_text}」",
@@ -1569,23 +1671,37 @@ class SelectEngine(_FormActionEngineBase):
                 next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
             )
 
-    async def tssc_multi_select(self, label_text: str, option_text: str, xpath_smart: str = ""):
+    async def tssc_multi_select(
+        self,
+        label_text: str,
+        option_text: str,
+        xpath_smart: str = "",
+        *,
+        mode: str = "record",
+        element: dict | None = None,
+    ):
+        is_replay = mode == "replay"
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
-        await self._ensure_scanned(label_text)
+        await self._maybe_ensure_scanned(label_text, mode)
         resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         label_text = (resolved.label or label_text or '').strip() or label_text
         xp = '' if resolved.error else (resolved.xpath_smart or '').strip()
-        element = await _capture_element(
-            page, label_text, target_kind='form_tssc_multi_select', xpath_smart=xp,
-        )
+        captured = element if isinstance(element, dict) else None
+        if captured is None:
+            captured = await _capture_element(
+                page, label_text, target_kind='form_tssc_multi_select', xpath_smart=xp,
+            )
         result = await page.evaluate(JS_TSSC_MULTI_SELECT, [label_text, option_text])
         if _is_ok_result(result):
+            if is_replay:
+                return str(result)
             # ok-first:部署方式 / ok:… / ok-echo:… / ok-already:… → stamp concrete
             # option_text (never persist sentinel "first" for replay/partner push).
             res_s = str(result or '')
             echo = res_s.split(':', 1)[1].strip() if ':' in res_s else ''
             stamped = resolve_recorded_option_text(option_text, echo)
+            element = captured
             if element is None and xp:
                 element = await _capture_element(
                     page, label_text, target_kind='form_tssc_multi_select', xpath_smart=xp,
@@ -1701,10 +1817,18 @@ class TreeEngine(_FormActionEngineBase):
         return _ok(f'ok-expanded-{total}-nodes')
 
 
-    async def select_tree_option(self, label_text: str, option_text: str, xpath_smart: str = ""):
+    async def select_tree_option(
+        self,
+        label_text: str,
+        option_text: str,
+        xpath_smart: str = "",
+        *,
+        mode: str = "record",
+    ):
+        is_replay = mode == "replay"
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
-        await self._ensure_scanned(label_text)
+        await self._maybe_ensure_scanned(label_text, mode)
         resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         # Soft resolve: tree-select can still run via label JS when scan miss;
         # capture uses resolved xpath when present so steps stamp form_tree_select.
@@ -1716,6 +1840,8 @@ class TreeEngine(_FormActionEngineBase):
         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label_text, option_text])
         # P0/P1/P2 success codes all use ok prefix → recordable via _is_ok_result
         if _is_ok_result(result):
+            if is_replay:
+                return str(result)
             if element is None and xp:
                 element = await _capture_element(
                     page, label_text, target_kind='form_tree_select', xpath_smart=xp,
@@ -1773,6 +1899,8 @@ class TreeEngine(_FormActionEngineBase):
                     fill_result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, fill_val])
                     record_params = {'label_text': label_text, 'value': fill_val}
                 if _is_ok_result(fill_result):
+                    if is_replay:
+                        return str(fill_result)
                     _record_action(
                         'fill_form_field',
                         record_params,
