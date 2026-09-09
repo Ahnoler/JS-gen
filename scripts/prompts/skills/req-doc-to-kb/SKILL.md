@@ -158,6 +158,8 @@ data/kb/req/<moduleKey>/
 
 **管线顺序**（手册 §1）：功能锚点（fid 必核叶子 `intermediateFlag=0`，禁挂 intermediate/孪生 id）→ 任务文案（**硬性成功门闩**+禁入写进任务全文）→ analyze → create → prepare → record/start → detach → 验收。
 
+- **树/表定位任务文案**：树或表定位步骤须写「搜索→（查询）→点击」。
+
 - **analyze 契约（第 6 轮实证修正，源码核实 `trajectory-meta-service.js`）**：入参 `{description, functionId?, model?}`——任务文本字段是 **`description`** 非 `requirement`（functionId 可选，用于特殊元素候选富化）；响应直接 `{phases:[…], businessEntries:[…]}`，不包 code/data 壳（手册「若包一层从 data 取」为防御性说法，现行实现不包）。拆分规则为服务端 prompt 硬约束：**阶段数严格跟编号步骤数走**；每阶段必含「预期结果：…」硬标记；【硬性成功门闩/禁止…】行与「关键数据」段**不计入 phases**（执行端另发）——任务文案按「编号步骤 + 门闩块 + 关键数据段」三段式写，analyze 即按此设计消化。
 - **create 漏挂补阶段**：`POST /api/v2/trajectories` 带 `phases` 数组；若 phaseCount=0 用 `PUT /api/v2/trajectories/{id}/phases` 补挂。
 - **验收铁律——业务证据，不认「全 phase_done」**：record/start **假成功模式**（T4 全波复现）：动作已执行但步骤不落库（~10 秒全 phase_done、stepCount=0；落库时点不一致——detach flush 或部分永不落库）。验收看 `stepCount`>0 + SUT 业务 stamp/字段/报文 hit；不满足时 CDP（19242+slotIndex）补证并如实写报告——业务 hit=true 但有假完成/0 步 phase → **DONE_WITH_CONCERNS**，不得记 DONE。产品级上报：建议 record/start 返回前做 stepCount 硬校验（agent-log 2026-09-06 已记，待转产品组）。
