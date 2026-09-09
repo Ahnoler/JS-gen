@@ -565,7 +565,7 @@ export default function (app) {
     }
   }));
 
-  /** 菜单推送专用系统查询（partner getSystemNodeLevel，POST 无参数；独立基址 PARTNER_MENU_PUSH_BASE） */
+  /** 菜单推送专用系统查询（partner getSystemNodeLevel，POST 无参数；基址与交易推送同为 PARTNER_API_BASE） */
   app.get('/api/v2/export/partner/menu-push/systems', asyncHandler(async (req, res) => {
     try {
       const accessToken = requireAccessToken(req);

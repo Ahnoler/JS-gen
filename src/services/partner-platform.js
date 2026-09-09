@@ -9,7 +9,6 @@
 import { resolve as configResolve, PARTNER_SECTION_TYPE } from '../../config/config.js';
 
 const DEFAULT_API_BASE = 'http://172.20.101.162:11001/api';
-const DEFAULT_MENU_PUSH_BASE = 'http://172.20.101.63:11002/api';
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /** User-facing copy when partner nginx/upstream is unreachable or returns non-JSON. */
@@ -37,11 +36,6 @@ function importDemandUrl() {
   const override = envOrConfig('PARTNER_IMPORT_DEMAND_URL');
   if (override) return override;
   return `${partnerApiBase()}/demand/demandtranscation/importDemand`;
-}
-
-/** 菜单推送专用基址：新联调服务器（发版后切线上地址时改 PARTNER_MENU_PUSH_BASE） */
-function menuPushApiBase() {
-  return envOrConfig('PARTNER_MENU_PUSH_BASE') || DEFAULT_MENU_PUSH_BASE;
 }
 
 /**
@@ -329,13 +323,13 @@ async function fetchPartnerSystemLevel({ accessToken, projectId, parentId } = {}
 
 /**
  * 菜单推送专用系统查询（partner 平台 getSystemNodeLevel，POST 无参数）。
- * 当前指向新联调服务器 172.20.101.63:11002（PARTNER_MENU_PUSH_BASE 可覆盖，发版后切线上地址）。
+ * 基址：PARTNER_API_BASE（与交易推送同一伙伴平台，菜单推送不得指向另一平台）。
  * @param {object} [opts] 请求参数
  * @param {string} opts.accessToken partner access token
  * @returns {Promise<object[]>} 归一化的系统节点列表（扁平，id/systemName）
  */
 export async function listPartnerMenuPushSystems({ accessToken } = {}) {
-  const url = `${menuPushApiBase()}/system/system/getSystemNodeLevel`;
+  const url = `${partnerApiBase()}/system/system/getSystemNodeLevel`;
   const { json, text, httpStatus } = await partnerFetch(url, {
     method: 'POST',
     accessToken,
@@ -475,13 +469,13 @@ export function toPartnerMenuPushPayload(payload) {
 
 /**
  * POST 伙伴菜单 importData（`/system/umlElementData/importData`）。
- * 基址：`PARTNER_MENU_PUSH_BASE`，默认 `http://172.20.101.63:11002/api`（联调；发版后切线上）。
+ * 基址：`PARTNER_API_BASE`（与交易推送同一伙伴平台）。
  * @param {object} payload v1.2 wire body（schemaVersion/systemNodeId/systemName/menuVersion/menus）
  * @param {{ accessToken?: string }} [opts]
  * @returns {Promise<{ code: number, msg?: string, data?: unknown }>} partner response
  */
 export async function pushMenusToPartner(payload, { accessToken } = {}) {
-  const url = `${menuPushApiBase()}/system/umlElementData/importData`;
+  const url = `${partnerApiBase()}/system/umlElementData/importData`;
   const wirePayload = toPartnerMenuPushPayload(payload);
   console.log('[partner] menu importData wire', {
     systemNodeId: wirePayload.systemNodeId,

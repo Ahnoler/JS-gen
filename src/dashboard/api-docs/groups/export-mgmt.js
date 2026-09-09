@@ -137,7 +137,7 @@ export const GROUP_EXPORT = [
       {
         method: 'GET', path: '/api/v2/export/partner/menu-push/systems',
         summary: '菜单推送：伙伴系统列表（代理 getSystemNodeLevel）',
-        desc: '转发伙伴 POST /system/system/getSystemNodeLevel（PARTNER_MENU_PUSH_BASE，默认 172.20.101.63:11002/api）。推送菜单弹窗「所属系统」下拉数据源；选中项 id 作为 push-menu body.systemNodeId。',
+        desc: '转发伙伴 POST /system/system/getSystemNodeLevel（基址与交易推送同为 PARTNER_API_BASE）。推送菜单弹窗「所属系统」下拉数据源；选中项 id 作为 push-menu body.systemNodeId。',
         params: [
           { name: 'access_token', type: 'string', required: true, in: 'query', desc: '通常放请求头 access_token' },
         ],
