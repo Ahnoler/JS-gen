@@ -88,6 +88,11 @@ _ERR_PRESCRIPTIONS = (
         'err-icon-label-ambiguous',
         _PREFIX + '同名按钮多个。用 现场/textButtons 里完整文字或 click_element_by_index 索引。',
     ),
+    (
+        'err-search-first',
+        _PREFIX + '先 fill 搜索关键字；若页面有「查询」则 click_button("查询")；'
+        '完成后再点树节点或 click_table_row_radio；禁止原样盲点。',
+    ),
 )
 
 

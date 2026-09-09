@@ -74,6 +74,17 @@ def main() -> int:
     assert_true('修复' in p6 and 'click_save' in p6, 'notification mapping')
     p8 = duplicate_failure_prescription('err-notification:实际控制人和所选配偶的性别相同，引入失败！')
     assert_true(p8.startswith('[纠偏] ') and '报错' in p8 and '禁止' in p8, 'err-notification mapping')
+    p9 = duplicate_failure_prescription(
+        'err-search-first:need-fill-search | 先填写搜索关键字（有「查询」按钮则再点查询），然后再点击树节点或选中列表行；禁止盲点。',
+    )
+    assert_true(
+        p9.startswith('[纠偏] ')
+        and 'fill 搜索关键字' in p9
+        and 'click_button' in p9
+        and '禁止原样盲点' in p9
+        and '原样重试，换参数或换策略' not in p9,
+        'err-search-first mapping',
+    )
     p7 = duplicate_failure_prescription('err-unknown-thing')
     assert_true(p7.startswith('[纠偏] ') and '原样重试' in p7, 'generic fallback')
 
