@@ -1214,6 +1214,33 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  await runAsync('flow-card-guide selectRelevantFlowCards ranks stem hit', async () => {
+    const guide = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/flow-card-guide.js')).href);
+    const cards = [
+      { _stem: 'other', flow: '其他', keywords: ['无关'], nodes: [] },
+      { _stem: 'customer_onboarding', flow: '对公客户建档', keywords: ['信贷潜在客户', '草稿客户'], nodes: [{ id: 'edit_page', page: '编辑页' }] },
+    ];
+    const chains = [{ chainId: 'a', title: '草稿转信贷潜在', steps: [{ index: 1, action: '维护概况并保存为信贷潜在客户' }] }];
+    const hit = guide.selectRelevantFlowCards({ chains, cards, limit: 2 });
+    assert.equal(hit[0]._stem, 'customer_onboarding');
+  });
+
+  await runAsync('flow-card-guide stepsShareClosedLoop allows fill+verify+one save', async () => {
+    const guide = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/flow-card-guide.js')).href);
+    assert.equal(
+      guide.stepsShareClosedLoop({
+        stepActions: ['进入编辑页', '维护概况', '联网核查', '保存'],
+      }),
+      true,
+    );
+    assert.equal(
+      guide.stepsShareClosedLoop({
+        stepActions: ['保存概况', '提交审批'],
+      }),
+      false,
+    );
+  });
+
   console.log(`OK ${passed}`);
 }
 
