@@ -1,7 +1,7 @@
 # 需求草稿向导：功能候选下拉（§6.4 前端派单）— 设计
 
 > 日期：2026-09-09  
-> 状态：待用户审阅  
+> 状态：已批准（会话 OK）→ 计划 [`../plans/2026-09-09-req-draft-wizard-function-candidates.md`](../plans/2026-09-09-req-draft-wizard-function-candidates.md)  
 > 前置：[`2026-09-08-kb-remediation-design.md`](./2026-09-08-kb-remediation-design.md) §6.4；向导假流式 [`2026-09-08-req-draft-keydata-and-streaming-ux-design.md`](./2026-09-08-req-draft-keydata-and-streaming-ux-design.md)  
 > 仓库：Vue `vue-project`（`dev`）；后端契约已就绪，本版不改 JS-gen 运行时
 

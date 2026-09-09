@@ -1,6 +1,12 @@
 # Agent 协作日志
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
+## 2026-09-09 15:50 · Cursor Lead — 收工：§6.4 功能候选下拉 implementation plan（回链设计 15:48）
+
+- 完成：`docs/superpowers/plans/2026-09-09-req-draft-wizard-function-candidates.md`（T1 helpers → T2 表列/canCreate/commit → T3 docs）
+- 验收：覆盖表对照 spec §3–§6；无 validate/paasUserId
+- 遗留：用户选 Subagent-Driven 或 Inline 后实现
+
 ## 2026-09-09 15:48 · Cursor Lead — 收工：§6.4 功能候选下拉设计稿（回链开工同批）
 
 - 完成：`docs/superpowers/specs/2026-09-09-req-draft-wizard-function-candidates-design.md`（表列下拉；overrides 按行；Out validate/truncated/paasUserId）
