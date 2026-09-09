@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 14:05 · Cursor Lead — 收工：回放 select_option→tssc 路由（回链 13:55）
+
+- 完成：`replay_form_action` 在 `select_option` 分支按 `target_kind=form_tssc_multi_select` 或 live `.tssc-multi-select` 转 `JS_TSSC_MULTI_SELECT`；cold pin 增补；提交 **`922d3a65`**
+- 验收：`characterize-tssc-multi-select` / `characterize-select-state-boundary` / `characterize-select-option-stamp` **GREEN**
+- 遗留：重启 executor 后复放「要素名称→部署方式」；用户自行 push
+
+## 2026-09-09 13:55 · Cursor Lead — 开工：回放 select_option→tssc 路由缺口
+
+- 进行中：13:55；`log.txt` 要素名称 `select_option(部署方式)` → `option-not-found:deplMod,…`；自愈走引擎 handoff `ok-p1` 证明 JS v2 正常，缺口在 `replay_form_action`
+- 范围：`scripts/controller/actions/replay_form_action.py`、`scripts/characterization/cold/characterize-tssc-multi-select.py`、本文件
+- 禁入区：`config/update-db-whitelist.ps1`；kb drafts；`.cursor/`；无关 KB 线
+- 方式：metadata `form_tssc_multi_select` + live `.tssc-multi-select` 探测 → `JS_TSSC_MULTI_SELECT`；pin → 验收
+
 ## 2026-09-09 12:50 · DSH reviewer — 收工：KB 加固验收修复（回链 12:24）
 
 - 完成：验收结论 **PASS**（初次 DONE_WITH_CONCERNS → 修复后复验全绿）；修复 6 项 — F-A 新增 lint warning×3、F-B 观测落盘隔离（`KB_STAGING_DIR`）+清污（**保留 4 条真实 py 召回**，测试行归档 `tmp/review-observability-archive/`）、F-C `matchFlowForAtom` 返回 `score`、F-D 金样例 note 事实更正、R-3 py 绊线改「不得有已收敛却仍登记的分歧」、R-4 出处列入 api-docs

@@ -201,6 +201,55 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             sys.stderr.flush()
             return str(result_text)
 
+        # D6: steps are recorded as select_option + form_tssc_multi_select; el-select
+        # JS_SELECT_OPTION cannot pick remote table rows (要素名称 → option-not-found:codes).
+        # Legacy action_name=tssc_multi_select still has its own branch above.
+        _tk = str(el.get('target_kind') or '').strip().lower().replace('-', '_')
+        _tssc_meta = _tk in ('form_tssc_multi_select', 'tssc_multi_select')
+
+        async def _is_live_tssc_field() -> bool:
+            if not label:
+                return False
+            try:
+                return bool(await page.evaluate(
+                    '''([lab]) => {
+                        const want = String(lab || '').replace(/\\s+/g, ' ').trim();
+                        if (!want) return false;
+                        const hit = (root) => {
+                            for (const item of root.querySelectorAll('.el-form-item')) {
+                                const l = (item.querySelector('.el-form-item__label')?.textContent || '')
+                                    .replace(/\\s+/g, ' ').trim();
+                                if (l === want || l.includes(want)) {
+                                    return !!(item.querySelector('.tssc-multi-select'));
+                                }
+                            }
+                            return false;
+                        };
+                        if (hit(document)) return true;
+                        for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+                            if (dlg.offsetParent === null) continue;
+                            if (hit(dlg)) return true;
+                        }
+                        return false;
+                    }''',
+                    [label],
+                ))
+            except Exception:
+                return False
+
+        if _tssc_meta or await _is_live_tssc_field():
+            # Empty pick → missing-option (use equality check so cold pins that
+            # .find the el-select "if not pick" gate are not confused by comments).
+            if pick == '':
+                return 'error:missing-option_text'
+
+            async def _tssc_via_select_option():
+                r = await page.evaluate(JS_TSSC_MULTI_SELECT, [label, pick])
+                await page.wait_for_timeout(WAIT_500_MS)
+                return r
+
+            return await _with_xpath_first(_tssc_via_select_option)
+
         branch_reset_diag = await reset_select_ui(page)
         if not branch_reset_diag.get('closed', False):
             sys.stderr.write(
