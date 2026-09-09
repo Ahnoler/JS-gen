@@ -3,6 +3,13 @@
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
 
+## 2026-09-09 21:57 · Cursor Lead — 开工：有 xpath 的 uml_ecd 唯一设计
+
+- 进行中：21:57；用户选 A（生成列 UNIQUE + 写入拒绝）；冲突拒绝已确认
+- 范围：`docs/superpowers/specs/2026-09-09-uml-ecd-nav-unique-design.md`、本文件；通过后 writing-plans
+- 禁入区：整表 UNIQUE(uml_ecd)；自动合并节点；search-then-click / radio unify 他线；fill/select；`.cursor/`
+- 方式：brainstorming 落盘 → 请用户审 spec
+
 ## 2026-09-09 21:55 · Cursor Lead — 开工：树/列表「先查再点」implementation plan
 
 - 进行中：21:55；writing-plans；spec 已批
