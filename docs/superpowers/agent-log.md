@@ -24,6 +24,12 @@
 - 禁入区：引擎实现直至 writing-plans；radio unify 线；`.cursor/`；无关 KB 大改
 - 方式：落盘 design → 用户审阅 spec → writing-plans；本单元不写护栏代码
 
+## 2026-09-09 21:58 · Cursor Lead — 收工：click_radio unify plan（回链 19:56）
+
+- 完成：plan `docs/superpowers/plans/2026-09-09-radio-record-replay-unify.md`（T1 pin → T2 RadioEngine → T3 replay 接线 → T4 契约/verify-all）；spec 链 plan
+- 验收：plan 自检覆盖 R1–R4 / O1–O3；无 radio_dispatch；与 fill/select Phase B 同形
+- 遗留：用户选 Subagent-Driven 或 Inline 后开实现开工条目
+
 ## 2026-09-09 19:56 · Cursor Lead — 开工：click_radio 录放统一 design（直接 Phase B）
 
 - 进行中：19:56；用户选 B（跳过 radio_dispatch，经 RadioEngine mode=replay）
