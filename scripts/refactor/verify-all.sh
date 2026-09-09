@@ -122,6 +122,7 @@ run "characterize-budget-extend" "$PY" scripts/characterization/characterize-bud
 run "characterize-export-v3-field-completeness" node scripts/characterization/characterize-export-v3-field-completeness.mjs
 run "characterize-xpath-three-sources" node scripts/characterization/characterize-xpath-three-sources.mjs
 run "characterize-manual-radio-fill" "$PY" scripts/characterization/cold/characterize-manual-radio-fill.py
+run "characterize-fill-dispatch" "$PY" scripts/characterization/cold/characterize-fill-dispatch.py
 run "characterize-select-dispatch" "$PY" scripts/characterization/cold/characterize-select-dispatch.py
 run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/characterize-select-replay-engine.py
 run "characterize-tssc-multi-select" "$PY" scripts/characterization/cold/characterize-tssc-multi-select.py

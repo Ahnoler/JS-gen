@@ -73,6 +73,7 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 - **Consecutive-only dedup** (`src/dedup.js`): only back-to-back identical `(action, params)`; non-consecutive duplicates are kept.
 - **Native setter pattern** for Element UI inputs — never rely on Playwright `page.fill()` alone for `el-form`.
 - **Select record/replay dispatch:** `select_option` recording and product replay share `resolve_select_dispatch` (`scripts/controller/actions/select_dispatch.py`) — do not assume docstring “same JS path” means the same Python router; see `docs/superpowers/specs/2026-09-09-select-record-replay-unify-design.md`.
+- **Fill record/replay dispatch:** `fill_form_field` shares `resolve_fill_attempt_order` (`scripts/controller/actions/fill_dispatch.py`); Phase B routes replay through `FillEngine` — see `docs/superpowers/specs/2026-09-09-fill-record-replay-unify-design.md`.
 - **`el-select`** → use `selectOption`; generic click-by-index on option spans fails silently.
 - **Re-query DOM** before each op — Vue may recreate dialogs/components.
 

@@ -52,7 +52,7 @@ params 主要：`text` / `menu_text` / `section` / `region` / `tab_name` 等（�
 
 | 动作 | params | 说明 |
 |---|---|---|
-| `fill_form_field` | `label_text`、`value`（别名 value/option/option_text/text 归一）、`placeholder` | native setter 填充 + 回读校验 |
+| `fill_form_field` | `label_text`、`value`（别名 value/option/option_text/text 归一）、`placeholder` | locate/JS 选用经 `resolve_fill_attempt_order`（`fill_dispatch`）：xpath_smart → label → placeholder → xpath_full；native setter + 回读校验。禁止只改 `FillEngine` 或只改 `replay_form_action`。见 [`2026-09-09-fill-record-replay-unify-design.md`](./2026-09-09-fill-record-replay-unify-design.md)。 |
 | `select_option` | `label_text`、`option_text` | 分流经 `resolve_select_dispatch`（`target_kind` / scan kind / live `.tssc-multi-select` → `tssc` \| `tree` \| `el-select`）；`path=tssc` 时执行 `JS_TSSC_MULTI_SELECT`，否则 el-select（真实 mousedown 开下拉，exactOnly 防漂移，事后回读 + option-mismatch）。禁止只改 `SelectEngine` 或只改 `replay_form_action`——须改 `select_dispatch` 后双端接线。见 [`2026-09-09-select-record-replay-unify-design.md`](./2026-09-09-select-record-replay-unify-design.md)。 |
 | `select_tree_option` | `label_text`、`option_text` | 树选择三段式 |
 | `click_radio` | `label_text`、`option_text` | radio 组 |

@@ -1,7 +1,7 @@
 # Design: `fill_form_field` 录制/回放统一（A→B）
 
 **日期**：2026-09-09  
-**状态**：已批准（2026-09-09）；实现计划 [`../plans/2026-09-09-fill-record-replay-unify.md`](../plans/2026-09-09-fill-record-replay-unify.md)  
+**状态**：Phase A 已落地（`fill_dispatch` + 双接线）；Phase B 待实现 — 计划 [`../plans/2026-09-09-fill-record-replay-unify.md`](../plans/2026-09-09-fill-record-replay-unify.md)  
 **前置**：[`2026-09-09-select-record-replay-unify-design.md`](./2026-09-09-select-record-replay-unify-design.md)（select 已 A+B 落地，为本 spec 样板）  
 **契约**：[`2026-09-05-engine-actions-contract.md`](./2026-09-05-engine-actions-contract.md) §2.4  
 **用户裁决**：fill 采用与 select **同形的 A→B**；战略目标为「录制与回放写动作经引擎管线」——本 spec **只交付 fill**；点击族另开。
