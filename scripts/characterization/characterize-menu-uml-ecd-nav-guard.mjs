@@ -9,7 +9,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isNavigableUmlPair } from '../../src/services/menu-uml-ecd-nav-guard.js';
+import {
+  assertUmlEcdNavAvailable,
+  isNavigableUmlPair,
+} from '../../src/services/menu-uml-ecd-nav-guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const GUARD_PATH = path.join(ROOT, 'src/services/menu-uml-ecd-nav-guard.js');
@@ -26,11 +29,19 @@ function testIsNavigableUmlPair() {
   assert.equal(isNavigableUmlPair(' UML1 ', ' /x '), true);
 }
 
+function testExports() {
+  assert.equal(typeof assertUmlEcdNavAvailable, 'function');
+  const guard = fs.readFileSync(GUARD_PATH, 'utf8');
+  assert.match(guard, /export async function assertUmlEcdNavAvailable/);
+  assert.match(guard, /CONFLICT/);
+}
+
 function main() {
   console.log('\n=== menu-uml-ecd-nav-guard characterization ===\n');
   const tests = [
     ['guard module exists', testGuardModuleExists],
     ['isNavigableUmlPair', testIsNavigableUmlPair],
+    ['assertUmlEcdNavAvailable export', testExports],
   ];
   let failed = 0;
   for (const [name, fn] of tests) {
