@@ -169,7 +169,7 @@
 ```
 done:  select_option / tssc / tree（select unify A+B）
 done:  fill_form_field（本文）
-next:  click_radio（表单四件套收尾）— 见 [`2026-09-09-radio-record-replay-unify-design.md`](./2026-09-09-radio-record-replay-unify-design.md)
+done:  click_radio（radio unify Phase B）
 then:  click_element_by_index / click_button / menu / close 组（点击族；特例多，单独 design）
 later: login 内嵌 fill 直调收敛（可选）
 ```

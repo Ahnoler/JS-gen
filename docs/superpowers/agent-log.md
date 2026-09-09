@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
+## 2026-09-09 22:47 · Cursor Lead — 收工：click_radio 录放统一 SDD close（回链 22:01）
+
+- 完成：契约 §2.4 `click_radio` 经 `RadioEngine`；AGENTS 一句；verify-all 注册 `characterize-radio-replay-engine`；radio design 已落地；fill §8 `click_radio` done；Tasks 1–4 文档/门禁收尾（**未 commit**，待主会话验收）
+- 验收：`characterize-radio-replay-engine` GREEN；fill/select/radio cold pins GREEN
+- 遗留：主会话 `git add` + commit `docs: Phase B radio record/replay unify close + verify-all pin`
+
 ## 2026-09-09 22:44 · ZCode — 开工：KB 召回评测常态化（方向 3，T0–T7）
 
 - 进行中：22:44；spec/plan/handoff 已确认（`specs/2026-09-09-kb-recall-eval-design.md` §13 D1–D12、`plans/2026-09-09-kb-recall-eval.md`、`plans/2026-09-09-kb-recall-eval-handoff.md`）
