@@ -11,7 +11,7 @@ const TABLE = 'system_page';
 /**
  * 整替某功能节点下的明细页面（先删后插），设计为在事务内被调用。
  * @param {number} nodeId system 节点 id（功能节点）
- * @param {object[]} pages 页面清单，每项含 pageId/pageName/resPath/pageType
+ * @param {object[]} pages 页面清单，每项含 pageId/pageName/resPath/pageType/activityUmlEcd
  * @param {object|null} [db] 可选 knex 实例（传 trx 时在事务内执行）
  * @returns {Promise<number>} 实际插入的行数
  */
@@ -27,6 +27,7 @@ export async function replaceForNode(nodeId, pages, db = null) {
       pageName: String(p.pageName ?? ''),
       resPath: String(p.resPath ?? ''),
       pageType: String(p.pageType || 'managePage'),
+      activityUmlEcd: String(p.activityUmlEcd ?? ''),
     }));
 
   if (!rows.length) return 0;
