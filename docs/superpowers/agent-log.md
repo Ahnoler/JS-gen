@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
+## 2026-09-09 22:44 · ZCode — 开工：KB 召回评测常态化（方向 3，T0–T7）
+
+- 进行中：22:44；spec/plan/handoff 已确认（`specs/2026-09-09-kb-recall-eval-design.md` §13 D1–D12、`plans/2026-09-09-kb-recall-eval.md`、`plans/2026-09-09-kb-recall-eval-handoff.md`）
+- 范围：`scripts/characterization/fixtures/kb-recall-eval.v1.json`（新建评测集）、`scripts/kb/recall-eval.mjs`（新建运行器）、`scripts/characterization/characterize-kb-recall-eval.mjs`（新建门禁）、`scripts/characterization/characterize-kb-recall.py`（T5 一致性）、`scripts/characterization/characterize-flow-card-recall.mjs`（T2 +2 pin）、`src/services/req-draft-traj/flow-card-recall.js`（T2 rankFlowCards）、`scripts/refactor/verify-all.sh`（**只追加一行**，独立 commit）、`AGENTS.md`+`docs/superpowers/todo-list.md`（T7 各一句）、`docs/superpowers/specs/2026-09-09-kb-recall-eval-design.md`（附录回填）、`docs/superpowers/reports/2026-09-09-kb-recall-eval-baseline.md`（T6）、本文件；证据落 `tmp/kb-eval/**`（不入库）
+- 禁入区：`src/services/req-draft-traj/propose.js`（他线 entry-only atom 折叠，虽已收工仍不碰）；`data/kb/**` 只读；`.cursor/`；`config/update-db-whitelist.ps1`；`scripts/controller/actions/**`；fill/select/radio/search-then-click 热区；不调 `prepare`/`record/start`/`detach`；不改召回算法
+- 方式：T0（基线复现→tmp）→T1 评测集 130 条（标注禁跑匹配器）→T2 ranked→T3 运行器→T4 阈值提案（**等 Lead 批准后写入**）→T5 PY 一致性→T6 报告→T7 文档；一个 Task 一个 commit；标注/复核需子智能体时由本会话代为声明
+
 ## 2026-09-09 22:20 · Cursor Lead — 收工：原子化入口步骤并入下一写（回链 22:11）
 
 - 完成：`isEntryOnlyStep`（打开抽屉/向导且无保存）→ 当导航；LLM `foldEntryOnlyLlmAtoms`；prompt 禁单独入口 atom；表征 +2（fallback/LLM fold）；`characterize-req-draft-traj` **OK 55**
