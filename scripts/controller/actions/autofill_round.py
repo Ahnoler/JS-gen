@@ -38,7 +38,6 @@ from ._js_snippets import (
     JS_SELECT_VALUE_BY_XPATH,
     JS_CLICK_RADIO_BY_XPATH,
     JS_SELECT_TREE_OPTION,
-    JS_TSSC_MULTI_SELECT,
     JS_FILL_FORM_FIELD,
     JS_CLICK_VERIFY_BUTTON,
     JS_READ_REFERENCE_DATE,
@@ -335,6 +334,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                 before_b64 = await capture_page_png_b64_from_page(page)
             except Exception:
                 before_b64 = None
+            engine_handled_record = False
             try:
                 is_tree = field_kind == 'tree-select' or kind in (
                     'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
@@ -345,7 +345,13 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                 if not xpath_smart and not is_tree and not is_tssc:
                     result = resolve_error or 'xpath-not-found'
                 elif is_tssc:
-                    result = await page.evaluate(JS_TSSC_MULTI_SELECT, [label, value])
+                    from .form_action_engines import SelectEngine
+                    select_engine = SelectEngine(
+                        self.browser_context, self.business_data_store, self,
+                    )
+                    result = await select_engine.select_option(label, value, xpath_smart)
+                    kind = 'select_option'
+                    engine_handled_record = True
                 elif is_tree:
                     result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
                     # Non-Tssc "tree-looking" fields: prefer resolve+xpath when store has xpath
@@ -421,57 +427,20 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
 
             if ok and should_record_result(result):
                 ok_in_group += 1
-                xp_inv = stamp_recorded_xpath_smart(element, xpath_smart)
-                if field_kind == 'radio' or kind in ('click_radio', 'radio'):
-                    await record_action_with_screenshots(
-                        page,
-                        'click_radio',
-                        {
-                            'label_text': label,
-                            'option_text': value,
-                        },
-                        result,
-                        element=element,
-                        before_b64=before_b64,
+                if engine_handled_record:
+                    prefix = f'[auto-fill] {round_tag}recorded:' if round_tag else '[auto-fill] recorded:'
+                    sys.stderr.write(
+                        f'{prefix} select_option "{label}" = {value} (engine, total: {len(_ACTION_LOG)})\n'
                     )
-                elif kind in ('fill_input', 'fill', 'input') and field_kind not in (
-                    'tree-select', 'tssc-multi-select',
-                ):
-                    await record_action_with_screenshots(
-                        page,
-                        'fill_form_field',
-                        {
-                            'label_text': label,
-                            'value': value,
-                        },
-                        result,
-                        element=element,
-                        before_b64=before_b64,
+                    sys.stderr.flush()
+                    status = 'ok' if ok else f'FAILED:{result}'
+                    await page.evaluate(
+                        'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
+                        f'{step_num}/{total} select_option "{label}" → {status}',
                     )
-                elif field_kind == 'tree-select' or kind in (
-                    'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
-                ):
-                    await record_action_with_screenshots(
-                        page,
-                        'select_tree_option',
-                        {'label_text': label, 'option_text': value},
-                        result,
-                        element=element,
-                        before_b64=before_b64,
-                    )
-                elif field_kind == 'tssc-multi-select' or kind in (
-                    'tssc_multi_select', 'tssc-multi-select',
-                ):
-                    await record_action_with_screenshots(
-                        page,
-                        'tssc_multi_select',
-                        {'label_text': label, 'option_text': value},
-                        result,
-                        element=element,
-                        before_b64=before_b64,
-                    )
-                elif kind in ('select_option', 'select', 'option'):
-                    if field_kind == 'radio':
+                else:
+                    xp_inv = stamp_recorded_xpath_smart(element, xpath_smart)
+                    if field_kind == 'radio' or kind in ('click_radio', 'radio'):
                         await record_action_with_screenshots(
                             page,
                             'click_radio',
@@ -483,45 +452,83 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                             element=element,
                             before_b64=before_b64,
                         )
-                    else:
-                        # Stamp concrete option from result (ok:X / ok-already:X)
-                        actual = ''
-                        rs = str(result or '')
-                        if rs.startswith('ok-already:'):
-                            actual = rs.split(':', 1)[1].split('|', 1)[0].strip()
-                        elif rs.startswith('ok:') or (rs.startswith('ok') and ':' in rs):
-                            actual = rs.split(':', 1)[1].split('|', 1)[0].strip()
-                        stamped = resolve_recorded_option_text(value, actual)
-                        params, element = await _pack_select_record(
-                            page, self.business_data_store, label, stamped, element,
-                        )
-                        params['option_text'] = stamped
+                    elif kind in ('fill_input', 'fill', 'input') and field_kind not in (
+                        'tree-select', 'tssc-multi-select',
+                    ):
                         await record_action_with_screenshots(
                             page,
-                            'select_option',
-                            params,
+                            'fill_form_field',
+                            {
+                                'label_text': label,
+                                'value': value,
+                            },
                             result,
                             element=element,
                             before_b64=before_b64,
                         )
-                _task_done_impl(
-                    label, self.business_data_store, value=value, xpath_smart=xp_inv,
-                )
-                # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
-                btn = has_button_map.get(label, '')
-                if '验证' in btn and kind in ('fill_input', 'fill', 'input'):
-                    try:
-                        await page.evaluate(JS_CLICK_VERIFY_BUTTON, [label])
-                    except Exception:
-                        pass
-                prefix = f'[auto-fill] {round_tag}recorded:' if round_tag else '[auto-fill] recorded:'
-                sys.stderr.write(f'{prefix} {kind} "{label}" = {value} (total: {len(_ACTION_LOG)})\n')
-                sys.stderr.flush()
-                status = 'ok' if ok else f'FAILED:{result}'
-                await page.evaluate(
-                    'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
-                    f'{step_num}/{total} {kind} "{label}" → {status}',
-                )
+                    elif field_kind == 'tree-select' or kind in (
+                        'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
+                    ):
+                        await record_action_with_screenshots(
+                            page,
+                            'select_tree_option',
+                            {'label_text': label, 'option_text': value},
+                            result,
+                            element=element,
+                            before_b64=before_b64,
+                        )
+                    elif kind in ('select_option', 'select', 'option'):
+                        if field_kind == 'radio':
+                            await record_action_with_screenshots(
+                                page,
+                                'click_radio',
+                                {
+                                    'label_text': label,
+                                    'option_text': value,
+                                },
+                                result,
+                                element=element,
+                                before_b64=before_b64,
+                            )
+                        else:
+                            # Stamp concrete option from result (ok:X / ok-already:X)
+                            actual = ''
+                            rs = str(result or '')
+                            if rs.startswith('ok-already:'):
+                                actual = rs.split(':', 1)[1].split('|', 1)[0].strip()
+                            elif rs.startswith('ok:') or (rs.startswith('ok') and ':' in rs):
+                                actual = rs.split(':', 1)[1].split('|', 1)[0].strip()
+                            stamped = resolve_recorded_option_text(value, actual)
+                            params, element = await _pack_select_record(
+                                page, self.business_data_store, label, stamped, element,
+                            )
+                            params['option_text'] = stamped
+                            await record_action_with_screenshots(
+                                page,
+                                'select_option',
+                                params,
+                                result,
+                                element=element,
+                                before_b64=before_b64,
+                            )
+                    _task_done_impl(
+                        label, self.business_data_store, value=value, xpath_smart=xp_inv,
+                    )
+                    # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
+                    btn = has_button_map.get(label, '')
+                    if '验证' in btn and kind in ('fill_input', 'fill', 'input'):
+                        try:
+                            await page.evaluate(JS_CLICK_VERIFY_BUTTON, [label])
+                        except Exception:
+                            pass
+                    prefix = f'[auto-fill] {round_tag}recorded:' if round_tag else '[auto-fill] recorded:'
+                    sys.stderr.write(f'{prefix} {kind} "{label}" = {value} (total: {len(_ACTION_LOG)})\n')
+                    sys.stderr.flush()
+                    status = 'ok' if ok else f'FAILED:{result}'
+                    await page.evaluate(
+                        'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
+                        f'{step_num}/{total} {kind} "{label}" → {status}',
+                    )
             elif ok:
                 # ok-skip:label-not-found — clear pending, do not write trajectory
                 ok_in_group += 1

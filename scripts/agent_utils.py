@@ -149,10 +149,6 @@ def build_agent_system_message(contract: dict | None = None) -> str:
         if mode in ('create', 'modify'):
             packs.append('agent-tools-tree.md')
 
-        # TsscMultiSelect table-row pick for introduce_pick / create / modify
-        if mode in ('introduce_pick', 'create', 'modify'):
-            packs.append('agent-tools-tssc-multi-select.md')
-
         # Full fallback: unknown mode or None contract
         if mode not in ('login', 'navigate', 'query', 'introduce_pick', 'create', 'modify'):
             packs = [
@@ -161,7 +157,6 @@ def build_agent_system_message(contract: dict | None = None) -> str:
                 'agent-tools-form.md',
                 'agent-tools-table.md',
                 'agent-tools-tree.md',
-                'agent-tools-tssc-multi-select.md',
             ]
 
     parts = [_read_pack(p) for p in packs]
