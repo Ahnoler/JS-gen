@@ -20,7 +20,12 @@ import {
 } from './provenance.js';
 import { listFlowCardsDetailed } from '../kb-flow-cards.js';
 import { matchFlowForAtom } from './flow-card-recall.js';
-import { selectRelevantFlowCards, stepsShareClosedLoop, summarizeCardsForLlm } from './flow-card-guide.js';
+import {
+  isPersistBoundaryAction,
+  selectRelevantFlowCards,
+  stepsShareClosedLoop,
+  summarizeCardsForLlm,
+} from './flow-card-guide.js';
 import { writeProposeCache, PROPOSE_CACHE_VERSION } from './propose-cache.js';
 import { collectPageCodes, sanitizeTaskDraftKeyData } from './atom-keydata.js';
 
@@ -173,6 +178,32 @@ function buildTemplateTaskDraft(navPreamble, action, step, sourceDoc) {
 }
 
 /**
+ * Build taskDraft for a multi-step card-guided fallback atom.
+ * @param {string[]} navPreamble Leading navigation actions
+ * @param {import('./parse-through-chains.js').ThroughChainStep[]} groupSteps Steps in the closed loop
+ * @param {string} sourceDoc Source document path
+ * @returns {string} Task draft text
+ */
+function buildGroupedTaskDraft(navPreamble, groupSteps, sourceDoc) {
+  const lines = [];
+  let idx = 1;
+  for (const nav of navPreamble) {
+    lines.push(`${idx}、${nav}`);
+    idx += 1;
+  }
+  for (const step of groupSteps) {
+    const action = String(step.action || '').trim();
+    const buttons = step.buttons ? `，操作：${step.buttons}` : '';
+    const page = step.page ? `（${step.page}）` : '';
+    lines.push(`${idx}、${action}${page}${buttons}`);
+    idx += 1;
+  }
+  lines.push('');
+  lines.push(`来源：${sourceDoc}`);
+  return `${lines.join('\n')}\n`;
+}
+
+/**
  * Deterministic fallback when LLM fails: one write step → one atom;
  * navigation-only steps merge into the next write atom's taskDraft preamble.
  * @param {import('./parse-through-chains.js').ThroughChain[]} chains Parsed chains
@@ -235,6 +266,82 @@ function buildFallbackLlmAtoms(chains, sourceDoc) {
         phaseHints: [action],
         suggestedFunctionId: null,
       });
+    }
+  }
+
+  return atoms;
+}
+
+/**
+ * Card-guided deterministic fallback: group consecutive steps until a persist
+ * boundary into one llm-shaped atom with flowRef; remainder without persist uses
+ * per-write fallback.
+ * @param {import('./parse-through-chains.js').ThroughChain[]} chains Parsed chains
+ * @param {string} sourceDoc Source document path for template
+ * @param {object[]} cards Relevant flow cards (with `_stem`)
+ * @returns {Array<Record<string, unknown>>} Fallback LLM-shaped atom list
+ */
+function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
+  /** @type {Array<Record<string, unknown>>} */
+  const atoms = [];
+  const defaultStem = String(cards[0]?._stem || cards[0]?.flowRef || '').trim();
+
+  for (const chain of chains) {
+    const steps = chain.steps || [];
+    /** @type {import('./parse-through-chains.js').ThroughChainStep[]} */
+    let groupSteps = [];
+    /** @type {string[]} */
+    let navPreamble = [];
+
+    const flushGroup = () => {
+      if (groupSteps.length === 0) return;
+      const actions = [
+        ...navPreamble,
+        ...groupSteps.map((s) => String(s.action || '').trim()),
+      ].filter(Boolean);
+      const haystack = actions.join('\n');
+      const hit = matchFlowForAtom({ title: haystack, taskDraft: haystack, cards });
+      const flowRef = String(hit.flowRef || defaultStem).trim();
+      const title = actions[actions.length - 1] || chain.title || chain.chainId;
+      /** @type {Record<string, unknown>} */
+      const atom = {
+        chainId: chain.chainId,
+        stepIndexes: groupSteps.map((s) => s.index),
+        title,
+        taskDraft: buildGroupedTaskDraft(navPreamble, groupSteps, sourceDoc),
+        phaseHints: actions.slice(0, 4),
+        suggestedFunctionId: null,
+      };
+      if (flowRef) atom.flowRef = flowRef;
+      if (hit.nodeId) atom.nodeId = hit.nodeId;
+      atoms.push(atom);
+      groupSteps = [];
+      navPreamble = [];
+    };
+
+    for (let i = 0; i < steps.length; i += 1) {
+      const step = steps[i];
+      const action = String(step.action || '').trim();
+      if (!action) continue;
+
+      if (isNavigationStep(action) || isEntryOnlyStep(action)) {
+        const hasLaterPersist = steps.slice(i + 1).some((s) => isPersistBoundaryAction(s.action));
+        if (hasLaterPersist || groupSteps.length > 0) {
+          navPreamble.push(action);
+          groupSteps.push(step);
+          continue;
+        }
+      }
+
+      groupSteps.push(step);
+      if (isPersistBoundaryAction(action)) {
+        flushGroup();
+      }
+    }
+
+    if (groupSteps.length > 0) {
+      const remainderChain = { ...chain, steps: groupSteps };
+      atoms.push(...buildFallbackLlmAtoms([remainderChain], sourceDoc));
     }
   }
 
@@ -698,8 +805,9 @@ export async function proposeDraftTrajectories({
   // Empty array means LLM returned no atoms — still use deterministic fallback
   // (prose-only through-chains already filtered at list via canProposeAtoms).
   if (!llmAtoms || llmAtoms.length === 0) {
-    // Deterministic fallback: each write step → one atom; nav merges into next write preamble.
-    llmAtoms = buildFallbackLlmAtoms(chains, sourceDoc);
+    llmAtoms = relevant.length > 0
+      ? buildCardGuidedFallbackAtoms(chains, sourceDoc, relevant)
+      : buildFallbackLlmAtoms(chains, sourceDoc);
   }
 
   // LLM may still emit open-drawer entry as its own atom — fold into next write.

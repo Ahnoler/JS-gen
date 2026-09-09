@@ -1286,6 +1286,22 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  await runAsync('propose card-guided deterministic fallback merges to persist boundary', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-flow-fallback-guide-'));
+    cpSync(flowGuideFixtureRoot, join(tmp, 'flow-guide-mod'), { recursive: true });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'flow-guide-mod',
+      rootDir: tmp,
+      callLLM: async () => { throw new Error('force fallback'); },
+      listSystemsFn: async () => [],
+      listFlowCardsFn: async () => [miniFlowCard],
+    });
+    assert.equal(out.atoms.length, 1);
+    assert.equal(out.atoms[0].flowGuided, true);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   await runAsync('propose fallback without cards sets flowGuided false', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-flow-fallback-'));
     cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
