@@ -69,20 +69,6 @@ from .replay_timing import WAIT_300_MS, WAIT_500_MS, WAIT_3000_MS, budget_for
 STRICT_FILL_GUARDS = True
 
 
-def _maybe_mark_stc_search_filled(
-    store: dict | None,
-    *,
-    label_text: str,
-    resolved_label: str = "",
-    placeholder: str = "",
-) -> None:
-    from .search_then_click_guard import is_search_field_label, mark_search_filled
-
-    for lbl in (label_text, resolved_label, placeholder):
-        if is_search_field_label(lbl):
-            mark_search_filled(store)
-            return
-
 def _select_failure_next_action(label_text: str, option_text: str, business_data_store) -> str:
     """确定性「建议字段」提示（C2）：值↔选项错配时的下一步指引。
 
@@ -531,14 +517,8 @@ class FillEngine(_FormActionEngineBase):
                 )
                 if not _is_query_mode(self.business_data_store):
                     _task_done_impl(label_text, self.business_data_store, value=value, xpath_smart=xp_inv)
-                _maybe_mark_stc_search_filled(
-                    self.business_data_store, label_text=label_text,
-                )
                 return _ok(_with_submit_cue(result, self.business_data_store))
             if _is_ok_result(result):
-                _maybe_mark_stc_search_filled(
-                    self.business_data_store, label_text=label_text,
-                )
                 return _ok(_with_submit_cue(result, self.business_data_store))
             if str(result).startswith('field-disabled'):
                 kind_info = await affordances(page, resolved.label or label_text)
@@ -662,20 +642,8 @@ class FillEngine(_FormActionEngineBase):
                 _task_done_impl(
                     resolved.label, self.business_data_store, value=value, xpath_smart=xp_inv,
                 )
-            _maybe_mark_stc_search_filled(
-                self.business_data_store,
-                label_text=label_text,
-                resolved_label=resolved.label or "",
-                placeholder=placeholder,
-            )
             return _ok(_with_submit_cue(result, self.business_data_store))
         if _is_ok_result(result):
-            _maybe_mark_stc_search_filled(
-                self.business_data_store,
-                label_text=label_text,
-                resolved_label=resolved.label or "",
-                placeholder=placeholder,
-            )
             return _ok(_with_submit_cue(result, self.business_data_store))
         if str(result).startswith('field-disabled'):
             kind_info = await affordances(page, resolved.label or label_text)
