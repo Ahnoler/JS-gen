@@ -426,6 +426,12 @@ async ack({ frameId, sessionId } = {}) {
         await this.client.send('Page.reload', { ignoreCache: false });
         return { ok: true };
       }
+      if (action === 'url') {
+        const url = String(payload.url || '').trim();
+        if (!url) return { ok: false, reason: 'empty_url' };
+        await this.client.send('Page.navigate', { url });
+        return { ok: true };
+      }
       if (action === 'back' || action === 'forward') {
         const hist = await this.client.send('Page.getNavigationHistory');
         const entries = hist?.entries || [];
