@@ -60,6 +60,7 @@ from .form_scan_utils import (
 
 from .form_autofill import FormAutofillEngine
 from .result_protocol import err_with, ok_marked, affordances
+from .select_dispatch import resolve_select_dispatch
 from .select_match import suggest_field_for_value
 from .replay_timing import WAIT_500_MS, WAIT_3000_MS, budget_for
 
@@ -1101,10 +1102,20 @@ class SelectEngine(_FormActionEngineBase):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
-        # TsscMultiSelect is classified as tssc-multi-select; select_option's
-        # el-select path cannot pick remote table rows — hand off early.
-        if lookup_field_kind(self.business_data_store, label_text) == 'tssc-multi-select':
+        field_kind = lookup_field_kind(self.business_data_store, label_text)
+        dispatch = await resolve_select_dispatch(
+            label=label_text,
+            element=None,
+            field_kind=field_kind,
+            page=page,
+        )
+        sys.stderr.write(
+            f"[select] dispatch path={dispatch.path} reason={dispatch.reason} label={label_text!r}\n"
+        )
+        sys.stderr.flush()
+        if dispatch.path == "tssc":
             return await self.tssc_multi_select(label_text, option_text, xpath_smart)
+        # tree path: select_option does not handle tree today — fall through to el-select.
 
         async def _final_select_failure(result_text: str, xpath_for_log: str = '') -> str:
             diag = await reset_select_ui(page)
