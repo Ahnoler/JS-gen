@@ -93,7 +93,7 @@ export const GROUP_KB = [{
       ],
     },
     {
-      method: 'GET', path: '/api/v2/kb/req-modules/:moduleKey',
+      method: 'GET', path: '/api/v2/kb/req-modules/{moduleKey}',
       summary: '需求模块详情（manifest + 目录探测字段）',
       params: [
         { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
@@ -118,7 +118,7 @@ export const GROUP_KB = [{
       notes: ['模块不存在 → NOT_FOUND'],
     },
     {
-      method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/source',
+      method: 'POST', path: '/api/v2/kb/req-modules/{moduleKey}/source',
       summary: '上传源文档副本到作业区（自包含；D4 复用 multer）',
       desc: 'multipart 字段 file（.docx/.doc/.md/.txt/.pdf，≤20MB）；落盘 data/kb/req/<module>/source/<原文件名>，source.link.json 增 localCopy/sha256/bytes/uploadedAt（保留 sourcePath 兼容）。propose 的 sourceDoc 优先用本地副本相对路径。',
       params: [
@@ -139,7 +139,7 @@ export const GROUP_KB = [{
       notes: ['模块不存在 → NOT_FOUND', '非文档扩展名 → 400', '无本地副本的旧模块行为不变（回退 sourcePath）'],
     },
     {
-      method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/propose',
+      method: 'POST', path: '/api/v2/kb/req-modules/{moduleKey}/draft-traj/propose',
       summary: '从 through-chains 生成可勾选原子候选（写 .draft-traj-propose.json）',
       desc: '解析模块 through-chains.md，LLM 原子化后仅返回出处齐全的可选原子；出处不可解析的进 rejected。缓存带 cacheVersion/sourceHash/inputHash，源文件变更后旧缓存会被 commit 判过期。',
       params: [
@@ -186,7 +186,7 @@ export const GROUP_KB = [{
       ],
     },
     {
-      method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/commit',
+      method: 'POST', path: '/api/v2/kb/req-modules/{moduleKey}/draft-traj/commit',
       summary: '勾选原子 analyze→建 draft 交易（写出处字段，不录制）',
       desc: '从 propose 缓存读取 atomKeys 子集，analyze 后创建 recordStatus=draft 的交易；默认同 req_atom_key 已有草稿则 skip。',
       params: [
@@ -217,7 +217,7 @@ export const GROUP_KB = [{
       notes: ['atomKeys 必填且非空', '未先 propose → 400', 'propose 缓存版本过期或 through-chains.md 已变更 → 4xx STALE_PROPOSE_CACHE（须重新 propose）', '章节文件缺失/内容漂移（sha256 不符）→ skipped stale_chapter_ref', '缺 functionId 且无 override → skipped missing_function_id', '同键已有任意状态轨迹（draft/recorded…）→ skipped duplicate_draft；force 时 req_atom_seq 递增重建', 'analyze 失败的原子进 skipped，其余继续', '不调用 prepare/record'],
     },
     {
-      method: 'POST', path: '/api/v2/kb/req-modules/:moduleKey/draft-traj/validate',
+      method: 'POST', path: '/api/v2/kb/req-modules/{moduleKey}/draft-traj/validate',
       summary: 'commit 预校验（dry-run，不写库、不调 LLM）',
       desc: '与 commit 共用同一校验函数：缓存存在性、出处齐全、任意状态重复、functionId 存在性；返回会成功/会失败清单。',
       params: [

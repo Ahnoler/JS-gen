@@ -82,6 +82,10 @@ JS-gen/
 │   ├── routes/browser-session/        # Session 调试、Agent 消息和 CDP 监听
 │   ├── services/                      # 业务服务；trajectory/ 为轨迹子模块
 │   ├── dao/                           # MySQL 数据访问层
+│   ├── models/                        # 领域常量与实体模型（层级、动作、实体映射）
+│   ├── http/                          # HTTP 响应信封、错误与上传解析辅助
+│   ├── middleware/                    # Express 中间件（SSO 鉴权等）
+│   ├── memory/                        # AI 记忆读写（服务、协议、权重引擎）
 │   ├── runtime/                       # 浏览器、Python 子进程和运行时通道
 │   ├── cdp/                           # CDP 连接和页面定位辅助
 │   ├── dashboard/api-docs/             # API 文档目录和前端契约
@@ -89,6 +93,8 @@ JS-gen/
 │   ├── ws-server.js                   # Dashboard WebSocket
 │   ├── llm-utils.js                   # 独立 LLM 调用
 │   └── dedup.js                       # 连续动作去重
+├── data/
+│   └── kb/                            # 信贷知识库工作区（流程卡、需求模块作业区）
 ├── executor/
 │   ├── agent.mjs                      # 远程执行机入口
 │   ├── session-manager.js             # slot 和 Session 生命周期
@@ -416,6 +422,8 @@ form_snapshot / snapshot_field
 api_override / memory_* / sys_dict_* / sys_msg_*
 ```
 
+另有 KB 流程卡、req-atom、记忆明细、系统参照等表，完整清单见 `migrations/`。
+
 核心状态：
 
 - `trajectory.record_status`：`draft`、`recording`、`failed`、`recorded`、`completed`。
@@ -455,7 +463,7 @@ npm run lint
 npm run lint:fix
 
 node scripts/characterization/characterize-dedup.mjs
-node scripts/smoke/accept-replay-apis.mjs
+node scripts/smoke/accept-recording-apis.mjs
 python scripts/characterization/characterize-form-rules.py
 node scripts/characterization/characterize-trajectory.mjs
 

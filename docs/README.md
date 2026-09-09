@@ -20,14 +20,12 @@
 | [830格式对齐改造spec.md](830格式对齐改造spec.md) | 伙伴平台 V3 格式对齐规格（已收官，2026-09-08 补记） |
 | [报文日志捞取接口设计.md](报文日志捞取接口设计.md) | 被测系统三接口开发请求文档（已搁置；被动捕获框架资产保留） |
 | [spec-phase-done-cross-run-fix.md](spec-phase-done-cross-run-fix.md) | phase_done 跨 run 串台修复规格 |
-| [orchestration/](orchestration/) | 多子智能体编排框架（workflow 方式B） |
 
 ## 其它
 
 | 路径 | 用途 |
 |------|------|
 | [superpowers/archive/](superpowers/archive/) | 已落地规格/计划归档（保留作决策记录） |
-| [天阳信贷系统需求文档/](天阳信贷系统需求文档/)、[830需求文档+原型：菜单分级/](830需求文档+原型：菜单分级/)、[需求评审-菜单切换/](需求评审-菜单切换/) | 需求原始材料 |
 | [report/](report/) | 试用期日报（与产品 backlog 无关） |
 
 ## 目标定稿（勿再写「要全 DOM」）

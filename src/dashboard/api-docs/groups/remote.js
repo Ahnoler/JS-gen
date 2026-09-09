@@ -106,6 +106,21 @@ export const GROUP_REMOTE = [
         }]),
       },
       {
+        method: 'POST', path: '/api/v2/screenshots/pending/upload',
+        summary: '一键上传全部待补传截图',
+        desc: '立即把所有 `storage_type=local` 的截图推送 MinIO 并更新数据库（无视重试间隔与次数上限）。docs UI「待上传截图」板的一键按钮即调用此接口。',
+        respExample: J({ scanned: 3, uploaded: 2, failed: 1, skipped: 0 }),
+        notes: ['后台按 SCREENSHOT_RETRY_INTERVAL_MS（默认 3 分钟）自动重试；本接口为手动触发'],
+      },
+      {
+        method: 'POST', path: '/api/v2/screenshots/{id}/upload',
+        summary: '单张待补传截图上传',
+        desc: '按 id 上传单张本地暂存截图到 MinIO（docs UI 单行上传按钮）。404：截图不存在；`not_pending`：该行不在本地暂存（已上传过）。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        respExample: J({ id: 1, status: 'uploaded', storagePath: 'screenshots/2026/09/1.png', imageUrl: 'https://minio.example.com/bucket/screenshots/1.png' }),
+        notes: ['status: uploaded | not_found(404) | not_pending(404)', '上传后本地暂存文件随之删除'],
+      },
+      {
         method: 'GET', path: '/api/v2/trajectories/{trajectoryId}/screenshots',
         summary: '交易关联截图列表',
         params: [{ name: 'trajectoryId', type: 'number', required: true, in: 'path', example: '42' }],

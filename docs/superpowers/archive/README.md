@@ -16,6 +16,10 @@
 | | KB 战役（切片→晋升→贯通） | credit-knowledge-base、product-mgmt-kb、customer-mgmt-kb、customer-query-kb、req-doc-kb-import、kb-insights、drafts-promote（plan） |
 | | 收官单线 | auth-recording、ghost-pending-prune |
 | todos（2026-09-08 移入） | 已完成单点 TODO | auto-grab-fullpage-same-name、remove-legacy-section-chunking、split-form-actions |
+| 第三波（2026-09-10 迁入） | 早期已收官：agent 结果协议（引用已删 ctrl-actions 树） | agent-result-protocol（plan） |
+| | 早期已收官：消息捕获 MVP 与持久化、JS/Python 改名 | message-capture-mvp（spec）、capture-persistence（plan）、rename-js-python（plan） |
+| | 已落地：系统账号同名唯一提示 UX | system-account-name-unique-ux（spec+plan） |
+| | 已落地：需求草稿关键数据与流式 UX（引用已删 script-runner.js） | req-draft-keydata-and-streaming-ux（plan） |
 
 ## 第一波成对明细
 

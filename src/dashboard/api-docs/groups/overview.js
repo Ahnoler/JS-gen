@@ -62,6 +62,21 @@ export const GROUP_OVERVIEW = [
         ],
       },
       {
+        method: 'GET', path: '/api/v2/system-mgmt/search',
+        summary: '系统树搜索（legacy 别名，等价 tree?accounts=false&name=…）',
+        desc: '与 GET /tree 同实现（不含账号）。优先用 GET /api/v2/system-mgmt/tree?name=关键词（可加 type）；缺关键词 → 400 并提示改用 /tree。',
+        params: [
+          { name: 'name', type: 'string', in: 'query', desc: '名称关键词；亦可传 q / keyword', example: '客户' },
+          { name: 'type', type: 'number', in: 'query', desc: '1 系统 / 2 模块 / 3 功能', example: '3' },
+          { name: 'limit', type: 'number', in: 'query', desc: '默认 50', example: '50' },
+        ],
+        respExample: J({
+          code: 200,
+          message: 'ok',
+          data: [{ id: 0, type: 0, name: '根', children: [{ id: 3, type: 3, name: '查询客户', path: '核心系统/客户模块/查询客户' }] }],
+        }),
+      },
+      {
         method: 'GET', path: '/api/v2/system-mgmt/meta',
         summary: '节点类型常量',
         respExample: J({
@@ -170,34 +185,34 @@ export const GROUP_OVERVIEW = [
         notes: ['类型填：系统 / 模块 / 功能', '系统行父节点留空；模块父=系统名；功能父=系统名/模块名'],
       },
       {
-        method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/import-json',
+        method: 'POST', path: '/api/v2/system-mgmt/nodes/{id}/import-json',
         summary: '导入菜单 JSON（建模组件关系）',
-        desc: 'multipart/form-data，字段 file=被测系统《建模组件关系》.json。解析 umlRelInfo，在 :id 系统节点下建立两级菜单树（顶层子领域→模块、叶子子领域→功能，中间层不建节点），记录菜单唯一ID(umlEcd，建模码形如 UML…；与 AI 扫描写入的数字串 id 为两种来源格式)、功能节点落地 pageId（仅 managePage，0/1；写入 `system.pd_cmpt_ecd` + 至多一行 `system_page`）、来源标记 json_import；重复导入按 umlEcd 幂等更新，同名同类型已存在的非 JSON 节点会被收编。成功返回 201 与统计、重建后的树。',
+        desc: 'multipart/form-data，字段 file=被测系统《建模组件关系》.json。解析 umlRelInfo，在 {id} 系统节点下建立两级菜单树（顶层子领域→模块、叶子子领域→功能，中间层不建节点），记录菜单唯一ID(umlEcd，建模码形如 UML…；与 AI 扫描写入的数字串 id 为两种来源格式)、功能节点落地 pageId（仅 managePage，0/1；写入 `system.pd_cmpt_ecd` + 至多一行 `system_page`）、来源标记 json_import；重复导入按 umlEcd 幂等更新，同名同类型已存在的非 JSON 节点会被收编。成功返回 201 与统计、重建后的树。',
         tryable: false,
         reqExample: 'form-data: file=@全部领域-建模组件关系.json',
         respExample: J({ created: 120, updated: 0, adopted: 24, markedOffline: 0, pagesImported: 411, tree: [] }),
-        notes: [':id 必须是系统类型节点 (type=1)', '非顶层叶子子领域一律 intermediateFlag=1（全量 system_page 目录；不按活动拆导航叶；无按系统白名单）；SUT 同名可点菜单扫描后可升格为可导航（intermediateFlag=0，source 保持 json_import）；异名叶仍 create(source=ai)；扫描后同名/pageId 可回填建模 umlEcd；guidePages 不入库', 'JSON 中消失的旧 json_import 菜单会保留并标记 removedFlag（版本下线）；unmatchedFlag 归扫描', '可导航（非空 menu_xpath + 非空 umlEcd）时 umlEcd 全库唯一；与另一可导航节点撞码 → 409 code=CONFLICT（中文提示含占用节点 id/name），不静默改码'],
+        notes: ['{id} 必须是系统类型节点 (type=1)', '非顶层叶子子领域一律 intermediateFlag=1（全量 system_page 目录；不按活动拆导航叶；无按系统白名单）；SUT 同名可点菜单扫描后可升格为可导航（intermediateFlag=0，source 保持 json_import）；异名叶仍 create(source=ai)；扫描后同名/pageId 可回填建模 umlEcd；guidePages 不入库', 'JSON 中消失的旧 json_import 菜单会保留并标记 removedFlag（版本下线）；unmatchedFlag 归扫描', '可导航（非空 menu_xpath + 非空 umlEcd）时 umlEcd 全库唯一；与另一可导航节点撞码 → 409 code=CONFLICT（中文提示含占用节点 id/name），不静默改码'],
       },
         {
-          method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/scan-menu',
+          method: 'POST', path: '/api/v2/system-mgmt/nodes/{id}/scan-menu',
           summary: '触发菜单扫描（后台）',
           desc: '打开被测系统浏览器并自动登录，一次提取全部菜单（名称/层级/xpath），按中文名匹配回写 system.menu_xpath；SUT 有而 JSON 无的菜单按实际层级新增（source=ai）。apply 后对空 pd_cmpt_ecd 的 L2 功能点读天元（组件单码→场景编号）写入落地 pageId。后台异步执行，立即返回 202 与 scanId。同一时刻仅允许一个扫描任务（409 冲突）。导入 JSON 成功后默认自动触发（?autoScan=false 可关闭）。',
           tryable: false,
           reqExample: 'POST /api/v2/system-mgmt/nodes/1/scan-menu',
           respExample: J({ scanId: '<uuid>' }),
-          notes: ['系统节点需已配置 url 与登录账号（system_account）', '状态轮询：GET /api/v2/system-mgmt/menu-scan/:scanId', 'apply 写入 xpath/umlEcd 时校验可导航 umlEcd 唯一（与 import-json 同 guard）；冲突时任务 status=failed，error 含占用节点信息，不脏写'],
+          notes: ['系统节点需已配置 url 与登录账号（system_account）', '状态轮询：GET /api/v2/system-mgmt/menu-scan/{scanId}', 'apply 写入 xpath/umlEcd 时校验可导航 umlEcd 唯一（与 import-json 同 guard）；冲突时任务 status=failed，error 含占用节点信息，不脏写'],
         },
         {
-          method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/fill-pageid',
+          method: 'POST', path: '/api/v2/system-mgmt/nodes/{id}/fill-pageid',
           summary: '仅补采落地 pageId（默认 AI）',
-          desc: '登录被测系统后，对空 pd_cmpt_ecd 的 L2 点读天元写入落地 pageId；默认只处理 source=ai。不扫菜单树、不改菜单结构。与 scan-menu 共用单飞锁与状态轮询 GET menu-scan/:scanId。',
+          desc: '登录被测系统后，对空 pd_cmpt_ecd 的 L2 点读天元写入落地 pageId；默认只处理 source=ai。不扫菜单树、不改菜单结构。与 scan-menu 共用单飞锁与状态轮询 GET menu-scan/{scanId}。',
           tryable: false,
           reqExample: 'POST /api/v2/system-mgmt/nodes/1/fill-pageid\nPOST /api/v2/system-mgmt/nodes/1/fill-pageid?sources=ai',
           respExample: J({ scanId: '<uuid>' }),
           notes: ['query.sources 逗号分隔，默认 ai', 'stats：pageIdCandidates/pageIdFilled/pageIdSkipped', '读不到或 L2 点击失败 skip；不写 AILZ；不覆盖已有 pageId'],
         },
         {
-          method: 'GET', path: '/api/v2/system-mgmt/menu-scan/:scanId',
+          method: 'GET', path: '/api/v2/system-mgmt/menu-scan/{scanId}',
           summary: '菜单扫描状态轮询',
           desc: 'running 返回 202，completed/failed 返回 200。stats 含 totalScanned/matched/created/clearedUnmatched/unmatchedScanned/pageIdCandidates/pageIdFilled/pageIdSkipped（fill-pageid 任务仅含 pageId* 与 sources）。',
           tryable: false,
@@ -206,7 +221,7 @@ export const GROUP_OVERVIEW = [
           notes: ['读不到天元编号时 skip 不失败', '不覆盖已有 pageId（仅空 pd_cmpt_ecd）', '不写 AILZ 到菜单'],
         },
         {
-          method: 'GET', path: '/api/v2/system-mgmt/nodes/:id/change-log',
+          method: 'GET', path: '/api/v2/system-mgmt/nodes/{id}/change-log',
           summary: '菜单变更历史',
           desc: '按系统节点返回菜单变更逐事件流水（id 倒序）。source=import（JSON 导入）/ scan（菜单扫描）；change_type 含 renamed/updated/adopted/created/moved/transaction_migrated/deleted/merged/unmatched_marked/offline_marked（导入侧版本已下线）；detail 为 JSON 字符串。测试人员查版本演化（version 过滤），管理员按 transaction_migrated 记录手动迁移排查。',
           params: [
@@ -223,14 +238,14 @@ export const GROUP_OVERVIEW = [
           notes: ['detail 为 JSON 字符串，前端需自行 parse', 'transaction_migrated 的 detail 含 trajectoryId/fromFunctionId/toFunctionId/pageId，用于手动迁移排查'],
         },
         {
-          method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/push-menu',
+          method: 'POST', path: '/api/v2/system-mgmt/nodes/{id}/push-menu',
           summary: '推送系统菜单至伙伴平台',
-          desc: '从本仓系统节点组菜单，POST 伙伴 importData。`:id` 为本仓系统 id（菜单来源）；body 须带伙伴 `systemNodeId`（下拉 getSystemNodeLevel 所选）。',
+          desc: '从本仓系统节点组菜单，POST 伙伴 importData。`{id}` 为本仓系统 id（菜单来源）；body 须带伙伴 `systemNodeId`（下拉 getSystemNodeLevel 所选）。',
           tryable: false,
           reqExample: 'POST /api/v2/system-mgmt/nodes/1/push-menu\n{ "systemNodeId": 51, "systemName": "系统1" }',
           respExample: J({ status: 'pushing', menuVersion: 8, menuCount: 42, partner: { code: 200, msg: '20260902100654-116736' }, partnerWire: { systemNodeId: 51, systemName: '系统1', menuVersion: 8, menuCount: 42 }, source: { systemId: 'JSGEN:1', systemName: 'JSGEN:信贷系统' }, autoSyncMs: 5000 }),
           notes: [
-            ':id 必须是本仓系统类型节点 (type=1)，决定 menus[] 数据来源',
+            '{id} 必须是本仓系统类型节点 (type=1)，决定 menus[] 数据来源',
             'body.systemNodeId（或 partnerSystemId）= 伙伴平台系统 id，来自 GET /api/v2/export/partner/menu-push/systems',
             'body.systemName（或 partnerSystemName）= 伙伴平台系统名，与下拉选中项 name 一致，必填',
             'menus[].umlEcd / parentUmlEcd：json_import 为建模 UML… 码；AI 扫描为 String(node.id)；空库值推送时回退节点 id',
@@ -241,7 +256,7 @@ export const GROUP_OVERVIEW = [
           ],
         },
         {
-          method: 'GET', path: '/api/v2/system-mgmt/nodes/:id/push-menu/status',
+          method: 'GET', path: '/api/v2/system-mgmt/nodes/{id}/push-menu/status',
           summary: '菜单推送状态轮询',
           desc: '返回 status/menuVersion/pushedAt/syncedAt/error。pushing 超过 autoSyncMs 时服务端自动纠偏为 synced。',
           params: [

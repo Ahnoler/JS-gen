@@ -1,7 +1,7 @@
 {
   "name": "opencode-agent-api",
   "version": "1.0.0",
-  "description": "Browser automation control plane: v2 trajectory record/replay, MySQL, executor, Playwright assemble/run",
+  "description": "Browser automation control plane: v2 trajectory record/replay APIs, MySQL persistence, remote executor nodes, and standalone LLM proxy",
   "type": "module",
   "imports": {
     "#config/*": "./config/*",

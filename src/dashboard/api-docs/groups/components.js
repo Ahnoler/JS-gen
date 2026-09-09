@@ -78,6 +78,23 @@ export const GROUP_COMPONENTS = [
         ],
       },
       {
+        method: 'POST', path: '/api/v2/special-elements/{id}/steps',
+        summary: '追加单步（stepNumber 自动递增）',
+        desc: '在特殊元素尾部追加一步并回写 stepCount；父元素 embeddingStatus=ready 时置 stale。返回 201 与新建步骤行。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        reqExample: J({
+          actionType: 'click',
+          actionIndex: 0,
+          paramsJson: { xpath: '//button[normalize-space()="查询"]' },
+          elementJson: null,
+        }),
+        notes: [
+          'actionType 必填（缺失 → 400）',
+          'id 非法 → 400；元素不存在 → 404',
+          'paramsJson 亦可传 params、elementJson 亦可传 element（同义别名）',
+        ],
+      },
+      {
         method: 'PATCH', path: '/api/v2/special-element-steps/{id}',
         summary: '更新单步 action/params/element',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],

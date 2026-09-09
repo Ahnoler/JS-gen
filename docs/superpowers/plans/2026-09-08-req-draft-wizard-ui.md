@@ -26,6 +26,8 @@
 
 ## File map
 
+> 注（2026-09-10）：文中 `src/views`（及 `vue-project/src/...`）均指 SPA 代码，位于独立仓库 **ui-auto-recording-agent-vue（vue-project）**，不在本仓 JS-gen 内。
+
 | 文件 | 职责 |
 |------|------|
 | `JS-gen/src/services/kb-req-modules.js` | `listReqModules` 附加 `hasThroughChains` |

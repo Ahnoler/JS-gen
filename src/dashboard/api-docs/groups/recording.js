@@ -390,6 +390,20 @@ export const GROUP_RECORDING = [
         params: [{ name: 'nodeUuid', type: 'string', required: true, in: 'path', example: 'abc' }],
         reqExample: J({}),
       },
+      {
+        method: 'POST', path: '/api/v2/executors/{nodeUuid}/sessions/{sessionId}/close',
+        summary: '关闭孤儿执行机会话（keepBrowser=true）',
+        desc: '按 nodeUuid + sessionId 关闭执行机上无 trajectory 绑定的孤儿会话：杀 Python agent，Chrome 保留在 CDP 供复用。docs UI「执行机监视」板的清理按钮即调用此接口。',
+        params: [
+          { name: 'nodeUuid', type: 'string', required: true, in: 'path', example: 'abc' },
+          { name: 'sessionId', type: 'string', required: true, in: 'path', example: 'sess-1' },
+        ],
+        respExample: J({ status: 'closed', nodeUuid: 'abc', sessionId: 'sess-1', keepBrowser: true }),
+        notes: [
+          '节点未连接 → 409；session 不在该执行机上 → 404',
+          '仅清理孤儿会话（无 trajectory 绑定）；正常会话走 POST /trajectories/{id}/detach',
+        ],
+      },
     ],
   },
 ];
