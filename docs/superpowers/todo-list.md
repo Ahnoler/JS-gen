@@ -125,6 +125,8 @@
 | **PR-SSO-ADMIN** | 挂起 | 管理员映射/权限闸等会议结论；阻塞 messages/case-data/screenshots 用户隔离、单条归属校验、「只看我的」UI |
 | **PR-EXEC** | 挂起 | 脚本执行（引擎/执行机）；本侧只提供浏览器操作与 actions 设计，暂不排调度产品 |
 | **PR-BATCH 小缺口** | P3 | 列表页 batchTaskName 筛选入口、顶栏徽标文案（后端参数已支持） |
+| **screenshot-quality** | 前置 | 优化截图功能（用户 2026-09-09：截图仍有问题）；**是 PR-LOC-HL 步骤级高亮的前置** |
+| **PR-LOC-HL** | 前端主力 | 步骤级高亮（bbox 画框）本体由前端开发；前置=screenshot-quality 截图优化完成后做；后端待前端推送结构要求后改数据结构（G 阶段内状态组截图已落 `0e1bee0`） |
 | **login-retry-heuristic** | P3 | prepare 登录冷启动失败固定等 8s 重试一次（attach-runner.js:197）是启发式非事件驱动，慢环境会误判失败；改事件驱动/指数退避（来源：2026-09-05 会话生命周期梳理 §5.8） |
 | **stop-busy-race** | P3 | record/stop 不等 busy（可能 stale）直接发 cancel_step（record-lifecycle.js:321 注释自认）；极端时对正收尾的 agent 发取消（来源同上） |
 
