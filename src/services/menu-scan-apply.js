@@ -9,6 +9,7 @@ import * as systemMenuSnapshotDao from '../dao/system-menu-snapshot-dao.js';
 import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import { NODE_TYPE } from '../models/hierarchy-constants.js';
 import { pickUmlEcdFromIntermediates } from './menu-scan-uml-adopt.js';
+import { assertUmlEcdNavAvailable } from './menu-uml-ecd-nav-guard.js';
 
 /**
  * AI 新建节点：用自身 DB id 写入 umlEcd。
@@ -24,6 +25,10 @@ import { pickUmlEcdFromIntermediates } from './menu-scan-uml-adopt.js';
 async function assignAiUmlEcdFromId(created, trx) {
   const id = Number(created.id);
   const umlEcd = String(id);
+  await assertUmlEcdNavAvailable(
+    { umlEcd, menuXpath: created.menuXpath || '', excludeNodeId: id },
+    trx,
+  );
   await systemDao.update(id, { umlEcd }, trx);
   return umlEcd;
 }
@@ -83,6 +88,10 @@ export async function adoptModelingUmlEcdUnderSystem(systemNodeId, trx) {
         intermediates,
       );
       if (!uml) continue;
+      await assertUmlEcdNavAvailable(
+        { umlEcd: uml, menuXpath: nav.menuXpath, excludeNodeId: nav.id },
+        trx,
+      );
       await systemDao.update(Number(nav.id), { umlEcd: uml }, trx);
       adopted += 1;
     }
@@ -117,6 +126,11 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
 
     // 更新命中节点（L1/L2 一并），写回真实菜单顺序 sortOrder；xpath 命中改名时同步 name。
     for (const u of plan.updates) {
+      const node = await systemDao.getRawById(u.nodeId, trx);
+      await assertUmlEcdNavAvailable(
+        { umlEcd: node.umlEcd, menuXpath: u.menuXpath, excludeNodeId: u.nodeId },
+        trx,
+      );
       await systemDao.update(
         u.nodeId,
         {

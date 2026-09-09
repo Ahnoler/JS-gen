@@ -127,6 +127,7 @@ run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/c
 run "characterize-fill-replay-engine" "$PY" scripts/characterization/cold/characterize-fill-replay-engine.py
 run "characterize-select-dispatch" "$PY" scripts/characterization/cold/characterize-select-dispatch.py
 run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/characterize-select-replay-engine.py
+run "characterize-radio-replay-engine" "$PY" scripts/characterization/cold/characterize-radio-replay-engine.py
 run "characterize-tssc-multi-select" "$PY" scripts/characterization/cold/characterize-tssc-multi-select.py
 run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs
@@ -137,6 +138,7 @@ run "characterize-executor-orphan-reconcile" node scripts/characterization/chara
 run "characterize-system-import-json" node scripts/characterization/characterize-system-import-json.mjs
 run "characterize-menu-scan" node scripts/characterization/characterize-menu-scan.mjs
 run "characterize-menu-scan-uml-adopt" node scripts/characterization/characterize-menu-scan-uml-adopt.mjs
+run "characterize-menu-uml-ecd-nav-guard" node scripts/characterization/characterize-menu-uml-ecd-nav-guard.mjs
 run "characterize-special-element" node scripts/characterization/characterize-special-element.mjs
 run "characterize-replay-batch" node scripts/characterization/characterize-replay-batch.mjs
 run "characterize-record-status" node scripts/characterization/characterize-record-status.mjs

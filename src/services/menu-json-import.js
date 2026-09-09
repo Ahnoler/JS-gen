@@ -12,6 +12,7 @@ import * as systemPageDao from '../dao/system-page-dao.js';
 import * as systemMenuSnapshotDao from '../dao/system-menu-snapshot-dao.js';
 import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import { getTree } from './hierarchy-service.js';
+import { assertUmlEcdNavAvailable } from './menu-uml-ecd-nav-guard.js';
 
 const NODE_TYPE_MODULE = 2;
 const NODE_TYPE_FUNCTION = 3;
@@ -317,6 +318,11 @@ export async function importMenuJson(systemNodeId, buffer) {
           // 变更事件：节点迁移（5.3）
           changeRows.push({ changeType: 'moved', nodeId: Number(node.id), detail: { name, oldParentId, newParentId: Number(parentId) } });
         }
+        const nextXpath = String(node.menuXpath || patchCommon.menuXpath || '').trim();
+        await assertUmlEcdNavAvailable(
+          { umlEcd, menuXpath: nextXpath || String(node.menuXpath || ''), excludeNodeId: node.id },
+          trx,
+        );
         await systemDao.update(node.id, patchCommon, trx);
         stats.updated += 1;
         // 变更事件：改名 / 更新
@@ -330,12 +336,18 @@ export async function importMenuJson(systemNodeId, buffer) {
         // 分支 2：同父同型同名命中（收编）
         if (childIndex.has(key)) {
           node = childIndex.get(key);
+          const nextXpath = String(node.menuXpath || patchCommon.menuXpath || '').trim();
+          await assertUmlEcdNavAvailable(
+            { umlEcd, menuXpath: nextXpath || String(node.menuXpath || ''), excludeNodeId: node.id },
+            trx,
+          );
           await systemDao.update(node.id, patchCommon, trx);
           stats.adopted += 1;
           // 变更事件：收编
           changeRows.push({ changeType: 'adopted', nodeId: Number(node.id), detail: { name } });
         } else {
           // 分支 3：新建
+          await assertUmlEcdNavAvailable({ umlEcd, menuXpath: '' }, trx);
           node = await systemDao.create({
             type,
             parentId,
