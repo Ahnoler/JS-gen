@@ -1,7 +1,7 @@
 # KB 召回评测常态化 — 设计
 
 > 日期：2026-09-09  
-> 状态：**待审阅**（批准后进入 [`plans/2026-09-09-kb-recall-eval.md`](../plans/2026-09-09-kb-recall-eval.md)）  
+> 状态：**已确认**（2026-09-09 Lead 裁定：全部按 reviewer 推荐，进入 [`plans/2026-09-09-kb-recall-eval.md`](../plans/2026-09-09-kb-recall-eval.md) 实施）  
 > 作者：DSH reviewer（依据 2026-09-09 基于公开标准的重评分结论）  
 > 相关：[`specs/2026-09-08-kb-remediation-design.md`](./2026-09-08-kb-remediation-design.md)（D3 共享金样例）、[`reports/2026-09-09-kb-remediation-reviewer-verdict.md`](../reports/2026-09-09-kb-remediation-reviewer-verdict.md)  
 > 标准依据（公开资料）：RAGAS 指标族、IR 排序指标（Recall@k/MRR/nDCG）、TruLens RAG Triad、RAG 评测综述（arXiv 2405.07437）、Chroma 分块评估（token 级 P/R/IoU）、DAMA-DMBOK 数据质量维度
@@ -179,12 +179,23 @@ node scripts/kb/recall-eval.mjs --json               # 机器可读
 | R5 `propose.js` 他线在改（entry-only atom 折叠） | 本线文件集不含 `propose.js`；`flow-card-recall.js` 改动与 `propose.js` 无同文件冲突，但需复跑 `characterize-req-draft-traj` |
 | R6 阈值过紧导致误红 | 余量上限见 §6；先测后定 |
 
-## 13. 审阅请确认
+## 13. 决策确认（2026-09-09 已定）
 
-1. §4 D1（评测集与契约金样例分离）是否接受。
-2. §5.1 配额（130 条 / 覆盖 ≥50 卡 / 负样本 30）是否调整。
-3. §5.2 标注人由谁承担（Lead / 业务 / 实施方），复核人是否为 reviewer。
-4. §7 ranked 是否对外暴露（默认仅内部）。
-5. §6 阈值「基线 − 余量」的上限是否认可（Acc@1 −0.05 / MRR −0.08 / 拒答 −0.05）。
+Lead 裁定：**全部按 reviewer 推荐执行**，不再逐项回问。
 
-确认后进入 plan 逐 Task 实施；实施完成后由 reviewer 按 plan 的 Reviewer Checklist 复核。
+| # | 决策项 | 采纳结论 |
+|---|---|---|
+| 1 | §4 D1 契约层/质量层分离 | **接受**。24 条金样例继续管跨语言契约；新建 130 条评测集管质量门禁 |
+| 2 | §4 D2 ranked 形态 | **接受**。新增 `rankFlowCards()`，`matchFlowForAtom` 语义与返回形状不变 |
+| 3 | §4 D3 标注纪律 | **接受**。禁止先跑实现；允许多 gold；歧义条目剔除 |
+| 4 | §4 D4 阈值先测后定 | **接受**。基线 − 余量提案，Lead 批准后写入 |
+| 5 | §4 D5 延迟冷/热分报 | **接受**。热态含语料画像缓存，冷态击穿缓存单测 |
+| 6 | §4 D6 PY 侧范围 | **接受**。PY 只断言正样本 flowRef 一致性，不参与 JS 指标门禁 |
+| 7 | §4 D7 评测集冻结 | **接受**。`evalVersion` + `changeLog`，变更需批准 |
+| 8 | §5.1 配额 | **维持** 130 条（A40/B30/C15/D15/N30），覆盖 ≥50 卡，单卡 ≤4 条 |
+| 9 | §5.2 标注分工 | **主标 = 实施方**（从语料出发，禁跑匹配器）；**复核 = reviewer 独立抽检 15 条**，分歧率 >10% 回炉重标；歧义条目由 **Lead 裁决** |
+| 10 | §7 ranked 对外暴露 | **默认不暴露**（仅内部评测用）；若后续产品化再单独立项 |
+| 11 | §6 阈值余量上限 | **认可**：Acc@1 −0.05 / Recall@5 −0.05 / MRR −0.08 / nDCG −0.08 / 拒答 −0.05 / 噪声 −0.10；热 p95 ≤50ms、冷 p95 ≤200ms |
+| 12 | reviewer 角色 | 不变：实施完成后由 reviewer 按 plan 的 Reviewer Checklist 复核，出具 PASS / FAIL / DONE_WITH_CONCERNS |
+
+实施按 plan T0 → T7 推进；每个 Task 交付后把 commit hash + 证据目录交 reviewer 复核。

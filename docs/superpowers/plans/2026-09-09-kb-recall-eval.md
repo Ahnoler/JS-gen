@@ -10,6 +10,22 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-09-kb-recall-eval-design.md`
 
+## Approved Decisions（2026-09-09 Lead 裁定：全部按 reviewer 推荐）
+
+| # | 决策 | 采纳结论 |
+|---|---|---|
+| D1 | 契约层/质量层 | 分离：`kb-recall-golden.json`（24 条，跨语言契约）+ `kb-recall-eval.v1.json`（130 条，质量门禁） |
+| D2 | ranked 形态 | 新增 `rankFlowCards()`；`matchFlowForAtom` 不变 |
+| D3 | 标注纪律 | 禁反推 + 多 gold + 歧义剔除 |
+| D4 | 阈值 | 先测后定（基线 − 余量），Lead 批准 |
+| D5 | 延迟 | 冷/热分报 |
+| D6 | PY 范围 | 只断言正样本 flowRef 一致，不入门禁 |
+| D7 | 评测集 | 冻结 + `evalVersion` + `changeLog` |
+| D8 | 配额 | 130 条（A40/B30/C15/D15/N30），≥50 卡，单卡 ≤4 条 |
+| D9 | 标注分工 | 主标=实施方（禁跑匹配器）；复核=reviewer 抽检 15 条（分歧 >10% 回炉）；歧义 Lead 裁决 |
+| D10 | ranked 暴露 | 默认仅内部，不写 api-docs |
+| D11 | 阈值余量 | Acc@1 −0.05 / Recall@5 −0.05 / MRR −0.08 / nDCG −0.08 / 拒答 −0.05 / 噪声 −0.10 |
+
 **基线（2026-09-09 reviewer 实测，20 条独立 hold-out + 留一法近似排序）**
 
 | 指标 | 基线 |
