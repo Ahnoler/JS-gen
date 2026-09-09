@@ -17,6 +17,12 @@
 - 禁入区：`config/update-db-whitelist.ps1`（他线 M 态）、`.cursor/`、Cursor tssc_multi_select v2 线文件（10:31/10:32 声明）、`scripts/controller/**`、`src/services/trajectory/**`、引擎 P0/P1 修复线（报告已入库待用户拍板，另开工）
 - 方式：主线程直接实施（小改动不派子智能体）；验证=新冷区行为 pin + verify-all + lint；执行机重启需协调（不打断在途录制），本单元只交付代码不改运行进程
 
+## 2026-09-09 10:55 · Cursor Lead — 收工：修订 tssc v2 spec D6（回链 10:54）
+
+- 完成：`2026-09-09-tssc-multi-select-v2-design.md` 增补 §2.1 / D6——agent 只调 `select_option`；controller 不向 agent 注册 `tssc_multi_select`；handoff 录制改记 `select_option`；失败文案禁止引导直调
+- 验收：用户口述裁决已写入决议表 D6 与 In/Out/Prompt/验收 C6–C7
+- 遗留：用户终审后 writing-plans → 实现（含反注册 + JS v2）
+
 ## 2026-09-09 10:54 · Cursor Lead — 开工：修订 tssc v2 spec（select_option 唯一对外面）
 
 - 进行中：10:54；用户裁决——agent 不直接调 tssc_multi_select；controller 不向 agent 注册该动作；一律 select_option 转调内部实现
