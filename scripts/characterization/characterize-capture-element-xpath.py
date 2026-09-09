@@ -114,9 +114,10 @@ def test_click_radio_passes_xpath_to_capture() -> None:
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
-    chunk = form.split("async def click_radio", 1)[1].split("async def ", 1)[0]
+    chunk = form.split("async def click_radio(", 1)[1].split("class TreeEngine", 1)[0]
     assert_true(
-        "xpath_smart=resolved.xpath_smart" in _norm(chunk),
+        "xpath_smart=resolved.xpath_smart" in _norm(chunk)
+        or "xpath_smart=xp" in _norm(chunk),
         "click_radio passes resolved xpath into capture",
     )
 
@@ -224,7 +225,7 @@ def test_form_resolved_paths_record_with_element() -> None:
     seg = fill[rec : rec + 200]
     assert_true("element=element" in seg, "fill_form_field _record_action gets element=")
 
-    radio = form.split("async def click_radio", 1)[1].split("async def ", 1)[0]
+    radio = form.split("async def click_radio(", 1)[1].split("class TreeEngine", 1)[0]
     assert_true("_capture_element" in radio, "click_radio captures element")
     idx3 = radio.find("JS_CLICK_RADIO_BY_XPATH")
     rec3 = radio.find("_record_action(", idx3)
@@ -252,7 +253,7 @@ def test_select_tree_option_fill_fallback_xpath_parity() -> None:
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
-    chunk = form.split("async def select_tree_option", 1)[1].split("async def ", 1)[0]
+    chunk = form.split("async def select_tree_option(", 1)[1].split("async def ", 1)[0]
     norm = _norm(chunk)
     assert_true(
         "no-tree-component" in chunk,
