@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 12:00 · Cursor Lead — 收工：tssc v2 实现 Subagent-Driven（回链 11:07）
+
+- 完成：T1–T4 落地 — commits `02f6d1f6..32c1352d`（pin → JS P0–P2 → 引擎录 `select_option` → D6 反注册+prompt/autofill/wizard/_llm_values）；`characterize-tssc-multi-select` / `select-option-stamp` / `agent-prompt-packs` **GREEN**
+- 验收：核心 cold pin 全绿；`bash scripts/refactor/verify-all.sh` 本轮 **FAILED**（与本线无关环境噪：`characterize-step-highlight` / `layer-tree` MySQL `ETIMEDOUT`；`network-capture` WSL 临时路径 python probe）——tssc 相关步骤在同次 gate 内为 ok
+- 遗留：重启 executor 后湿测要素名称/客户名称；verify-all 环境噪可另开；SDD workspace `.superpowers/sdd/2026-09-09-tssc-multi-select-v2/` 可删
+
 ## 2026-09-09 11:07 · Cursor Lead — 开工：tssc v2 实现（Subagent-Driven T1–T5）
 
 - 进行中：11:07；按 `docs/superpowers/plans/2026-09-09-tssc-multi-select-v2.md` 派子智能体逐任务；子智能体不 commit，主会话验收后代提交；子智能体不写 agent-log
