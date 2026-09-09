@@ -3,6 +3,13 @@
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
 
+## 2026-09-09 22:08 · Cursor Lead — 开工：有 xpath 的 uml_ecd 唯一 SDD 实现
+
+- 进行中：22:08；用户选 Subagent-Driven；plan `docs/superpowers/plans/2026-09-09-uml-ecd-nav-unique.md`
+- 范围：迁移、`menu-uml-ecd-nav-guard.js`、`menu-scan-apply`/`menu-json-import` 接线、表征 pin、api-docs 一句、本文件；ledger `.superpowers/sdd/2026-09-09-uml-ecd-nav-unique/`
+- 禁入区：radio unify / search-then-click 热区与其 WIP（`search_then_click_guard.py`、radio cold pin、他线正在改的 `verify-all.sh` 大段）；fill/select；`.cursor/`
+- 方式：SDD Task 1–5；子智能体不 commit，主会话验收后代提交；verify-all 注册时只追加本 pin 一行，避开他线冲突
+
 ## 2026-09-09 22:02 · Cursor Lead — 收工：有 xpath 的 uml_ecd 唯一 implementation plan（回链 21:57）
 
 - 完成：plan `docs/superpowers/plans/2026-09-09-uml-ecd-nav-unique.md`（T1 红 pin → T2 guard → T3 迁移 → T4 接线 → T5 docs）；spec 链 plan（`1bb8c592`）
