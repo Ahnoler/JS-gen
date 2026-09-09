@@ -60,7 +60,7 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         }
     }
     if (!host && !vm) {
-        return 'no-tssc-multi-select | Not TsscMultiSelect. Do NOT retry tssc_multi_select.';
+        return 'no-tssc-multi-select | Not TsscMultiSelect. Use select_option for plain el-select, or report.';
     }
 
     const triggerInput = fieldItem.querySelector('.el-select .el-input__inner')

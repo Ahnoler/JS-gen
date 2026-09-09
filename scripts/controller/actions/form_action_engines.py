@@ -1615,7 +1615,7 @@ class SelectEngine(_FormActionEngineBase):
             )
         if res_s.startswith('no-tssc-multi-select'):
             return (
-                res_s + ' Do NOT retry select_option for TsscMultiSelect. '
+                res_s + ' Field is not TsscMultiSelect. '
                 'Use select_option for plain el-select, or report.'
             )
         if res_s.startswith('err-no-echo'):
