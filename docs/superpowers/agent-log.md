@@ -4,7 +4,7 @@
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
 ## 2026-09-09 23:06 · Cursor Subagent — 收工：有 xpath 的 uml_ecd 唯一 SDD close（回链 22:08）
 
-- 完成：Tasks 1–4 已提交 `f3d1c9cf`（红 pin）/ `ceb72223`（guard）/ `a9919634`（迁移 uk_uml_ecd_nav）/ `b7aa21db`（scan/import/adopt 接线）；Task 5 api-docs + spec 已落地 + 本收工（**未 commit**，待主会话验收）
+- 完成：Tasks 1–5：`f3d1c9cf`（红 pin）/ `ceb72223`（guard）/ `a9919634`（迁移 uk_uml_ecd_nav）/ `b7aa21db`（接线）/ `cd6f285b`（docs close）
 - 验收：`node scripts/characterization/characterize-menu-uml-ecd-nav-guard.mjs` OK
 - 遗留：湿环境须跑迁移 `20260909220000_system_uml_ecd_nav_unique.js`（他库若有双 xpath 同 uml 会先硬失败）；radio / search-then-click 他线 WIP 与本线无关
 
