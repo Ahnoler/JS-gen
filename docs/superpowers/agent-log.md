@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 15:35 · Cursor Lead — 收工：fill 录放统一 implementation plan（回链 15:30）
+
+- 完成：`docs/superpowers/plans/2026-09-09-fill-record-replay-unify.md`（Task 1–9：A 红 pin→fill_dispatch→双接线→契约；B 红 pin→FillEngine mode→replay 调引擎→verify-all）；spec 链 plan
+- 验收：覆盖表对照 fill spec；对齐 select unify 样板；login/点击族明确不动
+- 遗留：用户选 Subagent-Driven 或 Inline 后实现
+
+## 2026-09-09 15:30 · Cursor Lead — 开工：fill 录放统一 implementation plan
+
+- 进行中：15:30；用户「继续」；writing-plans，不实现
+- 范围：plan 文件、spec 状态行、本文件
+- 禁入区：实现代码、点击族、whitelist、kb、`.cursor/`
+- 方式：writing-plans → 请用户选执行方式
+
 ## 2026-09-09 15:25 · Cursor Lead — 收工：fill 录放统一设计稿 A→B（回链 15:22）
 
 - 完成：`docs/superpowers/specs/2026-09-09-fill-record-replay-unify-design.md`（对齐 select A→B；点击族仅路线图）
