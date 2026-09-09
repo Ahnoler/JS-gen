@@ -100,7 +100,8 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
         summary: '交易详情（含 phases、businessEntries）',
-        desc: 'businessEntries 为交易级 legacy KV（business_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。',
+        desc: 'businessEntries 为交易级 legacy KV（business_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。'
+          + ' KB 出处列（camelCase，缺省 null）：reqModuleKey / reqSourcePath / reqChapterRef / reqAtomKey / reqAtomSeq（force 重提交序号，默认 0）/ reqSourceHash（propose 时章节文件 sha256）/ reqChunkId（`<章节文件>#<H1 slug>`）/ kbFlowRef / kbFlowNodeId；章节内容变更后 commit 会跳过该原子（skipped.reason=stale_chapter_ref）。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {

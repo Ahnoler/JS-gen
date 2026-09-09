@@ -6,12 +6,17 @@
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+// F-B: keep observability writes out of the repo (data/kb/staging).
+const OBSERVE_TMP = mkdtempSync(join(tmpdir(), 'kb-observe-'));
+process.env.KB_STAGING_DIR = OBSERVE_TMP;
+const REPO_OBSERVE_FILE = join(ROOT, 'data/kb/staging/propose-runs.jsonl');
+const repoObserveMtime = existsSync(REPO_OBSERVE_FILE) ? statSync(REPO_OBSERVE_FILE).mtimeMs : 0;
 let passed = 0;
 
 function run(name, fn) {
@@ -252,6 +257,12 @@ async function main() {
     const cachePath = join(tmp, 'demo-mod', '.draft-traj-propose.json');
     assert.ok(existsSync(cachePath));
     rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose observability honors KB_STAGING_DIR and never touches the repo staging dir', async () => {
+    assert.ok(existsSync(join(OBSERVE_TMP, 'propose-runs.jsonl')), 'isolated staging dir should receive propose-runs.jsonl');
+    const repoMtime = existsSync(REPO_OBSERVE_FILE) ? statSync(REPO_OBSERVE_FILE).mtimeMs : 0;
+    assert.equal(repoMtime, repoObserveMtime, 'repo data/kb/staging/propose-runs.jsonl must not be written by characterization');
   });
 
   await runAsync('proposeDraftTrajectories sanitizes ZJJK from 关键数据 into pageCodes', async () => {
@@ -970,13 +981,13 @@ async function main() {
     });
     let before = 0;
     try {
-      before = readFileSync(join(ROOT, 'data/kb/staging/propose-runs.jsonl'), 'utf8').split('\n').filter((l) => l.trim()).length;
+      before = readFileSync(join(OBSERVE_TMP, 'propose-runs.jsonl'), 'utf8').split('\n').filter((l) => l.trim()).length;
     } catch {
       before = 0;
     }
     await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM, listSystemsFn: async () => [] });
     await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM, listSystemsFn: async () => [] });
-    const lines = readFileSync(join(ROOT, 'data/kb/staging/propose-runs.jsonl'), 'utf8').split('\n').filter((l) => l.trim());
+    const lines = readFileSync(join(OBSERVE_TMP, 'propose-runs.jsonl'), 'utf8').split('\n').filter((l) => l.trim());
     assert.equal(lines.length, before + 2);
     const last = JSON.parse(lines[lines.length - 1]);
     for (const field of ['ts', 'moduleKey', 'atoms', 'rejected', 'truncated', 'cacheVersion', 'sourceHash', 'durationMs', 'flowRefHits', 'functionIdCandidateHits']) {

@@ -12,6 +12,9 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+// F-B: keep observability writes out of the repo (data/kb/staging).
+const OBSERVE_TMP = mkdtempSync(join(tmpdir(), 'kb-observe-'));
+process.env.KB_STAGING_DIR = OBSERVE_TMP;
 let passed = 0;
 
 function run(name, fn) {
@@ -311,6 +314,15 @@ async function main() {
           assert.notEqual(hit.nodeId, entry.forbidNodeId, `query="${entry.query}" nodeId must not be ${entry.forbidNodeId}`);
         }
       }
+    });
+
+    await runAsync('matchFlowForAtom exposes winning card score (F-C)', async () => {
+      const hit = matchFlowForAtom({ title: '查询产品列表', taskDraft: '', cards: realCards });
+      assert.equal(typeof hit.score, 'number');
+      assert.ok(hit.score > 0);
+      const miss = matchFlowForAtom({ title: '今天天气不错，我们去吃饭吧', taskDraft: '', cards: realCards });
+      assert.equal(miss.flowRef, null);
+      assert.equal(miss.score, null);
     });
 
     await runAsync('recall perf: 800-char single query under 200ms', async () => {

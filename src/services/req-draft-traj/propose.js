@@ -26,20 +26,31 @@ import { collectPageCodes, sanitizeTaskDraftKeyData } from './atom-keydata.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
 const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
-const OBSERVE_DIR = join(__dirname, '../../../data/kb/staging');
+const DEFAULT_OBSERVE_DIR = join(__dirname, '../../../data/kb/staging');
 
 /**
- * Append one JSONL observation line under data/kb/staging (append-only,
- * spec D5). Observability must never break the propose main flow — all
- * write failures are swallowed.
+ * Resolve the observability staging directory. `KB_STAGING_DIR` overrides the
+ * repo default so characterization/probe runs stay isolated and never pollute
+ * `data/kb/staging/*.jsonl` (F-B).
+ * @returns {string} Absolute staging directory path
+ */
+function observeDir() {
+  return process.env.KB_STAGING_DIR || DEFAULT_OBSERVE_DIR;
+}
+
+/**
+ * Append one JSONL observation line under the observability staging dir
+ * (append-only, spec D5; directory resolved by `observeDir()`). Observability
+ * must never break the propose main flow — all write failures are swallowed.
  * @param {string} file JSONL file name under the staging dir
  * @param {object} line Payload (JSON-serializable)
  * @returns {Promise<void>} Resolves after append (or after a swallowed error)
  */
 async function appendObservation(file, line) {
   try {
-    await mkdir(OBSERVE_DIR, { recursive: true });
-    await appendFile(join(OBSERVE_DIR, file), `${JSON.stringify(line)}\n`, 'utf-8');
+    const dir = observeDir();
+    await mkdir(dir, { recursive: true });
+    await appendFile(join(dir, file), `${JSON.stringify(line)}\n`, 'utf-8');
   } catch {
     // swallowed by design
   }

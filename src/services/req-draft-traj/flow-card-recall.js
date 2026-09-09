@@ -69,7 +69,11 @@ function buildCardHaystack(card) {
   return parts.filter(Boolean).join('|').toLowerCase();
 }
 
-/** Flow name with all whitespace stripped — specificity tie-break key. */
+/**
+ * Flow name with all whitespace stripped — specificity tie-break key.
+ * @param {object} card Flow card
+ * @returns {string} Whitespace-stripped flow name
+ */
 function normFlowName(card) {
   return String(card?.flow || '').replace(/\s+/g, '');
 }
@@ -89,7 +93,7 @@ const corpusCache = new WeakMap();
  * Build (and cache) the corpus profile: per-card haystack + token set, and the
  * semantic dictionary of raw flow/alias/keyword terms for longest-match.
  * @param {object[]} cards Flow cards
- * @returns {{ cards: Array<{ card: object, stem: string|null, haystack: string, tokens: Set<string>, semanticTerms: string[] }>, semanticDict: Set<string>, n: number }}
+ * @returns {{ cards: Array<{ card: object, stem: string|null, haystack: string, tokens: Set<string>, semanticTerms: string[] }>, semanticDict: Set<string>, n: number }} Cached corpus profile for the given cards array
  */
 function corpusProfile(cards) {
   const cached = corpusCache.get(cards);
@@ -278,7 +282,7 @@ export function matchFlowForAtom({ title, taskDraft, cards } = {}) {
     ? bestNodeId
     : null;
 
-  return { flowRef, nodeId };
+  return { flowRef, nodeId, score: bestCardScore };
 }
 
 /**

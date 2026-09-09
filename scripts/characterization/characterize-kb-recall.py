@@ -129,9 +129,19 @@ def main():
             f"golden py mismatch: query={entry['query']!r} want={want} got={got}"
             f" divergenceAccepted={entry.get('divergenceAccepted', False)}"
         )
-    diverged = [e["query"] for e in golden["entries"] if e.get("divergenceAccepted")]
-    assert diverged, "divergenceAccepted entries disappeared — converge the fixture by removing pyFlowRef"
-    print(f"golden fixture: {len(golden['entries'])} entries, {len(diverged)} accepted divergences")
+    # 绊线（R-3 修订）：不得存在「已收敛却仍登记为分歧」的条目——py 收敛并清理
+    # fixture 后本断言自然通过；只有漏删 divergenceAccepted 时才失败。
+    stale = [
+        e["query"] for e in golden["entries"]
+        if e.get("divergenceAccepted")
+        and e.get("pyFlowRef", e["expectFlowRef"]) == e["expectFlowRef"]
+    ]
+    assert not stale, (
+        "divergenceAccepted entries have converged — remove pyFlowRef/divergenceAccepted "
+        f"from the fixture: {stale}"
+    )
+    registered = sum(1 for e in golden['entries'] if e.get('divergenceAccepted'))
+    print(f"golden fixture: {len(golden['entries'])} entries, {registered} accepted divergences")
 
     print("ok: characterize-kb-recall")
 
