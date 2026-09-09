@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 00:55 · Cursor Lead — 收工：search-then-click SDD close（回链 09-09 22:02）
+
+- 完成：Tasks 1–7 — `88b0772e`（guard+cold pin）/ `20fad726`+`1f9b053a`（phase mark/clear）/ `ffa9cb9f`（gate table+tree）/ `376fbce8`（dup-failure）/ `b7bd4a1d`（prompts+analyze）/ `1ae7f055`（KB+SKILL）；spec 状态→已实现
+- 验收：`characterize-search-then-click-guard` OK / `characterize-search-then-click-prompts` OK；verify-all 内 STC 两 pin 绿；全 gate 6 红与他线/存量无关（xpath-fill-select、form-assistant、tree-select-record、step-highlight、layer-tree、export-v3）
+- 遗留：湿测可选（#709 步序：盲树点→`err-search-first`；填搜索关键字→再点树→ok）；Task 3 fail-open vs fail-closed、need-fill-and-query pin 等 minor 登记 ledger 待后续
+
 ## 2026-09-09 · Cursor Subagent — Task 4：card-guided deterministic fallback + docs close-out
 
 - 完成：`buildCardGuidedFallbackAtoms`（persist 边界合并 + flowRef）；characterize pin 61 passed；spec/agent-log 交叉引用更新
