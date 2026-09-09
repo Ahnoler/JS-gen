@@ -4,13 +4,21 @@
  */
 import { getDB } from '../../config/database.js';
 
+/**
+ * @param {string} umlEcd 候选 uml_ecd
+ * @param {string} menuXpath 候选 menu_xpath
+ * @returns {boolean} trim 后两者均非空时为 true
+ */
 export function isNavigableUmlPair(umlEcd, menuXpath) {
   return Boolean(String(umlEcd || '').trim() && String(menuXpath || '').trim());
 }
 
 /**
- * @param {{ umlEcd: string, menuXpath?: string, excludeNodeId?: number }} candidate
- * @param {object} [trx]
+ * @param {{ umlEcd: string, menuXpath?: string, excludeNodeId?: number }} candidate 待写入的 uml/xpath 对
+ * @param {string} candidate.umlEcd 待写入的 uml_ecd
+ * @param {string} [candidate.menuXpath] 待写入的 menu_xpath
+ * @param {number} [candidate.excludeNodeId] 更新时排除的 system.id
+ * @param {object} [trx] knex 事务；缺省用 getDB()
  * @returns {Promise<void>}
  */
 export async function assertUmlEcdNavAvailable(candidate, trx) {
