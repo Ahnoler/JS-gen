@@ -65,16 +65,45 @@ async function testOwnedWait() {
     phaseNumber: 1,
     onIgnored: (payload, reason) => ignored.push(reason),
   });
-  // 僵尸 done：旧 run 事件、同 run 阶段错位、本轮 canceled —— 均忽略
+  // 僵尸 done：旧 run 事件、同 run 阶段错位 —— 均忽略
   // （M1 后 phase 校验先行：两例均以 phase_mismatch 命中）
   hub.emit('phase_done', { runId: 'stale', phase: 4 });
   hub.emit('phase_done', { runId: 'r1', phase: 2 });
+  // 跨 run canceled（阶段号匹配、runId 不匹配）→ 维持忽略
+  hub.emit('phase_done', { runId: 'stale', phase: 1, canceled: true });
+  assert.deepEqual(ignored, ['phase_mismatch', 'phase_mismatch', 'runid_mismatch']);
+  // P0-2①：own-run canceled → settle（stop 后快速退出；spec 4.3.2 不计入阶段完成）
   hub.emit('phase_done', { runId: 'r1', phase: 1, canceled: true });
-  assert.deepEqual(ignored, ['phase_mismatch', 'phase_mismatch', 'canceled']);
-  // 真正的本轮阶段 1 done → resolve
+  const canceledPayload = await doneP;
+  assert.equal(canceledPayload.canceled, true);
+
+  // 真正的本轮阶段 1 done → resolve（新等待）
+  const done2 = waitForSessionEventOwned({
+    addListener,
+    type: 'phase_done',
+    runId: 'r1',
+    phaseNumber: 1,
+    onIgnored: (payload, reason) => ignored.push(reason),
+  });
   hub.emit('phase_done', { runId: 'r1', phase: 1, success: true });
-  const payload = await doneP;
+  const payload = await done2;
   assert.equal(payload.success, true);
+
+  // legacy（无 runId）canceled → 维持忽略（兼容窗口，spec 4.4）
+  const legacyCanceledIgnored = [];
+  const legacyCanceledP = waitForSessionEventOwned({
+    addListener,
+    type: 'phase_done',
+    runId: 'r9',
+    phaseNumber: 3,
+    onIgnored: (payload2, reason) => legacyCanceledIgnored.push(reason),
+  });
+  hub.emit('phase_done', { phase: 3, canceled: true });
+  assert.deepEqual(legacyCanceledIgnored, ['missing_runid', 'canceled']);
+  // 随后的 legacy 正常 done 仍放行
+  hub.emit('phase_done', { phase: 3, success: false });
+  const legacyCanceledPayload = await legacyCanceledP;
+  assert.equal(legacyCanceledPayload.success, false);
 
   // 兼容旧执行机（spec 4.4）：payload 无 runId → legacy 放行（resolve，日志经 onIgnored）
   const legacyIgnored = [];

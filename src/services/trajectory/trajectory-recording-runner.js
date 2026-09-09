@@ -14,6 +14,7 @@ import { AI_MEMORY_FACT_PACK, MAX_ACTIONS_PER_STEP, PHASE_MAX_STEPS } from '#con
 import {
   getTrajectoryRuntime,
   touchTrajectoryRuntimeActivity,
+  markConsumedActionLog,
 } from './trajectory-runtime.js';
 import { resolveTrajectoryAccount } from './trajectory-account-service.js';
 import { getTrajectoryTree } from './trajectory-query-service.js';
@@ -311,11 +312,27 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   if (session) session.dbTrajectoryId = tid;
   await broadcastRecordingLock();
 
+  // phase_done 跨 run 串台修复（spec 4.1）：本轮录制唯一 runId，随 step 下发，
+  // 事件按归属过滤；finally 补发 cancel_step 也以此标记本次 run。
+  // P0-3 H5：铸造提前到登录回放之前——登录窗口（可长达数分钟）内旧 run 的 90s
+  // 门闩比对 runtime.currentRunId 不再撞上上一轮旧值，盲区消除。
+  runtime.currentRunId = (await import('node:crypto')).randomUUID();
+  runtime._sentStepThisRun = false;
+  // P0-2②：本 run 循环的归属锚点——catch/finally 的写副作用以此为守卫
+  //（runtime 被重录替换 / 同对象换 run 时，旧循环不得再写任何状态）。
+  const myRunId = runtime.currentRunId;
+  const runStillOwnsRuntime = () =>
+    getTrajectoryRuntime(tid) === runtime && runtime.currentRunId === myRunId;
+
   const { account, accountId: acctId } = await resolveTrajectoryAccount(tid, accountId);
   try {
     if (runtime.skipDefaultLogin) {
       // Auth dry-run login segment: the agent performs the login itself.
       // Read-only here — the flag lives until runtime teardown at detach.
+      // P1-7：与正常登录路径三个调用点同形——预标 persistedActionIds，消费旧
+      // _ACTION_LOG；否则 detach→重附（fresh runtime）后旧条目全部重持久化并
+      // 归到新 run 阶段名下（旧步重录成新步）。
+      await markConsumedActionLog(runtime);
     } else if (!(runtime.loginDone && Number(runtime.loginAccountId) === Number(acctId))) {
       await runDefaultLogin(runtime, account);
     }
@@ -700,11 +717,6 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // 假成功防线 v2：每阶段业务步计数快照（终局门闩按阶段降级用，phaseNumber → count）
   runtime.phaseBusinessCounts = new Map();
 
-  // phase_done 跨 run 串台修复（spec 4.1）：本轮录制唯一 runId，随 step 下发，
-  // 事件按归属过滤；finally 补发 cancel_step 也以此标记本次 run。
-  runtime.currentRunId = (await import('node:crypto')).randomUUID();
-  runtime._sentStepThisRun = false;
-
   /**
    * 阶段空闲看门狗：超过 PHASE_IDLE_TIMEOUT_MS 无 agent 活动（action_log_sync 等）
    * 则 reject 返回的 idleP；就地更新外层 phaseActivity / clearPhaseActivity。
@@ -841,7 +853,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         // execSession.onSessionEvent 是 3 参 (sessionId, type, handler)——必须在此
         // 绑定 sessionId；直传会错位实参并抛 TypeError，录制在阶段 1 即失败（终审 B1）。
         addListener: (type, handler) => execSession.onSessionEvent(runtime.sessionId, type, handler),
-        runId: runtime.currentRunId,
+        // P0-2②：钉死本 run 的 runId——重录会改写 runtime.currentRunId，
+        // 旧循环的等待若 live 读取会误收新 run 的事件。
+        runId: myRunId,
         phaseNumber: phase.phaseNumber,
       };
       // 观察日志（spec 5.5）：标签带事件类型，避免 phase_error 被误记为 phase_done_*。
@@ -849,7 +863,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         console.warn(
           `[record] ${type}_${reason === 'missing_runid' ? 'missing_runid' : `ignored_${reason}`}`
           + ` session=${runtime.sessionId} phase=${payload?.phase} gotRunId=${payload?.runId}`
-          + ` expect=${runtime.currentRunId}`,
+          + ` expect=${myRunId}`,
         );
       };
       const doneP = waitForSessionEventOwned({ ...ownedWaitOpts, type: 'phase_done', onIgnored: onIgnored('phase_done') });
@@ -905,14 +919,16 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         description: phase.description || '',
         phaseNumber: phase.phaseNumber,
       });
-      execSession.forwardStdin({
-        nodeUuid: runtime.executorNodeUuid,
-        sessionId: runtime.sessionId,
-        event: 'step',
-        data: stepData,
-      });
       let donePayload;
+      // P2-#7：step 下发必须在本 try 内——forwardStdin 同步抛错（executor 掉线）时
+      // finally 仍能 cancel owned-wait 监听器，否则泄漏到 hub 关闭为止。
       try {
+        execSession.forwardStdin({
+          nodeUuid: runtime.executorNodeUuid,
+          sessionId: runtime.sessionId,
+          event: 'step',
+          data: stepData,
+        });
         donePayload = await Promise.race([doneP, errP, idleP]);
       } finally {
         doneP.cancel?.();
@@ -948,6 +964,46 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         console.log(`[record] async gate skipped for traj=${tid}: superseded by a newer run`);
         return;
       }
+      // P0-3 三重活性守卫：detach（删 runtime）→ 重附（新对象）后，仅比对闭包捕获的
+      // 旧 runtime 字段恒真，90s 到点会误伤正在录制的新 run。解析 live 状态三重校验，
+      // 任一不满足即整体放弃本次门闩（不做任何降级、不清副本）。
+      const gateRuntimeReplaced = getTrajectoryRuntime(tid) !== runtime;
+      const gateSessionGone = !state.sessions.has(runtime.sessionId);
+      let gateRecordingActive = false;
+      try {
+        gateRecordingActive = await isAiRecordingActive(tid);
+      } catch {}
+      if (gateRuntimeReplaced || gateSessionGone || gateRecordingActive) {
+        console.log(
+          `[record] async gate skipped for traj=${tid}: live state changed`
+          + ` (runtimeReplaced=${gateRuntimeReplaced}`
+          + ` sessionGone=${gateSessionGone}`
+          + ` recordingActive=${gateRecordingActive})`,
+        );
+        return;
+      }
+      // P0-3 CAS 降级：仅当前态仍为 recorded 才可降级为 failed。finishTransientRecording
+      // 无条件覆写；updateMetaIf whereIn record_status 是仓库现成的 CAS 落点。
+      // failure 终局恒为 failed（resolvePostRecordingStatus），故 CAS 直接写终态；
+      // persistent_record_status 列缺失（旧迁移）时退化为仅 record_status 的 CAS。
+      const casDegradeRecordedToFailed = async () => {
+        try {
+          const n = await trajectoryDao.updateMetaIf(
+            tid,
+            { recordStatus: 'failed', persistentRecordStatus: 'failed' },
+            { recordStatusIn: ['recorded'] },
+          );
+          if (n > 0) return true;
+        } catch {
+          const n2 = await trajectoryDao.updateMetaIf(
+            tid,
+            { recordStatus: 'failed' },
+            { recordStatusIn: ['recorded'] },
+          ).catch(() => 0);
+          if (n2 > 0) return true;
+        }
+        return false;
+      };
       try {
         execSession.forwardStdin({
           nodeUuid: runtime.executorNodeUuid,
@@ -1010,27 +1066,37 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         );
         if (zeroPhaseBoth.length) {
           try {
-            await trajectoryDao.finishTransientRecording(tid, 'failure');
-            await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
-            broadcast('fake_success_detected', {
-              trajectoryDbId: tid,
-              zeroStepPhases: zeroPhaseBoth,
-            });
-            console.warn(
-              `[record] traj #${tid} downgraded recorded→failure: zero-step phases [${zeroPhaseBoth}] after finalization window`,
-            );
+            if (await casDegradeRecordedToFailed()) {
+              await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
+              broadcast('fake_success_detected', {
+                trajectoryDbId: tid,
+                zeroStepPhases: zeroPhaseBoth,
+              });
+              console.warn(
+                `[record] traj #${tid} downgraded recorded→failure: zero-step phases [${zeroPhaseBoth}] after finalization window`,
+              );
+            } else {
+              console.log(
+                `[record] async gate downgrade skipped for traj=${tid}: recordStatus no longer 'recorded' (zeroStepPhases=[${zeroPhaseBoth}])`,
+              );
+            }
           } catch (err) {
             console.warn('[record] async gate downgrade failed:', err?.message || err);
           }
         }
       } else if (copySteps === 0 && dbSteps === 0) {
         try {
-          await trajectoryDao.finishTransientRecording(tid, 'failure');
-          await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
-          broadcast('fake_success_detected', { trajectoryDbId: tid });
-          console.warn(
-            `[record] traj #${tid} downgraded recorded→failure: 0 persisted business steps after finalization window`,
-          );
+          if (await casDegradeRecordedToFailed()) {
+            await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
+            broadcast('fake_success_detected', { trajectoryDbId: tid });
+            console.warn(
+              `[record] traj #${tid} downgraded recorded→failure: 0 persisted business steps after finalization window`,
+            );
+          } else {
+            console.log(
+              `[record] async gate downgrade skipped for traj=${tid}: recordStatus no longer 'recorded' (0 business steps)`,
+            );
+          }
         } catch (err) {
           console.warn('[record] async gate downgrade failed:', err?.message || err);
         }
@@ -1043,15 +1109,20 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         .map((p) => p.phaseNumber);
       if (perRunZeroPhases.length) {
         try {
-          await trajectoryDao.finishTransientRecording(tid, 'failure');
-          await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
-          broadcast('fake_success_detected', {
-            trajectoryDbId: tid,
-            perRunZeroPhases,
-          });
-          console.warn(
-            `[record] traj #${tid} downgraded recorded→failure: phases with 0 steps THIS run [${perRunZeroPhases}] (cumulative copy/DB masked by previous runs)`,
-          );
+          if (await casDegradeRecordedToFailed()) {
+            await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
+            broadcast('fake_success_detected', {
+              trajectoryDbId: tid,
+              perRunZeroPhases,
+            });
+            console.warn(
+              `[record] traj #${tid} downgraded recorded→failure: phases with 0 steps THIS run [${perRunZeroPhases}] (cumulative copy/DB masked by previous runs)`,
+            );
+          } else {
+            console.log(
+              `[record] per-run zero downgrade skipped for traj=${tid}: recordStatus no longer 'recorded' (phases=[${perRunZeroPhases}])`,
+            );
+          }
         } catch (err) {
           console.warn('[record] per-run zero downgrade failed:', err?.message || err);
         }
@@ -1065,12 +1136,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     // 显式 success=false，或 phase_end 上报 QUALITY FAIL（pending_fields /
     // missing_success_token 等），整轨按 failure 收官（宁误拒不假绿），不再无条件
     // recorded/isSuccessful=1。零步类假成功由上方异步门闩三路复核兜底。
+    // P2-#6：failedPhases 统一报 phaseNumber——phaseOutcomes 以 phase.id /
+    // phaseNumber 双键同写同一对象，直接迭代 Object.entries 会把 DB id 混进
+    // 载荷误导前端诊断；改为遍历 phases 数组取失败项的 phaseNumber。
     const failedOutcomeKeys = [];
-    const seenOutcome = new Set();
-    for (const [key, outcome] of Object.entries(runtime.phaseOutcomes || {})) {
-      if (outcome?.success === false && !seenOutcome.has(outcome)) {
-        seenOutcome.add(outcome);
-        failedOutcomeKeys.push(key);
+    for (const phase of phases) {
+      const outcome = runtime.phaseOutcomes?.[phase.id];
+      if (outcome?.success === false) {
+        failedOutcomeKeys.push(phase.phaseNumber);
       }
     }
     const qualityFails = runtime.phaseQualityFails || [];
@@ -1101,9 +1174,23 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       });
     }
   } catch (err) {
-    // A user-initiated record/stop already wrote the final recordStatus
-    // (recorded/failed); don't let the aborted runner overwrite that choice.
-    if (!runtime.userStop) {
+    // P0-2② 归属守卫：本循环已不是 runtime 的属主（runtime 被重录替换 / 同对象
+    // 换 run）→ 一行日志后直接退出，不写任何库、不清新 run 的锁、不发 cancel_step
+    //（否则 stop→重录级联误杀：覆写新 run 终态、砍新 run agent，review P0-2 分支 B）。
+    if (!runStillOwnsRuntime()) {
+      console.warn(
+        `[record] stale recording loop exit suppressed traj=${tid} myRunId=${myRunId}`
+        + ` liveRunId=${runtime.currentRunId} err=${String(err?.message || err || '').slice(0, 160)}`,
+      );
+      throw err;
+    }
+    // 用户 stop / abort 退出（spec 4.3.2：stop 不计入阶段完成）：lifecycle.stop
+    // 已写终态并清理 running 阶段——不得再写失败终态/失败注记，但仍走 finally 释放锁与清理。
+    const userStopPath = !!(runtime.userStop || runtime.abortRecording)
+      || /Recording aborted/i.test(String(err?.message || err || ''));
+    if (!userStopPath) {
+      // A user-initiated record/stop already wrote the final recordStatus
+      // (recorded/failed); don't let the aborted runner overwrite that choice.
       // 自动失败（V3）：显式失败结果 → 录制异常(failed)。
       finalStatus = await trajectoryDao.finishTransientRecording(tid, 'failure');
       await trajectoryDao.updateMeta(tid, {
@@ -1117,32 +1204,42 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       finalStatus = traj.recordStatus;
     }
     const failText = String(err?.message || err || '').trim();
-    if (failText && session?.activePhaseId) {
+    if (!userStopPath && failText && session?.activePhaseId) {
       await appendPhaseDoneLog(session.activePhaseId, { text: failText, source: 'fail' });
     }
     await notifyBatchProgressForTrajectory(tid);
     throw err;
   } finally {
-    if (session) {
-      session.busy = false;
-      session.aiRecording = false;
-      session.activePhaseId = null;
-    }
-    runtime.abortRecording = false;
-    runtime.aiRecording = false;
-    runtime.userStop = null;
-    // spec 4.2：所有异常结束路径补发 cancel_step，防止空闲超时/phase_error 退出后
-    // 执行机 agent 成为僵尸。幂等：用户 stop 路径已发过，再发无害（执行机侧
-    // _request_agent_stop 天然幂等）。发送失败不影响 finally 其余清理。
-    if (runtime._sentStepThisRun) {
-      try {
-        execSession.forwardStdin({
-          nodeUuid: runtime.executorNodeUuid,
-          sessionId: runtime.sessionId,
-          event: 'cancel_step',
-          data: {},
-        });
-      } catch {}
+    // P0-2② 归属守卫：旧循环（runtime 被重录替换 / 同对象换 run）不得清新 run 的
+    // session 锁、不得复位共享 runtime 字段（会洗掉新 run 的 abortRecording/userStop）、
+    // 不得补发 cancel_step（会砍掉新 run 当前 agent → 新 run done 也 canceled → 双录皆死）。
+    if (runStillOwnsRuntime()) {
+      if (session) {
+        session.busy = false;
+        session.aiRecording = false;
+        session.activePhaseId = null;
+      }
+      runtime.abortRecording = false;
+      runtime.aiRecording = false;
+      runtime.userStop = null;
+      // spec 4.2：所有异常结束路径补发 cancel_step，防止空闲超时/phase_error 退出后
+      // 执行机 agent 成为僵尸。幂等：用户 stop 路径已发过，再发无害（执行机侧
+      // _request_agent_stop 天然幂等）。发送失败不影响 finally 其余清理。
+      if (runtime._sentStepThisRun) {
+        try {
+          execSession.forwardStdin({
+            nodeUuid: runtime.executorNodeUuid,
+            sessionId: runtime.sessionId,
+            event: 'cancel_step',
+            data: {},
+          });
+        } catch {}
+      }
+    } else {
+      console.warn(
+        `[record] stale recording loop cleanup suppressed traj=${tid} myRunId=${myRunId}`
+        + ` liveRunId=${runtime.currentRunId}`,
+      );
     }
     clearPhaseActivity();
     // Subscription deliberately NOT unsubscribed here: it lives until the session

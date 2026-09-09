@@ -39,13 +39,35 @@ async function testRealHubOwnedWait() {
     });
     // 旧 run 事件（经真实 hub 发射）→ 丢弃
     emitSessionEvent(sessionId, 'phase_done', { runId: 'stale', phase: 1, success: true });
-    // 本轮 canceled 回声 → 丢弃
+    // 旧 run canceled（阶段号匹配、runId 不匹配）→ 维持丢弃
+    emitSessionEvent(sessionId, 'phase_done', { runId: 'stale', phase: 1, canceled: true });
+    // 本轮 canceled 回声 → P0-2①：own-run canceled 现在 settle（stop 快速退出）
     emitSessionEvent(sessionId, 'phase_done', { runId: 'r-owned', phase: 1, canceled: true });
-    // 本轮真正 done → resolve
-    emitSessionEvent(sessionId, 'phase_done', { runId: 'r-owned', phase: 1, success: true });
+    const payload = await doneP;
+    assert.equal(payload.canceled, true);
+    assert.deepEqual(ignored, ['runid_mismatch', 'runid_mismatch']);
+  } finally {
+    removeSessionHub(sessionId);
+  }
+}
+
+async function testLegacyCanceledStillIgnored() {
+  const sessionId = `smoke-arity-legacy-cancel-${Date.now()}`;
+  try {
+    const ignored = [];
+    const doneP = waitForSessionEventOwned({
+      addListener: (type, handler) => onSessionEvent(sessionId, type, handler),
+      type: 'phase_done',
+      runId: 'r-legacy-cancel',
+      onIgnored: (payload, reason) => ignored.push(reason),
+    });
+    // 旧执行机（payload 无 runId）canceled → 维持忽略（兼容窗口）
+    emitSessionEvent(sessionId, 'phase_done', { phase: 2, canceled: true });
+    assert.deepEqual(ignored, ['missing_runid', 'canceled']);
+    // 后续 legacy 正常 done 仍放行
+    emitSessionEvent(sessionId, 'phase_done', { phase: 2, success: true });
     const payload = await doneP;
     assert.equal(payload.success, true);
-    assert.deepEqual(ignored, ['runid_mismatch', 'canceled']);
   } finally {
     removeSessionHub(sessionId);
   }
@@ -88,7 +110,7 @@ function testHealWiring() {
     'raw phase_done subscription removed from heal wait');
 }
 
-const steps = [testArity, testRealHubOwnedWait, testLegacyPayloadStillPasses, testHealWiring];
+const steps = [testArity, testRealHubOwnedWait, testLegacyPayloadStillPasses, testLegacyCanceledStillIgnored, testHealWiring];
 let failed = 0;
 for (const [i, fn] of steps.entries()) {
   try {

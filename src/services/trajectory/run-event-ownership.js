@@ -32,15 +32,18 @@ export function phaseEventOwnership(payload, { runId, phaseNumber = null } = {})
 
 /**
  * Wait for the next OWNED session event (ownership-filtered waitForSessionEvent).
- * Foreign payloads (runid/phase mismatch) are ignored with onIgnored logging; a
- * payload flagged `canceled: true` is ignored too (spec 4.3.2: canceled phase_done
+ * Foreign payloads (runid/phase mismatch) are ignored with onIgnored logging.
+ * A payload flagged `canceled: true` is settled only when it belongs to THIS run
+ * (payload.runId === runId) — the caller's loop wakes and exits at its abort
+ * checkpoint instead of hanging on the idle watchdog (P0-2①); cross-run canceled
+ * and legacy (no runId) canceled stay ignored (spec 4.3.2: canceled phase_done
  * 不计入阶段完成). Legacy payloads (no runId, old executor) resolve per spec 4.4
  * 兼容期放行, with an onIgnored observation log.
  * No timeout here — the caller's idle watchdog is the only timeout (runner race).
  * @param {{ addListener: (type: string, handler: (payload: object) => void) => () => void,
  *           type: string, runId: string|null, phaseNumber?: number|null,
  *           onIgnored?: (payload: object, reason: string) => void }} opts - wait options: session listener factory, event type, current run id, expected phase (null for persist waits), ignored-event logger
- * @returns {Promise<object>} first owned payload; promise.cancel() detaches silently
+ * @returns {Promise<object>} first owned payload (including own-run canceled); promise.cancel() detaches silently
  */
 export function waitForSessionEventOwned({ addListener, type, runId, phaseNumber = null, onIgnored }) {
   let cancel = () => {};
@@ -61,6 +64,14 @@ export function waitForSessionEventOwned({ addListener, type, runId, phaseNumber
         onIgnored?.(payload, own.reason); // phase_done_missing_runid observation log (spec 4.4)
       }
       if (payload?.canceled === true) {
+        // P0-2①：own-run canceled → settle，让 runner 循环醒来走到 abort 检查点
+        // 秒退（stop 路径 lifecycle 已写终态，不计阶段完成）；跨 run 与 legacy
+        //（无 runId）canceled 维持忽略（兼容窗口）。
+        if (payload?.runId != null && runId != null && String(payload.runId) === String(runId)) {
+          unsub();
+          settle(payload);
+          return;
+        }
         onIgnored?.(payload, 'canceled');
         return;
       }
