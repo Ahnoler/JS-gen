@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 12:24 · DSH reviewer — 开工：KB 加固验收修复（F-A~F-D + R-3/R-4）
+
+- 进行中：2026-09-09 12:24。reviewer 验收结论 DONE_WITH_CONCERNS（3 必须修复 + 4 登记风险），本轮只修不扩范围
+- 范围：`src/services/req-draft-traj/flow-card-recall.js`（F-A/F-C）、`src/services/req-draft-traj/propose.js`（F-B 观测隔离）、`scripts/characterization/fixtures/kb-recall-golden.json`（F-D note）、`scripts/characterization/characterize-kb-recall.py`（R-3 绊线）、`scripts/characterization/characterize-req-draft-traj.mjs` / `characterize-flow-card-recall.mjs`（F-B pin）、`src/dashboard/api-docs/groups/trajectory.js`（R-4 出处列）、`data/kb/staging/*.jsonl`（清污）、`docs/superpowers/reports/2026-09-09-kb-remediation-reviewer-verdict.md`、本文件
+- 禁入区：`config/update-db-whitelist.ps1`；`.cursor/`；tssc 线文件（`scripts/controller/actions/**`、`form_action_engines.py`、`_form.py`、tssc prompts）；`data/kb/req/**`、`data/kb/flows/**`（不改语料）
+- 方式：逐项修复 → 复跑 lint 归因 + 五条基线 + 全量 gate → 出 reviewer 结论文档 → 收工条目
+
 ## 2026-09-09 12:00 · Cursor Lead — 收工：tssc v2 实现 Subagent-Driven（回链 11:07）
 
 - 完成：T1–T4 落地 — commits `02f6d1f6..32c1352d`（pin → JS P0–P2 → 引擎录 `select_option` → D6 反注册+prompt/autofill/wizard/_llm_values）；`characterize-tssc-multi-select` / `select-option-stamp` / `agent-prompt-packs` **GREEN**
