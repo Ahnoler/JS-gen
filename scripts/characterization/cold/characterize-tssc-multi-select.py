@@ -122,7 +122,7 @@ checks = [
         "async def tssc_multi_select",
         "form_tssc_multi_select",
         "JS_TSSC_MULTI_SELECT",
-        "lookup_field_kind(self.business_data_store, label_text) == 'tssc-multi-select'",
+        "resolve_select_dispatch",
         "return await self.tssc_multi_select(",
         "lookup_field_kind",
         "tssc-multi-select",
