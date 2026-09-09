@@ -13,12 +13,11 @@ from ._helpers import (
     reset_select_ui,
 )
 from ._js_snippets import (
-    JS_CLICK_RADIO,
     JS_FIND_LABELED_SELECT,
     JS_SELECT_VALUE_BY_XPATH,
     JS_TSSC_MULTI_SELECT,
 )
-from .form_action_engines import FillEngine, SelectEngine, TreeEngine
+from .form_action_engines import FillEngine, RadioEngine, SelectEngine, TreeEngine
 from .replay_js import _JS_LOCATE_BY_XPATH, _JS_READ_VALUE_BY_XPATH
 from .replay_timing import WAIT_200_MS, WAIT_300_MS, WAIT_400_MS, WAIT_500_MS
 from .select_dispatch import resolve_select_dispatch
@@ -112,7 +111,12 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
     if action_name == 'click_radio':
         async def _radio():
-            r = await page.evaluate(JS_CLICK_RADIO, [label, value])
+            r = await RadioEngine.click_radio_for_replay(
+                page,
+                label,
+                value,
+                xpath_smart=xpath_smart or '',
+            )
             await page.wait_for_timeout(WAIT_300_MS)
             return r
         return await _with_xpath_first(_radio)
