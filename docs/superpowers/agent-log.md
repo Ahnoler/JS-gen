@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 10:32 · Cursor Lead — 收工：tssc_multi_select v2 设计 spec（回链 10:31）
+
+- 完成：湿测拍板写入 `docs/superpowers/specs/2026-09-09-tssc-multi-select-v2-design.md`；v1 spec 加 v2 指针；决议 D1–D5（P2 兜底任意首项 / 无文案跳过 P1 / 仅 table / 单次 JS / P1 关精确查询）
+- 验收：用户已确认方案 1 + A + 跳过 P1 + table-only；spec 自检无 TBD 矛盾
+- 遗留：用户审阅本 spec 后 → writing-plans → 实现；浏览器会话可继续湿测
+
+## 2026-09-09 10:31 · Cursor Lead — 开工：tssc_multi_select v2 设计文档
+
+- 进行中：10:31；Playwright 湿测后写 design spec（不实现）
+- 范围：`docs/superpowers/specs/2026-09-09-tssc-multi-select-v2-design.md`；可选回链改 `2026-09-08-tssc-multi-select-action-design.md`；agent-log
+- 禁入区：`scripts/controller/actions/js_snippets/tssc_multi_select.py` 本单元不改；`config/update-db-whitelist.ps1`；kb draft；死代码/引擎 P0 修复线
+- 方式：brainstorming → 用户确认 → 写 spec + commit；实现另开单元
+
 ## 2026-09-09 · ZCode 死代码清理线 — 开工：CAUTION 待裁 9 项执行移除（用户裁决）
 
 ## 2026-09-09 · ZCode 死代码清理线+引擎review线 — 收工：CAUTION ×9 全删（-233 行）+ 三路对抗 review 漏洞报告入库（回链开工）
