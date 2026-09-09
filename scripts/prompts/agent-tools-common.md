@@ -12,7 +12,7 @@
 
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**
 - close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。`no-notification` ≠ 保存成功。**
-- expand_all_el_tree() — 完全展开 el-tree
+- expand_all_el_tree() — 完全展开 el-tree。**树/列表先查再点：** 侧栏/页内有可见搜索框或「查询」时，禁止用 `expand_all_el_tree()` + 滚屏/盲点代替查询定位；须先填搜索关键字（有查询则点查询）再点树节点；遇 **`err-search-first`** 按指引补步。
 - switch_tab(tab_name) — 切换 el-tabs 标签页。**⚠️ 切换前必须先点击"暂存"按钮保存数据，否则已填数据会丢失。**
 - click_menu_item(menu_text) — 点击 el-menu 菜单项（自动展开子菜单）
 - wait_for_loading() — 等待 Element UI 加载遮罩消失

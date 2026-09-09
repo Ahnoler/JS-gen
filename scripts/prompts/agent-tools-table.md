@@ -1,3 +1,5 @@
+> **树/列表先查再点：** 页面有搜索关键字框或可见「查询」按钮时，`click_table_row_radio` / `click_table_row_button` 前须先 `fill_form_field` 填写搜索（有查询则 `click_button('查询')`），禁止直接选行；遇 **`err-search-first`** 按指引补搜再点，禁止原样重试。
+
 - **click_table_row_button(row_text, button_text)** — 点击 el-table 行中的操作按钮。`row_text` 匹配行内容（支持跨单元格拼接文本，空格会被忽略——`"编号 名称"` 可命中 `编号名称` 拼接行），`button_text` 匹配按钮文本或图标类名。支持 `"edit"/"编辑"` 和 `"delete"/"删除"` 快捷方式。
   **⚠️ 行内无该按钮时不会盲点其他控件**，而是返回 **`err-button-not-found-in-row`**（三段式协议：原因/现场/下一步，现场含行内实际按钮清单与是否有单选框）。行未匹配时返回 **`err-table-row-not-found`**。工具栏模式页面（行内只有名称链接/单选框，操作按钮在表格上方工具栏，如「修改」「查看」「联网核查」）**必须**：先 `click_table_row_radio(row_text)` 选中行 → 再点击工具栏按钮；不要反复用本动作猜行内按钮。
 - **click_table_row_radio(row_text)** — 选中 el-table 行中的单选按钮（`label.el-radio`）。`row_text` 匹配行内容（同样支持跨单元格拼接文本）。
