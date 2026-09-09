@@ -3,6 +3,13 @@
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
 
+## 2026-09-09 21:55 · Cursor Lead — 开工：树/列表「先查再点」implementation plan
+
+- 进行中：21:55；writing-plans；spec 已批
+- 范围：`docs/superpowers/plans/2026-09-09-search-then-click.md`、spec 状态行、本文件
+- 禁入区：本单元不写护栏实现代码；radio unify；`.cursor/`
+- 方式：落盘 plan → 请用户选 Subagent-Driven / Inline
+
 ## 2026-09-09 21:46 · Cursor Lead — 开工：树/列表「先查再点」design
 
 - 进行中：21:46；用户批准 C + 护栏 A + 已查询 A + 路径 1；§1–§4 已口头 OK

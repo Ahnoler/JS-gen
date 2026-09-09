@@ -1,7 +1,7 @@
 # 树/列表「先查再点」设计
 
 > 日期：2026-09-09  
-> 状态：已批准（范围 C + 护栏触发 A + 已查询判定 A + 实现路径 1）  
+> 状态：已批准；计划 [`docs/superpowers/plans/2026-09-09-search-then-click.md`](../plans/2026-09-09-search-then-click.md)  
 > Lead：本会话 Cursor  
 > 实证锚点：traj **#709** 人工步 `fill_form_field`「搜索关键字=担保方式」→ agent 再点树节点；#708 同套路
 
