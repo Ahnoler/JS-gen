@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 14:20 · Cursor Lead — 收工：select 录放统一 implementation plan（回链 14:15）
+
+- 完成：`docs/superpowers/plans/2026-09-09-select-record-replay-unify.md`（Task 1–9：A 红 pin→dispatch→双接线→契约；B 红 pin→engine mode→replay 调引擎→verify-all）；spec 标已批准
+- 验收：覆盖表对照 spec §3–§8；无 TBD 占位
+- 遗留：用户选 Subagent-Driven 或 Inline 后实现；本单元未改 `scripts/controller/actions/**` 实现
+
+## 2026-09-09 14:15 · Cursor Lead — 开工：select 录放统一 implementation plan
+
+- 进行中：14:15；spec 已批准（用户「继续」）；writing-plans，不实现
+- 范围：`docs/superpowers/plans/2026-09-09-select-record-replay-unify.md`、spec 状态行、本文件
+- 禁入区：实现代码、kb、whitelist、`.cursor/`
+- 方式：writing-plans → 请用户选执行方式
+
 ## 2026-09-09 14:10 · Cursor Lead — 收工：select 录放统一设计稿 A→B（回链 14:08）
 
 - 完成：`docs/superpowers/specs/2026-09-09-select-record-replay-unify-design.md`（Phase A 共享 router → Phase B 回放复用 SelectEngine）；用户口头批准方向后落盘
