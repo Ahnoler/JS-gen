@@ -62,7 +62,7 @@ from .form_autofill import FormAutofillEngine
 from .result_protocol import err_with, ok_marked, affordances
 from .select_dispatch import resolve_select_dispatch
 from .select_match import suggest_field_for_value
-from .replay_timing import WAIT_500_MS, WAIT_3000_MS, budget_for
+from .replay_timing import WAIT_300_MS, WAIT_500_MS, WAIT_3000_MS, budget_for
 
 # SB：fill_form_field 确定性守卫总开关（Z2 严格解析闸 + Z4 弹层作用域闸）。
 # 置 False 可一键回退为守卫前的盲填行为。
@@ -358,8 +358,49 @@ class FillEngine(_FormActionEngineBase):
         val = match_rule(label_text)
         return val if val else 'NO-RULE'
 
+    @classmethod
+    async def fill_form_field_for_replay(
+        cls,
+        page,
+        label_text: str,
+        value: str,
+        *,
+        xpath_smart: str = "",
+        element: dict | None = None,
+        placeholder: str = "",
+    ) -> str:
+        """Replay entry: construct engine with page adapter and run mode=replay."""
+        store = _replay_engine_store(None)
+        bc = _ReplayPageAdapter(page)
+        autofill = _ReplayAutofillStub()
+        engine = cls(bc, store, autofill)
+        return await engine.fill_form_field(
+            label_text,
+            value,
+            xpath_smart,
+            mode="replay",
+            element=element,
+            placeholder=placeholder,
+        )
 
-    async def fill_form_field(self, label_text: str, value: str, xpath_smart: str = ""):
+    async def fill_form_field(
+        self,
+        label_text: str,
+        value: str,
+        xpath_smart: str = "",
+        *,
+        mode: str = "record",
+        element: dict | None = None,
+        placeholder: str = "",
+    ):
+        if mode == "replay":
+            return await self._fill_form_field_replay_impl(
+                label_text,
+                value,
+                xpath_smart,
+                element=element,
+                placeholder=placeholder,
+            )
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
@@ -622,6 +663,196 @@ class FillEngine(_FormActionEngineBase):
             )
         return _with_submit_cue(result, self.business_data_store)
 
+    async def _fill_form_field_replay_impl(
+        self,
+        label_text: str,
+        value: str,
+        xpath_smart: str = "",
+        *,
+        element: dict | None = None,
+        placeholder: str = "",
+    ) -> str:
+        """Replay fill: resolve_fill_attempt_order + JS evaluate; no record/task_done."""
+        from scripts.feature_flags import relative_xpath_primary_enabled
+        from ._replay import (
+            _annotate_label_result,
+            _classify_fill_result,
+            _element_xpath_full,
+            _read_value_by_label,
+            _read_value_by_xpath,
+        )
+
+        page = await self.browser_context.get_current_page()
+        await _wait_if_loading(page)
+        await self._maybe_ensure_scanned(label_text, "replay")
+        value = normalize_lat_lng_value(label_text, value)
+        label = label_text
+        ph = placeholder
+
+        kind = lookup_field_kind(self.business_data_store, label_text)
+        if kind not in ('tssc-multi-select', 'tree-select'):
+            try:
+                live = await page.evaluate(
+                    '''(label) => {
+                        const norm = (s) => String(s || '').replace(/\\s+/g, ' ').trim();
+                        const want = norm(label);
+                        const items = [...document.querySelectorAll('.el-form-item')];
+                        let fi = null;
+                        for (const it of items) {
+                            const t = norm((it.querySelector('.el-form-item__label') || {}).textContent);
+                            if (t && (t === want || t.includes(want))) { fi = it; break; }
+                        }
+                        if (!fi) return '';
+                        if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
+                        if (fi.querySelector(
+                            '.tree-popover, .tsscTree, .el-tree-select,'
+                            + ' [class*="tsscmultitree"], [class*="TsscMultiTree"]'
+                        )) return 'tree-select';
+                        return '';
+                    }''',
+                    [label_text],
+                )
+                if live in ('tssc-multi-select', 'tree-select'):
+                    kind = live
+            except Exception:
+                pass
+        if kind == 'tssc-multi-select':
+            return 'err-use-tssc-multi-select'
+        if kind == 'tree-select':
+            return 'err-use-select-tree-option'
+
+        use_relative = relative_xpath_primary_enabled()
+        entry = {'element': element} if isinstance(element, dict) else {}
+        xp = (xpath_smart or '').strip()
+        xp_src = 'element' if xp else ''
+        full = _element_xpath_full(entry) if use_relative else ''
+        element_xp = xp if use_relative else ''
+
+        from .fill_dispatch import resolve_fill_attempt_order
+
+        attempts = resolve_fill_attempt_order(
+            label=label,
+            placeholder=ph,
+            xpath_smart=xp,
+            xpath_smart_src=xp_src,
+            xpath_full=full if use_relative else '',
+        )
+
+        async def _guard_xpath_fill(xp_guard: str) -> str | None:
+            if not (STRICT_FILL_GUARDS and xp_guard):
+                return None
+            try:
+                strict_raw = await page.evaluate(
+                    "([expr]) => { " + PAGE_LOCATOR_HELPERS
+                    + " return resolveLocatorStrict(expr, {visibleOnly:true}); }",
+                    [xp_guard],
+                )
+                strict_info = strict_raw if isinstance(strict_raw, dict) else {}
+                if strict_info.get('error'):
+                    pass
+                elif int(strict_info.get('effectiveCount') or 0) == 0:
+                    return (
+                        'strict-locator-not-found:' + xp_guard
+                        + ' | 先 scan 重新获取定位，勿重试同参数'
+                    )
+                elif strict_info.get('ambiguous'):
+                    return (
+                        'ambiguous-locator:' + xp_guard
+                        + ' | hits=' + str(strict_info.get('effectiveCount'))
+                        + ' | ' + json.dumps(strict_info.get('samples') or [], ensure_ascii=False)[:200]
+                        + ' | 需含消歧条件的定位，拒绝盲试'
+                    )
+            except Exception:
+                pass
+            try:
+                overlay_raw = await page.evaluate(JS_VISIBLE_OVERLAY_OF, [xp_guard])
+                overlay = overlay_raw if isinstance(overlay_raw, dict) else {}
+                if (
+                    overlay.get('overlayPresent')
+                    and overlay.get('targetFound')
+                    and not overlay.get('targetInsideOverlay')
+                ):
+                    return (
+                        'fill-outside-overlay | 目标在可见弹层「'
+                        + str(overlay.get('overlayLabel'))
+                        + '」之外，已拒绝。若确要填底层页面字段，先关闭弹层再填'
+                    )
+            except Exception:
+                pass
+            return None
+
+        async def _try_xpath_fill(xpath: str, locate_src: str, hint: str) -> str | None:
+            if xpath:
+                guard_err = await _guard_xpath_fill(xpath)
+                if guard_err:
+                    return guard_err
+            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, hint])
+            expected_empty = _false_ok_empty_actual(result)
+            if expected_empty is not None:
+                try:
+                    raw = await page.evaluate(
+                        JS_CHECK_SINGLE_FIELD,
+                        [label, self._button_keywords()],
+                    )
+                    info = raw if isinstance(raw, dict) else _as_dict(raw)
+                    current = str((info or {}).get('currentValue') or '').strip()
+                    if current and field_values_equivalent(current, expected_empty):
+                        sys.stderr.write(
+                            '[fill-replay] false_ok(actual=empty) upgraded by label readback: label='
+                            + repr(label)
+                            + ' current=' + repr(current[:40]) + '\n'
+                        )
+                        sys.stderr.flush()
+                        result = 'ok:label-readback'
+                except Exception as _rb_exc:
+                    sys.stderr.write(f'[fill-replay] label readback skipped: {_rb_exc}\n')
+                    sys.stderr.flush()
+            action_ok = isinstance(result, str) and result.startswith('ok')
+            actual = await _read_value_by_xpath(page, xpath, hint) if (xpath and action_ok) else ''
+            if action_ok and not actual:
+                actual = await _read_value_by_label(page, label, ph)
+            classified = _classify_fill_result(action_ok, value, actual)
+            if classified == 'ok':
+                await page.wait_for_timeout(WAIT_300_MS)
+                return f'ok:locate={locate_src}'
+            if classified.startswith('false_ok'):
+                await page.wait_for_timeout(WAIT_300_MS)
+                return classified
+            return None
+
+        result = 'label-not-found'
+        for att in attempts:
+            if att.js_kind == 'by_xpath':
+                if not att.xpath:
+                    result = await page.evaluate(JS_FILL_BY_XPATH, ['', value, att.hint])
+                    if isinstance(result, str) and result.startswith('ok'):
+                        await page.wait_for_timeout(WAIT_300_MS)
+                        return str(result)
+                    continue
+                xpath_result = await _try_xpath_fill(att.xpath, att.locate_src, att.hint)
+                if xpath_result:
+                    return xpath_result
+                continue
+            result = await page.evaluate(JS_FILL_FORM_FIELD, [att.hint, value])
+            if isinstance(result, str) and result.startswith('ok'):
+                await page.wait_for_timeout(WAIT_300_MS)
+                if element_xp:
+                    actual = await _read_value_by_xpath(page, element_xp, label)
+                    classified = _classify_fill_result(True, value, actual)
+                    if classified.startswith('false_ok'):
+                        return classified
+                    if classified == 'ok':
+                        return 'ok:locate=label'
+                return _annotate_label_result(str(result))
+
+        final = _annotate_label_result(str(result))
+        if is_absent_field_result(final) or is_absent_field_result(result):
+            sys.stderr.write(
+                f'[fill-replay] skip absent label={label!r} result={result!r}\n'
+            )
+            sys.stderr.flush()
+            return absent_field_skip_result()
+        return final
 
     async def check_field_value(self, label_text: str):
         page = await self.browser_context.get_current_page()
