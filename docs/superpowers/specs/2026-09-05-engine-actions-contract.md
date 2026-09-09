@@ -53,7 +53,7 @@ params 主要：`text` / `menu_text` / `section` / `region` / `tab_name` 等（�
 | 动作 | params | 说明 |
 |---|---|---|
 | `fill_form_field` | `label_text`、`value`（别名 value/option/option_text/text 归一）、`placeholder` | native setter 填充 + 回读校验 |
-| `select_option` | `label_text`、`option_text` | el-select：真实 mousedown 开下拉，exactOnly 防漂移，事后回读 + option-mismatch 校验 |
+| `select_option` | `label_text`、`option_text` | 分流经 `resolve_select_dispatch`（`target_kind` / scan kind / live `.tssc-multi-select` → `tssc` \| `tree` \| `el-select`）；`path=tssc` 时执行 `JS_TSSC_MULTI_SELECT`，否则 el-select（真实 mousedown 开下拉，exactOnly 防漂移，事后回读 + option-mismatch）。禁止只改 `SelectEngine` 或只改 `replay_form_action`——须改 `select_dispatch` 后双端接线。见 [`2026-09-09-select-record-replay-unify-design.md`](./2026-09-09-select-record-replay-unify-design.md)。 |
 | `select_tree_option` | `label_text`、`option_text` | 树选择三段式 |
 | `click_radio` | `label_text`、`option_text` | radio 组 |
 
@@ -76,6 +76,7 @@ params 主要：`text` / `menu_text` / `section` / `region` / `tab_name` 等（�
 1. 旧别名 → canonical：`treeSelect/fillTree/…→select_tree_option`、`fillFormField/fillDateField→fill_form_field`、`clickIconButton→click_button`、`closeDialog→close_dialog` 等（全表见 `_ACTION_NAME_ALIASES`，17 条）。
 2. kebab / camelCase 自动转 snake_case（`selectTreeOption→select_tree_option`）。
 3. **新动作必须同时落两处**：代码注册 + 本文档 §2 加行；禁止只写别名不进注册表。
+4. **select 族分流**：`select_option` / tssc / tree 的 Python 分流必须以 `scripts/controller/actions/select_dispatch.py`（`resolve_select_dispatch`）为单源；录制与回放都须经此决定 path。动作名合并（类 D6）不得把独立 `action_name` 当作唯一门控。
 
 ## 4. 结果协议（`_result_ok`，_replay.py）
 

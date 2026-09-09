@@ -1,7 +1,7 @@
 # Design: select 录制/回放分流统一（A→B）
 
 **日期**：2026-09-09  
-**状态**：已批准（2026-09-09）；实现计划 [`../plans/2026-09-09-select-record-replay-unify.md`](../plans/2026-09-09-select-record-replay-unify.md)  
+**状态**：Phase A 已落地（`select_dispatch` + 双接线）；Phase B 待实现 — 计划 [`../plans/2026-09-09-select-record-replay-unify.md`](../plans/2026-09-09-select-record-replay-unify.md)  
 **触发**：`log.txt` 回放「要素名称→部署方式」失败（`option-not-found:deplMod,…`），自愈经 `SelectEngine` 成功（`ok-p1:部署方式`）  
 **相关**：[`2026-09-09-tssc-multi-select-v2-design.md`](./2026-09-09-tssc-multi-select-v2-design.md)（D6）、[`2026-09-05-engine-actions-contract.md`](./2026-09-05-engine-actions-contract.md) §2.4、hotfix `84a320a2`  
 **用户裁决**：系统性收敛采用 **A→B 分阶段**（先共享路由器，再回放复用 SelectEngine）
