@@ -55,17 +55,21 @@ export async function adoptModelingUmlEcdUnderSystem(systemNodeId, trx) {
       interNodes.map((i) => Number(i.id)),
       trx,
     );
-    const pageIdsByNode = new Map();
+    const pagesByNode = new Map();
     for (const p of pages) {
       const nid = Number(p.systemNodeId);
-      if (!pageIdsByNode.has(nid)) pageIdsByNode.set(nid, []);
-      const pid = String(p.pageId || '').trim();
-      if (pid) pageIdsByNode.get(nid).push(pid);
+      if (!pagesByNode.has(nid)) pagesByNode.set(nid, []);
+      const pageId = String(p.pageId || '').trim();
+      if (!pageId) continue;
+      pagesByNode.get(nid).push({
+        pageId,
+        activityUmlEcd: String(p.activityUmlEcd || '').trim(),
+      });
     }
     const intermediates = interNodes.map((i) => ({
       name: String(i.name || ''),
       umlEcd: String(i.umlEcd || ''),
-      pageIds: pageIdsByNode.get(Number(i.id)) || [],
+      pages: pagesByNode.get(Number(i.id)) || [],
     }));
     for (const nav of kids) {
       if (Number(nav.intermediateFlag) === 1) continue;
