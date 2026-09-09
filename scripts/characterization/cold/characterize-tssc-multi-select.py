@@ -1,5 +1,6 @@
-"""Pin tssc_multi_select contract: snippet markers, classify-before-el-select,
-registration, prompt pack, action registries."""
+"""Pin tssc_multi_select contract: v2 table markers, D6 select_option-only agent surface,
+internal handoff + replay registries."""
+import re
 import sys
 from pathlib import Path
 
@@ -23,7 +24,6 @@ def classify_before_el_select():
     src = (ROOT / "scripts/controller/actions/js_snippets/scan_utils.py").read_text(
         encoding="utf-8"
     )
-    marker = "tssc-multi-select"
     el = "if (item.querySelector('.el-select')) return 'select'"
     i_m = src.find("tssc-multi-select")
     i_e = src.find(el)
@@ -33,26 +33,86 @@ def classify_before_el_select():
     return True
 
 
+def no_agent_tssc_action():
+    src = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    if "async def tssc_multi_select" in src and "@controller.action" in src:
+        if re.search(
+            r"@controller\.action\([^)]*\)\s*\n\s*async def tssc_multi_select\b",
+            src,
+        ):
+            print("FAIL: tssc_multi_select still registered as @controller.action")
+            return False
+    return True
+
+
+def tssc_records_select_option():
+    src = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(
+        encoding="utf-8"
+    )
+    m = re.search(
+        r"async def tssc_multi_select\b.*?(?=\n    async def |\nclass |\Z)",
+        src,
+        re.DOTALL,
+    )
+    if not m:
+        print("FAIL: tssc_multi_select method not found in form_action_engines.py")
+        return False
+    body = m.group(0)
+    if re.search(r"_record_action\s*\(\s*['\"]tssc_multi_select['\"]", body):
+        print("FAIL: tssc_multi_select still records action name tssc_multi_select")
+        return False
+    if not re.search(r"_record_action\s*\(\s*['\"]select_option['\"]", body):
+        print("FAIL: tssc_multi_select must _record_action('select_option', ...)")
+        return False
+    return True
+
+
+def prompt_d6_form():
+    form = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
+    if "select_option" not in form:
+        print("FAIL: form prompt must teach select_option for tssc (D6)")
+        return False
+    if "tssc-multi-select" not in form and ".tssc-multi-select" not in form:
+        print("FAIL: form prompt must mention tssc-multi-select / .tssc-multi-select (D6)")
+        return False
+    if "tssc_multi_select(label_text" in form or "须用 **`tssc_multi_select`**" in form:
+        print("FAIL: form prompt still steers agents to call tssc_multi_select (D6)")
+        return False
+    return True
+
+
+def prompt_d6_pack():
+    pack = ROOT / "scripts/prompts/agent-tools-tssc-multi-select.md"
+    agent_utils = (ROOT / "scripts/agent_utils.py").read_text(encoding="utf-8")
+    if "agent-tools-tssc-multi-select.md" in agent_utils:
+        print("FAIL: agent_utils still injects agent-tools-tssc-multi-select.md (D6)")
+        return False
+    if pack.is_file():
+        pack_src = pack.read_text(encoding="utf-8")
+        if "tssc_multi_select(label_text" in pack_src:
+            print(
+                "FAIL: agent-tools-tssc-multi-select.md still teaches "
+                "tssc_multi_select(label_text call shape (D6)"
+            )
+            return False
+    agent_prompt = (ROOT / "scripts/prompts/agent-prompt.md").read_text(encoding="utf-8")
+    if "agent-tools-tssc-multi-select.md" in agent_prompt:
+        print("FAIL: agent-prompt.md still includes dedicated tssc pack (D6)")
+        return False
+    return True
+
+
 checks = [
     ("scripts/controller/actions/js_snippets/tssc_multi_select.py", (
         "JS_TSSC_MULTI_SELECT",
-        "no-tssc-multi-select",
-        "err-no-echo",
-        "ok-already",
-        "TsscMultiSelect",
-        ".tssc-multi-select",
-        ".select-table",
-        "el-table__row",
-        "force 精确查询 OFF",
-        "collectOptions",
+        "ok-p1:",
+        "ok-p2:",
+        "err-no-options",
+        "精确",
+        "select-table",
         "el-select-dropdown__item",
-        "mode === 'table'",
     )),
     ("scripts/controller/actions/_js_snippets.py", ("tssc_multi_select", "JS_TSSC_MULTI_SELECT")),
-    ("scripts/controller/actions/_form.py", (
-        "tssc_multi_select(label_text, option_text",
-        "tssc_multi_select",
-    )),
     ("scripts/models/field.py", (
         '"tssc-multi-select"',
         "FieldKind",
@@ -62,22 +122,14 @@ checks = [
         "async def tssc_multi_select",
         "form_tssc_multi_select",
         "JS_TSSC_MULTI_SELECT",
+        "lookup_field_kind(self.business_data_store, label_text) == 'tssc-multi-select'",
+        "return await self.tssc_multi_select(",
         "lookup_field_kind",
         "tssc-multi-select",
         "err-use-tssc-multi-select",
         "Do NOT fill_form_field",
         "resolve_recorded_option_text",
     )),
-    ("scripts/prompts/agent-tools-tssc-multi-select.md", (
-        "tssc_multi_select(label_text, option_text)",
-        "no-tssc-multi-select",
-        "err-no-echo",
-        "TsscMultiSelect",
-        "option_text=\"first\"",
-        "禁止改用 `fill_form_field`",
-    )),
-    ("scripts/prompts/agent-prompt.md", ("agent-tools-tssc-multi-select.md",)),
-    ("scripts/agent_utils.py", ("agent-tools-tssc-multi-select.md",)),
     ("scripts/models/action.py", ("tssc_multi_select",)),
     ("scripts/event_dispatch.py", ("tssc_multi_select",)),
     ("scripts/state.py", ("tssc_multi_select",)),
@@ -102,7 +154,13 @@ checks = [
     )),
 ]
 
-ok = all(needle(path, *texts) for path, texts in checks) and classify_before_el_select()
+ok = all(needle(path, *texts) for path, texts in checks)
+ok = ok and classify_before_el_select()
+ok = ok and no_agent_tssc_action()
+ok = ok and tssc_records_select_option()
+ok = ok and prompt_d6_form()
+ok = ok and prompt_d6_pack()
+
 # Runtime pin: ScannedField must accept DOM kind tssc-multi-select (traj 696 crash).
 try:
     sys.path.insert(0, str(ROOT))
@@ -112,20 +170,7 @@ try:
 except Exception as e:
     print("FAIL: ScannedField rejects kind=tssc-multi-select: %s" % e)
     ok = False
-# form.md must NOT still tell agents to use select_option for TsscMultiSelect table rows
-form = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
-if "必须用 select_option" in form and "TsscMultiSelect" in form:
-    print("FAIL: form prompt still steers TsscMultiSelect to select_option")
-    ok = False
-pack = ROOT / "scripts/prompts/agent-tools-tssc-multi-select.md"
-if "tssc_multi_select" not in form and pack.is_file() and "TsscMultiSelect" in pack.read_text(
-    encoding="utf-8"
-):
-    pass  # dedicated pack is enough; form must not contradict
-bad = "远程表格型下拉（弹层内 `el-table` 行" in form and "只能用 `select_option`" in form
-if bad:
-    print("FAIL: stale select_option table-row guidance in form.md")
-    ok = False
+
 if not ok:
     print("FAILED: characterize-tssc-multi-select")
     sys.exit(1)
