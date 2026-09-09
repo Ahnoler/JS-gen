@@ -6,6 +6,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
+## 2026-09-10 00:10 · ZCode — 开工：本周收尾——结构梳理 + 文档更新 + 死代码清理 + 漏洞处理（agent team 连续执行）
+
+- 进行中：00:10；用户指令「本周收尾：项目结构梳理、更新文档、清理死代码、处理程序漏洞，带 agent team，连续执行」
+- 范围（子智能体由本会话代为声明，文件集按路不相交）：①结构+文档路（只读研究→实施改 `README.md`、`docs/superpowers/**`、`src/dashboard/api-docs/catalog.js` 不一致项）；②死代码路（全库扫描→实施移除 `src/**`、`executor/**`、`scripts/**` 非热区符号/文件，含 pin 同步）；③漏洞路（核实 09-09 对抗 review P0×3/P1×4 现状→实施修复：`src/executor-session-client.js`、`executor/session-handler.js`（P0-1 runId 白名单+桥接表征）、`trajectory-recording-runner.js`/`trajectory-record-lifecycle.js`/`run-event-ownership.js`（P0-2/P0-3 竞速守卫）、Python `state.py`/`service.py`/`session_runner.py`（P1-4 事件归属））
+- 共享文件**仅主线程改**：`scripts/refactor/verify-all.sh`、`package.json`、`AGENTS.md`、`todo-list.md`、本文件；子智能体一律不 commit
+- 禁入区：`.cursor/` 与未跟踪 `plans/2026-09-09-flow-card-guided-propose.md`（他线 WIP）；fill/select/radio/tssc/search-then-click 热区（`scripts/controller/actions/*.py` 近三日他线改动文件只读不写）；`data/kb/**` 只读；安全 P1/P2 项（用户已明确不做勿再提）；不重启 4097/执行机、不动在途录制与执行机槽位
+- 方式：三路 Explore 并行研究（结构文档/死代码/漏洞核实）→ 主线程定清单 → 并行 general-purpose 实施（各带自包含 prompt+验证命令）→ 主线程验收 + `verify-all` 与 HEAD 基线比对 + lint 0 新增 → 分单元 commit → 收工回报
+
 ## 2026-09-10 00:45 · ZCode — 收工：KB 召回评测常态化 T0–T3/T5/T6/T7（回链 09-09 22:44）
 
 - 完成：**T0** 基线复现 6/6 精确 MATCH（`55a558ab` 声明）；**T1** 130 条评测集冻结（A40/B30/C15/D15/N30，62 卡覆盖，excluded 4，盲态子智能体复核 15/15 零分歧，`0e8a9f64`）；**T2** `rankFlowCards` + 2 pin=17 passed、重构后基线仍 6/6（`5acbbbe4`）；**T3** `scripts/kb/recall-eval.mjs` 真实排序指标运行器 + hold-out 对账 Δ全0 + `--baseline` 双向验收（`7543157e`）；**T5** PY agreement 62/100 非阻塞登记（`1e487ca4`）；**T6** 基线报告+阈值提案（`1be0ac8b`）；**T7** AGENTS 职责分离一句 + todo-list ⑧ 一行（本 commit）
