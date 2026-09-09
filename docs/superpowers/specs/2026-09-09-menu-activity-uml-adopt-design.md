@@ -1,7 +1,7 @@
 # Design: 菜单扫描回填改用活动级 `umlEcd`
 
 **日期**：2026-09-09  
-**状态**：设计已确认；实现计划 [`../plans/2026-09-09-menu-activity-uml-adopt.md`](../plans/2026-09-09-menu-activity-uml-adopt.md)  
+**状态**：已落地（表征 uml-adopt + import-json OK）— 计划 [`../plans/2026-09-09-menu-activity-uml-adopt.md`](../plans/2026-09-09-menu-activity-uml-adopt.md)  
 **前置**：[`archive/specs/2026-09-05-intermediate-promote-on-scan-design.md`](../archive/specs/2026-09-05-intermediate-promote-on-scan-design.md)、`menu-scan-uml-adopt`  
 **用户裁决**：可导航叶 `uml_ecd` 以**活动级**为准（`umlType=3` 的 `umlEcd` ↔ `managePage.pdCmptEcd`）；1:N 共享页**仅唯一才回填**。
 

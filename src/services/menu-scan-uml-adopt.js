@@ -9,17 +9,19 @@
  */
 
 /**
- * @param {string} umlEcd
- * @returns {boolean}
+ * 判断 umlEcd 是否为建模组件关系码（UML… 前缀）。
+ * @param {string} umlEcd 候选编码
+ * @returns {boolean} 是否为建模码
  */
 export function isModelingUmlEcd(umlEcd) {
   return /^UML/i.test(String(umlEcd || '').trim());
 }
 
 /**
- * @param {{ name: string, pageId?: string, umlEcd?: string }} nav
- * @param {Array<{ name: string, umlEcd: string, pages?: Array<{ pageId: string, activityUmlEcd?: string }>, pageIds?: string[] }>} intermediates
- * @returns {string}
+ * 从同模块 intermediate 目录为可导航叶挑选应回填的建模 umlEcd。
+ * @param {{ name: string, pageId?: string, umlEcd?: string }} nav 可导航叶（name、pdCmptEcd、已有 umlEcd）
+ * @param {Array<{ name: string, umlEcd: string, pages?: Array<{ pageId: string, activityUmlEcd?: string }> }>} intermediates 模块下 intermediate 列表
+ * @returns {string} 应写入的建模 umlEcd，无则空串
  */
 export function pickUmlEcdFromIntermediates(nav, intermediates) {
   const list = Array.isArray(intermediates) ? intermediates : [];

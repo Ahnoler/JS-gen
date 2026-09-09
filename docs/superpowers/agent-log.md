@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 17:30 · Cursor Subagent — 收工：菜单活动级 umlEcd adopt SDD 实现（回链 17:08）
+
+- 完成：T1–T5 SDD 全链；关键 commits `043db591` / `132ce54a` / `150829a8` / `04524603` + docs `pending`（`docs: close menu activity umlEcd adopt design`）
+- 验收：`characterize-menu-scan-uml-adopt.mjs` OK；`characterize-system-import-json.mjs` OK
+- 遗留（湿测）：部署迁移 → `systemId=1` 再导入同份建模 JSON → 触发扫描 apply 或调用 `adoptModelingUmlEcdUnderSystem` → 核对产品四叶表（spec §4.2）；同事已手工改码可作对照
+
 ## 2026-09-09 17:20 · Cursor Lead — 开工：产品库/要素库 修改+删除原子草稿与补录
 - 开工：17:20。范围 A 修改 + Del-A 删除；四笔原子草稿；fill 统一已收工可补录
 - 范围：`docs/superpowers/specs/2026-09-09-product-mod-del-atomic-draft-design.md`、`tmp/product-mgmt/draft-mod-del/**`、本文件；补录成功后可回写 flows source（另注）
