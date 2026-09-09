@@ -1299,6 +1299,15 @@ async function main() {
     });
     assert.equal(out.atoms.length, 1);
     assert.equal(out.atoms[0].flowGuided, true);
+    assert.equal(out.atoms[0].suggestedFlowRef, 'customer_onboarding_mini');
+    assert.deepEqual(out.atoms[0].phaseHints.slice(0, 4), [
+      '进入编辑页',
+      '维护概况',
+      '联网核查',
+      '保存（信贷潜在客户）',
+    ]);
+    assert.match(out.atoms[0].taskDraft, /^1、进入编辑页/m);
+    assert.doesNotMatch(out.atoms[0].taskDraft, /^1、进入编辑页[\s\S]*^2、进入编辑页/m);
     rmSync(tmp, { recursive: true, force: true });
   });
 

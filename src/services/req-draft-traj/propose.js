@@ -290,11 +290,13 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
     const steps = chain.steps || [];
     /** @type {import('./parse-through-chains.js').ThroughChainStep[]} */
     let groupSteps = [];
-    /** @type {string[]} */
-    let navPreamble = [];
+    /** @type {import('./parse-through-chains.js').ThroughChainStep[]} */
+    let leadingNavSteps = [];
 
     const flushGroup = () => {
-      if (groupSteps.length === 0) return;
+      const allSteps = [...leadingNavSteps, ...groupSteps];
+      if (allSteps.length === 0) return;
+      const navPreamble = leadingNavSteps.map((s) => String(s.action || '').trim()).filter(Boolean);
       const actions = [
         ...navPreamble,
         ...groupSteps.map((s) => String(s.action || '').trim()),
@@ -306,7 +308,7 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
       /** @type {Record<string, unknown>} */
       const atom = {
         chainId: chain.chainId,
-        stepIndexes: groupSteps.map((s) => s.index),
+        stepIndexes: allSteps.map((s) => s.index),
         title,
         taskDraft: buildGroupedTaskDraft(navPreamble, groupSteps, sourceDoc),
         phaseHints: actions.slice(0, 4),
@@ -316,7 +318,7 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
       if (hit.nodeId) atom.nodeId = hit.nodeId;
       atoms.push(atom);
       groupSteps = [];
-      navPreamble = [];
+      leadingNavSteps = [];
     };
 
     for (let i = 0; i < steps.length; i += 1) {
@@ -326,8 +328,11 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
 
       if (isNavigationStep(action) || isEntryOnlyStep(action)) {
         const hasLaterPersist = steps.slice(i + 1).some((s) => isPersistBoundaryAction(s.action));
-        if (hasLaterPersist || groupSteps.length > 0) {
-          navPreamble.push(action);
+        if (leadingNavSteps.length === 0 && groupSteps.length === 0 && hasLaterPersist) {
+          leadingNavSteps.push(step);
+          continue;
+        }
+        if (hasLaterPersist || groupSteps.length > 0 || leadingNavSteps.length > 0) {
           groupSteps.push(step);
           continue;
         }
@@ -339,8 +344,8 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
       }
     }
 
-    if (groupSteps.length > 0) {
-      const remainderChain = { ...chain, steps: groupSteps };
+    if (groupSteps.length > 0 || leadingNavSteps.length > 0) {
+      const remainderChain = { ...chain, steps: [...leadingNavSteps, ...groupSteps] };
       atoms.push(...buildFallbackLlmAtoms([remainderChain], sourceDoc));
     }
   }
