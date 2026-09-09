@@ -199,3 +199,14 @@ Lead 裁定：**全部按 reviewer 推荐执行**，不再逐项回问。
 | 12 | reviewer 角色 | 不变：实施完成后由 reviewer 按 plan 的 Reviewer Checklist 复核，出具 PASS / FAIL / DONE_WITH_CONCERNS |
 
 实施按 plan T0 → T7 推进；每个 Task 交付后把 commit hash + 证据目录交 reviewer 复核。
+
+## 附录 B：v1 评测集实测记录（T1 回填，2026-09-09）
+
+- 文件：`scripts/characterization/fixtures/kb-recall-eval.v1.json`（evalVersion=v1，冻结）。
+- 条数：**130**（A40 / B30 / C15 / D15 / N30，正样本 100）；query 无重复；负样本 30 条全部带 `whyNegative`。
+- 覆盖：正样本 gold 覆盖 **62 张不同卡**（84 卡中，≥50 达标）；单卡最多 3 条（≤4 达标）。
+- 种子：reviewer 20 条 hold-out 原样收编（A 层 15 / B 层 5）+ 跨域负样本 10 条（含已知 FP 靶子 `计算 2 加 3 等于多少`→`collection_scorecard`，保留为回归靶子）。
+- 标注纪律：主标只读 `data/kb/flows` 词表 dump（`tmp/kb-eval/corpus-inventory.json`），全程未运行匹配器；近域负样本经语料关键词缺席 grep 验证（展期/罚息/复利/请假/反洗钱/尾箱/报销/招标/ATM/下载安装 均 ABSENT）。
+- `excluded[]` 4 条：`打印企业征信报告`（「征信」存在于 customer_360/rating 词表，无法独立判定）、`签合同`（三卡可辩护）、`查额度`（两卡语义重叠）、`客户管理`（过泛）。
+- 临时双人复核（冻结前）：主会话派盲态子智能体（只给语料词表，禁止跑匹配器/读评测集）对 15 条敏感条目独立标注，**15/15 主判一致（分歧率 0%）**，多 gold 判断逐条吻合（rating 双卡 / approval 三卡 / lmtRgst 双卡）；证据 `tmp/kb-eval/T1-blind-review.txt`。G1（reviewer 正式抽检 15 条）仍按 handoff §6 执行，本复核不替代 G1。
+- 结构自检：`tmp/kb-eval/T1-struct.txt`（含 B 层无卡词原串、A 层词面构成、配额/覆盖/单卡上限检查）ALL OK。
