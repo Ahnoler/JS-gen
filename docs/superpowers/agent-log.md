@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 15:30 · Cursor Lead — 收工：select 录放统一 SDD A→B（回链 14:35）
+
+- 完成：Phase A（`select_dispatch` + 双接线 + 契约）+ Phase B（`mode=replay` + replay 调 `select_option_for_replay` / tree）；主线 commits `814595f7`…`44384ace`（见 ledger）；verify-all 注册 select-dispatch + select-replay-engine
+- 验收：`characterize-select-dispatch` / `select-replay-engine` / `tssc-multi-select` / `select-state-boundary` / `select-option-stamp` **GREEN**
+- 遗留：湿测复放「要素名称→部署方式」；全量 verify-all 或有环境噪；SDD workspace 可删；他线 `partner-platform.js` / `.env.example` 未动
+
 ## 2026-09-09 14:35 · Cursor Lead — 开工：select 录放统一 SDD 实现（A→B）
 
 - 进行中：14:35；按 `docs/superpowers/plans/2026-09-09-select-record-replay-unify.md` Subagent-Driven；子智能体不 commit，主会话验收后代提交
