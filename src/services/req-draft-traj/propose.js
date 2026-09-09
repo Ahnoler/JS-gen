@@ -20,7 +20,8 @@ import {
 } from './provenance.js';
 import { listFlowCardsDetailed } from '../kb-flow-cards.js';
 import { matchFlowForAtom } from './flow-card-recall.js';
-import { writeProposeCache } from './propose-cache.js';
+import { stepsShareClosedLoop } from './flow-card-guide.js';
+import { writeProposeCache, PROPOSE_CACHE_VERSION } from './propose-cache.js';
 import { collectPageCodes, sanitizeTaskDraftKeyData } from './atom-keydata.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +74,7 @@ async function appendObservation(file, line) {
  * @property {string[]} [pageCodes] Ordered unique ZJJK page/component codes (not in 关键数据)
  * @property {string} [suggestedFlowRef] Matched kb flow card stem
  * @property {string} [suggestedNodeId] Matched flow card node id
+ * @property {boolean} [flowGuided] True when LLM supplied flowRef (card-guided atom)
  */
 
 const WRITE_ACTION_RE = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交|启用|禁用|克隆|删除/;
@@ -439,6 +441,7 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   const primaryStep = findStepByIndex(chain, primaryIndex) || chain.steps[0];
   const title = String(llmAtom.title || primaryStep?.action || '').trim();
   const stepIndex = primaryStep?.index || primaryIndex;
+  const flowRef = llmAtom.flowRef != null ? String(llmAtom.flowRef).trim() : '';
 
   const atomKeyStepIndex = stepIndexes.length > 0
     ? pickAtomKeyStepIndex(chain, stepIndexes)
@@ -448,12 +451,16 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     ? countWriteStepsInIndexes(chain, stepIndexes)
     : (primaryStep && isWriteStep(primaryStep.action) ? 1 : 0);
   if (writeStepCount > 1) {
-    const atomKey = buildAtomKey({
-      moduleKey,
-      chainId: chain.chainId,
-      stepIndex: atomKeyStepIndex,
-    });
-    return { rejected: { atomKey, reason: 'multi_write_atom' } };
+    const actions = stepIndexes.map((idx) => findStepByIndex(chain, idx)?.action || title);
+    const allow = flowRef && stepsShareClosedLoop({ stepActions: actions });
+    if (!allow) {
+      const atomKey = buildAtomKey({
+        moduleKey,
+        chainId: chain.chainId,
+        stepIndex: atomKeyStepIndex,
+      });
+      return { rejected: { atomKey, reason: 'multi_write_atom' } };
+    }
   }
 
   const atomKey = buildAtomKey({
@@ -509,6 +516,15 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
 
   if (llmAtom.wetTestHint != null && String(llmAtom.wetTestHint).trim()) {
     atom.wetTestHint = String(llmAtom.wetTestHint).trim();
+  }
+
+  const flowGuided = Boolean(flowRef);
+  atom.flowGuided = flowGuided;
+  if (flowGuided) {
+    atom.suggestedFlowRef = flowRef;
+    if (llmAtom.nodeId != null && String(llmAtom.nodeId).trim()) {
+      atom.suggestedNodeId = String(llmAtom.nodeId).trim();
+    }
   }
 
   const prov = assertAtomProvenance(atom);
@@ -732,6 +748,7 @@ export async function proposeDraftTrajectories({
 
   const cards = await listFlowCardsDetailed({});
   for (const atom of capped) {
+    if (atom.suggestedFlowRef) continue;
     const hit = matchFlowForAtom({
       title: atom.title,
       taskDraft: atom.taskDraft,
@@ -761,7 +778,7 @@ export async function proposeDraftTrajectories({
     atoms: capped.length,
     rejected: rejected.length,
     truncated,
-    cacheVersion: 1,
+    cacheVersion: PROPOSE_CACHE_VERSION,
     sourceHash,
     durationMs: Date.now() - startedAt,
     flowRefHits,

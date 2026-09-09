@@ -13,7 +13,7 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
  * Cache format version — bump on breaking cache shape changes; commit
  * rejects caches whose version differs (STALE_PROPOSE_CACHE).
  */
-export const PROPOSE_CACHE_VERSION = 1;
+export const PROPOSE_CACHE_VERSION = 2;
 
 /**
  * Read cached propose result from a module directory.

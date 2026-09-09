@@ -254,6 +254,7 @@ async function main() {
     assert.ok(out.atoms[0].taskDraft.includes(out.atoms[0].sourceDoc));
     assert.ok(out.atoms[0].taskDraft.includes(out.atoms[0].sourceChapter));
     assert.ok(Array.isArray(out.atoms[0].pageCodes));
+    assert.equal(out.atoms[0].flowGuided, false);
     const cachePath = join(tmp, 'demo-mod', '.draft-traj-propose.json');
     assert.ok(existsSync(cachePath));
     rmSync(tmp, { recursive: true, force: true });
@@ -546,7 +547,10 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  const { writeProposeCache } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
+  const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
+  run('PROPOSE_CACHE_VERSION is 2 (flow-guided propose)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 2);
+  });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 
@@ -579,10 +583,10 @@ async function main() {
       inputHash: 'b'.repeat(64),
       truncated: { dropped: 0, requestedMax: null },
     });
-    assert.equal(body.cacheVersion, 1);
+    assert.equal(body.cacheVersion, 2);
     assert.ok(body.sourceHash && body.inputHash);
     const raw = JSON.parse(readFileSync(join(modDir, '.draft-traj-propose.json'), 'utf8'));
-    assert.equal(raw.cacheVersion, 1);
+    assert.equal(raw.cacheVersion, 2);
     assert.equal(raw.sourceHash, 'a'.repeat(64));
     assert.equal(existsSync(join(modDir, '.draft-traj-propose.json.tmp')), false);
     rmSync(tmp, { recursive: true, force: true });
@@ -600,7 +604,7 @@ async function main() {
     await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM, listSystemsFn: async () => [] });
     const cache = JSON.parse(readFileSync(join(tmp, 'demo-mod', '.draft-traj-propose.json'), 'utf8'));
     const md = readFileSync(join(tmp, 'demo-mod', 'through-chains.md'), 'utf8');
-    assert.equal(cache.cacheVersion, 1);
+    assert.equal(cache.cacheVersion, 2);
     assert.equal(cache.sourceHash, sha256(md));
     rmSync(tmp, { recursive: true, force: true });
   });
@@ -1090,7 +1094,7 @@ async function main() {
       assert.ok(field in last, `observation missing field ${field}`);
     }
     assert.equal(last.moduleKey, 'demo-mod');
-    assert.equal(last.cacheVersion, 1);
+    assert.equal(last.cacheVersion, 2);
     rmSync(tmp, { recursive: true, force: true });
   });
 
