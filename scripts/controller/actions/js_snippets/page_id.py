@@ -63,14 +63,19 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
         || pagePath.endsWith(currentRoute)
     ));
 
-    // Close leftover 天元 dialog — stale body causes wrong path/code.
-    for (const d of document.querySelectorAll('.el-dialog')) {
-        const title = (d.querySelector('.el-dialog__title') || {}).textContent;
-        if (title && title.indexOf('天元相关配置') !== -1) {
-            const btn = d.querySelector('.el-dialog__footer button, button');
-            if (btn) { try { btn.click(); } catch (e) {} }
+    // Close leftover / just-opened 天元 dialog via footer primary (通常「确 定」).
+    // Must run on every exit path: empty-config / timeout used to return with the
+    // dialog still visible, and the recording agent then pauses per global-dialog guard.
+    const closeTianyuanDialogs = () => {
+        for (const d of document.querySelectorAll('.el-dialog')) {
+            const title = (d.querySelector('.el-dialog__title') || {}).textContent;
+            if (title && title.indexOf('天元相关配置') !== -1) {
+                const btn = d.querySelector('.el-dialog__footer button, button');
+                if (btn) { try { btn.click(); } catch (e) {} }
+            }
         }
-    }
+    };
+    closeTianyuanDialogs();
     // Let SPA finish route change after click_menu_xpath in the same replay batch.
     await sleep(1000);
 
@@ -113,6 +118,7 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
         if (sawDialog && !sawLoading && !sawCodeLabel) {
             emptyStable += 1;
             if (emptyStable >= 5) {
+                closeTianyuanDialogs();
                 return {
                     componentCode: '',
                     scenarioCode: '',
@@ -129,6 +135,7 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
     }
 
     if (!dialog || !info) {
+        closeTianyuanDialogs();
         return {
             componentCode: '',
             scenarioCode: '',
@@ -146,10 +153,7 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
     const pagePath = String(info['页面路径'] || '').trim();
     const activityName = String(info['活动名称'] || '').trim();
 
-    try {
-        const btn = dialog.querySelector('.el-dialog__footer button, button');
-        if (btn) btn.click();
-    } catch (e) {}
+    closeTianyuanDialogs();
 
     return { componentCode: componentCode, scenarioCode: scenarioCode, pageName: pageName, pagePath: pagePath, activityName: activityName, reason: 'ok' };
 }'''

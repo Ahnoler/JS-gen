@@ -10,32 +10,34 @@ const FLOW_TEMPLATE_END_MARKER = '【/流程卡模板】';
 const CJK_RUN_RE = /[\u3400-\u9fff\u3040-\u30ff]+/g;
 const FS_CODE_RE = /FS\d+/gi;
 const ZJJK_CODE_RE = /ZJJK\d+/gi;
+/** Absolute score floors kept from the substring scorer (pin continuity). */
 const MIN_CARD_SCORE = 2;
 const MIN_NODE_SCORE = 1;
+/** Node must cover at least this fraction of the winning card's score. */
 const NODE_SCORE_RATIO = 0.5;
+/** Relative coverage floor: cardScore / maxPossible (spec §7.2). */
+const MIN_CARD_COVERAGE = 0.25;
+/** Longest semantic term (chars) considered for longest-match tokenization. */
+const MAX_TERM_LEN = 12;
 const MAX_PRECONDITIONS = 8;
 
 /**
- * @param {string} text
- * @returns {string[]}
+ * Bigrams + whole codes of a text (card/node profile vocabulary).
+ * @param {string} text Haystack text
+ * @returns {Set<string>} Token set (lowercased bigrams + uppercased codes)
  */
-function extractAtomTokens(text) {
+function profileTokens(text) {
   const hay = String(text || '');
+  /** @type {Set<string>} */
   const tokens = new Set();
-
   for (const m of hay.matchAll(FS_CODE_RE)) tokens.add(m[0].toUpperCase());
   for (const m of hay.matchAll(ZJJK_CODE_RE)) tokens.add(m[0].toUpperCase());
-
   for (const run of hay.match(CJK_RUN_RE) || []) {
-    if (run.length < 2) continue;
-    for (let len = 2; len <= run.length; len += 1) {
-      for (let i = 0; i <= run.length - len; i += 1) {
-        tokens.add(run.slice(i, i + len));
-      }
+    for (let i = 0; i + 2 <= run.length; i += 1) {
+      tokens.add(run.slice(i, i + 2));
     }
   }
-
-  return [...tokens];
+  return tokens;
 }
 
 /**
@@ -52,7 +54,24 @@ function buildCardHaystack(card) {
   for (const node of card.nodes || []) {
     parts.push(node.id, node.page, node.enter);
   }
+  // Short label fields only (rules[].keyword, state_actions entity/status,
+  // pendingSteps name): they carry operating vocabulary the headline fields
+  // miss (e.g. 客户转正 in customer_onboarding) without long-prose noise.
+  for (const rule of card.rules || []) {
+    parts.push(rule.keyword);
+  }
+  for (const sa of card.state_actions || []) {
+    parts.push(sa.entity, sa.status);
+  }
+  for (const ps of card.pendingSteps || []) {
+    parts.push(ps.name);
+  }
   return parts.filter(Boolean).join('|').toLowerCase();
+}
+
+/** Flow name with all whitespace stripped — specificity tie-break key. */
+function normFlowName(card) {
+  return String(card?.flow || '').replace(/\s+/g, '');
 }
 
 /**
@@ -63,68 +82,191 @@ function buildNodeHaystack(node) {
   return [node.id, node.page, node.enter].filter(Boolean).join('|').toLowerCase();
 }
 
+/** Cached card corpus profile (per cards array identity). */
+const corpusCache = new WeakMap();
+
 /**
- * @param {string[]} tokens
- * @param {string} haystack
- * @returns {number}
+ * Build (and cache) the corpus profile: per-card haystack + token set, and the
+ * semantic dictionary of raw flow/alias/keyword terms for longest-match.
+ * @param {object[]} cards Flow cards
+ * @returns {{ cards: Array<{ card: object, stem: string|null, haystack: string, tokens: Set<string>, semanticTerms: string[] }>, semanticDict: Set<string>, n: number }}
  */
-function scoreTokens(tokens, haystack) {
-  let score = 0;
-  for (const token of tokens) {
-    const needle = token.toLowerCase();
-    if (haystack.includes(needle)) score += 1;
+function corpusProfile(cards) {
+  const cached = corpusCache.get(cards);
+  if (cached) return cached;
+  /** @type {Array<{ card: object, stem: string|null, haystack: string, tokens: Set<string>, semanticTerms: string[] }>} */
+  const entries = [];
+  /** @type {Set<string>} */
+  const semanticDict = new Set();
+  for (const card of cards) {
+    const haystack = buildCardHaystack(card);
+    const semanticTerms = [
+      card.flow,
+      ...(card.aliases || []),
+      ...(card.keywords || []),
+    ].filter(Boolean);
+    for (const term of semanticTerms) semanticDict.add(String(term));
+    entries.push({
+      card,
+      stem: card._stem ?? null,
+      haystack,
+      tokens: profileTokens(haystack),
+      semanticTerms,
+    });
   }
-  return score;
+  const profile = { cards: entries, semanticDict, n: entries.length };
+  corpusCache.set(cards, profile);
+  return profile;
 }
 
 /**
- * @param {object} node
- * @param {string} taskDraft
- * @returns {number}
+ * Tokenize a query: whole FS/ZJJK codes + CJK bigrams, with multi-char
+ * semantic terms matched longest-first (consumed chars no longer feed shorter
+ * tokens, so one long hit is not double-credited by its substrings).
+ * @param {string} text Query text
+ * @param {Set<string>} semanticDict Raw card vocabulary terms
+ * @returns {Map<string, number>} token → char length
  */
-function nodeTaskDraftBonus(node, taskDraft) {
-  const draft = String(taskDraft || '').toLowerCase();
-  if (!draft) return 0;
-  let bonus = 0;
-  for (const field of [node.enter, node.page, node.id]) {
-    const value = String(field || '').trim().toLowerCase();
-    if (value && draft.includes(value)) bonus += 1;
+function extractQueryTokens(text, semanticDict) {
+  const hay = String(text || '');
+  /** @type {Map<string, number>} */
+  const tokens = new Map();
+  for (const m of hay.matchAll(FS_CODE_RE)) tokens.set(m[0].toUpperCase(), m[0].length);
+  for (const m of hay.matchAll(ZJJK_CODE_RE)) tokens.set(m[0].toUpperCase(), m[0].length);
+
+  for (const run of hay.match(CJK_RUN_RE) || []) {
+    const consumed = new Uint8Array(run.length);
+    for (let len = Math.min(run.length, MAX_TERM_LEN); len >= 3; len -= 1) {
+      for (let i = 0; i + len <= run.length; i += 1) {
+        let overlaps = false;
+        for (let k = i; k < i + len; k += 1) {
+          if (consumed[k]) { overlaps = true; break; }
+        }
+        if (overlaps) continue;
+        const term = run.slice(i, i + len);
+        if (semanticDict.has(term)) {
+          tokens.set(term, len);
+          for (let k = i; k < i + len; k += 1) consumed[k] = 1;
+        }
+      }
+    }
+    for (let i = 0; i + 2 <= run.length; i += 1) {
+      if (consumed[i] && consumed[i + 1]) continue;
+      tokens.set(run.slice(i, i + 2), 2);
+    }
   }
-  return bonus;
+  return tokens;
 }
 
 /**
+ * idf-weighted match weights: for each query token, df = cards containing it
+ * (token-set membership for bigram/code tokens, substring for long semantic
+ * terms), idf = log(1 + N/df), weight = idf × len.
+ * @param {Map<string, number>} tokens Query tokens
+ * @param {ReturnType<typeof corpusProfile>} corpus Card corpus profile
+ * @returns {{ weights: Map<string, number>, maxPossible: number }} Token weights and their sum over matchable tokens
+ */
+function tokenWeights(tokens, corpus) {
+  /** @type {Map<string, number>} */
+  const weights = new Map();
+  let maxPossible = 0;
+  for (const [token, len] of tokens) {
+    let df = 0;
+    if (len <= 2) {
+      for (const entry of corpus.cards) {
+        if (entry.tokens.has(token)) df += 1;
+      }
+    } else {
+      for (const entry of corpus.cards) {
+        if (entry.haystack.includes(token)) df += 1;
+      }
+    }
+    if (df === 0) continue;
+    const weight = Math.log(1 + corpus.n / df) * len;
+    weights.set(token, weight);
+    maxPossible += weight;
+  }
+  return { weights, maxPossible };
+}
+
+/**
+ * True when the node's id/page polarity contradicts the query title
+ * (启用 query must not land on 禁用/下架/disable nodes and vice versa; spec §7.2).
+ * @param {object} node Flow card node
+ * @param {string} title Query title
+ * @returns {boolean} Whether the node is excluded
+ */
+function nodeExcludedByPolarity(node, title) {
+  const idPage = `${node.id || ''} ${node.page || ''}`.toLowerCase();
+  const t = String(title || '');
+  const wantsEnable = /启用/.test(t) && !/禁用|下架/.test(t);
+  const wantsDisable = /禁用|下架/.test(t) && !/启用/.test(t);
+  if (wantsEnable && /disable|禁用|下架/.test(idPage)) return true;
+  if (wantsDisable && /enable|启用/.test(idPage)) return true;
+  return false;
+}
+
+/**
+ * Deterministic flow-card recall for atom recording (spec §7.2):
+ * bigram/code tokens + longest semantic match, idf × len scoring, relative
+ * coverage floor and polarity disambiguation.
  * @param {{ title?: string, taskDraft?: string, cards?: object[] }} opts
- * @returns {{ flowRef: string|null, nodeId: string|null }}
+ * @returns {{ flowRef: string|null, nodeId: string|null, score: number|null }} Winning card score exposed for observability
  */
 export function matchFlowForAtom({ title, taskDraft, cards } = {}) {
-  const tokens = extractAtomTokens(`${title || ''}${taskDraft || ''}`);
-  if (!tokens.length || !cards?.length) {
-    return { flowRef: null, nodeId: null };
+  if (!cards?.length) {
+    return { flowRef: null, nodeId: null, score: null };
+  }
+  const corpus = corpusProfile(cards);
+  const tokens = extractQueryTokens(`${title || ''}${taskDraft || ''}`, corpus.semanticDict);
+  if (!tokens.size) {
+    return { flowRef: null, nodeId: null, score: null };
+  }
+  const { weights, maxPossible } = tokenWeights(tokens, corpus);
+  if (maxPossible <= 0) {
+    return { flowRef: null, nodeId: null, score: null };
   }
 
-  let bestCard = null;
-  let bestCardScore = 0;
-
-  for (const card of cards) {
-    const cardScore = scoreTokens(tokens, buildCardHaystack(card));
-    if (cardScore > bestCardScore) {
-      bestCardScore = cardScore;
-      bestCard = card;
+  let bestEntry = null;
+  let bestCardScore = -1;
+  for (const entry of corpus.cards) {
+    let score = 0;
+    for (const [token, weight] of weights) {
+      const hit = token.length <= 2
+        ? entry.tokens.has(token)
+        : entry.haystack.includes(token);
+      if (hit) score += weight;
+    }
+    // Tie-break: shorter flow name is the more specific card (mirrors the
+    // Python recall rule so the two implementations converge).
+    if (score > bestCardScore
+      || (score === bestCardScore && bestEntry
+        && normFlowName(entry.card).length < normFlowName(bestEntry.card).length)) {
+      bestCardScore = score;
+      bestEntry = entry;
     }
   }
 
-  if (!bestCard || bestCardScore < MIN_CARD_SCORE) {
-    return { flowRef: null, nodeId: null };
+  if (!bestEntry || bestCardScore < MIN_CARD_SCORE
+    || bestCardScore / maxPossible < MIN_CARD_COVERAGE) {
+    return { flowRef: null, nodeId: null, score: null };
   }
 
-  const flowRef = bestCard._stem ?? null;
+  const flowRef = bestEntry.stem;
   let bestNodeId = null;
   let bestNodeScore = 0;
 
-  for (const node of bestCard.nodes || []) {
-    const nodeScore = scoreTokens(tokens, buildNodeHaystack(node))
-      + nodeTaskDraftBonus(node, taskDraft);
+  for (const node of bestEntry.card.nodes || []) {
+    if (nodeExcludedByPolarity(node, `${title || ''}`)) continue;
+    const nodeHay = buildNodeHaystack(node);
+    const nodeTokens = profileTokens(nodeHay);
+    let nodeScore = 0;
+    for (const [token, weight] of weights) {
+      const hit = token.length <= 2
+        ? nodeTokens.has(token)
+        : nodeHay.includes(token);
+      if (hit) nodeScore += weight;
+    }
     if (nodeScore > bestNodeScore) {
       bestNodeScore = nodeScore;
       bestNodeId = node.id;

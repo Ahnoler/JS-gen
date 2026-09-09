@@ -126,7 +126,7 @@ class FormSnapshot(BaseModel):
             # in the checkpoint params to keep legacy consumers untouched).
             kind = str(f.get("kind") or "").strip()
             field_options: list[str] = []
-            if kind in ("select", "tree-select", "tree"):
+            if kind in ("select", "tree-select", "tree", "tssc-multi-select"):
                 raw_opts = f.get("options")
                 if isinstance(raw_opts, list):
                     field_options = [

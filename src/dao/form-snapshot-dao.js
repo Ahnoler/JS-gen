@@ -140,17 +140,6 @@ export async function listByTrajectory(trajectoryId) {
 }
 
 /**
- * List snapshots for a business_data record ordered by action_index, with attached fields.
- * @param {number} businessDataId 业务数据 id
- * @returns {Promise<object[]>} snapshot entities with fields
- */
-export async function listByBusinessData(businessDataId) {
-  const db = getDB();
-  const rows = await db(TABLE).where({ business_data_id: businessDataId }).orderBy('action_index');
-  return attachFields(db, fromDbRows(rows));
-}
-
-/**
  * Find snapshot for fingerprint dedupe: same trajectory + phase (via trigger step) + root container + fields fingerprint.
  * @param {number} trajectoryId 轨迹 id
  * @param {number} phaseId trajectory_phase id (0/invalid to skip phase filter)

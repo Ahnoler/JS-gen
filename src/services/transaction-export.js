@@ -19,7 +19,6 @@ import { sanitizeTranscationName } from './transaction-name.js';
 import {
   ACTION_TO_ENGINE_TYPE,
   pickExportTarget,
-  buildOperationName,
   pickOperationValue,
   SKIP_ACTIONS,
 } from './legacy-engine-export.js';
@@ -64,6 +63,41 @@ function resolveOptions(entry) {
 }
 
 /**
+ * Partner business-object name: field / control noun only (no 填写/选择/点击 verbs).
+ * Event type is already shown as a tag (eventTypeName). Empty → uniquify falls back to「步骤」.
+ * @param {string} action normalized action name
+ * @param {object} [params] action params
+ * @param {object} [element] element info
+ * @returns {string} noun for propertiesName
+ */
+export function buildBusinessObjectName(action, params = {}, element = {}) {
+  const p = params || {};
+  const el = element || {};
+  const label = String(p.label_text || p.label || el.formLabel || el.matchedLabel || '').trim();
+  if (label) return label;
+  const text = String(p.text || p.menu_text || p.tab_name || p.button_text || el.text || '').trim();
+  if (text) return text;
+  const row = String(p.row_text || '').trim();
+  if (row) return row;
+  const dialog = String(p.dialog_name || '').trim();
+  if (dialog) return dialog;
+  const option = String(p.option_text || p.option || '').trim();
+  if (option) return option;
+  switch (action) {
+    case 'close_dialog':
+      return '关闭弹窗';
+    case 'expand_all_el_tree':
+      return '展开树';
+    case 'picker_dialog_query':
+      return '弹窗查询';
+    case 'picker_dialog_select':
+      return '弹窗选择';
+    default:
+      return '';
+  }
+}
+
+/**
  * Map a trajectory step to a partner transaction event (or null if skipped).
  * @param {object} step trajectory step row
  * @returns {object|null} transaction event, or null if action is skipped
@@ -84,8 +118,8 @@ export function mapStepToTransactionEvent(step) {
   const { target, source } = pickExportTarget(entry);
   const options = resolveOptions(entry);
 
-  // Partner: no separator in propertiesName (点击客户管理); also strip \ / : * ? " < > | '
-  const propertiesName = String(buildOperationName(action, params, element) || '')
+  // Partner: propertiesName is the field noun (tag shows type); strip \ / : * ? " < > | '
+  const propertiesName = String(buildBusinessObjectName(action, params, element) || '')
     .replace(/[\\/:*?"<>|']/g, '');
 
   // elementType=xpath、eventTypeValue=click 等：ATP 历史字段语义，按对方约定保持
@@ -107,7 +141,7 @@ export function mapStepToTransactionEvent(step) {
 
 /**
  * Ensure propertiesName unique within one transaction (partner requirement).
- * First keeps base; later get numeric suffix: 填写客户名称 → 填写客户名称2.
+ * First keeps base; later get numeric suffix: 客户名称 → 客户名称2.
  * @param {object[]} properties transaction event properties to dedupe in-place
  * @returns {object[]} the same properties array with unique names
  */

@@ -64,47 +64,6 @@ export async function exportTree() {
 }
 
 /**
- * Empty / sample template for import (legacy JSON shape; prefer Excel endpoints).
- * @returns {{ version: number, typeMap: object, description: string, nodes: object[] }} sample import template
- */
-export function getTreeTemplate() {
-  return {
-    version: EXPORT_VERSION,
-    typeMap: { ...TYPE_LABEL },
-    description: '将 nodes 填入后 POST /api/v2/system-mgmt/import。uid 可选；缺省自动生成。mode=merge 按 uid 合并，append 始终新建。系统节点可带 url。',
-    nodes: [
-      {
-        uid: '',
-        type: NODE_TYPE.SYSTEM,
-        name: '示例系统',
-        description: '',
-        url: 'https://example.com',
-        sortOrder: 0,
-        children: [
-          {
-            uid: '',
-            type: NODE_TYPE.MODULE,
-            name: '示例模块',
-            description: '',
-            sortOrder: 0,
-            children: [
-              {
-                uid: '',
-                type: NODE_TYPE.FUNCTION,
-                name: '示例功能',
-                description: '',
-                sortOrder: 0,
-                children: [],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-/**
  * Excel template (.xlsx Buffer).
  * @returns {Promise<Buffer>} xlsx buffer of the sample template
  */

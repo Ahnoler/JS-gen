@@ -4,39 +4,6 @@
  * Python 侧镜像：scripts/memory/writer.py。
  */
 
-/** 已知事件类型（append-only 事件流）。未来新增类型只追加，不改旧语义。 */
-export const KNOWN_EVENT_TYPES = new Set([
-  'action',
-  'phase_done',
-  'business_saved',
-  'case_read',
-  'contract',
-  'summary',
-  'decision',
-  'context_drop',
-  'nav',
-  'notification',
-  'page_state',
-  'form_state',
-  'action_removed',
-  'network_captured',
-  'system',
-]);
-
-/** 事实来源（reliability 基准见 weight-engine.js）。 */
-export const FACT_SOURCES = new Set([
-  'requirement', // 需求/业务数据（base_weight 1.0，不可被 LLM 覆盖）
-  'user',
-  'page',
-  'rule',
-  'llm',
-  'observer',
-  'system',
-  'human',
-  'agent',
-  'history', // P2-2 同 function 历史成功交易复用（低权重，stance=inferred）
-]);
-
 /** 事实立场。 */
 export const STANCES = new Set(['authoritative', 'inferred', 'disputed', 'neutral']);
 

@@ -235,6 +235,46 @@ export async function prepareBusinessDataInjection(trajectoryId) {
 }
 
 
+/** 登录前探测判定为「已登录」的签名（与执行机 login_probe 动作的返回契约一致）。 */
+const LOGGED_IN_PROBE_SIGS = new Set(['home', 'token', 'left-login']);
+
+/**
+ * 登录前探测：复用浏览器（孤儿 Chrome 复用 / 断开画面保留）时页面可能已处于登录态，
+ * 此时登录回放必然全找不到（label-not-found + click-failed）→ prepare 反复失败。
+ * 命中已登录签名即返回，调用方跳过登录回放；未登录 / 探测动作不可用（旧执行机
+ * 返回 unknown-action）/ 任何异常一律返回 null，调用方保持既有登录回放路径（fail-safe）。
+ * 探测批次自带一次 go_to_url；未登录时登录批次会再导航一次——多一次导航换「探测
+ * 失败不改变既有行为」的确定性。
+ * @param {object} runtime trajectory runtime（sessionId / executorNodeUuid）
+ * @param {string} url 系统登录地址
+ * @returns {Promise<string|null>} 已登录签名，或 null（未登录 / 无法判定）
+ */
+async function probeLoggedInBeforeLogin(runtime, url) {
+  try {
+    const { results } = await runReplayActions({
+      execSession,
+      sessionId: runtime.sessionId,
+      nodeUuid: runtime.executorNodeUuid,
+      actions: [
+        { action: 'go_to_url', params: { url } },
+        { action: 'wait_for_loading' },
+        { action: 'login_probe', params: {} },
+      ],
+      timeoutMs: 60000,
+      // 探测失败不得中断 prepare：旧执行机没有 login_probe 动作时按未登录继续。
+      stopOnFail: false,
+      isReplay: true,
+    });
+    const row = (Array.isArray(results) ? results : []).find((r) => r?.action === 'login_probe');
+    const sig = /^ok-probe:(\S+)/.exec(String(row?.result || ''))?.[1] || '';
+    return LOGGED_IN_PROBE_SIGS.has(sig) ? sig : null;
+  } catch (err) {
+    console.warn('[record] login pre-probe skipped:', err?.message || err);
+    return null;
+  }
+}
+
+
 /**
  * Default login/navigate — NOT written to trajectory_step (is_replay / suppress persist).
  * Hardcoded go_to_url + login via runReplayActions (replay_actions; no browser-use Agent).
@@ -260,6 +300,16 @@ export async function runDefaultLogin(runtime, account, system = null) {
       const err = new Error('System url is empty — set system.url (or legacy account.loginUrl)');
       err.statusCode = 400;
       throw err;
+    }
+    // 登录前探测：已登录（复用孤儿 Chrome / 断开画面保留的浏览器停在首页）直接跳过登录回放。
+    // 否则登录步骤在首页必然全失败 → 8s 重试 → 拆会话重开，prepare 陷入循环（2026-09-08 #699）。
+    const loggedInSig = await probeLoggedInBeforeLogin(runtime, url);
+    if (loggedInSig) {
+      console.log(`[record] login pre-probe hit (${loggedInSig}) — skip login replay (already logged in)`);
+      await markConsumedActionLog(runtime);
+      runtime.loginDone = true;
+      runtime.loginAccountId = Number(account.id);
+      return;
     }
     // --- 登录组件优先（Task 7）：查到 active login 组件则 replay 组件步骤，
     // 否则回落到下方硬编码 go_to_url + wait_for_loading + login 序列。

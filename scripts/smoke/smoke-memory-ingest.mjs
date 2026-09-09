@@ -3,7 +3,7 @@
  *
  * Inserts sample events (+ facts + decision) through memory-service.ingestEvents,
  * verifies fact-pack retrieval / decision detail / audit summary / timeline /
- * global stats, then removes the test trajectory via deleteByTrajectory.
+ * global stats, then removes the test trajectory with inline knex cleanup.
  *
  * Prerequisites:
  *   npx knex migrate:latest --knexfile config/knexfile.js   (MySQL up)
@@ -20,7 +20,7 @@ import {
   timeline,
   stats,
 } from '../../src/memory/memory-service.js';
-import { deleteByTrajectory, isReady } from '../../src/memory/memory-dao.js';
+import { isReady } from '../../src/memory/memory-dao.js';
 import { getDB } from '../../config/database.js';
 
 const TRAJ = 99990001; // test-only trajectory id (cleaned up at the end)
@@ -174,7 +174,17 @@ async function main() {
   check('stats.recentEventTypes', Array.isArray(st.recentEventTypes), 'event-type breakdown present');
 
   console.log('[smoke] cleanup');
-  const removed = await deleteByTrajectory(TRAJ);
+  // deleteByTrajectory 已删除（生产零引用）——smoke 用同语义 knex 清理：
+  // 先按 fact 关联删 relation，再删 facts/events/decisions。
+  const db = getDB();
+  const factIds = (await db('memory_fact').where({ trajectory_id: TRAJ }).select('id')).map((r) => r.id);
+  if (factIds.length) {
+    await db('memory_relation').where('from_fact_id', 'in', factIds).del();
+    await db('memory_relation').where('to_fact_id', 'in', factIds).del();
+  }
+  let removed = await db('memory_fact').where({ trajectory_id: TRAJ }).del();
+  removed += await db('memory_event').where({ trajectory_id: TRAJ }).del();
+  removed += await db('decision_record').where({ trajectory_id: TRAJ }).del();
   check('cleanup.removed', removed >= 7, `removed=${removed} (3 events + 3 facts + 1 decision)`);
   const after = await timeline(TRAJ);
   check(

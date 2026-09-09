@@ -1,8 +1,9 @@
 /**
  * Propose atomic draft trajectory candidates from req-module through-chains.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as systemDao from '../../dao/system-dao.js';
@@ -10,7 +11,7 @@ import { AppError } from '../../http/app-error.js';
 import { callLLM as defaultCallLLM } from '../../llm-utils.js';
 import { getReqModule, moduleDir } from '../kb-req-modules.js';
 import { parseLlmJsonObject } from '../operation-component-signature.js';
-import { buildAtomKey, parseThroughChainsMarkdown } from './parse-through-chains.js';
+import { buildAtomKey, parseThroughChainsMarkdown, hasProposeableChainSteps } from './parse-through-chains.js';
 import {
   assertAtomProvenance,
   fillTaskDraftProvenancePlaceholders,
@@ -20,27 +21,56 @@ import {
 import { listFlowCardsDetailed } from '../kb-flow-cards.js';
 import { matchFlowForAtom } from './flow-card-recall.js';
 import { writeProposeCache } from './propose-cache.js';
+import { collectPageCodes, sanitizeTaskDraftKeyData } from './atom-keydata.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
 const MAX_CHAIN_PAYLOAD_CHARS = 28_000;
+const OBSERVE_DIR = join(__dirname, '../../../data/kb/staging');
+
+/**
+ * Append one JSONL observation line under data/kb/staging (append-only,
+ * spec D5). Observability must never break the propose main flow — all
+ * write failures are swallowed.
+ * @param {string} file JSONL file name under the staging dir
+ * @param {object} line Payload (JSON-serializable)
+ * @returns {Promise<void>} Resolves after append (or after a swallowed error)
+ */
+async function appendObservation(file, line) {
+  try {
+    await mkdir(OBSERVE_DIR, { recursive: true });
+    await appendFile(join(OBSERVE_DIR, file), `${JSON.stringify(line)}\n`, 'utf-8');
+  } catch {
+    // swallowed by design
+  }
+}
 
 /**
  * @typedef {object} DraftAtom
  * @property {string} atomKey Stable atom key for idempotency
  * @property {string} title Human-readable atom title
+ * @property {'write'|'nav'} [kind] Step granularity: write mutation vs navigation
  * @property {number|null} suggestedFunctionId Guessed function id or null
+ * @property {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} [functionIdCandidates] Deterministic candidates when suggestedFunctionId is null
  * @property {string} sourceDoc Source document path
  * @property {string} sourceChapter Chapter reference under module
+ * @property {string} [sourceHash] sha256 of the resolved chapter file (anchor)
+ * @property {string} [chunkId] `<file-stem>#<h1-slug>` chapter anchor
  * @property {string} taskDraft Task text for analyze
  * @property {string[]} phaseHints Short phase titles
  * @property {string} [wetTestHint] Optional wet-test hint
+ * @property {string[]} [pageCodes] Ordered unique ZJJK page/component codes (not in 关键数据)
  * @property {string} [suggestedFlowRef] Matched kb flow card stem
  * @property {string} [suggestedNodeId] Matched flow card node id
  */
 
 const WRITE_ACTION_RE = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交|启用|禁用|克隆|删除/;
 const NAV_ACTION_RE = /进入|加载|刷树|打开|导航|切换|刷新/;
+/**
+ * Reference-style steps defer to another chain's steps and are not
+ * independently recordable atoms (spec F-10; e.g. `回主链 A 第 6-9 步…`).
+ */
+const REF_STEP_RE = /回主链|同主链|见主链|同上|参照/;
 
 /**
  * Load atomize system prompt template from disk.
@@ -306,7 +336,6 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
       moduleKey,
       chainId: chain.chainId,
       stepIndex: atomKeyStepIndex,
-      title,
     });
     return { rejected: { atomKey, reason: 'multi_write_atom' } };
   }
@@ -315,10 +344,12 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     moduleKey,
     chainId: chain.chainId,
     stepIndex: atomKeyStepIndex,
-    title,
   });
 
   const provenanceStep = findStepByIndex(chain, atomKeyStepIndex) || primaryStep;
+  if (REF_STEP_RE.test(`${title} ${provenanceStep?.action || ''}`)) {
+    return { rejected: { atomKey, reason: 'reference_step' } };
+  }
   const sourceChapter = await resolveChapterRef({
     chaptersDir: join(modDir, 'chapters'),
     chapterHint: chain.chapterHint,
@@ -326,21 +357,38 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     actionHint: title || provenanceStep?.action || '',
   });
 
-  const resolvedChapter = sourceChapter || '';
+  const resolvedChapter = sourceChapter ? sourceChapter.ref : '';
   const rawTaskDraft = String(llmAtom.taskDraft || '').trim();
-  const taskDraft = fillTaskDraftProvenancePlaceholders(rawTaskDraft, sourceDoc, resolvedChapter);
+  const filled = fillTaskDraftProvenancePlaceholders(rawTaskDraft, sourceDoc, resolvedChapter);
+  const { taskDraft: cleanedDraft, extractedCodes } = sanitizeTaskDraftKeyData(filled);
+
+  const zjjkCells = [];
+  for (const idx of (stepIndexes.length ? stepIndexes : [atomKeyStepIndex])) {
+    const st = findStepByIndex(chain, idx);
+    if (st?.zjjk) zjjkCells.push(st.zjjk);
+  }
+
+  const pageCodes = collectPageCodes({
+    llmPageCodes: llmAtom.pageCodes,
+    taskDraft: cleanedDraft,
+    zjjkCells: [...zjjkCells, ...extractedCodes],
+  });
 
   /** @type {DraftAtom} */
   const atom = {
     atomKey,
     title,
+    kind: provenanceStep && isWriteStep(provenanceStep.action) ? 'write' : 'nav',
     suggestedFunctionId: parseSuggestedFunctionId(llmAtom.suggestedFunctionId),
     sourceDoc,
     sourceChapter: resolvedChapter,
-    taskDraft,
+    sourceHash: sourceChapter ? sourceChapter.sourceHash : undefined,
+    chunkId: sourceChapter ? sourceChapter.chunkId : undefined,
+    taskDraft: cleanedDraft,
     phaseHints: Array.isArray(llmAtom.phaseHints)
       ? llmAtom.phaseHints.map((h) => String(h))
       : [],
+    pageCodes,
   };
 
   if (llmAtom.wetTestHint != null && String(llmAtom.wetTestHint).trim()) {
@@ -394,6 +442,55 @@ async function normalizeSuggestedFunctionIds(atoms, existsFn = null) {
 }
 
 /**
+ * Compute ≤3 deterministic functionId candidates for one atom from the system
+ * tree (F-08: suggestedFunctionId is empirically null for most atoms, so the
+ * wizard needs hints instead of per-atom manual overrides).
+ * Priority: page_code (pdCmptEcd/umlEcd exactly in atom pageCodes) >
+ * name_match (function name occurs in title/taskDraft) > menu_path (function
+ * name occurs in the source chapter file stem). Duplicate ids collapse.
+ * @param {DraftAtom} atom Atom with title/taskDraft/pageCodes/sourceChapter
+ * @param {Array<{id: number, type: number, name: string, pdCmptEcd?: string, umlEcd?: string, removedFlag?: number}>} functionNodes Flat system nodes (function type filtered here)
+ * @returns {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} Ranked candidates (max 3)
+ */
+export function computeFunctionIdCandidates(atom, functionNodes) {
+  /** @type {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} */
+  const out = [];
+  const seen = new Set();
+  const push = (node, score, reason) => {
+    if (!node || seen.has(node.id)) return;
+    seen.add(node.id);
+    out.push({ id: node.id, name: node.name, score, reason });
+  };
+  const fns = (Array.isArray(functionNodes) ? functionNodes : [])
+    .filter((n) => Number(n.type) === 3 && !n.removedFlag);
+
+  const codes = new Set((atom.pageCodes || []).map((c) => String(c).toUpperCase()));
+  for (const n of fns) {
+    const pd = String(n.pdCmptEcd || '').toUpperCase();
+    const uml = String(n.umlEcd || '').toUpperCase();
+    if ((pd && codes.has(pd)) || (uml && codes.has(uml))) {
+      push(n, 100, 'page_code');
+    }
+  }
+  const hayTitle = String(atom.title || '');
+  const hayDraft = String(atom.taskDraft || '');
+  for (const n of fns) {
+    const name = String(n.name || '').trim();
+    if (name.length >= 2 && (hayTitle.includes(name) || hayDraft.includes(name))) {
+      push(n, 50, 'name_match');
+    }
+  }
+  const chapterStem = String(atom.sourceChapter || '').replace(/\\/g, '/').split('/').pop() || '';
+  for (const n of fns) {
+    const name = String(n.name || '').trim();
+    if (name.length >= 2 && chapterStem.includes(name)) {
+      push(n, 30, 'menu_path');
+    }
+  }
+  return out.slice(0, 3);
+}
+
+/**
  * Propose atomic draft trajectory candidates for a req module.
  * @param {object} opts Propose options
  * @param {string} opts.moduleKey Req module key
@@ -403,7 +500,9 @@ async function normalizeSuggestedFunctionIds(atoms, existsFn = null) {
  * @param {(text: string) => Promise<string>} [opts.callLLM] Injectable LLM caller (offline tests)
  * @param {(id: number) => Promise<boolean>} [opts.functionIdExists] Injectable function-id
  *   existence check (offline characterization stubs; defaults to system table lookup)
- * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }> }>} Accepted and rejected atoms
+ * @param {() => Promise<Array<object>>} [opts.listSystemsFn] Injectable system-tree loader
+ *   (offline characterization stubs; defaults to systemDao.listAll)
+ * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }>, truncated: { dropped: number, requestedMax: number|null } }>} Accepted and rejected atoms with truncation facts
  */
 export async function proposeDraftTrajectories({
   moduleKey,
@@ -412,7 +511,9 @@ export async function proposeDraftTrajectories({
   maxAtoms,
   callLLM,
   functionIdExists = null,
+  listSystemsFn = null,
 }) {
+  const startedAt = Date.now();
   const mod = await getReqModule({ rootDir, moduleKey });
   if (!mod.hasThroughChains) {
     throw new AppError('through-chains.md required', { code: 'VALIDATION' });
@@ -420,6 +521,9 @@ export async function proposeDraftTrajectories({
 
   const modDir = moduleDir(moduleKey, rootDir);
   const md = await readFile(join(modDir, 'through-chains.md'), 'utf-8');
+  if (!hasProposeableChainSteps(md)) {
+    throw new AppError('through-chains.md has no parseable step table', { code: 'VALIDATION' });
+  }
   const { chains: allChains } = parseThroughChainsMarkdown(md);
 
   const chainIdSet = Array.isArray(chainIds) && chainIds.length > 0
@@ -428,6 +532,12 @@ export async function proposeDraftTrajectories({
   const chains = chainIdSet
     ? allChains.filter((c) => chainIdSet.has(c.chainId))
     : allChains;
+  if (chainIdSet && chains.length === 0) {
+    throw new AppError(
+      `chainIds matched no chains (available: ${allChains.map((c) => c.chainId).join(', ')})`,
+      { code: 'VALIDATION' },
+    );
+  }
 
   const sourceDoc = await loadSourceDoc(modDir);
   const llmFn = callLLM || defaultCallLLM;
@@ -465,11 +575,41 @@ export async function proposeDraftTrajectories({
     }
   }
 
-  const capped = Number.isFinite(maxAtoms) && maxAtoms > 0
-    ? atoms.slice(0, maxAtoms)
-    : atoms;
+  const requestedMax = Number.isFinite(maxAtoms) && maxAtoms > 0 ? maxAtoms : null;
+  let capped = atoms;
+  if (requestedMax != null && atoms.length > requestedMax) {
+    // Prefer keeping write atoms; fill leftover budget with nav atoms in
+    // original order, then hard-cap (F-11: callers must see what was dropped).
+    const writeCount = atoms.filter((a) => a.kind !== 'nav').length;
+    const navBudget = Math.max(0, requestedMax - writeCount);
+    let usedNav = 0;
+    capped = atoms.filter((a) => a.kind !== 'nav' || (usedNav += 1) <= navBudget);
+    if (capped.length > requestedMax) {
+      capped = capped.slice(0, requestedMax);
+    }
+  }
+  const truncated = { dropped: atoms.length - capped.length, requestedMax };
 
   await normalizeSuggestedFunctionIds(capped, functionIdExists);
+
+  // Only hit the system tree when at least one atom would use candidates —
+  // keeps offline runs (all ids present) free of DB connections.
+  let systems = null;
+  if (capped.some((a) => a.suggestedFunctionId == null)) {
+    try {
+      systems = await (listSystemsFn ? listSystemsFn() : systemDao.listAll());
+    } catch (e) {
+      console.warn('[req-draft-traj] system tree load failed (%s) — skip functionIdCandidates', e.message);
+      systems = null;
+    }
+  }
+  if (systems) {
+    for (const atom of capped) {
+      if (atom.suggestedFunctionId == null) {
+        atom.functionIdCandidates = computeFunctionIdCandidates(atom, systems);
+      }
+    }
+  }
 
   const cards = await listFlowCardsDetailed({});
   for (const atom of capped) {
@@ -482,7 +622,42 @@ export async function proposeDraftTrajectories({
     if (hit.nodeId) atom.suggestedNodeId = hit.nodeId;
   }
 
-  await writeProposeCache(modDir, { atoms: capped, rejected });
+  const sourceHash = createHash('sha256').update(md, 'utf8').digest('hex');
+  const inputHash = createHash('sha256')
+    .update(JSON.stringify({ chainIds: chainIds ?? null, maxAtoms: maxAtoms ?? null }), 'utf8')
+    .digest('hex');
+  await writeProposeCache(modDir, {
+    atoms: capped,
+    rejected,
+    sourceHash,
+    inputHash,
+    truncated,
+  });
 
-  return { atoms: capped, rejected };
+  const flowRefHits = capped.filter((a) => a.suggestedFlowRef).length;
+  const functionIdCandidateHits = capped.filter((a) => (a.functionIdCandidates || []).length > 0).length;
+  await appendObservation('propose-runs.jsonl', {
+    ts: new Date().toISOString(),
+    moduleKey,
+    atoms: capped.length,
+    rejected: rejected.length,
+    truncated,
+    cacheVersion: 1,
+    sourceHash,
+    durationMs: Date.now() - startedAt,
+    flowRefHits,
+    functionIdCandidateHits,
+  });
+  for (const atom of capped) {
+    if (!atom.suggestedFlowRef) continue;
+    await appendObservation('recall-events.jsonl', {
+      ts: new Date().toISOString(),
+      query: atom.title,
+      flowRef: atom.suggestedFlowRef,
+      nodeId: atom.suggestedNodeId ?? null,
+      source: 'js',
+    });
+  }
+
+  return { atoms: capped, rejected, truncated };
 }

@@ -18,6 +18,7 @@ _KIND_ACTIONS = {
     "select": 'select_option(label_text="<此字段label>", option_text=<选项原文>)',
     "date": "fill_form_field(值需 YYYY-MM-DD)",
     "tree-select": 'select_tree_option(label_text="<此字段label>", option_text=<选项原文>)',
+    "tssc-multi-select": 'tssc_multi_select(label_text="<此字段label>", option_text=<选项原文>)',
     "radio": "click_radio",
 }
 
@@ -132,7 +133,9 @@ _AFFORDANCES_JS = r"""(labelText) => {
     if (fi) scopeLabel = norm((fi.querySelector('.el-form-item__label') || {}).textContent);
     const vis = (el) => el && el.offsetParent !== null;
     const kind = fi
-        ? (fi.querySelector('.el-select') ? 'select'
+        ? (fi.querySelector('.tssc-multi-select') ? 'tssc-multi-select'
+           : fi.querySelector('.tree-popover, .tsscTree, .el-tree-select, [class*="tsscmultitree"]') ? 'tree-select'
+           : fi.querySelector('.el-select') ? 'select'
            : fi.querySelector('.el-date-editor, .tsscdatepicker') ? 'date'
            : fi.querySelector('.el-cascader') ? 'cascader'
            : fi.querySelector('[class*="tssc"]') && (fi.querySelector('.tree-popover, .my-popover')) ? 'tree'

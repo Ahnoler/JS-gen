@@ -275,23 +275,6 @@ export async function getByUuid(systemId) {
 }
 
 /**
- * Fuzzy match on name; returns shaped nodes.
- * @param {string} keyword name search term
- * @param {object} [opts] 选项
- * @param {number} [opts.limit] max rows (clamped 1..200)
- * @returns {Promise<object[]>} API-shaped node entities
- */
-export async function searchByName(keyword, { limit = 50 } = {}) {
-  const q = String(keyword || '').trim();
-  if (!q) return [];
-  const rows = await getDB()(TABLE)
-    .where('name', 'like', `%${q}%`)
-    .orderBy([{ column: 'type', order: 'asc' }, { column: 'id', order: 'asc' }])
-    .limit(Math.min(200, Math.max(1, limit)));
-  return shapeNodes(rows);
-}
-
-/**
  * Create a node (system/module/function) with parent validation and return the created entity.
  * @param {object} data camelCase node fields (type/name/parentId required)
  * @param {object|null} [db] optional knex instance

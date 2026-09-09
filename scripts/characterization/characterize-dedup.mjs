@@ -2,7 +2,6 @@
  * Characterization: consecutive-only element dedup (keep later; must not remove non-consecutive).
  */
 import { deduplicateByXPath, deduplicateActionFile, elementDedupKey } from '../../src/dedup.js';
-import { parseReplayStepMarker, findScreenshotForStep, findScreenshotsForStep } from '../../src/runtime/script-runner.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -38,26 +37,6 @@ const file = deduplicateActionFile({
 assert(file._meta.removedCount === 1, 'meta.removedCount should be 1');
 assert(file.tests[0].commands.length === 3, 'commands length 3');
 
-const marker = parseReplayStepMarker('__REPLAY_STEP__{"step":2,"ok":true,"id":10}');
-assert(marker && marker.step === 2 && marker.id === 10, 'parseReplayStepMarker failed');
-
-const shot = findScreenshotForStep(2, [
-  { fileName: 'step-1-x.png', url: '/a', stepNumber: 1 },
-  { fileName: 'step-2-y.png', url: '/b', stepNumber: 2 },
-]);
-assert(shot?.fileName === 'step-2-y.png', 'findScreenshotForStep failed');
-
-const before = findScreenshotForStep(2, [
-  { fileName: 'step-2-before-abc.png', url: '/b', stepNumber: 2, kind: 'before' },
-  { fileName: 'step-2-after-abc.png', url: '/a', stepNumber: 2, kind: 'after' },
-], 'before');
-assert(before?.kind === 'before', 'findScreenshotForStep before kind failed');
-const after = findScreenshotForStep(2, [
-  { fileName: 'step-2-before-abc.png', url: '/b', stepNumber: 2, kind: 'before' },
-  { fileName: 'step-2-after-abc.png', url: '/a', stepNumber: 2, kind: 'after' },
-], 'after');
-assert(after?.kind === 'after', 'findScreenshotForStep after kind failed');
-
 const nextA = {
   action: 'click_element_by_index',
   params: { text: '下一步' },
@@ -81,4 +60,4 @@ assert(
   'page-state next keys must differ',
 );
 
-console.log('ok: characterization dedup + replay markers');
+console.log('ok: characterization dedup');

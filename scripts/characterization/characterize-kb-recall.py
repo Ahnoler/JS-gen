@@ -101,6 +101,38 @@ def main():
     assert cands == [{"value": "信贷预客户", "dict_type": "cstSt", "text": "信贷预客户", "value_code": "2"}]
     assert dict_candidates_for_values(["不存在"], by_type) == []
 
+    # 跨语言金样例（与 JS 侧 characterize-flow-card-recall 共用同一 fixture）：
+    # py 侧对真实语料断言 pyFlowRef（缺省=expectFlowRef）；divergenceAccepted 条目
+    # 记录两侧已知算法分歧（D3：先共享契约、不合并实现）。
+    import glob as _glob
+    import json as _json
+
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    real_flows_dir = os.path.join(root, "data", "kb", "flows")
+    real_cards = []
+    name2stem = {}
+    for path in sorted(_glob.glob(os.path.join(real_flows_dir, "*.json"))):
+        with open(path, encoding="utf-8") as f:
+            c = _json.load(f)
+        if isinstance(c, dict) and c.get("flow"):
+            real_cards.append(c)
+            name2stem[c["flow"]] = os.path.splitext(os.path.basename(path))[0]
+
+    with open(os.path.join(root, "scripts", "characterization", "fixtures", "kb-recall-golden.json"), encoding="utf-8") as f:
+        golden = _json.load(f)
+    assert len(golden["entries"]) >= 20, "golden fixture must keep >=20 entries"
+    for entry in golden["entries"]:
+        hit, _score = find_flow_for_task(real_cards, entry["query"])
+        got = name2stem.get(hit["flow"]) if hit else None
+        want = entry.get("pyFlowRef", entry["expectFlowRef"])
+        assert got == want, (
+            f"golden py mismatch: query={entry['query']!r} want={want} got={got}"
+            f" divergenceAccepted={entry.get('divergenceAccepted', False)}"
+        )
+    diverged = [e["query"] for e in golden["entries"] if e.get("divergenceAccepted")]
+    assert diverged, "divergenceAccepted entries disappeared — converge the fixture by removing pyFlowRef"
+    print(f"golden fixture: {len(golden['entries'])} entries, {len(diverged)} accepted divergences")
+
     print("ok: characterize-kb-recall")
 
 

@@ -141,6 +141,8 @@ function describeActionIntent(action, params) {
       return `在 "${p.label_text || ''}" 中选择 "${p.option_text || ''}"`;
     case 'select_tree_option':
       return `在树选择 "${p.label_text || ''}" 中选择 "${p.option_text || p.node_text || ''}"`;
+    case 'tssc_multi_select':
+      return `在远程表格下拉 "${p.label_text || ''}" 中选择 "${p.option_text || ''}"`;
     case 'click_save':
       return `点击保存/提交（${p.button_text || p.text || '保存'}）`;
     case 'click_element_by_index':

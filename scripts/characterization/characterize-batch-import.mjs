@@ -17,8 +17,6 @@ import {
 import { buildRequestHash } from '../../src/services/trajectory/trajectory-batch-service.js';
 import {
   BATCH_JOB_MODES,
-  BATCH_JOB_STATUSES,
-  BATCH_ITEM_STATUSES,
   BATCH_ITEM_RESUMABLE,
   BATCH_ITEM_TERMINAL,
 } from '../../src/models/constants.js';
@@ -120,9 +118,6 @@ function testRequestHash() {
 function testConstantsAndTerminal() {
   assert.ok(BATCH_JOB_MODES.includes('draft'));
   assert.ok(BATCH_JOB_MODES.includes('record'));
-  assert.ok(BATCH_JOB_STATUSES.includes('completed_with_errors'));
-  assert.ok(BATCH_ITEM_STATUSES.includes('waiting_executor'));
-  assert.ok(BATCH_ITEM_STATUSES.includes('drafted'));
   assert.ok(BATCH_ITEM_RESUMABLE.includes('analyzed'));
   assert.ok(BATCH_ITEM_TERMINAL.includes('rejected'));
   assert.ok(BATCH_ITEM_TERMINAL.includes('drafted'));

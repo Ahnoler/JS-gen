@@ -18,8 +18,6 @@ import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import * as lease from '../executor-slot-lease.js';
 
-export { shortSid };
-
 const LINE_PREFIX_RE = /^\[slot:(\d+)\s+sid:([a-z0-9]+)\]/;
 
 /**

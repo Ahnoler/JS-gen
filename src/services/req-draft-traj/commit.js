@@ -1,6 +1,9 @@
 /**
  * Commit propose-cache atoms to draft trajectories (analyze → create + provenance).
  */
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import * as systemDao from '../../dao/system-dao.js';
 import { findDraftByReqAtomKey } from '../../dao/trajectory-dao.js';
 import { AppError } from '../../http/app-error.js';
@@ -10,7 +13,35 @@ import {
   createTransactionWithPhases,
 } from '../trajectory/trajectory-meta-service.js';
 import { assertAtomProvenance } from './provenance.js';
-import { readProposeCache } from './propose-cache.js';
+import { readProposeCache, PROPOSE_CACHE_VERSION } from './propose-cache.js';
+
+/**
+ * Load the propose cache and refuse stale shapes: missing cache → VALIDATION;
+ * cacheVersion mismatch or through-chains.md hash drift → STALE_PROPOSE_CACHE
+ * (the source changed since propose — re-run propose, never silently reuse).
+ * @param {string} modDir Absolute module workspace directory
+ * @returns {Promise<object>} Validated cache payload
+ */
+async function loadFreshProposeCache(modDir) {
+  const cache = await readProposeCache(modDir);
+  if (!cache?.atoms?.length) {
+    throw new AppError('propose cache missing — run draft-traj/propose first', { code: 'VALIDATION' });
+  }
+  if (cache.cacheVersion !== PROPOSE_CACHE_VERSION) {
+    throw new AppError('propose cache outdated — run draft-traj/propose again', { code: 'STALE_PROPOSE_CACHE' });
+  }
+  let md;
+  try {
+    md = await readFile(join(modDir, 'through-chains.md'), 'utf-8');
+  } catch {
+    throw new AppError('through-chains.md missing — run draft-traj/propose again', { code: 'STALE_PROPOSE_CACHE' });
+  }
+  const hash = createHash('sha256').update(md, 'utf8').digest('hex');
+  if (hash !== cache.sourceHash) {
+    throw new AppError('through-chains changed — run draft-traj/propose again', { code: 'STALE_PROPOSE_CACHE' });
+  }
+  return cache;
+}
 
 /**
  * Check that a function id exists in the system table (FK guard before
@@ -34,6 +65,111 @@ async function isKnownFunctionId(functionId, existsFn = null) {
 }
 
 /**
+ * Re-check an atom's chapter anchor: the referenced chapter file must still
+ * exist and hash to the propose-time sourceHash (spec F-05 — chapter renames
+ * or re-slicing must surface as stale_chapter_ref, not silent wrong provenance).
+ * @param {object} atom Cache atom
+ * @param {string} modDir Module workspace directory
+ * @returns {Promise<{ ok: true } | { ok: false, message: string }>} Recheck result
+ */
+async function recheckChapterAnchor(atom, modDir) {
+  if (!atom.sourceHash) {
+    return { ok: true };
+  }
+  const ref = String(atom.sourceChapter || '').replace(/\\/g, '/');
+  const fileName = ref.replace(/^chapters\//, '').split('#')[0];
+  if (!fileName) {
+    return { ok: false, message: 'sourceChapter has no chapter file' };
+  }
+  let content;
+  try {
+    content = await readFile(join(modDir, 'chapters', fileName), 'utf-8');
+  } catch {
+    return { ok: false, message: `chapter file missing: ${fileName}` };
+  }
+  const hash = createHash('sha256').update(content, 'utf8').digest('hex');
+  if (hash !== atom.sourceHash) {
+    return { ok: false, message: `chapter content drifted: ${fileName}` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Dry-run validation shared by commit and the validate endpoint: every check
+ * that does not need analyze/create (cache lookup, provenance, any-state
+ * duplicate, chapter anchor, functionId presence/existence). No writes, no LLM.
+ * @param {object} [opts] Validation options (same shape as commitDraftTrajectories minus analyze/create)
+ * @param {string} opts.moduleKey KB req module key
+ * @param {string[]} [opts.atomKeys] Atom keys to validate
+ * @param {string} [opts.rootDir] Module workspace root (default data/kb/req)
+ * @param {Record<string, number|string>} [opts.functionIdOverrides] Per-atom function id overrides
+ * @param {boolean} [opts.force] When true, duplicate rows do not block (seq increments at commit)
+ * @param {typeof findDraftByReqAtomKey} [opts.findDraftFn] Duplicate lookup override
+ * @param {(id: number) => Promise<boolean>} [opts.functionIdExists] Injectable
+ *   function-id existence check (offline characterization stubs)
+ * @returns {Promise<{ ok: string[], problems: Array<{ atomKey: string, code: string, message: string, trajectoryId?: number }>, cache: object }>} Keys that would commit and why the rest would not
+ */
+export async function validateCommitAtoms({
+  moduleKey,
+  atomKeys,
+  rootDir,
+  functionIdOverrides = {},
+  force = false,
+  findDraftFn,
+  functionIdExists = null,
+} = {}) {
+  const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
+    ? functionIdOverrides
+    : {};
+  const keys = Array.isArray(atomKeys) ? atomKeys.map(String) : [];
+  const modDir = moduleDir(moduleKey, rootDir);
+  const cache = await loadFreshProposeCache(modDir);
+  const byKey = new Map(cache.atoms.map((a) => [a.atomKey, a]));
+  const findDraft = findDraftFn || findDraftByReqAtomKey;
+
+  const ok = [];
+  const problems = [];
+  for (const atomKey of keys) {
+    const atom = byKey.get(atomKey);
+    if (!atom) {
+      problems.push({ atomKey, code: 'unknown_or_stale_atom', message: 'atom not in propose cache' });
+      continue;
+    }
+    const prov = assertAtomProvenance(atom);
+    if (!prov.ok) {
+      problems.push({ atomKey, code: prov.reason, message: 'atom provenance incomplete' });
+      continue;
+    }
+    const anchor = await recheckChapterAnchor(atom, modDir);
+    if (!anchor.ok) {
+      problems.push({ atomKey, code: 'stale_chapter_ref', message: anchor.message });
+      continue;
+    }
+    const existing = await findDraft(moduleKey, atomKey);
+    if (existing && !force) {
+      problems.push({
+        atomKey,
+        code: 'duplicate_draft',
+        message: `trajectory ${existing.id} already carries this atom`,
+        trajectoryId: existing.id,
+      });
+      continue;
+    }
+    const functionId = overrides[atomKey] ?? atom.suggestedFunctionId;
+    if (!Number(functionId)) {
+      problems.push({ atomKey, code: 'missing_function_id', message: 'no suggestedFunctionId and no override' });
+      continue;
+    }
+    if (!(await isKnownFunctionId(functionId, functionIdExists))) {
+      problems.push({ atomKey, code: 'unknown_function_id', message: `functionId ${functionId} not found` });
+      continue;
+    }
+    ok.push(atomKey);
+  }
+  return { ok, problems, cache };
+}
+
+/**
  * Commit selected propose-cache atoms to draft trajectories.
  * Does not call record/prepare or record/start.
  * @param {object} [opts] Commit options
@@ -41,9 +177,12 @@ async function isKnownFunctionId(functionId, existsFn = null) {
  * @param {string[]} opts.atomKeys Atom keys to commit
  * @param {string} [opts.rootDir] Module workspace root (default data/kb/req)
  * @param {number|null} [opts.systemAccountId] Optional system account id
+ * @param {string|null} [opts.paasUserId] Operator PaaS user id (audit passthrough)
  * @param {Record<string, number|string>} [opts.functionIdOverrides] Per-atom function id overrides
  * @param {Record<string, { kbFlowRef?: string|null, kbFlowNodeId?: string|null }>} [opts.flowRefOverrides] Per-atom flow ref overrides
- * @param {boolean} [opts.force] When true, skip duplicate-draft check
+ * @param {boolean} [opts.force] When true, bypass the duplicate skip and take
+ *   the next req_atom_seq for that (module, atom); the DB unique index still
+ *   converts concurrent races into skipped duplicate_draft
  * @param {typeof analyzeRequirementToPhases} [opts.analyzeFn] Analyze override (characterization)
  * @param {typeof createTransactionWithPhases} [opts.createFn] Create override (characterization)
  * @param {typeof findDraftByReqAtomKey} [opts.findDraftFn] Duplicate lookup override
@@ -56,6 +195,7 @@ export async function commitDraftTrajectories({
   atomKeys,
   rootDir,
   systemAccountId = null,
+  paasUserId = null,
   functionIdOverrides = {},
   flowRefOverrides = {},
   force = false,
@@ -64,51 +204,35 @@ export async function commitDraftTrajectories({
   findDraftFn,
   functionIdExists = null,
 } = {}) {
-  const overrides = (functionIdOverrides && typeof functionIdOverrides === 'object')
-    ? functionIdOverrides
-    : {};
   const flowOverrides = (flowRefOverrides && typeof flowRefOverrides === 'object')
     ? flowRefOverrides
     : {};
-  const keys = Array.isArray(atomKeys) ? atomKeys.map(String) : [];
-  const cache = await readProposeCache(moduleDir(moduleKey, rootDir));
-  if (!cache?.atoms?.length) {
-    throw new AppError('propose cache missing — run draft-traj/propose first', { code: 'VALIDATION' });
-  }
-  const byKey = new Map(cache.atoms.map((a) => [a.atomKey, a]));
   const analyze = analyzeFn || analyzeRequirementToPhases;
   const create = createFn || createTransactionWithPhases;
   const findDraft = findDraftFn || findDraftByReqAtomKey;
 
+  const { ok, problems, cache } = await validateCommitAtoms({
+    moduleKey,
+    atomKeys,
+    rootDir,
+    functionIdOverrides,
+    force,
+    findDraftFn,
+    functionIdExists,
+  });
+  const skipped = problems.map(({ atomKey, code, trajectoryId }) => (
+    trajectoryId != null ? { atomKey, reason: code, trajectoryId } : { atomKey, reason: code }
+  ));
+  const byKey = new Map(cache.atoms.map((a) => [a.atomKey, a]));
+
   const created = [];
-  const skipped = [];
-  for (const atomKey of keys) {
+  for (const atomKey of ok) {
     const atom = byKey.get(atomKey);
-    if (!atom) {
-      skipped.push({ atomKey, reason: 'unknown_or_stale_atom' });
-      continue;
-    }
-    const prov = assertAtomProvenance(atom);
-    if (!prov.ok) {
-      skipped.push({ atomKey, reason: prov.reason });
-      continue;
-    }
-    if (!force) {
-      const existing = await findDraft(moduleKey, atomKey);
-      if (existing) {
-        skipped.push({ atomKey, reason: 'duplicate_draft', trajectoryId: existing.id });
-        continue;
-      }
-    }
-    const functionId = overrides[atomKey] ?? atom.suggestedFunctionId;
-    if (!Number(functionId)) {
-      skipped.push({ atomKey, reason: 'missing_function_id' });
-      continue;
-    }
-    if (!(await isKnownFunctionId(functionId, functionIdExists))) {
-      skipped.push({ atomKey, reason: 'unknown_function_id' });
-      continue;
-    }
+    const functionId = (functionIdOverrides && typeof functionIdOverrides === 'object'
+      ? functionIdOverrides[atomKey]
+      : undefined) ?? atom.suggestedFunctionId;
+    const existing = force ? await findDraft(moduleKey, atomKey) : null;
+    const reqAtomSeq = existing ? Number(existing.reqAtomSeq ?? 0) + 1 : 0;
     let analyzed;
     try {
       analyzed = await analyze({ description: atom.taskDraft });
@@ -127,17 +251,25 @@ export async function commitDraftTrajectories({
         phases: analyzed.phases,
         businessEntries: analyzed.businessEntries,
         systemAccountId,
+        paasUserId,
         requireFunctionId: true,
         reqModuleKey: moduleKey,
         reqSourcePath: atom.sourceDoc,
         reqChapterRef: atom.sourceChapter,
+        reqSourceHash: atom.sourceHash ?? null,
+        reqChunkId: atom.chunkId ?? null,
         reqAtomKey: atom.atomKey,
+        reqAtomSeq,
         kbFlowRef,
         kbFlowNodeId,
       });
       const trajectoryId = typeof traj === 'number' ? traj : traj.id;
       created.push({ trajectoryId, atomKey, name: atom.title });
     } catch (e) {
+      if (e && e.code === 'ER_DUP_ENTRY') {
+        skipped.push({ atomKey, reason: 'duplicate_draft' });
+        continue;
+      }
       skipped.push({ atomKey, reason: `create_failed:${e.message}` });
     }
   }

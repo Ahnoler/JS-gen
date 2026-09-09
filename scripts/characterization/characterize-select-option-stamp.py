@@ -16,7 +16,7 @@ def assert_true(cond: bool, msg: str) -> None:
 
 
 def test_resolve_recorded_option_text() -> None:
-    from scripts.controller.actions.form_scan_utils import resolve_recorded_option_text
+    from scripts.controller.actions.select_match import resolve_recorded_option_text
 
     assert_true(
         resolve_recorded_option_text("first", "信贷潜在客户") == "信贷潜在客户",
@@ -80,9 +80,36 @@ def test_select_option_already_matched_stamps_concrete() -> None:
     )
 
 
+def test_tssc_multi_select_stamps_concrete() -> None:
+    engines = (
+        ROOT / "scripts/controller/actions/form_action_engines.py"
+    ).read_text(encoding="utf-8")
+    idx = engines.find("async def tssc_multi_select(")
+    assert_true(idx >= 0, "tssc_multi_select present")
+    end = engines.find("class RadioEngine", idx)
+    assert_true(end > idx, "RadioEngine after tssc_multi_select")
+    body = engines[idx:end]
+    assert_true(
+        "resolve_recorded_option_text" in body,
+        "tssc_multi_select stamps via resolve_recorded_option_text",
+    )
+    assert_true(
+        "ok-first" in body or "split(':', 1)" in body,
+        "tssc_multi_select reads echo from ok-first:/ok: result",
+    )
+    # Must not record raw option_text without stamp on success path
+    rec = body.find("_record_action(")
+    assert_true(rec > 0, "tssc_multi_select records")
+    assert_true(
+        "stamped" in body[rec : rec + 200],
+        "record params use stamped option_text",
+    )
+
+
 def main() -> int:
     test_resolve_recorded_option_text()
     test_select_option_already_matched_stamps_concrete()
+    test_tssc_multi_select_stamps_concrete()
     print("characterize-select-option-stamp: OK")
     return 0
 

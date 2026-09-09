@@ -227,19 +227,20 @@ export function hasProposeableChainSteps(md) {
 }
 
 /**
- * Build a stable slug-like atom key for propose/commit idempotency.
+ * Build a stable title-independent atom key for propose/commit idempotency.
+ * Key shape `<module-slug>:<chain-slug>:<step-index>`; invalid stepIndex → 0.
+ * Title is deliberately excluded: LLM re-runs rephrase titles, and a rephrased
+ * title must not produce a new atom identity (spec F-01).
  * @param {object} opts Atom identity fields
  * @param {string} opts.moduleKey Req module key
  * @param {string} opts.chainId Parsed chain id
- * @param {number} opts.stepIndex 1-based step index
- * @param {string} opts.title Step action/title text
+ * @param {number} [opts.stepIndex] 1-based step index
  * @returns {string} Stable atom key
  */
-export function buildAtomKey({ moduleKey, chainId, stepIndex, title }) {
+export function buildAtomKey({ moduleKey, chainId, stepIndex }) {
   const mod = slugPart(moduleKey);
   const chain = slugPart(chainId);
   const idx = Number(stepIndex);
   const step = Number.isFinite(idx) ? String(idx) : '0';
-  const titleSlug = slugPart(title) || 'step';
-  return `${mod}:${chain}:${step}:${titleSlug}`;
+  return `${mod}:${chain}:${step}`;
 }

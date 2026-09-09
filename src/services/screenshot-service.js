@@ -243,16 +243,6 @@ export async function replacePhaseGroupScreenshot(trajectoryPhaseId, {
 }
 
 /**
- * Find the phase-group screenshot row for one phase × state-group.
- * @param {number} phaseId phase DB id
- * @param {string} stateGroup state-group key
- * @returns {Promise<object|null>} screenshot row or null
- */
-export async function findPhaseGroupByStateGroup(phaseId, stateGroup) {
-  return screenshotDao.findByPhaseAndStateGroup(phaseId, stateGroup);
-}
-
-/**
  * List phase-group screenshots of a trajectory (kind='phase_group'), ordered by id.
  * @param {number} trajectoryId trajectory DB id
  * @returns {Promise<Array<object>>} phase-group screenshot rows
@@ -339,15 +329,6 @@ export async function replacePageLevelScreenshot({
       ...storageFields,
     }),
   });
-}
-
-/**
- * List page-level screenshots for a trajectory.
- * @param {number} trajectoryId trajectory DB id
- * @returns {Promise<Array<object>>} page-level screenshot rows
- */
-export async function listPageLevelScreenshotsByTrajectory(trajectoryId) {
-  return screenshotDao.listPageLevelByTrajectory(trajectoryId);
 }
 
 /**
@@ -506,21 +487,6 @@ export async function uploadPendingScreenshot(id) {
  */
 export async function listDialogScreenshotsByTrajectory(trajectoryId) {
   return screenshotDao.listDialogScreenshotsByTrajectory(trajectoryId);
-}
-
-/**
- * Get a presigned/relative URL for a screenshot by id.
- * @param {number} id screenshot DB id
- * @returns {Promise<string|null>} image URL or null if not found
- */
-export async function getScreenshotUrl(id) {
-  const row = await screenshotDao.getImage(id);
-  if (!row) return null;
-  if (row.storage_type === 'minio' && row.storage_path) {
-    const presigned = await getPresignedUrl(row.storage_path).catch(() => null);
-    return presigned || row.image_url || `/api/v2/screenshots/${id}/image`;
-  }
-  return row.image_url || `/api/v2/screenshots/${id}/image`;
 }
 
 /**

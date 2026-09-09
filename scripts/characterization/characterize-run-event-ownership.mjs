@@ -125,7 +125,18 @@ function testRunnerOwnFilterWiring() {
   assert.ok(cb.includes('phaseEventOwnership'), 'persist callback filters by ownership');
 }
 
-const steps = [testOwnership, testOwnedWait, testRunnerWiring, testRunnerOwnFilterWiring];
+/** Pin: startPhaseWatchdog returns a Promise; must NOT destructure as `{ idleP }`
+ *  (that yields undefined → Promise.race resolves immediately → zero-step fake record). */
+function testIdleWatchdogNoDestructure() {
+  const runner = readFileSync(
+    join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
+  assert.match(runner, /const idleP = startPhaseWatchdog\(phase\)/,
+    'idleP assigned from startPhaseWatchdog return value');
+  assert.doesNotMatch(runner, /const \{ idleP \} = startPhaseWatchdog/,
+    'must not destructure startPhaseWatchdog (returns Promise, not {idleP})');
+}
+
+const steps = [testOwnership, testOwnedWait, testRunnerWiring, testRunnerOwnFilterWiring, testIdleWatchdogNoDestructure];
 for (const [i, fn] of steps.entries()) {
   try {
     await fn();

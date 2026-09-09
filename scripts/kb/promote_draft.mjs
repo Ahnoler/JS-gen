@@ -458,6 +458,7 @@ async function main() {
 
   // --apply：按审查表动作写 flows/
   let applied = 0;
+  const promotedAt = new Date().toISOString();
   for (const r of results) {
     try {
       if (r.action.action === 'new') {
@@ -475,12 +476,32 @@ async function main() {
         console.log(`  [applied-merge] ${r.action.target} <- ${r.moduleKey}/${r.file} (+nodes ${w.writtenNodes}, +rules ${w.writtenRules}, +exceptions ${w.writtenExceptions})`);
         applied += 1;
       }
+      stampDraftPromoted(r, promotedAt);
     } catch (err) {
       console.error(`  [applied-fail] ${r.moduleKey}/${r.file}: ${err.message}`);
     }
   }
-  console.log(`applied: ${applied}/${results.length} 张已写入 ${FLOWS_DIR}/（drafts/ 存档保留）`);
+  console.log(`applied: ${applied}/${results.length} 张已写入 ${FLOWS_DIR}/（drafts/ 存档保留，已晋升卡打 promotedAt 标记）`);
   return 0;
+}
+
+/**
+ * 在草稿卡存档上打晋升标记（D5：保留存档不移文件；promotedAt=本次 apply 时间，
+ * promotedTo=目标 flows 文件名）。失败不中断 apply 主流程。
+ * @param {{moduleKey: string, file: string}} item 草稿卡条目
+ * @param {string} promotedAt ISO 时间戳
+ * @returns {void}
+ */
+function stampDraftPromoted(item, promotedAt) {
+  try {
+    const path = join(REQ_ROOT, item.moduleKey, 'drafts', item.file);
+    const draft = JSON.parse(readFileSync(path, 'utf-8'));
+    draft.promotedAt = promotedAt;
+    draft.promotedTo = item.action?.target ?? null;
+    writeFileSync(path, `${JSON.stringify(draft, null, 2)}\n`, 'utf-8');
+  } catch (err) {
+    console.error(`  [stamp-fail] ${item.moduleKey}/${item.file}: ${err.message}`);
+  }
 }
 
 process.exit(await main());

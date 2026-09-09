@@ -9,9 +9,6 @@ import {
   DEFAULT_MIN_FORWARD_MS,
   DEFAULT_EVERY_NTH_FRAME,
   DEFAULT_STREAM_QUALITY,
-  DEFAULT_STREAM_MAX_W,
-  DEFAULT_STREAM_MAX_H,
-  resolveScreencastTiming,
 } from '../screencast-timing.js';
 
 /** Binary frame magic: Remote ScreenCast Frame */
@@ -19,11 +16,8 @@ export const MAGIC = Buffer.from('RSCF');
 
 /** Align with Session BrowserContextConfig (session_runner.py) */
 export const SESSION_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
-export const STREAM_MAX_W = DEFAULT_STREAM_MAX_W;
-export const STREAM_MAX_H = DEFAULT_STREAM_MAX_H;
 // Re-export default for readers; runtime throttle should use bridge.minForwardMs.
 export const MIN_FORWARD_MS = DEFAULT_MIN_FORWARD_MS;
-export { resolveScreencastTiming };
 export const STALL_RESTART_MS = 2500;
 
 /** Mutable state shared by all remote-bridge modules. */

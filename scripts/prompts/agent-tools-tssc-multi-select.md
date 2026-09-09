@@ -1,0 +1,8 @@
+- **tssc_multi_select(label_text, option_text) — 仅用于真正的 TsscMultiSelect（`.tssc-multi-select`）。两种弹层：①远程表行（`.select-table`，如「要素名称」）②字典 el-option（如「要素类型」下拉数据字典/枚举）。按任意单元格或 option 文本匹配；`option_text="first"`/`第一个` 选当前页首项。成功码 `ok*` / `ok-already` / `ok-echo`：信任，勿重选。**
+- **🚨 任务写「任一/任意可用」或不确定原文时：直接 `option_text="first"`。禁止把组件 stamp / 交易名（如 `20260908-elem`）当 option_text。**
+- **🚨 `option-not-found` / `no-items`：禁止改用 `fill_form_field` 往触发框里打字，禁止 `real_click`/`click_element_by_index` 拨「精确查询」或点 option。立刻改调 `tssc_multi_select(..., option_text="first")` 或表行/选项原文。**
+- **🚨 `disabled`：只读（如回填的要素编码）— 禁止再调本动作或 select_option，跳过。**
+- **🚨 `no-tssc-multi-select`：不是本组件 — 禁止重试；改用 `select_option`（真 el-option 且无 Tssc 壳）或上报。**
+- **🚨 `err-no-echo`：已点但触发器未回显 — 勿盲目重试；`check_field_value` 或上报。**
+- **本动作只填字段；外层弹窗「确定/确 定」由你 `click_save` / 任务指定按钮点击。**
+- **与 select_option / select_tree_option / fill 分工：凡 `.tssc-multi-select`（含字典 option 形态）= 只准 tssc_multi_select；普通 el-option 无 Tssc 壳 = select_option；TsscMultiTree = select_tree_option；禁止对上述种类 fill_form_field。**

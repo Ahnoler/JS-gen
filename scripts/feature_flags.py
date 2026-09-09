@@ -135,3 +135,12 @@ def kb_flow_inject_enabled() -> bool:
 def click_nav_cue_enabled() -> bool:
     """AI_CLICK_NAV_CUE — inject [导航] cue when an index click navigated to a new page (default on)."""
     return _env_flag('AI_CLICK_NAV_CUE', True)
+
+
+def step_notice_scan_enabled() -> bool:
+    """AI_STEP_NOTICE_SCAN — after each agent step, scan visible toast/notification into memory (default on).
+
+    Lightweight one-shot DOM scan (+ ``__notify_log`` cursor); not a new business-side
+    MutationObserver architecture. Deduped so the same toast is not re-injected.
+    """
+    return _env_flag('AI_STEP_NOTICE_SCAN', True)

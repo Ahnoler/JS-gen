@@ -1,0 +1,135 @@
+# 需求草稿向导：关键数据分层 + 候选假流式 UX — 设计
+
+> 日期：2026-09-08  
+> 状态：已实现（SDD `475328d4..01794542` JS-gen · Vue `8788ee9..00c62ca`；characterize OK）；待 4097 重启 + 向导湿测  
+> 前置：[`2026-09-08-req-draft-wizard-ui-design.md`](./2026-09-08-req-draft-wizard-ui-design.md)；atomize：`scripts/prompts/req-draft-traj-atomize-prompt.md`  
+> 前端：`vue-project` 录制向导；后端：propose/commit（本版 **不** 改 SSE）
+
+## 1. 问题
+
+1. **关键数据误用**：候选里「关键数据」常堆 ZJJK 组件编号。analyze 会剔除「关键数据」段；录制 Agent 也不认 ZJJK 调工具 → 对执行无用，对人也难读。  
+2. **生成等待 UX**：点「生成候选」后长时间停在作业区；出结果后再进勾选页，割裂。用户希望：立刻进候选页、边出边看边勾、有进度感。
+
+## 2. 目标
+
+1. 候选内容分层：步骤可执行、业务数据可注入、页面编号可审阅但不污染 taskDraft。  
+2. 向导改为 **三步**：选作业区 → **候选与勾选**（假流式）→ 结果；首包前也有反馈。
+
+成功终点：
+
+- 新 propose 产出的 `taskDraft` 中「关键数据」仅含字段/规则类 KV（或为空）；ZJJK 不进该块。  
+- 向导点生成后立即进入「候选与勾选」；列表逐条入场 + 进度；同页勾选后可 commit。  
+- 本版仍一次 HTTP propose（假流式）；真 SSE 列为后续。
+
+## 3. 关键数据分层
+
+### 3.1 三层模型
+
+| 层 | 内容 | 载体 | 消费者 |
+|----|------|------|--------|
+| **A 操作步骤** | 有序自然语言；可选在步骤内写「…主页（ZJJK…）」 | `taskDraft` 编号步骤 | analyze → phases；录制 Agent |
+| **B 业务数据** | `字段名：值`、校验说明（如 ±2 级） | `taskDraft` 末「关键数据」块 **或** 结构化 `businessHints[]`（见下） | `extractBusinessEntriesFromRequirement` / 录制注入 |
+| **C 溯源元数据** | 页面/组件编号列表、大页面号 | **结构化字段** `pageCodes?: string[]`（不进「关键数据」标题块） | 向导 UI、流程卡匹配增强、人审 |
+
+### 3.2 atomize / fallback 规则（须改 prompt + 可选校验）
+
+- **禁止**在「关键数据」下列「大页面 / 基本信息页签 / ZJJK 表格式清单」。  
+- 「关键数据」仅允许：业务可填值、业务规则短句；无则整块省略。  
+- ZJJK：优先写入步骤括号；同时可填 `pageCodes`（去重、保序）。  
+- `phaseHints`：仍可输出，但 UI 标注「预览建议」；**commit 仍以 analyze(taskDraft) 为准**（与既有结论一致，本版不改为硬驱动阶段）。
+
+### 3.3 向导展开区展示
+
+候选行展开三分栏（或三段）：
+
+1. 任务草稿（步骤 + 来源）  
+2. 业务数据（解析自关键数据块；空则隐藏）  
+3. 页面编号 tags（`pageCodes`；无则隐藏）
+
+不再把 ZJJK 混在「关键数据」段落里当正文展示。
+
+### 3.4 兼容
+
+- 旧缓存原子：UI 若检测到「关键数据」下只有 `ZJJKxxxx` 行，展示为「页面编号（遗留）」并弱提示重新生成。  
+- 不强制清 propose 缓存文件。
+
+## 4. 向导 UX：候选与勾选 + 假流式
+
+### 4.1 步骤条（三步）
+
+1. 选作业区  
+2. **候选与勾选**（原「生成候选」+「勾选确认」合并）  
+3. 结果  
+
+### 4.2 交互流
+
+```
+[选作业区] 点「生成候选」
+    → 立即 step=2，showing proposing=true
+    → 骨架 / 「正在拆解主链…」
+    → POST propose（仍同步等整包）
+    → 成功：按条间隔 80–150ms 推入列表（入场动画），进度 i/total
+    → 用户可随时勾选已出现的行；未出完前「创建草稿」禁用或仅允许已勾选且 propose 已结束
+    → propose 结束后可「重新生成」（清空勾选与列表再跑）
+```
+
+### 4.3 进度文案
+
+- 请求中、尚无总数：不确定进度条 +「正在生成候选…」  
+- 开始逐条揭示：`已展示 i / total`（percent = i/total）  
+- 失败：留在 step 2，错误 Alert +「返回作业区 / 重试」  
+
+### 4.4 假流式 vs 真流式
+
+| | 本版（假流式） | 后续（真流式） |
+|--|----------------|----------------|
+| 传输 | 一次 `POST propose` | SSE / NDJSON 逐 atom |
+| 首包感知 | 跳转 + 等待文案 | 首条更快到达 |
+| 风险 | 真等待仍在首包前 | 超时、半包、取消语义 |
+
+本版明确采用假流式；API 契约不变。
+
+### 4.5 勾选与创建
+
+- 同页：展开看任务内容 + checkbox。  
+- 「创建草稿」：`selectedKeys.length ≥ 1` 且功能节点已选且 **propose 已完成**（避免半列表误创）。  
+- rejected 折叠区仍只读展示。
+
+## 5. 范围
+
+### In
+
+- 改 `req-draft-traj-atomize-prompt.md`（+ 必要时 fallback 不写 ZJJK 关键数据块）。  
+- propose 响应可选增加 `pageCodes?: string[]`（materialize 从步骤 zjjk / LLM 字段归一）。  
+- Vue：三步向导、假流式揭示、展开区分栏。  
+- api-docs / 短 characterize 或前端自测说明。  
+
+### Out
+
+- SSE 真流式 propose。  
+- `phaseHints` 改为 commit 硬阶段源。  
+- 自动录制。  
+- 批量改写存量 `data/kb/req/**/.draft-traj-propose.json`。
+
+## 6. 验收
+
+### 代码（characterization / 静态）
+
+- [x] 新 propose 样例：`taskDraft`「关键数据」无纯 ZJJK 表；`pageCodes` 或步骤内括号可见编号。（`475328d4`/`af756fa4`/`01794542`；characterize-atom-keydata · characterize-req-draft-traj OK）  
+- [x] 点生成立即进入候选页；列表逐条出现；进度到 100% 后可创建。（Vue `00c62ca`；`handleGenerate` → step 2 + `startReveal` + `canCreate` 门闩）  
+- [x] 同页勾选 + 展开可读步骤/业务数据/页面编号。（Vue `8788ee9`/`00c62ca`；`atom-display` 三分栏 + 遗留 ZJJK 弱提示）  
+- [x] 旧四步路由深链：兼容到新三步（step 2+3→2、4→3 映射，`index.vue` onMounted）。
+
+### 湿测（待用户）
+
+- [ ] 重启控制面 **4097**，product-mgmt 录制向导冒烟：生成候选 → 假流式揭示 → 勾选 → 创建；确认 UI 与 §4 一致。
+
+## 7. 实现分期（供计划）
+
+1. Prompt + `pageCodes` 归一（后端小改）  
+2. 向导三步 + 假流式 + 展开分栏（前端）  
+3. 文档/api-docs 收口  
+
+---
+
+**审阅请确认**：§3.2 禁止关键数据堆 ZJJK、§4 假流式与「propose 完成前不可创建」。确认后出实现计划。

@@ -501,7 +501,10 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             const operable = trigger || ctrl;
             const host = selectWrap || (ctrl.closest('.el-input, .el-date-editor, .el-cascader') || ctrl);
             const kind = selectWrap
-                ? (host.querySelector('.tree-popover, .tsscTree, .el-tree-select, [class*="tsscmultitree"]') ? 'tree-select' : 'select')
+                ? (host.closest('.tssc-multi-select') || host.querySelector('.tssc-multi-select')
+                    ? 'tssc-multi-select'
+                    : (host.querySelector('.tree-popover, .tsscTree, .el-tree-select, [class*="tsscmultitree"]')
+                        ? 'tree-select' : 'select'))
                 : ((ctrl.closest && ctrl.closest('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) ? 'date' : 'input');
             const currentValue = readValue(inputEl, trigger, host);
             const placeholder = (operable.getAttribute && operable.getAttribute('placeholder')) || '';
@@ -522,7 +525,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             };
             stampRegionAndLegacyMirror(field, operable);
             if (!pushField(field)) continue;
-            if (kind === 'select' || kind === 'tree-select') {
+            if (kind === 'select' || kind === 'tree-select' || kind === 'tssc-multi-select') {
                 selectFields.push({ field, trigger: operable });
             }
         }

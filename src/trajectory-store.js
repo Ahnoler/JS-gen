@@ -1,9 +1,8 @@
 /**
  * File-based trajectory store: index + per-trajectory JSON persistence under TRAJECTORIES_DIR.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { TRAJECTORIES_DIR } from '../config/config.js';
 import { extractFlowFromTrajectory } from './script-utils.js';
 
@@ -49,20 +48,6 @@ export function loadTrajectoryIndex() {
 export function saveTrajectoryIndex(list) {
   ensureTrajectoriesDir();
   writeFileSync(indexPath(), JSON.stringify(list, null, 2), 'utf-8');
-}
-
-/**
- * Generate a timestamped trajectory id (e.g. traj_20260101_120000).
- * @returns {string} result
- */
-export function createTrajectoryId() {
-  const now = new Date();
-  const pad = (n, d = 2) => String(n).padStart(d, '0');
-  const ts = [
-    now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate()),
-    '_', pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds()),
-  ].join('');
-  return 'traj_' + ts;
 }
 
 /**
@@ -118,50 +103,4 @@ export function saveTrajectoryRecord({ trajectoryId, task, model, sourcePath, ex
   saveTrajectoryIndex(list);
 
   return { record, trajectory, flow };
-}
-
-/**
- * Look up a trajectory record from the index by id.
- * @param {string} trajectoryId trajectory id
- * @returns {object|null} result
- */
-export function getTrajectoryRecord(trajectoryId) {
-  const list = loadTrajectoryIndex();
-  return list.find(r => r.trajectoryId === trajectoryId) || null;
-}
-
-/**
- * Load and parse a trajectory's full JSON by id.
- * @param {string} trajectoryId trajectory id
- * @returns {object|null} result
- */
-export function loadTrajectoryJson(trajectoryId) {
-  const record = getTrajectoryRecord(trajectoryId);
-  if (!record) return null;
-  const filePath = path.join(TRAJECTORIES_DIR, record.fileName);
-  if (!existsSync(filePath)) return null;
-  try {
-    return JSON.parse(readFileSync(filePath, 'utf-8'));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Delete a trajectory JSON file and remove it from the index.
- * @param {string} trajectoryId trajectory id
- * @returns {boolean} result
- */
-export function deleteTrajectory(trajectoryId) {
-  const list = loadTrajectoryIndex();
-  const idx = list.findIndex(r => r.trajectoryId === trajectoryId);
-  if (idx === -1) return false;
-
-  const record = list[idx];
-  const filePath = path.join(TRAJECTORIES_DIR, record.fileName);
-  try { if (existsSync(filePath)) unlinkSync(filePath); } catch {}
-
-  list.splice(idx, 1);
-  saveTrajectoryIndex(list);
-  return true;
 }

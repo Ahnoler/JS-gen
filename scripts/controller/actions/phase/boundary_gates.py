@@ -76,10 +76,16 @@ def phase_done_ok(business_data_store: dict | None) -> tuple[bool, list[str]]:
             missing.append('save_evidence')
         return (not missing), missing
 
-    # Any of success_when is enough
-    if have & set(needed):
+    # Any of success_when is enough. Alias LLM dialog_close ↔ introduce close kinds.
+    needed_set = set(needed)
+    have_match = set(have)
+    intro_close = intro_kinds | {'dialog_close', 'confirm_click'}
+    if have_match & intro_close:
+        have_match |= intro_close
+    if have_match & needed_set:
         return True, []
     return False, [f'missing_any_of:{needed}']
+
 
 def can_submit_writes(business_data_store: dict | None, section: str = "") -> tuple[bool, list[str]]:
     """Write gate: maintain + requires_write → no fillable pending in current container."""

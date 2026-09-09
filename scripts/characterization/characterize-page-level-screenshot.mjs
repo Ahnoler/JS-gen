@@ -45,7 +45,6 @@ const ok = (n) => console.log(`ok: ${n}`);
   assert.match(dao, /listPageLevelByTrajectory/);
   const svc = readFileSync(join(root, 'src/services/screenshot-service.js'), 'utf8');
   assert.match(svc, /replacePageLevelScreenshot/);
-  assert.match(svc, /listPageLevelScreenshotsByTrajectory/);
   ok('dao/service page_level functions');
 }
 

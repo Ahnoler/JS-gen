@@ -22,6 +22,7 @@ from ._js_snippets import (
     JS_SELECT_TRIGGER_BY_XPATH,
     JS_SELECT_VALUE_BY_XPATH,
     JS_SELECT_TREE_OPTION,
+    JS_TSSC_MULTI_SELECT,
 )
 from .replay_js import _JS_LOCATE_BY_XPATH, _JS_READ_VALUE_BY_XPATH
 from .replay_timing import WAIT_200_MS, WAIT_300_MS, WAIT_400_MS, WAIT_500_MS
@@ -163,6 +164,13 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             await page.wait_for_timeout(WAIT_500_MS)
             return r
         return await _with_xpath_first(_tree)
+
+    if action_name == 'tssc_multi_select':
+        async def _tssc():
+            r = await page.evaluate(JS_TSSC_MULTI_SELECT, [label, value])
+            await page.wait_for_timeout(WAIT_500_MS)
+            return r
+        return await _with_xpath_first(_tssc)
 
     if action_name == 'click_radio':
         async def _radio():

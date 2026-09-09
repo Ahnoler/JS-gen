@@ -9,14 +9,6 @@ import {
   SCREENSHOT_PENDING_DIR,
 } from '../../config/config.js';
 
-/**
- * Return the configured pending screenshots directory.
- * @returns {string} absolute path to SCREENSHOT_PENDING_DIR
- */
-export function getPendingDir() {
-  return SCREENSHOT_PENDING_DIR;
-}
-
 async function ensureDir() {
   await mkdir(SCREENSHOT_PENDING_DIR, { recursive: true, mode: 0o700 });
 }
@@ -84,16 +76,6 @@ export async function deletePendingFile(idOrPath) {
   } catch (err) {
     if (err?.code !== 'ENOENT') throw err;
   }
-}
-
-/**
- * List all `.png` file names currently in the pending directory.
- * @returns {Promise<Array<string>>} array of file names ending with `.png`
- */
-export async function listPendingFiles() {
-  await ensureDir();
-  const names = await readdir(SCREENSHOT_PENDING_DIR);
-  return names.filter((n) => n.endsWith('.png'));
 }
 
 /**

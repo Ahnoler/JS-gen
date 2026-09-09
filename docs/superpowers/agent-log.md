@@ -2,19 +2,214 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
-## 2026-09-08 21:12 · OpenCode — 收工：Windows 执行机 CDP IPv6 localhost 连接修复
+## 2026-09-09 · ZCode 死代码清理线 — 开工：CAUTION 待裁 9 项执行移除（用户裁决）
 
-- 完成：回链 20:28 开工条目；`factory.py` 在 Windows 下将 browser_use 的本地 CDP 连接端点固定为 `127.0.0.1`，并优先选择可用系统 Chrome，规避 Chromium 1208 在本机启动即退出
-- 验收：`python -m py_compile scripts/browser/factory.py` 通过；`git diff --check` 通过；独立 CDP 启动烟测输出 `CDP_IPV4_SMOKE_OK port=19377 session=BrowserSession`
-- 遗留移交：需重启当前执行机进程后再从控制面发起一次真实 session；若用户必须使用 Playwright Chromium，可通过 `CHROME_PATH` 显式指定可启动的浏览器
-- 注意：提交仅包含 `scripts/browser/factory.py` 与本日志；`config/*` 的既有未提交改动未触碰
+## 2026-09-09 · ZCode 死代码清理线+引擎review线 — 收工：CAUTION ×9 全删（-233 行）+ 三路对抗 review 漏洞报告入库（回链开工）
+- **deadcode 收工**：8 原子 commit（d9f76259→23a90df2）ff 合入 uara_V1.2，17 文件 +20/−233，整文件删 src/runtime/script-runner.js；每单元同 commit 改 pin（replay-batch teardown 行/cold screenshot-pending/phase-group-shot cue/page-level 断言/trajectory+batch-import+cold record-status-v2 三处收窄/smoke-memory-ingest 内联 knex 清理 23/23 过/network-capture step1/dedup replay-marker 段）。验收=主检出 verify-all 前后基线比对：124 ok 行全同（唯一差异=dedup 日志文案有意改）；worktree 法全程（junction 先摘非递归删、branch 已删、主检出 node_modules 完好 278 项）。教训两笔：①smoke 目录 gitignore 但文件被跟踪——git add 须 -f；②amend 落错 HEAD（叠到后一笔上）——soft reset 重排两笔修复；C6 曾漏删 dao 函数本体，分支级零引用复核抓到
+- **引擎 review 交付**：三路只读子智能体（JS 管线/Python 执行机/跨端 hub）对抗审查完毕，合并去重后 **P0×3 + P1×4 + P2×10**，全部带 file:line 与失效时序，报告入库 `docs/superpowers/reports/2026-09-09-engine-pipeline-adversarial-review.md`。头条：**runId 在 executor-session-client.js 与 executor/session-handler.js 两道字段白名单被丢，runId 归属隔离上线即失效（生产全走 legacy 路径）**；stop→重录级联误杀（stale runner 10min 后写 failure+砍新 agent）；90s 终局门闩对 detach→重附场景守卫失效。子智能体由本会话代声明，未写本文件未 commit（read-only）
+- 遗留移交：报告内 P0/P1 修复排序建议待用户拍板后实施；旧 execute-env 红的 worktree 判据不变
+- 开工：09-09（时刻以 commit 为准）。用户裁决首轮清理的 CAUTION ×9（生产零引用但被 pin）执行移除：①executor-registry.clearAll ②③screenshot-pending-store getPendingDir/listPendingFiles ④screenshot-service findPhaseGroupByStateGroup ⑤screenshot-service listPageLevelScreenshotsByTrajectory ⑥constants 4 状态表 ⑦memory-dao deleteByTrajectory ⑧protocol.KNOWN_EVENT_TYPES ⑨runtime/script-runner.js 整文件——每项同 commit 同步改 pin
+- 范围：src/services/executor-registry.js、src/services/screenshot-pending-store.js、src/services/screenshot-service.js、src/models/constants.js、src/memory/memory-dao.js、src/memory/protocol.js、src/runtime/script-runner.js（删）、对应 pin：scripts/characterization/characterize-replay-batch*、cold/screenshot-pending*、phase-group-shot.py、page-level-screenshot*、record-status-v2/trajectory/batch-import 相关、smoke-memory-ingest、network-capture、characterize-dedup；agent-log 本文件
+- 禁入区：引擎 review 热区（src/services/trajectory/**、scripts/session_runner.py、scripts/state.py、scripts/agent/service.py、src/executor-event-hub.js、remote-session-service/replay-actions/form-structure-heal/auth-recording/trajectory-manual-record/phase-highlight-screenshot——三路只读 review 在途）；人工 CLI ×11（api-capture 报文捞取线资产）不动；migrations/** 不动；config/update-db-whitelist.ps1 他线 WIP
+- 方式：worktree 独立分支 `cleanup/deadcode-caution-20260909`（D:\dev\JS-gen-deadcode，junction+.env 模板法）；先逐项复核 09-08 后仍零引用，再删+改 pin+原子 commit；worktree verify-all 比对基线（network-capture 探针 worktree 环境特异红除外）→ 合并回 uara_V1.2 主检出终验 ALL GREEN；只读侦查/审查子智能体由本会话代声明
 
-## 2026-09-08 20:28 · OpenCode — 开工：Windows 执行机 CDP IPv6 localhost 连接修复
+## 2026-09-08 23:59 · ZCode KB 加固线 — 收工：KB 链路加固 Task 0+四线 13 任务全落地，verify-all ALL GREEN（回链 23:10）
 
-- 进行中：修复本地执行机启动 Chromium 后 `browser_use` 通过 `localhost` 解析到 `::1`、无法连接仅监听 IPv4 的 CDP 端口问题
-- 范围：`scripts/browser/factory.py`、对应 characterization（如需新增）、本文件
-- 禁入：V3 导出线、req-draft/KB、轨迹查询及其他工作区 WIP；不修改 site-packages 第三方源码
-- 方式：项目侧最小覆盖 CDP 启动连接端点为 `127.0.0.1`，离线回归后运行 Python 启动冒烟
+- 完成：Task 0 门禁（`38142025` kb-staging/kb-promote 移到横幅前+自证故意失败 exit=1）；A 线 T1 稳定 atomKey+回填迁移（`9ca808f3`，dev 库 0 行存量=No-op）、T2 幂等全状态+req_atom_seq 唯一索引（`55bce80c`，真库 ER_DUP_ENTRY 实证）、T9 validate 端点+paasUserId（`e04c72ec`）；B 线 T3 缓存 cacheVersion/sourceHash/原子写+gitignore（`f09635e7`，10 个盘上缓存保留判过期）、T4 propose 4xx 语义（`712e40fd`，4098 独立实例 HTTP 实证）、T8 functionIdCandidates（`941b00b2`，product-mgmt 28/28=100%）、T13 reference_step+truncated（`4e13dd98`，chain-b:4/c:2 出局）；C 线 T6 召回 idf 重写（`359809cb`，800 字 2ms 基线 654ms；金样例 24/24；provenance 具名权重+章节 mtime+size 缓存）、T7 跨语言金样例契约（`4cf1827f`，py 19/24 直配+5 条 divergenceAccepted 登记；AGENTS.md 补唯一跨语言契约行）；D 线 T5 出处锚点 req_source_hash/req_chunk_id+commit 回查（`f6f34f54`）、T10 观测 JSONL+propose-stats（`d967367b`）、T11 source 上传复用 multer（`35a0fbe1`，HTTP 端到端 sourceDoc=副本相对路径）、T12 promotedAt 打标（`dbe12376`，沙箱实证）、T14 F-15 登记（`4693e5cb`）
+- 验收：终轮 `bash scripts/refactor/verify-all.sh` **ALL GREEN**（tmp/kb-remediation/gate-final.txt）；spec §9 逐条——§9.2 门禁自证（D0/gate-selfproof-fail exit=1）、§9.3 金样例两侧断言入 verify-all、§9.4 product-mgmt 副本两次 propose 26/26 键全同（final/probe-spec9-out.txt）+同键重复由 T2 真库唯一索引拦截；characterize-req-draft-traj 26→**52**、flow-card-recall 12→**14**（金样例+性能断言）；lint 全程 0 新增 warning（存量 23 条未动）；三笔迁移已 apply（Batch 42/43/44）；全程零 prepare/record/start/detach
+- 注意：⑧ 线 API 契约有增量（validate 端点/functionIdCandidates/kind/truncated/stale 语义），**前端仓库待派单**：向导禁用条件改 `canProposeAtoms` + 候选下拉（spec §6.4，本线未动前端仓）；py 召回 5 条分歧在 fixture 内登记待 D3 另议收敛；`data/kb/staging/*.jsonl` 观测已 gitignore
+- 遗留移交：①spec §6.4 前端派单（上）；②F-15 readonly-partial 待 Lead 批准（todo ⑧′ 已登记）；③服务器库迁移部署时须跑三笔新迁移（20260908231500/233000/2350000）；④propose 真实 LLM 路径湿测未跑（本线全离线桩/4098 隔离实例，避免网关挂起）；⑤观察 `data/kb/staging/recall-events.jsonl` py 侧运行期增长
+- 状态：本线全部任务闭环，状态以本条目为准；工作区仅剩他线 `config/update-db-whitelist.ps1`（M 态，未触碰）
+
+## 2026-09-08 23:10 · ZCode KB 加固线 — 开工：KB 链路加固 Task 0 + 四线（A/B/C/D）连续执行
+
+- 进行中：23:10。按已批准 spec（`specs/2026-09-08-kb-remediation-design.md`）+ plan（`plans/2026-09-08-kb-remediation.md`）实施 Task 0→A(1/2/9)→B(3/4/8/13)→C(6/7)→D(5/10/11/12/14 连续执行)。开工本条目顺带把 spec/plan 两份未入库文档 carry 进 commit
+- 范围：`scripts/refactor/verify-all.sh`、`src/services/req-draft-traj/**`（parse-through-chains/propose/propose-cache/commit/provenance/flow-card-recall/atom-keydata）、`src/dao/trajectory-dao.js`、`src/services/trajectory/trajectory-meta-service.js`、`src/routes/v2/kb.js`、`src/dashboard/api-docs/groups/kb.js`、`src/http/upload-xlsx.js`（只读复用）、`migrations/`（新增三笔）、`.gitignore`、`scripts/characterization/characterize-req-draft-traj.mjs|characterize-flow-card-recall.mjs|characterize-kb-recall.py|fixtures/kb-recall-golden.json`、`scripts/kb/recall.py|promote_draft.mjs|propose-stats.mjs`、`scripts/prompts/skills/req-doc-to-kb/SKILL.md`（仅登记）、`AGENTS.md`（跨语言单源补一行）、`data/kb/staging/`（运行期 JSONL）；本文件
+- 禁入区：`config/update-db-whitelist.ps1`（他线 M 态）、`data/kb/req/**/.draft-traj-propose.json`（禁止手改，Task 3 只加 gitignore）、`data/kb/flows/**`（禁止手改）、`src/services/trajectory/**` 除 `trajectory-meta-service.js` 一处透传、`scripts/controller/**`（引擎热区）、其余他线 WIP
+- 方式：主会话连续执行（不派子智能体改文件）；每 Task 先 pin 后实现后复跑 verify-all；全程禁 `prepare`/`record/start`/`detach`；迁移 up/down 成对 + hasColumn 守卫；api-docs 同步每笔
+
+## 2026-09-08 23:00 · Cursor Lead — 收工：轻量每步末扫通知（回链 22:50）
+
+- 完成：AI_STEP_NOTICE_SCAN（默认开）；JS_SCAN_STEP_NOTICES；on_step_end 注入【页面通知】去重 cue；成功 toast 顺带 toast_ok；复用既有 JS_NOTIFY_HOOK 兜底短命通知
+- 验收：characterize-step-notice-scan PASS
+- 遗留：重启 executor；可用 AI_STEP_NOTICE_SCAN=off 关闭
+
+## 2026-09-08 22:50 · Cursor Lead — 开工：轻量每步末扫通知注入 agent
+
+- 进行中：22:50。用户选定轻量方案：每步末扫可见 toast/error（非常驻业务 hook），塞进 agent 观察；可复用 __notify_log
+- 范围：feature_flags、js snippet、recorder on_step_end cue、characterize pin；本文件
+- 禁入：whitelist / draft-traj / kb-remediation / 常驻 MutationObserver 新架构
+- 方式：TDD pin → step_end 扫+去重注入 HumanMessage；成功文案顺带 toast_ok → 收工
+
+## 2026-09-08 22:55 · Cursor Lead — 收工：introduce_pick 成功令牌（回链 22:45）
+
+- 完成：sanitize introduce_pick 合并 toast_ok/dialog_close/picker_closed；click_save toast+确定 补记 picker_closed/dialog_close；phase_done_ok 关闭类别名；pin characterize-introduce-dialog-close + verify-all
+- 验收：characterize-introduce-dialog-close / phase-boundary / phase-reviewer / done-accept-reason PASS
+- 遗留：重启 executor 后重录；全局通知 hook 不做
+
+## 2026-09-08 22:45 · Cursor Lead — 开工：introduce_pick 成功令牌（dialog_close vs toast_ok）
+
+- 进行中：22:45。sid 0975ed13：click_save 已 ok-save-success/toast_ok，但 success_when=[dialog_close] 反复 Premature done 空转
+- 范围：form_save.py（toast 路径补记 picker_closed）、phase/boundary_gates.py 或 reviewer sanitize、characterize；本文件
+- 禁入：whitelist / draft-traj / kb-remediation / tssc 无关改动
+- 方式：TDD — introduce_pick 合并成功 kinds（含 toast_ok/dialog_close）；toast+确定 补记关闭证据 → 收工
+
+## 2026-09-08 22:40 · Cursor Lead — 收工：tssc 推送并进 select:click + first 打戳（回链 22:35）
+
+- 完成：442665eb — ACTION_TO_ENGINE_TYPE tssc_multi_select→select:click；成功路径 resolve_recorded_option_text(ok-first 回显)；pin legacy/transaction/stamp/tssc；spec/plan 备注
+- 验收：characterize-tssc-multi-select / characterize-select-option-stamp / characterize-legacy-engine-export / characterize-transaction-export PASS
+- 遗留：重启 executor 后重录才有具体 option_text；存量 first 步需重录或手工改库
+
+## 2026-09-08 22:35 · Cursor Lead — 开工：tssc_multi_select 推送并进 select:click + first 落库打戳
+
+- 进行中：22:35。用户裁定：导出映射并进 select:click（不再 select:tssc-multi）；落库时将 ok-first:回显 打成具体 option_text
+- 范围：legacy-engine-export.js、form_action_engines.py tssc_multi_select 成功路径、characterize pin/export、spec/plan 备注、本文件
+- 禁入：whitelist / draft-traj-propose / kb-remediation WIP
+- 方式：改 ACTION_TO_ENGINE_TYPE；成功路径 resolve_recorded_option_text(option, echo)；pin → 收工
+
+## 2026-09-08 22:25 · Cursor Lead — 收工：tssc_multi_select 字典 el-option 回退（回链 22:15）
+
+- 完成：84db48e5 — 无 select-table 行时回退 el-option；统一匹配/点击/回显；精确 OFF 仅 table；prompt/pin；策略统一 first
+- 验收：characterize-tssc-multi-select + characterize-agent-prompt-packs PASS。收工时 CDP 19242 ECONNREFUSED（浏览器已关），湿测未复跑；先前同会话已证手点 option 可回显
+- 遗留：重启 executor 后重录要素类型用 tssc_multi_select(..., first|原文)；选项窥探不做，统一 first
+
+## 2026-09-08 22:15 · Cursor Lead — 开工：tssc_multi_select 支持字典 el-option（要素类型）
+
+- 进行中：22:15。CDP 19242 实证：「要素类型」亦为 TsscMultiSelect，但弹层是 el-option（下拉数据字典/阈值）非 `.select-table`；现片段只收集表行 → no-items；点 el-option 可选中
+- 范围：`scripts/controller/actions/js_snippets/tssc_multi_select.py`、prompt/pin、本文件
+- 禁入：whitelist / draft-traj-propose / 他线 WIP
+- 方式：无表行时回退 `.el-select-dropdown__item`；CDP 已验证点选项可回显
+
+## 2026-09-08 22:05 · Cursor Lead — 收工：修 tssc_multi_select fill 退化（回链 21:55）
+
+- 完成：fill 拒写 tssc/tree；option-not-found 禁 fill/精确查询并指引 `first`；搜索强制精确 OFF；affordances/prompt/pin
+- 验收：`characterize-tssc-multi-select` + `characterize-agent-prompt-packs` PASS；根因 sid `5b463582` step3→fill 链
+- 遗留：需重启 executor 后重录 #696；任务文案勿把 stamp 当数据项名
+
+## 2026-09-08 21:55 · Cursor Lead — 开工：修 tssc_multi_select 录制退化为 fill（sid 5b463582）
+
+- 进行中：21:55。用户反馈 #696 类录制「不好用」：日志 step3 `tssc_multi_select(要素名称, 20260908-elem)`→option-not-found 后反复 `fill_form_field` 假成功 + 误开精确查询 → 无匹配数据
+- 范围：`scripts/controller/actions/form_action_engines.py`（fill 门禁）、`js_snippets/tssc_multi_select.py`（精确查询启发式）、`result_protocol.py` affordances、`agent-tools-tssc-multi-select.md`、characterize pin；本文件
+- 禁入：whitelist / draft-traj-propose / trajectory-dao / 死代码清理已合入区无关改动
+- 方式：fill 拒写 tssc-multi-select → 强化 option-not-found 指引 → 禁止搜索时强开精确 → pin → 收工
+
+## 2026-09-08 19:42 · ZCode 死代码清理线 — 收工：全仓死代码清理 534 行落库，verify-all ALL GREEN（回链 18:55）
+
+- 完成：10 个原子 commit（`376fa2b1`→`9440dae8`）fast-forward 合入 uara_V1.2，31 文件 **+1/−534**。C1 整文件孤儿 ×6（models/index barrel、models/sys-msg shim、services/sys-msg/index barrel、playwright-runner/lib/helpers.js、scripts/count_steps.py、scripts/tools/_gen_locator_helpers_py.mjs 过期副本）；C2-C9 零引用符号 ×30 + 死转发行 ×11 组（trajectory-store ×4 含传导死亡 getTrajectoryRecord、ws 层 ×3、remote-session/state ×4、杂项导出 ×7、hierarchy 模板+转发行 ×6、locator-candidates ×3、constants ×7、DAO 方法 ×9）
+- 验收：①worktree 干净基线 vs 编辑后 verify-all ok 行逐一相同（115 ok，唯一红=characterize-network-capture 的 Python 探针 import，实证为 worktree 环境特异性、主检出绿）；②合并后主检出 **verify-all ALL GREEN 120 项零失败**；③5 个只读子智能体全程（侦查 ×3、kill list 对抗复核 ×1〔37 项 36 确认 1 修正〕、分支 diff 审查 ×1〔PASS：无裹挟删除、36 被删符号 HEAD 零引用、保留项 REMOTE_SESSION_OCCUPIED/EVENT_SOURCES/isGeneratedId 等全部完好〕）
+- 遗留移交：CAUTION（生产零引用但被 pin，删除须同步改 pin）×9 清单在清理报告（clearAll、screenshot-pending ×2、findPhaseGroupByStateGroup、listPageLevelScreenshotsByTrajectory、constants 4 个状态表、memory deleteByTrajectory、KNOWN_EVENT_TYPES、runtime/script-runner.js 整文件）；人工 CLI CAUTION ×11 未动（api-capture 是报文捞取线资产明示保留）；DANGER 零项未删。发现：`src/dao/trajectory-dao.js:630` 存量 18 条 jsdoc warning（1ad954fe 引入，主检出现存，宜由该线补 @param）；pack-control-plane.sh 打包缺 executor/（运维不一致）；「export 收窄」候选清单在报告
+- 注意：worktree D:\dev\JS-gen-deadcode 已拆除（node_modules junction 先摘再删，防递归误删主检出依赖），分支 cleanup/dead-code-20260908 已合并删除；本线全程未触碰禁入区与他线 WIP
+
+## 2026-09-08 18:55 · ZCode 死代码清理线 — 开工：全仓死代码清理（用户模板任务）
+
+- 开工：18:55。用户下发死代码清理流程：SAFE 直接删、CAUTION/DANGER 只报告不动代码
+- 范围（预计改动集，侦查已毕）：src/{models/index.js、models/sys-msg.js、services/sys-msg/index.js、playwright-runner/lib/helpers.js、trajectory-store.js、executor-ws.js、ws-server.js、services/remote-session-service.js、cdp/remote-bridge/state.js、services/screenshot-service.js、services/sso/paas-client.js、services/hierarchy-excel.js、services/hierarchy-service.js、services/agent-stderr-log-service.js、cdp/locator-candidates.js、dao/ 若干文件、models/constants.js、http/api-response.js、memory/memory-dao.js、memory/protocol.js、runtime/agent-process.js、routes/browser-session/executor-events.js}、scripts/count_steps.py、scripts/tools/_gen_locator_helpers_py.mjs；另 agent-log 本文件
+- 禁入区：config/update-db-whitelist.ps1、scripts/characterization/characterize-req-draft-traj.mjs、src/dashboard/api-docs/groups/kb.js、src/services/req-draft-traj/**、data/kb/req/**（⑧线 WIP）；src/services/trajectory/**、src/services/transaction-export*、legacy-engine-export.js、src/dedup.js、src/models/action-name.js、src/models/element.js、scripts/controller/actions/**（引擎/TsscMultiSelect/伙伴导出线热区）；migrations/**（有意保留的一次性归档）
+- 方式：worktree 独立分支 `cleanup/dead-code-20260908`（D:\dev\JS-gen-deadcode，不切共享检出分支、不碰他线 WIP）；只删全仓零引用 SAFE 项（含 characterization pin 复核），逐单元 commit+验证，收工合并回 uara_V1.2 后 verify-all 终验；Explore 子智能体只读侦查/审查由本会话代声明（不写本文件、不 commit）
+
+## 2026-09-08 18:50 · Cursor Subagent — 收工：关键数据分层 + 候选假流式 UX（回链 16:05）
+
+- 完成：Tasks 1–5 绿；plan `docs/superpowers/plans/2026-09-08-req-draft-keydata-and-streaming-ux.md`（`5ac588bf`）；spec 状态 → 已实现；docs 收工（本 commit）
+- 验收：characterize-atom-keydata OK；characterize-req-draft-traj OK（pageCodes + sanitize pin）；Vue `vue-tsc` OK
+- JS-gen：`475328d4` prompt · `af756fa4` atom-keydata · `01794542` propose wire
+- Vue dev：`8788ee9` atom-display/types · `00c62ca` 3-step fake-stream wizard
+- 湿测：SKIP — 待用户重启 4097 + 冒烟录制向导（product-mgmt 生成 → 勾选 → 创建）
+
+## 2026-09-08 18:45 · Cursor Subagent — 收工：TsscMultiSelect 专用动作实现线（回链 17:42）
+
+- 完成：Tasks 1–5 绿；spec 状态 → 已实现；docs 收工（本 commit）
+- 验收：`characterize-tssc-multi-select.py` PASS（dry）
+- 实现 commits：`9ac615a8` pin · `2c19b731` JS snippet · `0a2de736` scan · `b303394b` engine/registries · `93cd430f` replay/heal · `ba63c84c` prompts/autofill
+- 注意：`effdc8fb` 为 keydata restore，与本线无关
+- 遗留：#695/#696 重录；`introduce_pick` toast_ok vs dialog_close 门闩（spec Out，另案）
+- 湿测：SKIP（本 session 未验控制面 4097 + 选择要素弹窗）
+
+## 2026-09-08 17:50 · Cursor Lead — 进度：TsscMultiSelect 设计已批，实现计划已落盘（回链 17:42）
+
+- 进行中：spec 已批准；plan `docs/superpowers/plans/2026-09-08-tssc-multi-select-action.md`（Task1 pin → JS → scan → engine → prompts/autofill → 收工）
+- 注意：代码尚未动；等用户选 Subagent-Driven 或 Inline 执行
+- 禁入：同 17:42
+
+## 2026-09-08 17:42 · Cursor Lead — 开工：TsscMultiSelect 专用动作设计（对标 select_tree_option）
+
+- 进行中：17:42。用户确认专用动作，并要求契约参考已注册 tree-select 族
+- 范围：`docs/superpowers/specs/2026-09-08-tssc-multi-select-action-design.md`；本文件；审过后再写 plan / 动 `scripts/controller/actions/**`、prompts、characterize（未开工代码）
+- 禁入：遗留 #61/#66/#503；`config/update-db-whitelist.ps1`；`data/kb/req/**/.draft-traj-propose.json`；trajectory-dao 他线 WIP；不改 introduce_pick 门闩
+- 方式：spec → 用户审文件 → writing-plans → 实现；扫描分流须在 `.el-select` 之前；匹配键修「只认第一列英文」
+
+## 2026-09-08 17:21 · Cursor Lead — 收工：产品要素库原子重录湿测（回链 16:10 / 16:28 / 16:40 / 16:45）
+
+- 完成：T2 #694 recorded PASS；T3 #695 / T4 #696 业务有保存成功证据但轨迹 failed；T1 #693 废止；顺带修 page-bind 关窗 `93112677` + idleP 竞态 `a01b7461`
+- 验收：报告 `tmp/product-element/through-report.md`；#694 stderr `SUCCESS: 操作成功` + stamp 类型；#695/#696 亦有 save success，但 P3/premature-done/idle timeout 拖状态
+- 遗留移交：T3/T4 是否清后重录或只认业务；T4 `introduce_pick` 门闩 toast_ok vs dialog_close；核实要素是否挂在 stamp 组件下
+
+## 2026-09-08 16:45 · Cursor Lead — 开工：修 record idleP 解构竞态 + 重录 #694
+
+- 开工：16:45。用户纠正天元应关闭后已修 page-bind（`93112677`）；重录仍假完成：根因 `const { idleP } = startPhaseWatchdog()` 解构错误 → Promise.race 立即 resolve → 阶段空跑 + new_step_arrived 互砍
+- 范围：`src/services/trajectory/trajectory-recording-runner.js`（+characterize 若有）、重启控制面后 clear/prepare/start #694、本文件
+- 禁入：遗留 61/66/503；他线 trajectory-dao WIP
+- 方式：改 `const idleP = startPhaseWatchdog(...)` → pin → 重启 4097 → 重录
+
+## 2026-09-08 16:40 · Cursor Lead — 开工：page-bind empty-config 关天元弹窗 + 重录 #694
+
+- 开工：16:40。用户纠正：导航后天元应自行关闭；根因=prepare `read_page_component_code` 在 `empty-config`/`timeout` 早退未点确定关窗，agent 见可见弹窗按 prompt 暂停
+- 范围：`scripts/controller/actions/js_snippets/page_id.py`、characterize-page-bind（若加固）、`tmp/product-element/` 重录、spec/plan/task 去掉等 C 文案、本文件
+- 禁入：遗留 61/66/503；trajectory-dao 他线 WIP；不改 agent-tools-common 全局纪律（修源头关窗即可）
+- 方式：补关窗 → pin → clear/prepare/start #694→695→696
+
+## 2026-09-08 16:35 · Cursor Lead — #694 误判等 C（已由 16:40 纠正）
+
+- 现象：A 已落地（`da1d081e`）；#694 prepare+start 后 agent 自停；`steps=0`（已 clear→draft）；session `08369de8`
+- 误判：当成需授权关窗；实为 page-bind 读码早退未关窗
+
+## 2026-09-08 16:28 · Cursor Lead — 修订：废 T1（方案 A），续录 T2=#694
+
+- 修订：16:28。用户选 A；#693 failed（天元弹窗 pause + zero-actions done 拒）；独立进入原子废止
+- 范围：同 16:10；改 `task-T2`/`specs|plans/*product-element-atomic*`；串行 **694→695→696**
+- 禁入：重录 #693；擅自关「天元相关配置」（未授权 C）；遗留 61/66/503；他线 WIP
+- 方式：PATCH #694 任务+phases → prepare/start/detach；T3/T4 依赖 T2 stamp 类型
+
+## 2026-09-08 16:10 · Cursor Lead — 开工：产品要素库原子交易重切湿测（参考 #61/#66/#503）
+
+- 开工：16:10。用户确认方案 B；仅以 #61/#66/#503 为参考；spec `2026-09-08-product-element-atomic-rerecord-design.md`
+- 范围：`tmp/product-element/`（task/analyze/create/prepare/start/through-report）、`docs/superpowers/specs|plans/*product-element-atomic*`、本文件；建 draft 挂 **9000000468**
+- 禁入：改/删遗留 61/66/503；产品库侧 688/689/670 要素配置录制；引擎大改；trajectory-dao 等他线 WIP
+- 方式：T1→T4 串行 analyze/create → prepare/start/detach；stamp `20260908-elem`；account=2（**已由 16:28 修订为 T2→T4**）
+
+## 2026-09-08 16:05 · Cursor — 开工+收工：关键数据分层 + 候选假流式 UX 设计
+
+- 完成：用户认可方向；spec → `docs/superpowers/specs/2026-09-08-req-draft-keydata-and-streaming-ux-design.md`（关键数据 A/B/C 分层；向导三步合并勾选；假流式非 SSE）
+- 验收：设计自检覆盖 prompt/UI/兼容旧缓存；真流式明确 Out
+- 遗留：用户审阅后 writing-plans + 实现
+- 注意：仅文档；未动 Vue/propose 代码
+
+## 2026-09-08 15:31 · Cursor — 收工：人工录制 el-radio 去掉码值 fill 重复步（回链 15:16 开工）
+
+- 完成：`emitFill` 跳过 native radio/checkbox 与 `.el-radio`/`.el-switch` 容器；点单选只记 `click_radio`（`567312e0`）
+- 验收：`characterize-manual-radio-fill` OK；用户湿测通过
+- 遗留：无
+
+## 2026-09-08 15:31 · Cursor — 收工：批量推送业务对象名去掉动词（回链 15:00 开工）
+
+- 完成：`propertiesName` 改为字段名（`buildBusinessObjectName`）；不再拼填写/选择/点击；legacy-engine 操作名未改（`f1728b38`）
+- 验收：characterize-transaction-export / export-region / export-v3 / legacy-engine-export OK；用户湿测通过
+- 遗留：无
+
+## 2026-09-08 15:16 · Cursor — 开工：人工录制 el-radio 去掉码值 fill 重复步
+
+- 进行中：点 Element UI radio 只记 click_radio，不再因原生 input change/blur 多记 fill（码值 0/1）
+- 范围：`scripts/manual_recorder/js_parts/b.py`（`emitFill`）；characterization `characterize-manual-radio-fill.py`
+- 禁入：V3 导出 / transaction-export.js 动词名改动；Python RadioEngine 回放路径
+- 方式：TDD 先红后绿；根因=emitFill 已跳过 .el-select 未跳过 .el-radio
+- 注意：已收工，见上方 15:31 条目
+
+## 2026-09-08 15:00 · Cursor — 开工：批量推送业务对象名去掉动词
+
+- 进行中：伙伴 `propertiesName` 改为字段名（与真实名称对齐），不再拼「填写/选择/点击」等动词
+- 范围：`src/services/transaction-export.js`；characterization `characterize-transaction-export.mjs` + `characterize-transaction-export-region.mjs`
+- 禁入：legacy-engine `buildOperationName`（操作名仍带动词）；V3 截图/分区组装；Vue SPA
+- 方式：TDD 改 characterization 期望 → 改 `mapStepToTransactionEvent`；V2/V3 推送共用此函数
+- 注意：已收工，见上方 15:31 条目
 
 ## 2026-09-08 · ZCode V3导出线 — 收工：弹窗与触发行同层级（2475f9fb）
 

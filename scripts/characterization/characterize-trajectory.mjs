@@ -19,7 +19,6 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   TRAJECTORY_RECORD_STATUSES,
-  TRAJECTORY_PHASE_STATUSES,
   normalizeActionName,
   normalizeElementJson,
   stepFromActionLog,
@@ -52,9 +51,6 @@ function assert(cond, msg) {
 function testStatusEnums() {
   for (const s of ['draft', 'recording', 'failed', 'recorded', 'completed']) {
     assert(TRAJECTORY_RECORD_STATUSES.includes(s), `missing recordStatus: ${s}`);
-  }
-  for (const s of ['pending', 'running', 'completed', 'failed']) {
-    assert(TRAJECTORY_PHASE_STATUSES.includes(s), `missing phaseStatus: ${s}`);
   }
 }
 

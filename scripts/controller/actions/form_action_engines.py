@@ -26,7 +26,7 @@ from ._js_snippets import (
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH, JS_SELECT_VALUE_BY_XPATH, JS_LOCATOR,
     JS_CLICK_RADIO_BY_XPATH,
-    JS_SELECT_TREE_OPTION, JS_EXPAND_ALL_EL_TREE,
+    JS_SELECT_TREE_OPTION, JS_TSSC_MULTI_SELECT, JS_EXPAND_ALL_EL_TREE,
     JS_SCROLL_TO_FIRST_ERROR,
     JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME, JS_WATCH_SAVE_NOTIFICATIONS,
     JS_CLICK_LOGIN_BUTTON,
@@ -54,7 +54,7 @@ from .form_scan_utils import (
     _pack_select_record, resolve_recorded_option_text, select_option_already_matched,
     match_select_option_candidate,
     _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
-    ResolvedControl, _resolve_control, resolve_select_fallback, _task_xpath_smart, _task_done_impl,
+    ResolvedControl, _resolve_control, lookup_field_kind, resolve_select_fallback, _task_xpath_smart, _task_done_impl,
     _submit_ready_hint, _switch_task_list_container, _with_submit_cue, _query_not_form_payload,
 )
 
@@ -363,6 +363,60 @@ class FillEngine(_FormActionEngineBase):
             sys.stderr.write(f'[form] skip absent fill label={(lbl or label_text)!r}\n')
             sys.stderr.flush()
             return _ok(_with_submit_cue(absent_field_skip_result(), self.business_data_store))
+
+        # TsscMultiSelect/TsscMultiTree: typing into the trigger looks like a
+        # successful fill (filterable input) but never selects a row/node and
+        # falsely marks task_done — seen on traj #696 / sid 5b463582.
+        kind = lookup_field_kind(self.business_data_store, label_text)
+        if kind not in ('tssc-multi-select', 'tree-select'):
+            try:
+                live = await page.evaluate(
+                    '''(label) => {
+                        const norm = (s) => String(s || '').replace(/\\s+/g, ' ').trim();
+                        const want = norm(label);
+                        const items = [...document.querySelectorAll('.el-form-item')];
+                        let fi = null;
+                        for (const it of items) {
+                            const t = norm((it.querySelector('.el-form-item__label') || {}).textContent);
+                            if (t && (t === want || t.includes(want))) { fi = it; break; }
+                        }
+                        if (!fi) return '';
+                        if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
+                        if (fi.querySelector(
+                            '.tree-popover, .tsscTree, .el-tree-select,'
+                            + ' [class*="tsscmultitree"], [class*="TsscMultiTree"]'
+                        )) return 'tree-select';
+                        return '';
+                    }''',
+                    [label_text],
+                )
+                if live in ('tssc-multi-select', 'tree-select'):
+                    kind = live
+            except Exception:
+                pass
+        if kind == 'tssc-multi-select':
+            from .result_protocol import err_with
+            nxt = (
+                f'tssc_multi_select(label_text="{resolved.label or label_text}", '
+                f'option_text="first" 或表行中文名原文)'
+            )
+            return err_with(
+                "err-use-tssc-multi-select",
+                "「要素名称」类字段是 TsscMultiSelect（弹层表格行选），禁止 fill_form_field 文本直填",
+                observed=f"label={resolved.label or label_text} kind=tssc-multi-select",
+                next_action=nxt,
+            )
+        if kind == 'tree-select':
+            from .result_protocol import err_with, recommend_action_for_kind
+            nxt = recommend_action_for_kind(kind).replace(
+                '<此字段label>', resolved.label or label_text,
+            )
+            return err_with(
+                "err-use-select-tree-option",
+                "该字段是 TsscMultiTree，禁止 fill_form_field 文本直填",
+                observed=f"label={resolved.label or label_text} kind=tree-select",
+                next_action=nxt,
+            )
 
         strict_xpath = xpath_smart_fill_only_enabled()
         use_label_fallback = (
@@ -1047,6 +1101,10 @@ class SelectEngine(_FormActionEngineBase):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
+        # TsscMultiSelect is classified as tssc-multi-select; select_option's
+        # el-select path cannot pick remote table rows — hand off early.
+        if lookup_field_kind(self.business_data_store, label_text) == 'tssc-multi-select':
+            return await self.tssc_multi_select(label_text, option_text, xpath_smart)
 
         async def _final_select_failure(result_text: str, xpath_for_log: str = '') -> str:
             diag = await reset_select_ui(page)
@@ -1499,6 +1557,80 @@ class SelectEngine(_FormActionEngineBase):
                 observed=f"label={label_text} last={failed}"[:160],
                 next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
             )
+
+    async def tssc_multi_select(self, label_text: str, option_text: str, xpath_smart: str = ""):
+        page = await self.browser_context.get_current_page()
+        await _wait_if_loading(page)
+        await self._ensure_scanned(label_text)
+        resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
+        label_text = (resolved.label or label_text or '').strip() or label_text
+        xp = '' if resolved.error else (resolved.xpath_smart or '').strip()
+        element = await _capture_element(
+            page, label_text, target_kind='form_tssc_multi_select', xpath_smart=xp,
+        )
+        result = await page.evaluate(JS_TSSC_MULTI_SELECT, [label_text, option_text])
+        if _is_ok_result(result):
+            # ok-first:部署方式 / ok:… / ok-echo:… / ok-already:… → stamp concrete
+            # option_text (never persist sentinel "first" for replay/partner push).
+            res_s = str(result or '')
+            echo = res_s.split(':', 1)[1].strip() if ':' in res_s else ''
+            stamped = resolve_recorded_option_text(option_text, echo)
+            if element is None and xp:
+                element = await _capture_element(
+                    page, label_text, target_kind='form_tssc_multi_select', xpath_smart=xp,
+                )
+            if element is None:
+                element = {
+                    'tag_name': 'div',
+                    'xpath': xp or '',
+                    'xpath_smart': xp or '',
+                    'formLabel': label_text,
+                    'target_kind': 'form_tssc_multi_select',
+                    'text': (stamped or option_text or '')[:80],
+                    'attributes': {},
+                    'candidates': (
+                        [{'type': 'xpath_smart', 'value': xp}] if xp else []
+                    ),
+                }
+            elif isinstance(element, dict) and stamped:
+                element = dict(element)
+                element['text'] = (stamped or '')[:80]
+            xp_inv = stamp_recorded_xpath_smart(element, xp)
+            _record_action(
+                'tssc_multi_select',
+                {'label_text': label_text, 'option_text': stamped},
+                result,
+                element=element,
+            )
+            _task_done_impl(
+                label_text, self.business_data_store,
+                value=stamped or option_text, xpath_smart=xp_inv,
+            )
+            return _ok(result)
+        res_s = str(result or '')
+        if res_s == 'disabled' or res_s.startswith('disabled'):
+            return (
+                f'disabled | Field "{label_text}" is read-only (TsscMultiSelect). '
+                f'Do NOT retry tssc_multi_select or select_option — skip this field.'
+            )
+        if res_s.startswith('no-tssc-multi-select'):
+            return (
+                res_s + ' Do NOT retry tssc_multi_select. '
+                'Use select_option for plain el-select, or report.'
+            )
+        if res_s.startswith('err-no-echo'):
+            return (
+                res_s + ' Do NOT blindly retry. check_field_value or report.'
+            )
+        if res_s.startswith('option-not-found') or res_s.startswith('no-items'):
+            return (
+                res_s
+                + ' | Do NOT fill_form_field / real_click「精确查询」.'
+                + ' 任务写「任一/任意」或 stamp/组件名不是数据项时用'
+                + f' tssc_multi_select(label_text="{label_text}", option_text="first")；'
+                + ' 否则 option_text 必须是弹层表格「中文名」列原文。'
+            )
+        return res_s
 
     # ── Adjacent button / radio (moved from misc for logical grouping) ──
 

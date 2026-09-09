@@ -7,7 +7,8 @@ import { EXECUTOR_TOKEN } from '../config/config.js';
 import * as registry from './executor-registry.js';
 import * as executorService from './services/executor-node-service.js';
 import { routeExecutorInbound } from './executor-event-hub.js';
-import { broadcast, broadcastBinary, countBinarySubscribers } from './ws-server.js';
+import { getLiveBindingByAgentSession } from './services/remote-session-state.js';
+import { broadcast, broadcastBinary, broadcastToUuid, countBinarySubscribers } from './ws-server.js';
 
 let wss = null;
 
@@ -221,12 +222,23 @@ async function handleMessage(ws, msg) {
       broadcast('manual_record_status', { ...payload, sessionId: payload.sessionId });
     }
     if (type === 'session.bib_tabs' || type === 'session.bib_ready') {
-      broadcast('remote:tabs', {
+      // 定向投递：只发给订阅了该浏览器的 dashboard 客户端（remote:subscribe 时
+      // 登记的 remoteSessionUuid）。全局 broadcast 会让所有打开的详情页地址栏
+      // 轮播出别的浏览器 URL（多会话各 2.5s 轮询相互污染）。
+      const binding = getLiveBindingByAgentSession(payload.sessionId) || null;
+      const uuid = binding?.remoteSessionUuid || payload.remoteSessionUuid || null;
+      const tabsPayload = {
         sessionId: payload.sessionId,
+        remoteSessionUuid: uuid || null,
+        trajectoryId: binding?.trajectoryId ?? null,
         tabs: payload.tabs || [],
         activeTargetId: payload.activeTargetId || null,
         switched: !!payload.switched,
-      });
+      };
+      const delivered = broadcastToUuid(uuid, 'remote:tabs', tabsPayload);
+      // uuid 解析不出（控制面重启后 binding 尚未恢复等罕见边界）才回退全量，
+      // 前端另有 uuid 归属守卫兜底。
+      if (!delivered) broadcast('remote:tabs', tabsPayload);
     }
     if (type === 'session.bib_ready' && payload.remoteSessionUuid) {
       // attach 完成后立即对齐观众数（观众先于 attach 订阅的场景；0 观众 → 执行机暂停推流）
@@ -366,12 +378,5 @@ export function initExecutorWs() {
   wss.on('close', () => clearInterval(heartbeat));
 
   console.log('[executor-ws] Executor WebSocket ready at /ws/executor (noServer mode)');
-  return wss;
-}
-
-/**
- * @returns {import('ws').WebSocketServer|null} result
- */
-export function getExecutorWss() {
   return wss;
 }

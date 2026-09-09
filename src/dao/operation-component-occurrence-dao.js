@@ -56,18 +56,6 @@ export async function getById(id) {
 }
 
 /**
- * List occurrences for a component ordered by id.
- * @param {number} componentId 组件 id
- * @returns {Promise<object[]>} occurrence entities
- */
-export async function listByComponent(componentId) {
-  const rows = await getDB()(TABLE)
-    .where({ component_id: componentId })
-    .orderBy('id', 'asc');
-  return rows.map(shape);
-}
-
-/**
  * Count occurrences for a component.
  * @param {number} componentId 组件 id
  * @returns {Promise<number>} occurrence count
@@ -107,13 +95,4 @@ export async function listByComponentWithPhaseMeta(componentId) {
       trajectoryName: r.trajectory_name ?? null,
     };
   });
-}
-
-/**
- * Delete all occurrences for a component.
- * @param {number} componentId 组件 id
- * @returns {Promise<number>} number of deleted rows
- */
-export async function removeByComponent(componentId) {
-  return getDB()(TABLE).where({ component_id: componentId }).del();
 }

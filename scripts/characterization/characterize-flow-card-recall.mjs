@@ -5,6 +5,7 @@
  *   node scripts/characterization/characterize-flow-card-recall.mjs
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -208,24 +209,28 @@ async function main() {
       pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href,
     );
 
+    const seedFlowCommitCache = async (modDir, atoms) => {
+      const md = '### 主链 A：客户\n\n| # | 步骤 | 页面 | ZJJK | 按钮 |\n|---|---|---|---|---|\n| 1 | 客户转正 | 对公客户主页 | ZJJK00000001 | 转正 |\n';
+      writeFileSync(join(modDir, 'through-chains.md'), md, 'utf8');
+      const sourceHash = createHash('sha256').update(md, 'utf8').digest('hex');
+      await writeProposeCache(modDir, { atoms, rejected: [], sourceHash });
+    };
+
     await runAsync('commitDraftTrajectories persists suggestedFlowRef as kbFlowRef', async () => {
       const tmp = mkdtempSync(join(tmpdir(), 'flow-card-commit-'));
       const modDir = join(tmp, 'demo-mod');
       mkdirSync(modDir, { recursive: true });
       const atomKey = 'demo-mod:chain-a:1:客户转正';
-      await writeProposeCache(modDir, {
-        atoms: [{
-          atomKey,
-          title: '客户转正',
-          suggestedFunctionId: 9000000740,
-          suggestedFlowRef: 'customer_onboarding',
-          suggestedNodeId: 'convert',
-          sourceDoc: 'demo.docx',
-          sourceChapter: 'chapters/01-customer.md#对公客户管理',
-          taskDraft: '在对公客户主页点击【客户转正】。',
-        }],
-        rejected: [],
-      });
+      await seedFlowCommitCache(modDir, [{
+        atomKey,
+        title: '客户转正',
+        suggestedFunctionId: 9000000740,
+        suggestedFlowRef: 'customer_onboarding',
+        suggestedNodeId: 'convert',
+        sourceDoc: 'demo.docx',
+        sourceChapter: 'chapters/01-customer.md#对公客户管理',
+        taskDraft: '在对公客户主页点击【客户转正】。',
+      }]);
 
       let createOpts;
       const out = await commitDraftTrajectories({
@@ -251,19 +256,16 @@ async function main() {
       const modDir = join(tmp, 'demo-mod');
       mkdirSync(modDir, { recursive: true });
       const atomKey = 'demo-mod:chain-a:1:客户转正';
-      await writeProposeCache(modDir, {
-        atoms: [{
-          atomKey,
-          title: '客户转正',
-          suggestedFunctionId: 9000000740,
-          suggestedFlowRef: 'customer_onboarding',
-          suggestedNodeId: 'convert',
-          sourceDoc: 'demo.docx',
-          sourceChapter: 'chapters/01-customer.md#对公客户管理',
-          taskDraft: '在对公客户主页点击【客户转正】。',
-        }],
-        rejected: [],
-      });
+      await seedFlowCommitCache(modDir, [{
+        atomKey,
+        title: '客户转正',
+        suggestedFunctionId: 9000000740,
+        suggestedFlowRef: 'customer_onboarding',
+        suggestedNodeId: 'convert',
+        sourceDoc: 'demo.docx',
+        sourceChapter: 'chapters/01-customer.md#对公客户管理',
+        taskDraft: '在对公客户主页点击【客户转正】。',
+      }]);
 
       let createOpts;
       await commitDraftTrajectories({
@@ -284,6 +286,39 @@ async function main() {
       assert.equal(createOpts.kbFlowRef, 'product_library');
       assert.equal(createOpts.kbFlowNodeId, 'add_category');
       rmSync(tmp, { recursive: true, force: true });
+    });
+
+    // Cross-language golden fixture (shared contract with scripts/kb/recall.py):
+    // JS side asserts flowRef (+ nodeId where pinned) against the real corpus.
+    const golden = JSON.parse(
+      readFileSync(join(ROOT, 'scripts/characterization/fixtures/kb-recall-golden.json'), 'utf8'),
+    );
+    const realCards = await kbMod.listFlowCardsDetailed({});
+    assert.ok(realCards.length >= 50, `expected real flow corpus, got ${realCards.length}`);
+
+    await runAsync(`golden fixture: ${golden.entries.length} queries match real corpus`, async () => {
+      for (const entry of golden.entries) {
+        const hit = matchFlowForAtom({ title: entry.query, taskDraft: '', cards: realCards });
+        assert.equal(
+          hit.flowRef,
+          entry.expectFlowRef,
+          `query="${entry.query}" expected flowRef=${entry.expectFlowRef} got ${hit.flowRef}`,
+        );
+        if (entry.expectNodeId != null) {
+          assert.equal(hit.nodeId, entry.expectNodeId, `query="${entry.query}" nodeId`);
+        }
+        if (entry.forbidNodeId != null) {
+          assert.notEqual(hit.nodeId, entry.forbidNodeId, `query="${entry.query}" nodeId must not be ${entry.forbidNodeId}`);
+        }
+      }
+    });
+
+    await runAsync('recall perf: 800-char single query under 200ms', async () => {
+      const long = '维'.repeat(800);
+      const t0 = Date.now();
+      matchFlowForAtom({ title: '', taskDraft: long, cards: realCards });
+      const ms = Date.now() - t0;
+      assert.ok(ms < 200, `800-char recall took ${ms}ms (budget 200ms)`);
     });
 
     console.log(`\ncharacterize-flow-card-recall: ${passed} passed`);

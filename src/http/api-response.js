@@ -66,21 +66,6 @@ export function sendOk(res, data = null, { status = 200, message = 'ok' } = {}) 
   return res.status(status).json(okBody(data, message));
 }
 
-/**
- * Send a failure envelope directly via res.json().
- * @param {import('express').Response} res res
- * @param {number} httpStatus http status
- * @param {string} [message] message
- * @param {unknown} [data] data
- * @returns {import('express').Response} result
- */
-export function sendFail(res, httpStatus, message, data = null) {
-  const status = Number(httpStatus) >= 100 && Number(httpStatus) < 600
-    ? Number(httpStatus)
-    : 500;
-  return res.status(status).json(failBody(status, message, data));
-}
-
 function looksLikeEnvelope(body) {
   return (
     body != null

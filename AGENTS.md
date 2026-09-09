@@ -67,6 +67,7 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 - agent 侧浏览器 JS 片段唯一定义在 `scripts/controller/actions/js_snippets/*`（由 `scripts/controller/actions/_js_snippets.py` 聚合 re-export）；控件逻辑改一处即可，无跨语言同步负担。
 - 仍存在的跨语言单源是 **PAGE_LOCATOR_HELPERS 生成链**：JS 源 `src/cdp/page-locator-helpers.js` 经 `node scripts/_gen_locator_helpers_py.mjs` 生成 `scripts/controller/actions/js_snippets/_locator_helpers_js.py`，仍禁止手改生成物。
 - Do **not** hand-edit generated `scripts/controller/actions/js_snippets/_locator_helpers_js.py` — it's produced by `node scripts/_gen_locator_helpers_py.mjs` from `src/cdp/page-locator-helpers.js`.
+- **KB 召回金样例是唯一跨语言契约**：`scripts/characterization/fixtures/kb-recall-golden.json` 由 JS（`characterize-flow-card-recall.mjs`）与 Python（`characterize-kb-recall.py`）两侧共同断言；改任一侧召回实现必须同 commit 复跑两侧 characterization，已知分歧以 `divergenceAccepted` 显式登记（收敛后移除），禁止在实现对金样例 query 特判。
 
 **Element UI / correctness rules:**
 - **Consecutive-only dedup** (`src/dedup.js`): only back-to-back identical `(action, params)`; non-consecutive duplicates are kept.

@@ -145,12 +145,14 @@ def _dedupe_needs_agent(needs: list) -> list:
 
 KNOWN_EDITABLE_FIELD_KINDS = frozenset({
     'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'tree',
+    'tssc-multi-select',
 })
 
 _SHELL_ROLES = frozenset({'shell-header', 'shell-aside'})
 _NON_FILL_KINDS = frozenset({'menu_item', 'icon'})
 _SCANNED_FIELD_KINDS = frozenset({
-    'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'unknown',
+    'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'tssc-multi-select',
+    'unknown',
 })
 _TREE_FILTER_LABEL_RE = re.compile(r'关键字|过滤|搜索')
 _NUMERIC_DISPLAY_RE = re.compile(r'^-?\d+(\.\d+)?$')
@@ -505,6 +507,24 @@ def _resolve_control(business_data_store, label_text: str, xpath_hint: str = "")
         )
 
     return _resolve_control_by_label(business_data_store, label_text)
+
+
+def lookup_field_kind(business_data_store, label_text: str) -> str:
+    """Return scanned/task-list kind for an exact label, or '' when unknown."""
+    label = (label_text or "").strip()
+    if not label:
+        return ""
+    for f in business_data_store.get("_scan_fields") or []:
+        if isinstance(f, dict) and (f.get("label") or "").strip() == label:
+            return (f.get("kind") or "").strip()
+    try:
+        tl = TaskList.from_store(business_data_store.get("task_list"))
+    except Exception:
+        return ""
+    for item in list(tl.pending) + list(tl.done):
+        if (item.label or "").strip() == label:
+            return (item.kind or "").strip()
+    return ""
 
 
 def _resolve_control_by_label(business_data_store, label_text: str) -> ResolvedControl:

@@ -8,6 +8,7 @@ _FORM_ACTIONS = {
     'fill_form_field',
     'select_option',
     'select_tree_option',
+    'tssc_multi_select',
     'click_radio',
 }
 
@@ -19,6 +20,8 @@ _ACTION_NAME_ALIASES = {
     'treeselect': 'select_tree_option',
     'fill_tree': 'select_tree_option',
     'fillTree': 'select_tree_option',
+    'tsscMultiSelect': 'tssc_multi_select',
+    'select_tssc_multi': 'tssc_multi_select',
     'fillFormField': 'fill_form_field',
     'fill_date_field': 'fill_form_field',
     'fillDateField': 'fill_form_field',

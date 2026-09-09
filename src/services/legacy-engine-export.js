@@ -21,6 +21,8 @@ export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   fill_form_field: 'input',
   select_option: 'select:click',
   select_tree_option: 'select:tree',
+  // Partner ATP: same runner as plain el-select (open + pick by text / table cell).
+  tssc_multi_select: 'select:click',
   click_element_by_index: 'click',
   click_menu_item: 'click',
   click_table_row_button: 'click',
@@ -173,6 +175,7 @@ export function buildOperationName(action, params = {}, element = {}) {
       return label ? `填写:${label}` : `填写:${action}`;
     case 'select_option':
     case 'select_tree_option':
+    case 'tssc_multi_select':
       return label ? `选择:${label}` : `选择:${option || action}`;
     case 'click_radio':
       return label ? `单选:${label}` : `单选:${option || action}`;
@@ -224,6 +227,7 @@ export function pickOperationValue(action, params = {}) {
       return String(p.value ?? p.option_text ?? p.text ?? '');
     case 'select_option':
     case 'select_tree_option':
+    case 'tssc_multi_select':
     case 'click_radio':
       return String(p.option_text ?? p.value ?? p.option ?? '');
     case 'go_to_url':

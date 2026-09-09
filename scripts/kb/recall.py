@@ -1,6 +1,34 @@
 """KB 召回纯逻辑：任务文本→流程卡匹配；业务值→码表候选。
 供 scripts/agent/service.py 的 phase 注入使用；不依赖浏览器。"""
 
+import datetime
+import json
+import os
+
+
+def _observe_recall(query, flow, score):
+    """召回事件追加到 <KB_DATA_DIR>/staging/recall-events.jsonl（append-only，D5）。
+
+    观测不得影响召回主流程——任何写失败静默吞掉；KB_DATA_DIR 指向隔离
+    目录（特征化）时事件自然落在隔离目录内，不污染仓库数据。
+    """
+    try:
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        data_dir = os.environ.get('KB_DATA_DIR') or os.path.join(project_root, 'data', 'kb')
+        staging = os.path.join(data_dir, 'staging')
+        os.makedirs(staging, exist_ok=True)
+        line = {
+            'ts': datetime.datetime.now().isoformat(timespec='milliseconds') + 'Z',
+            'query': str(query or '')[:120],
+            'flowRef': flow,
+            'score': score,
+            'source': 'py',
+        }
+        with open(os.path.join(staging, 'recall-events.jsonl'), 'a', encoding='utf-8') as f:
+            f.write(json.dumps(line, ensure_ascii=False) + '\n')
+    except Exception:
+        pass
+
 
 def _terms(text):
     """流程名/别名/页面名 → 归一词条（去空格按 / 与空格切分，长度≥3）。"""
@@ -76,7 +104,10 @@ def find_flow_for_task(flows, task_text, page_hash=None):
         tscore = sum(len(t) for t in terms if t in text)
         if tscore > 0 or exact:
             _consider(card, tscore + (1000 if exact else 0))
-    return (best, best_score) if best_score > 0 else (None, 0)
+    hit, hit_score = (best, best_score) if best_score > 0 else (None, 0)
+    if hit is not None:
+        _observe_recall(text, hit.get('flow'), hit_score)
+    return (hit, hit_score)
 
 
 def flow_summary_text(card, limit=800):

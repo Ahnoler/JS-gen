@@ -198,7 +198,7 @@ def _emit_memory_action_event(agent, _actions, _last_result_str):
                     parsed = {}
                 name = str(parsed.get('action') or '')
                 if name in ('fill_form_field', 'select_option', 'click_radio',
-                            'select_tree_option', 'fill_input'):
+                            'select_tree_option', 'tssc_multi_select', 'fill_input'):
                     lab = str(parsed.get('label') or parsed.get('label_text') or '').strip()
                     if lab:
                         fill_labels.append(lab)
@@ -888,4 +888,14 @@ def _emit_navigation_cue(business_data_store, agent):
         sys.stderr.flush()
     except Exception as e:
         sys.stderr.write(f'[recorder] navigation cue skipped: {e}\n')
+        sys.stderr.flush()
+
+
+async def _emit_step_notice_scan(agent, business_data_store) -> None:
+    """Per-step toast/notification scan → 【页面通知】cue (steering-only)."""
+    try:
+        from scripts.agent.step_notice import scan_and_emit_step_notices
+        await scan_and_emit_step_notices(agent, business_data_store)
+    except Exception as e:
+        sys.stderr.write(f'[recorder] step-notice skipped: {e}\n')
         sys.stderr.flush()

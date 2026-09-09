@@ -138,6 +138,33 @@ export function countBinarySubscribers(remoteSessionUuid) {
 }
 
 /**
+ * Send a JSON message only to dashboard sockets subscribed to a remote session uuid
+ * (registered via addBinarySubscription on `remote:subscribe`). Returns the number of
+ * delivered clients; 0 when the uuid is falsy or nobody is subscribed — callers decide
+ * whether to fall back to a full broadcast.
+ * @param {string|null} remoteSessionUuid target remote session UUID
+ * @param {string} type message type
+ * @param {unknown} payload payload
+ * @returns {number} number of clients that received the message
+ */
+export function broadcastToUuid(remoteSessionUuid, type, payload) {
+  if (!wss || !remoteSessionUuid) return 0;
+  const key = String(remoteSessionUuid);
+  const msg = JSON.stringify({ type, payload });
+  let count = 0;
+  for (const client of wss.clients) {
+    if (client.readyState !== 1) continue;
+    const subs = binarySubscriptions.get(client);
+    if (!subs || !subs.has(key)) continue;
+    try {
+      client.send(msg);
+      count++;
+    } catch {}
+  }
+  return count;
+}
+
+/**
  * Extract the remoteSessionUuid from an RSCF binary frame header.
  * Local copy of remote-bridge parseRemoteFrame layout (magic + frameId + uuidLen + uuid + jpeg)
  * to avoid an import cycle; keep in sync with src/cdp/remote-bridge/index.js.
@@ -267,12 +294,5 @@ export function initWebSocket() {
   wss.on('close', () => clearInterval(heartbeat));
 
   console.log('[ws-server] WebSocket server ready at /ws (noServer mode)');
-  return wss;
-}
-
-/**
- * @returns {import('ws').WebSocketServer|null} result
- */
-export function getDashboardWss() {
   return wss;
 }

@@ -78,6 +78,8 @@ run "characterize-field-value-match" "$PY" scripts/characterization/characterize
 run "characterize-dual-save-section" "$PY" scripts/characterization/characterize-dual-save-section.py
 run "characterize-form-assistant" "$PY" scripts/characterization/characterize-form-assistant.py
 run "characterize-introduce-query-fill" "$PY" scripts/characterization/characterize-introduce-query-fill.py
+run "characterize-introduce-dialog-close" "$PY" scripts/characterization/cold/characterize-introduce-dialog-close.py
+run "characterize-step-notice-scan" "$PY" scripts/characterization/cold/characterize-step-notice-scan.py
 run "characterize-select-state-boundary" "$PY" scripts/characterization/characterize-select-state-boundary.py
 run "characterize-replay-params-xpath" "$PY" scripts/characterization/characterize-replay-params-xpath.py
 run "characterize-tree-select-record" "$PY" scripts/characterization/characterize-tree-select-record.py
@@ -118,6 +120,8 @@ run "characterize-export-v3-pid" node scripts/characterization/characterize-expo
 run "characterize-budget-extend" "$PY" scripts/characterization/characterize-budget-extend.py
 run "characterize-export-v3-field-completeness" node scripts/characterization/characterize-export-v3-field-completeness.mjs
 run "characterize-xpath-three-sources" node scripts/characterization/characterize-xpath-three-sources.mjs
+run "characterize-manual-radio-fill" "$PY" scripts/characterization/cold/characterize-manual-radio-fill.py
+run "characterize-tssc-multi-select" "$PY" scripts/characterization/cold/characterize-tssc-multi-select.py
 run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs
 run "characterize-log-extract" node scripts/characterization/characterize-log-extract.mjs
@@ -141,7 +145,10 @@ run "characterize-kb-req-modules" node scripts/characterization/characterize-kb-
 run "characterize-req-draft-traj" node scripts/characterization/characterize-req-draft-traj.mjs
 run "characterize-req-draft-fk-guard" node scripts/characterization/characterize-req-draft-fk-guard.mjs
 run "characterize-flow-card-recall" node scripts/characterization/characterize-flow-card-recall.mjs
+run "characterize-atom-keydata" node scripts/characterization/characterize-atom-keydata.mjs
 run "characterize-network-capture" node scripts/characterization/characterize-network-capture.mjs
+run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-staging.py
+run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
@@ -149,5 +156,3 @@ if [ "$FAILED" -ne 0 ]; then
   exit 1
 fi
 echo "verify-all: ALL GREEN"
-run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-staging.py
-run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py

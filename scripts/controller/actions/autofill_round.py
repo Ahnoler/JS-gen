@@ -38,6 +38,7 @@ from ._js_snippets import (
     JS_SELECT_VALUE_BY_XPATH,
     JS_CLICK_RADIO_BY_XPATH,
     JS_SELECT_TREE_OPTION,
+    JS_TSSC_MULTI_SELECT,
     JS_FILL_FORM_FIELD,
     JS_CLICK_VERIFY_BUTTON,
     JS_READ_REFERENCE_DATE,
@@ -164,7 +165,10 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
             sys.stderr.flush()
         return sel_result
 
-    KIND_ORDER = {'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
+    KIND_ORDER = {
+        'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4,
+        'tree-select': 5, 'tssc-multi-select': 6,
+    }
     groups: dict[int, list[dict]] = {}
     for d in items:
         if filt and not section_matches(filt, d.get('section_id', ''), d.get('section_title', ''), d.get('region_label', '')):
@@ -179,7 +183,10 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
         sub = groups[idx]
         if not sub:
             continue
-        kind_name = {0: 'date', 1: 'select', 2: 'input', 3: 'radio', 4: 'checkbox', 5: 'tree-select'}.get(idx, 'other')
+        kind_name = {
+            0: 'date', 1: 'select', 2: 'input', 3: 'radio', 4: 'checkbox',
+            5: 'tree-select', 6: 'tssc-multi-select',
+        }.get(idx, 'other')
         await page.evaluate(
             's => console.log("[AI填表] 分组 " + s)',
             f'{kind_name}: {len(sub)}个字段',
@@ -309,6 +316,10 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                 'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
             ):
                 capture_kind = 'form_tree_select'
+            elif field_kind == 'tssc-multi-select' or kind in (
+                'tssc_multi_select', 'tssc-multi-select',
+            ):
+                capture_kind = 'form_tssc_multi_select'
             elif field_kind == 'date':
                 capture_kind = 'form_date'
             elif kind in ('select_option', 'select', 'option'):
@@ -328,25 +339,13 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                 is_tree = field_kind == 'tree-select' or kind in (
                     'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
                 )
-                if not xpath_smart and not is_tree:
+                is_tssc = field_kind == 'tssc-multi-select' or kind in (
+                    'tssc_multi_select', 'tssc-multi-select',
+                )
+                if not xpath_smart and not is_tree and not is_tssc:
                     result = resolve_error or 'xpath-not-found'
-                elif kind in ('fill_input', 'fill', 'input'):
-                    if field_kind == 'date':
-                        result = await page.evaluate(
-                            JS_FILL_DATE_BY_XPATH, [xpath_smart, value],
-                        )
-                    else:
-                        result = await page.evaluate(
-                            JS_FILL_BY_XPATH, [xpath_smart, value, placeholder],
-                        )
-                elif field_kind == 'radio' or kind in ('click_radio', 'radio'):
-                    result = await page.evaluate(
-                        JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
-                    )
-                elif field_kind == 'checkbox' or kind == 'checkbox':
-                    result = await page.evaluate(
-                        JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
-                    )
+                elif is_tssc:
+                    result = await page.evaluate(JS_TSSC_MULTI_SELECT, [label, value])
                 elif is_tree:
                     result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
                     # Non-Tssc "tree-looking" fields: prefer resolve+xpath when store has xpath
@@ -389,6 +388,23 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                                     element = await _capture_element(
                                         page, label, target_kind='form_select',
                                     )
+                elif kind in ('fill_input', 'fill', 'input'):
+                    if field_kind == 'date':
+                        result = await page.evaluate(
+                            JS_FILL_DATE_BY_XPATH, [xpath_smart, value],
+                        )
+                    else:
+                        result = await page.evaluate(
+                            JS_FILL_BY_XPATH, [xpath_smart, value, placeholder],
+                        )
+                elif field_kind == 'radio' or kind in ('click_radio', 'radio'):
+                    result = await page.evaluate(
+                        JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
+                    )
+                elif field_kind == 'checkbox' or kind == 'checkbox':
+                    result = await page.evaluate(
+                        JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
+                    )
                 elif kind in ('select_option', 'select', 'option'):
                     result = await _select_by_xpath(page, value, xpath_smart, label)
                 else:
@@ -418,7 +434,9 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                         element=element,
                         before_b64=before_b64,
                     )
-                elif kind in ('fill_input', 'fill', 'input') and field_kind != 'tree-select':
+                elif kind in ('fill_input', 'fill', 'input') and field_kind not in (
+                    'tree-select', 'tssc-multi-select',
+                ):
                     await record_action_with_screenshots(
                         page,
                         'fill_form_field',
@@ -436,6 +454,17 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                     await record_action_with_screenshots(
                         page,
                         'select_tree_option',
+                        {'label_text': label, 'option_text': value},
+                        result,
+                        element=element,
+                        before_b64=before_b64,
+                    )
+                elif field_kind == 'tssc-multi-select' or kind in (
+                    'tssc_multi_select', 'tssc-multi-select',
+                ):
+                    await record_action_with_screenshots(
+                        page,
+                        'tssc_multi_select',
                         {'label_text': label, 'option_text': value},
                         result,
                         element=element,

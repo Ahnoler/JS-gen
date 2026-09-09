@@ -11,7 +11,7 @@ export {
 } from './provenance.js';
 export { readProposeCache, writeProposeCache, PROPOSE_CACHE_FILENAME } from './propose-cache.js';
 export { proposeDraftTrajectories } from './propose.js';
-export { commitDraftTrajectories } from './commit.js';
+export { commitDraftTrajectories, validateCommitAtoms } from './commit.js';
 export {
   FLOW_TEMPLATE_MARKER,
   matchFlowForAtom,
@@ -19,3 +19,8 @@ export {
   applyFlowTemplateHintToDescription,
   getFlowTemplateHintForTrajectory,
 } from './flow-card-recall.js';
+export {
+  collectPageCodes,
+  sanitizeTaskDraftKeyData,
+  isLegacyZjjkOnlyKeyData,
+} from './atom-keydata.js';

@@ -644,17 +644,6 @@ export async function updateRetry(id, { retryCount, lastRetryAt }) {
 }
 
 /**
- * Delete screenshots by trajectory_step id.
- * @param {number} stepId 步骤 id
- * @returns {Promise<number>} number of deleted rows
- */
-export async function removeByTrajectoryStepId(stepId) {
-  const id = Number(stepId);
-  if (!Number.isFinite(id) || id <= 0) return 0;
-  return getDB()(TABLE).where({ trajectory_step_id: id }).del();
-}
-
-/**
  * Delete a screenshot by id.
  * @param {number} id 主键
  * @returns {Promise<number>} number of deleted rows

@@ -26,25 +26,42 @@ function Write-Log([string]$msg) {
 
 function Invoke-RemoteSsh([string]$scriptText) {
     # EAP=Continue so ssh stderr warnings (post-quantum notice) don't throw via 2>&1
+    # Write LF-only temp file and feed via cmd redirection — PowerShell's object
+    # pipeline to ssh.exe re-introduces CRLF, and bash then concatenates "prefix"\r
+    # into the iptables --log-prefix value (breaks matching/cleanup).
     $ErrorActionPreference = 'Continue'
-    $out = $scriptText | ssh -o BatchMode=yes -o ConnectTimeout=10 "$User@$Server" 'bash -s' 2>&1
+    $tmp = Join-Path $env:TEMP ('jsgen-wl-' + [guid]::NewGuid().ToString('N') + '.sh')
+    try {
+        $lf = $scriptText -replace "`r`n", "`n" -replace "`r", "`n"
+        $utf8 = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($tmp, $lf, $utf8)
+        $out = cmd /c "ssh -o BatchMode=yes -o ConnectTimeout=10 $User@$Server bash -s < `"$tmp`"" 2>&1
+    } finally {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    }
     $ErrorActionPreference = 'Stop'
     return @($out | Out-String)
 }
 
 function Probe-SourceIp {
-    # 1) temporary LOG rule before the 3306 DROP rule; 2) probe; 3) read SRC; 4) cleanup
+    # Unique prefix so we never pick up a stale dmesg line from an earlier probe
+    # (multi-WAN egress drifts; old SRC in the ring buffer caused false "sync OK").
+    # LOG must be at the top of DOCKER-USER: iptables LOG is non-terminating, so the
+    # packet still hits ACCEPT/DROP below — but if LOG sits only before DROP, an
+    # already-whitelisted IP is ACCEPTed first and never logged → stale SRC.
+    $tag = 'DB3306P{0}' -f ([guid]::NewGuid().ToString('N').Substring(0, 8))
     $setup = @'
 set -e
-# install LOG rule idempotently right before the 3306 DROP line
-if ! iptables -C DOCKER-USER -p tcp --dport 3306 -j LOG --log-prefix "DB3306 " 2>/dev/null; then
-    DROPLINE=$(iptables -L DOCKER-USER --line-numbers -n | awk '/dpt:3306/ && /DROP/ {print $1; exit}')
-    [ -n "$DROPLINE" ] && iptables -I DOCKER-USER "$DROPLINE" -p tcp --dport 3306 -j LOG --log-prefix "DB3306 "
-fi
+# remove any leftover 3306 LOG rules (by line number, bottom-up)
+for n in $(iptables -L DOCKER-USER --line-numbers -n | awk '/dpt:3306/ && /LOG/ {print $1}' | tac); do
+    iptables -D DOCKER-USER "$n" || true
+done
+iptables -I DOCKER-USER 1 -p tcp --dport 3306 -j LOG --log-prefix "__TAG__ "
 '@
+    $setup = $setup.Replace('__TAG__', $tag)
     Invoke-RemoteSsh $setup | Out-Null
 
-    # probe: SYN reaches the server and is logged before DROP; short timeout is fine
+    # probe: SYN is logged at chain head, then ACCEPT or DROP as usual
     $client = New-Object Net.Sockets.TcpClient
     $null = $client.BeginConnect($Server, 3306, $null, $null)
     Start-Sleep -Milliseconds 1500
@@ -52,10 +69,14 @@ fi
 
     $read = @'
 set -e
-SRC=$(dmesg | grep 'DB3306 ' | tail -1 | sed -n 's/.*SRC=\([0-9.]*\).*/\1/p')
-iptables -D DOCKER-USER -p tcp --dport 3306 -j LOG --log-prefix "DB3306 " 2>/dev/null || true
+SRC=$(dmesg | grep '__TAG__ ' | tail -1 | sed -n 's/.*SRC=\([0-9.]*\).*/\1/p')
+# always clear LOG by line number (prefix match is fragile)
+for n in $(iptables -L DOCKER-USER --line-numbers -n | awk '/dpt:3306/ && /LOG/ {print $1}' | tac); do
+    iptables -D DOCKER-USER "$n" || true
+done
 echo "SRC=$SRC"
 '@
+    $read = $read.Replace('__TAG__', $tag)
     $out = Invoke-RemoteSsh $read
     $m = [regex]::Match($out, 'SRC=(\d{1,3}(?:\.\d{1,3}){3})')
     if (-not $m.Success) { throw 'could not observe source IP from server dmesg' }

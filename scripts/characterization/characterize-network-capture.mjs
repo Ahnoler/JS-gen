@@ -2,7 +2,6 @@
  * Characterization: network capture persistence wiring (Task 9).
  *
  * Offline, no DB. Asserts:
- *  - protocol.js KNOWN_EVENT_TYPES contains 'network_captured'
  *  - system-ref-dao.js exports findByUrlPattern (function)
  *  - system-ref-service.js exports persistCapturedInterface (function)
  *  - memory-service.js source contains the network_captured persist branch
@@ -28,13 +27,7 @@ function ok(msg) {
   console.log(`  ok ${count} - ${msg}`);
 }
 
-// 1. protocol.js: KNOWN_EVENT_TYPES includes 'network_captured'
-const { KNOWN_EVENT_TYPES } = await import('../../src/memory/protocol.js');
-assert(KNOWN_EVENT_TYPES instanceof Set, 'KNOWN_EVENT_TYPES is a Set');
-assert(KNOWN_EVENT_TYPES.has('network_captured'), "KNOWN_EVENT_TYPES contains 'network_captured'");
-ok("KNOWN_EVENT_TYPES contains 'network_captured'");
-
-// 2. dao/service exports
+// 1. dao/service exports
 const systemRefDao = await import('../../src/dao/system-ref-dao.js');
 assert(typeof systemRefDao.findByUrlPattern === 'function', 'system-ref-dao exports findByUrlPattern');
 ok('system-ref-dao.js exports findByUrlPattern (function)');
