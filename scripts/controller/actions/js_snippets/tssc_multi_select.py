@@ -7,6 +7,12 @@ TsscMultiSelect (.tssc-multi-select) has two dropdown shapes:
 
 Prefer table rows when present; otherwise fall back to el-option.
 Not tree; outer confirm dialog is the caller's job.
+
+Wet research (2026-09-09 Playwright @ 产品要素库「选择要素」→「要素名称」):
+remote table search is async (~300ms). P1 must NOT treat "any visible row"
+as ready — the default page still has rows (often first=部署方式) until the
+filter settles; clicking that stale first row yielded ok-p1:部署方式 while
+option_text was 服务ID.
 """
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER
@@ -269,10 +275,8 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         return out;
     };
 
-    const clickFirstRow = async () => {
-        const rows = visibleRows();
-        if (!rows.length) return '';
-        const target = rows[0];
+    const clickRow = async (target) => {
+        if (!target) return '';
         target.scrollIntoView({ block: 'nearest' });
         const clickEl = target.querySelector('td .cell, td') || target;
         clickEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -282,11 +286,36 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         return readback();
     };
 
+    const clickFirstRow = async () => {
+        const rows = visibleRows();
+        if (!rows.length) return '';
+        return await clickRow(rows[0]);
+    };
+
+    // P2 / empty-list wait: any visible row is enough (list already cleared).
     const pollRows = async () => {
         for (let i = 0; i < 12; i++) {
             if (visibleRows().length) return;
             await sleep(250);
         }
+    };
+
+    const rowText = (tr) => norm(
+        [...tr.querySelectorAll('td')].map((td) => td.textContent || '').join(' ')
+    );
+
+    // Wet 2026-09-09: after setSearch('服务ID'), pollRows exited on iter 1 with
+    // stale 5-row page (first=deplMod|部署方式); ~500ms later only svcId|服务ID.
+    // Wait until a visible row's text includes want (or table empties → P2).
+    const pollMatchingRow = async (want) => {
+        for (let i = 0; i < 16; i++) {
+            const rows = visibleRows();
+            const hit = rows.find((tr) => rowText(tr).includes(want));
+            if (hit) return hit;
+            if (!rows.length) return null;
+            await sleep(250);
+        }
+        return null;
     };
 
     if (!isFirstAlias(optNorm)) {
@@ -300,12 +329,13 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
             setSearch(searchInput, optNorm);
         }
         if (p1HasSearch) {
-            await pollRows();
-            if (visibleRows().length) {
-                const echo = await clickFirstRow();
+            const hit = await pollMatchingRow(optNorm);
+            if (hit) {
+                const echo = await clickRow(hit);
                 if (echo) return 'ok-p1:' + echo;
-                return 'err-no-echo: P1 clicked first table row, readback empty';
+                return 'err-no-echo: P1 clicked matching table row, readback empty';
             }
+            // No matching row after wait (or emptied) → P2 clear+first.
         }
     }
 

@@ -3,6 +3,13 @@
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
 
+## 2026-09-09 18:45 · Cursor Lead — 开工：tssc P1 搜索竞态 + 回放 mismatch
+
+- 进行中：18:45；Playwright 湿测：`pollRows` 见旧列表即点首行 → `ok-p1:部署方式` 而 want=`服务ID`；回放 tssc 经 `_with_xpath_first` 跳过 option-mismatch
+- 范围：`scripts/controller/actions/js_snippets/tssc_multi_select.py`、`replay_form_action.py`、cold pin、本文件
+- 禁入区：whitelist、kb、`.cursor/`、无关 partner WIP
+- 方式：P1 等行文案含 option 再点；tssc 回放走 `_map_engine_select_result` + 正确 echo 解析
+
 ## 2026-09-09 18:04 · DSH — 收工：agent-log 归档分流完成（回链 18:03 开工）
 
 - 完成：`agent-log.md` 1717→1724（开工条目 +7）→ 切分后主文件 1045 行；2026-08-24 ~ 2026-09-06 共 690 行条目原样分流至 `agent-log-archive-2026-09-06.md`（沿 09-05 归档先例命名）；主文件现仅含协议头 + 归档指针 + 09-07 ~ 09-09 条目

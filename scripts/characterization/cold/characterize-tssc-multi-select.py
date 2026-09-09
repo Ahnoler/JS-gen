@@ -111,6 +111,8 @@ checks = [
         "精确",
         "select-table",
         "el-select-dropdown__item",
+        "pollMatchingRow",
+        "Wet 2026-09-09",
     )),
     ("scripts/controller/actions/_js_snippets.py", ("tssc_multi_select", "JS_TSSC_MULTI_SELECT")),
     ("scripts/models/field.py", (
@@ -152,11 +154,14 @@ checks = [
         "field_kind not in (",
         "'tssc-multi-select'",
     )),
-    # D6 replay: select_option + form_tssc_multi_select → JS_TSSC via dispatch (not el-select)
+    # D6 replay: dispatch + mismatch on tssc (not bare _with_xpath_first for select_option)
     ("scripts/controller/actions/replay_form_action.py", (
         "resolve_select_dispatch",
-        "JS_TSSC_MULTI_SELECT",
         'path == "tssc"',
+        "_echo_from_select_ok",
+        "_map_engine_select_result",
+        "option-mismatch:want=",
+        "ok-p1:",
     )),
 ]
 

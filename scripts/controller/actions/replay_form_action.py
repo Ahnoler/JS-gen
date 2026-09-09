@@ -139,9 +139,60 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             sys.stderr.flush()
             return str(result_text)
 
-        # D6: steps are recorded as select_option + form_tssc_multi_select; el-select
-        # JS_SELECT_OPTION cannot pick remote table rows (要素名称 → option-not-found:codes).
-        # Legacy action_name=tssc_multi_select still has its own branch above.
+        _SENT = frozenset({'first', 'any', 'random', '1st', '第一个', '第一项'})
+
+        def _echo_from_select_ok(result: str) -> str:
+            """Strip ok-p1:/ok-p2:/ok: prefixes so mismatch compares display text."""
+            s = str(result or '').strip()
+            for prefix in (
+                'ok-already:', 'ok-p1:', 'ok-p2:', 'ok-first:', 'ok-echo:',
+                'ok-confirmed:', 'ok:',
+            ):
+                if s.startswith(prefix):
+                    return s[len(prefix):].strip()
+            if s.startswith('ok-') and ':' in s:
+                return s.split(':', 1)[1].strip()
+            return ''
+
+        async def _map_engine_select_result(
+            raw, locate_src: str | None = None, xpath: str = '',
+        ) -> str:
+            result = str(raw)
+            if is_absent_field_result(result):
+                return await _replay_select_final_failure(result)
+            if result.startswith('ok-already:'):
+                cur = _echo_from_select_ok(result)
+                if cur:
+                    await page.wait_for_timeout(WAIT_200_MS)
+                    if locate_src:
+                        return f'ok-already:{cur}|locate={locate_src}'
+                return result
+            if result.startswith('ok'):
+                got = _echo_from_select_ok(result)
+                # Recorded option_text is authoritative (except sentinel first/any).
+                if (
+                    got
+                    and got != pick
+                    and pick.lower() not in _SENT
+                    and pick not in _SENT
+                ):
+                    return await _replay_select_final_failure(
+                        f'option-mismatch:want={pick}|got={got}'
+                    )
+                if xpath and locate_src:
+                    actual = await _read_value_by_xpath(page, xpath, label)
+                    classified = _classify_fill_result(True, pick, actual)
+                    await page.wait_for_timeout(WAIT_500_MS)
+                    if classified.startswith('false_ok'):
+                        return await _replay_select_final_failure(classified)
+                    return f'ok:locate={locate_src}'
+                await page.wait_for_timeout(WAIT_500_MS)
+                return _annotate_label_result(result)
+            return await _replay_select_final_failure(result)
+
+        # D6: select_option + form_tssc_multi_select → JS_TSSC (not el-select).
+        # Wet 2026-09-09: do NOT return via bare _with_xpath_first — it annotated
+        # ok-p1:部署方式 as OK without option-mismatch when want was 服务ID.
         dispatch = await resolve_select_dispatch(
             label=label,
             element=el,
@@ -156,15 +207,34 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         if dispatch.path == "tssc":
             if pick == '':
                 return 'error:missing-option_text'
-
-            async def _tssc_via_select_option():
-                r = await SelectEngine.select_option_for_replay(
-                    page, label, pick, xpath_smart=element_xp or '', element=el,
+            located_smart = (
+                await _try_xpath_locate(page, xpath_smart) if xpath_smart else False
+            )
+            raw = await SelectEngine.select_option_for_replay(
+                page, label, pick, xpath_smart=element_xp or '', element=el,
+            )
+            locate_src = 'element' if located_smart else None
+            mapped = await _map_engine_select_result(
+                raw, locate_src, element_xp if located_smart else '',
+            )
+            if (
+                located_smart
+                and isinstance(mapped, str)
+                and mapped.startswith('ok')
+                and not mapped.startswith('ok:locate=')
+                and not mapped.startswith('ok-skip')
+            ):
+                echo = _echo_from_select_ok(str(raw))
+                if str(raw).startswith('ok-p1:'):
+                    return f'ok-xpath-smart:p1:{echo}'
+                if str(raw).startswith('ok-p2:'):
+                    return f'ok-xpath-smart:p2:{echo}'
+                return (
+                    f'ok-xpath-smart:{mapped[3:]}'
+                    if mapped.startswith('ok-')
+                    else 'ok-xpath-smart'
                 )
-                await page.wait_for_timeout(WAIT_500_MS)
-                return r
-
-            return await _with_xpath_first(_tssc_via_select_option)
+            return mapped
 
         branch_reset_diag = await reset_select_ui(page)
         if not branch_reset_diag.get('closed', False):
@@ -179,7 +249,6 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         # Legacy dirty steps may still store option_text=first (recording used to skip
         # stamping). "first" meant "any existing value is fine" — if the control already
         # has a value, accept ok-already. Never invent options[0]. Empty → still fail.
-        _SENT = frozenset({'first', 'any', 'random', '1st', '第一个', '第一项'})
         if pick.lower() in _SENT or pick in _SENT:
             xp_s, src_s = _resolve_replay_xpath(entry, params)
             if xp_s:
@@ -201,36 +270,6 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         _XPATH_MISS = frozenset({
             'xpath-not-found', 'xpath-empty', 'label-not-found', 'no-select-found',
         })
-
-        async def _map_engine_select_result(
-            raw, locate_src: str | None = None, xpath: str = '',
-        ) -> str:
-            result = str(raw)
-            if is_absent_field_result(result):
-                return await _replay_select_final_failure(result)
-            if result.startswith('ok-already:'):
-                cur = result.split(':', 1)[1].strip()
-                if cur:
-                    await page.wait_for_timeout(WAIT_200_MS)
-                    if locate_src:
-                        return f'ok-already:{cur}|locate={locate_src}'
-                return result
-            if result.startswith('ok'):
-                got = result.split(':', 1)[1].strip() if ':' in result else ''
-                if got and got != pick:
-                    return await _replay_select_final_failure(
-                        f'option-mismatch:want={pick}|got={got}'
-                    )
-                if xpath and locate_src:
-                    actual = await _read_value_by_xpath(page, xpath, label)
-                    classified = _classify_fill_result(True, pick, actual)
-                    await page.wait_for_timeout(WAIT_500_MS)
-                    if classified.startswith('false_ok'):
-                        return await _replay_select_final_failure(classified)
-                    return f'ok:locate={locate_src}'
-                await page.wait_for_timeout(WAIT_500_MS)
-                return _annotate_label_result(result)
-            return await _replay_select_final_failure(result)
 
         async def _select_by_xpath(xpath: str, locate_src: str) -> str | None:
             reset_diag = await reset_select_ui(page)
