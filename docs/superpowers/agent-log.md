@@ -2,9 +2,22 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 14:10 · Cursor Lead — 收工：select 录放统一设计稿 A→B（回链 14:08）
+
+- 完成：`docs/superpowers/specs/2026-09-09-select-record-replay-unify-design.md`（Phase A 共享 router → Phase B 回放复用 SelectEngine）；用户口头批准方向后落盘
+- 验收：自检无占位矛盾；链 D6 / engine-actions-contract / hotfix `84a320a2`
+- 遗留：用户审阅本 spec → 通过后 writing-plans；**尚未实现**
+
+## 2026-09-09 14:08 · Cursor Lead — 开工：select 录放统一设计稿
+
+- 进行中：14:08；用户选 A→B；只写 spec，不写代码/plan
+- 范围：`docs/superpowers/specs/2026-09-09-select-record-replay-unify-design.md`、本文件
+- 禁入区：`scripts/controller/actions/**`（本单元不改实现）、kb、whitelist、`.cursor/`
+- 方式：brainstorming 落盘 → 请用户审文件
+
 ## 2026-09-09 14:05 · Cursor Lead — 收工：回放 select_option→tssc 路由（回链 13:55）
 
-- 完成：`replay_form_action` 在 `select_option` 分支按 `target_kind=form_tssc_multi_select` 或 live `.tssc-multi-select` 转 `JS_TSSC_MULTI_SELECT`；cold pin 增补；提交 **`6e618d8f`**
+- 完成：`replay_form_action` 在 `select_option` 分支按 `target_kind=form_tssc_multi_select` 或 live `.tssc-multi-select` 转 `JS_TSSC_MULTI_SELECT`；cold pin 增补；代码提交 **`84a320a2`**
 - 验收：`characterize-tssc-multi-select` / `characterize-select-state-boundary` / `characterize-select-option-stamp` **GREEN**
 - 遗留：重启 executor 后复放「要素名称→部署方式」；用户自行 push
 
