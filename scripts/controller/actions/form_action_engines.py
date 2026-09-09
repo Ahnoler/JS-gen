@@ -428,11 +428,24 @@ class FillEngine(_FormActionEngineBase):
                 next_action=nxt,
             )
 
+        from .fill_dispatch import resolve_fill_attempt_order
+
+        attempts = resolve_fill_attempt_order(
+            label=resolved.label or label_text,
+            placeholder="",
+            xpath_smart=(resolved.xpath_smart or xpath_smart or "").strip(),
+            xpath_smart_src="element",
+            xpath_full="",
+        )
+        has_xpath_attempt = any(
+            a.path == "xpath" and (a.xpath or "").strip() for a in attempts
+        )
+
         strict_xpath = xpath_smart_fill_only_enabled()
         use_label_fallback = (
             (not strict_xpath)
             and bool(resolved.error)
-            and not (resolved.xpath_smart or "").strip()
+            and not has_xpath_attempt
         )
         if resolved.error and not use_label_fallback:
             if is_absent_field_result(resolved.error):

@@ -112,17 +112,30 @@ def test_replay_fill_passes_label_as_xpath_hint() -> None:
 
 
 def test_replay_select_uses_trigger_by_xpath() -> None:
-    src = (
+    engines_src = (
+        ROOT / "scripts/controller/actions/form_action_engines.py"
+    ).read_text(encoding="utf-8")
+    select_impl = engines_src.split("async def _select_option_impl", 1)[1].split(
+        "async def tssc_multi_select", 1
+    )[0]
+    replay_src = (
         (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
         + "\n"
         + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
             encoding="utf-8"
         )
     )
-    select_fn = src.split("if action_name == 'select_option':", 1)[1].split(
+    select_fn = replay_src.split("if action_name == 'select_option':", 1)[1].split(
         "return f'unknown-form-action", 1
     )[0]
-    assert_true("JS_SELECT_TRIGGER_BY_XPATH" in select_fn, "replay select uses xpath trigger")
+    assert_true(
+        "JS_SELECT_TRIGGER_BY_XPATH" in select_impl,
+        "SelectEngine uses xpath trigger",
+    )
+    assert_true(
+        "SelectEngine.select_option_for_replay" in select_fn,
+        "replay select delegates to SelectEngine",
+    )
     assert_true(
         "bad_option_text" in select_fn,
         "replay select still emits bad_option_text when sentinel and empty",
@@ -131,9 +144,13 @@ def test_replay_select_uses_trigger_by_xpath() -> None:
         "legacy-sentinel" in select_fn or "ok-already" in select_fn.split("bad_option_text")[0],
         "replay select soft-accepts sentinel when field already has a value",
     )
+    el_select_ladder = select_fn.split(
+        "return await _with_xpath_first(_tssc_via_select_option)", 1
+    )
+    el_select_body = el_select_ladder[1] if len(el_select_ladder) > 1 else select_fn
     assert_true(
-        "_with_xpath_first" not in select_fn,
-        "replay select must not use _with_xpath_first locate-then-label",
+        "_with_xpath_first" not in el_select_body,
+        "el-select replay ladder must not use _with_xpath_first locate-then-label",
     )
     assert_true(
         "JS_SELECT_VALUE_BY_XPATH" in select_fn,
