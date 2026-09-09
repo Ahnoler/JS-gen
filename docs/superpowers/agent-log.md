@@ -17,6 +17,13 @@
 - 禁入区：`config/update-db-whitelist.ps1`（他线 M 态）、`.cursor/`、Cursor tssc_multi_select v2 线文件（10:31/10:32 声明）、`scripts/controller/**`、`src/services/trajectory/**`、引擎 P0/P1 修复线（报告已入库待用户拍板，另开工）
 - 方式：主线程直接实施（小改动不派子智能体）；验证=新冷区行为 pin + verify-all + lint；执行机重启需协调（不打断在途录制），本单元只交付代码不改运行进程
 
+## 2026-09-09 10:54 · Cursor Lead — 开工：修订 tssc v2 spec（select_option 唯一对外面）
+
+- 进行中：10:54；用户裁决——agent 不直接调 tssc_multi_select；controller 不向 agent 注册该动作；一律 select_option 转调内部实现
+- 范围：仅 `docs/superpowers/specs/2026-09-09-tssc-multi-select-v2-design.md` + agent-log
+- 禁入区：snippet/引擎实现本单元不改；whitelist / kb / 死代码线
+- 方式：改 spec + commit；实现另开
+
 ## 2026-09-09 10:32 · Cursor Lead — 收工：tssc_multi_select v2 设计 spec（回链 10:31）
 
 - 完成：湿测拍板写入 `docs/superpowers/specs/2026-09-09-tssc-multi-select-v2-design.md`；v1 spec 加 v2 指针；决议 D1–D5（P2 兜底任意首项 / 无文案跳过 P1 / 仅 table / 单次 JS / P1 关精确查询）
