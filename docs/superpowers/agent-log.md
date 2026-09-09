@@ -3,6 +3,19 @@
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
 
+## 2026-09-09 19:56 · Cursor Lead — 开工：click_radio 录放统一 design（直接 Phase B）
+
+- 进行中：19:56；用户选 B（跳过 radio_dispatch，经 RadioEngine mode=replay）
+- 范围：`docs/superpowers/specs/2026-09-09-radio-record-replay-unify-design.md`；fill unify §8 路线图指针；本文件
+- 禁入区：实现代码、whitelist、kb、`.cursor/`、菜单 umlEcd / 产品草稿他线
+- 方式：落盘 design → 用户审阅 spec → writing-plans；本单元不写引擎代码
+
+## 2026-09-09 18:55 · Cursor Lead — 收工：tssc P1 搜索竞态 + 回放 mismatch（回链 18:45）
+
+- 完成：P1 `pollMatchingRow`（等行文案含 option）；回放 tssc 经 `_map_engine_select_result` + `_echo_from_select_ok`；注释写入 2026-09-09 Playwright 湿测结论
+- 验收：tssc / select-dispatch / select-replay-engine / state-boundary / stamp **GREEN**
+- 遗留：重启 executor 后复放「要素名称→服务ID」；用户自行 push
+
 ## 2026-09-09 18:45 · Cursor Lead — 开工：tssc P1 搜索竞态 + 回放 mismatch
 
 - 进行中：18:45；Playwright 湿测：`pollRows` 见旧列表即点首行 → `ok-p1:部署方式` 而 want=`服务ID`；回放 tssc 经 `_with_xpath_first` 跳过 option-mismatch
