@@ -338,6 +338,36 @@ export async function closeSession({
 }
 
 /**
+ * Map a control-plane stdin `step` payload to the executor WS `session.step` fields
+ * (explicit whitelist — unlisted keys are not forwarded to the executor subprocess).
+ * @param {object} data stdin step 事件负载（camelCase / snake_case 双兼容读取）
+ * @returns {object} session.step WS 负载字段（sessionId 由调用方附加）
+ */
+export function mapStepPayloadForExecutor(data) {
+  return {
+    task: data.instruction,
+    maxSteps: data.max_steps,
+    phaseNumber: data.phase_number,
+    businessDataFile: data.business_data_file,
+    businessData: data.business_data,
+    // Must forward — otherwise Python loads 0 special-element candidates
+    specialElementCandidates:
+      data.special_element_candidates ?? data.specialElementCandidates,
+    priorPhases: data.prior_phases ?? data.priorPhases,
+    allPhases: data.all_phases ?? data.allPhases,
+    priorOutcome: data.prior_outcome ?? data.priorOutcome,
+    // P1：记忆事件归属 —— Python writer 需要 trajectory_id + fact_pack
+    trajectoryId: data.trajectory_id,
+    factPack: data.fact_pack,
+    businessDataBlock: data.business_data_block ?? data.businessDataBlock,
+    healContract: data.heal_contract ?? data.healContract ?? null,
+    // spec 4.3.1：录制 run 事件归属 —— 必须透传，否则 Python runId 恒 None、
+    // 跨 run 事件归属过滤退化为 legacy 放行（09-09 对抗 review P0-1）
+    runId: data.runId ?? data.run_id,
+  };
+}
+
+/**
  * Forward a stdin event from the control plane to the executor session subprocess.
  * @param {object} opts 转发选项
  * @param {string} opts.nodeUuid 节点UUID
@@ -351,22 +381,7 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
   if (wsType === 'session.step') {
     sendToExecutor(nodeUuid, 'session.step', {
       sessionId,
-      task: data.instruction,
-      maxSteps: data.max_steps,
-      phaseNumber: data.phase_number,
-      businessDataFile: data.business_data_file,
-      businessData: data.business_data,
-      // Must forward — otherwise Python loads 0 special-element candidates
-      specialElementCandidates:
-        data.special_element_candidates ?? data.specialElementCandidates,
-      priorPhases: data.prior_phases ?? data.priorPhases,
-      allPhases: data.all_phases ?? data.allPhases,
-      priorOutcome: data.prior_outcome ?? data.priorOutcome,
-      // P1：记忆事件归属 —— Python writer 需要 trajectory_id + fact_pack
-      trajectoryId: data.trajectory_id,
-      factPack: data.fact_pack,
-      businessDataBlock: data.business_data_block ?? data.businessDataBlock,
-      healContract: data.heal_contract ?? data.healContract ?? null,
+      ...mapStepPayloadForExecutor(data),
     });
     return;
   }

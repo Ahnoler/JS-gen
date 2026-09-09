@@ -90,6 +90,9 @@ export function createSessionHandler(manager) {
           trajectory_id: payload.trajectoryId ?? payload.trajectory_id,
           fact_pack: payload.factPack ?? payload.fact_pack,
           heal_contract: payload.healContract ?? payload.heal_contract ?? null,
+          // spec 4.3.1：runId 透传 —— Python 消费点 session_runner.py data.get("runId")，
+          // 键名必须是 runId（不可改名/不可丢，否则归属过滤退化为 legacy 放行）
+          runId: payload.runId ?? payload.run_id,
         });
       case 'session.close':
         return manager.close(sessionId, {
