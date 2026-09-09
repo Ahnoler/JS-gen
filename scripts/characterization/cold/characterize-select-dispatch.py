@@ -1,4 +1,5 @@
 """Pin select_dispatch: shared router for record + replay (unify spec A)."""
+import asyncio
 from pathlib import Path
 import sys
 
@@ -53,24 +54,24 @@ def main() -> int:
     sys.path.insert(0, str(ROOT))
     from scripts.controller.actions.select_dispatch import resolve_select_dispatch
 
-    d = resolve_select_dispatch(
+    d = asyncio.run(resolve_select_dispatch(
         label="要素名称",
         element={"target_kind": "form_tssc_multi_select"},
         field_kind=None,
         page=None,
-    )
+    ))
     if d.path != "tssc":
         print(f"FAIL: expected path=tssc got {d.path!r} reason={d.reason!r}")
         return 1
-    d2 = resolve_select_dispatch(
+    d2 = asyncio.run(resolve_select_dispatch(
         label="x", element={"target_kind": "form_select"}, field_kind="select", page=None
-    )
+    ))
     if d2.path != "el-select":
         print(f"FAIL: expected el-select got {d2.path!r}")
         return 1
-    d3 = resolve_select_dispatch(
+    d3 = asyncio.run(resolve_select_dispatch(
         label="x", element=None, field_kind="tssc-multi-select", page=None
-    )
+    ))
     if d3.path != "tssc":
         print(f"FAIL: field_kind tssc-multi-select → tssc, got {d3.path!r}")
         return 1
