@@ -26,6 +26,7 @@ from ._js_snippets import (
 )
 from .replay_js import _JS_LOCATE_BY_XPATH, _JS_READ_VALUE_BY_XPATH
 from .replay_timing import WAIT_200_MS, WAIT_300_MS, WAIT_400_MS, WAIT_500_MS
+from .select_dispatch import resolve_select_dispatch
 
 
 async def _replay_form_action(page, action_name: str, params: dict, entry: dict | None = None) -> str:
@@ -166,6 +167,12 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         return await _with_xpath_first(_tree)
 
     if action_name == 'tssc_multi_select':
+        dispatch = await resolve_select_dispatch(label=label, element=el, force_path='tssc')
+        sys.stderr.write(
+            f'[replay-select] dispatch path={dispatch.path} reason={dispatch.reason}\n'
+        )
+        sys.stderr.flush()
+
         async def _tssc():
             r = await page.evaluate(JS_TSSC_MULTI_SELECT, [label, value])
             await page.wait_for_timeout(WAIT_500_MS)
@@ -204,42 +211,18 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         # D6: steps are recorded as select_option + form_tssc_multi_select; el-select
         # JS_SELECT_OPTION cannot pick remote table rows (要素名称 → option-not-found:codes).
         # Legacy action_name=tssc_multi_select still has its own branch above.
-        _tk = str(el.get('target_kind') or '').strip().lower().replace('-', '_')
-        _tssc_meta = _tk in ('form_tssc_multi_select', 'tssc_multi_select')
-
-        async def _is_live_tssc_field() -> bool:
-            if not label:
-                return False
-            try:
-                return bool(await page.evaluate(
-                    '''([lab]) => {
-                        const want = String(lab || '').replace(/\\s+/g, ' ').trim();
-                        if (!want) return false;
-                        const hit = (root) => {
-                            for (const item of root.querySelectorAll('.el-form-item')) {
-                                const l = (item.querySelector('.el-form-item__label')?.textContent || '')
-                                    .replace(/\\s+/g, ' ').trim();
-                                if (l === want || l.includes(want)) {
-                                    return !!(item.querySelector('.tssc-multi-select'));
-                                }
-                            }
-                            return false;
-                        };
-                        if (hit(document)) return true;
-                        for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
-                            if (dlg.offsetParent === null) continue;
-                            if (hit(dlg)) return true;
-                        }
-                        return false;
-                    }''',
-                    [label],
-                ))
-            except Exception:
-                return False
-
-        if _tssc_meta or await _is_live_tssc_field():
-            # Empty pick → missing-option (use equality check so cold pins that
-            # .find the el-select "if not pick" gate are not confused by comments).
+        dispatch = await resolve_select_dispatch(
+            label=label,
+            element=el,
+            field_kind=None,
+            page=page,
+        )
+        sys.stderr.write(
+            f'[replay-select] dispatch path={dispatch.path} reason={dispatch.reason} '
+            f'label={label!r} option={pick!r}\n'
+        )
+        sys.stderr.flush()
+        if dispatch.path == "tssc":
             if pick == '':
                 return 'error:missing-option_text'
 
