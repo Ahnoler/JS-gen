@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 10:36 · ZCode 引擎线 — 开工：bib-bridge 地址栏跳转补丁（navigate action=url）
+
+- 进行中：10:36。前端线已定位：地址栏回车 `remote:input {kind:'navigate',action:'url'}` → 控制面 ws-router 转发正常 → `executor/bib-bridge.js` handleInput navigate 分支只实现 reload/back/forward，`action==='url'` 落 441 行 `unknown_navigate_action` 静默丢弃（前端/控制面/入口三环均无恙）
+- 范围：`executor/bib-bridge.js`（navigate 分支加 url case，约 5 行）、`scripts/characterization/cold/characterize-bib-navigate-input.mjs`（新建行为 pin：stub client 断言 url→Page.navigate/空 url 拒绝/reload+back+forward+unknown 不回归）、`scripts/refactor/verify-all.sh`（注册一行）、agent-log 本文件
+- 禁入区：`config/update-db-whitelist.ps1`（他线 M 态）、`.cursor/`、Cursor tssc_multi_select v2 线文件（10:31/10:32 声明）、`scripts/controller/**`、`src/services/trajectory/**`、引擎 P0/P1 修复线（报告已入库待用户拍板，另开工）
+- 方式：主线程直接实施（小改动不派子智能体）；验证=新冷区行为 pin + verify-all + lint；执行机重启需协调（不打断在途录制），本单元只交付代码不改运行进程
+
 ## 2026-09-09 10:32 · Cursor Lead — 收工：tssc_multi_select v2 设计 spec（回链 10:31）
 
 - 完成：湿测拍板写入 `docs/superpowers/specs/2026-09-09-tssc-multi-select-v2-design.md`；v1 spec 加 v2 指针；决议 D1–D5（P2 兜底任意首项 / 无文案跳过 P1 / 仅 table / 单次 JS / P1 关精确查询）
