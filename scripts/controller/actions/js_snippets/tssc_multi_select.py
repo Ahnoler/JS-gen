@@ -231,8 +231,14 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
 
     const forceExactOff = (dd) => {
         for (const sw of dd.querySelectorAll('.el-switch')) {
-            const lbl = (sw.innerText || sw.getAttribute('aria-label') || '');
-            if (lbl.includes('精确') && sw.classList.contains('is-checked')) sw.click();
+            const lbl = sw.closest('.el-form-item, label, span, div')?.textContent
+                || sw.innerText
+                || sw.getAttribute('aria-label')
+                || '';
+            if (!lbl.includes('精确')) continue;
+            if (!sw.classList.contains('is-checked')) continue;
+            const clickTarget = sw.querySelector('.el-switch__core') || sw;
+            clickTarget.click();
         }
     };
 
@@ -284,16 +290,22 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
     };
 
     if (!isFirstAlias(optNorm)) {
+        let p1HasSearch = false;
         for (const dd of openDropdowns()) {
             if (!dd.querySelector('.select-table')) continue;
             forceExactOff(dd);
-            setSearch(findSearchInput(dd), optNorm);
+            const searchInput = findSearchInput(dd);
+            if (!searchInput) continue;
+            p1HasSearch = true;
+            setSearch(searchInput, optNorm);
         }
-        await pollRows();
-        if (visibleRows().length) {
-            const echo = await clickFirstRow();
-            if (echo) return 'ok-p1:' + echo;
-            return 'err-no-echo: P1 clicked first table row, readback empty';
+        if (p1HasSearch) {
+            await pollRows();
+            if (visibleRows().length) {
+                const echo = await clickFirstRow();
+                if (echo) return 'ok-p1:' + echo;
+                return 'err-no-echo: P1 clicked first table row, readback empty';
+            }
         }
     }
 
