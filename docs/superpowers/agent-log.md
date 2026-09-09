@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 16:58 · Cursor Lead — 开工：菜单活动级 umlEcd 回填设计
+
+- 进行中：16:58；用户确认方案 1 + 1:N 仅唯一；同事已手工纠产品四叶
+- 范围：`docs/superpowers/specs/2026-09-09-menu-activity-uml-adopt-design.md`、本文件；通过后 writing-plans → 实现（迁移 / import / uml-adopt / 表征）
+- 禁入区：按活动拆导航叶；fill/select 录放线；`.cursor/`；他线 Vue/partner-platform
+- 方式：brainstorming 落盘 → 请用户审 spec
+
 ## 2026-09-09 16:15 · Cursor Lead — 收工：fill 录放统一 SDD A→B（回链 15:40）
 
 - 完成：Phase A（`fill_dispatch` + 双接线 + 契约）+ Phase B（`FillEngine.mode=replay` + `fill_form_field_for_replay`）；关键 commits `471b42d3` / `741e57cc` / `cee9519d` / `f991f2a8` / `739bd35a` / `c763511e`；verify-all 注册 fill-dispatch + fill-replay-engine
