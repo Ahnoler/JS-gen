@@ -20,7 +20,7 @@ import {
 } from './provenance.js';
 import { listFlowCardsDetailed } from '../kb-flow-cards.js';
 import { matchFlowForAtom } from './flow-card-recall.js';
-import { stepsShareClosedLoop } from './flow-card-guide.js';
+import { selectRelevantFlowCards, stepsShareClosedLoop, summarizeCardsForLlm } from './flow-card-guide.js';
 import { writeProposeCache, PROPOSE_CACHE_VERSION } from './propose-cache.js';
 import { collectPageCodes, sanitizeTaskDraftKeyData } from './atom-keydata.js';
 
@@ -326,25 +326,28 @@ function foldEntryOnlyLlmAtoms(llmAtoms, chains) {
 }
 
 /**
- * Serialize chains for LLM input, truncating when payload is huge.
+ * Build atomize user payload object with optional truncation for huge chains.
  * @param {import('./parse-through-chains.js').ThroughChain[]} chains Chains to serialize
+ * @param {object[]} [flowCards] Relevant flow cards for LLM guidance
  * @returns {string} JSON string for user payload
  */
-function serializeChainsForLlm(chains) {
-  let payload = JSON.stringify({ chains }, null, 2);
-  if (payload.length <= MAX_CHAIN_PAYLOAD_CHARS) {
-    return payload;
+function buildAtomizeUserPayload(chains, flowCards = []) {
+  const summarized = summarizeCardsForLlm(flowCards);
+  let chainsObj = { chains };
+  let payload = JSON.stringify(chainsObj, null, 2);
+  if (payload.length > MAX_CHAIN_PAYLOAD_CHARS) {
+    const trimmed = chains.map((chain) => ({
+      ...chain,
+      steps: (chain.steps || []).map((step) => ({
+        index: step.index,
+        action: step.action,
+        zjjk: step.zjjk,
+        buttons: step.buttons,
+      })),
+    }));
+    chainsObj = { chains: trimmed, truncated: true };
   }
-  const trimmed = chains.map((chain) => ({
-    ...chain,
-    steps: (chain.steps || []).map((step) => ({
-      index: step.index,
-      action: step.action,
-      zjjk: step.zjjk,
-      buttons: step.buttons,
-    })),
-  }));
-  payload = JSON.stringify({ chains: trimmed, truncated: true }, null, 2);
+  payload = JSON.stringify({ ...chainsObj, flowCards: summarized }, null, 2);
   if (payload.length > MAX_CHAIN_PAYLOAD_CHARS) {
     return `${payload.slice(0, MAX_CHAIN_PAYLOAD_CHARS)}\n/* truncated */`;
   }
@@ -356,11 +359,12 @@ function serializeChainsForLlm(chains) {
  * @param {import('./parse-through-chains.js').ThroughChain[]} chains Filtered chains
  * @param {string} moduleKey Module key
  * @param {(text: string) => Promise<string>} llmFn Injectable LLM caller
+ * @param {object[]} [flowCards] Relevant flow cards for LLM guidance
  * @returns {Promise<Array<Record<string, unknown>>>} Raw LLM atom objects
  */
-async function callAtomizeLlm(chains, moduleKey, llmFn) {
+async function callAtomizeLlm(chains, moduleKey, llmFn, flowCards = []) {
   const systemPrompt = loadAtomizePrompt();
-  const userPayload = serializeChainsForLlm(chains);
+  const userPayload = buildAtomizeUserPayload(chains, flowCards);
   const prompt = `${systemPrompt}\n\n---\n\nmoduleKey: ${moduleKey}\n\n${userPayload}`;
   const raw = await llmFn(prompt);
   const parsed = parseLlmJsonObject(raw);
@@ -634,6 +638,9 @@ export function computeFunctionIdCandidates(atom, functionNodes) {
  *   existence check (offline characterization stubs; defaults to system table lookup)
  * @param {() => Promise<Array<object>>} [opts.listSystemsFn] Injectable system-tree loader
  *   (offline characterization stubs; defaults to systemDao.listAll)
+ * @param {() => Promise<Array<object>>} [opts.listFlowCardsFn] Injectable flow-card loader
+ *   (offline characterization stubs; defaults to listFlowCardsDetailed)
+ * @param {string} [opts.flowsDir] Override flows directory for listFlowCardsDetailed
  * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }>, truncated: { dropped: number, requestedMax: number|null } }>} Accepted and rejected atoms with truncation facts
  */
 export async function proposeDraftTrajectories({
@@ -644,6 +651,8 @@ export async function proposeDraftTrajectories({
   callLLM,
   functionIdExists = null,
   listSystemsFn = null,
+  listFlowCardsFn = null,
+  flowsDir = null,
 }) {
   const startedAt = Date.now();
   const mod = await getReqModule({ rootDir, moduleKey });
@@ -674,9 +683,14 @@ export async function proposeDraftTrajectories({
   const sourceDoc = await loadSourceDoc(modDir);
   const llmFn = callLLM || defaultCallLLM;
 
+  const cards = await (listFlowCardsFn
+    ? listFlowCardsFn()
+    : listFlowCardsDetailed(flowsDir ? { dir: flowsDir } : {}));
+  const relevant = selectRelevantFlowCards({ chains, cards, limit: 6 });
+
   let llmAtoms = null;
   try {
-    llmAtoms = await callAtomizeLlm(chains, moduleKey, llmFn);
+    llmAtoms = await callAtomizeLlm(chains, moduleKey, llmFn, relevant);
   } catch {
     llmAtoms = null;
   }
@@ -746,7 +760,6 @@ export async function proposeDraftTrajectories({
     }
   }
 
-  const cards = await listFlowCardsDetailed({});
   for (const atom of capped) {
     if (atom.suggestedFlowRef) continue;
     const hit = matchFlowForAtom({
@@ -772,6 +785,8 @@ export async function proposeDraftTrajectories({
 
   const flowRefHits = capped.filter((a) => a.suggestedFlowRef).length;
   const functionIdCandidateHits = capped.filter((a) => (a.functionIdCandidates || []).length > 0).length;
+  const flowGuidedCount = capped.filter((a) => a.flowGuided).length;
+  const fallbackCount = capped.filter((a) => !a.flowGuided).length;
   await appendObservation('propose-runs.jsonl', {
     ts: new Date().toISOString(),
     moduleKey,
@@ -783,6 +798,8 @@ export async function proposeDraftTrajectories({
     durationMs: Date.now() - startedAt,
     flowRefHits,
     functionIdCandidateHits,
+    flowGuidedCount,
+    fallbackCount,
   });
   for (const atom of capped) {
     if (!atom.suggestedFlowRef) continue;

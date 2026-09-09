@@ -1090,7 +1090,7 @@ async function main() {
     const lines = readFileSync(join(OBSERVE_TMP, 'propose-runs.jsonl'), 'utf8').split('\n').filter((l) => l.trim());
     assert.equal(lines.length, before + 2);
     const last = JSON.parse(lines[lines.length - 1]);
-    for (const field of ['ts', 'moduleKey', 'atoms', 'rejected', 'truncated', 'cacheVersion', 'sourceHash', 'durationMs', 'flowRefHits', 'functionIdCandidateHits']) {
+    for (const field of ['ts', 'moduleKey', 'atoms', 'rejected', 'truncated', 'cacheVersion', 'sourceHash', 'durationMs', 'flowRefHits', 'functionIdCandidateHits', 'flowGuidedCount', 'fallbackCount']) {
       assert.ok(field in last, `observation missing field ${field}`);
     }
     assert.equal(last.moduleKey, 'demo-mod');
@@ -1243,6 +1243,63 @@ async function main() {
       }),
       false,
     );
+  });
+
+  const flowGuideFixtureRoot = join(ROOT, 'scripts/characterization/fixtures/req-draft-traj/flow-guide-mod');
+  const miniFlowCard = JSON.parse(
+    readFileSync(join(flowGuideFixtureRoot, 'flows/customer_onboarding_mini.json'), 'utf8'),
+  );
+  miniFlowCard._stem = 'customer_onboarding_mini';
+
+  await runAsync('propose merges same-loop steps when LLM returns flowRef', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-flow-guide-'));
+    cpSync(flowGuideFixtureRoot, join(tmp, 'flow-guide-mod'), { recursive: true });
+
+    const fakeLLM = async (prompt) => {
+      assert.match(prompt, /flowCards|customer_onboarding_mini/);
+      return JSON.stringify({
+        atoms: [{
+          chainId: 'chain-a',
+          stepIndexes: [1, 2, 3, 4],
+          title: '草稿客户转为信贷潜在客户',
+          flowRef: 'customer_onboarding_mini',
+          nodeId: 'edit_page',
+          taskDraft: '1、进入编辑页\n2、维护概况\n3、联网核查\n4、保存\n\n来源：<sourceDoc> / <sourceChapter>\n',
+          phaseHints: ['进页', '保存'],
+          pageCodes: [],
+          suggestedFunctionId: null,
+        }],
+      });
+    };
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'flow-guide-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+      listFlowCardsFn: async () => [miniFlowCard],
+    });
+    assert.equal(out.atoms.length, 1);
+    assert.equal(out.atoms[0].flowGuided, true);
+    assert.equal(out.atoms[0].suggestedFlowRef, 'customer_onboarding_mini');
+    assert.equal(out.rejected.filter((r) => r.reason === 'multi_write_atom').length, 0);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose fallback without cards sets flowGuided false', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-flow-fallback-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: async () => { throw new Error('force fallback'); },
+      listSystemsFn: async () => [],
+      listFlowCardsFn: async () => [],
+    });
+    assert.ok(out.atoms.length >= 1);
+    assert.ok(out.atoms.every((a) => a.flowGuided === false));
+    rmSync(tmp, { recursive: true, force: true });
   });
 
   console.log(`OK ${passed}`);

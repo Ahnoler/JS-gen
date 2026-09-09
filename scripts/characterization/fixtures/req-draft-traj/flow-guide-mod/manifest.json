@@ -1,0 +1,10 @@
+{
+  "moduleKey": "flow-guide-mod",
+  "moduleName": "Flow guide demo",
+  "sourcePath": "C:/fixtures/flow-guide-mod.docx",
+  "sourceKind": "req",
+  "status": "sliced",
+  "warnings": [],
+  "createdAt": "2026-09-09T00:00:00.000Z",
+  "updatedAt": "2026-09-09T00:00:00.000Z"
+}
