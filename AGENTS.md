@@ -68,6 +68,7 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 - 仍存在的跨语言单源是 **PAGE_LOCATOR_HELPERS 生成链**：JS 源 `src/cdp/page-locator-helpers.js` 经 `node scripts/_gen_locator_helpers_py.mjs` 生成 `scripts/controller/actions/js_snippets/_locator_helpers_js.py`，仍禁止手改生成物。
 - Do **not** hand-edit generated `scripts/controller/actions/js_snippets/_locator_helpers_js.py` — it's produced by `node scripts/_gen_locator_helpers_py.mjs` from `src/cdp/page-locator-helpers.js`.
 - **KB 召回金样例是唯一跨语言契约**：`scripts/characterization/fixtures/kb-recall-golden.json` 由 JS（`characterize-flow-card-recall.mjs`）与 Python（`characterize-kb-recall.py`）两侧共同断言；改任一侧召回实现必须同 commit 复跑两侧 characterization，已知分歧以 `divergenceAccepted` 显式登记（收敛后移除），禁止在实现对金样例 query 特判。
+- **KB 召回质量评测与跨语言契约职责分离**：质量门禁 = `scripts/characterization/fixtures/kb-recall-eval.v1.json`（130 条独立标注，冻结，`evalVersion`/`changeLog` 变更须 Lead 批准），指标由 `node scripts/kb/recall-eval.mjs` 产出（Acc@1/Recall@5/MRR/nDCG/拒答/噪声/延迟冷热，`--baseline` diff）；任何召回改动须复跑评测并与基线 diff（设计/基线/阈值提案见 `docs/superpowers/reports/2026-09-09-kb-recall-eval-baseline.md`）；扩充/修订该评测集时禁止先跑匹配器反推 gold。
 
 **Element UI / correctness rules:**
 - **Consecutive-only dedup** (`src/dedup.js`): only back-to-back identical `(action, params)`; non-consecutive duplicates are kept.

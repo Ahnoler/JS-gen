@@ -25,6 +25,7 @@
 - **§6.4 前端派单已落地（2026-09-09 SDD）**：Vue `a1ac7d1`→`587f30c`（per-atom 功能下拉 + `functionIdOverrides` 按行提交）；spec [`2026-09-09-req-draft-wizard-function-candidates-design.md`](specs/2026-09-09-req-draft-wizard-function-candidates-design.md)；待 4097 重启 + product-mgmt 湿测（多行不同功能 overrides）
 - **待办：服务器部署**跑三笔新迁移 `20260908231500_req_atom_key_stable` / `20260908233000_req_atom_seq_unique`（遇历史重复会显式报错，人工合并后重跑）/ `20260908235000_req_source_anchor`
 - **through-chains 全量 proposeable（2026-09-08 Zcode 连续执行）**：29/29 模块 `canProposeAtoms=true`（P0 customer-corp+rating → P1 两波 25 模块子智能体编队 → credit-retail 补漏 + product-mgmt B-G 链表格化）；每模块机械核对原文 ZJJK 码/「」短语零缺失；接口型/无码模块（limit-ctrl-api/portal/system-mgmt/meeting-mgmt 等）ZJJK 列如实 `—`；业务口径零删减。commit `3c9b5d39`/`17b1cd6d`/`c35f2983`+补漏。规范=[`guides/through-chains-proposeable-format.md`](guides/through-chains-proposeable-format.md)
+- **KB 召回评测常态化（2026-09-09 Zcode，方向 3，T0–T3/T5/T6 完成）**：130 条独立标注评测集冻结（62 卡覆盖/盲态复核 0% 分歧）+ `rankFlowCards` 真实排序（`matchFlowForAtom` 语义不变）+ `scripts/kb/recall-eval.mjs` 指标运行器 + PY 一致性 62%；**v1 基线 Acc@1 0.65**（B 层改写 0.23 / D 层短码 0.33 = 算法缺口另立项）；报告 [`reports/2026-09-09-kb-recall-eval-baseline.md`](reports/2026-09-09-kb-recall-eval-baseline.md)。**待办：G1 reviewer 抽检 → G2 Lead 批阈值 → T4 门禁写入 + verify-all 注册**
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 

@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 > **归档**：2026-09-06（含）及更早条目已分流至 [agent-log-archive-2026-09-06.md](agent-log-archive-2026-09-06.md)（2026-09-09 归档）；更早历史见 [agent-log-archive-2026-09-05.md](agent-log-archive-2026-09-05.md)。**本文件只保留最近 3 天条目**——历史不删只归档。
+## 2026-09-10 00:45 · ZCode — 收工：KB 召回评测常态化 T0–T3/T5/T6/T7（回链 09-09 22:44）
+
+- 完成：**T0** 基线复现 6/6 精确 MATCH（`55a558ab` 声明）；**T1** 130 条评测集冻结（A40/B30/C15/D15/N30，62 卡覆盖，excluded 4，盲态子智能体复核 15/15 零分歧，`0e8a9f64`）；**T2** `rankFlowCards` + 2 pin=17 passed、重构后基线仍 6/6（`5acbbbe4`）；**T3** `scripts/kb/recall-eval.mjs` 真实排序指标运行器 + hold-out 对账 Δ全0 + `--baseline` 双向验收（`7543157e`）；**T5** PY agreement 62/100 非阻塞登记（`1e487ca4`）；**T6** 基线报告+阈值提案（`1be0ac8b`）；**T7** AGENTS 职责分离一句 + todo-list ⑧ 一行（本 commit）
+- 验收：`characterize-flow-card-recall` 17 passed / `characterize-kb-recall` 24 契约+5 分歧绿 / v1 指标确定性稳定；**v1 基线 Acc@1 0.65**（Wilson [0.553,0.736]），分层 A 1.00 / C 0.87 / D 0.33 / B 0.23——B 层同义词鸿沟与 D 层 ASCII 短码分词缺口首次被独立评测集量化（旧 24 条 16/24 自 pin 掩盖）；证据 `tmp/kb-eval/`（baseline/T1-struct/T1-blind-review/T2/T3/T5/gate/v1-run1.json）
+- 注意（并行线）：①「flow-card-guided-propose」线在本线执行期间开工且**未写开工条目**，其 WIP=改 `characterize-req-draft-traj.mjs`（flowGuided/PROPOSE_CACHE_VERSION=2 红 pin）+ duplicate-failure-cue 两文件 + 未跟踪 spec/plan；曾致 req-draft-traj 一度过红（本轮 verify-all 时已回绿）；该线若改 `flow-card-recall.js` 须以本线 `rankFlowCards`（`5acbbbe4`）为基线。②本轮 `verify-all` 7 红（capture-element-xpath/xpath-fill-select/form-assistant/tree-select-record/step-highlight/layer-tree/export-v3）经依赖检查对本线文件**零依赖**=他线热区 WIP+存量红，本线三套件在 gate 内全绿
+- 遗留：**T4 门禁写入（`characterize-kb-recall-eval.mjs` + verify-all 一行 + 自证红/绿）等 G1（reviewer 抽检 15 条）与 G2（Lead 批阈值：Acc 0.600/Rec 0.707/MRR 0.614/nDCG 0.628/拒答 0.583/噪声 0.55 + 热50ms/冷200ms）后执行**；算法缺口（同义词桥/ASCII 短码/FP 覆盖率地板）另立项；评测集 v1 冻结只读，变更须 Lead 批准 + changeLog
+
 ## 2026-09-09 23:06 · Cursor Subagent — 收工：有 xpath 的 uml_ecd 唯一 SDD close（回链 22:08）
 
 - 完成：Tasks 1–5：`f3d1c9cf`（红 pin）/ `ceb72223`（guard）/ `a9919634`（迁移 uk_uml_ecd_nav）/ `b7aa21db`（接线）/ `cd6f285b`（docs close）
