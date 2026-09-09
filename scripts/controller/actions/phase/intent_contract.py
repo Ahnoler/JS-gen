@@ -228,8 +228,11 @@ def _clear_phase_form_state(business_data_store: dict | None, *, mode: str, task
     """Drop phase-scoped form/query flags when a new contract is applied."""
     if not business_data_store:
         return
+    from ..search_then_click_guard import clear_stc_flags
+
     for key in ('_query_ui', '_query_ready', '_submit_ready'):
         business_data_store.pop(key, None)
+    clear_stc_flags(business_data_store)
     clear_form = (
         mode in ('navigate', 'query', 'login', 'other')
         or task_mode in ('query', 'login', 'other')

@@ -443,6 +443,9 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             if business_data_store is not None:
                 from scripts.controller.actions.container_naming import remember_trigger_button
                 remember_trigger_button(business_data_store, button_text)
+                if re.sub(r'\s+', '', bt) == '查询':
+                    from scripts.controller.actions.search_then_click_guard import mark_query_clicked
+                    mark_query_clicked(business_data_store)
             return _ok(result)
         if str(result).startswith('err-icon-label-ambiguous:'):
             # Generalized fallback found same-label buttons but could not pick

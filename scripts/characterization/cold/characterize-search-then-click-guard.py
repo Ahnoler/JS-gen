@@ -76,6 +76,11 @@ def main() -> int:
     if store.get(STC_SEARCH_FILLED) or store.get(STC_QUERY_CLICKED):
         print("FAIL: clear_stc_flags")
         return 1
+    intent_path = ROOT / "scripts/controller/actions/phase/intent_contract.py"
+    intent_src = intent_path.read_text(encoding="utf-8")
+    if "_stc_search_filled" not in intent_src and "clear_stc_flags" not in intent_src:
+        print("FAIL: intent_contract missing stc clear wiring")
+        return 1
     print("OK search-then-click-guard")
     return 0
 
