@@ -18,7 +18,7 @@ import {
   loadSourceDoc,
   resolveChapterRef,
 } from './provenance.js';
-import { listFlowCardsDetailed } from '../kb-flow-cards.js';
+import { getFlowCard, listFlowCardsDetailed } from '../kb-flow-cards.js';
 import { matchFlowForAtom } from './flow-card-recall.js';
 import {
   isPersistBoundaryAction,
@@ -284,7 +284,6 @@ function buildFallbackLlmAtoms(chains, sourceDoc) {
 function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
   /** @type {Array<Record<string, unknown>>} */
   const atoms = [];
-  const defaultStem = String(cards[0]?._stem || cards[0]?.flowRef || '').trim();
 
   for (const chain of chains) {
     const steps = chain.steps || [];
@@ -303,7 +302,13 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
       ].filter(Boolean);
       const haystack = actions.join('\n');
       const hit = matchFlowForAtom({ title: haystack, taskDraft: haystack, cards });
-      const flowRef = String(hit.flowRef || defaultStem).trim();
+      if (!hit.flowRef) {
+        atoms.push(...buildFallbackLlmAtoms([{ ...chain, steps: allSteps }], sourceDoc));
+        groupSteps = [];
+        leadingNavSteps = [];
+        return;
+      }
+      const flowRef = String(hit.flowRef).trim();
       const title = actions[actions.length - 1] || chain.title || chain.chainId;
       /** @type {Record<string, unknown>} */
       const atom = {
@@ -534,6 +539,35 @@ function pickAtomKeyStepIndex(chain, stepIndexes) {
 }
 
 /**
+ * Stems from the recalled flow-card list passed into propose.
+ * @param {object[]} cards Relevant flow cards
+ * @returns {Set<string>} Known card stems
+ */
+function recalledCardStems(cards) {
+  /** @type {Set<string>} */
+  const stems = new Set();
+  for (const card of cards || []) {
+    const stem = String(card._stem || card.flowRef || '').trim();
+    if (stem) stems.add(stem);
+  }
+  return stems;
+}
+
+/**
+ * Accept flowRef only when it matches a recalled card stem or exists on disk.
+ * @param {string} flowRef Candidate flow ref from LLM/fallback
+ * @param {{ cards?: object[], flowsDir?: string|null }} ctx Recall context
+ * @returns {Promise<string>} Validated stem or empty string
+ */
+async function resolveKnownFlowRef(flowRef, { cards, flowsDir }) {
+  const ref = String(flowRef || '').trim();
+  if (!ref) return '';
+  if (recalledCardStems(cards).has(ref)) return ref;
+  const card = await getFlowCard(flowsDir ? { stem: ref, dir: flowsDir } : { stem: ref });
+  return card ? ref : '';
+}
+
+/**
  * Materialize one LLM atom into a DraftAtom or rejection entry.
  * @param {Record<string, unknown>} llmAtom Raw LLM atom
  * @param {object} ctx Materialization context
@@ -541,9 +575,11 @@ function pickAtomKeyStepIndex(chain, stepIndexes) {
  * @param {string} ctx.modDir Module directory
  * @param {import('./parse-through-chains.js').ThroughChain[]} ctx.chains Parsed chains
  * @param {string} ctx.sourceDoc Source document path
+ * @param {object[]} ctx.cards Recalled flow cards (stem validation)
+ * @param {string|null} [ctx.flowsDir] Optional flows directory override
  * @returns {Promise<{ atom?: DraftAtom, rejected?: { atomKey?: string, reason: string } }>} Materialized atom or rejection
  */
-async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDoc }) {
+async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDoc, cards, flowsDir }) {
   const chainId = String(llmAtom.chainId || '').trim();
   const chain = chains.find((c) => c.chainId === chainId);
   if (!chain) {
@@ -557,7 +593,8 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   const primaryStep = findStepByIndex(chain, primaryIndex) || chain.steps[0];
   const title = String(llmAtom.title || primaryStep?.action || '').trim();
   const stepIndex = primaryStep?.index || primaryIndex;
-  const flowRef = llmAtom.flowRef != null ? String(llmAtom.flowRef).trim() : '';
+  const rawFlowRef = llmAtom.flowRef != null ? String(llmAtom.flowRef).trim() : '';
+  const flowRef = await resolveKnownFlowRef(rawFlowRef, { cards, flowsDir });
 
   const atomKeyStepIndex = stepIndexes.length > 0
     ? pickAtomKeyStepIndex(chain, stepIndexes)
@@ -829,6 +866,8 @@ export async function proposeDraftTrajectories({
       modDir,
       chains,
       sourceDoc,
+      cards: relevant,
+      flowsDir,
     });
     if (result.atom) {
       atoms.push(result.atom);

@@ -1327,6 +1327,68 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  await runAsync('propose rejects multi_write when LLM flowRef is unknown', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-flow-ref-unknown-'));
+    cpSync(flowGuideFixtureRoot, join(tmp, 'flow-guide-mod'), { recursive: true });
+
+    const fakeLLM = async () => JSON.stringify({
+      atoms: [{
+        chainId: 'chain-a',
+        stepIndexes: [1, 2, 3, 4],
+        title: '草稿客户转为信贷潜在客户',
+        flowRef: 'invented_nonexistent_flow',
+        nodeId: 'edit_page',
+        taskDraft: '1、进入编辑页\n2、维护概况\n3、联网核查\n4、保存\n\n来源：<sourceDoc> / <sourceChapter>\n',
+        phaseHints: ['进页', '保存'],
+        pageCodes: [],
+        suggestedFunctionId: null,
+      }],
+    });
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'flow-guide-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+      listFlowCardsFn: async () => [miniFlowCard],
+    });
+    assert.equal(out.atoms.filter((a) => a.flowGuided === true).length, 0);
+    assert.ok(out.rejected.some((r) => r.reason === 'multi_write_atom'));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose card-guided fallback splits on two persist boundaries', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-flow-two-persist-'));
+    cpSync(flowGuideFixtureRoot, join(tmp, 'flow-guide-mod'), { recursive: true });
+    const chainsPath = join(tmp, 'flow-guide-mod/through-chains.md');
+    writeFileSync(chainsPath, `# 视图2：可贯通主链清单（flow-guide-mod）
+
+### 主链 A：草稿客户转信贷潜在
+
+- **章节出处**：章1 客户编辑
+
+| # | 步骤 | 页面/弹窗 | ZJJK | 关键按钮 |
+|---|------|-----------|------|----------|
+| 1 | 进入编辑页 | 客户编辑页 | ZJJK00066158 | 【进入】 |
+| 2 | 维护概况 | 客户编辑页 | ZJJK00066158 | 【保存概况】 |
+| 3 | 保存（信贷潜在客户） | 客户编辑页 | ZJJK00066158 | 【保存】 |
+| 4 | 提交审批 | 客户编辑页 | ZJJK00066158 | 【提交】 |
+`, 'utf8');
+
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'flow-guide-mod',
+      rootDir: tmp,
+      callLLM: async () => { throw new Error('force fallback'); },
+      listSystemsFn: async () => [],
+      listFlowCardsFn: async () => [miniFlowCard],
+    });
+    assert.equal(out.atoms.length, 2);
+    assert.equal(out.atoms[0].flowGuided, true);
+    assert.match(out.atoms[0].title, /保存/);
+    assert.equal(out.atoms[1].title, '提交审批');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   console.log(`OK ${passed}`);
 }
 
