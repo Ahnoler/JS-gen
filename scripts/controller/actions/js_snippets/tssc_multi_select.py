@@ -99,10 +99,9 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         if (readbackMatches(cur, optNorm)) return 'ok-already:' + cur;
     }
 
-    const opener = triggerInput
-        || fieldItem.querySelector('.el-select .el-input__inner')
-        || fieldItem.querySelector('.el-select')
-        || host;
+    const elSelect = fieldItem.querySelector('.el-select');
+    let opener = triggerInput || elSelect || host;
+    if (triggerInput && triggerInput.readOnly && elSelect) opener = elSelect;
     if (opener) opener.click();
     await sleep(200);
 
@@ -118,21 +117,6 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         return roots;
     };
 
-    const collectRows = () => {
-        const out = [];
-        const seen = new Set();
-        for (const dd of openDropdowns()) {
-            const found = dd.querySelectorAll(
-                '.select-table tr.el-table__row, .el-table__body tr.el-table__row, tr.el-table__row'
-            );
-            for (const tr of found) {
-                if (seen.has(tr)) continue;
-                seen.add(tr);
-                out.push(tr);
-            }
-        }
-        return out;
-    };
     // Dict-mode (要素类型): el-option list, no .select-table (CDP 19242).
     const collectOptions = () => {
         const out = [];
@@ -148,148 +132,180 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         return out;
     };
 
-    let rows = collectRows();
-    if (rows.length === 0) {
+    const dropdownHasTable = () =>
+        openDropdowns().some(dd => dd.querySelector('.select-table'));
+
+    for (let i = 0; i < 12; i++) {
+        if (dropdownHasTable() || collectOptions().length) break;
+        await sleep(250);
+    }
+
+    const hasTable = dropdownHasTable();
+    if (!hasTable) {
+        let items = collectOptions();
+        if (items.length === 0) return 'no-items';
+
+        const itemLabel = (el) => {
+            if (!el) return { cells: [], full: '' };
+            const full = norm(el.textContent);
+            return { cells: full ? [full] : [], full };
+        };
+
+        const rowSummary = (el) => itemLabel(el).full;
+
+        const exactMatchItem = (el, want) => itemLabel(el).full === want;
+
+        const fuzzyMatchItem = (el, want) => {
+            const { full } = itemLabel(el);
+            return full.includes(want) ? full.length : Infinity;
+        };
+
+        const visiblePool = (list) => {
+            const vis = [...list].filter(el => {
+                if (el.classList.contains('is-disabled')) return false;
+                const r = el.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) return true;
+                const dd = el.closest && el.closest('.el-select-dropdown');
+                return !!(dd && dd.getBoundingClientRect().width > 0);
+            });
+            return vis.length ? vis : [...list];
+        };
+
+        const findExact = (pool, want) => {
+            for (const el of pool) {
+                if (exactMatchItem(el, want)) return el;
+            }
+            return null;
+        };
+
+        const findFuzzy = (pool, want) => {
+            let best = null;
+            let bestLen = Infinity;
+            for (const el of pool) {
+                const score = fuzzyMatchItem(el, want);
+                if (score < bestLen) { best = el; bestLen = score; }
+            }
+            return bestLen < Infinity ? best : null;
+        };
+
+        let pool = visiblePool(items);
+        let target = null;
+
+        if (wantFirst) {
+            target = pool[0];
+        } else {
+            target = findExact(pool, optNorm) || findFuzzy(pool, optNorm);
+        }
+
+        if (!target) {
+            const summaries = pool.slice(0, 5).map(rowSummary).join('; ');
+            return 'option-not-found:' + optNorm + ' | mode:option | rows: ' + summaries;
+        }
+
+        target.scrollIntoView({ block: 'nearest' });
+        target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        target.click();
+
+        await sleep(250);
+        const after = readback();
+
+        if (wantFirst) {
+            if (after) return 'ok-first:' + after;
+            return 'err-no-echo: clicked first option, readback empty';
+        }
+        if (readbackMatches(after, optNorm)) {
+            if (after === optNorm) return 'ok:' + after;
+            return 'ok-echo:' + after;
+        }
+        if (after && after.includes(optNorm)) return 'ok-echo:' + after;
+        return 'err-no-echo: expected ' + optNorm + ' | current:' + (after || '(empty)');
+    }
+
+    // --- table v2: P0 opened; P1 search+first / P2 clear+first ---
+    const isFirstAlias = (s) => {
+        const n = norm(s);
+        if (!n) return true;
+        const lower = n.toLowerCase();
+        return FIRST_ALIASES.includes(lower) || FIRST_ALIASES.includes(n);
+    };
+
+    const forceExactOff = (dd) => {
+        for (const sw of dd.querySelectorAll('.el-switch')) {
+            const lbl = (sw.innerText || sw.getAttribute('aria-label') || '');
+            if (lbl.includes('精确') && sw.classList.contains('is-checked')) sw.click();
+        }
+    };
+
+    const findSearchInput = (dd) =>
+        dd.querySelector('.search input.el-input__inner, .search input, .select-table input.el-input__inner');
+
+    const setSearch = (input, val) => {
+        if (!input) return;
+        const proto = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        proto.set.call(input, val);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const visibleRows = () => {
+        const out = [];
+        const seen = new Set();
+        for (const dd of openDropdowns()) {
+            if (!dd.querySelector('.select-table')) continue;
+            for (const tr of dd.querySelectorAll('tr.el-table__row')) {
+                if (seen.has(tr)) continue;
+                seen.add(tr);
+                const r = tr.getBoundingClientRect();
+                if (r.height <= 0) continue;
+                out.push(tr);
+            }
+        }
+        return out;
+    };
+
+    const clickFirstRow = async () => {
+        const rows = visibleRows();
+        if (!rows.length) return '';
+        const target = rows[0];
+        target.scrollIntoView({ block: 'nearest' });
+        const clickEl = target.querySelector('td .cell, td') || target;
+        clickEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        clickEl.click();
+        if (clickEl !== target) target.click();
+        await sleep(250);
+        return readback();
+    };
+
+    const pollRows = async () => {
         for (let i = 0; i < 12; i++) {
+            if (visibleRows().length) return;
             await sleep(250);
-            rows = collectRows();
-            if (rows.length) break;
-            if (collectOptions().length) break;
+        }
+    };
+
+    if (!isFirstAlias(optNorm)) {
+        for (const dd of openDropdowns()) {
+            if (!dd.querySelector('.select-table')) continue;
+            forceExactOff(dd);
+            setSearch(findSearchInput(dd), optNorm);
+        }
+        await pollRows();
+        if (visibleRows().length) {
+            const echo = await clickFirstRow();
+            if (echo) return 'ok-p1:' + echo;
+            return 'err-no-echo: P1 clicked first table row, readback empty';
         }
     }
-    let mode = 'table';
-    let items = rows;
-    if (items.length === 0) {
-        items = collectOptions();
-        mode = 'option';
+
+    for (const dd of openDropdowns()) {
+        if (!dd.querySelector('.select-table')) continue;
+        setSearch(findSearchInput(dd), '');
     }
-    if (items.length === 0) return 'no-items';
-
-    const itemLabel = (el) => {
-        if (!el) return { cells: [], full: '' };
-        if (el.tagName === 'TR') {
-            const cells = [];
-            for (const cell of el.querySelectorAll('td .cell, td')) {
-                const t = norm(cell.textContent);
-                if (t) cells.push(t);
-            }
-            return { cells, full: norm(el.textContent) };
-        }
-        const full = norm(el.textContent);
-        return { cells: full ? [full] : [], full };
-    };
-
-    const rowSummary = (el) => {
-        const { cells, full } = itemLabel(el);
-        return cells.length ? cells.join('|') : full;
-    };
-
-    const exactMatchItem = (el, want) => {
-        const { cells, full } = itemLabel(el);
-        for (const c of cells) {
-            if (c === want) return true;
-        }
-        return full === want;
-    };
-
-    const fuzzyMatchItem = (el, want) => {
-        const { cells, full } = itemLabel(el);
-        let best = Infinity;
-        if (full.includes(want)) best = Math.min(best, full.length);
-        for (const c of cells) {
-            if (c.includes(want)) best = Math.min(best, c.length);
-        }
-        return best;
-    };
-
-    const visiblePool = (list) => {
-        const vis = [...list].filter(el => {
-            if (el.classList.contains('is-disabled')) return false;
-            const r = el.getBoundingClientRect();
-            if (r.width > 0 && r.height > 0) return true;
-            const dd = el.closest && el.closest('.el-select-dropdown');
-            return !!(dd && dd.getBoundingClientRect().width > 0);
-        });
-        return vis.length ? vis : [...list];
-    };
-
-    const findExact = (pool, want) => {
-        for (const el of pool) {
-            if (exactMatchItem(el, want)) return el;
-        }
-        return null;
-    };
-
-    const findFuzzy = (pool, want) => {
-        let best = null;
-        let bestLen = Infinity;
-        for (const el of pool) {
-            const score = fuzzyMatchItem(el, want);
-            if (score < bestLen) { best = el; bestLen = score; }
-        }
-        return bestLen < Infinity ? best : null;
-    };
-
-    let pool = visiblePool(items);
-    let target = null;
-
-    if (wantFirst) {
-        target = pool[0];
-    } else {
-        target = findExact(pool, optNorm);
-        if (!target && mode === 'table') {
-            for (const dd of openDropdowns()) {
-                const searchInput = dd.querySelector(
-                    '.select-table input:not([type="hidden"]), .select-table .el-input__inner,'
-                    + ' .el-input__inner, input:not([type="hidden"])'
-                );
-                if (!searchInput || searchInput === triggerInput) continue;
-                const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                s.call(searchInput, optNorm);
-                searchInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
-                searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-                // Prefer fuzzy: force 精确查询 OFF (sid 5b463582 empty rows).
-                for (const sw of dd.querySelectorAll('.el-switch')) {
-                    const lbl = sw.closest('.el-form-item, label, span, div')?.textContent || sw.textContent || '';
-                    if (!lbl.includes('精确')) continue;
-                    const inner = sw.querySelector('.el-switch__core') || sw;
-                    if (sw.classList.contains('is-checked')) inner.click();
-                    break;
-                }
-                await sleep(500);
-                items = collectRows();
-                pool = visiblePool(items);
-                target = findExact(pool, optNorm) || findFuzzy(pool, optNorm);
-                if (target) break;
-            }
-        }
-        if (!target) target = findFuzzy(pool, optNorm);
+    await pollRows();
+    if (visibleRows().length) {
+        const echo = await clickFirstRow();
+        if (echo) return 'ok-p2:' + echo;
+        return 'err-no-echo: P2 clicked first table row, readback empty';
     }
-
-    if (!target) {
-        const summaries = pool.slice(0, 5).map(rowSummary).join('; ');
-        return 'option-not-found:' + optNorm + ' | mode:' + mode + ' | rows: ' + summaries;
-    }
-
-    target.scrollIntoView({ block: 'nearest' });
-    const clickEl = (target.tagName === 'TR')
-        ? (target.querySelector('td .cell, td') || target)
-        : target;
-    clickEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    clickEl.click();
-    if (target.tagName === 'TR' && clickEl !== target) target.click();
-
-    await sleep(250);
-    const after = readback();
-
-    if (wantFirst) {
-        if (after) return 'ok-first:' + after;
-        return 'err-no-echo: clicked first ' + mode + ', readback empty';
-    }
-    if (readbackMatches(after, optNorm)) {
-        if (after === optNorm) return 'ok:' + after;
-        return 'ok-echo:' + after;
-    }
-    if (after && after.includes(optNorm)) return 'ok-echo:' + after;
-    return 'err-no-echo: expected ' + optNorm + ' | current:' + (after || '(empty)');
+    return 'err-no-options: table empty after clear. Prefer real_click / click_element to fill this field; do NOT blindly retry select_option.';
 }'''
