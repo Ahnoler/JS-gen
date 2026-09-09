@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 15:25 · Cursor Lead — 收工：fill 录放统一设计稿 A→B（回链 15:22）
+
+- 完成：`docs/superpowers/specs/2026-09-09-fill-record-replay-unify-design.md`（对齐 select A→B；点击族仅路线图）
+- 验收：用户确认方向 A + 落盘「可以」
+- 遗留：用户审阅本 spec → 通过后 writing-plans；**尚未实现**
+
+## 2026-09-09 15:22 · Cursor Lead — 开工：fill 录放统一设计稿
+
+- 进行中：15:22；用户确认先 fill、深度 A→B；只写 spec
+- 范围：`docs/superpowers/specs/2026-09-09-fill-record-replay-unify-design.md`、本文件
+- 禁入区：实现代码、点击族实现、whitelist、kb、`.cursor/`
+- 方式：brainstorming 落盘 → 请用户审文件
+
 ## 2026-09-09 15:30 · Cursor Lead — 收工：select 录放统一 SDD A→B（回链 14:35）
 
 - 完成：Phase A（`select_dispatch` + 双接线 + 契约）+ Phase B（`mode=replay` + replay 调 `select_option_for_replay` / tree）；主线 commits `814595f7`…`44384ace`（见 ledger）；verify-all 注册 select-dispatch + select-replay-engine
