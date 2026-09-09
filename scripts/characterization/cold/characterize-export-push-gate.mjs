@@ -21,13 +21,24 @@ assert.equal(isPushableRecordStatus(null), false);
 
 assert.equal(getRecordStatus({ recordStatus: 'draft' }), 'draft');
 assert.equal(getRecordStatus({ record_status: 'recorded' }), 'recorded');
+// 2026-09-09：判定源改为持久基线 persistent_record_status，record_status 仅作旧行回退
+assert.equal(
+  getRecordStatus({ persistentRecordStatus: 'completed', recordStatus: 'recording' }),
+  'completed',
+);
+assert.equal(
+  getRecordStatus({ persistent_record_status: 'completed', record_status: 'recording' }),
+  'completed',
+);
 
 assertPushableForPartner({ recordStatus: 'completed' });
+assertPushableForPartner({ persistentRecordStatus: 'completed', recordStatus: 'recording' });
 
 for (const status of ['recorded', 'failed', 'draft', 'recording']) {
   let threw = false;
   try {
     assertPushableForPartner({ recordStatus: status });
+    assertPushableForPartner({ persistentRecordStatus: status });
   } catch (err) {
     threw = true;
     assert.equal(err.statusCode, 409);
