@@ -1,6 +1,18 @@
 # Agent 协作日志
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
+## 2026-09-09 15:48 · Cursor Lead — 收工：§6.4 功能候选下拉设计稿（回链开工同批）
+
+- 完成：`docs/superpowers/specs/2026-09-09-req-draft-wizard-function-candidates-design.md`（表列下拉；overrides 按行；Out validate/truncated/paasUserId）
+- 验收：用户选范围 A + 确认推荐方案 1
+- 遗留：用户审阅 spec → writing-plans；尚未实现
+
+## 2026-09-09 15:48 · Cursor Lead — 开工：§6.4 功能候选下拉设计稿
+
+- 进行中：2026-09-09 15:48；用户「下一步」→ 范围 A → 确认表列方案
+- 范围：本 spec、本文件
+- 禁入区：Vue 实现本单元不改；JS-gen 运行时；whitelist；select/fill 录放线
+- 方式：brainstorming 落盘 → 请用户审文件
 
 ## 2026-09-09 15:40 · Cursor Lead — 开工：fill 录放统一 SDD 实现（A→B）
 
