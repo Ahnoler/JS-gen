@@ -25,7 +25,7 @@ from ._js_snippets import (
     JS_CLEAR_FIELD_VALUE,
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH, JS_SELECT_VALUE_BY_XPATH, JS_LOCATOR,
-    JS_CLICK_RADIO_BY_XPATH,
+    JS_CLICK_RADIO, JS_CLICK_RADIO_BY_XPATH,
     JS_SELECT_TREE_OPTION, JS_TSSC_MULTI_SELECT, JS_EXPAND_ALL_EL_TREE,
     JS_SCROLL_TO_FIRST_ERROR,
     JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME, JS_WATCH_SAVE_NOTIFICATIONS,
@@ -67,6 +67,21 @@ from .replay_timing import WAIT_300_MS, WAIT_500_MS, WAIT_3000_MS, budget_for
 # SB：fill_form_field 确定性守卫总开关（Z2 严格解析闸 + Z4 弹层作用域闸）。
 # 置 False 可一键回退为守卫前的盲填行为。
 STRICT_FILL_GUARDS = True
+
+
+def _maybe_mark_stc_search_filled(
+    store: dict | None,
+    *,
+    label_text: str,
+    resolved_label: str = "",
+    placeholder: str = "",
+) -> None:
+    from .search_then_click_guard import is_search_field_label, mark_search_filled
+
+    for lbl in (label_text, resolved_label, placeholder):
+        if is_search_field_label(lbl):
+            mark_search_filled(store)
+            return
 
 def _select_failure_next_action(label_text: str, option_text: str, business_data_store) -> str:
     """确定性「建议字段」提示（C2）：值↔选项错配时的下一步指引。
@@ -516,8 +531,14 @@ class FillEngine(_FormActionEngineBase):
                 )
                 if not _is_query_mode(self.business_data_store):
                     _task_done_impl(label_text, self.business_data_store, value=value, xpath_smart=xp_inv)
+                _maybe_mark_stc_search_filled(
+                    self.business_data_store, label_text=label_text,
+                )
                 return _ok(_with_submit_cue(result, self.business_data_store))
             if _is_ok_result(result):
+                _maybe_mark_stc_search_filled(
+                    self.business_data_store, label_text=label_text,
+                )
                 return _ok(_with_submit_cue(result, self.business_data_store))
             if str(result).startswith('field-disabled'):
                 kind_info = await affordances(page, resolved.label or label_text)
@@ -641,8 +662,20 @@ class FillEngine(_FormActionEngineBase):
                 _task_done_impl(
                     resolved.label, self.business_data_store, value=value, xpath_smart=xp_inv,
                 )
+            _maybe_mark_stc_search_filled(
+                self.business_data_store,
+                label_text=label_text,
+                resolved_label=resolved.label or "",
+                placeholder=placeholder,
+            )
             return _ok(_with_submit_cue(result, self.business_data_store))
         if _is_ok_result(result):
+            _maybe_mark_stc_search_filled(
+                self.business_data_store,
+                label_text=label_text,
+                resolved_label=resolved.label or "",
+                placeholder=placeholder,
+            )
             return _ok(_with_submit_cue(result, self.business_data_store))
         if str(result).startswith('field-disabled'):
             kind_info = await affordances(page, resolved.label or label_text)
@@ -2056,38 +2089,91 @@ class SelectEngine(_FormActionEngineBase):
 
 
 class RadioEngine(_FormActionEngineBase):
-    async def click_radio(self, label_text: str, option_text: str, xpath_smart: str = ""):
+    @classmethod
+    async def click_radio_for_replay(
+        cls,
+        page,
+        label_text: str,
+        option_text: str,
+        *,
+        xpath_smart: str = "",
+        business_data_store: dict | None = None,
+    ):
+        """Replay entry: construct engine with page adapter and run mode=replay."""
+        store = _replay_engine_store(business_data_store)
+        bc = _ReplayPageAdapter(page)
+        autofill = _ReplayAutofillStub()
+        engine = cls(bc, store, autofill)
+        return await engine.click_radio(
+            label_text,
+            option_text,
+            xpath_smart,
+            mode="replay",
+        )
+
+    async def click_radio(
+        self,
+        label_text: str,
+        option_text: str,
+        xpath_smart: str = "",
+        *,
+        mode: str = "record",
+    ):
+        is_replay = mode == "replay"
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
-        await self._ensure_scanned(label_text)
+        await self._maybe_ensure_scanned(label_text, mode)
         resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         if resolved.error:
-            return resolved.error
+            err = resolved.error
+            if is_replay:
+                return _unwrap_action_result(err) if not isinstance(err, str) else str(err)
+            return err
+        label_resolved = resolved.label
+        xp = (resolved.xpath_smart or "").strip()
         element = await _capture_element(
-            page, resolved.label, target_kind='form_radio', xpath_smart=resolved.xpath_smart,
+            page, label_resolved, target_kind='form_radio', xpath_smart=xp,
         )
-        result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [resolved.xpath_smart, option_text])
+
+        if xp:
+            result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [xp, option_text])
+            if is_absent_field_result(result) or _is_ok_result(result):
+                pass
+            else:
+                result = await page.evaluate(JS_CLICK_RADIO, [label_resolved, option_text])
+        else:
+            result = await page.evaluate(JS_CLICK_RADIO, [label_resolved, option_text])
+
         if is_absent_field_result(result):
+            if is_replay:
+                sys.stderr.write(f'[form] skip absent radio label={label_resolved!r}\n')
+                sys.stderr.flush()
+                return absent_field_skip_result()
             if not _is_query_mode(self.business_data_store):
-                _task_done_impl(resolved.label, self.business_data_store)
-            sys.stderr.write(f'[form] skip absent radio label={resolved.label!r}\n')
+                _task_done_impl(label_resolved, self.business_data_store)
+            sys.stderr.write(f'[form] skip absent radio label={label_resolved!r}\n')
             sys.stderr.flush()
             return _ok(_with_submit_cue(absent_field_skip_result(), self.business_data_store))
+
         if _is_ok_result(result):
-            xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
+            if is_replay:
+                return str(result)
+            xp_inv = stamp_recorded_xpath_smart(element, xp)
             _record_action(
                 'click_radio',
                 {
-                    'label_text': resolved.label,
+                    'label_text': label_resolved,
                     'option_text': option_text,
                 },
                 result,
                 element=element,
             )
             _task_done_impl(
-                resolved.label, self.business_data_store, value=option_text, xpath_smart=xp_inv,
+                label_resolved, self.business_data_store, value=option_text, xpath_smart=xp_inv,
             )
             return _ok(result)
+        if is_replay:
+            return str(result)
         return result
 
 
