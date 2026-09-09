@@ -5,7 +5,8 @@
  * 1. 中文名相同 → intermediate 的 umlEcd
  * 2. 可导航叶 pdCmptEcd 唯一命中 activity umlEcd（1:N 跳过）
  *
- * 仅当候选 umlEcd 为建模码（UML…）时回填；不覆盖叶上已有的 UML… 码。
+ * 仅当候选 umlEcd 为建模码（UML…）时回填；不覆盖叶上已有的活动级 UML… 码，
+ * 但若叶上已是某 intermediate 的子域/分组 umlEcd，则允许用活动码替换。
  */
 
 /**
@@ -28,7 +29,12 @@ export function pickUmlEcdFromIntermediates(nav, intermediates) {
   const navName = String(nav?.name || '').trim();
   const navPageId = String(nav?.pageId || '').trim();
   const existing = String(nav?.umlEcd || '').trim();
-  if (isModelingUmlEcd(existing)) return '';
+  if (isModelingUmlEcd(existing)) {
+    const isIntermediateGroupCode = list.some(
+      (i) => String(i.umlEcd || '').trim() === existing,
+    );
+    if (!isIntermediateGroupCode) return '';
+  }
 
   if (navName) {
     const byName = list.find(

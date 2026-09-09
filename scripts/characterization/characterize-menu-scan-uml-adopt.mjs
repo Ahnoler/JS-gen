@@ -85,6 +85,29 @@ function testDoNotOverwriteModelingUml() {
   assert.equal(
     pickUmlEcdFromIntermediates({ name: 'X', umlEcd: 'UML_OLD' }, inter),
     '',
+    'existing activity-like UML_OLD is not overwritten by name match to UML_NEW',
+  );
+}
+
+function testOverwriteIntermediateGroupCode() {
+  const inter = [
+    {
+      name: '产品信息管理',
+      umlEcd: 'UML00092662',
+      pages: [
+        { pageId: 'ZJJK00110131', activityUmlEcd: 'UML00057701' },
+        { pageId: 'ZJJK00095454', activityUmlEcd: 'UML00031743' },
+      ],
+    },
+  ];
+  assert.equal(
+    pickUmlEcdFromIntermediates({
+      name: '产品库管理',
+      pageId: 'ZJJK00110131',
+      umlEcd: 'UML00092662',
+    }, inter),
+    'UML00057701',
+    'group umlEcd on leaf is replaced by unique activity code via pageId',
   );
 }
 
@@ -96,6 +119,7 @@ function main() {
     ['pick by pageId unique activity', testPickByPageIdUniqueActivity],
     ['pick by pageId ambiguous', testPickByPageIdAmbiguous],
     ['do not overwrite existing UML…', testDoNotOverwriteModelingUml],
+    ['overwrite intermediate group code', testOverwriteIntermediateGroupCode],
   ];
   let failed = 0;
   for (const [name, fn] of tests) {
