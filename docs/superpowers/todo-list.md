@@ -41,7 +41,7 @@
 
 1. **自主录制**：引擎按 KB 流程卡自主走通环节并经产品管线录制（analyze→create→prepare→record/start→steps 落库）。假成功模式已修（异步终局化门闩）——验收认 `stepCount>0` + 业务 stamp，不认「全 phase_done」。
 2. **成功回放**：录制产物经 `replay_actions` 回放通过（R1 已验证 11/12 confirmed）。
-3. **LLM 脚本容错**：小页面变化（文案漂移/结构微调）下回放不受影响——关联挂起项 `heal-locate-wet`（Heal-Locate 修复定位路由）。
+3. **LLM 脚本容错**：小页面变化（文案漂移/结构微调）下回放不受影响。
 
 **已完成（2026-09-07 主链跑车，全轨迹 recorded + 业务 stamp 双证；子代理编队 G1-G6，Lead 编排）**：
 
@@ -110,7 +110,6 @@
 
 | ID | 优先级 | 项 |
 |----|--------|-----|
-| **heal-locate-wet** | 待跑 | Heal-Locate live 冒烟：真实浏览器 + 后端 + executor；Phase 7 级联隐藏/折叠/Tab/Dialog/缺字段场景；`HEAL_LOCATE_DECISION_ENABLED=1` 路由验收 |
 | **L1-picker-wet** | 挂起 | 多「新增」Vue 选择器冒烟；等执行机 / BiB 重载 |
 | **page-state-wet** | 挂起 | dialog/drawer 内/外同文案按钮碰撞湿测 |
 | **L1c-wet** | P1 挂起 | `L1C_LLM=1` BiB 湿测低置信区域 |
