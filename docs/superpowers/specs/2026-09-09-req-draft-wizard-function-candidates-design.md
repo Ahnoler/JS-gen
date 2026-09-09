@@ -1,7 +1,8 @@
 # 需求草稿向导：功能候选下拉（§6.4 前端派单）— 设计
 
 > 日期：2026-09-09  
-> 状态：已批准（会话 OK）→ 计划 [`../plans/2026-09-09-req-draft-wizard-function-candidates.md`](../plans/2026-09-09-req-draft-wizard-function-candidates.md)  
+> 状态：已实现（Vue commits `a1ac7d1` · `587f30c`）；待 4097 重启 + product-mgmt 湿测（多行不同功能 overrides）  
+> 计划：[`../plans/2026-09-09-req-draft-wizard-function-candidates.md`](../plans/2026-09-09-req-draft-wizard-function-candidates.md)  
 > 前置：[`2026-09-08-kb-remediation-design.md`](./2026-09-08-kb-remediation-design.md) §6.4；向导假流式 [`2026-09-08-req-draft-keydata-and-streaming-ux-design.md`](./2026-09-08-req-draft-keydata-and-streaming-ux-design.md)  
 > 仓库：Vue `vue-project`（`dev`）；后端契约已就绪，本版不改 JS-gen 运行时
 
@@ -100,17 +101,17 @@ functionIdOverrides[key] = fnPickByAtomKey[key]
 
 ## 6. 验收
 
-- [ ] 类型含 `functionIdCandidates`  
-- [ ] 表列下拉可见候选；默认符合 §3  
-- [ ] 两行绑不同功能 → commit overrides 两键两值  
-- [ ] 无 pick 的勾选行阻止创建  
-- [ ] 不调用 validate；不传 paasUserId  
+- [x] 类型含 `functionIdCandidates`（`a1ac7d1` `kb.ts` + `fn-pick.ts`）  
+- [x] 表列下拉可见候选；默认符合 §3（`587f30c` 功能列 + `initFnPicks`）  
+- [ ] 两行绑不同功能 → commit overrides 两键两值（**湿测**：重启 4097 + product-mgmt 向导）  
+- [x] 无 pick 的勾选行阻止创建（`canCreate` + `buildFunctionIdOverrides` 错误 toast）  
+- [x] 不调用 validate；不传 paasUserId（静态 grep / Task 2 checklist）  
 
 ## 7. 实现分期
 
-1. 类型 + pick 初始化 helper（可单测纯函数）  
-2. 表列 UI + canCreate + runCommit  
-3. 湿测 / 静态验收勾选  
+1. ~~类型 + pick 初始化 helper~~ ✓ `a1ac7d1`  
+2. ~~表列 UI + canCreate + runCommit~~ ✓ `587f30c`  
+3. 湿测 / 静态验收勾选 — 静态 ✓；湿测待 4097 + product-mgmt  
 
 ---
 
