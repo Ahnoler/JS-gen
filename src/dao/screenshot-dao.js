@@ -552,45 +552,6 @@ export async function findPageLevel(trajectoryId, levelKey) {
 }
 
 /**
- * List screenshots by a set of trajectory_step ids (storage columns only).
- * @param {number[]} stepIds step ids
- * @returns {Promise<object[]>} screenshot entities
- */
-export async function listByStepIds(stepIds) {  const ids = [...new Set((stepIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
-  if (!ids.length) return [];
-  const rows = await getDB()(TABLE)
-    .select('id', 'storage_type', 'storage_path', 'image_url')
-    .whereIn('trajectory_step_id', ids);
-  return fromDbRows(rows);
-}
-
-/**
- * List screenshots by a set of trajectory_phase ids (storage columns only).
- * @param {number[]} phaseIds phase ids
- * @returns {Promise<object[]>} screenshot entities
- */
-export async function listByPhaseIds(phaseIds) {
-  const ids = [...new Set((phaseIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
-  if (!ids.length) return [];
-  const rows = await getDB()(TABLE)
-    .select('id', 'storage_type', 'storage_path', 'image_url')
-    .whereIn('trajectory_phase_id', ids);
-  return fromDbRows(rows);
-}
-
-/**
- * List storage columns for all screenshots of a trajectory.
- * @param {number} trajectoryId 轨迹 id
- * @returns {Promise<object[]>} screenshot storage entities
- */
-export async function listStorageByTrajectory(trajectoryId) {
-  const rows = await getDB()(TABLE)
-    .select('id', 'storage_type', 'storage_path', 'image_url')
-    .where({ trajectory_id: trajectoryId });
-  return fromDbRows(rows);
-}
-
-/**
  * List screenshots pending upload (storage_type='local'), ordered by created_at.
  * @returns {Promise<object[]>} pending screenshot entities
  */

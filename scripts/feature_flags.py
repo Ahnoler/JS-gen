@@ -94,11 +94,6 @@ def memory_decisions_enabled() -> bool:
     return _env_flag('AI_MEMORY_DECISIONS', True)
 
 
-def memory_audit_strict_enabled() -> bool:
-    """AI_MEMORY_AUDIT_STRICT — 审计严格模式（默认关）。"""
-    return _env_flag('AI_MEMORY_AUDIT_STRICT', False)
-
-
 def phase_reviewer_enabled() -> bool:
     """AI_PHASE_REVIEWER — per-phase LLM contract (default on)."""
     return _env_flag('AI_PHASE_REVIEWER', True)

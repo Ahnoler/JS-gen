@@ -36,15 +36,6 @@ def test_err_with_three_sections():
     assert_true(str(r2.error).startswith("err-icon-label-miss"), "error attr mirrors code")
 
 
-def test_validate_protocol():
-    from scripts.controller.actions.result_protocol import validate_protocol
-    good = ("err-x | 原因:a | 现场:b | 下一步:c")
-    assert_true(validate_protocol(good) == [], f"good rejected: {validate_protocol(good)}")
-    assert_true(any("原因" in v for v in validate_protocol("err-x | 现场:b")), "missing reason flagged")
-    assert_true(validate_protocol("not-err | 原因:a") != [], "non err- prefix flagged")
-    assert_true(validate_protocol("err-X! | 原因:a") != [], "bad code charset flagged")
-
-
 def test_recommend_action_for_kind():
     from scripts.controller.actions.result_protocol import recommend_action_for_kind as rec
     assert_true(rec("select").startswith("select_option"), "select -> select_option")
@@ -83,7 +74,6 @@ def test_final_review_fixes():
 
 def main() -> int:
     test_err_with_three_sections()
-    test_validate_protocol()
     test_recommend_action_for_kind()
     test_affordances_source_shape()
     test_final_review_fixes()

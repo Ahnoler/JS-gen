@@ -1,7 +1,7 @@
 /**
  * File-based business data store: index + per-record JSON persistence under BUSINESS_DATA_DIR.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import path from 'path';
 
 import { BUSINESS_DATA_DIR } from '../config/config.js';
@@ -68,46 +68,4 @@ export function saveBusinessDataRecord({ businessDataPath, sessionId, model, des
   saveBusinessDataIndex(list);
 
   return { record, data };
-}
-
-/**
- * Look up a business data record from the index by id.
- * @param {string} recordId record id
- * @returns {object|null} result
- */
-export function getBusinessDataRecord(recordId) {
-  const list = loadBusinessDataIndex();
-  return list.find(r => r.recordId === recordId) || null;
-}
-
-/**
- * Load and parse a business data record's full JSON by id.
- * @param {string} recordId record id
- * @returns {object|null} result
- */
-export function loadBusinessDataJson(recordId) {
-  const record = getBusinessDataRecord(recordId);
-  if (!record) return null;
-  const filePath = path.join(BUSINESS_DATA_DIR, record.fileName);
-  if (!existsSync(filePath)) return null;
-  try { return JSON.parse(readFileSync(filePath, 'utf-8')); } catch { return null; }
-}
-
-/**
- * Delete a business data JSON file and remove it from the index.
- * @param {string} recordId record id
- * @returns {boolean} result
- */
-export function deleteBusinessData(recordId) {
-  const list = loadBusinessDataIndex();
-  const idx = list.findIndex(r => r.recordId === recordId);
-  if (idx === -1) return false;
-
-  const record = list[idx];
-  const filePath = path.join(BUSINESS_DATA_DIR, record.fileName);
-  try { if (existsSync(filePath)) unlinkSync(filePath); } catch {}
-
-  list.splice(idx, 1);
-  saveBusinessDataIndex(list);
-  return true;
 }

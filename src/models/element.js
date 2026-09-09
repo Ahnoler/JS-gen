@@ -325,39 +325,6 @@ export function prepareElementJson({
 }
 
 /**
- * Convert a StepEntry-like action log item to TrajectoryStep entity fields (camelCase).
- * @param {object} entry 动作日志条目
- * @param {object} [context] — trajectoryId, stepNumber, phaseNumber, etc.
- * @returns {import('./entities.js').TrajectoryStep} 轨迹步骤实体字段
- */
-export function stepEntryToTrajectoryStep(entry, context = {}) {
-  const actionType = normalizeActionName(entry.action || entry.actionType || '');
-  const params = entry.params || entry.paramsJson || null;
-  const element = entry.element && typeof entry.element === 'object' && !Array.isArray(entry.element)
-    ? prepareElementJson({
-      element: entry.element,
-      actionType,
-      params,
-      requireUsable: false,
-    })
-    : null;
-  return {
-    actionType,
-    params,
-    element,
-    extractedContent: entry.result ?? entry.extractedContent ?? '',
-    success: entry.success ?? null,
-    error: entry.error ?? null,
-    phaseNumber: context.phaseNumber ?? entry.phaseNumber ?? entry.phase ?? 0,
-    stepNumber: context.stepNumber ?? entry.stepNumber ?? 0,
-    actionIndex: context.actionIndex ?? entry.actionIndex ?? 0,
-    trajectoryId: context.trajectoryId ?? entry.trajectoryId,
-    trajectoryPhaseId: context.trajectoryPhaseId ?? entry.trajectoryPhaseId ?? null,
-    source: context.source ?? entry.source ?? 'agent',
-  };
-}
-
-/**
  * Map trajectory_step row to action_{ts}.json entry format (legacy action_{ts}.json export format).
  * @param {object} step — camelCase TrajectoryStep from DAO
  * @returns {object} action entry

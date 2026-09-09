@@ -79,27 +79,6 @@ export async function syncMount(trajectoryId, remoteSessionId) {
 }
 
 /**
- * Cache-only clear (does not touch remote_session.trajectory_id / grace).
- * @param {number} remoteSessionId remote_session DB id
- * @param {object} [root0] options
- * @param {number|null} [root0.exceptTrajectoryId] trajectory id to preserve
- * @param {boolean} [root0.demoteLive] whether to demote live trajectories, default true
- * @returns {Promise<number[]>} trajectory ids whose cache was cleared
- */
-export async function clearMountCache(remoteSessionId, {
-  exceptTrajectoryId = null,
-  demoteLive = true,
-} = {}) {
-  const rid = Number(remoteSessionId);
-  const cleared = await trajectoryDao.clearMountByRemoteSessionId(rid, {
-    exceptTrajectoryId,
-    demoteLive,
-  });
-  await clearRuntimeMounts(cleared, rid);
-  return cleared;
-}
-
-/**
  * streamDetach ownership side: idle + grace + clear caches (not Chrome).
  * @param {number} remoteSessionId remote_session DB id
  * @param {object} [root0] options
@@ -130,25 +109,6 @@ export async function streamDetachOwnership(remoteSessionId, {
   logLifecycle('stream_detach', { remoteSessionId: rid, trajectoryId: owner, graceUntil });
   logLifecycle('grace_set', { remoteSessionId: rid, trajectoryId: owner, graceUntil });
   return remoteSessionDao.getById(rid);
-}
-
-/**
- * Expire grace for a single remote session and clear its mounts.
- * @param {number} remoteSessionId remote_session DB id
- * @returns {Promise<number|null>} expired remote_session id, or null if not found
- */
-export async function expireGrace(remoteSessionId) {
-  const rid = Number(remoteSessionId);
-  const row = await remoteSessionDao.getById(rid);
-  if (!row) return null;
-  await remoteSessionDao.clearGraceOwnership(rid);
-  const cleared = await trajectoryDao.clearMountByRemoteSessionId(rid, { demoteLive: true });
-  await clearRuntimeMounts(cleared, rid);
-  logLifecycle('grace_expire', {
-    remoteSessionId: rid,
-    prevTrajectoryId: row.trajectoryId,
-  });
-  return rid;
 }
 
 /**
@@ -183,25 +143,4 @@ export async function clearOwnershipOnClose(remoteSessionId) {
   await clearRuntimeMounts(cleared, rid);
   clearLiveBinding(rid);
   logLifecycle('close', { remoteSessionId: rid });
-}
-
-/**
- * Wrap stale-mount repair (truth backfill left to callers / Task 5).
- * @returns {Promise<number[]>} trajectory ids whose stale mounts were repaired
- */
-export async function reconcileDirtyMounts() {
-  const cleared = await trajectoryDao.repairStaleRemoteMounts();
-  if (!cleared.length) return cleared;
-  try {
-    const { getTrajectoryRuntime } = await import('./trajectory/trajectory-runtime.js');
-    for (const tid of cleared) {
-      const runtime = getTrajectoryRuntime(tid);
-      if (runtime) {
-        runtime.remoteSessionId = null;
-        runtime.bibError = null;
-      }
-    }
-  } catch {}
-  logLifecycle('reconcile_dirty', { cleared });
-  return cleared;
 }

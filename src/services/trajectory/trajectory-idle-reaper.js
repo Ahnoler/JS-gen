@@ -163,10 +163,3 @@ export function startTrajectoryIdleReaper() {
   timer.unref?.();
   console.log(`[idle-reaper] started (idle=${IDLE_MS / 1000}s, tick=${TICK_MS / 1000}s)`);
 }
-
-export function stopTrajectoryIdleReaper() {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
-}

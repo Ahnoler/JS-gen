@@ -133,40 +133,6 @@ def _gen_idcard() -> str:
     return base + check
 
 
-def _gen_idcard_male() -> str:
-    """生成男性身份证（顺序码为奇数）。"""
-    prefix = _random.choice(_IDCARD_AREAS)
-    year = 1950 + _random.randint(0, 55)
-    month = _random.randint(1, 12)
-    day = _random.randint(1, 28)
-    birth = f"{year}{month:02d}{day:02d}"
-
-    seq = _random.choice([1, 3, 5, 7, 9]) * 100 + _random.randint(0, 99)
-    seq_str = f"{seq:03d}"
-
-    base = prefix + birth + seq_str
-    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
-    check = '10X98765432'[sum(int(base[i]) * weights[i] for i in range(17)) % 11]
-    return base + check
-
-
-def _gen_idcard_female() -> str:
-    """生成女性身份证（顺序码为偶数）。"""
-    prefix = _random.choice(_IDCARD_AREAS)
-    year = 1950 + _random.randint(0, 55)
-    month = _random.randint(1, 12)
-    day = _random.randint(1, 28)
-    birth = f"{year}{month:02d}{day:02d}"
-
-    seq = _random.choice([0, 2, 4, 6, 8]) * 100 + _random.randint(0, 99)
-    seq_str = f"{seq:03d}"
-
-    base = prefix + birth + seq_str
-    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
-    check = '10X98765432'[sum(int(base[i]) * weights[i] for i in range(17)) % 11]
-    return base + check
-
-
 def _gen_landline() -> str:
     return _random.choice(['010', '021', '0731', '0755', '0571', '028']) + ''.join(
         str(_random.randint(0, 9)) for _ in range(8))
@@ -326,10 +292,6 @@ def _gen_count() -> str:
 
 def _gen_percent() -> str:
     return f"{_random.randint(0, 10000) / 100:.2f}"
-
-
-def _gen_phone() -> str:
-    return _gen_mobile()
 
 
 def _gen_year() -> str:

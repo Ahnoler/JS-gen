@@ -16,7 +16,6 @@ from scripts.controller.actions.section_scope import (  # noqa: E402
     pending_by_region,
     pending_by_section,
     requires_region_declaration,
-    requires_section_declaration,
     resolve_scope,
 )
 from scripts.controller.actions.form_scan_utils import (  # noqa: E402
@@ -102,10 +101,6 @@ def main() -> int:
     )
     assert_true(pending_by_region(tl) == pending_by_section(tl), "region alias matches section map")
     assert_true(requires_region_declaration(tl), "multi-region requires declaration")
-    assert_true(
-        requires_section_declaration(tl) is True,
-        "legacy requires_section_declaration alias",
-    )
 
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")

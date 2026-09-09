@@ -11,8 +11,6 @@ import re
 
 from ._helpers import _err, _ok
 
-_CODE_RE = re.compile(r"^err-[a-z0-9-]+$")
-
 # kind -> 推荐动作（防呆前置单点出处；spec §第3层映射表）
 _KIND_ACTIONS = {
     "select": 'select_option(label_text="<此字段label>", option_text=<选项原文>)',
@@ -66,32 +64,6 @@ def err_with(code: str, reason: str, observed: str = "", next_action: str = "",
     # (which keys off startswith('err-')) and characterization pins can read it.
     res.error = f"err-{bare}"
     return res
-
-
-def validate_protocol(text: str) -> list[str]:
-    """Return violations ([] == valid). Used by characterization pins.
-
-    Detects: missing 原因 segment (缺段), wrong section order (乱序),
-    duplicate segment (重复), bad prefix, bad code charset (码字符集).
-    """
-    t = (text or "").strip()
-    bad: list[str] = []
-    if not t.startswith("err-"):
-        bad.append("prefix: must start with err-")
-    head = t.split(" ", 1)[0].rstrip(":")
-    if t.startswith("err-") and not _CODE_RE.match(head):
-        bad.append(f"code charset: {head!r}")
-    # 原因: is the mandatory first body segment — its absence is a 缺段 violation.
-    if "原因:" not in t:
-        bad.append("missing segment 原因:")
-    for seg in ("原因:", "现场:", "下一步:"):
-        idx = t.find(seg)
-        if idx >= 0 and t.find(seg, idx + 1) > idx:
-            bad.append(f"duplicate segment {seg}")
-    order = [t.find(s) for s in ("原因:", "现场:", "下一步:") if t.find(s) >= 0]
-    if order != sorted(order):
-        bad.append("section order must be 原因→现场→下一步")
-    return bad
 
 
 def ok_marked(store=None, label: str = "", got: str = "", *, fallback: str = "",

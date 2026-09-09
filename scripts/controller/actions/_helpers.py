@@ -143,28 +143,6 @@ async def reset_select_ui(page) -> dict:
     return result
 
 
-def resolve_option_against_list(want: str, options: list[str] | None) -> str:
-    """Map a desired label onto a catalog list (recording / agent assist only).
-
-    Replay must NOT use this to change option_text — recorded value is authoritative;
-    ``options`` is export/reference inventory for other products.
-    """
-    w = (want or '').strip()
-    opts = normalize_select_options(options or [])
-    if not w or not opts:
-        return w
-    if w in opts:
-        return w
-    for o in opts:
-        if w in o or o in w:
-            return o
-    if w in ('中国', '中国大陆'):
-        for o in opts:
-            if '中国' in o:
-                return o
-    return w
-
-
 def _ok(msg, include_in_memory: bool = False):
     """Wrap a success string in ActionResult with is_done=False.
 

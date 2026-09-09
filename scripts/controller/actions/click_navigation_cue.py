@@ -9,12 +9,6 @@ transition as "entered target page" instead of hunting the same button.
 from __future__ import annotations
 
 
-def navigation_changed(url_before: str, url_after: str) -> bool:
-    b = (url_before or '').strip()
-    a = (url_after or '').strip()
-    return bool(b and a and b != a)
-
-
 def navigation_cue_message(from_url: str, to_url: str) -> str:
     return (
         '[导航] 点击后页面已跳转（URL 变化）→ ' + (to_url or '') + '。'

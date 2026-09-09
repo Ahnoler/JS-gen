@@ -152,32 +152,6 @@ export function extractBusinessEntriesFromRequirement(text) {
 }
 
 /**
- * Append 业务数据 block only to fill / introduce phases (not navigate / login / query).
- * @param {string[]} phases array of phase goal texts
- * @param {string} caseBlock raw business-data block to append
- * @returns {string[]} phase texts with business-data block appended where eligible
- */
-export function appendBusinessDataToPhases(phases, caseBlock) {
-  const block = String(caseBlock || '').trim();
-  if (!block || !Array.isArray(phases) || !phases.length) return phases || [];
-  // Avoid「填写」in the mark — that keyword pollutes task_mode if strip ever fails.
-  const suffix = `\n\n【业务数据 — 来自用户需求；填表/引入时参考理解，按场景选用关键取值】\n${block}`;
-  return phases.map((p) => {
-    const text = String(p || '').trim();
-    if (!text) return text;
-    if (!phaseNeedsBusinessData(text)) return text;
-    if (
-      text.includes('【业务数据')
-      || text.includes('【业务场景案例数据')
-      || text.includes(block.slice(0, Math.min(40, block.length)))
-    ) {
-      return text;
-    }
-    return text + suffix;
-  });
-}
-
-/**
  * Extract the global hard-success-gate block (【硬性成功门闩/门槛——…】) from a
  * requirement text. The block starts at the gate header line and ends before the
  * first numbered step or a business-data section header. Empty when absent —

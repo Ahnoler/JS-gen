@@ -14,7 +14,6 @@ from scripts.controller.actions.section_scope import (  # noqa: E402
     section_matches,
     pending_by_section,
     filter_pending_labels,
-    requires_section_declaration,
     unique_button_section,
 )
 from scripts.controller.actions._form import _submit_ready_hint  # noqa: E402
@@ -119,7 +118,6 @@ def test_err_section_required_trigger_condition() -> None:
     )
     by = pending_by_section(tl)
     assert_true(len(by) >= 2, f"multi-section pending, got {by}")
-    assert_true(requires_section_declaration(tl), "requires_section_declaration when ≥2 sections")
     all_labels = filter_pending_labels(tl, "")
     assert_true(
         "借款企业" in all_labels and "综合评价" in all_labels,
@@ -129,16 +127,6 @@ def test_err_section_required_trigger_condition() -> None:
     assert_true(
         scoped == ["综合评价"] and "借款企业" not in scoped,
         f"scoped filter excludes other section, got {scoped}",
-    )
-    assert_true(
-        not requires_section_declaration(
-            TaskList(
-                pending=[
-                    TaskItem(label="借款企业", kind="radio", section_title="征信信息", section_id="征信信息"),
-                ]
-            )
-        ),
-        "single-section pending does not require section declaration",
     )
 
 
@@ -359,7 +347,6 @@ def test_force_refill_preserves_section_on_valued_fields() -> None:
     item = next(i for i in tl.pending if i.label == "此次评级建议等级")
     tl.mark_done("此次评级建议等级", value="未评级", xpath_smart=item.xpath_smart)
     assert_true(filter_pending_labels(tl, "系统评级结论") == [], "scoped pending empty after fill")
-    assert_true(requires_section_declaration(tl), "other sections still pending → need section=")
 
 
 def main() -> int:

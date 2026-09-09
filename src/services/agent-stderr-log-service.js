@@ -205,20 +205,6 @@ export function filterLines(filter = {}) {
 }
 
 /**
- * List log file paths that contain at least one matching line (or just the session file when sessionId given).
- * @param {{ slot?: number, sid?: string, sessionId?: string }} [filter] slot/sid/sessionId filter
- * @returns {string[]} absolute log file paths matching the filter
- */
-export function listLogFilesMatching(filter = {}) {
-  const { sessionId } = filter;
-  if (sessionId) {
-    const p = logPathForSession(sessionId);
-    return existsSync(p) ? [p] : [];
-  }
-  return listLogFilePaths().filter((filePath) => readMatchingLines(filePath, filter).length > 0);
-}
-
-/**
  * Ask connected executors for per-slot CDP ports (session.list).
  * @returns {Promise<object>} `{ byNodeUuid, bySessionId }` port maps keyed by node uuid / session id
  */

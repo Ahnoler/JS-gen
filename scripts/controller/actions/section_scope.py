@@ -104,11 +104,6 @@ def requires_region_declaration(tl: "TaskList") -> bool:
     return len(pending_by_region(tl)) >= 2
 
 
-def requires_section_declaration(tl: "TaskList") -> bool:
-    """Deprecated alias for requires_region_declaration."""
-    return requires_region_declaration(tl)
-
-
 def same_label_section_keys(buttons: list | None, button_text: str = "保存") -> list[str]:
     """Distinct section titles/ids for visible scan buttons matching ``button_text``.
 

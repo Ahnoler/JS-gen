@@ -54,7 +54,6 @@ export const PROJECT_DIR = _resolve('PROJECT_DIR') || PROJECT_ROOT;
 export const SKILL_DIR = path.join(PROJECT_ROOT, 'src', 'playwright-runner');
 export const TMP_DIR = process.env.TMPDIR || process.env.TMP || process.env.TEMP || os.tmpdir();
 export const DASHBOARD_DIR = PROJECT_ROOT;
-export const GENERATED_DIR = path.join(PROJECT_ROOT, 'scripts', 'generated');
 export const TRAJECTORIES_DIR = path.join(PROJECT_ROOT, 'scripts', 'trajectories');
 export const BUSINESS_DATA_DIR = path.join(PROJECT_ROOT, 'scripts', 'case_data');
 export const BROWSER_DIR = path.join(PROJECT_ROOT, 'browser');
@@ -128,10 +127,6 @@ export const SCREENSHOT_MAX_RETRY = Math.max(
   1,
   parseInt(_resolve('SCREENSHOT_MAX_RETRY', '3'), 10) || 3,
 );
-export const SCREENSHOT_PENDING_TTL_MS = Math.max(
-  60000,
-  parseInt(_resolve('SCREENSHOT_PENDING_TTL_MS', '604800000'), 10) || 604800000,
-);
 
 // Python — detection chain: explicit env → embedded in install dir → system PATH
 function _findPython() {
@@ -174,8 +169,6 @@ export const REPLAY_LOGIN_TIMEOUT_MS = parseInt(_resolve('REPLAY_LOGIN_TIMEOUT_M
 export const REPLAY_STEP_TIMEOUT_MS = parseInt(_resolve('REPLAY_STEP_TIMEOUT_MS', '300000'), 10) || 300000;
 /** 交易执行前菜单导航 replay 超时（menu-navigation）。 */
 export const REPLAY_NAV_TIMEOUT_MS = parseInt(_resolve('REPLAY_NAV_TIMEOUT_MS', '120000'), 10) || 120000;
-/** 读起点页面组件编号 replay 超时（recording-page-bind read_page_component_code）。 */
-export const REPLAY_READ_PAGE_TIMEOUT_MS = parseInt(_resolve('REPLAY_READ_PAGE_TIMEOUT_MS', '90000'), 10) || 90000;
 /** 菜单扫描阶段二组件编号合并读取 replay 超时（menu-scan-service phase2）。 */
 export const REPLAY_PHASE2_TIMEOUT_MS = parseInt(_resolve('REPLAY_PHASE2_TIMEOUT_MS', '25000'), 10) || 25000;
 

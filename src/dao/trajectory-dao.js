@@ -560,19 +560,6 @@ export async function hasRunningPhase(trajectoryId) {
 }
 
 /**
- * Get the maximum phase number for a trajectory.
- * @param {number} trajectoryDbId The trajectory ID to query
- * @returns {Promise<number>} Maximum phase number or 0 if no phases exist
- */
-export async function getMaxPhaseNumber(trajectoryDbId) {
-  const row = await getDB()('trajectory_phase')
-    .where({ trajectory_id: trajectoryDbId })
-    .max('phase_number as maxPhase')
-    .first();
-  return row?.maxPhase || 0;
-}
-
-/**
  * Find the latest trajectory row for a req atom in ANY lifecycle state
  * (idempotency guard — draft/recorded/paused all block re-commit).
  * @param {string} moduleKey KB req moduleKey
