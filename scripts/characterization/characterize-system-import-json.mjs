@@ -42,8 +42,9 @@ try {
  */
 function buildFixture() {
   const managePage = (ecd, nm, resPath) => ({ pdCmptEcd: ecd, pdCmptNm: nm, resPath });
-  const activity = (name, mp, guidePages, scenes) => ({
+  const activity = (name, mp, guidePages, scenes, umlEcd = '') => ({
     umlType: '3',
+    umlEcd: umlEcd || `UML_${name}`,
     name,
     managePage: mp,
     guidePages: guidePages || [],
@@ -55,16 +56,22 @@ function buildFixture() {
     managePage('ZJJK00066153', '对公客户管理页', '/cstMgt/x'),
     [{ pdCmptEcd: 'ZJJK00066158', pdCmptNm: '新增对公客户' }],
     [{ tasks: [{ pdCmptEcd: 'ZJJK99999999', pdCmptNm: '任务级模板' }] }],
+    'UML_GONGYE_MAINT',
   );
   const gongYeCreate = activity(
     '创建对公客户信息',
     managePage('ZJJK00066153', '对公客户管理页', '/cstMgt/x'),
+    undefined,
+    undefined,
+    'UML_GONGYE_CREATE',
   );
 
   const siYe = activity(
     '对私活动',
     managePage('ZJJK00067207', '对私客户管理页', '/cstMgt/y'),
     [{ pdCmptEcd: '', pdCmptNm: '空编码引导页' }],
+    undefined,
+    'UML_SIYE',
   );
 
   const gongGongLeaf = { umlType: '2', umlNm: '对公客户管理', children: [gongYe, gongYeCreate] };
@@ -77,13 +84,28 @@ function buildFixture() {
   const heiMingDan = activity(
     '黑名单活动',
     managePage('ZJJK00098110', '黑名单管理页', '/cstMgt/z'),
+    undefined,
+    undefined,
+    'UML_HEIMINGDAN',
   );
   const mingDanLeaf = { umlType: '2', umlNm: '黑名单管理', children: [heiMingDan] };
   const mingDanMid = { umlType: '2', umlNm: '名单制管理', children: [mingDanLeaf] };
 
   // Top-level leaf directly under the root module (goes into functions, not pages).
-  const gongGaoView = activity('查看', managePage('ZJJK00109712', '中征网公告管理页', '/gongGao/view'));
-  const gongGaoAlloc = activity('分配', managePage('ZJJK00109712', '中征网公告管理页', '/gongGao/view'));
+  const gongGaoView = activity(
+    '查看',
+    managePage('ZJJK00109712', '中征网公告管理页', '/gongGao/view'),
+    undefined,
+    undefined,
+    'UML_GONGGAO_VIEW',
+  );
+  const gongGaoAlloc = activity(
+    '分配',
+    managePage('ZJJK00109712', '中征网公告管理页', '/gongGao/view'),
+    undefined,
+    undefined,
+    'UML_GONGGAO_ALLOC',
+  );
   const gongGaoLeaf = { umlType: '2', umlNm: '中征网公告管理', children: [gongGaoView, gongGaoAlloc] };
 
   const keHuMgt = {
@@ -169,15 +191,21 @@ function testBuildPlanSharedManagePageDedup() {
   assert.ok(!pageIds.includes('ZJJK00066158'), 'guidePage ZJJK00066158 not imported');
   assert.equal(gongGong.pages.length, 1);
   assert.equal(gongGong.pages[0].pageType, 'managePage');
+  assert.equal(
+    gongGong.pages[0].activityUmlEcd,
+    '',
+    'two activities with different umlEcd on same pageId → cleared',
+  );
 }
 
 /** 非顶层叶子一律 intermediate；全量 pages；不按活动拆导航叶 */
 function testBuildPlanMultiPageLeafIntermediate() {
   if (!importAvailable) { console.log('    (skipped: SUT not importable)'); return; }
   const managePage = (ecd, nm) => ({ pdCmptEcd: ecd, pdCmptNm: nm, resPath: '/' + ecd });
-  const activity = (name, ecd) => ({
+  const activity = (name, ecd, umlEcd = '') => ({
     umlType: '3',
     umlNm: name,
+    umlEcd: umlEcd || `UML_${ecd}`,
     managePage: managePage(ecd, name + '页'),
   });
   const infoLeaf = {
@@ -185,16 +213,16 @@ function testBuildPlanMultiPageLeafIntermediate() {
     umlNm: '产品信息管理',
     umlEcd: 'UML_INFO',
     children: [
-      activity('配置产品信息', 'ZJJK_A'),
-      activity('维护产品阶段', 'ZJJK_B'),
-      activity('维护核心产品映射', 'ZJJK_C'),
+      activity('配置产品信息', 'ZJJK_A', 'UML_ZJJK_A'),
+      activity('维护产品阶段', 'ZJJK_B', 'UML_ZJJK_B'),
+      activity('维护核心产品映射', 'ZJJK_C', 'UML_ZJJK_C'),
     ],
   };
   const elmtLeaf = {
     umlType: '2',
     umlNm: '产品要素管理',
     umlEcd: 'UML00092663',
-    children: [activity('维护产品要素', 'ZJJK_E')],
+    children: [activity('维护产品要素', 'ZJJK_E', 'UML_ZJJK_E')],
   };
   const mod = {
     umlType: '2',
@@ -214,6 +242,11 @@ function testBuildPlanMultiPageLeafIntermediate() {
   assert.ok(elmt);
   assert.equal(elmt.intermediate, true, 'single-page group also intermediate without whitelist');
   assert.equal(elmt.pages[0].pageId, 'ZJJK_E');
+  assert.equal(elmt.pages[0].activityUmlEcd, 'UML_ZJJK_E', 'unique page carries activity umlEcd');
+  const pageById = new Map(fn.pages.map((p) => [p.pageId, p]));
+  assert.equal(pageById.get('ZJJK_A').activityUmlEcd, 'UML_ZJJK_A');
+  assert.equal(pageById.get('ZJJK_B').activityUmlEcd, 'UML_ZJJK_B');
+  assert.equal(pageById.get('ZJJK_C').activityUmlEcd, 'UML_ZJJK_C');
 }
 
 function testBuildPlanEmptyGuidePageSkipped() {
@@ -236,6 +269,11 @@ function testBuildPlanTopLevelLeafDedup() {
   const pageIds = gongGao.pages.map((p) => p.pageId);
   // Two activities share ZJJK00109712 → deduped to 1.
   assert.deepEqual(pageIds, ['ZJJK00109712'], 'shared managePage across two activities deduped to 1');
+  assert.equal(
+    gongGao.pages[0].activityUmlEcd,
+    '',
+    'shared pageId with conflicting activity umlEcd → cleared',
+  );
   // The module itself must not also list this page at module.pages scope.
   const modPageIds = plan.modules[0].pages.map((p) => p.pageId);
   assert.ok(!modPageIds.includes('ZJJK00109712') || true,
@@ -251,6 +289,7 @@ function testBuildPlanHeiMingDan() {
   assert.equal(hei.intermediate, true);
   const pageIds = hei.pages.map((p) => p.pageId);
   assert.deepEqual(pageIds, ['ZJJK00098110']);
+  assert.equal(hei.pages[0].activityUmlEcd, 'UML_HEIMINGDAN', 'unique page carries activity umlEcd');
 }
 
 function testWiringRoute() {

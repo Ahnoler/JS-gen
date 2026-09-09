@@ -45,7 +45,7 @@ export function parseMenuJson(buffer) {
  * 收集一个节点直属活动（children 中 umlType='3'）的落地页。
  * @param {object} node 子领域/模块节点
  * @param {{ all?: boolean }} [opts] all=true 时收齐全部非空 managePage（中间菜单目录）；默认只留第一个（可导航功能）
- * @returns {object[]} 项含 pageId/pageName/resPath/pageType='managePage'
+ * @returns {object[]} 项含 pageId/pageName/resPath/pageType='managePage'/activityUmlEcd
  */
 function collectPages(node, opts = {}) {
   const wantAll = !!opts.all;
@@ -58,7 +58,19 @@ function collectPages(node, opts = {}) {
     const managePage = child.managePage;
     const pageId = managePage ? String(managePage.pdCmptEcd || '').trim() : '';
     if (!pageId) continue;
-    if (seen.has(pageId)) continue;
+    const activityUmlEcd = String(child.umlEcd || '').trim();
+    if (seen.has(pageId)) {
+      const existing = pages.find((p) => p.pageId === pageId);
+      if (
+        existing &&
+        activityUmlEcd &&
+        existing.activityUmlEcd &&
+        existing.activityUmlEcd !== activityUmlEcd
+      ) {
+        existing.activityUmlEcd = ''; // 1:N ambiguous → adopt must skip
+      }
+      continue;
+    }
     if (!wantAll && pages.length > 0) {
       skippedExtraManage += 1;
       continue;
@@ -69,6 +81,7 @@ function collectPages(node, opts = {}) {
       pageName: String(managePage.pdCmptNm || '').trim(),
       resPath: String(managePage.resPath || '').trim(),
       pageType: 'managePage',
+      activityUmlEcd,
     });
   }
   if (!wantAll && skippedExtraManage > 0) {
