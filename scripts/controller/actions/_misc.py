@@ -649,12 +649,12 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             # rows / dropdown body). Agents otherwise record 点击元素 with concatenated
             # company names (对公评级申请「客户名称」TsscMultiSelect) then still call
             # select_option — duplicate junk step. Same rule as prompt EL-SELECT §2–3.
+            gate_xp = str(
+                (element_info or {}).get('xpath')
+                or getattr(element_node, 'xpath', None)
+                or ''
+            )
             try:
-                gate_xp = str(
-                    (element_info or {}).get('xpath')
-                    or getattr(element_node, 'xpath', None)
-                    or ''
-                )
                 dd_gate = await page.evaluate(
                     '''(xpath) => {
                         let node = null;
@@ -691,6 +691,17 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 sys.stderr.write("[click] el-select dropdown gate check failed index={index!r}" + '\n')
                 sys.stderr.flush()
                 pass
+
+            if gate_xp:
+                try:
+                    from .search_then_click_guard import guard_locate_or_err, xpath_is_tree_node
+                    if await xpath_is_tree_node(page, gate_xp):
+                        stc_err = await guard_locate_or_err(page, business_data_store)
+                        if stc_err:
+                            return _err(stc_err, include_in_memory=True)
+                except Exception:
+                    sys.stderr.write("[click] search-then-click tree gate failed index={index!r}" + '\n')
+                    sys.stderr.flush()
 
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
             # select→修改→确认 loops after premature done() rejection.

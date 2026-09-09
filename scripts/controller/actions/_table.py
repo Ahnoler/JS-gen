@@ -35,6 +35,10 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
     @controller.action('Click a button in an el-table row by matching row text and button text. Supports edit/delete icon shortcuts. If the row has no such button (toolbar-style tables: select the row via radio, then click the toolbar button), returns structured guidance instead of clicking an arbitrary control.')
     async def click_table_row_button(row_text: str, button_text: str):
         page = await browser_context.get_current_page()
+        from .search_then_click_guard import guard_locate_or_err
+        err = await guard_locate_or_err(page, business_data_store)
+        if err:
+            return err
         # Pre-mutation snapshot of the intended control
         element = await _enrich_click_element(
             page,
@@ -148,6 +152,10 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
     @controller.action('Click the radio button in an el-table row, identified by row text. Clicks label.el-radio > .el-radio__inner. Supports Element UI fixed columns.')
     async def click_table_row_radio(row_text: str):
         page = await browser_context.get_current_page()
+        from .search_then_click_guard import guard_locate_or_err
+        err = await guard_locate_or_err(page, business_data_store)
+        if err:
+            return err
         # Pre-strip stale dialog wrappers (tsscMutilDialog 关闭残留) so real
         # clicks reach the row radio; idempotent, <10ms.
         try:

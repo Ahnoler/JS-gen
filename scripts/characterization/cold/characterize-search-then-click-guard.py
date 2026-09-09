@@ -18,9 +18,20 @@ def main() -> int:
         mark_search_filled,
         mark_query_clicked,
         clear_stc_flags,
+        detect_search_ui,
+        xpath_is_tree_node,
+        guard_locate_or_err,
         STC_SEARCH_FILLED,
         STC_QUERY_CLICKED,
     )
+    for name, fn in (
+        ("detect_search_ui", detect_search_ui),
+        ("xpath_is_tree_node", xpath_is_tree_node),
+        ("guard_locate_or_err", guard_locate_or_err),
+    ):
+        if not callable(fn):
+            print(f"FAIL: missing async helper {name}")
+            return 1
     err = build_err_search_first("need-fill")
     if not err.startswith("err-search-first:"):
         print(f"FAIL: bad err prefix {err!r}")
@@ -80,6 +91,17 @@ def main() -> int:
     intent_src = intent_path.read_text(encoding="utf-8")
     if "_stc_search_filled" not in intent_src and "clear_stc_flags" not in intent_src:
         print("FAIL: intent_contract missing stc clear wiring")
+        return 1
+    table_src = (ROOT / "scripts/controller/actions/_table.py").read_text(encoding="utf-8")
+    misc_src = (ROOT / "scripts/controller/actions/_misc.py").read_text(encoding="utf-8")
+    if "guard_locate_or_err" not in table_src:
+        print("FAIL: _table.py missing guard_locate_or_err wiring")
+        return 1
+    if table_src.count("guard_locate_or_err") < 2:
+        print("FAIL: _table.py must gate click_table_row_radio and click_table_row_button")
+        return 1
+    if "guard_locate_or_err" not in misc_src or "xpath_is_tree_node" not in misc_src:
+        print("FAIL: _misc.py missing tree search-then-click gate wiring")
         return 1
     print("OK search-then-click-guard")
     return 0
