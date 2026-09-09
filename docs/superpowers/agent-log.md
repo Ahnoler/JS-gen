@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-09 14:35 · Cursor Lead — 开工：select 录放统一 SDD 实现（A→B）
+
+- 进行中：14:35；按 `docs/superpowers/plans/2026-09-09-select-record-replay-unify.md` Subagent-Driven；子智能体不 commit，主会话验收后代提交
+- 范围：`scripts/controller/actions/select_dispatch.py`、`form_action_engines.py`、`replay_form_action.py`、cold pins（select-dispatch / tssc / Phase B）、`engine-actions-contract`、`AGENTS.md`、verify-all、本文件；ledger `.superpowers/sdd/2026-09-09-select-record-replay-unify/`
+- 禁入区：`config/update-db-whitelist.ps1`；kb drafts；`src/services/partner-platform.js`（他线 WIP）；`.cursor/`；fill 全双线重写
+- 方式：SDD Task 1–9；主会话 commit
+
 ## 2026-09-09 14:20 · Cursor Lead — 收工：select 录放统一 implementation plan（回链 14:15）
 
 - 完成：`docs/superpowers/plans/2026-09-09-select-record-replay-unify.md`（Task 1–9：A 红 pin→dispatch→双接线→契约；B 红 pin→engine mode→replay 调引擎→verify-all）；spec 标已批准
