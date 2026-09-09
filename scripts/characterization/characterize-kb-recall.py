@@ -143,6 +143,28 @@ def main():
     registered = sum(1 for e in golden['entries'] if e.get('divergenceAccepted'))
     print(f"golden fixture: {len(golden['entries'])} entries, {registered} accepted divergences")
 
+    # 质量评测集 v1（kb-recall-eval.v1.json，spec 2026-09-09-kb-recall-eval-design D6）：
+    # py 侧只断言正样本 flowRef 与 gold 的一致性——命不命中记为分歧登记（不阻塞，
+    # py 算法未升级不参与 JS 指标门禁）；无阈值，避免长期红。
+    with open(os.path.join(root, "scripts", "characterization", "fixtures", "kb-recall-eval.v1.json"), encoding="utf-8") as f:
+        eval_v1 = _json.load(f)
+    positives = [e for e in eval_v1["entries"] if e["tier"] != "N"]
+    agree = 0
+    mismatches = []
+    for entry in positives:
+        hit, _score = find_flow_for_task(real_cards, entry["query"])
+        got = name2stem.get(hit["flow"]) if hit else None
+        if got in entry["gold"]:
+            agree += 1
+        else:
+            mismatches.append(f"{entry['id']} {entry['query']!r} gold={entry['gold']} py={got}")
+    rate = agree / len(positives)
+    print(f"py agreement: {agree}/{len(positives)} ({rate:.0%})")
+    for m in mismatches[:20]:
+        print(f"  py-divergence: {m}")
+    if len(mismatches) > 20:
+        print(f"  ... and {len(mismatches) - 20} more")
+
     print("ok: characterize-kb-recall")
 
 
