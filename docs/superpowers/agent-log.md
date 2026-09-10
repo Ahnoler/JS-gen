@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 00:04 · Zcode — 开工：colloquial-bridge 收尾（Lead 裁定 `dc31f756`，F-2/F-5/R-1/台账 三 commit）
+
+- 工作范围：`tmp/kb-bridge/T2-bridge.txt`（F-2 入库，force-add）、`tmp/kb-bridge/t2-build-table.mjs`（F-5 幂等化）、`scripts/kb/recall-eval.mjs` + `scripts/characterization/characterize-kb-recall-eval.mjs`（R-1 留痕+pin，**扩围**——不在 23:23 原声明内，特此声明）、`docs/superpowers/reports/2026-09-10-colloquial-bridge-report.md`（§8 对账）、`docs/superpowers/todo-list.md`、本文件、`tmp/kb-bridge/T3-on.after.json`（等价性证据）
+- 禁入区：评测集 v1/v2、`data/kb/synonyms.json`、`data/kb/colloquial-bridge.json` 的 `entries`（sha256 `eb4ec272…` 逐位不变铁律）、`verify-all.sh`、`data/kb/req/**`、阈值/loader 过滤、他线 WIP（Cursor L1c-scan-py 线刚收工）
+- 执行方式：一 Task 一 commit；R-1 仅留痕+stderr 告警（不改加载条数/metrics/exit code）；pin 临时资产写 tmp/ 不落 data/；幂等性以真跑+空 diff 证明
+
 ## 2026-09-10 23:44 · Cursor Lead — 收工：L1c-scan-py scan 接 regions/classify
 
 - 完成：回链开工 `1dc516b4`；新建 `l1c_region_classify.py`（map/apply/HTTP fail-soft）；`scan_editable_summary_impl` 在 `build_editable_summary` 前调用；只写回 `regions[]`
