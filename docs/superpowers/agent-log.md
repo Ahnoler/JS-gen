@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 23:55 · ZCode 引擎线 — 开工：tansun 引擎 18 操作兼容实装（回链 23:40 格式核对/23:10 词表冻结）
+
+- 工作范围：D:\dev\tansun_ui_engine 新建分支 compat/js-gen-operations——ui_execute/engine/data_name.py(新)/action_registry.py、ui_execute/engine/actions/{input_action.py, click.py, replay_adapter.py(仅 hint 归一), select_click.py, date_action.py(新), click_subroutes.py(新)}、ui_execute/models/{enums.py, payload.py}、docs/EXECUTION_PAYLOAD_MIGRATION.md、tests/{test_input_action.py, test_click_subroutes.py, test_date_action.py, test_select_click_rowselect.py}(新)+.venv(本地依赖, gitignore 意);JS-gen 仓仅 docs/superpowers/agent-log.md
+- 禁入区：JS-gen 主仓 src//scripts/（他线 12 项 WIP 热区）；tansun_ui_engine 其余全部（scheduler/executor/locator/models 其余/tests 存量 16 件）
+- 执行方式：主会话先落 data_name 前缀解析 helper（路由键+labelHint 剥前缀），随后 3 并行子智能体——A=input 值字段(object_value or val)+hint 剥前缀；B=click dataName 前缀子路由（关闭弹窗/展开树/页签：/表格：/树选：/邻钮：/菜单：,JS 从 JS-gen js_snippets 移植,miss 落回原链）；C=date event 六处清单+select:click「弹窗选择：」行选分支——子智能体不 commit 不写本文件,主会话 pytest 全量+diff 审查后代提交；radio/select:tree 等同事推送后复验（批 5,不在本次）；不动 JS-gen 推送链
+
 ## 2026-09-10 23:40 · ZCode 引擎线 — 推送接口数据格式核对（回链 23:10）
 
 - 用户要求重看推送接口数据格式——全链路重读：JS-gen 侧 transaction-export.js（importDemand 报文：transcationEventTypeList→transcationProperties，六 type=eventTypeName/eventTypeValue）与同事引擎侧两套接收（V2/V3 structured：scheduler/payload.py:105→ExecutionPayload→_step_to_transaction 压平 transaction JSON；V1 老格式：ExecuteRequest+transactionList 直收，payload.py:164 id>0 硬校验）逐字段对齐
