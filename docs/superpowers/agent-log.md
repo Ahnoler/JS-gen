@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 17:50 · Cursor Lead — 开工：p2-toast-cursor 导航/跨页 notify 游标回卷
+
+- 进行中：2026-09-10 17:50；根因=`log_len < cursor` 时不回卷 → 新页前 N 条 toast 永久跳过；seen 残留同效
+- 范围：`scripts/agent/step_notice.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、todo-list、本文件
+- 禁入区：js_snippets/fill/select 热区（本修仅 Python 游标/seen，不改 JS 片段）、classify/verify-all WIP
+- 方式：TDD 抽 `rewind_notify_cursor_if_shrunk` → scan 路径 shrink 时重扫 cursor=0 → 绿 pin → 收工
+
 ## 2026-09-10 17:15 · Cursor Lead — 收工：p1-6 replayId 全链过滤 + 超时 cancel_step
 
 - 完成：回链开工 `6e84fa6b`；`runReplayActions` 铸造 replayId → Python `replay_done` 回带 → `waitForOwnedReplayDone` 过滤；超时发 `cancel_step`；rerun executor 路改走 helper（`seedActionLog`）
