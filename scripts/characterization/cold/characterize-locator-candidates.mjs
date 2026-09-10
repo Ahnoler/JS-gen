@@ -372,6 +372,78 @@ function ok(name) {
 }
 
 {
+  // Tree/filter search boxes: label_text is the placeholder; inventing
+  // el-form-item+label xpath breaks replay (strict-locator-not-found).
+  const xp = buildXPathSmart({
+    tag: 'input',
+    formLabel: '搜索关键字',
+    placeholder: '搜索关键字',
+    targetKind: 'form_input',
+    className: 'el-input__inner',
+    attributes: { class: 'el-input__inner', placeholder: '搜索关键字' },
+  });
+  assert.ok(xp.includes('placeholder'), `expected placeholder xpath, got ${xp}`);
+  assert.ok(!xp.includes('el-form-item'), `must not invent form-item label xpath, got ${xp}`);
+  ok('buildXPathSmart placeholder-only search cue');
+}
+
+{
+  const enriched = enrichLocatorFields({
+    tag: 'input',
+    formLabel: '搜索关键字',
+    label_text: '搜索关键字',
+    placeholder: '搜索关键字',
+    target_kind: 'form_input',
+    attributes: { class: 'el-input__inner', placeholder: '搜索关键字' },
+  });
+  assert.ok(
+    String(enriched.xpath_smart || '').includes('placeholder'),
+    `enrich invents placeholder xpath, got ${enriched.xpath_smart}`,
+  );
+  assert.ok(
+    !String(enriched.xpath_smart || '').includes('el-form-item'),
+    `enrich must not invent el-form-item label for placeholder-only, got ${enriched.xpath_smart}`,
+  );
+  ok('enrichLocatorFields placeholder-only search invent');
+}
+
+{
+  // Search cue as formLabel alone (no attrs.placeholder) — still invent placeholder.
+  const xp = buildXPathSmart({
+    tag: 'input',
+    formLabel: '搜索关键字',
+    targetKind: 'form_input',
+  });
+  assert.ok(xp.includes('placeholder'), `search-like label alone → placeholder, got ${xp}`);
+  assert.ok(!xp.includes('el-form-item'), `no form-item invent, got ${xp}`);
+  ok('buildXPathSmart search-like label without placeholder attr');
+}
+
+{
+  const enriched = enrichLocatorFields({
+    tag: 'input',
+    formLabel: '搜索关键字',
+    label_text: '搜索关键字',
+    placeholder: '搜索关键字',
+    target_kind: 'form_input',
+    xpath_smart: (
+      "//div[contains(@class,'el-form-item')]"
+      + "[.//label[normalize-space(.)='搜索关键字']]//input"
+    ),
+    attributes: { class: 'el-input__inner', placeholder: '搜索关键字' },
+  });
+  assert.ok(
+    String(enriched.xpath_smart || '').includes('placeholder'),
+    `heal bad invented label xpath → placeholder, got ${enriched.xpath_smart}`,
+  );
+  assert.ok(
+    !String(enriched.xpath_smart || '').includes('el-form-item'),
+    `healed xpath must not keep el-form-item, got ${enriched.xpath_smart}`,
+  );
+  ok('enrichLocatorFields heals placeholder-only invented label xpath');
+}
+
+{
   // Python mirror must contain the same page helpers.
   const py = readFileSync(join(__dirname, '..', '..', 'controller', 'actions', 'js_snippets', '_locator_helpers_js.py'), 'utf8');
   assert.ok(py.includes('buildLocatorSnap'));

@@ -142,6 +142,36 @@ export function buildXPathSmart(opts = {}) {
     });
   }
 
+  const ph = normalizeControlText(placeholder || (attributes && attributes.placeholder) || '');
+  // Placeholder-only fields (tree filter 搜索关键字, login): formLabel is often the
+  // placeholder promoted to label_text. Inventing el-form-item+label xpath then
+  // fails replay (strict-locator-not-found). Prefer placeholder when cues match
+  // live formFieldXpathSmartOf(!realLabel) / manual mapper offline order.
+  const placeholderOnlyCue = Boolean(
+    ph
+    && formLbl
+    && (formLbl === ph
+      || formLbl === normalizeControlText(String(ph).replace(/^请输入/, '')))
+  ) || Boolean(
+    !ph
+    && formLbl
+    && /搜索|关键字|过滤/.test(formLbl)
+  );
+  if (
+    (ph || placeholderOnlyCue)
+    && (!formLbl || placeholderOnlyCue || kind === 'form_input' || !kind)
+  ) {
+    const phXp = buildPlaceholderXPathSmart({
+      placeholder: ph || formLbl,
+      tag,
+      xpathFull,
+      className,
+      container,
+      occurrence,
+    });
+    if (phXp) return phXp;
+  }
+
   if (formLbl && (!kind || kind.startsWith('form_') || kind === 'generic' || !kind)) {
     const formXp = buildFormFieldXPathSmart({
       label: formLbl,
@@ -155,7 +185,6 @@ export function buildXPathSmart(opts = {}) {
     if (formXp) return formXp;
   }
 
-  const ph = normalizeControlText(placeholder || (attributes && attributes.placeholder) || '');
   if (ph && (!formLbl || kind === 'form_input' || !kind)) {
     const phXp = buildPlaceholderXPathSmart({
       placeholder: ph,

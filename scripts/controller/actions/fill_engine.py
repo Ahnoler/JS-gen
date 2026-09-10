@@ -227,10 +227,37 @@ class FillEngine(_FormActionEngineBase):
             if is_absent_field_result(result):
                 return _absent_skip(label_text)
             if _is_ok_result(result) and should_record_result(result):
+                # Discover write xpath after label/placeholder fill so prepareElementJson
+                # does not invent el-form-item+label for placeholder-only controls.
+                discover_xp = ''
+                try:
+                    discover_xp = await page.evaluate(
+                        "([label]) => { " + PAGE_LOCATOR_HELPERS
+                        + " const want = String(label || '').trim();"
+                        + " if (!want) return '';"
+                        + " const inputs = [...document.querySelectorAll("
+                        + "   'input:not([type=\"hidden\"]), textarea')];"
+                        + " let hit = null;"
+                        + " for (const inp of inputs) {"
+                        + "   if (inp.offsetParent === null"
+                        + "       && !(inp.closest && inp.closest('.el-table__fixed'))) continue;"
+                        + "   const ph = (inp.getAttribute && inp.getAttribute('placeholder') || '').trim();"
+                        + "   if (ph && (ph === want || ph.includes(want))) { hit = inp; break; }"
+                        + " }"
+                        + " if (!hit) return '';"
+                        + " return formFieldXpathSmartOf(hit, want) || '';"
+                        + " }",
+                        [label_text],
+                    ) or ''
+                except Exception:
+                    discover_xp = ''
                 element = await _capture_element(
-                    page, label_text, target_kind='form_input', xpath_smart='',
+                    page,
+                    label_text,
+                    target_kind='form_input',
+                    xpath_smart=str(discover_xp or '').strip(),
                 )
-                xp_inv = stamp_recorded_xpath_smart(element, "")
+                xp_inv = stamp_recorded_xpath_smart(element, str(discover_xp or '').strip())
                 _record_action(
                     'fill_form_field',
                     {'label_text': label_text, 'value': value},
@@ -526,6 +553,10 @@ class FillEngine(_FormActionEngineBase):
             if xpath:
                 guard_err = await _guard_xpath_fill(xpath)
                 if guard_err:
+                    # Soft miss: invented/stale el-form-item xpath for placeholder-only
+                    # fields must fall through to label/placeholder attempts.
+                    if str(guard_err).startswith('strict-locator-not-found'):
+                        return None
                     return guard_err
             result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, hint])
             expected_empty = _false_ok_empty_actual(result)

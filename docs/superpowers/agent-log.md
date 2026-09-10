@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 15:17 · Cursor Lead — 收工：placeholder-only 搜索框抓取/回放定位修复（回链 15:12）
+
+- 完成：离线 `buildXPathSmart/enrichLocatorFields` 对 placeholder-only（含搜索关键字）优先/纠偏为 placeholder xpath；回放 `strict-locator-not-found` 软继续 + `fill_dispatch` label==ph 仍发 by_xpath 空 xpath；录制 label 兜底后 DOM 发现再 capture
+- 验收：`characterize-locator-candidates` / `characterize-fill-dispatch` / `characterize-xpath-fill-select` / `characterize-replay-params-xpath` / `characterize-capture-element-xpath` GREEN；smoke invent → `//input[contains(@placeholder,'搜索关键字')]`
+- 遗留：存量步骤若 element 已写死错误 xpath，直接回放靠软继续+placeholder 兜底即可；重新保存步骤会 heal；活 Python 须 detach 重挂才加载 fill_engine 新逻辑
+
 ## 2026-09-10 15:12 · Cursor Lead — 开工：placeholder-only 搜索框抓取/回放定位修复
 
 - 进行中：2026-09-10 15:12；根因=无 label 仅 placeholder 的 fill 落库时 `enrichLocatorFields/buildXPathSmart` 用 label_text 臆造 el-form-item+label xpath；回放 `strict-locator-not-found` 短路不走 placeholder 兜底

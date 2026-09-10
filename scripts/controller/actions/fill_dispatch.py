@@ -27,8 +27,9 @@ def resolve_fill_attempt_order(
     extractors). Never consult ``params['xpath_smart']`` here — dirty-param
     lesson (traj 130).
 
-    Order: primary xpath → label → placeholder (≠ label) → placeholder-only
-    ``JS_FILL_BY_XPATH`` → ``xpath_full`` when distinct from primary xpath.
+    Order: primary xpath → label → placeholder (≠ label) form_field →
+    placeholder ``JS_FILL_BY_XPATH`` (empty xpath; also when label==placeholder)
+    → ``xpath_full`` when distinct from primary xpath.
     """
     attempts: list[FillAttempt] = []
     lab = str(label or "").strip()
@@ -59,7 +60,10 @@ def resolve_fill_attempt_order(
             hint=ph,
             js_kind="form_field",
         ))
-    if not lab and ph:
+    # Always emit by_xpath empty attempt when placeholder is known — covers
+    # placeholder-only fields where label_text == placeholder (搜索关键字) so
+    # JS_FILL_BY_XPATH can still hit after a bad invented label xpath fails.
+    if ph:
         attempts.append(FillAttempt(
             path="placeholder",
             locate_src="placeholder",

@@ -73,19 +73,42 @@ export function enrichLocatorFields(meta = {}) {
   const targetKind = String(meta.target_kind || meta.targetKind || '').trim();
   const occurrence = Number(meta.locator_occurrence || meta.occurrence || 0) || 0;
   const container = String(meta.locator_scope || meta.scope || meta.container || '').trim();
+  const placeholder = normalizeControlText(
+    meta.placeholder
+    || attributes.placeholder
+    || '',
+  );
 
   let xpathSmart = String(meta.xpath_smart || '').trim();
+  // Heal: placeholder-only cues previously invented as el-form-item+label
+  // (搜索关键字 tree filter). Drop and rebuild via placeholder builder.
+  const placeholderOnlyCue = Boolean(
+    (placeholder && formLabel && formLabel === placeholder)
+    || (!placeholder && formLabel && /搜索|关键字|过滤/.test(formLabel)),
+  );
+  if (
+    placeholderOnlyCue
+    && xpathSmart.includes('el-form-item')
+    && /label/i.test(xpathSmart)
+  ) {
+    xpathSmart = '';
+  }
   if (!xpathSmart) {
     // Prefer an already-captured relative xpath (e.g. titlebox-anchored) over
     // inventing a bare leaf from button/label text — clients that only send
     // `xpath` would otherwise lose section uniqueness on prepareElementJson.
-    if (existing.startsWith('//')) {
+    if (existing.startsWith('//') && !(
+      placeholderOnlyCue
+      && existing.includes('el-form-item')
+      && /label/i.test(existing)
+    )) {
       xpathSmart = existing;
     } else {
       xpathSmart = buildXPathSmart({
         tag,
         text,
         formLabel,
+        placeholder,
         xpathFull: abs || xpathFull,
         className,
         container,
