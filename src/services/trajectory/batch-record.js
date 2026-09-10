@@ -25,8 +25,8 @@ let recordWorkers = 0;
 
 /**
  * Renew interval: ~1/3 of lease, floored at 30s so short leases still tick before expiry.
- * @param {number} [leaseMs]
- * @returns {number}
+ * @param {number} [leaseMs] Lease duration in milliseconds
+ * @returns {number} Interval in milliseconds between renewals
  */
 export function leaseRenewIntervalMs(leaseMs = BATCH_ITEM_LEASE_MS) {
   return Math.max(30_000, Math.floor(Number(leaseMs || 600_000) / 3));
@@ -34,13 +34,13 @@ export function leaseRenewIntervalMs(leaseMs = BATCH_ITEM_LEASE_MS) {
 
 /**
  * Periodically renew a claimed item lease while prepare/record is in flight.
- * @param {object} opts
- * @param {number} opts.itemId
- * @param {string} opts.workerToken
- * @param {number} [opts.leaseMs]
+ * @param {object} opts Renewal timer options
+ * @param {number} opts.itemId Batch item id to renew
+ * @param {string} opts.workerToken Worker token that owns the claim
+ * @param {number} [opts.leaseMs] Lease duration passed to renew
  * @param {number} [opts.renewEveryMs] Override interval (tests)
- * @param {(itemId: number, opts: object) => Promise<unknown>} [opts.renew]
- * @returns {() => void} stop function
+ * @param {(itemId: number, opts: object) => Promise<unknown>} [opts.renew] Renew function (defaults to DAO)
+ * @returns {() => void} stop function that clears the interval
  */
 export function startItemLeaseRenewal({
   itemId,

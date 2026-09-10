@@ -274,7 +274,7 @@ export async function transitionItem(itemId, fromStatuses, toStatus, {
  * Extend lease_expires_at for an in-flight preparing/recording item (CAS on worker token).
  * Used so long prepare+record does not expire and get reclaimed by claimNextItem.
  * @param {number} itemId Item ID
- * @param {object} [opts]
+ * @param {object} [opts] Renewal options
  * @param {string|null} [opts.expectedWorkerToken] Required current worker_token
  * @param {number} [opts.leaseMs] Lease duration from now
  * @param {string[]} [opts.fromStatuses] Allowed statuses (default preparing|recording)
