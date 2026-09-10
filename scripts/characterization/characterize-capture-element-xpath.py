@@ -193,12 +193,20 @@ def test_stamp_rejects_weak_fallback() -> None:
     from scripts.controller.actions._helpers import stamp_recorded_xpath_smart, is_weak_xpath_smart
 
     weak = "//input[@placeholder='???'][1]"
+    shared = "//input[@placeholder='请输入'][1]"
+    search_ph = "//input[contains(@placeholder,'搜索关键字')]"
+    filter_ph = "//input[contains(@placeholder,'输入关键字进行过滤')]"
+    login_ph = "//input[@placeholder='请输入账号']"
     durable = (
         "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
         "//div[contains(@class,'el-form-item')]"
         "[.//label[contains(normalize-space(.),'??????')]]//input"
     )
     assert_true(is_weak_xpath_smart(weak), "placeholder occurrence is weak")
+    assert_true(is_weak_xpath_smart(shared), "shared 请输入[1] stays weak (traj-130)")
+    assert_true(not is_weak_xpath_smart(search_ph), "distinctive search placeholder is durable")
+    assert_true(not is_weak_xpath_smart(filter_ph), "filter placeholder cue is durable")
+    assert_true(not is_weak_xpath_smart(login_ph), "login 请输入账号 is durable")
     assert_true(not is_weak_xpath_smart(durable), "dialog+label is durable")
     assert_true(
         stamp_recorded_xpath_smart({"xpath_smart": durable}, weak) == durable,
@@ -206,11 +214,19 @@ def test_stamp_rejects_weak_fallback() -> None:
     )
     assert_true(
         stamp_recorded_xpath_smart(None, weak) == "",
-        "weak fallback alone ? empty",
+        "weak fallback alone → empty",
     )
     assert_true(
         stamp_recorded_xpath_smart({"xpath_smart": weak}, durable) == durable,
         "weak capture loses to durable inventory fallback when capture weak",
+    )
+    assert_true(
+        stamp_recorded_xpath_smart({"xpath_smart": search_ph}, "") == search_ph,
+        "unique search placeholder stamps into inventory",
+    )
+    assert_true(
+        stamp_recorded_xpath_smart(None, shared) == "",
+        "shared 请输入 fallback alone → empty",
     )
 
 

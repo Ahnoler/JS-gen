@@ -31,15 +31,54 @@ def _as_dict(raw):
     return json.loads(raw) if isinstance(raw, str) else raw
 
 
+_PLACEHOLDER_EQ_RE = re.compile(
+    r"""@placeholder\s*=\s*(?:'([^']*)'|"([^"]*)")""",
+    re.I,
+)
+_PLACEHOLDER_CONTAINS_RE = re.compile(
+    r"""contains\(\s*@placeholder\s*,\s*(?:'([^']*)'|"([^"]*)")\s*\)""",
+    re.I,
+)
+# Bare / shared form cues — not unique enough to stamp into inventory.
+_GENERIC_PLACEHOLDER_RE = re.compile(r"^(请输入|请选择|请填写|输入|…|\.{0,3}|\?+)$")
+
+
+def _placeholder_literal_from_xpath(xp: str) -> str | None:
+    """Return the placeholder string inside an xpath predicate, or None."""
+    m = _PLACEHOLDER_CONTAINS_RE.search(xp) or _PLACEHOLDER_EQ_RE.search(xp)
+    if not m:
+        return None
+    return (m.group(1) or m.group(2) or "").strip()
+
+
+def _is_durable_placeholder_cue(ph: str) -> bool:
+    """True when placeholder text is distinctive enough to stamp (not traj-130 shared)."""
+    if not ph:
+        return False
+    from .search_then_click_guard import is_search_field_label
+
+    if is_search_field_label(ph):
+        return True
+    if _GENERIC_PLACEHOLDER_RE.fullmatch(ph):
+        return False
+    # 「请输入」alone is generic; 「请输入账号」/「请输入您的用户名」are durable.
+    for prefix in ("请输入", "请选择", "请填写"):
+        if ph.startswith(prefix):
+            return len(ph[len(prefix) :].strip("…. ")) >= 2
+    return len(ph) >= 4
+
+
 def is_weak_xpath_smart(xp: str) -> bool:
     s = (xp or "").strip()
     if not s:
         return True
     if "el-form-item" in s and "label" in s:
         return False
-    if "placeholder" in s.lower() and "el-form-item" not in s:
-        return True
-    if re.fullmatch(r"//input(\[@placeholder=[^\]]+\])?(\[\d+\])?", s, re.I):
+    ph = _placeholder_literal_from_xpath(s)
+    if ph is not None:
+        # Distinctive search/login cues may stamp; shared 「请输入」/??? stay weak.
+        return not _is_durable_placeholder_cue(ph)
+    if re.fullmatch(r"//input(\[\d+\])?", s, re.I):
         return True
     return False
 
@@ -49,7 +88,8 @@ def stamp_recorded_xpath_smart(element, fallback: str = "") -> str:
 
     Prefers capture-rebuilt element.xpath_smart (dialog/drawer + label via
     formFieldXpathSmartOf); resolved/agent fallback only when capture missed or
-    is weak. Weak placeholder-only xpaths are rejected — prefer empty over hints.
+    is weak. Shared/generic placeholder-only xpaths (e.g. 请输入[1]) are
+    rejected; distinctive cues (搜索关键字 / 请输入账号) may stamp.
     Not used for params_json (recorded steps use element_json only).
     """
     cap = ""

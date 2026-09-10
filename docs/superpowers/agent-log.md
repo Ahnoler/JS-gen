@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 16:09 · Cursor Lead — 收工：is_weak 分档——唯一 placeholder 可入库
+
+- 完成：回链开工 `e6b9127c`；改动 `is_weak_xpath_smart` 分档（搜索/过滤 cue + 请输入XXX 可 stamp；请输入[1]/??? 仍弱）
+- 验收：`D:\anaconda3\envs\browser_use\python.exe scripts/characterization/characterize-capture-element-xpath.py` → OK
+- 遗留：无（本单元）；库存 stamp 后 resolve 仍依赖 label 对齐——另线
+
 ## 2026-09-10 16:06 · Cursor Lead — 开工：is_weak 分档——唯一 placeholder 可入库
 
 - 进行中：2026-09-10 16:06；根因=`is_weak_xpath_smart` 凡含 placeholder 且无 el-form-item 一律弱，导致搜索关键字等唯一 cue 无法 stamp 进 task_list
