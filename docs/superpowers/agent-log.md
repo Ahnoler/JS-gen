@@ -1,6 +1,12 @@
 # Agent 协作日志
 
-## 2026-09-10 13:58 · ZCode — 收工：KB 召回评测 T4 门禁写入（回链 13:44）
+## 2026-09-10 13:58 · ZCode — 开工：form_action_engines 拆分回归修复（NameError 三连）
+
+- 进行中：13:58；用户报真机回放 `fill_form_field → NameError: _replay_engine_store`。根因=昨日拆分（dbcc329b）fill/select/radio 三文件的 `*_for_replay` 包装用了 `_replay_engine_store/_ReplayPageAdapter/_ReplayAutofillStub` 而 tree_engine 才补了 import；另发现 login_engine 缺 `JS_FILL_FORM_FIELD`、fill_engine 缺 `import re/sys/json`——call-time 才爆，import 级 wiring 测不出的哑雷
+- 范围：`scripts/controller/actions/{fill_engine,select_engine,radio_engine,login_engine}.py`（只加 import 行）、`scripts/characterization/characterize-form-engine-scope-audit.py`（新建 AST 作用域审计，防再犯护栏）、`scripts/refactor/verify-all.sh`（追加一行，独立 commit）、tmp/engine-scope-audit.py（草稿）、本文件
+- 禁入区：他线 5 红（step-highlight/layer-tree/export-v3/confirm-notification/network-capture）不修；Cursor 线热区 `replay_form_action.py`/`click_action_engine.py`/`_misc.py`；`.cursor/`；`data/kb/**` 只读
+- 方式：AST 作用域审计枚举全部哑雷 → 一次性补 import（只插行不删改）→ 真机验证登录组件回放 → 审计沉淀入门禁 → 收工
+
 
 - 完成：**T4 全链**——门禁 `characterize-kb-recall-eval.mjs`（4 断言：结构/lockstep 防漂移绊线/六项批准 floor+退化明细/延迟预算，单一指标引擎=复用 runner 的 runRecallEval+compareWithBaseline，`71c24fa7`）；verify-all 追加一行独立 commit（`8ae492ed`，gate 内 `ok: characterize-kb-recall-eval`）；**自证三段式** 提交态绿 exit0 → 阈值+0.2 六项全红 exit1 → 还原绿 exit0（`tmp/kb-eval/T4-selfproof.txt`）；**reviewer 三建议落地**（`56b52af3`）：①多 gold 分摊口径入 JSDoc（0.757/0.708 vs 二值 0.760/0.711 差异显式化）②30 条种子统一 `seed:true`（行级手术编辑+changeLog 记批准来源，冻结文件审计 diff 最小）③`metrics.byTier` 每次运行输出（A 层第七项下限未捆绑加，留 Lead 单独批）；报告 T4 章节+结论翻转+todo ⑧ 状态行（本 commit）
 - 验收：门禁 4 passed / runner Acc@1 0.65 不变 / T1 结构自检 OK / runner+门禁 lint 0 warning（characterization 目录在 eslint ignore=按 AGENTS 绕过区）/ verify-all 注册行生效
