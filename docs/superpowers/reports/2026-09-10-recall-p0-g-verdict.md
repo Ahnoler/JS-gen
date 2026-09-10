@@ -82,3 +82,21 @@ Lead 采纳 reviewer 的**第三条路**——既不是原 (A) 全删机制，�
 | 4 | **T3 重评前置** | 先做评测集 **v2** 扩版（≥100 条独立新查询，另立项）→ 在 v2 上建表并验证**独立正增量** → 通过后才接线 propose 并计入成果 |
 | 5 | **两条追认 + 一条补丁** | ① 契约金样例 `expectNodeId`（check_drawer→list）Lead 追认；② T2 的 `bestNodeIdFor` 分母改动补一条 characterization pin，钉住「码只活在卡级字段」场景 |
 | 6 | **线状态** | T0/T1a/T2 = **交付**；T1b = **FAIL 已回退**；T3 = **停用待 v2 重评**（不计成果）。收尾小任务 = 本表 2/3/5② |
+
+## 7. 收尾复核（reviewer 实测，2026-09-10）
+
+4 项收尾由实施方完成（`62fca4c5` 开工 / `b7bdb8e8` / `eeca9fa6`），reviewer 逐项实测：
+
+| 项 | 复核结果 |
+|---|---|
+| ① 报告口径更正 | 报告顶部已加**口径更正块**，「生产实际生效 = T2 链态 0.740」；Task 表 T3 改为「FAIL → 停用待评测集 v2 重评」；T3 章节标题、遗留、复现命令同步 ✓ |
+| ② 词表标注 | `data/kb/synonyms.json` 仅 **+2 行**（`status: "unvalidated"` + `statusNote`），**entries 零改动** ✓ |
+| ③ 分母 pin | `characterize-flow-card-recall.mjs` +25 行；**reviewer 自己动手证伪**：还原旧分母 `cardScore` → **exit 1 / pin 红**（`✗ matchFlowForAtom scores customer_onboarding + convert node`）→ `git checkout` 还原 → **23 passed / exit 0 / 工作区干净** ✓ |
+| ④ 台账 | agent-log 收工回链 `62fca4c5`；todo 线标「✅ 线关闭——G1/G2/G3 已出，T3 被 Lead 裁停用」并带生产口径 ✓ |
+| 纪律 | 本收尾区间**未动** `kb-recall-eval.v1.json` / `characterize-kb-recall-eval.mjs` / `verify-all.sh` / `propose.js`（`git log` 空）；未 revert `2ae8e4e1`、未删 `synonyms.json` ✓ |
+
+**HEAD 终态（reviewer 独立复算）**：生产 Acc@1 **0.740** / Recall@5 0.847 / MRR@5 0.784 / nDCG@5 0.798 / 拒答 0.633 / 噪声 0.740；分层 A **1.00** · B 0.233 · C 0.867 · D **0.933**；`--baseline` **exit 0**；`characterize-flow-card-recall` **23 passed**；py 跨语言契约 **ok**。
+
+**结论：本线 CLOSED。** 成果 = **T1a 血缘资产 + T2 分词**（生产 Acc@1 0.650→0.740、D 层 0.333→0.933、A 层零退、拒答零变、零新依赖）；T1b FAIL 已回退；T3 机制保留但停用、不计成果、待评测集 v2 重评。
+
+**移交 Lead 的两项**：① `N-002` 存量 FP 处置（回 null 需收紧覆盖率地板 = 改口径，须批准）；② **评测集 v2 扩版立项**（≥100 条独立新查询，是 T3 重评的前置）。
