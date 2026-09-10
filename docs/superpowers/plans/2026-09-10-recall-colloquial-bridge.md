@@ -81,7 +81,7 @@ node scripts/characterization/characterize-kb-recall-eval.mjs   # 期望 5 passe
 - [ ] **Step 4: 新增 3 条 pin**（`characterize-flow-card-recall.mjs`）：桥接表可加载 / scope 门控生效 / **空表或不传时字节不变**
 - [ ] **Step 5: 复跑** `characterize-flow-card-recall`（期望 26 passed）
 
-`- [ ] **Step 6: Commit**`
+- [ ] **Step 6: Commit**
 
 **DoD**：终表 40–80 条；**每条 source ∈ {corpus-card, corpus-req-doc, wet-test-drift}**；0 条来自评测失败；pin 全绿。
 
