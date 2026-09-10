@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 18:35 · ZCode 引擎线 — 开工+收工：mega-menu 不收起交接文档（纯文档单元）
+
+- 完成：同事侧执行引擎反馈「子菜单出现后不再隐藏」——按本仓真机定案（probe-menu-close-v2.py 单变量实证：关=面板外真实 mousedown，hover/Escape/合成点击全无效；合成 el.click() 可开）写排查四步+修复三件套配方，交接文档入库 `docs/superpowers/guides/menu-nav-megamenu-close-handover.md`
+- 验收：文档内配方均带本仓代码坐标（page_id.py:190/164、_replay.py:194/216）与双菜单 DOM 实证（tmp/menu_crawl/verify-report.md：li[data-id] 恒隐藏 386/410，可见分支=li.submenu-item[data-url]）；纯文档无代码改动
+- 遗留移交：打包交付同事方式待定（上次 select:click 走 zip，本次先落仓内文档可直接转发）；同事引擎若需移植，配方含 Playwright page.mouse 与裸 CDP Input.dispatchMouseEvent 两版
+- 注意：工作区 12 项他线 WIP（agent-log archive 两删/plans 三改/classify.py/verify-all.sh 等，dedup 删除线与 form-engine 拆分线在途）**全部未触碰未携带**；本单元只提交 agent-log + 新 guides 文档两个文件
+
 ## 2026-09-10 18:21 · Cursor Lead — 收工：dedup-deletion 删装配期死 dedup
 
 - 完成：回链开工 `1ac49e6f`；删 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS 改为指向 `state.py` 录制 coalesce；CLAUDE/README/jsdoc/verify-all 去门禁
