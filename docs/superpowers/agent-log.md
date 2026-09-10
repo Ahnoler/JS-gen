@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-10 17:01 · Cursor Lead — 收工：engine-wet-trio ②③ 真机湿测 PASS
+
+- 完成：回链开工 `78dd209d`；重启控制面加载 `0421744b`；湿测 traj **720/721**
+- ③ 并发 start：**PASS**（200 + 409 `Recording already in progress`）
+- ② detach→重附门闩：**PASS**——控制面日志 `async gate skipped for traj=721: live state changed (runtimeReplaced=true sessionGone=true …)`；N+1 未假失败；报告 `tmp/engine-wet-trio/report.md`
+- 顺带：`RECORD_FINALIZE_GATE_MS` 环境变量（默认 90000）便于门闩湿测缩窗
+- 遗留：无（engine-wet-trio 闭环）；下一优先挂起项见 todo `p1-6-replayid`
+
 ## 2026-09-10 16:53 · Cursor Lead — 开工：engine-wet-trio ②③ 真机湿测
 
 - 进行中：2026-09-10 16:53；验收=② detach→重附后旧 90s 门闩不得误伤新 run；③ 并发 start 第二路 409

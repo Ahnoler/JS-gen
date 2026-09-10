@@ -1143,7 +1143,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       try {
         clearActionLogCopy(tid);
       } catch {}
-    }, 90000);
+    }, Number(process.env.RECORD_FINALIZE_GATE_MS || 90000));
     if (typeof finalizeGate.unref === 'function') finalizeGate.unref();
     // 假成功防线 v3（终局判定消费阶段结果——09-07 #612/#614/19:55 教训）：任一阶段
     // 显式 success=false，或 phase_end 上报 QUALITY FAIL（pending_fields /
