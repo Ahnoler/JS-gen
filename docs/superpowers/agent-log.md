@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 01:20 · Zcode — 开工：覆盖回溯 T5 小迭代（G 判决 `38e0ef7d` D1/D2/D3/D8 必改 + D4/D5 警告）
+
+- 判决要点：数据面与门禁通过（M1/M2/M3/M4/M6 可用作决策）；M5 作废待重建——D1 根因=40 字守卫误伤结构键 `page_level_key`（库里 47–135 字全被剥成 null，fixture 2408 region key 全空）；D2=M5 饱和（上限 0.1424 的 91.9%）量的是词表非行为；D3=primaryCard 字母序非链优先级（24/69 错配）；D8=报告 §4「补 rating 码」头条是事实错误（那 6 条 ROUTE 链 6/6 已映射）
+- 工作范围（T5 五小步，一 commit 一改）：`scripts/kb/coverage-snapshot.mjs`（D1 结构键免守卫+key 剥 query 存 `host#/route`；D5 createdDate→toISOString）→ 重冻 `scripts/characterization/fixtures/kb-coverage.v1.json` + 基线（**回库验证 key 非空比例**，预期覆盖 28 轨迹）→ `scripts/kb/kb-coverage.mjs`（D3 primaryCard 链优先级+重建 M5=page_level_key 页面序列↔卡 nodes[].page 同类比较+上限分析+卡外页面清单）→ `scripts/characterization/characterize-kb-coverage.mjs`（D4：M5 两项出 floor 改 informational）→ `docs/superpowers/reports/2026-09-11-kb-coverage-retro.md` 三处必改（§1 M5 行/§4 头条换真实缺口族/§6.3 改写）+ D6 ROUTE 精度标注 + `docs/superpowers/todo-list.md` + 本文件 + `tmp/kb-coverage/**`
+- 禁入区：他线 WIP（工作区有 Cursor 未提交改动：`scripts/refactor/verify-all.sh`、`scripts/controller/actions/phase/classify.py`、plans/specs 归档移动等——**不碰不混 commit**）、`src/**` 零改动、评测集/阈值/`verify-all.sh`、`data/kb/req/**`、写库（SELECT only）
+- 执行方式：DB 走既有隧道 127.0.0.1:13306（reviewer 后台 job 仍开）；重冻 fixture changeLog 记版本；新 M5 不复用旧数字、上限分析随交付；门禁证伪钩子保留可复用；改完回 reviewer hash 等三验（key 非空比例/新 M5 上限分析/D8 订正）
+
 ## 2026-09-11 00:52 · Zcode — 收工：KB 覆盖回溯 T3 报告+T4 台账（回链 00:26 开工 `ca4763b6`）
 
 - 完成：T3（`5b05c5d8`）基线报告 [`reports/2026-09-11-kb-coverage-retro.md`](reports/2026-09-11-kb-coverage-retro.md)——M1–M6 全表（含分母）+ 12 无码卡 + 57 死卡 + 38 陈旧卡清单 + Top20 缺口与页面族 + 结论（KB=少数高频交易深知识非广覆盖；投资方向=做准 27 张活卡+按真实频次补缺口，评级申请族×6 补 rating 卡 ZJJK 码为性价比最高单点）；T4（本 commit）台账：todo-list 新线状态 + 本条收工
