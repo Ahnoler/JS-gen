@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-11 06:45 · Zcode — 收工：KB 价值 A/B 全线 T0–T5 完成（回链 02:35 开工；结论=③证据不足 +8.3pp）
+
+- **完成（提交链）**：pilot 4/4（`ea5d04c9` 含天花板触发→manifest v1.1 难度锚重冻）→ **正式 24 run（727–750）全落地** → T2/T3 证据+引擎+门禁（`cf1751e6`）→ lint 清零（`c1ef3ad7`）→ runlog 收尾（`5af3ab23`）→ 清理终局（`e82bad07`）→ **T4 报告+P5/P6 修复（`9bda883c`）** → 本条 T5
+- **验收证据**：正式批 A 5/12（41.7%，Wilson [0.193,0.680]）vs B 6/12（50.0%，[0.254,0.746]），差 +8.3pp；配对结局 A 独赢 2 / B 独赢 3 / 双成 3 / 双败 4；n=12/臂按冻结口径只接受大效应（≥30pp）→ **结论三类之③「证据不足」**，要下 ±20pp 结论需 n≥40/臂。门禁 `characterize-kb-ab` **GREEN**（形状/配对 12/12/臂平衡/无跨臂污染 ④纯度断言逐字/收数完备 24/24；不设成功率 floor）；证伪×2 各红一次（臂互换→④红、删需求→②红）已贴 `cf1751e6` commit message；`kb-ab-eval` 连跑两次 `cmp` 逐位一致（eval-final/e2 冻结快照入库）；**`src/**` 零改动复核**（`git diff ea5d04c9..HEAD -- src/` = 0 行）
+- **B 臂价值形态**（供 KB 线决策）：不是省步数也不是更贴卡（P5 两臂对称：A 48/57 vs B 44/57 按钮命中），而是**把预算内做不完的多腿链路做完**——B 独赢 3 对全是多腿任务（R02 33 步/N02 39 步 vs A 预算耗尽）；单腿任务两臂等价。下一轮若扩 n≥40/臂，建议只留 5 个多腿锚
+- **干扰项如实登记**（报告 §6）：744 质量门伪失败（reviewer kinds url_change+toast_ok vs legacy token saved_navigation，legacy `has_contract_success` 缺 boundary 别名表——引擎侧已知 artifact，红线内未改 src）；733/741/742 零步异步降级；739/740 SUT NPE、749/750 评级在途墙=paired 同墙有效对照；747 attempt1 executor WS 1006 半开（aborted 留痕，无副作用非按结果剔除）；731/729/745 HeadersTimeout 已改 fire-and-poll 驱动
+- **清理终局**：8 笔新建客户全为「信贷预客户」（SUT 删除入口仅对草稿客户开放，09-07 R1 先例）→ 无法经 UI 删除，留证移交 `cleanup-ledger.jsonl`（custNo 已回填/纠错 746=26091105094428662）+ manifest cleanupLog 终局条目；他人 `KB测…` 零触碰；executor 槽位全释放（remote_session 37 closed+6 crashed 无 live）
+- **遗留移交**：①730 墙钟 2143s（卡臂录制长但预算内完成 vs 729 预算 23/23 失败——成本结论依赖卡不是提速）②引擎侧两个候选修复（kind 别名表/零步 navigate 豁免）已写报告 §8 归引擎线排期 ③证伪钩子 `--falsify-arm/--falsify-pair` 保留可复用 ④memory 已更新
+
 ## 2026-09-11 02:35 · Zcode — 开工：KB 价值 A/B（方向 2，spec `e6abfdc2`；真机对照实验）+ 覆盖线 E-commit
 
 - **先收覆盖线尾巴**：G-recheck `4baffd25` 判 PASS pending E-commit——E1（`nodeCoverage`→`pageKeyOnCardRate`+退化条件注记：实测 18/18 单 key 构造性退化）+ E3（门禁锁 `fixture.contentSha256===baseline.fixtureSha256`，证伪红/还原绿）+ E4（报告注明 tmp 取证快照非门禁输入）→ `e6bde302`，覆盖线关线
