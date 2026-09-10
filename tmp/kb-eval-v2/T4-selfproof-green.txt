@@ -1,0 +1,22 @@
+  ✓ eval fixture v2 structure: >=235 entries / tier quotas / E sub-patterns / >=70 cards / no dupes
+  ✓ gate margins stay in lockstep with runner DEFAULT_MARGINS
+eval v2 (k=5) positives=190 negatives=55
+  Acc@1      0.6
+  Recall@5   0.725
+  MRR@5      0.653
+  nDCG@5     0.667
+  拒答率     0.382  (FP: 计算 2 加 3 等于多少=>collection_scorecard; 太阳系最大的行星是哪个=>customer-group-cluster; 介绍一下量子力学的基本概念=>loan; 贷款展期怎么申请=>loan; 罚息和复利怎么计算=>collection_scorecard; 员工请假审批流程怎么走=>approval_todo; 反洗钱可疑交易上报=>limit-ctrl-api-ocp-revoke-loop; 差旅费报销单填写=>product_query; ATM 机吞卡处理=>approval_chain; 手机银行 APP 下载安装=>approval_chain; 银行营业网点今天几点开门=>session_login; 还款期限延长怎么办理=>duigong_contract_sign; 提前还款违约金怎么算=>loan_account; 预约还款日期怎么改=>collection-remind-cfg; 信贷档案借阅要怎么登记=>digital-loan-desk-data-index; 罚息减免申请怎么提=>credit_application; 贴现业务怎么办理=>approval_todo; 保函开立需要什么材料=>risk-class-query; 信用证开证流程怎么走=>credit_usage; 银行承兑汇票签发手续=>loan-corp-entrust-loan; 借款人变更申请怎么办=>loan-corp-entrust-loan; 抵债资产怎么处置=>collateral_seizure; 不良贷款核销条件是什么=>judicial-litigation; 以物抵债怎么操作=>portal-subapp; 信贷资产转让流程=>asset-preserve-ops-outsourced-collection; 贷款结清证明去哪里开=>collateral-func-warning; 抵押登记注销手续怎么办=>guaranty_contract; 授信年审要准备哪些材料=>risk-class-query; 首套房利率优惠政策有哪些=>credit_usage; 对公账户信息变更怎么预约=>duigong_contract_sign; 反洗钱客户风险等级怎么划分=>rating; 印章保管和使用怎么登记=>asset-preserve-ops-outsourced-collection; 会议室预约在哪个系统=>customer_onboarding; 手机银行上怎么查贷款余额=>collateral-func-warning)
+  噪声 Acc@1 0.6  (Δ 0)
+  延迟ms     warm p50=0.074 p95=0.213 | cold p50=2.395 cold p95=3.741
+  分层 Acc@1  A 55/55=1.00  B 18/45=0.40  C 18/20=0.90  D 18/20=0.90  E 5/50=0.10
+  ✓ A-tier Acc@1 >= 0.95 (A5: zero-tolerance regression detector)
+    OK  accuracyAt1: current=0.6 floor=0.55 (baseline=0.6 margin=0.05)
+    OK  recallAt5: current=0.725 floor=0.675 (baseline=0.725 margin=0.05)
+    OK  mrrAt5: current=0.653 floor=0.573 (baseline=0.653 margin=0.08)
+    OK  ndcgAt5: current=0.667 floor=0.587 (baseline=0.667 margin=0.08)
+    OK  rejectionRate: current=0.382 floor=0.332 (baseline=0.382 margin=0.05)
+    OK  noiseAccuracyAt1: current=0.6 floor=0.5 (baseline=0.6 margin=0.1)
+  ✓ approved metric floors hold (compareWithBaseline, D11 margins)
+  ✓ latency budgets hold (warm p95 <= 50ms, cold p95 <= 200ms)
+
+characterize-kb-recall-eval: 5 passed

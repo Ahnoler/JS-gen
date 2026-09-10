@@ -1,0 +1,58 @@
+  ✓ eval fixture v2 structure: >=235 entries / tier quotas / E sub-patterns / >=70 cards / no dupes
+  ✓ gate margins stay in lockstep with runner DEFAULT_MARGINS
+eval v2 (k=5) positives=190 negatives=55
+  Acc@1      0.6
+  Recall@5   0.725
+  MRR@5      0.653
+  nDCG@5     0.667
+  拒答率     0.382  (FP: 计算 2 加 3 等于多少=>collection_scorecard; 太阳系最大的行星是哪个=>customer-group-cluster; 介绍一下量子力学的基本概念=>loan; 贷款展期怎么申请=>loan; 罚息和复利怎么计算=>collection_scorecard; 员工请假审批流程怎么走=>approval_todo; 反洗钱可疑交易上报=>limit-ctrl-api-ocp-revoke-loop; 差旅费报销单填写=>product_query; ATM 机吞卡处理=>approval_chain; 手机银行 APP 下载安装=>approval_chain; 银行营业网点今天几点开门=>session_login; 还款期限延长怎么办理=>duigong_contract_sign; 提前还款违约金怎么算=>loan_account; 预约还款日期怎么改=>collection-remind-cfg; 信贷档案借阅要怎么登记=>digital-loan-desk-data-index; 罚息减免申请怎么提=>credit_application; 贴现业务怎么办理=>approval_todo; 保函开立需要什么材料=>risk-class-query; 信用证开证流程怎么走=>credit_usage; 银行承兑汇票签发手续=>loan-corp-entrust-loan; 借款人变更申请怎么办=>loan-corp-entrust-loan; 抵债资产怎么处置=>collateral_seizure; 不良贷款核销条件是什么=>judicial-litigation; 以物抵债怎么操作=>portal-subapp; 信贷资产转让流程=>asset-preserve-ops-outsourced-collection; 贷款结清证明去哪里开=>collateral-func-warning; 抵押登记注销手续怎么办=>guaranty_contract; 授信年审要准备哪些材料=>risk-class-query; 首套房利率优惠政策有哪些=>credit_usage; 对公账户信息变更怎么预约=>duigong_contract_sign; 反洗钱客户风险等级怎么划分=>rating; 印章保管和使用怎么登记=>asset-preserve-ops-outsourced-collection; 会议室预约在哪个系统=>customer_onboarding; 手机银行上怎么查贷款余额=>collateral-func-warning)
+  噪声 Acc@1 0.6  (Δ 0)
+  延迟ms     warm p50=0.047 p95=0.13 | cold p50=2.305 cold p95=3.284
+  分层 Acc@1  A 55/55=1.00  B 18/45=0.40  C 18/20=0.90  D 18/20=0.90  E 5/50=0.10
+  ✓ A-tier Acc@1 >= 0.95 (A5: zero-tolerance regression detector)
+    FAIL accuracyAt1: current=0.6 floor=0.75 (baseline=0.8 margin=0.05)
+    FAIL recallAt5: current=0.725 floor=0.875 (baseline=0.925 margin=0.05)
+    FAIL mrrAt5: current=0.653 floor=0.773 (baseline=0.853 margin=0.08)
+    FAIL ndcgAt5: current=0.667 floor=0.787 (baseline=0.867 margin=0.08)
+    FAIL rejectionRate: current=0.382 floor=0.532 (baseline=0.582 margin=0.05)
+    FAIL noiseAccuracyAt1: current=0.6 floor=0.7 (baseline=0.8 margin=0.1)
+  退化明细 perQuery (first 20):
+    MISS B-001 「把额度临时止付再恢复」 top1=smart-ctrl-rule-toggle gold=limit rank=3
+    MISS B-005 「两家机构合并怎么登记」 top1=asset-preserve-ops-outsourced-collection gold=system-mgmt-org-merge rank=2
+    MISS B-006 「把一笔贷款的担保物登记进系统」 top1=collateral-func-ledger gold=collateral_info rank=-
+    MISS B-008 「看看某个客户都有哪些业务往来全景」 top1=credit_application gold=customer_360 rank=4
+    MISS B-009 「查一个客户的基本资料」 top1=rating gold=customer_query rank=-
+    MISS B-010 「给企业客户做信用等级评定」 top1=credit-retail-credit-config gold=rating rank=-
+    MISS B-011 「看看评级最终结果和审批过程」 top1=rating gold=rating-query-view rank=2
+    MISS B-012 「发起一笔对公的授信业务」 top1=credit_usage gold=credit_application rank=2
+    MISS B-013 「企业借钱用款怎么申请」 top1=customer-group-general-group gold=credit_usage rank=3
+    MISS B-014 「贷款批下来了安排打款给客户」 top1=loan-corp-syndicate-lead-apply gold=loan rank=-
+    MISS B-015 「签正式的借款合同」 top1=guarantee_intro gold=duigong_contract_sign rank=-
+    MISS B-016 「找个人给这笔贷款做担保」 top1=customer_360 gold=guarantee_intro rank=4
+    MISS B-019 「逾期了安排人上门要账」 top1=collection_scorecard gold=collection_task rank=4
+    MISS B-020 「抵押的房子被法院占了怎么办」 top1=guaranty_contract gold=collateral_seizure rank=2
+    MISS B-021 「估算一下抵押物值多少钱」 top1=guaranty_contract gold=collateral_valuation rank=-
+    MISS B-022 「把催收的活儿外包给外面的公司」 top1=customer-group-group gold=asset-preserve-ops-outsourced-collection rank=-
+    MISS B-023 「和别人打官司要起诉」 top1=null gold=judicial-litigation rank=-
+    MISS B-024 「按合同约定直接把钱付给交易对手」 top1=limit-ctrl-api-ocp-revoke-loop gold=disburse-entrusted-payment rank=-
+    MISS B-025 「放款放错了要红字冲回来」 top1=loan_account gold=disburse-account-abnormal rank=-
+    MISS B-027 「一批产业链上的小企业打包管理」 top1=credit_usage gold=customer-group-cluster rank=-
+  ✗ approved metric floors hold (compareWithBaseline, D11 margins)
+metrics below approved floors: accuracyAt1, recallAt5, mrrAt5, ndcgAt5, rejectionRate, noiseAccuracyAt1
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: metrics below approved floors: accuracyAt1, recallAt5, mrrAt5, ndcgAt5, rejectionRate, noiseAccuracyAt1
+    at file:///D:/dev/JS-gen/scripts/characterization/characterize-kb-recall-eval.mjs:166:10
+    at run (file:///D:/dev/JS-gen/scripts/characterization/characterize-kb-recall-eval.mjs:68:11)
+    at file:///D:/dev/JS-gen/scripts/characterization/characterize-kb-recall-eval.mjs:154:7 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.14.1

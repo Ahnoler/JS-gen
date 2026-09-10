@@ -1,0 +1,39 @@
+{
+ "v1": {
+  "accuracyAt1": 0.74,
+  "recallAt5": 0.847,
+  "mrrAt5": 0.784,
+  "ndcgAt5": 0.798,
+  "rejectionRate": 0.633,
+  "noiseAccuracyAt1": 0.74,
+  "byTier": {
+   "A": 1,
+   "B": 0.233,
+   "C": 0.867,
+   "D": 0.933
+  },
+  "n": "100+30"
+ },
+ "v2": {
+  "accuracyAt1": 0.6,
+  "recallAt5": 0.725,
+  "mrrAt5": 0.653,
+  "ndcgAt5": 0.667,
+  "rejectionRate": 0.382,
+  "noiseAccuracyAt1": 0.6,
+  "byTier": {
+   "A": 1,
+   "B": 0.4,
+   "C": 0.9,
+   "D": 0.9,
+   "E": 0.1
+  },
+  "n": "190+55"
+ },
+ "v2Latency": {
+  "warmP50": 0.059,
+  "warmP95": 0.19,
+  "coldP50": 2.355,
+  "coldP95": 4.498
+ }
+}

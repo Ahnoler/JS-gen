@@ -1,0 +1,12 @@
+=== T4 falsification self-proof (2026-09-10) ===
+1) all floors +0.2 (incl A-tier 0.95->1.15, lockstep synced): exit=1
+   A-tier assertion red:   ✗ A-tier Acc@1 >= 0.95 (A5: zero-tolerance regression detector)
+2) six metric floors +0.2 only (A-tier back 0.95): exit=1, FAIL rows=6:
+       FAIL accuracyAt1: current=0.6 floor=0.75 (baseline=0.8 margin=0.05)
+       FAIL recallAt5: current=0.725 floor=0.875 (baseline=0.925 margin=0.05)
+       FAIL mrrAt5: current=0.653 floor=0.773 (baseline=0.853 margin=0.08)
+       FAIL ndcgAt5: current=0.667 floor=0.787 (baseline=0.867 margin=0.08)
+       FAIL rejectionRate: current=0.382 floor=0.532 (baseline=0.582 margin=0.05)
+       FAIL noiseAccuracyAt1: current=0.6 floor=0.7 (baseline=0.8 margin=0.1)
+3) git checkout restore -> exit=0, 5 passed (file byte-identical to commit 8f906527)
+4) runner --baseline tmp/kb-eval-v2/T4-v2.json: exit=0
