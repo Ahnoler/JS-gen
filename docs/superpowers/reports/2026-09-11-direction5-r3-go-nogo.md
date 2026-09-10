@@ -12,6 +12,8 @@ ssh -N -o ServerAliveInterval=30 -L 13306:127.0.0.1:3306 -p 22 root@47.101.58.49
 # 随后按 config/.env 的 DB_USER/DB_PASS/DB_NAME 连 127.0.0.1:13306（只读）
 ```
 
+> **订正（2026-09-11，reviewer 自查）**：本节原写「库只经 SSH 隧道可达」，这是把一次**白名单空窗**当成了常态。实测：**直连 `47.101.58.49:3306` 可用**——raw TCP **46ms**，且 `SELECT COUNT(*)` 真实查询成功（trajectory **421** 行 / `batch_recording_item` 需求 **98** 条）。正确口径：**主路径=直连**（`config/update-db-whitelist.ps1` 常开窗口每 600s 同步出口 IP）；**隧道=空窗期兜底**（VPN 重拨换出口 IP，白名单最多滞后 10 分钟）。**R-3 的 NO-GO 结论不受影响**——它依据的是库内容（有无口语语料/卡片配对），与访问方式无关。
+
 ## 2. 实测数据（`js_gen`）
 
 | 项 | 实测 |
