@@ -92,7 +92,6 @@ JS-gen/
 │   ├── executor-*.js                  # Executor 节点、租约和 WS 协议
 │   ├── ws-server.js                   # Dashboard WebSocket
 │   ├── llm-utils.js                   # 独立 LLM 调用
-│   └── dedup.js                       # 连续动作去重
 ├── data/
 │   └── kb/                            # 信贷知识库工作区（流程卡、需求模块作业区）
 ├── executor/
@@ -429,7 +428,7 @@ api_override / memory_* / sys_dict_* / sys_msg_*
 - `trajectory.record_status`：`draft`、`recording`、`failed`、`recorded`、`completed`。
 - `remote_session.status`：`active`、`idle`、`closed`、`crashed`。
 - 步骤 `action_id` 用于控制面重启后的幂等补写。
-- `src/dedup.js` 只去掉相邻且 `(action, params)` 相同的动作，非连续重复会保留。
+- 录制期同控件连续操作在 Python `_record_action` 合并（保留后者）；非连续重复保留。
 
 ## 接口入口
 
@@ -462,7 +461,6 @@ api_override / memory_* / sys_dict_* / sys_msg_*
 npm run lint
 npm run lint:fix
 
-node scripts/characterization/characterize-dedup.mjs
 node scripts/smoke/accept-recording-apis.mjs
 python scripts/characterization/characterize-form-rules.py
 node scripts/characterization/characterize-trajectory.mjs

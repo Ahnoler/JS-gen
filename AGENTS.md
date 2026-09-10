@@ -47,7 +47,6 @@ npm run executor   # executor agent (connects out to /ws/executor)
 npm install        # install dependencies (first time)
 
 # characterization / import smokes (not a full test suite)
-node scripts/characterization/characterize-dedup.mjs
 node scripts/smoke/accept-replay-apis.mjs
 python scripts/characterization/characterize-form-rules.py
 node scripts/characterization/characterize-trajectory.mjs
@@ -71,7 +70,7 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 - **KB 召回质量评测与跨语言契约职责分离**：质量门禁 = `scripts/characterization/fixtures/kb-recall-eval.v1.json`（130 条独立标注，冻结，`evalVersion`/`changeLog` 变更须 Lead 批准），指标由 `node scripts/kb/recall-eval.mjs` 产出（Acc@1/Recall@5/MRR/nDCG/拒答/噪声/延迟冷热，`--baseline` diff）；任何召回改动须复跑评测并与基线 diff（设计/基线/阈值提案见 `docs/superpowers/reports/2026-09-09-kb-recall-eval-baseline.md`）；扩充/修订该评测集时禁止先跑匹配器反推 gold。
 
 **Element UI / correctness rules:**
-- **Consecutive-only dedup** (`src/dedup.js`): only back-to-back identical `(action, params)`; non-consecutive duplicates are kept.
+- **Recording coalesce** (`scripts/state.py` `_record_action`): consecutive same-element ops keep the later entry and emit `removedIds`; non-consecutive duplicates stay. (Former Node assemble-time `src/dedup.js` removed with the assemble pipeline.)
 - **Native setter pattern** for Element UI inputs — never rely on Playwright `page.fill()` alone for `el-form`.
 - **Select record/replay dispatch:** `select_option` recording and product replay share `resolve_select_dispatch` (`scripts/controller/actions/select_dispatch.py`) — do not assume docstring “same JS path” means the same Python router; see `docs/superpowers/specs/2026-09-09-select-record-replay-unify-design.md`.
 - **Fill record/replay dispatch:** `fill_form_field` shares `resolve_fill_attempt_order` (`scripts/controller/actions/fill_dispatch.py`); Phase B routes replay through `FillEngine` — see `docs/superpowers/specs/2026-09-09-fill-record-replay-unify-design.md`.

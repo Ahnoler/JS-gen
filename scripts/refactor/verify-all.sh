@@ -5,8 +5,8 @@
 set -u
 
 # Resolve a Python interpreter that works from Git Bash, WSL, or cmd.
-# Order mirrors config/config.js _findPython: explicit PYTHON_EXE → project-embedded
-# python (portable install; has browser_use etc.) → system PATH.
+# Order mirrors config/config.js _findPython: explicit PYTHON_EXE 鈫?project-embedded
+# python (portable install; has browser_use etc.) 鈫?system PATH.
 PY=""
 resolve_python() {
   if [ -n "${PYTHON_EXE:-}" ]; then
@@ -164,7 +164,7 @@ run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-pro
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
-  echo "verify-all: FAILED — revert the micro-step"
+  echo "verify-all: FAILED 鈥?revert the micro-step"
   exit 1
 fi
 echo "verify-all: ALL GREEN"

@@ -39,7 +39,7 @@
  */
 ```
 
-> 参考：`src/dedup.js:1-9`、`src/routes/v2/export-mgmt.js:1-5`、`src/runtime/script-runner.js:1-3`
+> 参考：`src/routes/v2/export-mgmt.js:1-5`、`src/services/trajectory/action-log-copy.js:1-10`
 
 ---
 

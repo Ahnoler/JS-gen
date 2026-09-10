@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 18:21 · Cursor Lead — 收工：dedup-deletion 删装配期死 dedup
+
+- 完成：回链开工 `1ac49e6f`；删 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS 改为指向 `state.py` 录制 coalesce；CLAUDE/README/jsdoc/verify-all 去门禁
+- 验收：`rg` 生产侧无 `dedup.js` import；活录 coalesce 仍在 `scripts/state.py`
+- 遗留：他线 `verify-all` 的 form-engine-scope-audit 行未纳入本 commit（工作区还原）；下一可排 screenshot-quality / PR-BATCH 小缺口
+
 ## 2026-09-10 18:20 · Cursor Lead — 开工：dedup-deletion 删装配期死 dedup
 
 - 进行中：2026-09-10 18:20；根因=`src/dedup.js` 生产零引用（装配管线已删），仅 `characterize-dedup` 门禁消费；活录 coalesce 仍在 `state.py`
