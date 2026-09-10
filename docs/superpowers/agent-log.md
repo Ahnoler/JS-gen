@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 15:12 · Cursor Lead — 开工：placeholder-only 搜索框抓取/回放定位修复
+
+- 进行中：2026-09-10 15:12；根因=无 label 仅 placeholder 的 fill 落库时 `enrichLocatorFields/buildXPathSmart` 用 label_text 臆造 el-form-item+label xpath；回放 `strict-locator-not-found` 短路不走 placeholder 兜底
+- 范围：`src/cdp/locator-builders/{dispatcher,candidates}.js`、`scripts/controller/actions/{fill_engine,fill_dispatch}.py`、表征 pin（locator-candidates / fill-dispatch / 新 cold pin）、本文件
+- 禁入区：`classify.py` / analyze / KB / `.cursor/` / click 引擎热区；他线 WIP 文件不相交
+- 方式：TDD 先红 pin → 离线 invent 优先 placeholder + 回放严格未命中继续尝试 + 录制 label 兜底补抓 → 绿 pin → 收工
+
 # Agent 协作日志
 
 ## 2026-09-10 14:55 · Cursor Lead — 收工：#676 搜索保留用户目标 + query 注入业务数据（回链 14:45）
