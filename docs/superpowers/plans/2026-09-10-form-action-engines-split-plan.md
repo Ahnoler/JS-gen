@@ -1,7 +1,9 @@
-# form_action_engines.py 拆分 — 执行 plan
+# form_action_engines.py 拆分 — 执行 plan（✅ 已完成 2026-09-10，实际 commit 链见下）
 
 > 2026-09-10 · 重构线。设计依据：`docs/superpowers/specs/2026-09-10-form-action-engines-split-design.md`。
-> 门禁：每个 S 步结束 `bash scripts/refactor/verify-all.sh` 全绿后 commit。
+> 门禁：每个 S 步结束 `bash scripts/refactor/verify-all.sh` 与基线一致（4 存量红，零新增）后 commit。
+>
+> **执行结果**：S1 `03d18a4f`（pin 拼接）→ S2 `fc094dd7`（base）→ S3 login → S4 `dbf0dc43`（fill，**搬运序修正**：必须严格等于拼接序 base→login→fill→select→radio→tree，radio 先行实测红并回退）→ S5 `dd7bba38`（select）→ S6 `496e7510`（radio 重做）→ S7 `dfb2740a`（tree + barrel 25 行终态，死 import 全清无 pin 伤亡）。2329 行单文件 → 6 模块 + barrel，25 pin 全存活。
 
 ## S1 — pin 拼接改造（25 脚本，4 并行子智能体，文件集不相交）
 

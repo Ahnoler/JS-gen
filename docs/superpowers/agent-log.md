@@ -663,6 +663,14 @@
 - 方式：TDD 改 characterization 期望 → 改 `mapStepToTransactionEvent`；V2/V3 推送共用此函数
 - 注意：已收工，见上方 15:31 条目
 
+## 2026-09-10 · ZCode 重构线 — 收工：form_action_engines.py 按引擎拆分完成（回链开工条目）
+
+- 完成：2329 行单文件拆为 7 件——form_engine_base(48)/login_engine(190)/fill_engine(717)/select_engine(1129)/radio_engine(109)/tree_engine(161)/barrel(25行纯re-export)。commit 链：73ae1dcc(spec/plan)→03d18a4f(S1 pin拼接)→fc094dd7(S2 base)→S3(login)→dbf0dc43(S4 fill)→dd7bba38(S5 select)→496e7510(S6 radio)→dfb2740a(S7 tree+barrel终态)
+- 验收：每步 verify-all 与基线一致（4 存量红 step-highlight/layer-tree/export-v3/confirm-notification，均他线数据漂移/pin 过期，零新增红）；25 个 read_text pin 经"顺序保真拼接读取"全存活；4 个 cold 脚本单独跑 PASS；barrel 身份检查 5/5；顺带修绿 3 个存量红 pin（tree-select-record/xpath-fill-select/form-assistant）
+- 关键教训（已写回 plan）：①搬运序必须严格等于拼接序（radio 先行实测 select 系 chunk 切空变红，回退重排）；②6 个 cold 脚本中 6 个实际有 6 个在门禁内——调研修正假设；③S7 barrel 终态曾因 IndentationError 半途未生效致双类并存，靠 barrel is 身份检查抓出
+- 遗留：confirm-notification 存量红（_misc.py pin 漂移，属 click 线热区，未代修）；dst 桌面 select-click-handover 包中的 form_action_engines.py 现已过时（不影响规格正确性，py 参考以 select_engine.py 为准）
+- 注意：本轮文件集=scripts/controller/actions/{form_action_engines,form_engine_base,login_engine,fill_engine,select_engine,radio_engine,tree_engine}.py + 25 characterization 脚本 + 本条 docs；未触碰 src/ 与他线 WIP
+
 ## 2026-09-10 · ZCode 重构线 — 开工：form_action_engines.py 按引擎拆分
 
 - 范围：scripts/controller/actions/form_action_engines.py（拆为 5 引擎文件+base+barrel）+ 新建 form_engine_base/login/fill/select/radio/tree_engine.py；特征化 pin 迁移（25 个 read_text 脚本，逐批改读新路径）；docs/superpowers/{specs,plans}/2026-09-10-form-action-engines-split-*.md
