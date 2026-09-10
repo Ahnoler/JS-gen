@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 22:32 · Zcode — 开工：recall-p0 closeout G3 收尾四项
+
+- 进行中：2026-09-10 22:32；依据=G3 结论（T0/T1a/T2/T4 PASS、T1b FAIL 已正确回退、**T3 FAIL**=verify 独立增量 0+未接线）+ Lead 裁定第三条路：**机制保留、词表停用、不接线、T3 不计成果**；生产口径统一为 T2 链态 0.740/0.847/0.784/0.798
+- 范围：`data/kb/synonyms.json`（仅加顶层 status 字段，不动 entries）、`docs/superpowers/reports/2026-09-10-recall-p0-report.md`（口径更正）、`scripts/characterization/characterize-flow-card-recall.mjs`（**唯一允许动代码文件**：补 bestNodeIdFor 分母 pin）、todo-list、本文件、tmp/kb-p0/closeout/
+- 禁入区：`propose.js`（裁定不接线）、`kb-recall-eval.v1.json`（冻结）、门禁阈值/`verify-all.sh`（本线禁改且他线 WIP）、`data/kb/req/**`（只读）、`.cursor/`、他线 WIP 12 项（agent-log archive 两删/classify.py/verify-all.sh 等）
+- 方式：开工 commit → 词表标注 → 报告口径更正 → 补 pin（TDD 红→绿验证防伪）→ 台账收工 commit；不 revert `2ae8e4e1`、不删词表、不再跑 T3 度量当成果
+
 ## 2026-09-10 00:05 · ZCode 引擎线 — 回滚+改期：tansun 兼容实装延至周末（回链 23:55 开工）
 
 - 用户指示：同事还在调试，等他调整完最后一版，**周末再做兼容**；改动全部回滚，虚拟环境保留
