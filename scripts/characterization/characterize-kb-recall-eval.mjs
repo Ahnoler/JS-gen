@@ -31,6 +31,8 @@ import {
   compareWithBaseline,
   DEFAULT_MARGINS,
   LATENCY_BUDGETS_MS,
+  loadSynonyms,
+  readSynonymsAssetStatus,
 } from '../kb/recall-eval.mjs';
 import { listFlowCardsDetailed } from '../../src/services/kb-flow-cards.js';
 
@@ -169,6 +171,40 @@ await run('approved metric floors hold (compareWithBaseline, D11 margins)', () =
 await run('latency budgets hold (warm p95 <= 50ms, cold p95 <= 200ms)', () => {
   assert.ok(m.latencyMs.warmP95 <= LATENCY_BUDGETS_MS.warmP95, `warmP95 ${m.latencyMs.warmP95}ms > ${LATENCY_BUDGETS_MS.warmP95}ms`);
   assert.ok(m.latencyMs.coldP95 <= LATENCY_BUDGETS_MS.coldP95, `coldP95 ${m.latencyMs.coldP95}ms > ${LATENCY_BUDGETS_MS.coldP95}ms`);
+});
+
+await run('synonyms asset status is provenance only (R-1: full load, never a filter)', async () => {
+  // Temporary assets live in tmp/ (never data/) — plan Task 1 Step 3.
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'r1-status-'));
+  try {
+    const entries = [
+      { term: '止付', expand: ['冻结'], scope: null },
+      { term: '数标', expand: ['数据指标'], scope: null },
+    ];
+    // ① declared non-active status → FULLY loaded (no filtering) + status readable
+    const archived = join(dir, 'archived.json');
+    writeFileSync(archived, JSON.stringify({ status: 'archived', entries }, null, 2));
+    assert.equal(loadSynonyms(archived).length, entries.length, 'declared status must NOT reduce the loaded entry count');
+    assert.equal(readSynonymsAssetStatus(archived), 'archived', 'declared status must be exposed for provenance');
+    // ② undeclared status → behavior identical to the status quo (null, no field)
+    const bare = join(dir, 'bare.json');
+    writeFileSync(bare, JSON.stringify({ entries }, null, 2));
+    assert.equal(loadSynonyms(bare).length, entries.length);
+    assert.equal(readSynonymsAssetStatus(bare), null, 'undeclared status must read as null (no invented field)');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  // ③ the real archived asset loads at full count and its status is documentary:
+  // the CLI surfaces it via result.synonyms.status + a stderr warning line, but
+  // loading count, metrics, and exit codes are untouched (this gate itself is
+  // the exit-code witness — a warning that changed exit codes would fail above).
+  const bridge = fileURLToPath(new URL('../../data/kb/colloquial-bridge.json', import.meta.url));
+  const bridgeEntries = loadSynonyms(bridge);
+  assert.equal(bridgeEntries.length, 67, 'archived colloquial-bridge must load at full count (67)');
+  assert.equal(readSynonymsAssetStatus(bridge), 'archived');
 });
 
 console.log(`\ncharacterize-kb-recall-eval: ${passed} passed`);

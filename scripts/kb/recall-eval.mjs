@@ -299,6 +299,11 @@ function renderTable(result) {
  * Load the controlled-vocabulary asset (recall P0 lever 3). Missing file is a
  * hard error in --synonyms mode (explicit opt-in must be explicit); empty
  * entries list degrades to no-op per spec §7.
+ *
+ * R-1 (closeout ruling 2026-09-10): `status` is PROVENANCE ONLY — it is never
+ * a filter. Loading stays full-count; the CLI surfaces a declared `status`
+ * (and warns on stderr when it is not "active") without touching metrics,
+ * thresholds, or exit codes.
  * @param {string} path synonyms.json path
  * @returns {Array<{term: string, expand: string[], scope?: string|null}>} Entries
  */
@@ -308,6 +313,17 @@ export function loadSynonyms(path = DEFAULT_SYNONYMS) {
     throw new Error(`synonyms asset malformed (entries): ${path}`);
   }
   return asset.entries;
+}
+
+/**
+ * R-1 provenance read: return the asset's declared `status`, or null when the
+ * asset does not declare one (historical output shape stays unchanged).
+ * @param {string} path synonyms.json path
+ * @returns {string|null} Declared status, e.g. "archived" / "unvalidated" / "active"
+ */
+export function readSynonymsAssetStatus(path) {
+  const asset = JSON.parse(readFileSync(path, 'utf8'));
+  return typeof asset?.status === 'string' ? asset.status : null;
 }
 
 /**
@@ -337,7 +353,19 @@ async function main() {
   result.generatedAt = new Date().toISOString();
   result.gitHead = execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim();
   result.corpusCards = cards.length;
-  if (synonyms) result.synonyms = { path: synonymsPath, entries: synonyms.length };
+  if (synonyms) {
+    result.synonyms = { path: synonymsPath, entries: synonyms.length };
+    // R-1 provenance only: record a declared asset status (field absent when
+    // undeclared → historical artifacts keep their shape) and warn on stderr
+    // for non-active assets. Never a filter; metrics/exit codes untouched.
+    const assetStatus = readSynonymsAssetStatus(synonymsPath);
+    if (assetStatus !== null) {
+      result.synonyms.status = assetStatus;
+      if (assetStatus !== 'active') {
+        console.error(`[recall-eval] synonyms asset status="${assetStatus}" — 仅限度量口径，禁止接线`);
+      }
+    }
+  }
 
   let exitCode = 0;
   if (baselinePath) {

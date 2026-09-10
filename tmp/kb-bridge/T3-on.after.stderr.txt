@@ -1,0 +1,1 @@
+[recall-eval] synonyms asset status="archived" — 仅限度量口径，禁止接线
