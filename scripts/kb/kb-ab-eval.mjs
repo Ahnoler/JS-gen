@@ -48,15 +48,19 @@ function loadJson(file) {
 }
 
 /**
- * region_id 形如 "page:http://…#/cstMgt/…/cpctMgtPg|main" → 提取 URL hash 段文本
- * @param {string} regionId region_id 原文
- * @returns {string} URL hash 段文本
+ * element_json → region_id / page_level_key（mysql2 会把 JSON 列自动 parse 成对象，两种形态都收）
+ * @param {string|object|null} elementJson step.element_json（string 或已 parse 的对象）
+ * @returns {string} URL hash 段文本；无 region_id 时返回 ''
  */
-function regionKey(regionId) {
-  const m = /region_id[":=]?\s*"?page:([^|"\n]+)/.exec(regionId || '');
-  if (m) return m[1];
-  const m2 = /page:([^|"\n]+)/.exec(regionId || '');
-  return m2 ? m2[1] : String(regionId || '');
+function regionKeyOf(elementJson) {
+  let ej = elementJson;
+  if (typeof ej === 'string') {
+    try { ej = JSON.parse(ej || '{}'); } catch { return ''; }
+  }
+  if (!ej || typeof ej !== 'object') return '';
+  const regionId = String(ej.region_id || '');
+  const m = /page:([^|\s]+)/.exec(regionId);
+  return m ? m[1] : '';
 }
 
 /**
@@ -67,7 +71,7 @@ function regionKey(regionId) {
 function visitedRegionsFromSteps(steps) {
   const out = [];
   for (const s of steps) {
-    const key = regionKey(s.element_json || '');
+    const key = regionKeyOf(s.element_json);
     if (!key) continue;
     if (out.length && out[out.length - 1].key === key) continue;
     out.push({ key, stepNumber: s.step_number });
@@ -92,7 +96,9 @@ function markerHits(regions, markers) {
 
 function stripElementJsonText(elementJson) {
   try {
-    const ej = JSON.parse(elementJson || '{}');
+    let ej = elementJson;
+    if (typeof ej === 'string') ej = JSON.parse(ej || '{}');
+    if (!ej || typeof ej !== 'object') return '';
     return String(ej.text || ej.attr?.text || '');
   } catch {
     return '';

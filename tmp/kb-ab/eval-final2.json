@@ -1,0 +1,985 @@
+{
+  "manifest": "scripts/kb/kb-ab-manifest.v1.json",
+  "setup": "tmp/kb-ab/setup-26091102.json",
+  "manifestVersion": "v1.1",
+  "runs": [
+    {
+      "trajectoryId": 727,
+      "trajectoryName": "KBAB26091102-A-R01",
+      "reqId": "R01",
+      "arm": "A",
+      "card": "rating",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 15,
+        "phaseCount": 1,
+        "wallS": 7525
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 16,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 16
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 10,
+        "clickButtonHits": 9,
+        "clickButtonHitRatio": 0.9
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 728,
+      "trajectoryName": "KBAB26091102-B-R01",
+      "reqId": "R01",
+      "arm": "B",
+      "card": "rating",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 0,
+        "phaseCount": 1,
+        "wallS": 7526
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 0,
+        "ratio": null
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 0
+      },
+      "P5": {
+        "visitedRegionCount": 0,
+        "markerHitRegionCount": 0,
+        "markerHitRatio": null,
+        "clickButtonTexts": 0,
+        "clickButtonHits": 0,
+        "clickButtonHitRatio": null
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 729,
+      "trajectoryName": "KBAB26091102-A-R02",
+      "reqId": "R02",
+      "arm": "A",
+      "card": "customer_onboarding",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 27,
+        "phaseCount": 1,
+        "wallS": 7526
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 31,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 31
+      },
+      "P5": {
+        "visitedRegionCount": 2,
+        "markerHitRegionCount": 2,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 4,
+        "clickButtonHits": 3,
+        "clickButtonHitRatio": 0.75
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 730,
+      "trajectoryName": "KBAB26091102-B-R02",
+      "reqId": "R02",
+      "arm": "B",
+      "card": "customer_onboarding",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 33,
+        "phaseCount": 1,
+        "wallS": 7528
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 37,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 37
+      },
+      "P5": {
+        "visitedRegionCount": 2,
+        "markerHitRegionCount": 2,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 7,
+        "clickButtonHits": 5,
+        "clickButtonHitRatio": 0.7143
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 731,
+      "trajectoryName": "KBAB26091102-A-R04",
+      "reqId": "R04",
+      "arm": "A",
+      "card": "customer_onboarding",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 34,
+        "phaseCount": 1,
+        "wallS": 7529
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 37,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 37
+      },
+      "P5": {
+        "visitedRegionCount": 2,
+        "markerHitRegionCount": 2,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 7,
+        "clickButtonHits": 5,
+        "clickButtonHitRatio": 0.7143
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 732,
+      "trajectoryName": "KBAB26091102-B-R04",
+      "reqId": "R04",
+      "arm": "B",
+      "card": "customer_onboarding",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 38,
+        "phaseCount": 1,
+        "wallS": 7530
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 41,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 41
+      },
+      "P5": {
+        "visitedRegionCount": 2,
+        "markerHitRegionCount": 2,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 9,
+        "clickButtonHits": 6,
+        "clickButtonHitRatio": 0.6667
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 733,
+      "trajectoryName": "KBAB26091102-A-R05",
+      "reqId": "R05",
+      "arm": "A",
+      "card": "rating",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 0,
+        "phaseCount": 1,
+        "wallS": 7528
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 0,
+        "ratio": null
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 0
+      },
+      "P5": {
+        "visitedRegionCount": 0,
+        "markerHitRegionCount": 0,
+        "markerHitRatio": null,
+        "clickButtonTexts": 0,
+        "clickButtonHits": 0,
+        "clickButtonHitRatio": null
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 734,
+      "trajectoryName": "KBAB26091102-B-R05",
+      "reqId": "R05",
+      "arm": "B",
+      "card": "rating",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 4,
+        "phaseCount": 1,
+        "wallS": 7529
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 4,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 4
+      },
+      "P5": {
+        "visitedRegionCount": 2,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 0.5,
+        "clickButtonTexts": 1,
+        "clickButtonHits": 0,
+        "clickButtonHitRatio": 0
+      },
+      "P6": {
+        "offCardRegionCount": 1,
+        "offCardRegionKeys": [
+          "http://test.creditv5p2.tansun.com.cn#/cstMgt/csinfMnt/cpctMgt/cpctMgtPg"
+        ],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 735,
+      "trajectoryName": "KBAB26091102-A-R06",
+      "reqId": "R06",
+      "arm": "A",
+      "card": "customer_query",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 5,
+        "phaseCount": 1,
+        "wallS": 7529
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 6,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 6
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 3,
+        "clickButtonHits": 3,
+        "clickButtonHitRatio": 1
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 736,
+      "trajectoryName": "KBAB26091102-B-R06",
+      "reqId": "R06",
+      "arm": "B",
+      "card": "customer_query",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 6,
+        "phaseCount": 1,
+        "wallS": 7530
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 7,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 7
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 4,
+        "clickButtonHits": 4,
+        "clickButtonHitRatio": 1
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 737,
+      "trajectoryName": "KBAB26091102-A-R07",
+      "reqId": "R07",
+      "arm": "A",
+      "card": "rating-query-view",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 1,
+        "phaseCount": 1,
+        "wallS": 7529
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 1,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 1
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 0,
+        "markerHitRatio": 0,
+        "clickButtonTexts": 1,
+        "clickButtonHits": 1,
+        "clickButtonHitRatio": 1
+      },
+      "P6": {
+        "offCardRegionCount": 1,
+        "offCardRegionKeys": [
+          "http://test.creditv5p2.tansun.com.cn#/rtgMgt/rtgEnqr/rtgEnqrMgtPg"
+        ],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 738,
+      "trajectoryName": "KBAB26091102-B-R07",
+      "reqId": "R07",
+      "arm": "B",
+      "card": "rating-query-view",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 1,
+        "phaseCount": 1,
+        "wallS": 7530
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 1,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 1
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 0,
+        "markerHitRatio": 0,
+        "clickButtonTexts": 1,
+        "clickButtonHits": 1,
+        "clickButtonHitRatio": 1
+      },
+      "P6": {
+        "offCardRegionCount": 1,
+        "offCardRegionKeys": [
+          "http://test.creditv5p2.tansun.com.cn#/rtgMgt/rtgEnqr/rtgEnqrMgtPg"
+        ],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 739,
+      "trajectoryName": "KBAB26091102-A-R09",
+      "reqId": "R09",
+      "arm": "A",
+      "card": "product_query",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 7,
+        "phaseCount": 1,
+        "wallS": 7892
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 8,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 8
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 4,
+        "clickButtonHits": 4,
+        "clickButtonHitRatio": 1
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 740,
+      "trajectoryName": "KBAB26091102-B-R09",
+      "reqId": "R09",
+      "arm": "B",
+      "card": "product_query",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 6,
+        "phaseCount": 1,
+        "wallS": 8391
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 7,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 7
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 4,
+        "clickButtonHits": 4,
+        "clickButtonHitRatio": 1
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 741,
+      "trajectoryName": "KBAB26091102-A-R11",
+      "reqId": "R11",
+      "arm": "A",
+      "card": "risk-class-statistics",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 0,
+        "phaseCount": 1,
+        "wallS": 8564
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 0,
+        "ratio": null
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 0
+      },
+      "P5": {
+        "visitedRegionCount": 0,
+        "markerHitRegionCount": 0,
+        "markerHitRatio": null,
+        "clickButtonTexts": 0,
+        "clickButtonHits": 0,
+        "clickButtonHitRatio": null
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 742,
+      "trajectoryName": "KBAB26091102-B-R11",
+      "reqId": "R11",
+      "arm": "B",
+      "card": "risk-class-statistics",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 0,
+        "phaseCount": 1,
+        "wallS": 8881
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 0,
+        "ratio": null
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 0
+      },
+      "P5": {
+        "visitedRegionCount": 0,
+        "markerHitRegionCount": 0,
+        "markerHitRatio": null,
+        "clickButtonTexts": 0,
+        "clickButtonHits": 0,
+        "clickButtonHitRatio": null
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 743,
+      "trajectoryName": "KBAB26091102-A-N01",
+      "reqId": "N01",
+      "arm": "A",
+      "card": "customer_onboarding",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 12,
+        "phaseCount": 1,
+        "wallS": 9258
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 14,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 14
+      },
+      "P5": {
+        "visitedRegionCount": 3,
+        "markerHitRegionCount": 3,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 5,
+        "clickButtonHits": 4,
+        "clickButtonHitRatio": 0.8
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 744,
+      "trajectoryName": "KBAB26091102-B-N01",
+      "reqId": "N01",
+      "arm": "B",
+      "card": "customer_onboarding",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 12,
+        "phaseCount": 1,
+        "wallS": 9813
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 14,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 14
+      },
+      "P5": {
+        "visitedRegionCount": 3,
+        "markerHitRegionCount": 3,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 5,
+        "clickButtonHits": 4,
+        "clickButtonHitRatio": 0.8
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 745,
+      "trajectoryName": "KBAB26091102-A-N02",
+      "reqId": "N02",
+      "arm": "A",
+      "card": "customer_onboarding",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 33,
+        "phaseCount": 1,
+        "wallS": 12245
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 36,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 36
+      },
+      "P5": {
+        "visitedRegionCount": 2,
+        "markerHitRegionCount": 2,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 7,
+        "clickButtonHits": 5,
+        "clickButtonHitRatio": 0.7143
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 746,
+      "trajectoryName": "KBAB26091102-B-N02",
+      "reqId": "N02",
+      "arm": "B",
+      "card": "customer_onboarding",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 39,
+        "phaseCount": 1,
+        "wallS": 12245
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 42,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 42
+      },
+      "P5": {
+        "visitedRegionCount": 3,
+        "markerHitRegionCount": 3,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 9,
+        "clickButtonHits": 6,
+        "clickButtonHitRatio": 0.6667
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 747,
+      "trajectoryName": "KBAB26091102-A-N03",
+      "reqId": "N03",
+      "arm": "A",
+      "card": "customer_query",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 9,
+        "phaseCount": 1,
+        "wallS": 12640
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 10,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 10
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 4,
+        "clickButtonHits": 4,
+        "clickButtonHitRatio": 1
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 748,
+      "trajectoryName": "KBAB26091102-B-N03",
+      "reqId": "N03",
+      "arm": "B",
+      "card": "customer_query",
+      "P1": {
+        "recordStatus": "recorded",
+        "isSuccessful": 1,
+        "ok": true
+      },
+      "P2": {
+        "stepCount": 11,
+        "phaseCount": 1,
+        "wallS": 12995
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 12,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 12
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 6,
+        "clickButtonHits": 6,
+        "clickButtonHitRatio": 1
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 749,
+      "trajectoryName": "KBAB26091102-A-N04",
+      "reqId": "N04",
+      "arm": "A",
+      "card": "rating",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 17,
+        "phaseCount": 1,
+        "wallS": 13976
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 18,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 18
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 12,
+        "clickButtonHits": 10,
+        "clickButtonHitRatio": 0.8333
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    },
+    {
+      "trajectoryId": 750,
+      "trajectoryName": "KBAB26091102-B-N04",
+      "reqId": "N04",
+      "arm": "B",
+      "card": "rating",
+      "P1": {
+        "recordStatus": "failed",
+        "isSuccessful": 0,
+        "ok": false
+      },
+      "P2": {
+        "stepCount": 14,
+        "phaseCount": 1,
+        "wallS": 14616
+      },
+      "P3": {
+        "manualSteps": 0,
+        "totalSteps": 15,
+        "ratio": 0
+      },
+      "P4": {
+        "errorSteps": 0,
+        "totalSteps": 15
+      },
+      "P5": {
+        "visitedRegionCount": 1,
+        "markerHitRegionCount": 1,
+        "markerHitRatio": 1,
+        "clickButtonTexts": 11,
+        "clickButtonHits": 8,
+        "clickButtonHitRatio": 0.7273
+      },
+      "P6": {
+        "offCardRegionCount": 0,
+        "offCardRegionKeys": [],
+        "blacklistButtonHits": 0,
+        "blacklistButtonTexts": []
+      }
+    }
+  ],
+  "armSummary": {
+    "A": {
+      "total": 12,
+      "success": 5,
+      "successRate": 0.4167
+    },
+    "B": {
+      "total": 12,
+      "success": 6,
+      "successRate": 0.5
+    }
+  }
+}
