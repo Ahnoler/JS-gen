@@ -1,0 +1,163 @@
+{
+  "manifestVersion": "v1",
+  "changeLog": [
+    "v1 (2026-09-11): initial freeze. Requirement pool = batch_recording_item.requirement DISTINCT 36 (tmp/kb-ab/requirements-36.json, tunnel read-only 2026-09-11). 12 selected offline (human), card mapping fixed offline from data/kb/flows (flow/aliases/menu_path), NOT from v2 eval set (physical isolation).",
+    "v1 (2026-09-11): functionId per requirement verified against system_menu_snapshot v10 (system_node_id=1): 对公客户管理=7, 对公客户评级=9000000011, 客户信息查询=9000000039, 评级查询=9000000055, 产品库管理=9000000740, 查询产品信息=9000000467, 集群客户管理=9000000018, 风险分类统计=9000000144, 贷款计算器=9000000452.",
+    "Selection rationale: 6 query/read-only + inspection requirements (safe, fast, rollbackable) + 4 create-family (customer/product/cluster, difficulty-bearing, stamp-prefixed) + 2 mixed-navigation. Difficulty anchors preserved per spec S4 fallback: stamp customer family (#586/590/592/593/594) and credit_usage (#615) remain the v1.1 substitutes if pilot ceiling trips.",
+    "Cleanup caveat (accepted, documented): SUT customer rows in 信贷预客户 state have NO UI delete (state_actions: only 草稿客户 allows 删除). Create-family runs stamp every name with KBAB<runId>- and attempt list-delete when the state allows it; residue with visible stamp prefix is otherwise documented in cleanupLog and handed over. This mirrors the 2026-09-07 R1 precedent (8 stamp rows retained).",
+    "Known-stale pool entries excluded: 新增项目 family (12-18) has no matching menu/card in system_page (在审议/已上会项目管理 are 公共业务 unrelated); 删除评级 req (#35) is destructive on real data; 录制个人客户 (#36) ambiguous. Numbered-suffix 新增客户 variants (#21-34) are the same task as #2 (numbering artifact from batch template regeneration) - represented by #2."
+  ],
+  "frozenAt": "2026-09-11T02:50:00+08:00",
+  "spec": "docs/superpowers/specs/2026-09-11-kb-value-ab-design.md",
+  "environment": {
+    "controlPlane": "http://127.0.0.1:4097",
+    "sut": "http://test.creditv5p2.tansun.com.cn",
+    "systemAccountId": 2,
+    "accountName": "黄某某（经理，701994）",
+    "passwordSource": "config/.env DB → system_account.id=2; password NEVER written to this manifest",
+    "serialExecution": true,
+    "writePrefix": "KBAB<runId>-"
+  },
+  "armProtocol": {
+    "paired": true,
+    "alternating": true,
+    "armMarker": "name=KBAB<runId>-<arm>-<reqId> ONLY; never in description",
+    "oneChance": true,
+    "retryPolicy": "no auto-retry; exceptional retry run records retryOf"
+  },
+  "requirements": [
+    {
+      "reqId": "R01",
+      "requirement": "1、登录系统。\n2、对公客户评级。",
+      "module": "评级管理",
+      "card": "rating",
+      "functionId": 9000000011,
+      "endpoint": "评级申请弹窗提交（评级对象=已有客户，模型自动带出）",
+      "cleanup": "无写数据（评级若提交成功为流程数据，stamp 无法前置——评级入口要求选已有客户；若申请发起成功按流程撤销；报告如实记录）",
+      "rollbackRisk": "low"
+    },
+    {
+      "reqId": "R02",
+      "requirement": "1、登录系统。\n2、新增客户。",
+      "module": "客户管理",
+      "card": "customer_onboarding",
+      "functionId": 7,
+      "endpoint": "对公客户新增保存成功（stamp=KBAB<runId>-客户）",
+      "cleanup": "列表查 stamp → 状态=草稿客户则删除；信贷预客户不可删（SUT 状态机），留证移交",
+      "rollbackRisk": "medium"
+    },
+    {
+      "reqId": "R03",
+      "requirement": "1、登录系统。\n2、新增对公客户。",
+      "module": "客户管理",
+      "card": "customer_onboarding",
+      "functionId": 7,
+      "endpoint": "对公客户新增保存成功（stamp 前缀）",
+      "cleanup": "同 R02",
+      "rollbackRisk": "medium"
+    },
+    {
+      "reqId": "R04",
+      "requirement": "1.点击客户管理，点击对公客户管理。\n2.新增一个信贷潜在客户，点击保存。（点击法定代表人/负责人证件号码的引入按钮，客户名称 填写 吴芳军，点击查询，选择一个客户，点击确认。）",
+      "module": "客户管理",
+      "card": "customer_onboarding",
+      "functionId": 7,
+      "endpoint": "信贷潜在客户新增+法人引入（客户名 stamp 前缀）",
+      "cleanup": "同 R02",
+      "rollbackRisk": "medium"
+    },
+    {
+      "reqId": "R05",
+      "requirement": "1、点击客户管理，点击对公客户管理。2、点击评级管理，点击对公客户评级。",
+      "module": "评级管理",
+      "card": "rating",
+      "functionId": 9000000011,
+      "endpoint": "抵达对公客户评级列表页（导航+列表可见即成功，不发起申请）",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low"
+    },
+    {
+      "reqId": "R06",
+      "requirement": "1、登录系统。2、进入客户管理，打开客户信息查询，查询客户。",
+      "module": "客户管理",
+      "card": "customer_query",
+      "functionId": 9000000039,
+      "endpoint": "客户查询页列表返回结果",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low"
+    },
+    {
+      "reqId": "R07",
+      "requirement": "1、登录系统。2、进入评级管理，打开评级查询，查询评级记录。",
+      "module": "评级管理",
+      "card": "rating-query-view",
+      "functionId": 9000000055,
+      "endpoint": "评级查询管理页列表返回结果",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low"
+    },
+    {
+      "reqId": "R08",
+      "requirement": "1、登录系统。2、进入产品管理，打开产品库管理，查询产品。",
+      "module": "产品管理",
+      "card": "product_library",
+      "functionId": 9000000740,
+      "endpoint": "产品库列表可见",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low"
+    },
+    {
+      "reqId": "R09",
+      "requirement": "1、登录系统。2、进入产品管理，打开查询产品信息，查询一个产品。",
+      "module": "产品管理",
+      "card": "product_query",
+      "functionId": 9000000467,
+      "endpoint": "查询产品信息列表可见",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low"
+    },
+    {
+      "reqId": "R10",
+      "requirement": "1、登录系统。2、进入客户管理，打开集群客户管理，查询集群客户。",
+      "module": "客户管理",
+      "card": "customer-group-cluster",
+      "functionId": 9000000018,
+      "endpoint": "集群客户管理页列表可见",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low"
+    },
+    {
+      "reqId": "R11",
+      "requirement": "1、登录系统。2、进入贷后管理，打开风险分类统计，查看统计。",
+      "module": "贷后管理",
+      "card": "risk-class-statistics",
+      "functionId": 9000000144,
+      "endpoint": "风险分类统计页可见",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low"
+    },
+    {
+      "reqId": "R12",
+      "requirement": "1、登录系统。2、进入系统管理，打开贷款计算器，做一次试算。",
+      "module": "系统管理",
+      "card": "system-mgmt-loan-calc",
+      "functionId": 9000000452,
+      "endpoint": "贷款计算器页打开并完成一次试算（纯计算无落库）",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low"
+    }
+  ],
+  "pilot": {
+    "reqIds": ["R02", "R06"],
+    "order": "R02:A,B then R06:B,A (alternating)",
+    "ceilingRule": "pilot A-arm success rate >= 0.9 -> switch difficulty anchors per spec S4 (stamp family #586/590/592/593/594 + credit_usage #615), manifest -> v1.1",
+    "optionalCArm": "deferred (kept for report discussion; not run in v1)"
+  },
+  "officialPlan": {
+    "order": "per-requirement pairs, arm order alternating A->B / B->A by reqId index parity",
+    "runsTotal": 24
+  },
+  "cleanupLog": [],
+  "abortedRuns": [],
+  "notes": "Requirement texts above are copied verbatim from batch_recording_item.requirement (user/QA hand-written, product register). R06-R12 texts: the pool only contains these families in degraded numbered variants; the canonical un-numbered text here preserves the same instruction content and was verified against card menu_path targets. No v2 eval set usage."
+}
