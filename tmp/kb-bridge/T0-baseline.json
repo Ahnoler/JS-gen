@@ -1,0 +1,3203 @@
+{
+  "evalVersion": "v2",
+  "k": 5,
+  "metrics": {
+    "accuracyAt1": 0.6,
+    "recallAt5": 0.725,
+    "mrrAt5": 0.653,
+    "ndcgAt5": 0.667,
+    "rejectionRate": 0.382,
+    "noiseAccuracyAt1": 0.6,
+    "positives": 190,
+    "negatives": 55,
+    "byTier": {
+      "A": 1,
+      "B": 0.4,
+      "C": 0.9,
+      "D": 0.9,
+      "E": 0.1
+    },
+    "latencyMs": {
+      "warmP50": 0.053,
+      "warmP95": 0.156,
+      "coldP50": 2.419,
+      "coldP95": 3.433
+    }
+  },
+  "perQuery": [
+    {
+      "id": "A-001",
+      "tier": "A",
+      "query": "额度冻结解冻操作",
+      "gold": [
+        "limit"
+      ],
+      "top5": [
+        "limit"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-002",
+      "tier": "A",
+      "query": "押品查封后如何处置",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "top5": [
+        "collateral_seizure",
+        "system-mgmt-org-merge",
+        "judicial-litigation"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-003",
+      "tier": "A",
+      "query": "新增担保合同",
+      "gold": [
+        "guaranty_contract"
+      ],
+      "top5": [
+        "guaranty_contract",
+        "duigong_contract_sign",
+        "asset-preserve-ops-counter-entrust",
+        "loan-retail-erheyi-apply"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-004",
+      "tier": "A",
+      "query": "放款账户信息与还款账户",
+      "gold": [
+        "loan_account"
+      ],
+      "top5": [
+        "loan_account"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-005",
+      "tier": "A",
+      "query": "催收评分卡配置管理",
+      "gold": [
+        "collection_scorecard"
+      ],
+      "top5": [
+        "collection_scorecard"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-006",
+      "tier": "A",
+      "query": "贷后检查规则配置检查频率",
+      "gold": [
+        "check-config"
+      ],
+      "top5": [
+        "check-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-007",
+      "tier": "A",
+      "query": "新增数据权限",
+      "gold": [
+        "system-mgmt-data-perm"
+      ],
+      "top5": [
+        "system-mgmt-data-perm"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-008",
+      "tier": "A",
+      "query": "公告管理发布公告",
+      "gold": [
+        "system-mgmt-message-center"
+      ],
+      "top5": [
+        "system-mgmt-message-center"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-009",
+      "tier": "A",
+      "query": "机构撤并登记",
+      "gold": [
+        "system-mgmt-org-merge"
+      ],
+      "top5": [
+        "system-mgmt-org-merge"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-010",
+      "tier": "A",
+      "query": "控制规则库新增规则",
+      "gold": [
+        "smart-ctrl-rule-lib"
+      ],
+      "top5": [
+        "smart-ctrl-rule-lib"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-011",
+      "tier": "A",
+      "query": "法院查封押品要处置",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "top5": [
+        "collateral_seizure"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-012",
+      "tier": "A",
+      "query": "设置常规贷后检查频率",
+      "gold": [
+        "check-config"
+      ],
+      "top5": [
+        "check-config",
+        "postloan"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-013",
+      "tier": "A",
+      "query": "给角色配数据权限场景",
+      "gold": [
+        "system-mgmt-data-perm"
+      ],
+      "top5": [
+        "system-mgmt-data-perm",
+        "credit_usage"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-014",
+      "tier": "A",
+      "query": "押品估值怎么算",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "top5": [
+        "collateral_valuation",
+        "collateral-func-params"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-015",
+      "tier": "A",
+      "query": "电子签怎么发起",
+      "gold": [
+        "electronic_signing"
+      ],
+      "top5": [
+        "electronic_signing",
+        "guaranty_contract",
+        "duigong_contract_sign",
+        "credit_application",
+        "credit_usage"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-016",
+      "tier": "A",
+      "query": "对公客户建档新增客户",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "top5": [
+        "customer_onboarding"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-017",
+      "tier": "A",
+      "query": "客户信息查询",
+      "gold": [
+        "customer_query"
+      ],
+      "top5": [
+        "customer_query"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-018",
+      "tier": "A",
+      "query": "对公授信申请授信额度",
+      "gold": [
+        "credit_application"
+      ],
+      "top5": [
+        "credit_application",
+        "credit-retail-credit-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-019",
+      "tier": "A",
+      "query": "对公用信申请",
+      "gold": [
+        "credit_usage"
+      ],
+      "top5": [
+        "credit_usage"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-020",
+      "tier": "A",
+      "query": "对公放款申请新增放款",
+      "gold": [
+        "loan"
+      ],
+      "top5": [
+        "loan"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-021",
+      "tier": "A",
+      "query": "对公合同签订",
+      "gold": [
+        "duigong_contract_sign"
+      ],
+      "top5": [
+        "duigong_contract_sign"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-022",
+      "tier": "A",
+      "query": "引入保证人",
+      "gold": [
+        "guarantee_intro"
+      ],
+      "top5": [
+        "guarantee_intro"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-023",
+      "tier": "A",
+      "query": "电子签署线上签约",
+      "gold": [
+        "electronic_signing"
+      ],
+      "top5": [
+        "electronic_signing"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-024",
+      "tier": "A",
+      "query": "对公客户评级",
+      "gold": [
+        "rating",
+        "rating_flow"
+      ],
+      "top5": [
+        "rating",
+        "rating_flow"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-025",
+      "tier": "A",
+      "query": "评级查询查看评级详情",
+      "gold": [
+        "rating-query-view"
+      ],
+      "top5": [
+        "rating-query-view"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-026",
+      "tier": "A",
+      "query": "贷后检查检查任务",
+      "gold": [
+        "postloan"
+      ],
+      "top5": [
+        "postloan",
+        "check-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-027",
+      "tier": "A",
+      "query": "委外清收登记",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "top5": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-028",
+      "tier": "A",
+      "query": "司法诉讼申请",
+      "gold": [
+        "judicial-litigation"
+      ],
+      "top5": [
+        "judicial-litigation"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-029",
+      "tier": "A",
+      "query": "受托支付信息",
+      "gold": [
+        "disburse-entrusted-payment"
+      ],
+      "top5": [
+        "disburse-entrusted-payment"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-030",
+      "tier": "A",
+      "query": "账务异常处理",
+      "gold": [
+        "disburse-account-abnormal"
+      ],
+      "top5": [
+        "disburse-account-abnormal"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-031",
+      "tier": "A",
+      "query": "押品信息管理押品新增向导页",
+      "gold": [
+        "collateral_info"
+      ],
+      "top5": [
+        "collateral_info"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-032",
+      "tier": "A",
+      "query": "押品估值管理",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "top5": [
+        "collateral_valuation"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-033",
+      "tier": "A",
+      "query": "押品台账管理综合查询",
+      "gold": [
+        "collateral-func-ledger"
+      ],
+      "top5": [
+        "collateral-func-ledger",
+        "customer_query",
+        "risk-class-ledger"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-034",
+      "tier": "A",
+      "query": "催收任务管理",
+      "gold": [
+        "collection_task"
+      ],
+      "top5": [
+        "collection_task"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-035",
+      "tier": "A",
+      "query": "催收策略配置",
+      "gold": [
+        "collection_strategy"
+      ],
+      "top5": [
+        "collection_strategy"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-036",
+      "tier": "A",
+      "query": "提醒或催收配置",
+      "gold": [
+        "collection-remind-cfg"
+      ],
+      "top5": [
+        "collection-remind-cfg"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-037",
+      "tier": "A",
+      "query": "产品库管理新增产品",
+      "gold": [
+        "product_library"
+      ],
+      "top5": [
+        "product_library"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-038",
+      "tier": "A",
+      "query": "产品要素库公共要素",
+      "gold": [
+        "product_element"
+      ],
+      "top5": [
+        "product_element",
+        "product_library"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-039",
+      "tier": "A",
+      "query": "核心产品映射",
+      "gold": [
+        "product_core_mapping"
+      ],
+      "top5": [
+        "product_core_mapping"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-040",
+      "tier": "A",
+      "query": "产品阶段管理新增阶段",
+      "gold": [
+        "product_stage"
+      ],
+      "top5": [
+        "product_stage"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-001",
+      "tier": "B",
+      "query": "把额度临时止付再恢复",
+      "gold": [
+        "limit"
+      ],
+      "top5": [
+        "smart-ctrl-rule-toggle",
+        "credit_application",
+        "limit",
+        "limit-ctrl-api-ocp-revoke-loop",
+        "credit-retail-credit-config"
+      ],
+      "rank": 3,
+      "ok": false
+    },
+    {
+      "id": "B-002",
+      "tier": "B",
+      "query": "放款时填还款账号",
+      "gold": [
+        "loan_account"
+      ],
+      "top5": [
+        "loan_account",
+        "loan",
+        "customer-group-group"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-003",
+      "tier": "B",
+      "query": "给催收人员配评分规则",
+      "gold": [
+        "collection_scorecard"
+      ],
+      "top5": [
+        "collection_scorecard",
+        "collection_strategy",
+        "collection-remind-cfg",
+        "collateral-func-ext-assess",
+        "limit-ctrl-api-grant-use-one"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-004",
+      "tier": "B",
+      "query": "发布一条系统公告",
+      "gold": [
+        "system-mgmt-message-center"
+      ],
+      "top5": [
+        "system-mgmt-message-center",
+        "product_library",
+        "smart-ctrl-rule-cfg"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-005",
+      "tier": "B",
+      "query": "两家机构合并怎么登记",
+      "gold": [
+        "system-mgmt-org-merge"
+      ],
+      "top5": [
+        "asset-preserve-ops-outsourced-collection",
+        "system-mgmt-org-merge",
+        "collateral_info",
+        "digital-loan-desk-data-index",
+        "customer-group-cluster"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "B-006",
+      "tier": "B",
+      "query": "把一笔贷款的担保物登记进系统",
+      "gold": [
+        "collateral_info"
+      ],
+      "top5": [
+        "collateral-func-ledger",
+        "system-mgmt-org-merge",
+        "system-mgmt-loan-calc"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-007",
+      "tier": "B",
+      "query": "新客户第一次进信贷系统建档案",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "top5": [
+        "customer_onboarding",
+        "risk-class-observation-whitelist",
+        "customer-group-group"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-008",
+      "tier": "B",
+      "query": "看看某个客户都有哪些业务往来全景",
+      "gold": [
+        "customer_360"
+      ],
+      "top5": [
+        "credit_application",
+        "credit_usage",
+        "customer_onboarding",
+        "customer_360",
+        "loan-corp-syndicate-lead-apply"
+      ],
+      "rank": 4,
+      "ok": false
+    },
+    {
+      "id": "B-009",
+      "tier": "B",
+      "query": "查一个客户的基本资料",
+      "gold": [
+        "customer_query"
+      ],
+      "top5": [
+        "rating",
+        "archive-stock-in",
+        "customer_360",
+        "credit-corp-approval-result",
+        "loan-corp-syndicate-lead-apply"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-010",
+      "tier": "B",
+      "query": "给企业客户做信用等级评定",
+      "gold": [
+        "rating"
+      ],
+      "top5": [
+        "credit-retail-credit-config",
+        "customer_query",
+        "customer-group-general-group"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-011",
+      "tier": "B",
+      "query": "看看评级最终结果和审批过程",
+      "gold": [
+        "rating-query-view"
+      ],
+      "top5": [
+        "rating",
+        "rating-query-view",
+        "rating_flow",
+        "credit-corp-approval-task",
+        "loan-retail-erheyi-apply"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "B-012",
+      "tier": "B",
+      "query": "发起一笔对公的授信业务",
+      "gold": [
+        "credit_application"
+      ],
+      "top5": [
+        "credit_usage",
+        "credit_application",
+        "credit-corp-approval-result",
+        "credit-corp-approval-task",
+        "loan"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "B-013",
+      "tier": "B",
+      "query": "企业借钱用款怎么申请",
+      "gold": [
+        "credit_usage"
+      ],
+      "top5": [
+        "customer-group-general-group",
+        "credit_application",
+        "credit_usage",
+        "loan",
+        "rating"
+      ],
+      "rank": 3,
+      "ok": false
+    },
+    {
+      "id": "B-014",
+      "tier": "B",
+      "query": "贷款批下来了安排打款给客户",
+      "gold": [
+        "loan"
+      ],
+      "top5": [
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-syndicate-participant-apply",
+        "system-mgmt-loan-calc",
+        "loan-corp-entrust-loan",
+        "collection-remind-cfg"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-015",
+      "tier": "B",
+      "query": "签正式的借款合同",
+      "gold": [
+        "duigong_contract_sign"
+      ],
+      "top5": [
+        "guarantee_intro",
+        "customer_onboarding",
+        "collateral_custody",
+        "loan-corp-entrust-loan"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-016",
+      "tier": "B",
+      "query": "找个人给这笔贷款做担保",
+      "gold": [
+        "guarantee_intro"
+      ],
+      "top5": [
+        "customer_360",
+        "product_core_mapping",
+        "guaranty_contract",
+        "guarantee_intro",
+        "risk-class-overdue-config"
+      ],
+      "rank": 4,
+      "ok": false
+    },
+    {
+      "id": "B-017",
+      "tier": "B",
+      "query": "合同不用纸笔直接网上签",
+      "gold": [
+        "electronic_signing"
+      ],
+      "top5": [
+        "electronic_signing",
+        "guaranty_contract",
+        "guarantee_intro",
+        "collection_task",
+        "duigong_contract_sign"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-018",
+      "tier": "B",
+      "query": "贷款放完之后要跟进检查",
+      "gold": [
+        "postloan"
+      ],
+      "top5": [
+        "postloan",
+        "check-config",
+        "collection-remind-cfg",
+        "loan",
+        "loan-corp-syndicate-lead-apply"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-019",
+      "tier": "B",
+      "query": "逾期了安排人上门要账",
+      "gold": [
+        "collection_task"
+      ],
+      "top5": [
+        "collection_scorecard",
+        "risk-class-overdue-config",
+        "collection_strategy",
+        "collection_task",
+        "collateral-func-warning"
+      ],
+      "rank": 4,
+      "ok": false
+    },
+    {
+      "id": "B-020",
+      "tier": "B",
+      "query": "抵押的房子被法院占了怎么办",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "top5": [
+        "guaranty_contract",
+        "collateral_seizure"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "B-021",
+      "tier": "B",
+      "query": "估算一下抵押物值多少钱",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "top5": [
+        "guaranty_contract"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-022",
+      "tier": "B",
+      "query": "把催收的活儿外包给外面的公司",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "top5": [
+        "customer-group-group",
+        "collection_scorecard",
+        "collection-remind-cfg",
+        "collection_strategy",
+        "collection_task"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-023",
+      "tier": "B",
+      "query": "和别人打官司要起诉",
+      "gold": [
+        "judicial-litigation"
+      ],
+      "top5": [],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-024",
+      "tier": "B",
+      "query": "按合同约定直接把钱付给交易对手",
+      "gold": [
+        "disburse-entrusted-payment"
+      ],
+      "top5": [
+        "limit-ctrl-api-ocp-revoke-loop",
+        "disburse-account-abnormal",
+        "limit-ctrl-api-grant-use-one",
+        "electronic_signing",
+        "guaranty_contract"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-025",
+      "tier": "B",
+      "query": "放款放错了要红字冲回来",
+      "gold": [
+        "disburse-account-abnormal"
+      ],
+      "top5": [
+        "loan_account",
+        "loan"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-026",
+      "tier": "B",
+      "query": "两个公司组了个团要一起管",
+      "gold": [
+        "customer-group-group"
+      ],
+      "top5": [
+        "customer-group-group"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-027",
+      "tier": "B",
+      "query": "一批产业链上的小企业打包管理",
+      "gold": [
+        "customer-group-cluster"
+      ],
+      "top5": [
+        "credit_usage",
+        "customer-group-general-group"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-028",
+      "tier": "B",
+      "query": "把旗下所有子公司挂到一个总户头下",
+      "gold": [
+        "customer-group-general-group"
+      ],
+      "top5": [
+        "product_element",
+        "customer-group-group"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-029",
+      "tier": "B",
+      "query": "股东和实际控制人之间的关系要登记",
+      "gold": [
+        "customer-common-cust-relation"
+      ],
+      "top5": [
+        "customer-group-group",
+        "customer-group-cluster"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-030",
+      "tier": "B",
+      "query": "产品目录里加一个新品并让它可用",
+      "gold": [
+        "product_library"
+      ],
+      "top5": [
+        "product_query",
+        "loan",
+        "limit"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "C-001",
+      "tier": "C",
+      "query": "阶段1：登录被测系统并进入信贷工作台首页",
+      "gold": [
+        "session_login"
+      ],
+      "top5": [
+        "customer_onboarding",
+        "approval_todo",
+        "portal-public-info",
+        "portal-home-mgmt"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "C-002",
+      "tier": "C",
+      "query": "阶段2：在首页待办任务里打开一笔授信审批，点同意并填写审批意见后提交下一步",
+      "gold": [
+        "approval_chain",
+        "approval_todo",
+        "credit-corp-approval-task"
+      ],
+      "top5": [
+        "approval_chain",
+        "credit-corp-approval-task",
+        "loan",
+        "credit_application"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-003",
+      "tier": "C",
+      "query": "阶段3：工作台任务事项里看待办任务清单并转交别人处理",
+      "gold": [
+        "approval_todo"
+      ],
+      "top5": [
+        "approval_todo",
+        "rating",
+        "credit-corp-approval-task"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-004",
+      "tier": "C",
+      "query": "阶段4：授信批复下来后在批复查看任务页核对分项批复和终审意见",
+      "gold": [
+        "credit-corp-approval-result"
+      ],
+      "top5": [
+        "credit-corp-approval-result"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-005",
+      "tier": "C",
+      "query": "阶段5：押品评估走外部评估，先维护外部评估管理人员再设置评估费用",
+      "gold": [
+        "collateral-func-ext-assess"
+      ],
+      "top5": [
+        "collateral-func-ext-assess",
+        "collateral_valuation"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-006",
+      "tier": "C",
+      "query": "阶段6：维护押品种类树和各农合机构估值参数，还有房产估值模型",
+      "gold": [
+        "collateral-func-params"
+      ],
+      "top5": [
+        "collateral-func-params"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-007",
+      "tier": "C",
+      "query": "阶段7：查押品预警，看保险到期和权证未按期归还的提示",
+      "gold": [
+        "collateral-func-warning"
+      ],
+      "top5": [
+        "collateral-func-warning"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-008",
+      "tier": "C",
+      "query": "阶段8：押品权证先入库，后面借阅到期归还，结清后正式出库",
+      "gold": [
+        "collateral_custody"
+      ],
+      "top5": [
+        "collateral-func-warning",
+        "collateral_custody"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "C-009",
+      "tier": "C",
+      "query": "阶段9：纸质合同资料整理好后提交档案入库申请",
+      "gold": [
+        "archive-stock-in"
+      ],
+      "top5": [
+        "archive-stock-in"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-010",
+      "tier": "C",
+      "query": "阶段10：维护授信系数和拨款转换系数，给农户配授信额度",
+      "gold": [
+        "credit-retail-credit-config"
+      ],
+      "top5": [
+        "credit-retail-credit-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-011",
+      "tier": "C",
+      "query": "阶段11：社团贷款牵头行发起，维护参团份额，参与行再发起子申请",
+      "gold": [
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-syndicate-participant-apply"
+      ],
+      "top5": [
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-syndicate-participant-apply"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-012",
+      "tier": "C",
+      "query": "阶段12：委托贷款业务先维护委托人再发起用信",
+      "gold": [
+        "loan-corp-entrust-loan"
+      ],
+      "top5": [
+        "loan-corp-entrust-loan"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-013",
+      "tier": "C",
+      "query": "阶段13：对私客户做二合一申请，评级和用信一起审批",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "top5": [
+        "loan-retail-erheyi-apply",
+        "credit_usage",
+        "credit-corp-approval-task",
+        "customer_query",
+        "customer_360"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-014",
+      "tier": "C",
+      "query": "阶段14：对私用信在主页里查看流程轨迹，撤销一笔待发起的申请",
+      "gold": [
+        "loan-retail-apply-maintain"
+      ],
+      "top5": [
+        "loan-retail-apply-maintain",
+        "rating",
+        "loan",
+        "loan-retail-erheyi-apply",
+        "credit_application"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-015",
+      "tier": "C",
+      "query": "阶段15：数字信贷里建数据指标模板并登记到指标库",
+      "gold": [
+        "digital-loan-desk-data-index"
+      ],
+      "top5": [
+        "digital-loan-desk-data-index"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-001",
+      "tier": "D",
+      "query": "W0",
+      "gold": [
+        "session_login"
+      ],
+      "top5": [
+        "session_login"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-002",
+      "tier": "D",
+      "query": "lmtRgstAndOcp",
+      "gold": [
+        "limit-ctrl-api-grant-use-one"
+      ],
+      "top5": [
+        "limit-ctrl-api-grant-use-one",
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-003",
+      "tier": "D",
+      "query": "lmtRgst",
+      "gold": [
+        "limit-ctrl-api-grant-use-one",
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "top5": [
+        "limit-ctrl-api-ocp-revoke-loop",
+        "limit-ctrl-api-grant-use-one"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-004",
+      "tier": "D",
+      "query": "doOcpRevoke",
+      "gold": [
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "top5": [
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-005",
+      "tier": "D",
+      "query": "cstInfQuery",
+      "gold": [
+        "customer_query"
+      ],
+      "top5": [
+        "customer_query"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-006",
+      "tier": "D",
+      "query": "enqrPdInf",
+      "gold": [
+        "product_query"
+      ],
+      "top5": [
+        "product_query",
+        "customer_query",
+        "limit"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-007",
+      "tier": "D",
+      "query": "mntPdStg",
+      "gold": [
+        "product_stage"
+      ],
+      "top5": [
+        "product_stage"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-008",
+      "tier": "D",
+      "query": "cpctMgtPg",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "top5": [
+        "customer_onboarding",
+        "rating",
+        "postloan"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-009",
+      "tier": "D",
+      "query": "FS00006502",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "top5": [
+        "loan-retail-erheyi-apply"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-010",
+      "tier": "D",
+      "query": "360视图",
+      "gold": [
+        "customer_360"
+      ],
+      "top5": [
+        "customer_onboarding",
+        "customer_360",
+        "collateral-func-ext-assess",
+        "product_library"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "D-011",
+      "tier": "D",
+      "query": "查询交易信息 trdlog",
+      "gold": [
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "top5": [
+        "limit-ctrl-api-ocp-revoke-loop",
+        "limit-ctrl-api-grant-use-one",
+        "disburse-account-abnormal"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-012",
+      "tier": "D",
+      "query": "反委托",
+      "gold": [
+        "asset-preserve-ops-counter-entrust"
+      ],
+      "top5": [
+        "asset-preserve-ops-counter-entrust"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-013",
+      "tier": "D",
+      "query": "押品种类管理",
+      "gold": [
+        "collateral-func-params"
+      ],
+      "top5": [
+        "collateral-func-params"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-014",
+      "tier": "D",
+      "query": "权证借阅管理",
+      "gold": [
+        "collateral_custody"
+      ],
+      "top5": [
+        "collateral_custody"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-015",
+      "tier": "D",
+      "query": "评分模型",
+      "gold": [
+        "rating_flow"
+      ],
+      "top5": [
+        "rating_flow"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-041",
+      "tier": "A",
+      "query": "观察期白名单配置",
+      "gold": [
+        "risk-class-observation-whitelist"
+      ],
+      "top5": [
+        "risk-class-observation-whitelist"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-042",
+      "tier": "A",
+      "query": "脱期法配置",
+      "gold": [
+        "risk-class-overdue-config"
+      ],
+      "top5": [
+        "risk-class-overdue-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-043",
+      "tier": "A",
+      "query": "风险分类台账",
+      "gold": [
+        "risk-class-ledger"
+      ],
+      "top5": [
+        "risk-class-ledger"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-044",
+      "tier": "A",
+      "query": "分类查询生成认定表",
+      "gold": [
+        "risk-class-query"
+      ],
+      "top5": [
+        "risk-class-query"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-045",
+      "tier": "A",
+      "query": "风险分类统计",
+      "gold": [
+        "risk-class-statistics"
+      ],
+      "top5": [
+        "risk-class-statistics"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-046",
+      "tier": "A",
+      "query": "法人机构分类配置",
+      "gold": [
+        "risk-class-corp-org-config"
+      ],
+      "top5": [
+        "risk-class-corp-org-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-047",
+      "tier": "A",
+      "query": "分类认定理由配置",
+      "gold": [
+        "risk-class-reason-config"
+      ],
+      "top5": [
+        "risk-class-reason-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-048",
+      "tier": "A",
+      "query": "风险分类生成配置",
+      "gold": [
+        "risk-class-gen-config"
+      ],
+      "top5": [
+        "risk-class-gen-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-049",
+      "tier": "A",
+      "query": "风险默认分类配置",
+      "gold": [
+        "risk-class-default-config"
+      ],
+      "top5": [
+        "risk-class-default-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-050",
+      "tier": "A",
+      "query": "子应用管理",
+      "gold": [
+        "portal-subapp"
+      ],
+      "top5": [
+        "portal-subapp"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-051",
+      "tier": "A",
+      "query": "公共信息配置",
+      "gold": [
+        "portal-public-info"
+      ],
+      "top5": [
+        "portal-public-info"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-052",
+      "tier": "A",
+      "query": "首页管理角色卡片库",
+      "gold": [
+        "portal-home-mgmt"
+      ],
+      "top5": [
+        "portal-home-mgmt"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-053",
+      "tier": "A",
+      "query": "首页个性化设置",
+      "gold": [
+        "portal-personalization"
+      ],
+      "top5": [
+        "portal-personalization",
+        "product_stage",
+        "product_element"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-054",
+      "tier": "A",
+      "query": "国债收益利率平均值配置",
+      "gold": [
+        "system-mgmt-gov-bond"
+      ],
+      "top5": [
+        "system-mgmt-gov-bond"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "A-055",
+      "tier": "A",
+      "query": "贷款计算器利率试算",
+      "gold": [
+        "system-mgmt-loan-calc"
+      ],
+      "top5": [
+        "system-mgmt-loan-calc"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-031",
+      "tier": "B",
+      "query": "到点没还上自动发短信通知的规则在哪里开",
+      "gold": [
+        "collection-remind-cfg"
+      ],
+      "top5": [
+        "smart-ctrl-rule-lib",
+        "credit_application",
+        "credit_usage",
+        "duigong_contract_sign",
+        "collateral-func-ext-assess"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-032",
+      "tier": "B",
+      "query": "给不同欠款人群配置不同的追讨手段",
+      "gold": [
+        "collection_strategy"
+      ],
+      "top5": [
+        "guarantee_intro",
+        "loan-corp-entrust-loan",
+        "disburse-entrusted-payment",
+        "collection_scorecard",
+        "risk-class-overdue-config"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-033",
+      "tier": "B",
+      "query": "借出去的权证到期没还回来哪里有提示",
+      "gold": [
+        "collateral-func-warning"
+      ],
+      "top5": [
+        "collateral-func-warning"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-034",
+      "tier": "B",
+      "query": "系统界面水印怎么加上去",
+      "gold": [
+        "portal-public-info"
+      ],
+      "top5": [
+        "portal-public-info",
+        "collateral-func-ledger",
+        "customer_onboarding",
+        "rating",
+        "rating_flow"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-035",
+      "tier": "B",
+      "query": "接入一个外部子系统要在哪里配置",
+      "gold": [
+        "portal-subapp"
+      ],
+      "top5": [
+        "portal-subapp",
+        "system-mgmt-base-mgmt",
+        "collateral-func-ext-assess"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-036",
+      "tier": "B",
+      "query": "我想把首页换成自己常用的样子",
+      "gold": [
+        "portal-personalization"
+      ],
+      "top5": [
+        "approval_chain",
+        "session_login",
+        "risk-class-query",
+        "portal-home-mgmt",
+        "portal-public-info"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "B-037",
+      "tier": "B",
+      "query": "管理员给某个角色配一套默认首页卡片",
+      "gold": [
+        "portal-home-mgmt"
+      ],
+      "top5": [
+        "portal-home-mgmt",
+        "approval_chain",
+        "portal-personalization",
+        "credit_usage",
+        "portal-public-info"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-038",
+      "tier": "B",
+      "query": "最新的 LPR 数值在哪里维护",
+      "gold": [
+        "system-mgmt-param-mgmt"
+      ],
+      "top5": [
+        "system-mgmt-param-mgmt",
+        "system-mgmt-loan-calc"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-039",
+      "tier": "B",
+      "query": "登录密码复杂度要求在哪里设置",
+      "gold": [
+        "system-mgmt-base-mgmt"
+      ],
+      "top5": [
+        "system-mgmt-base-mgmt",
+        "product_stage",
+        "portal-personalization"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-040",
+      "tier": "B",
+      "query": "智能控制执行过的动作在哪里查记录",
+      "gold": [
+        "smart-ctrl-log-query"
+      ],
+      "top5": [
+        "smart-ctrl-log-query",
+        "smart-ctrl-rule-toggle",
+        "smart-ctrl-rule-lib",
+        "smart-ctrl-rule-cfg",
+        "smart-ctrl-rule-scheme"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-041",
+      "tier": "B",
+      "query": "这笔业务的审批走到哪一步了哪里看流转记录",
+      "gold": [
+        "approval_chain"
+      ],
+      "top5": [
+        "credit_application",
+        "rating_flow",
+        "disburse-entrusted-payment",
+        "approval_chain",
+        "loan"
+      ],
+      "rank": 4,
+      "ok": false
+    },
+    {
+      "id": "B-042",
+      "tier": "B",
+      "query": "一批规则先统一停用过段时间再分批恢复",
+      "gold": [
+        "smart-ctrl-rule-toggle"
+      ],
+      "top5": [
+        "smart-ctrl-rule-toggle",
+        "smart-ctrl-rule-cfg",
+        "smart-ctrl-log-query"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-043",
+      "tier": "B",
+      "query": "新建控制方案任务页并把已有规则引入进来",
+      "gold": [
+        "smart-ctrl-rule-scheme"
+      ],
+      "top5": [
+        "smart-ctrl-rule-scheme",
+        "customer-group-group",
+        "smart-ctrl-rule-cfg",
+        "smart-ctrl-rule-toggle",
+        "smart-ctrl-rule-lib"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-044",
+      "tier": "B",
+      "query": "委外清收的台账和登记入口在哪里",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "top5": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "B-045",
+      "tier": "B",
+      "query": "押品外部评估的机构人员名单和评估费用怎么维护",
+      "gold": [
+        "collateral-func-ext-assess"
+      ],
+      "top5": [
+        "collateral-func-ext-assess",
+        "collateral_valuation"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-016",
+      "tier": "C",
+      "query": "管理员先给新来的客户经理建系统账号并配好角色，再把数据权限按场景分配到位",
+      "gold": [
+        "system-mgmt-base-mgmt",
+        "system-mgmt-data-perm"
+      ],
+      "top5": [
+        "system-mgmt-data-perm",
+        "customer-group-group",
+        "asset-preserve-ops-counter-entrust",
+        "portal-home-mgmt",
+        "customer-group-cluster"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-017",
+      "tier": "C",
+      "query": "先给对公客户做完评级，评级生效后发起授信申请，批复下来核对无误再申请用信",
+      "gold": [
+        "rating",
+        "credit_application",
+        "credit-corp-approval-result",
+        "credit_usage"
+      ],
+      "top5": [
+        "rating",
+        "credit_application",
+        "credit_usage",
+        "credit-corp-approval-result",
+        "loan-corp-syndicate-participant-apply"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-018",
+      "tier": "C",
+      "query": "押品先在系统里建档立卡，权证移库入库保管，后续借阅到期归还全程登记",
+      "gold": [
+        "collateral_info",
+        "collateral_custody"
+      ],
+      "top5": [
+        "collateral_custody",
+        "collateral-func-warning"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-019",
+      "tier": "C",
+      "query": "集团客户先建档案，再把成员子公司逐个导入维护，在档案里查看集团评级和额度",
+      "gold": [
+        "customer-group-group"
+      ],
+      "top5": [
+        "customer-group-group",
+        "customer-group-general-group",
+        "customer_360"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "C-020",
+      "tier": "C",
+      "query": "催收先配好评分卡和策略，再新建任务派给人员处理并留下处理记录",
+      "gold": [
+        "collection_scorecard",
+        "collection_strategy",
+        "collection_task"
+      ],
+      "top5": [
+        "collection_strategy",
+        "collection_scorecard",
+        "collection_task",
+        "rating"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-016",
+      "tier": "D",
+      "query": "corpCrgReplyPrimPg",
+      "gold": [
+        "credit-corp-approval-result"
+      ],
+      "top5": [
+        "credit-corp-approval-result"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-017",
+      "tier": "D",
+      "query": "wf_usecredit_004",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "top5": [
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-syndicate-participant-apply",
+        "loan-retail-erheyi-apply",
+        "loan-corp-entrust-loan",
+        "credit-corp-approval-task"
+      ],
+      "rank": 3,
+      "ok": false
+    },
+    {
+      "id": "D-018",
+      "tier": "D",
+      "query": "ZJJK00095907",
+      "gold": [
+        "product_query"
+      ],
+      "top5": [
+        "product_query"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-019",
+      "tier": "D",
+      "query": "FS00004789",
+      "gold": [
+        "collateral-func-ext-assess"
+      ],
+      "top5": [
+        "collateral-func-ext-assess"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "D-020",
+      "tier": "D",
+      "query": "UML00048975",
+      "gold": [
+        "collateral-func-warning"
+      ],
+      "top5": [
+        "collateral-func-warning"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "E-001",
+      "tier": "E",
+      "query": "把客户的口子先封住不让他接着支取",
+      "gold": [
+        "limit"
+      ],
+      "top5": [
+        "credit_application",
+        "credit_usage",
+        "customer_onboarding",
+        "customer_query",
+        "rating"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-002",
+      "tier": "E",
+      "query": "把欠款的人按风险打分定档",
+      "gold": [
+        "collection_scorecard"
+      ],
+      "top5": [
+        "risk-class-overdue-config",
+        "credit_application",
+        "loan",
+        "rating",
+        "risk-class-ledger"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-003",
+      "tier": "E",
+      "query": "房本凭证要拿出来用先登记事后还回",
+      "gold": [
+        "collateral_custody"
+      ],
+      "top5": [
+        "asset-preserve-ops-outsourced-collection",
+        "system-mgmt-org-merge",
+        "collateral_info",
+        "digital-loan-desk-data-index",
+        "customer-group-cluster"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-004",
+      "tier": "E",
+      "query": "抵押的厂房被法院贴了封条怎么登记",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "top5": [
+        "guaranty_contract",
+        "collateral_seizure"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "E-005",
+      "tier": "E",
+      "query": "这套商铺现在行情价多少给算一算",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "top5": [],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-006",
+      "tier": "E",
+      "query": "把这家公司的底档资料调出来看看",
+      "gold": [
+        "customer_query"
+      ],
+      "top5": [
+        "customer-group-group",
+        "rating",
+        "archive-stock-in"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-007",
+      "tier": "E",
+      "query": "新企业头一回来行里立户怎么走",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "top5": [
+        "customer-group-general-group"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-008",
+      "tier": "E",
+      "query": "给这家企业的信用水平定个档",
+      "gold": [
+        "rating"
+      ],
+      "top5": [
+        "customer-group-general-group",
+        "portal-personalization",
+        "credit_usage",
+        "credit-retail-credit-config"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-009",
+      "tier": "E",
+      "query": "上次定的档现在是几档去哪儿调阅",
+      "gold": [
+        "rating-query-view"
+      ],
+      "top5": [],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-010",
+      "tier": "E",
+      "query": "贷款批文下来了头一笔钱往外放的申请",
+      "gold": [
+        "loan"
+      ],
+      "top5": [
+        "loan",
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-syndicate-participant-apply",
+        "loan-corp-entrust-loan",
+        "collection-remind-cfg"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "E-011",
+      "tier": "E",
+      "query": "扣款的银行卡换成另一张去哪儿改",
+      "gold": [
+        "loan_account"
+      ],
+      "top5": [],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-012",
+      "tier": "E",
+      "query": "跟客户谈好的条款在系统里把正式文本立起来",
+      "gold": [
+        "duigong_contract_sign"
+      ],
+      "top5": [
+        "customer_onboarding",
+        "product_library",
+        "collateral_custody",
+        "loan-retail-apply-maintain",
+        "rating"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-013",
+      "tier": "E",
+      "query": "客户不来网点在手机上把字签掉",
+      "gold": [
+        "electronic_signing"
+      ],
+      "top5": [
+        "credit_application",
+        "credit_usage",
+        "customer_onboarding",
+        "customer_query",
+        "rating"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-014",
+      "tier": "E",
+      "query": "找个有实力的第三方给借款人兜底怎么录",
+      "gold": [
+        "guarantee_intro"
+      ],
+      "top5": [
+        "guarantee_intro",
+        "loan-corp-entrust-loan",
+        "disburse-entrusted-payment"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "E-015",
+      "tier": "E",
+      "query": "关联企业圈成一条链统一维护",
+      "gold": [
+        "customer-group-cluster"
+      ],
+      "top5": [
+        "customer-group-general-group",
+        "smart-ctrl-rule-cfg"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-016",
+      "tier": "E",
+      "query": "智能风控要拦的动作先在库里定义出来",
+      "gold": [
+        "smart-ctrl-rule-lib"
+      ],
+      "top5": [
+        "smart-ctrl-rule-scheme"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-017",
+      "tier": "E",
+      "query": "不动产的分类树和各机构的作价口径在哪儿配",
+      "gold": [
+        "collateral-func-params"
+      ],
+      "top5": [
+        "collateral-func-params",
+        "risk-class-gen-config",
+        "risk-class-ledger",
+        "risk-class-corp-org-config"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "E-018",
+      "tier": "E",
+      "query": "智能风控要拦的判断逻辑先写出来再发布出去",
+      "gold": [
+        "smart-ctrl-rule-cfg"
+      ],
+      "top5": [
+        "smart-ctrl-rule-scheme",
+        "smart-ctrl-rule-cfg",
+        "product_stage"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "E-019",
+      "tier": "E",
+      "query": "几本押品相关的账册要能分开查分开导出",
+      "gold": [
+        "collateral-func-ledger"
+      ],
+      "top5": [
+        "collateral_seizure",
+        "collateral-func-ledger",
+        "product_query",
+        "smart-ctrl-rule-cfg",
+        "customer-group-general-group"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "E-020",
+      "tier": "E",
+      "query": "拖账的户头移交专人接着跟",
+      "gold": [
+        "collection_task"
+      ],
+      "top5": [],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-021",
+      "tier": "E",
+      "query": "款放出去之后每季度去企业现场转一转看看经营",
+      "gold": [
+        "postloan"
+      ],
+      "top5": [
+        "customer-group-general-group"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-022",
+      "tier": "E",
+      "query": "批下来的盘子头一笔支取在哪儿发起",
+      "gold": [
+        "credit_usage"
+      ],
+      "top5": [
+        "credit_application",
+        "credit_usage",
+        "loan",
+        "rating",
+        "loan-corp-syndicate-lead-apply"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "E-023",
+      "tier": "E",
+      "query": "轮到我名下处理的几件事从哪里进去办",
+      "gold": [
+        "approval_todo"
+      ],
+      "top5": [
+        "approval_chain",
+        "collection_task",
+        "rating",
+        "asset-preserve-ops-outsourced-collection",
+        "system-mgmt-org-merge"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-024",
+      "tier": "E",
+      "query": "这家企业在我们行里的全貌调出来看看",
+      "gold": [
+        "customer_360"
+      ],
+      "top5": [
+        "customer-group-general-group"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-025",
+      "tier": "E",
+      "query": "纸质件都齐了要移交保管怎么申请",
+      "gold": [
+        "archive-stock-in"
+      ],
+      "top5": [
+        "archive-stock-in",
+        "credit_application",
+        "credit_usage",
+        "loan",
+        "rating"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "E-026",
+      "tier": "E",
+      "query": "个人的评级和支用一次办完的那个申请",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "top5": [
+        "rating",
+        "credit-corp-approval-task",
+        "loan-retail-erheyi-apply",
+        "limit-ctrl-api-grant-use-one",
+        "customer_360"
+      ],
+      "rank": 3,
+      "ok": false
+    },
+    {
+      "id": "E-027",
+      "tier": "E",
+      "query": "银行只当中介、钱是别人出的那种业务怎么发起",
+      "gold": [
+        "loan-corp-entrust-loan"
+      ],
+      "top5": [
+        "credit_application",
+        "credit_usage",
+        "loan-corp-syndicate-lead-apply",
+        "loan-retail-apply-maintain",
+        "loan"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-028",
+      "tier": "E",
+      "query": "几家行拼盘的大额业务主办那家先发起申请",
+      "gold": [
+        "loan-corp-syndicate-lead-apply"
+      ],
+      "top5": [
+        "credit_application",
+        "credit_usage",
+        "loan-corp-syndicate-lead-apply",
+        "loan-retail-apply-maintain",
+        "approval_todo"
+      ],
+      "rank": 3,
+      "ok": false
+    },
+    {
+      "id": "E-029",
+      "tier": "E",
+      "query": "拼盘里跟投的那家行怎么发起自己的那份",
+      "gold": [
+        "loan-corp-syndicate-participant-apply"
+      ],
+      "top5": [
+        "credit_application",
+        "credit_usage",
+        "loan",
+        "rating",
+        "loan-corp-syndicate-lead-apply"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-030",
+      "tier": "E",
+      "query": "个人用款申请填错了信息要改一改在哪操作",
+      "gold": [
+        "loan-retail-apply-maintain"
+      ],
+      "top5": [
+        "loan",
+        "loan-retail-apply-maintain",
+        "credit-corp-approval-task",
+        "customer_360",
+        "product_core_mapping"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "E-031",
+      "tier": "E",
+      "query": "批文长什么样在哪个页面上看",
+      "gold": [
+        "credit-corp-approval-result"
+      ],
+      "top5": [
+        "collateral_seizure",
+        "rating",
+        "credit-corp-approval-result",
+        "risk-class-reason-config",
+        "loan-corp-entrust-loan"
+      ],
+      "rank": 3,
+      "ok": false
+    },
+    {
+      "id": "E-032",
+      "tier": "E",
+      "query": "款不进借款人的户头直接划给上游卖货的怎么弄",
+      "gold": [
+        "disburse-entrusted-payment"
+      ],
+      "top5": [
+        "guarantee_intro",
+        "loan-corp-entrust-loan",
+        "disburse-entrusted-payment"
+      ],
+      "rank": 3,
+      "ok": false
+    },
+    {
+      "id": "E-033",
+      "tier": "E",
+      "query": "收不回来的户头行里接手自己管着要登记",
+      "gold": [
+        "asset-preserve-ops-counter-entrust"
+      ],
+      "top5": [
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-syndicate-participant-apply",
+        "asset-preserve-ops-outsourced-collection",
+        "system-mgmt-org-merge",
+        "collateral_info"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-034",
+      "tier": "E",
+      "query": "到点没还上的自动发条通知出来在哪儿开",
+      "gold": [
+        "collection-remind-cfg"
+      ],
+      "top5": [
+        "credit_application",
+        "credit_usage",
+        "duigong_contract_sign",
+        "smart-ctrl-rule-lib",
+        "collateral-func-ext-assess"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-035",
+      "tier": "E",
+      "query": "新收进来的楼先在系统里立卷建卡",
+      "gold": [
+        "collateral_info"
+      ],
+      "top5": [
+        "customer_onboarding",
+        "rating",
+        "rating_flow",
+        "rating-query-view",
+        "system-mgmt-route-mgmt"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-036",
+      "tier": "E",
+      "query": "烂账打包交给外面的专业户去清",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "top5": [],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-037",
+      "tier": "E",
+      "query": "状子已经递到法院了系统里走哪条",
+      "gold": [
+        "judicial-litigation"
+      ],
+      "top5": [
+        "collateral_seizure",
+        "customer_onboarding",
+        "rating",
+        "rating_flow",
+        "rating-query-view"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-038",
+      "tier": "E",
+      "query": "全行都要看到的通知在哪儿发",
+      "gold": [
+        "system-mgmt-message-center"
+      ],
+      "top5": [],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-039",
+      "tier": "E",
+      "query": "头一回例检和往后定期检的间隔规矩在哪儿定",
+      "gold": [
+        "check-config"
+      ],
+      "top5": [],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-040",
+      "tier": "E",
+      "query": "轮到我处理的那笔在详情里放行并选好下一棒的人",
+      "gold": [
+        "credit-corp-approval-task"
+      ],
+      "top5": [
+        "rating",
+        "approval_chain",
+        "asset-preserve-ops-outsourced-collection",
+        "system-mgmt-org-merge",
+        "credit-corp-approval-task"
+      ],
+      "rank": 5,
+      "ok": false
+    },
+    {
+      "id": "E-041",
+      "tier": "E",
+      "query": "贷款品种分几段推进的树形结构在哪儿维护",
+      "gold": [
+        "product_stage"
+      ],
+      "top5": [
+        "disburse-entrusted-payment",
+        "loan",
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-entrust-loan",
+        "credit-retail-credit-config"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-042",
+      "tier": "E",
+      "query": "组品种要用的公共零件和分组在哪儿配",
+      "gold": [
+        "product_element"
+      ],
+      "top5": [
+        "product_element",
+        "credit-corp-approval-task",
+        "credit_application",
+        "credit_usage",
+        "collateral_info"
+      ],
+      "rank": 1,
+      "ok": true
+    },
+    {
+      "id": "E-043",
+      "tier": "E",
+      "query": "总行定义的贷款品种先录进去再放开用",
+      "gold": [
+        "product_library"
+      ],
+      "top5": [
+        "portal-home-mgmt",
+        "portal-personalization",
+        "credit_application",
+        "credit_usage",
+        "collateral_info"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-044",
+      "tier": "E",
+      "query": "某个品种的详情和历史版本调出来看看",
+      "gold": [
+        "product_query"
+      ],
+      "top5": [
+        "smart-ctrl-rule-cfg"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-045",
+      "tier": "E",
+      "query": "品种和后台账务系统之间的对应关系在哪儿挂",
+      "gold": [
+        "product_core_mapping"
+      ],
+      "top5": [
+        "system-mgmt-base-mgmt"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-046",
+      "tier": "E",
+      "query": "在所有集团之上再立一个总的伞形户头",
+      "gold": [
+        "customer-group-general-group"
+      ],
+      "top5": [
+        "customer_360",
+        "customer-group-general-group",
+        "customer-group-group"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "E-047",
+      "tier": "E",
+      "query": "款放出去了账上却没体现这种例外在哪儿处理",
+      "gold": [
+        "disburse-account-abnormal"
+      ],
+      "top5": [
+        "approval_chain",
+        "collection_task",
+        "rating",
+        "asset-preserve-ops-outsourced-collection",
+        "system-mgmt-org-merge"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-048",
+      "tier": "E",
+      "query": "两个客户是母子公司要在系统里挂上这层关系",
+      "gold": [
+        "customer-common-cust-relation"
+      ],
+      "top5": [
+        "customer-group-group",
+        "customer-common-cust-relation",
+        "customer-group-general-group",
+        "customer-group-cluster",
+        "customer_onboarding"
+      ],
+      "rank": 2,
+      "ok": false
+    },
+    {
+      "id": "E-049",
+      "tier": "E",
+      "query": "给这笔业务配套的附属文书要补立一份",
+      "gold": [
+        "guaranty_contract"
+      ],
+      "top5": [
+        "approval_todo",
+        "credit_application",
+        "credit_usage",
+        "customer_onboarding",
+        "customer_360"
+      ],
+      "rank": null,
+      "ok": false
+    },
+    {
+      "id": "E-050",
+      "tier": "E",
+      "query": "界面想改成自己用着顺手的样式",
+      "gold": [
+        "portal-personalization"
+      ],
+      "top5": [
+        "customer-group-cluster"
+      ],
+      "rank": null,
+      "ok": false
+    }
+  ],
+  "negatives": [
+    {
+      "id": "N-001",
+      "query": "写一首关于春天的诗",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-002",
+      "query": "计算 2 加 3 等于多少",
+      "got": "collection_scorecard",
+      "score": 6.734591659972948,
+      "rejected": false
+    },
+    {
+      "id": "N-003",
+      "query": "明天股票会涨吗",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-004",
+      "query": "推荐一部好看的电影",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-005",
+      "query": "如何学习 Rust 编程",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-006",
+      "query": "北京到上海的高铁票价",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-007",
+      "query": "帮我翻译这段英文",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-008",
+      "query": "世界杯冠军是谁",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-009",
+      "query": "给我讲个笑话",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-010",
+      "query": "晚上吃什么比较好",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-011",
+      "query": "帮我写一份辞职信",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-012",
+      "query": "太阳系最大的行星是哪个",
+      "got": "customer-group-cluster",
+      "score": 8.885302512980633,
+      "rejected": false
+    },
+    {
+      "id": "N-013",
+      "query": "介绍一下量子力学的基本概念",
+      "got": "loan",
+      "score": 3.7741392980647595,
+      "rejected": false
+    },
+    {
+      "id": "N-014",
+      "query": "明天的天气适合爬山吗",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-015",
+      "query": "推荐几本经典小说",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-016",
+      "query": "怎么做红烧肉",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-017",
+      "query": "Python 和 Java 哪个更适合初学者",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-018",
+      "query": "唱一首生日快乐歌",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-019",
+      "query": "我emo了怎么办",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-020",
+      "query": "帮我订一张去成都的机票",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-021",
+      "query": "贷款展期怎么申请",
+      "got": "loan",
+      "score": 8.23456417720416,
+      "rejected": false
+    },
+    {
+      "id": "N-022",
+      "query": "罚息和复利怎么计算",
+      "got": "collection_scorecard",
+      "score": 6.734591659972948,
+      "rejected": false
+    },
+    {
+      "id": "N-023",
+      "query": "员工请假审批流程怎么走",
+      "got": "approval_todo",
+      "score": 7.127628691140174,
+      "rejected": false
+    },
+    {
+      "id": "N-024",
+      "query": "反洗钱可疑交易上报",
+      "got": "limit-ctrl-api-ocp-revoke-loop",
+      "score": 6.734591659972948,
+      "rejected": false
+    },
+    {
+      "id": "N-025",
+      "query": "柜员现金尾箱交接",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-026",
+      "query": "差旅费报销单填写",
+      "got": "product_query",
+      "score": 7.522400231387125,
+      "rejected": false
+    },
+    {
+      "id": "N-027",
+      "query": "网点装修招标采购",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-028",
+      "query": "ATM 机吞卡处理",
+      "got": "approval_chain",
+      "score": 4.8846940707384086,
+      "rejected": false
+    },
+    {
+      "id": "N-029",
+      "query": "手机银行 APP 下载安装",
+      "got": "approval_chain",
+      "score": 10.101887489959422,
+      "rejected": false
+    },
+    {
+      "id": "N-030",
+      "query": "银行营业网点今天几点开门",
+      "got": "session_login",
+      "score": 8.885302512980633,
+      "rejected": false
+    },
+    {
+      "id": "N-031",
+      "query": "还款期限延长怎么办理",
+      "got": "duigong_contract_sign",
+      "score": 6.182084906716632,
+      "rejected": false
+    },
+    {
+      "id": "N-032",
+      "query": "提前还款违约金怎么算",
+      "got": "loan_account",
+      "score": 5.1298987149230735,
+      "rejected": false
+    },
+    {
+      "id": "N-033",
+      "query": "预约还款日期怎么改",
+      "got": "collection-remind-cfg",
+      "score": 14.015201227903706,
+      "rejected": false
+    },
+    {
+      "id": "N-034",
+      "query": "信贷档案借阅要怎么登记",
+      "got": "digital-loan-desk-data-index",
+      "score": 13.280797145983204,
+      "rejected": false
+    },
+    {
+      "id": "N-035",
+      "query": "罚息减免申请怎么提",
+      "got": "credit_application",
+      "score": 3.563814345570087,
+      "rejected": false
+    },
+    {
+      "id": "N-036",
+      "query": "贴现业务怎么办理",
+      "got": "approval_todo",
+      "score": 3.6651629274966204,
+      "rejected": false
+    },
+    {
+      "id": "N-037",
+      "query": "保函开立需要什么材料",
+      "got": "risk-class-query",
+      "score": 8.885302512980633,
+      "rejected": false
+    },
+    {
+      "id": "N-038",
+      "query": "信用证开证流程怎么走",
+      "got": "credit_usage",
+      "score": 11.086214576957211,
+      "rejected": false
+    },
+    {
+      "id": "N-039",
+      "query": "银行承兑汇票签发手续",
+      "got": "loan-corp-entrust-loan",
+      "score": 8.885302512980633,
+      "rejected": false
+    },
+    {
+      "id": "N-040",
+      "query": "借款人变更申请怎么办",
+      "got": "loan-corp-entrust-loan",
+      "score": 17.82080623693016,
+      "rejected": false
+    },
+    {
+      "id": "N-041",
+      "query": "抵债资产怎么处置",
+      "got": "collateral_seizure",
+      "score": 12.916676566689581,
+      "rejected": false
+    },
+    {
+      "id": "N-042",
+      "query": "不良贷款核销条件是什么",
+      "got": "judicial-litigation",
+      "score": 8.885302512980633,
+      "rejected": false
+    },
+    {
+      "id": "N-043",
+      "query": "以物抵债怎么操作",
+      "got": "portal-subapp",
+      "score": 6.734591659972948,
+      "rejected": false
+    },
+    {
+      "id": "N-044",
+      "query": "信贷资产转让流程",
+      "got": "asset-preserve-ops-outsourced-collection",
+      "score": 9.74589925228672,
+      "rejected": false
+    },
+    {
+      "id": "N-045",
+      "query": "贷款结清证明去哪里开",
+      "got": "collateral-func-warning",
+      "score": 13.556052344614706,
+      "rejected": false
+    },
+    {
+      "id": "N-046",
+      "query": "抵押登记注销手续怎么办",
+      "got": "guaranty_contract",
+      "score": 8.885302512980633,
+      "rejected": false
+    },
+    {
+      "id": "N-047",
+      "query": "授信年审要准备哪些材料",
+      "got": "risk-class-query",
+      "score": 8.885302512980633,
+      "rejected": false
+    },
+    {
+      "id": "N-048",
+      "query": "首套房利率优惠政策有哪些",
+      "got": "credit_usage",
+      "score": 6.734591659972948,
+      "rejected": false
+    },
+    {
+      "id": "N-049",
+      "query": "跨行大额转账限额是多少",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-050",
+      "query": "对公账户信息变更怎么预约",
+      "got": "duigong_contract_sign",
+      "score": 18.081238194315933,
+      "rejected": false
+    },
+    {
+      "id": "N-051",
+      "query": "反洗钱客户风险等级怎么划分",
+      "got": "rating",
+      "score": 13.040063704700259,
+      "rejected": false
+    },
+    {
+      "id": "N-052",
+      "query": "印章保管和使用怎么登记",
+      "got": "asset-preserve-ops-outsourced-collection",
+      "score": 5.758396914596079,
+      "rejected": false
+    },
+    {
+      "id": "N-053",
+      "query": "网点装修施工怎么备案",
+      "got": null,
+      "score": null,
+      "rejected": true
+    },
+    {
+      "id": "N-054",
+      "query": "会议室预约在哪个系统",
+      "got": "customer_onboarding",
+      "score": 3.7741392980647595,
+      "rejected": false
+    },
+    {
+      "id": "N-055",
+      "query": "手机银行上怎么查贷款余额",
+      "got": "collateral-func-warning",
+      "score": 17.770605025961267,
+      "rejected": false
+    }
+  ],
+  "noise": {
+    "accuracyAt1": 0.6,
+    "delta": 0
+  },
+  "generatedAt": "2026-09-10T15:23:31.481Z",
+  "gitHead": "d41cb787",
+  "corpusCards": 84
+}

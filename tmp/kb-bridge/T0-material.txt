@@ -1,0 +1,17 @@
+=== A card-surface (embedded synonym) samples: 8
+  archive-stock-in | 档案入库申请 -> 档案入库 | 档案入库 ⊂ 档案入库申请
+  archive-stock-in | 档案入库申请 -> 入库申请 | 入库申请 ⊂ 档案入库申请
+  asset-preserve-ops-counter-entrust | 反委托资产管理 -> 反委托 | 反委托 ⊂ 反委托资产管理
+  asset-preserve-ops-outsourced-collection | 委外清收登记 -> 委外清收 | 委外清收 ⊂ 委外清收登记
+  check-config | 常规贷后检查规则配置 -> 贷后检查规则配置 | 贷后检查规则配置 ⊂ 常规贷后检查规则配置
+=== B req-doc 「」（）alternative samples: 4
+  collateral-func:184 | 待湿测 / chapters/04 | - 不动产信息管理：查询/新增（向登记中心查询，需授权书上传）/查看详情/电子证照下载；柳州、北海限制「待湿测」（cha
+  credit-interbank:94 | 待处理或打回 / 06/08 章 | 4. 撤销状态条件「待发起或打回」vs「待处理或打回」（06/08 章）。
+  loan-retail:127 | xx-客户名称-批复编号 / 10 章 | - **4 类下载**（批复文件/审查报告/调查报告/风险评价报告）：已生效批复的文件导出旁路，PDF 命名规则「xx-
+  postloan-risk-class:76 | 系统自动生成任务 / 分类频度跑批 | - 「系统自动生成任务」（分类频度跑批）文档只给配置端，跑批执行端不在本册，无端到端闭环。
+=== C wet-test wording drift samples: 8
+  collateral-func 叶1:21 | SUT「发起入库」vs 文档「发起流程」
+  customer-common 叶3:22 | SUT「拦截等级标识」vs 文档「拦截等级」
+  customer-common 叶7:26 | SUT「加入理由」vs 文档「加入原因」
+  customer-common 叶11:30 | SUT「名单认定类型」vs 文档「认定类型」
+  customer-group 叶15:39 | SUT「创建」vs 文档「新增」
