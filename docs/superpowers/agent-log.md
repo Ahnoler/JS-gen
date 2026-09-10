@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-10 23:59 · Zcode — 收工：recall-eval-v2 评测集扩版+门禁切换+T3 重评（回链 22:58 开工 `6e2ceeb7`）
+
+- 完成：T0 盘点+配额表（`d30f273f`）→ T1 v2 骨架脚本搬运 130 条 verbatim（`db4c1582`，保真 diffs=0 130/130 全字段深校验）→ T2 新增 115 条独立标注（`3bc31e8f`：A15/B15/C5/D5/E50/N25，语料出发零匹配器，E 层全词 ban-check，盲态第二标注人复核 E-019/N-034 换靶+9 消歧 note）→ T3 冻结+G1 盲判抽检（`16e6bab0`+`de4ee6a3`：**15 条分歧 1=6.7% ≤10% PASS**，先盲判后对照）→ T4 门禁切换独立 commit（`8f906527`：显式读 v2、runner DEFAULT 保持 v1、结构断言升级 spec §7、floor=新基线−不变 margins、**A 层 ≥0.95 断言**；`33d28f12` 对跑表+阈值提案+证伪自证：+0.2 必红/还原 5 passed 字节一致）→ T5 T3 重评（`939e61a6`：**DoD 字面 PASS**——六项聚合全上行 acc1+0.032/B+5/E+1/零丢失零新增 FP/拒答不变/A 不掉；**归因如实拆解：5 条 B 增量=建表集自身（记忆一致性），全新地面增量=+1/115（E-030 桥「用款→用信」）**——解除停用并接线 propose.js 与否移交 Lead，本线红线未接线）→ T6 报告+台账
+- 验收：门禁 5 passed exit 0；`--baseline tmp/kb-eval-v2/T4-v2.json` exit 0；v1 保真三轮全字段 diffs=0；`recall-eval.mjs` DEFAULT_FIXTURE 未动（v1 历史对跑零成本）；data/kb/synonyms.json 本线零改动（建表隔离）；不接线 propose.js；红线全守（未动 v1 文件/failures/verify-all/data/kb/req）
+- v2 新基线：**0.600/0.725/0.653/0.667/拒答 0.382/噪声 0.600；A 1.00 · B 0.400 · C 0.900 · D 0.900 · E 0.100**
+- 遗留移交：Lead=①T3 处置裁定（解除停用+接线 vs 维持停用）②阈值提案追认（六项+A 层 0.95）③D-017 下划线流程码分词桥接缺口（新发现）；reviewer=C 层加抽建议；方向 5=E 层 45 miss+近域 24 FP 靶区；N-002 维持移交
+- 注意：工作区他线 WIP 12 项未触碰未携带；本线 10 commits 一 Task 一 commit（T4 拆切换/证据两笔系独立 commit 红线要求）
+
 ## 2026-09-10 22:58 · Zcode — 开工：recall-eval-v2 评测集扩版+门禁切换+T3 重评（spec+plan 已批 A1–A6）
 
 - 工作范围：`scripts/characterization/fixtures/kb-recall-eval.v2.json`（新建）、`scripts/characterization/fixtures/kb-recall-v2-quota.md`（新建）、`scripts/characterization/characterize-kb-recall-eval.mjs`（T4 门禁切换）、`docs/superpowers/reports/2026-09-10-recall-eval-v2-report.md`（新建）、`docs/superpowers/todo-list.md`、`docs/superpowers/agent-log.md`、`tmp/kb-eval-v2/**`（证据）
