@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 20:00 · ZCode 引擎线 — 开工+收工：click_button 交接包（纯文档+zip 单元）
+
+- 完成：同事执行引擎缺 click button 操作类型——按 radio/tree 同模式产出：spec `docs/superpowers/specs/2026-09-10-click-button-operation-spec.md`（录制 G1 容器优先三层=z-index 最高 overlay+popper 补扫+label 开 trigger；JS_CLICK_ICON_BUTTON 三级=精确文本>icon 宿主>泛化文本兜底含池化消歧；回放 durable 链=xpath_smart→弹窗修正→Playwright .last 兜底+分类沉降；**硬门槛=保存/提交/确认类改道 click_save**；同名消歧/点击前采集/.last 纪律等集成注意六条）+ 交付包 `C:/Users/water/Desktop/click-button-handover.zip`（15 文件 80KB：py/ 源码 14 含 form_save.py 附带参考 + spec，zip 完整性 OK）
+- 验收：spec 全部代码坐标现场核对（click_action_engine.py:29 录制编排/:480 两个 for_replay 入口/replay_click.py:19 durable 链/:127 分类沉降/_misc.py:67 容器优先/icons.py:133 三级点击）；契约对齐 engine-actions-contract §2.3 与 2026-09-10-click-record-replay-unify-design.md（已落地态）；纯文档+Desktop 产物，无代码改动
+- 遗留移交：click_table_row_button/click_menu_xpath/real_click（CDP trusted）不在本包（分别在 table 族/mega-menu 交接文档/radio-tree 包）；同事侧如需保存链完整契约（分区保存/双保存）另出 click_save 专包
+- 注意：工作区他线 WIP 未触碰未携带；本单元只提交 agent-log + spec 两个文件；tmp 临时打包脚本已删
+
 ## 2026-09-10 19:30 · ZCode 引擎线 — 开工+收工：click_radio 交接包（纯文档+zip 单元）
 
 - 完成：同事执行引擎缺 radio 操作类型——按 select:tree 同模式产出：spec `docs/superpowers/specs/2026-09-10-radio-operation-spec.md`（双 JS 路=xpath 版 JS_CLICK_RADIO_BY_XPATH 弹窗感知+`[last()]` 隐藏弹窗修正，label 版补扫 dialog/drawer；RadioEngine 录放同体 absent=skip OK 级联语义；autofill/_llm_values 消费面；集成注意五条）+ 交付包 `C:/Users/water/Desktop/radio-handover.zip`（14 文件 58KB：py/ 源码 13 + spec，zip 完整性 OK）
