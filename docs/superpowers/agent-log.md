@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 17:51 · Cursor Lead — 收工：p2-toast-cursor 导航/跨页 notify 游标回卷
+
+- 完成：回链开工 `f3b9e1a7`；`rewind_notify_cursor_if_shrunk` + scan shrink 后 cursor=0 重扫；清 `_step_notice_seen`
+- 验收：`characterize-step-notice-scan.py` OK
+- 遗留：无（未改 js_snippets）；下一 P3 可排 `login-retry-heuristic` / `p2-batch-lease`
+
 ## 2026-09-10 17:50 · Cursor Lead — 开工：p2-toast-cursor 导航/跨页 notify 游标回卷
 
 - 进行中：2026-09-10 17:50；根因=`log_len < cursor` 时不回卷 → 新页前 N 条 toast 永久跳过；seen 残留同效

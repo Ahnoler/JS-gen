@@ -62,6 +62,48 @@ def test_format_and_dedupe() -> None:
     assert_true("勿 done" in cue, "error guidance present")
 
 
+def test_rewind_when_notify_log_shrinks() -> None:
+    """P2-toast-cursor: navigation resets __notify_log → must rewind cursor + clear seen."""
+    from scripts.agent.step_notice import rewind_notify_cursor_if_shrunk
+
+    store = {
+        "_step_notice_log_cursor": 12,
+        "_step_notice_seen": {"success|旧页成功"},
+    }
+    assert_true(
+        rewind_notify_cursor_if_shrunk(store, 3) is True,
+        "log_len < cursor → rewind",
+    )
+    assert_true(store.get("_step_notice_log_cursor") == 0, "cursor reset to 0")
+    assert_true("_step_notice_seen" not in store, "seen cleared on rewind")
+    store2 = {"_step_notice_log_cursor": 5}
+    assert_true(
+        rewind_notify_cursor_if_shrunk(store2, 5) is False,
+        "equal length → no rewind",
+    )
+    assert_true(store2.get("_step_notice_log_cursor") == 5, "cursor unchanged")
+    assert_true(
+        rewind_notify_cursor_if_shrunk(store2, 8) is False,
+        "log grew → no rewind",
+    )
+
+
+def test_scan_source_rewinds_before_advancing_cursor() -> None:
+    src = (ROOT / "scripts/agent/step_notice.py").read_text(encoding="utf-8")
+    assert_true("rewind_notify_cursor_if_shrunk" in src, "helper wired")
+    # After shrink, must re-evaluate with cursor 0 (not keep stale slice).
+    assert_true(
+        "JS_SCAN_STEP_NOTICES" in src and "rewind_notify_cursor_if_shrunk" in src,
+        "scan path references rewind",
+    )
+    idx = src.find("async def scan_and_emit_step_notices")
+    body = src[idx : idx + 2200]
+    assert_true(
+        "rewind_notify_cursor_if_shrunk" in body,
+        "scan_and_emit calls rewind helper",
+    )
+
+
 def test_recorder_wires_step_end() -> None:
     rec = (ROOT / "scripts/recorder.py").read_text(encoding="utf-8")
     assert_true("_emit_step_notice_scan" in rec, "recorder imports/calls step notice")
@@ -82,6 +124,8 @@ def main() -> int:
     test_feature_flag_default_on()
     test_js_snippet_pins()
     test_format_and_dedupe()
+    test_rewind_when_notify_log_shrinks()
+    test_scan_source_rewinds_before_advancing_cursor()
     test_recorder_wires_step_end()
     test_reexport_js()
     print("characterize-step-notice-scan: OK")

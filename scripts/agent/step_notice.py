@@ -39,6 +39,22 @@ def take_new_notices(business_data_store: dict | None, items: list[dict]) -> lis
     return fresh
 
 
+def rewind_notify_cursor_if_shrunk(business_data_store: dict | None, log_len: int) -> bool:
+    """Reset cursor + seen when in-page ``__notify_log`` shrank (navigation / new document).
+
+    Without this, ``log_len < cursor`` leaves the cursor past the new log head and
+    permanently skips early toasts on the next page (P2-toast-cursor).
+    """
+    if business_data_store is None:
+        return False
+    cursor = int(business_data_store.get("_step_notice_log_cursor") or 0)
+    if int(log_len or 0) >= cursor:
+        return False
+    business_data_store["_step_notice_log_cursor"] = 0
+    business_data_store.pop("_step_notice_seen", None)
+    return True
+
+
 def format_notice_cue(items: list[dict]) -> str:
     """HumanMessage body for new notices."""
     if not items:
@@ -115,6 +131,18 @@ async def scan_and_emit_step_notices(agent, business_data_store: dict | None) ->
     data = _as_dict(raw)
     items = data.get("items") if isinstance(data.get("items"), list) else []
     log_len = int(data.get("notify_log_len") or 0)
+    if rewind_notify_cursor_if_shrunk(business_data_store, log_len):
+        # Re-scan from 0 — first evaluate used a stale cursor past the new log head.
+        cursor = 0
+        try:
+            raw = await page.evaluate(JS_SCAN_STEP_NOTICES, 0)
+            data = _as_dict(raw)
+            items = data.get("items") if isinstance(data.get("items"), list) else []
+            log_len = int(data.get("notify_log_len") or 0)
+        except Exception as e:
+            sys.stderr.write(f"[recorder] step-notice rescan after rewind failed: {e}\n")
+            sys.stderr.flush()
+            return []
     if log_len >= cursor:
         business_data_store["_step_notice_log_cursor"] = log_len
 
