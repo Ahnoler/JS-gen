@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-10 21:10 · Zcode — 收工：recall-p0-three-levers KB 召回 P0 三杠杆（回链 18:36 开工 `1e047cc6`）
+
+- 完成：T0 失败清单冻结+build/verify 五五划分（`06dbe12d`，B 12/11·D 5/5·C 1/1 机械交替）；T1a 血缘资产 mapped 72/84=85.7% + unmapped 12/ambiguous 1 显式 + promote_draft 补写 moduleKey（`b0e0e534`）；**T1b 作用域 FAIL 整体回退**（保守 1.15/.92 与授权上限 1.30/.85 均 2/11 转正<6，9 条余项中 7 条 gold raw=0=词面鸿沟非排序问题——已向 T3 归类建议，无代码残留）；T2 camelCase/ASCII 分词 D 层 0.333→**0.933**、9/9 null 转正、修复死 FS/ZJJK token 与 node-ratio 分母（`01572239`）；T3 受控词表 16 词条只据 build 集建表、B 层 0.233→**0.400**、build 0→10/18 上行、FP 零新增（`2ae8e4e1`）；T4 报告入库
+- 验收：终态六项 acc1 **0.790**/rec5 **0.917**/mrr 0.843/ndcg 0.860/拒答 0.633 不变/噪声 0.790（A 1.00 保持·C 不动）；`recall-eval.mjs --synonyms --baseline` exit=0；`characterize-kb-recall-eval` 4 passed（floor 只升不降）；`characterize-flow-card-recall` 22 passed（存量 17+新增 5）；py 契约 ok；lint 新增 warning=0（16 条存量同规则仅行号平移）；verify-all.sh/kb-recall-eval.v1.json/data/kb/req/** 均未动
+- 遗留移交：①reviewer 三 gate 待跑（G1 血缘+词表抽检 / G2 划分与冻结未动确认 / G3 独立复算+pin 证伪+反作弊）；②**裁量点已披露**：T3 词表对 verify 独立增量=0（verify +4 全归因 T2 分词），若 reviewer 判「词表自身须 verify 增量>0」则按 A4 词表单项回退至 `01572239` 链态；③移交 Lead：N-002 计算2加3→collection_scorecard 系基线存量 FP，回 null 须收紧覆盖率地板=改口径（须批）或 embedding（另立项）；④propose.js A5 放行但最终未触碰（作用域回退后 moduleKey 注入无消费者，产品侧 synonyms 装配另立任务）；⑤作用域杠杆归类偏差（11 靶中 7 条实为词面鸿沟）建议下版评审重归类
+- 证据：tmp/kb-p0/（T0-failures/T1-lineage/T1b-verdict+after+exp/T2-verdict+after/T3-verdict+after+build-set/T4-verify-perentry/gate）；报告 docs/superpowers/reports/2026-09-10-recall-p0-report.md
+- 工作区他线 WIP（verify-all/classify.py/agent-log archive 等 12 项）全程未触碰未携带
+
 ## 2026-09-10 18:36 · Zcode — 开工：recall-p0-three-levers KB 召回 P0 三杠杆
 
 - 进行中：2026-09-10 18:36；目标=按已确认 spec（决策 A1–A5 已裁定）用三条零依赖杠杆提召回分：血缘作用域三态 / camelCase·ASCII 分词 / 受控词表扩展；冻结基线 Acc@1 0.650·Recall@5 0.757·MRR@5 0.694·nDCG@5 0.708·拒答 0.633·噪声 0.650 不得回退
