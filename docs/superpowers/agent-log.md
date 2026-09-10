@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 18:09 · Cursor Lead — 收工：p2-async-actionlog 增量 sync
+
+- 完成：回链开工 `8f3de3b1`；Python `_emit_action_log_sync` 默认 delta + 孤儿/周期(50) full；Node `applyActionLogSync`；runner 接线
+- 验收：`characterize-action-log-sync-delta.py/.mjs` OK；`characterize-recorder-phase-reset` PASS
+- 遗留：`emit_json` 仍同步 flush（增量后载荷已小）；冷 pin 未入 verify-all（WIP）；执行机+控制面需同版本；下一挂起可排 `dedup-deletion`（待裁）/ PR-BATCH 小缺口
+
 ## 2026-09-10 18:07 · Cursor Lead — 开工：p2-async-actionlog 增量 sync
 
 - 进行中：2026-09-10 18:07；根因=每步全量 `entries` + `emit_json` flush → O(n²) 管道字节与背压拉长 cancel

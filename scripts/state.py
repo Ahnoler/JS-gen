@@ -14,6 +14,11 @@ import uuid
 from urllib.parse import urlsplit
 
 _ACTION_LOG: list[dict] = []
+# Ids already pushed via action_log_sync (delta bookkeeping). Cleared on full snapshot.
+_ACTION_LOG_SYNCED_IDS: set[str] = set()
+# Emit a full snapshot every N syncs so a mid-run control-plane restart can rebootstrap.
+_ACTION_LOG_SYNC_FULL_EVERY: int = 50
+_ACTION_LOG_SYNC_TICK: int = 0
 _TRAJECTORY_URL: str | None = None
 _CURRENT_PHASE: int = 0
 # Current recording run id: control plane sends runId with each `step` event;
@@ -703,16 +708,72 @@ async def record_action_with_screenshots(
     return entry
 
 
-def _emit_action_log_sync(removed_ids=None):
-    """Push the full _ACTION_LOG to the Dashboard (optional removedIds for live-persist cleanup)."""
+def _emit_action_log_sync(removed_ids=None, *, full: bool = False):
+    """Push action_log_sync to the Dashboard.
+
+    Default is *delta*: only entries whose ids were not yet synced, plus optional
+    ``removedIds`` for coalesce cleanup. Periodic / forced ``full`` snapshots keep
+    the control-plane in-memory copy rebootstrapable after restart.
+
+    Historical O(n²) cost came from sending ``list(_ACTION_LOG)`` on every action
+    with a blocking stdout flush; delta shrinks pipe bytes to ~O(1) per step.
+    """
+    global _ACTION_LOG_SYNC_TICK
     try:
         from .agent_utils import emit_json
-        data = {
-            "entries": list(_ACTION_LOG),
-            "count": len(_ACTION_LOG),
+
+        removed = [str(x) for x in (removed_ids or []) if x]
+        for rid in removed:
+            _ACTION_LOG_SYNCED_IDS.discard(rid)
+
+        current_ids = {
+            str(e.get("id"))
+            for e in _ACTION_LOG
+            if isinstance(e, dict) and e.get("id")
         }
-        if removed_ids:
-            data["removedIds"] = [str(x) for x in removed_ids if x]
+        orphan_synced = _ACTION_LOG_SYNCED_IDS - current_ids
+        if removed:
+            orphan_synced -= set(removed)
+
+        _ACTION_LOG_SYNC_TICK += 1
+        periodic_full = (
+            _ACTION_LOG_SYNC_FULL_EVERY > 0
+            and (_ACTION_LOG_SYNC_TICK % _ACTION_LOG_SYNC_FULL_EVERY) == 0
+        )
+        force_full = bool(full) or bool(orphan_synced) or periodic_full
+
+        if force_full:
+            entries = list(_ACTION_LOG)
+            sync_mode = "full"
+            _ACTION_LOG_SYNCED_IDS.clear()
+            _ACTION_LOG_SYNCED_IDS.update(current_ids)
+        else:
+            entries = [
+                e for e in _ACTION_LOG
+                if isinstance(e, dict)
+                and e.get("id")
+                and str(e["id"]) not in _ACTION_LOG_SYNCED_IDS
+            ]
+            sync_mode = "delta"
+            for e in entries:
+                _ACTION_LOG_SYNCED_IDS.add(str(e["id"]))
+
+        # True no-op (already synced, nothing removed) — skip pipe write.
+        # Empty log + never synced still emits full [] (explicit flush / characterization).
+        if sync_mode == "delta" and not entries and not removed:
+            if not current_ids and not _ACTION_LOG_SYNCED_IDS:
+                sync_mode = "full"
+                entries = []
+            else:
+                return
+
+        data = {
+            "entries": entries,
+            "count": len(_ACTION_LOG),
+            "syncMode": sync_mode,
+        }
+        if removed:
+            data["removedIds"] = removed
         # 附加当前录制 runId，供 Node 侧按 run 归属过滤（None 时省略保持 legacy 兼容）
         rid = get_current_run_id()
         if rid is not None:

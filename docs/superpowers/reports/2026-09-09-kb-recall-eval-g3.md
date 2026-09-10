@@ -78,3 +78,39 @@
 5. JS/PY 对同一评测集正样本断言 + 分歧登记（62/100，非阻塞）✓
 
 **放行**：本线可关闭；后续召回算法改动（方向 5：混合检索）须以本门禁为护栏，任何 floor 变更走 Lead 批准 + lockstep 同 commit。
+
+## 8. 收口核验（2026-09-10 reviewer 补记）
+
+### 8.1 逐项核实
+
+| 声称 | 核验证据 | 结论 |
+|---|---|---|
+| agent-log 已写线关闭条目（回链 T0/T4） | `agent-log.md:77`（2026-09-10 16:53），含 G3 PASS、引用本报告 `13abd9a2`、关闭声明 | ✓ 存在且内容正确 |
+| todo ⑧ 翻为「线关闭 G3 PASS」 | `todo-list.md:28`；`81673f49` 对 todo-list **仅 1 行**改动 | ✓ |
+| T0–T7 共 13 笔 commit | T0–T7 12 笔 + 收口 1 笔，逐笔 `git show --stat` 文件集均在声明范围内 | ✓ |
+| 复核探针留档 | `tmp/score-retrieval.mjs`(4402B) / `tmp/review-recall.mjs`(1217B)，时间戳未变 | ✓ |
+| 三遗留按归属记录、不越权 | 报告「遗留与通报」3/4/5 + todo 均在 | ✓ |
+| 方向 5 接口约定「已写入 memory 与报告」 | **报告中无此节**；仓库内仅 `agent-log:154` 提到 lockstep pin | ✗ 见 §8.3 |
+
+### 8.2 提交归属事实（非缺陷，供 Lead 知悉）
+
+线关闭条目由 `78dd209d`（09-10 16:53，engine-wet-trio 线的开工声明提交）**顺带携带入库**，该 commit message **未注明**携带他线条目（AGENTS.md 要求注明）；ZCode 自身收口 `81673f49`（16:54）只翻了 todo-list。
+→ **条目存在且正确**，仅提交归属分散在两处；属携带方（他线）的流程瑕疵，不计入本线。
+
+### 8.3 承接条件（reviewer 补录 —— 替代「memory 存档」）
+
+> AGENTS.md：跨工具互通靠**仓库内文件 + git 历史**，不靠任何工具的内置记忆。故把已接受的接口约定固化在此，作为方向 5（混合检索）的开工依据：
+
+1. 改召回实现（`src/services/req-draft-traj/flow-card-recall.js`）→ **同 commit** 复跑 `characterize-kb-recall-eval` 与 `recall-eval.mjs --baseline`；
+2. **floor 只升不降**；下调 = 改批准基线，须 Lead 批准 + 与 lockstep 绊线**同 commit 同移**；
+3. 评测集升 **v2** 走 `changeLog` + Lead 批准；**禁止先跑匹配器反推 gold**；
+4. **multi-gold 分数化口径即契约**（`hits/|gold|`、`DCG/IDCG`）；改口径 = 改基线 = 须批准；
+5. **单引擎**：门禁只复用 `scripts/kb/recall-eval.mjs`，不得出现第二套指标实现；
+6. `propose.js` 属他线热区，动前声明；
+7. py 一致性 62% 为**已登记分歧**，收敛另立任务。
+
+**主看指标**：B 层 Acc@1（现 0.233）上行且 A 层 1.00 不得回退；35 条失败清单为靶子。
+
+### 8.4 关闭状态
+
+本线 **CLOSED**（G3 PASS，反作弊六项零触发，门禁护栏在岗）。遗留 1/2/3 归属见 agent-log 收口条目；方向 5 开工前以 §8.3 为接口。

@@ -1,12 +1,12 @@
 /**
  * In-control-plane action_log copy (write-through cache, 2026-09-07 user design).
  *
- * 执行机每次上报 action_log_sync（全量快照语义）时，控制面同步维护一份内存副本；
- * 前端展示与假成功门闩判定读副本（即时），DB 降级为异步持久化层（最终一致，
- * persist 失败走 step_persist_failed 告警）。server 重启副本即失，查询侧回退 DB。
+ * 执行机上报 action_log_sync：`syncMode=full` 覆盖副本；`syncMode=delta` 按
+ * removedIds 删 + entries 追加（缺省/legacy 无 syncMode 视为 full）。
+ * 前端展示与假成功门闩判定读副本（即时），DB 降级为异步持久化层。
  *
- * 【部署架构】执行机→控制面只有出站 WS 一条通道（见 executor/ws-client.js 顶部注释），
- * 副本数据源就是该通道上的 action_log_sync 全量快照——不新增任何网络假设。
+ * 【部署架构】执行机→控制面只有出站 WS 一条通道；增量 sync 降低管道字节，
+ * 周期性 full（Python 侧）便于控制面重启后重新灌满副本。
  */
 import {
   META_STEP_ACTIONS,
@@ -28,6 +28,49 @@ export function setActionLogCopy(trajectoryDbId, entries) {
   const tid = Number(trajectoryDbId);
   if (!Number.isFinite(tid) || tid <= 0 || !Array.isArray(entries)) return;
   copies.set(tid, { entries, updatedAt: Date.now() });
+}
+
+/**
+ * Apply an action_log_sync payload to the in-memory copy (full replace or delta merge).
+ * @param {number} trajectoryDbId trajectory DB id
+ * @param {object|null|undefined} payload sync payload (`entries` / `removedIds` / `syncMode`)
+ * @returns {void}
+ */
+export function applyActionLogSync(trajectoryDbId, payload) {
+  const tid = Number(trajectoryDbId);
+  if (!Number.isFinite(tid) || tid <= 0) return;
+  const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+  const removedIds = Array.isArray(payload?.removedIds) ? payload.removedIds : [];
+  const mode = payload?.syncMode === 'delta' ? 'delta' : 'full';
+
+  if (mode === 'full') {
+    setActionLogCopy(tid, entries);
+    return;
+  }
+
+  let copy = copies.get(tid);
+  if (!copy) {
+    copy = { entries: [], updatedAt: Date.now() };
+    copies.set(tid, copy);
+  }
+
+  if (removedIds.length) {
+    const drop = new Set(removedIds.map((id) => String(id || '')).filter(Boolean));
+    if (drop.size) {
+      copy.entries = copy.entries.filter((e) => !drop.has(String(e?.id || '')));
+    }
+  }
+
+  const seen = new Set(
+    copy.entries.map((e) => String(e?.id || '')).filter(Boolean),
+  );
+  for (const entry of entries) {
+    const id = entry?.id != null ? String(entry.id) : '';
+    if (!id || seen.has(id)) continue;
+    copy.entries.push(entry);
+    seen.add(id);
+  }
+  copy.updatedAt = Date.now();
 }
 
 /**

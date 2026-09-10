@@ -28,7 +28,7 @@ import {
   attachSpecialElementCandidates,
 } from './recording-runner-step-context.js';
 import { appendPhaseDoneLog } from './trajectory-phase-service.js';
-import { setActionLogCopy, countBusinessSteps, countBusinessStepsByPhase, clearActionLogCopy } from './action-log-copy.js';
+import { applyActionLogSync, countBusinessSteps, countBusinessStepsByPhase, clearActionLogCopy } from './action-log-copy.js';
 import { META_STEP_ACTIONS, isEngineeringStepAction } from '../../models/meta-step-actions.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
@@ -494,10 +494,10 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   const handleActionLogSync = async (payload) => {
     const entries = Array.isArray(payload?.entries) ? payload.entries : [];
     const removedIds = Array.isArray(payload?.removedIds) ? payload.removedIds : [];
-    // 服务器端 action_log 副本（2026-09-07 用户设计）：sync 是全量快照，直接覆盖副本；
+    // 服务器端 action_log 副本：full 覆盖 / delta 合并（syncMode）；legacy 无 syncMode=full。
     // 前端展示与门闩判定读副本（即时），DB persist 降级为异步持久化。
     try {
-      setActionLogCopy(tid, entries);
+      applyActionLogSync(tid, payload);
     } catch {}
     if (!runtime._lastPersistByActionId) runtime._lastPersistByActionId = new Map();
     if (session && !session._lastPersistByActionId) {
