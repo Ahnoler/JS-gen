@@ -1,0 +1,549 @@
+{
+  "bridgeVersion": "v1",
+  "status": "candidate",
+  "builtFrom": [
+    "corpus-card",
+    "corpus-req-doc",
+    "wet-test-drift"
+  ],
+  "buildDiscipline": "禁止使用 kb-recall-eval.* 的任何条目作为建表依据（建表期物理隔离）；候选经双向校验（纯语料 grep，禁跑匹配器）+ 人工裁决；零 import 召回模块",
+  "scopePolicy": "v1 全表 scope=null：冻结度量 harness（recall-eval.mjs）无 moduleKey 入口，scoped 条目在 T3 度量中不可能触发，故 v1 不设 scope；全局生效风险由「term 必须字面出现于查询」前提 + T3 零新增 FP 硬门覆盖；scope 门控机制另由 characterize-flow-card-recall pin 与 T4 B5 证明保留",
+  "entries": [
+    {
+      "term": "待办",
+      "expand": [
+        "待办任务"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/approval_todo.json — keyword「待办」⊂ alias「待办任务」（同卡 approval_todo）"
+    },
+    {
+      "term": "入库申请",
+      "expand": [
+        "档案入库申请"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/archive-stock-in.json — keyword「入库申请」⊂ alias「档案入库申请」（同卡 archive-stock-in）"
+    },
+    {
+      "term": "反委托",
+      "expand": [
+        "反委托借据"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/asset-preserve-ops-counter-entrust.json — keyword「反委托」⊂ alias「反委托借据」（同卡 asset-preserve-ops-counter-entrust）"
+    },
+    {
+      "term": "委外清收",
+      "expand": [
+        "委外清收登记"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/asset-preserve-ops-outsourced-collection.json — keyword「委外清收」⊂ alias「委外清收登记」（同卡 asset-preserve-ops-outsourced-collection）"
+    },
+    {
+      "term": "记账台账",
+      "expand": [
+        "押品记账台账"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/collateral-func-ledger.json — keyword「记账台账」⊂ alias「押品记账台账」（同卡 collateral-func-ledger）"
+    },
+    {
+      "term": "批复查看",
+      "expand": [
+        "授信批复查看"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/credit-corp-approval-result.json — keyword「批复查看」⊂ alias「授信批复查看」（同卡 credit-corp-approval-result）"
+    },
+    {
+      "term": "关联关系",
+      "expand": [
+        "关联关系日志"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/customer-common-cust-relation.json — keyword「关联关系」⊂ alias「关联关系日志」（同卡 customer-common-cust-relation）"
+    },
+    {
+      "term": "过滤配置",
+      "expand": [
+        "关联关系过滤配置"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/customer-common-cust-relation.json — keyword「过滤配置」⊂ alias「关联关系过滤配置」（同卡 customer-common-cust-relation）"
+    },
+    {
+      "term": "评级列表",
+      "expand": [
+        "集团评级列表"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/customer-group-group.json — keyword「评级列表」⊂ alias「集团评级列表」（同卡 customer-group-group）"
+    },
+    {
+      "term": "额度列表",
+      "expand": [
+        "集团额度列表"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/customer-group-group.json — keyword「额度列表」⊂ alias「集团额度列表」（同卡 customer-group-group）"
+    },
+    {
+      "term": "受托支付",
+      "expand": [
+        "受托支付变更"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/disburse-entrusted-payment.json — keyword「受托支付」⊂ alias「受托支付变更」（同卡 disburse-entrusted-payment）"
+    },
+    {
+      "term": "电子签",
+      "expand": [
+        "模拟电子签"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/electronic_signing.json — alias「电子签」⊂ keyword「模拟电子签」（同卡 electronic_signing）"
+    },
+    {
+      "term": "保证人",
+      "expand": [
+        "引入保证人"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/guarantee_intro.json — alias「保证人」⊂ keyword「引入保证人」（同卡 guarantee_intro）"
+    },
+    {
+      "term": "独立新增",
+      "expand": [
+        "独立新增担保"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/guaranty_contract.json — keyword「独立新增」⊂ alias「独立新增担保」（同卡 guaranty_contract）"
+    },
+    {
+      "term": "注册并占用",
+      "expand": [
+        "额度注册并占用"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/limit-ctrl-api-grant-use-one.json — keyword「注册并占用」⊂ alias「额度注册并占用」（同卡 limit-ctrl-api-grant-use-one）"
+    },
+    {
+      "term": "牵头行",
+      "expand": [
+        "牵头行发起"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/loan-corp-syndicate-lead-apply.json — keyword「牵头行」⊂ alias「牵头行发起」（同卡 loan-corp-syndicate-lead-apply）"
+    },
+    {
+      "term": "参与行",
+      "expand": [
+        "参与行发起"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/loan-corp-syndicate-participant-apply.json — keyword「参与行」⊂ alias「参与行发起」（同卡 loan-corp-syndicate-participant-apply）"
+    },
+    {
+      "term": "卡片库",
+      "expand": [
+        "角色卡片库"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/portal-home-mgmt.json — keyword「卡片库」⊂ alias「角色卡片库」（同卡 portal-home-mgmt）"
+    },
+    {
+      "term": "角色切换",
+      "expand": [
+        "机构角色切换"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/portal-personalization.json — keyword「角色切换」⊂ alias「机构角色切换」（同卡 portal-personalization）"
+    },
+    {
+      "term": "检查任务",
+      "expand": [
+        "贷后检查任务"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/postloan.json — keyword「检查任务」⊂ alias「贷后检查任务」（同卡 postloan）"
+    },
+    {
+      "term": "生成配置",
+      "expand": [
+        "风险分类生成配置"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/risk-class-gen-config.json — alias「生成配置」⊂ keyword「风险分类生成配置」（同卡 risk-class-gen-config）"
+    },
+    {
+      "term": "脱期法配置",
+      "expand": [
+        "脱期法配置矩阵"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/risk-class-overdue-config.json — keyword「脱期法配置」⊂ alias「脱期法配置矩阵」（同卡 risk-class-overdue-config）"
+    },
+    {
+      "term": "认定理由配置",
+      "expand": [
+        "分类认定理由配置"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/risk-class-reason-config.json — alias「认定理由配置」⊂ keyword「分类认定理由配置」（同卡 risk-class-reason-config）"
+    },
+    {
+      "term": "表达式",
+      "expand": [
+        "表达式编辑器"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/smart-ctrl-rule-cfg.json — keyword「表达式」⊂ alias「表达式编辑器」（同卡 smart-ctrl-rule-cfg）"
+    },
+    {
+      "term": "关联方案",
+      "expand": [
+        "控制规则关联方案"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/smart-ctrl-rule-lib.json — keyword「关联方案」⊂ alias「控制规则关联方案」（同卡 smart-ctrl-rule-lib）"
+    },
+    {
+      "term": "一键失效",
+      "expand": [
+        "规则一键失效及恢复"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/smart-ctrl-rule-toggle.json — alias「一键失效」⊂ keyword「规则一键失效及恢复」（同卡 smart-ctrl-rule-toggle）"
+    },
+    {
+      "term": "失效规则",
+      "expand": [
+        "批量失效规则"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/smart-ctrl-rule-toggle.json — keyword「失效规则」⊂ alias「批量失效规则」（同卡 smart-ctrl-rule-toggle）"
+    },
+    {
+      "term": "生效规则",
+      "expand": [
+        "批量生效规则"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/smart-ctrl-rule-toggle.json — alias「生效规则」⊂ keyword「批量生效规则」（同卡 smart-ctrl-rule-toggle）"
+    },
+    {
+      "term": "机构管理",
+      "expand": [
+        "账务机构管理"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/system-mgmt-base-mgmt.json — alias「机构管理」⊂ keyword「账务机构管理」（同卡 system-mgmt-base-mgmt）"
+    },
+    {
+      "term": "机构撤并",
+      "expand": [
+        "机构撤并登记"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/system-mgmt-org-merge.json — keyword「机构撤并」⊂ alias「机构撤并登记」（同卡 system-mgmt-org-merge）"
+    },
+    {
+      "term": "催收评分",
+      "expand": [
+        "催收评分卡配置"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/collection_scorecard.json — alias「催收评分」⊂ keyword「催收评分卡配置」（同卡 collection_scorecard）"
+    },
+    {
+      "term": "流程提交",
+      "expand": [
+        "审批意见流程提交"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/credit-corp-approval-task.json — keyword「流程提交」⊂ alias「审批意见流程提交」（同卡 credit-corp-approval-task）"
+    },
+    {
+      "term": "催收任务",
+      "expand": [
+        "催收任务编号"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/collection_task.json — alias「催收任务」⊂ keyword「催收任务编号」（同卡 collection_task）"
+    },
+    {
+      "term": "对公授信",
+      "expand": [
+        "新增对公授信管理"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/credit_application.json — alias「对公授信」⊂ keyword「新增对公授信管理」（同卡 credit_application）"
+    },
+    {
+      "term": "委托贷款",
+      "expand": [
+        "委托贷款用信申请"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/loan-corp-entrust-loan.json — alias「委托贷款」⊂ keyword「委托贷款用信申请」（同卡 loan-corp-entrust-loan）"
+    },
+    {
+      "term": "二合一",
+      "expand": [
+        "二合一用信申请"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/loan-retail-erheyi-apply.json — keyword「二合一」⊂ alias「二合一用信申请」（同卡 loan-retail-erheyi-apply）"
+    },
+    {
+      "term": "要素分组",
+      "expand": [
+        "产品要素分组"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/product_element.json — keyword「要素分组」⊂ alias「产品要素分组」（同卡 product_element）"
+    },
+    {
+      "term": "公共要素",
+      "expand": [
+        "产品公共要素"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/product_element.json — alias「公共要素」⊂ keyword「产品公共要素」（同卡 product_element）"
+    },
+    {
+      "term": "个性化要素",
+      "expand": [
+        "产品个性化要素"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/product_element.json — alias「个性化要素」⊂ keyword「产品个性化要素」（同卡 product_element）"
+    },
+    {
+      "term": "签订合同",
+      "expand": [
+        "待签订合同管理"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/duigong_contract_sign.json — alias「签订合同」⊂ keyword「待签订合同管理」（同卡 duigong_contract_sign）"
+    },
+    {
+      "term": "签订合同",
+      "expand": [
+        "已签订合同管理"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/duigong_contract_sign.json — alias「签订合同」⊂ keyword「已签订合同管理」（同卡 duigong_contract_sign）"
+    },
+    {
+      "term": "撤诉",
+      "expand": [
+        "撤诉申请"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/judicial-litigation.json — keyword「撤诉」⊂ alias「撤诉申请」（同卡 judicial-litigation）"
+    },
+    {
+      "term": "数据指标模板",
+      "expand": [
+        "数据指标模板配置"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/digital-loan-desk-data-index.json — keyword「数据指标模板」⊂ alias「数据指标模板配置」（同卡 digital-loan-desk-data-index）"
+    },
+    {
+      "term": "数据指标库",
+      "expand": [
+        "数据指标库配置"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/digital-loan-desk-data-index.json — keyword「数据指标库」⊂ alias「数据指标库配置」（同卡 digital-loan-desk-data-index）"
+    },
+    {
+      "term": "观察期白名单",
+      "expand": [
+        "观察期白名单配置"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/risk-class-observation-whitelist.json — alias「观察期白名单」⊂ keyword「观察期白名单配置」（同卡 risk-class-observation-whitelist）"
+    },
+    {
+      "term": "集团客户",
+      "expand": [
+        "集团客户管理"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/customer-group-group.json — keyword「集团客户」⊂ alias「集团客户管理」（同卡 customer-group-group）"
+    },
+    {
+      "term": "授信系数",
+      "expand": [
+        "授信系数管理"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/credit-retail-credit-config.json — keyword「授信系数」⊂ alias「授信系数管理」（同卡 credit-retail-credit-config）"
+    },
+    {
+      "term": "催收策略",
+      "expand": [
+        "催收策略配置"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/collection_strategy.json — alias「催收策略」⊂ keyword「催收策略配置」（同卡 collection_strategy）"
+    },
+    {
+      "term": "密码策略",
+      "expand": [
+        "密码策略管理"
+      ],
+      "scope": null,
+      "source": "corpus-card data/kb/flows/system-mgmt-base-mgmt.json — keyword「密码策略」⊂ alias「密码策略管理」（同卡 system-mgmt-base-mgmt）"
+    },
+    {
+      "term": "拨款系数",
+      "expand": [
+        "拨款转换系数"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/credit-retail/chapters\\06-授信配置管理.md:4 — 拨款系数（拨款转换系数）"
+    },
+    {
+      "term": "征信结果",
+      "expand": [
+        "查看征信报告"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/customer-common/chapters\\09-征信管理.md:4 — 征信结果（查看征信报告）"
+    },
+    {
+      "term": "引入客户",
+      "expand": [
+        "客户放大镜"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/customer-common/through-chains.md:22 — 引入客户（客户放大镜）"
+    },
+    {
+      "term": "数标",
+      "expand": [
+        "数据指标"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/digital-loan-desk/chapters\\05-进件受理.md:37 — 数标（数据指标）"
+    },
+    {
+      "term": "产品要素管理",
+      "expand": [
+        "产品要素库"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/product-mgmt/chapters\\01-总体概述.md:32 — 产品要素管理（产品要素库）"
+    },
+    {
+      "term": "流程跟踪信息主页",
+      "expand": [
+        "流程轨迹弹窗"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/rating/chapters\\03-对公客户评级.md:18 — 流程跟踪信息主页（流程轨迹弹窗）"
+    },
+    {
+      "term": "弹审批意见窗",
+      "expand": [
+        "签署意见"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/rating/chapters\\04-同业客户评级.md:45 — 弹审批意见窗（签署意见）"
+    },
+    {
+      "term": "退回",
+      "expand": [
+        "打回"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/rating/chapters\\05-集团客户评级.md:25 — 退回（打回）"
+    },
+    {
+      "term": "影像信息",
+      "expand": [
+        "公共影像组件"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/archive/chapters\\06-档案盘库.md:18 — 影像信息（公共影像组件）"
+    },
+    {
+      "term": "组织管理",
+      "expand": [
+        "路由管理"
+      ],
+      "scope": null,
+      "source": "corpus-req-doc data/kb/req/system-mgmt/chapters\\08-组织管理.md:4 — 组织管理（路由管理）"
+    },
+    {
+      "term": "权限移交",
+      "expand": [
+        "权限转移"
+      ],
+      "scope": null,
+      "source": "wet-test-drift collateral-info/wet-test.md 叶6:34 — SUT「权限转移」vs 文档「权限移交」"
+    },
+    {
+      "term": "提交流程",
+      "expand": [
+        "流程提交"
+      ],
+      "scope": null,
+      "source": "wet-test-drift credit-corp/wet-test.md 叶20:31 ZJJK00106505 — SUT「流程提交」vs 文档「提交流程」"
+    },
+    {
+      "term": "对私客户管理",
+      "expand": [
+        "个人客户管理"
+      ],
+      "scope": null,
+      "source": "wet-test-drift customer-corp/wet-test.md 叶29:50 ZJJK00067207 — SUT「个人客户管理」vs 文档「对私客户管理」"
+    },
+    {
+      "term": "模板管理",
+      "expand": [
+        "模板配置"
+      ],
+      "scope": null,
+      "source": "wet-test-drift digital-loan-desk/wet-test.md 叶16:40 ZJJK00124943 — SUT「模板配置」vs 文档「模板管理」"
+    },
+    {
+      "term": "对公放款管理",
+      "expand": [
+        "对公放款申请"
+      ],
+      "scope": null,
+      "source": "wet-test-drift disburse/wet-test.md 叶1:22 ZJJK00106459 — SUT「对公放款申请」vs 文档「对公放款管理」"
+    },
+    {
+      "term": "零售放款管理",
+      "expand": [
+        "零售放款申请"
+      ],
+      "scope": null,
+      "source": "wet-test-drift disburse/wet-test.md 叶11:32 ZJJK00068667 — SUT「零售放款申请」vs 文档「零售放款管理」"
+    },
+    {
+      "term": "贷款业务类型",
+      "expand": [
+        "业务发生类型"
+      ],
+      "scope": null,
+      "source": "wet-test-drift loan-retail/wet-test.md 叶3:30 ZJJK00108099 — SUT「业务发生类型」vs 文档「贷款业务类型」"
+    },
+    {
+      "term": "风险分类默认配置",
+      "expand": [
+        "风险默认分类配置"
+      ],
+      "scope": null,
+      "source": "wet-test-drift postloan-risk-class/wet-test.md 叶29:64 ZJJK00096714 — SUT「风险默认分类配置」vs 文档「风险分类默认配置」"
+    }
+  ]
+}

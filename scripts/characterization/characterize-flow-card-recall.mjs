@@ -418,6 +418,60 @@ async function main() {
       assert.deepEqual(without, explicitNull);
     });
 
+    // ---- colloquial-bridge.json asset pins (plan Task 2 Step 4) ----
+    await runAsync('colloquial bridge table loads and passes shape+discipline audit', async () => {
+      const raw = readFileSync(join(ROOT, 'data/kb/colloquial-bridge.json'), 'utf-8');
+      const table = JSON.parse(raw);
+      assert.equal(table.bridgeVersion, 'v1');
+      assert.ok(Array.isArray(table.entries) && table.entries.length >= 40 && table.entries.length <= 80,
+        `bridge table must hold 40..80 entries, got ${table.entries?.length}`);
+      for (const e of table.entries) {
+        assert.ok(e.term && Array.isArray(e.expand) && e.expand.length > 0 && e.expand.every((x) => x && typeof x === 'string'),
+          `entry ${e.term}: expand must be a non-empty string array`);
+        assert.match(e.source, /^(corpus-card|corpus-req-doc|wet-test-drift) /,
+          `entry ${e.term}: source must start with an allowed sourceKind`);
+        assert.ok(e.scope === null || typeof e.scope === 'string', `entry ${e.term}: scope must be null|string`);
+      }
+      const kinds = table.entries.map((e) => e.source.split(' ')[0]);
+      const c = kinds.filter((k) => k === 'wet-test-drift').length;
+      assert.ok(c / kinds.length <= 0.4, `wet-test-drift share ${(c / kinds.length).toFixed(3)} must be <= 0.4`);
+      // every wet-test-drift entry must cite a module + leaf (B3)
+      for (const e of table.entries.filter((x) => x.source.startsWith('wet-test-drift'))) {
+        assert.match(e.source, /\S+\/wet-test\.md 叶\d+/, `entry ${e.term}: drift source must cite module + leaf`);
+      }
+    });
+
+    await runAsync('colloquial bridge scoped entries gate on moduleKey (real table)', async () => {
+      const table = JSON.parse(readFileSync(join(ROOT, 'data/kb/colloquial-bridge.json'), 'utf-8'));
+      // pick a real entry whose term can appear literally in a query
+      const probe = table.entries.find((e) => e.term === '拨款系数' && e.expand[0] === '拨款转换系数');
+      assert.ok(probe, 'bridge table must contain the adjudicated 拨款系数→拨款转换系数 entry');
+      const cards = [
+        { _stem: 'credit_cfg', flow: '授信配置管理卡', aliases: ['拨款转换系数'], keywords: ['拨款转换系数'] },
+        { _stem: 'other_a', flow: '机构维护卡', aliases: ['机构信息'], keywords: ['机构维护', '机构调整'] },
+      ];
+      const scoped = { ...probe, scope: 'credit_cfg' };
+      const legacy = matchFlowForAtom({ title: '拨款系数在哪里设置', taskDraft: '', cards });
+      const blocked = matchFlowForAtom({ title: '拨款系数在哪里设置', taskDraft: '', cards, synonyms: [scoped], moduleKey: 'other-module' });
+      assert.equal(blocked.score, legacy.score, 'scope mismatch must leave the score byte-identical to legacy (no injection)');
+      const allowed = matchFlowForAtom({ title: '拨款系数在哪里设置', taskDraft: '', cards, synonyms: [scoped], moduleKey: 'credit_cfg' });
+      assert.ok(allowed.score > legacy.score, `matching moduleKey must inject expand tokens (score ${allowed.score} > legacy ${legacy.score})`);
+    });
+
+    await runAsync('colloquial bridge absent or empty => byte-identical ranking', async () => {
+      const table = JSON.parse(readFileSync(join(ROOT, 'data/kb/colloquial-bridge.json'), 'utf-8'));
+      const cards = [
+        { _stem: 'a', flow: '冻结申请操作', keywords: ['冻结', '申请'] },
+        { _stem: 'b', flow: '机构维护操作', keywords: ['机构', '维护'] },
+      ];
+      const legacy = rankFlowCards({ title: '冻结申请操作', taskDraft: '', cards, k: 3 });
+      const emptyTable = rankFlowCards({ title: '冻结申请操作', taskDraft: '', cards, k: 3, synonyms: [] });
+      const realTable = rankFlowCards({ title: '冻结申请操作', taskDraft: '', cards, k: 3, synonyms: table.entries });
+      // query contains no bridge term literal → no entry may fire (term-presence precondition)
+      assert.deepEqual(legacy, emptyTable, 'empty table must equal legacy');
+      assert.deepEqual(legacy, realTable, 'real table must be inert when no bridge term appears in the query');
+    });
+
     await runAsync('recall perf: 800-char single query under 200ms', async () => {
       const long = '维'.repeat(800);
       const t0 = Date.now();
