@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 22:05 · ZCode 引擎线 — 更正：18 动作矩阵 radio/select:tree 状态（用户确认）
+
+- 完成：用户确认 radio / select:tree **已在同事引擎最新（未推送）版本实现**——本仓克隆仅含远端唯一提交 2b22613。报告 `2026-09-10-tansun-engine-18-action-mapping-audit.md` 全线更正：矩阵 #14/#15 ❌→「待复验」（复验清单：event 字面量/object_value 读取/absent=skip/布尔伪成功）；§0/§2（仅剩 date）/§5（路线图 7 步重排）/§4 P5/§6 横切 1 同步改写；date（fill 日期升格）用户未提及，仍按缺失对待
+- 验收：git fetch 确认远端仅 2b22613（chore: initialize UI execution engine），无未拉取分支；更正逐条落档
+- 遗留移交：①同事推送后按矩阵 #14/#15 对齐清单复验；②date event 是否同步实现待确认；③JS-gen 侧 P1-P6 修复清单不变待开工；④本单元只提交 agent-log + 报告两文件，他线 WIP 未触碰未携带
+
 ## 2026-09-10 20:40 · ZCode 引擎线 — 开工+收工：18 动作映射支持矩阵调研（4 路并行子智能体，只读）
 
 - 完成：用户拉同事引擎仓 D:\dev\tansun_ui_engine 到本地，要求按 18 动作映射表（click/input/select:click/radio/select:tree + 前缀操作名样式）确保全部可执行——派 4 路只读子智能体（click 族 10 动作 / input-radio 族 6 动作 / 报文入口与执行链路 / JS-gen 推送侧转换器核对）调研完毕，汇总矩阵入库 `docs/superpowers/reports/2026-09-10-tansun-engine-18-action-mapping-audit.md`
