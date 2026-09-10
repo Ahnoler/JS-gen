@@ -1,0 +1,39 @@
+# T3 G1 盲判抽检（reviewer 独立子智能体，2026-09-10）
+
+## 抽检设计
+- 抽样：`g1-sample.mjs`（种子 SEED=20260910 可复现）从 245 条抽 15 条，**不含 v1 种子（seed:true）**，重心新标：A4/B4/E3/N3/D1（C 层未抽中，见遗留）。
+- 盲判纪律：盲判答案先固定写入 `g1-blind.json` 后才运行对照 `g1-grade.mjs`；全程未运行任何召回/匹配器实现；语料=84 卡词面 dump + data/kb/flows 原卡 + req through-chains。
+
+## 逐条比对（盲判 vs 实际 gold）
+
+| id | tier | 盲判 | 实际 gold | 一致 |
+|---|---|---|---|---|
+| A-024 | A | rating | rating, rating_flow | 分歧 |
+| D-002 | D | limit-ctrl-api-grant-use-one | 同 | ✓ |
+| N-040 | N | 拒答 | 同 | ✓ |
+| A-011 | A | collateral_seizure | 同 | ✓ |
+| A-003 | A | guaranty_contract | 同 | ✓ |
+| E-050 | E | portal-personalization | 同 | ✓ |
+| N-029 | N | 拒答 | 同 | ✓ |
+| E-004 | E | collateral_seizure | 同 | ✓ |
+| B-024 | B | disburse-entrusted-payment | 同 | ✓ |
+| E-028 | E | loan-corp-syndicate-lead-apply | 同 | ✓ |
+| B-030 | B | product_library | 同 | ✓ |
+| B-039 | B | system-mgmt-base-mgmt | 同 | ✓ |
+| N-011 | N | 拒答 | 同 | ✓ |
+| A-017 | A | customer_query | 同 | ✓ |
+| B-013 | B | credit_usage | 同 | ✓ |
+
+**SAMPLED=15 AGREED=14 DISAGREED=1 RATE=6.7% ≤ 10% → G1 PASS**
+
+## 唯一分歧分析
+A-024「对公客户评级」：语料天然双指（rating 卡菜单名 + rating_flow 卡流程名词干）；标注已用双 gold [rating, rating_flow] 收敛，multi-gold 按任一命中计分。reviewer 结论：**合理歧义已正确处理，不是标注错误，不进 relabels/excluded**。
+
+## 顺带核查（全成立）
+1. E-019 换靶（押品账册分开查分开导出→collateral-func-ledger）✓；N-034 换靶（信贷档案借阅→拒答，与权证借阅构成 near-miss 竞争面）✓。
+2. excluded 4 条均为真歧义（征信 8 卡命中/签合同三卡/查额度两卡/客户管理=域节点）✓。
+3. 完整性：245 条口径一致、冻结元数据完整、relabels 空、gold 覆盖 83/84 卡（唯一未覆盖 system-mgmt-route-mgmt 薄卡合理）、N 层 55 条全 gold=[]。
+
+## 遗留（移交 reviewer 正式 G1）
+- C 层（多卡场景层，最难）未被抽中；正式 G1 可对 C 层单独加抽 3-5 条。
+- E 层子串级桥词（法院/借款人/发布/评级/分组/集团/关系）在全词 ban-check 规则下放行，T2-labeling-log 已逐条登记；正式 G1 若判强桥词可走 relabels。
