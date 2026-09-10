@@ -2,7 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
-**Goal:** 把召回评测集从 130 条扩到 **≥230 条**（v1 原样保留 + 新增 ≥100 条全独立，含口语层 E ≥50、负样本 ≥50），把门禁切到 v2 并**重测阈值**，最后用「**旧集建表 → 新集验证**」给 T3 受控词表一个干净的泛化判决。
+**Goal:** 把召回评测集从 130 条扩到 **目标 245 / 底线 ≥235**（v1 原样保留 + 新增 ≥105 条全独立，含口语层 **E ≥50（三子模式各 ≥15）**、负样本 **N ≥55（近域 25）**），把门禁切到 v2 并**重测阈值**，最后用「**旧集建表 → 新集验证**」给 T3 受控词表一个干净的泛化判决。
+
+## Approved Decisions（2026-09-10 Lead 裁定：全部按 reviewer 推荐）
+
+| # | 决策 | 采纳结论 |
+|---|---|---|
+| A1 | v2 构成 | v1 130 条**原样保留**（机械 diff 0 差异）+ 新增 **≥105** 全独立；`relabels` 默认空 |
+| A2 | E 层 | **≥50 且三子模式各 ≥15**（synonym / verb / domain 口语），带 `pattern` 字段 |
+| A3 | N 层 | **≥55**（跨域 30 + 近域 25）；保留 N-002 类靶子 |
+| A4 | 层目标 | A≥55 / B≥45 / C≥20 / D≥20 / E≥50 / N≥55 → 目标 245、底线 ≥235 |
+| A5 | A 层下限 | **批准 `A ≥ 0.95`**，与 v2 门禁同批落地 |
+| A6 | 阈值 | **先测后定、不继承 v1 floor**；对跑表先出，Lead 批准后写入 |
 
 **Architecture:** 纯**数据与门禁**工程——不改召回算法、不引依赖、不接线 `propose.js`。新增一个冻结评测集文件，门禁**显式**指向它；runner 默认仍指 v1 以保历史对跑。
 
@@ -59,8 +70,9 @@ node -e "const f=require('./scripts/characterization/fixtures/kb-recall-eval.v1.
 | C 场景长句 | 20 | v1 15 原样 + 新增 5 |
 | D 别名/短码 | 20 | v1 15 原样 + 新增 5 |
 | **E 口语改写（新层）** | **≥50** | 全新 |
-| N 负样本 | **≥50**（跨域 30 + 近域 20） | v1 30 原样 + 近域新增 20 |
-| **合计** | **≥230**，正 ≥180 / 负 ≥50 | |
+| E 口语改写 | **≥50**（三子模式各 ≥15，带 `pattern`） | 全新 |
+| N 负样本 | **≥55**（跨域 30 + 近域 25） | v1 30 原样 + 近域新增 25 |
+| **合计** | **目标 245 / 底线 ≥235**（正 ≥180 / 负 ≥55） | v1 130 原样 + 新增 ≥105 |
 
 覆盖约束：正样本 ≥70 卡；单卡 ≤4；query 无重复。
 
@@ -105,7 +117,7 @@ node -e "const f=require('./scripts/characterization/fixtures/kb-recall-eval.v2.
 
 - [ ] **Step 4: Commit**
 
-**DoD**：条目 ≥230；E ≥50；N ≥50（含近域 20）；覆盖 ≥70 卡；单卡 ≤4；dups=0。
+**DoD**：条目 **≥235**（目标 245）；A≥55/B≥45/C≥20/D≥20/**E≥50（三子模式各 ≥15）**/**N≥55（近域 25）**；覆盖 ≥70 卡；单卡 ≤4；dups=0；**v1 保真 diff=0**。
 
 ---
 
@@ -172,7 +184,7 @@ node scripts/kb/recall-eval.mjs --fixture scripts/characterization/fixtures/kb-r
 |---|---|---|---|
 | 0 | v1 盘点 | 130 / A40B30C15D15N30 / 62 卡 | `T0-inventory.txt` |
 | 1 | 保真校验 | **diffs=0，count=130/130** | `T1-fidelity.txt` |
-| 2 | 结构自检 | 条目 ≥230；E ≥50；N ≥50；≥70 卡；单卡 ≤4；dups=0 | `T2-struct.txt` |
+| 2 | 结构自检 | 条目 ≥235；E ≥50（三子模式各 ≥15）；N ≥55；≥70 卡；单卡 ≤4；dups=0 | `T2-struct.txt` |
 | 3 | reviewer 抽检 | 15 条分歧 ≤10% | `T3-blind-review.txt` |
 | 4 | 门禁自证 | 阈值 +0.2 必红；还原绿；`--baseline` exit 0 | `T4-selfproof.txt` |
 | 5 | T3 重评 | v2 上独立正增量 > 0 且无退化 | `T5-on.json` / `T5-off.json` |
