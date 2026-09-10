@@ -55,13 +55,29 @@ def test_affordances_source_shape():
 
 
 def fill_all():
-    p = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    p = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            p += _fpath.read_text(encoding="utf-8")
     return p.split("class FillEngine", 1)[1].split("class SelectEngine", 1)[0]
 
 
 def test_final_review_fixes():
     src_all = MOD.read_text(encoding="utf-8")
-    adj = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    adj = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            adj += _fpath.read_text(encoding="utf-8")
     sv = (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
     dupe = (ROOT / "scripts/controller/actions/duplicate_failure_cue.py").read_text(encoding="utf-8")
     form_prompt = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")

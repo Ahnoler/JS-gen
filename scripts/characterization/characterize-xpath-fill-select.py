@@ -89,9 +89,15 @@ def test_fill_by_xpath_prefers_form_label_hint() -> None:
 
 
 def test_replay_fill_passes_label_as_xpath_hint() -> None:
-    engines_src = (
-        ROOT / "scripts/controller/actions/form_action_engines.py"
-    ).read_text(encoding="utf-8")
+    engines_src = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            engines_src += _fpath.read_text(encoding="utf-8")
     fill_replay = engines_src.split("async def _fill_form_field_replay_impl", 1)[1].split(
         "async def check_field_value", 1
     )[0]
@@ -127,9 +133,15 @@ def test_replay_fill_passes_label_as_xpath_hint() -> None:
 
 
 def test_replay_select_uses_trigger_by_xpath() -> None:
-    engines_src = (
-        ROOT / "scripts/controller/actions/form_action_engines.py"
-    ).read_text(encoding="utf-8")
+    engines_src = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            engines_src += _fpath.read_text(encoding="utf-8")
     select_impl = engines_src.split("async def _select_option_impl", 1)[1].split(
         "async def tssc_multi_select", 1
     )[0]
@@ -159,9 +171,9 @@ def test_replay_select_uses_trigger_by_xpath() -> None:
         "legacy-sentinel" in select_fn or "ok-already" in select_fn.split("bad_option_text")[0],
         "replay select soft-accepts sentinel when field already has a value",
     )
-    el_select_ladder = select_fn.split(
-        "return await _with_xpath_first(_tssc_via_select_option)", 1
-    )
+    # Legacy tssc branch no longer returns via _with_xpath_first; the el-select
+    # ladder is everything after the tssc dispatch branch in select_fn.
+    el_select_ladder = select_fn.split('if dispatch.path == "tssc":', 1)
     el_select_body = el_select_ladder[1] if len(el_select_ladder) > 1 else select_fn
     assert_true(
         "_with_xpath_first" not in el_select_body,
@@ -176,8 +188,17 @@ def test_replay_select_uses_trigger_by_xpath() -> None:
 def test_xpath_date_radio_helpers() -> None:
     assert_true(hasattr(sn, "JS_FILL_DATE_BY_XPATH"), "JS_FILL_DATE_BY_XPATH")
     assert_true(hasattr(sn, "JS_CLICK_RADIO_BY_XPATH"), "JS_CLICK_RADIO_BY_XPATH")
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )

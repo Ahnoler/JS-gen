@@ -24,12 +24,21 @@ def _norm(s: str) -> str:
 
 
 def test_select_tree_option_resolves_and_captures_xpath() -> None:
-    form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
-        + "\n"
-        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    )
-    chunk = form.split("async def select_tree_option", 1)[1].split("async def ", 1)[0]
+    # Ordered concat read of the (split) form action engines — see
+    # docs/superpowers/specs/2026-09-10-form-action-engines-split-design.md §3.
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
+    form += "\n" + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    # Anchor with "(" so the split lands on select_tree_option, not the
+    # earlier-added select_tree_option_for_replay wrapper (pre-existing fix).
+    chunk = form.split("async def select_tree_option(", 1)[1].split("async def ", 1)[0]
     norm = _norm(chunk)
     assert_true("_resolve_control" in chunk, "select_tree_option must resolve control xpath")
     assert_true(

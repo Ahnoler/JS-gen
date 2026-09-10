@@ -78,8 +78,17 @@ def test_reset_persistent_false_after_both_attempts() -> None:
 
 
 def test_direct_persistent_reset_gates_before_resolve() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -223,8 +232,17 @@ def test_replay_branch_reset_before_pick_validation() -> None:
 
 
 def test_direct_reset_before_resolve_and_gates_trigger() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -259,8 +277,17 @@ def test_direct_reset_before_resolve_and_gates_trigger() -> None:
 
 
 def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -316,8 +343,17 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
 
 
 def test_recording_and_replay_use_reset_boundary() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -423,8 +459,17 @@ def test_prompt_serializes_select_and_forbids_invented_xpath() -> None:
 
 
 def test_direct_select_wires_runtime_fallback_only() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )

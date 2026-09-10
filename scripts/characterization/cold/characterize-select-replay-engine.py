@@ -24,9 +24,15 @@ def phase_b_select_option_uses_engine() -> bool:
     if "page.evaluate(JS_SELECT_OPTION" in body or "page.evaluate(JS_TSSC_MULTI_SELECT" in body:
         print("FAIL: replay select_option still evaluates JS_* directly")
         return False
-    engines = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(
-        encoding="utf-8"
-    )
+    engines = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            engines += _fpath.read_text(encoding="utf-8")
     if "mode" not in engines or "replay" not in engines:
         print("FAIL: SelectEngine missing replay mode")
         return False

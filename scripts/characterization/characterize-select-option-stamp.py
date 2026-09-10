@@ -49,9 +49,15 @@ def test_resolve_recorded_option_text() -> None:
 
 
 def test_select_option_already_matched_stamps_concrete() -> None:
-    engines = (
-        ROOT / "scripts/controller/actions/form_action_engines.py"
-    ).read_text(encoding="utf-8")
+    engines = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            engines += _fpath.read_text(encoding="utf-8")
     class_idx = engines.find("class SelectEngine")
     assert_true(class_idx >= 0, "SelectEngine class present")
     idx = engines.find("async def select_option(", class_idx)
@@ -81,9 +87,15 @@ def test_select_option_already_matched_stamps_concrete() -> None:
 
 
 def test_tssc_multi_select_stamps_concrete() -> None:
-    engines = (
-        ROOT / "scripts/controller/actions/form_action_engines.py"
-    ).read_text(encoding="utf-8")
+    engines = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            engines += _fpath.read_text(encoding="utf-8")
     idx = engines.find("async def tssc_multi_select(")
     assert_true(idx >= 0, "tssc_multi_select present")
     end = engines.find("class RadioEngine", idx)

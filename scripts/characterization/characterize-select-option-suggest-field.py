@@ -35,7 +35,6 @@ from scripts.controller.actions.select_match import (  # noqa: E402
 )
 
 SELECT_MATCH = ROOT / "scripts" / "controller" / "actions" / "select_match.py"
-FORM_ENGINE = ROOT / "scripts" / "controller" / "actions" / "form_action_engines.py"
 LLM_VALUES = ROOT / "scripts" / "controller" / "actions" / "_llm_values.py"
 AGENT_CORE = ROOT / "scripts" / "prompts" / "agent-core.md"
 AGENT_TOOLS_FORM = ROOT / "scripts" / "prompts" / "agent-tools-form.md"
@@ -171,7 +170,15 @@ def test_suggest_exact_priority() -> None:
 # ── 3. form_action_engines.py — C2 wiring markers ─────────────────────────
 
 def test_form_engine_next_action_wiring() -> None:
-    text = FORM_ENGINE.read_text(encoding="utf-8")
+    text = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            text += _fpath.read_text(encoding="utf-8")
     assert_true(
         "def _select_failure_next_action(" in text,
         "_select_failure_next_action defined",

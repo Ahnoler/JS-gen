@@ -33,11 +33,21 @@ def assert_true(cond: bool, msg: str) -> None:
 
 # ── 1. click_adjacent_button evaluate JS ─────────────────────────────────────
 
-FORM_ENGINE = ROOT / "scripts" / "controller" / "actions" / "form_action_engines.py"
+# Ordered concat read of the (split) form action engines — see
+# docs/superpowers/specs/2026-09-10-form-action-engines-split-design.md §3.
+FORM_ENGINE_TEXT = ""
+for _fname in (
+    "form_engine_base.py", "login_engine.py", "fill_engine.py",
+    "select_engine.py", "radio_engine.py", "tree_engine.py",
+    "form_action_engines.py",
+):
+    _fpath = ROOT / "scripts" / "controller" / "actions" / _fname
+    if _fpath.exists():
+        FORM_ENGINE_TEXT += _fpath.read_text(encoding="utf-8")
 
 
 def test_form_engine_multi_item_matching() -> None:
-    text = FORM_ENGINE.read_text(encoding="utf-8")
+    text = FORM_ENGINE_TEXT
     # Keyword button list must still be present.
     assert_true("'选择'" in text and "'引入'" in text and "'上传'" in text,
                 "keyword button list preserved")
@@ -96,7 +106,7 @@ def test_form_engine_disabled_no_button_skip() -> None:
     - return _ok(f'disabled-no-adjacent-button | <label>') (non-ok message,
       same _ok wrapper + non-recordable semantics as already-filled).
     """
-    text = FORM_ENGINE.read_text(encoding="utf-8")
+    text = FORM_ENGINE_TEXT
     # Marker strings present.
     assert_true("disabled-no-adjacent-button" in text,
                 "disabled-no-adjacent-button skip marker present")

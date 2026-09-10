@@ -68,7 +68,17 @@ def test_xpath_smart_fill_only_flag() -> None:
         else:
             os.environ["XPATH_SMART_FILL_ONLY"] = prev
 
-    form_src = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    # Ordered concat read of the (split) form action engines — see
+    # docs/superpowers/specs/2026-09-10-form-action-engines-split-design.md §3.
+    form_src = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form_src += _fpath.read_text(encoding="utf-8")
     assert_true(
         "xpath_smart_fill_only_enabled" in form_src,
         "fill_form_field gates on xpath_smart_fill_only_enabled",

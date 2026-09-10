@@ -28,8 +28,17 @@ def assert_true(cond: bool, msg: str) -> None:
 
 
 def main() -> int:
+    form_py = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / 'scripts/controller/actions' / _fname
+        if _fpath.exists():
+            form_py += _fpath.read_text(encoding='utf-8')
     form_py = (
-        (ROOT / 'scripts/controller/actions/form_action_engines.py').read_text(encoding='utf-8')
+        form_py
         + (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
         + (ROOT / 'scripts/controller/actions/form_autofill.py').read_text(encoding='utf-8')
     )

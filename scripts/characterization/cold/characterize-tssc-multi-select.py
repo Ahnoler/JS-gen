@@ -46,9 +46,17 @@ def no_agent_tssc_action():
 
 
 def tssc_records_select_option():
-    src = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(
-        encoding="utf-8"
-    )
+    # Ordered concat read (split design §3): base → login → fill → select →
+    # radio → tree → barrel tail; missing files skipped.
+    src = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            src += _fpath.read_text(encoding="utf-8")
     m = re.search(
         r"async def tssc_multi_select\b.*?(?=\n    async def |\nclass |\Z)",
         src,
@@ -102,6 +110,40 @@ def prompt_d6_pack():
     return True
 
 
+def engines_needles():
+    """Ordered concat read of the form engine files (split design §3).
+
+    Replaces the former checks entry for form_action_engines.py: missing
+    files are skipped so the concat equals the original file until the
+    split lands.
+    """
+    src = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            src += _fpath.read_text(encoding="utf-8")
+    for t in (
+        "async def tssc_multi_select",
+        "form_tssc_multi_select",
+        "JS_TSSC_MULTI_SELECT",
+        "resolve_select_dispatch",
+        "return await self.tssc_multi_select(",
+        "lookup_field_kind",
+        "tssc-multi-select",
+        "err-use-tssc-multi-select",
+        "Do NOT fill_form_field",
+        "resolve_recorded_option_text",
+    ):
+        if t not in src:
+            print("MISSING scripts/controller/actions/form_action_engines :: %r" % (t,))
+            return False
+    return True
+
+
 checks = [
     ("scripts/controller/actions/js_snippets/tssc_multi_select.py", (
         "JS_TSSC_MULTI_SELECT",
@@ -119,18 +161,6 @@ checks = [
         '"tssc-multi-select"',
         "FieldKind",
         "ScannedField",
-    )),
-    ("scripts/controller/actions/form_action_engines.py", (
-        "async def tssc_multi_select",
-        "form_tssc_multi_select",
-        "JS_TSSC_MULTI_SELECT",
-        "resolve_select_dispatch",
-        "return await self.tssc_multi_select(",
-        "lookup_field_kind",
-        "tssc-multi-select",
-        "err-use-tssc-multi-select",
-        "Do NOT fill_form_field",
-        "resolve_recorded_option_text",
     )),
     ("scripts/models/action.py", ("tssc_multi_select",)),
     ("scripts/event_dispatch.py", ("tssc_multi_select",)),
@@ -166,6 +196,7 @@ checks = [
 ]
 
 ok = all(needle(path, *texts) for path, texts in checks)
+ok = ok and engines_needles()
 ok = ok and classify_before_el_select()
 ok = ok and no_agent_tssc_action()
 ok = ok and tssc_records_select_option()

@@ -29,18 +29,40 @@ ENGINES = os.path.join(ROOT, "scripts", "controller", "actions", "form_action_en
 TABLE = os.path.join(ROOT, "scripts", "controller", "actions", "_table.py")
 PICKER = os.path.join(ROOT, "scripts", "controller", "actions", "js_snippets", "picker_confirm.py")
 
+# Ordered concat read (split design §3): base → login → fill → select → radio
+# → tree → barrel tail. Missing files are skipped so the concat equals the
+# original form_action_engines.py until the split lands.
+ENGINES_PARTS = (
+    "form_engine_base.py", "login_engine.py", "fill_engine.py",
+    "select_engine.py", "radio_engine.py", "tree_engine.py",
+    "form_action_engines.py",
+)
+
+
+def _engines_text():
+    src = ""
+    for _fname in ENGINES_PARTS:
+        _fpath = os.path.join(ROOT, "scripts", "controller", "actions", _fname)
+        if os.path.exists(_fpath):
+            with open(_fpath, "r", encoding="utf-8") as f:
+                src += f.read()
+    return src
+
+
 FAILURES = []
 
 
-def _pin(label, path, needles):
-    with open(path, "r", encoding="utf-8") as f:
-        text = f.read()
+def _pin(label, path, needles, text=None):
+    if text is None:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read()
     for needle in needles:
         if needle not in text:
             FAILURES.append(f"{label}: {os.path.basename(path)} missing {needle!r}")
 
 
 def main():
+    engines_text = _engines_text()
     # N1: filterable-typed fallback present in the select engine...
     _pin("N1-new", ENGINES, [
         "JS_SELECT_FILTERABLE_TYPED",
@@ -50,7 +72,7 @@ def main():
         "setNativeValue(trigger, '')",
         "setTimeout(resolve, 300)",  # round-3: 600ms one-shot read → 300ms poll
         "Date.now() + 1800",  # round-3: poll window 1.8s (fits 5s action budget)
-    ])
+    ], text=engines_text)
     # ...and the original select_option paths are untouched.
     _pin("N1-orig", ENGINES, [
         "select_result.startswith('option-not-found:')",
@@ -58,7 +80,7 @@ def main():
         "fuzzy-matched-from:",
         "err-select-option-unresolved",
         "JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text]",
-    ])
+    ], text=engines_text)
     # N4: paged-traverse fallback for paginated el-select (round-5).
     _pin("N4-new", ENGINES, [
         "JS_SELECT_PAGED_TRAVERSE",
@@ -67,7 +89,7 @@ def main():
         "select-paged-no-pagination",
         "wrap.scrollTop = 0",
         "budget_for('select_option')",
-    ])
+    ], text=engines_text)
     # N2: explicit zero-row failure + visibility filter in the radio engine...
     _pin("N2-new", TABLE, [
         "err-no-row-match",

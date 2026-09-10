@@ -82,8 +82,17 @@ def _norm(s: str) -> str:
 
 
 def test_form_fill_passes_xpath_to_capture() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -95,8 +104,17 @@ def test_form_fill_passes_xpath_to_capture() -> None:
 
 
 def test_select_option_passes_xpath_to_capture() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -109,8 +127,17 @@ def test_select_option_passes_xpath_to_capture() -> None:
 
 
 def test_click_radio_passes_xpath_to_capture() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -188,8 +215,17 @@ def test_stamp_rejects_weak_fallback() -> None:
 
 
 def test_form_record_params_omit_xpath_smart() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -212,8 +248,17 @@ def test_form_record_params_omit_xpath_smart() -> None:
 
 def test_form_resolved_paths_record_with_element() -> None:
     """Resolved write paths capture element and pass element= to _record_action (no params xpath)."""
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -234,8 +279,17 @@ def test_form_resolved_paths_record_with_element() -> None:
 
 
 def test_select_option_records_with_element() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )
@@ -248,8 +302,17 @@ def test_select_option_records_with_element() -> None:
 
 
 def test_select_tree_option_fill_fallback_xpath_parity() -> None:
+    form = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            form += _fpath.read_text(encoding="utf-8")
     form = (
-        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        form
         + "\n"
         + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     )

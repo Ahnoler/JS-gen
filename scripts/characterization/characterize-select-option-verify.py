@@ -122,11 +122,16 @@ def test_js_select_option_all_return_points_verified() -> None:
 
 # ── 2. form_action_engines value-mismatch retry branch ──────────────────────
 
-FORM_ENGINE = ROOT / "scripts" / "controller" / "actions" / "form_action_engines.py"
-
-
 def test_form_engine_value_mismatch_branch() -> None:
-    text = FORM_ENGINE.read_text(encoding="utf-8")
+    text = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            text += _fpath.read_text(encoding="utf-8")
     # Locate select_option body.
     class_idx = text.find("class SelectEngine")
     assert_true(class_idx >= 0, "SelectEngine class present")
@@ -333,7 +338,15 @@ def test_prompts_have_same_prefix_guidance() -> None:
 
 
 def test_protocol_envelopes_wired():
-    src = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    src = ""
+    for _fname in (
+        "form_engine_base.py", "login_engine.py", "fill_engine.py",
+        "select_engine.py", "radio_engine.py", "tree_engine.py",
+        "form_action_engines.py",
+    ):
+        _fpath = ROOT / "scripts/controller/actions" / _fname
+        if _fpath.exists():
+            src += _fpath.read_text(encoding="utf-8")
     sel = src.split("class SelectEngine", 1)[1].split("class RadioEngine", 1)[0]
     fill = src.split("class FillEngine", 1)[1].split("class SelectEngine", 1)[0]
     assert_true("err-select-option-unresolved" in sel, "select tail envelope")

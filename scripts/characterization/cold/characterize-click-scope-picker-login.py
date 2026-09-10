@@ -24,7 +24,18 @@ sys.path.insert(0, ROOT)
 
 MISC = os.path.join(ROOT, "scripts", "controller", "actions", "_misc.py")
 CLICK_ENGINE = os.path.join(ROOT, "scripts", "controller", "actions", "click_action_engine.py")
-ENGINES = os.path.join(ROOT, "scripts", "controller", "actions", "form_action_engines.py")
+# Ordered concat read of the (split) form action engines — see
+# docs/superpowers/specs/2026-09-10-form-action-engines-split-design.md §3.
+ENGINES = ""
+for _fname in (
+    "form_engine_base.py", "login_engine.py", "fill_engine.py",
+    "select_engine.py", "radio_engine.py", "tree_engine.py",
+    "form_action_engines.py",
+):
+    _fpath = os.path.join(ROOT, "scripts", "controller", "actions", _fname)
+    if os.path.exists(_fpath):
+        with open(_fpath, "r", encoding="utf-8") as f:
+            ENGINES += f.read()
 WORKSPACE = os.path.join(ROOT, "scripts", "controller", "actions", "_workspace.py")
 PICKER = os.path.join(ROOT, "scripts", "controller", "actions", "js_snippets", "picker_confirm.py")
 ICONS = os.path.join(ROOT, "scripts", "controller", "actions", "js_snippets", "icons.py")
@@ -69,14 +80,16 @@ def main():
         "err-refill-not-verified",
         "JS_PICKER_DIALOG_SELECT, [dialog_name, row_text]",
     ])
-    # G5: login orphan-chrome reuse probe.
-    _pin("G5", ENGINES, [
+    # G5: login orphan-chrome reuse probe (ENGINES is the ordered concat text).
+    for needle in [
         "ok-login reuse",
         "already-logged-in",
         "_usertoken",
         "localStorage.clear()",
         "_wait_for_login_form(page)",
-    ])
+    ]:
+        if needle not in ENGINES:
+            FAILURES.append(f"G5: form_action_engines.py missing {needle!r}")
     # icons.py: constants must keep their original names.
     _pin("icons", ICONS, [
         "JS_STAMP_ICON_ARIA_LABELS",

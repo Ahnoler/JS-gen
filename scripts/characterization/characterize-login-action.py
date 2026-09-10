@@ -6,11 +6,18 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-form = (
-    (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
-    + "\n"
-    + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-)
+# Ordered concat read of the (split) form action engines — see
+# docs/superpowers/specs/2026-09-10-form-action-engines-split-design.md §3.
+form = ""
+for _fname in (
+    "form_engine_base.py", "login_engine.py", "fill_engine.py",
+    "select_engine.py", "radio_engine.py", "tree_engine.py",
+    "form_action_engines.py",
+):
+    _fpath = ROOT / "scripts/controller/actions" / _fname
+    if _fpath.exists():
+        form += _fpath.read_text(encoding="utf-8")
+form += "\n" + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
 
 
 def assert_true(cond: bool, msg: str) -> None:
