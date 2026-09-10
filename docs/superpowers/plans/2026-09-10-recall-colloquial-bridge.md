@@ -10,6 +10,16 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-10-recall-colloquial-bridge-design.md`
 
+## Approved Decisions（2026-09-10 Lead 裁定：全部按 reviewer 推荐）
+
+| # | 决策 | 采纳结论 |
+|---|---|---|
+| B1 | 方向重定位 | 口语桥接为主；**BM25 押后**；**embedding 另立项**（不做） |
+| B2 | E 层目标 | **≥0.25**（现 0.100），刻意压低防过拟合 |
+| B3 | 素材配比 | **A+B ≥60%、C（wet-test drift）≤40%**；每条 C 引到「模块 + 叶号」 |
+| B4 | 接线 | **达标即授权**（条件见 B5）；**独立 commit** 便于回退 |
+| B5 | 接线验收（新增） | 除门禁 5 passed 外，须有**端到端证据**：真实 `proposeDraftTrajectories`（tmp 副本 + 假 LLM）证明桥接表被加载且 `moduleKey` scope 门控生效 |
+
 **v2 基线（门禁现行）**：Acc@1 **0.600** · Recall@5 0.725 · MRR@5 0.653 · nDCG@5 0.667 · 拒答 **0.382**；分层 A **1.00** / B 0.400 / C 0.900 / D 0.900 / **E 0.100**；FP 集合 34 条。
 
 ## Global Constraints
@@ -83,7 +93,7 @@ node scripts/characterization/characterize-kb-recall-eval.mjs   # 期望 5 passe
 
 - [ ] **Step 6: Commit**
 
-**DoD**：终表 40–80 条；**每条 source ∈ {corpus-card, corpus-req-doc, wet-test-drift}**；0 条来自评测失败；pin 全绿。
+**DoD**：终表 40–80 条；**每条 source ∈ {corpus-card, corpus-req-doc, wet-test-drift}**；**配比 A+B ≥60% / C ≤40%**（B3）；C 类每条引到「模块 + 叶号」；0 条来自评测失败；pin 全绿。
 
 ---
 
@@ -117,6 +127,7 @@ node scripts/kb/recall-eval.mjs --fixture scripts/characterization/fixtures/kb-r
 
 - [ ] **Step 1: 接线 `propose.js`**：加载 `data/kb/colloquial-bridge.json` + 传 `synonyms` 与 `moduleKey`（scope 门控）；**只新增参数与透传，不改既有语义**；开工声明已含该文件（A5 先例）
 - [ ] **Step 2: 空路径不变式**：桥接表缺失/损坏时退化为不扩展（warn 不红）
+- [ ] **Step 2b: 端到端证据（B5 硬要求）**：在 tmp 副本 + 假 LLM 上跑真实 `proposeDraftTrajectories`，证明 ① 桥接表被加载；② `moduleKey` 传入且 scope 门控生效（构造一条 scope 不匹配的条目验证不注入）；③ 无桥接表时行为与接线前一致
 - [ ] **Step 3: 复跑门禁**：`characterize-kb-recall-eval` 5 passed、`characterize-flow-card-recall` 26 passed、`--baseline` exit 0
 - [ ] **Step 4: Commit**（独立 commit，便于回退）
 
