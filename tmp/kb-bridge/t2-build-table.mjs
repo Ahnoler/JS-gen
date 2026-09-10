@@ -20,7 +20,13 @@
  * global-effect risk is covered by the term literal-presence precondition + the
  * zero-new-FP hard gate. The scope MECHANISM is pinned separately (see gate file).
  *
- * Run: node tmp/kb-bridge/t2-build-table.mjs
+ * WARNING (F-5): re-running this script REWRITES data/kb/colloquial-bridge.json and
+ * tmp/kb-bridge/T2-bridge.txt. The output MUST stay byte-identical to the archived
+ * asset (status:'archived' + archiveNote/archivedSemantics below must never be lost) —
+ * after a run, `git diff` on both targets must be EMPTY. If it is not, fix this
+ * script, never the table. `entries` sha256 must remain eb4ec272… (67).
+ *
+ * Run: node tmp/kb-bridge/t2-build-table.mjs   (idempotent no-op vs the archived asset)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -138,11 +144,15 @@ if (c / n > 0.4) { console.error(`C ratio ${(c / n).toFixed(3)} > 0.4`); process
 
 const table = {
   bridgeVersion: 'v1',
-  status: 'candidate',
+  status: 'archived',
   builtFrom: ['corpus-card', 'corpus-req-doc', 'wet-test-drift'],
   buildDiscipline: '禁止使用 kb-recall-eval.* 的任何条目作为建表依据（建表期物理隔离）；候选经双向校验（纯语料 grep，禁跑匹配器）+ 人工裁决；零 import 召回模块',
   scopePolicy: 'v1 全表 scope=null：冻结度量 harness（recall-eval.mjs）无 moduleKey 入口，scoped 条目在 T3 度量中不可能触发，故 v1 不设 scope；全局生效风险由「term 必须字面出现于查询」前提 + T3 零新增 FP 硬门覆盖；scope 门控机制另由 characterize-flow-card-recall pin 与 T4 B5 证明保留',
   entries,
+  // F-4/F-5: copied verbatim from the archived asset (data/kb/colloquial-bridge.json) —
+  // never reword these; a drift here means the next run un-archives the table.
+  archiveNote: '2026-09-10 T3 度量未达标（E 0.100<0.25；全新地面增量 0<4）→ 按计划跳过接线、本版不计成果；资产保留为无害（护栏全绿）但归档',
+  archivedSemantics: 'archived：不得接线，仅作续跑基线（reviewer F-4：loadSynonyms 不读 status，本标记为文档性、无强制力；loader 加 status 过滤=口径变更，等 Lead 批）',
 };
 writeFileSync('data/kb/colloquial-bridge.json', JSON.stringify(table, null, 2) + '\n');
 

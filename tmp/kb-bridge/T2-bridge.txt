@@ -15,7 +15,7 @@
    "abRatio": 0.881,
    "cRatio": 0.119
   },
-  "note": "裁决规则与逐条理由见 t2-build-table.mjs 头注释（grounding 断言强制回溯池内记录）"
+  "note": "汇总裁决原则见本脚本（t2-build-table.mjs）头注释——为汇总规则非逐条理由；grounding 断言强制回溯池内记录；reviewer F-3 口径：规则批量裁决+快速人工过一遍（~7 分钟），B 类 10 条中 4 条真词法同义"
  },
  "entries": [
   {
