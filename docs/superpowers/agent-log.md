@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 22:58 · Zcode — 开工：recall-eval-v2 评测集扩版+门禁切换+T3 重评（spec+plan 已批 A1–A6）
+
+- 工作范围：`scripts/characterization/fixtures/kb-recall-eval.v2.json`（新建）、`scripts/characterization/fixtures/kb-recall-v2-quota.md`（新建）、`scripts/characterization/characterize-kb-recall-eval.mjs`（T4 门禁切换）、`docs/superpowers/reports/2026-09-10-recall-eval-v2-report.md`（新建）、`docs/superpowers/todo-list.md`、`docs/superpowers/agent-log.md`、`tmp/kb-eval-v2/**`（证据）
+- 禁入区：`propose.js`、`kb-recall-eval.v1.json`（冻结一字不改）、`kb-recall-failures.v1.json`（只读建表集）、`data/kb/req/**`（只读）、`scripts/refactor/verify-all.sh`、`.cursor/`；工作区他线 WIP 12 项（agent-log archive 两删/plans 三改/classify.py/verify-all.sh/archive/logs 等不触碰不携带）
+- 执行方式：主线程单线推进 T0→T6 一 Task 一 commit；标注纪律=禁跑匹配器、gold 只从语料（84 卡+through-chains+湿测叶名）出发；建表隔离=词表/阈值构建期物理排除 v2；不引依赖、不改召回算法；阈值先测后定待 Lead 批
+
 ## 2026-09-10 22:50 · Zcode — 收工：recall-p0 closeout G3 收尾四项（回链 22:32 开工 `62fca4c5`）
 
 - 完成：依据 G3 结论 + Lead 裁定第三条路（机制保留/词表停用/不接线/T3 不计成果）落收尾四项——
