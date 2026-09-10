@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 17:59 · Cursor Lead — 开工：p2-batch-lease 录制期续租
+
+- 进行中：2026-09-10 17:59；根因=`BATCH_ITEM_LEASE_MS=600000` 录制中不续租，长跑 item 过期可被二次 claim
+- 范围：`src/dao/batch-recording-dao.js`、`src/services/trajectory/batch-record.js`、冷 pin、todo-list、本文件
+- 禁入区：classify/verify-all WIP、fill/select、`.cursor/`
+- 方式：TDD 加 `renewItemLease` + runRecord 周期续租（lease/3）→ 绿 pin → 收工
+
 ## 2026-09-10 17:57 · Cursor Lead — 收工：login-retry-heuristic 事件沉降 + 指数退避
 
 - 完成：回链开工 `0c697eba`；新建 `prepare-login-retry.js`；attach-runner 失败后 `wait_for_loading` settle + 指数退避（替代固定 8s）
