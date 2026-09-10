@@ -68,6 +68,7 @@ from .replay_wait import (  # noqa: F401  (re-exported for compat)
     _wait_after_tree_node_for_form,
 )
 
+from .click_action_engine import ClickEngine
 from .replay_click import _post_click_settle, _replay_click_by_index
 from .replay_form_action import _replay_form_action
 from .replay_table import _replay_table_row_radio
@@ -565,7 +566,10 @@ async def _replay_close_dialog_idempotent(page, entry, params, action_name, cont
                     )
                     sys.stderr.flush()
         if result is None and (_element_xpath_smart(entry) or click_params.get('text')):
-            result = await _replay_click_by_index(page, entry, click_params)
+            if action_name == 'click_button':
+                result = await ClickEngine.click_button_for_replay(page, entry, click_params)
+            else:
+                result = await _replay_click_by_index(page, entry, click_params)
             # close_dialog: dialog-scoped xpath often misses drawers
             # (Element UI reuses i.el-dialog__close inside drawer).
             # Fall back to CTRL/controller close which handles drawer.
@@ -641,7 +645,7 @@ async def replay_action_entries(
                 elif action_name == 'save_form_snapshot':
                     result = await _replay_verify_form_structure(page, params)
                 elif action_name == _CLICK_BY_INDEX:
-                    result = await _replay_click_by_index(page, entry, params)
+                    result = await ClickEngine.click_element_by_index_for_replay(page, entry, params)
                 elif action_name in (
                     'click_menu_item',
                     'click_button',
