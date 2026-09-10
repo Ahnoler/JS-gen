@@ -78,6 +78,7 @@ async function main() {
       buildFlowTemplateHint,
       applyFlowTemplateHintToDescription,
       getFlowTemplateHintForTrajectory,
+      tokenizeCodes,
     } = recallMod;
 
     await runAsync('getFlowCard reads card from temp dir', async () => {
@@ -344,6 +345,19 @@ async function main() {
       assert.equal(r.flowRef, null);
       assert.equal(r.score, null);
       assert.deepEqual(r.candidates, []);
+    });
+
+    await runAsync('code tokenizer splits camelCase and keeps whole token', async () => {
+      const t = tokenizeCodes('enqrPdInf');
+      assert.ok(t.has('enqrpdinf'), 'whole token kept (lowercased)');
+      for (const part of ['enqr', 'pd', 'inf']) assert.ok(t.has(part), 'camelCase part ' + part);
+      assert.ok(tokenizeCodes('W0').has('w0'), 'letter+digit run kept whole');
+      assert.ok(!tokenizeCodes('计算 2 加 3').has('2') && !tokenizeCodes('计算 2 加 3').has('3'), 'single chars dropped (no FP fuel)');
+    });
+
+    await runAsync('ASCII short-code query reaches its gold card (D-001 regression)', async () => {
+      const hit = matchFlowForAtom({ title: 'W0', taskDraft: '', cards: realCards });
+      assert.equal(hit.flowRef, 'session_login');
     });
 
     await runAsync('recall perf: 800-char single query under 200ms', async () => {

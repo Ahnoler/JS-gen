@@ -8,8 +8,6 @@ export const FLOW_TEMPLATE_MARKER = '【流程卡模板】';
 const FLOW_TEMPLATE_END_MARKER = '【/流程卡模板】';
 
 const CJK_RUN_RE = /[\u3400-\u9fff\u3040-\u30ff]+/g;
-const FS_CODE_RE = /FS\d+/gi;
-const ZJJK_CODE_RE = /ZJJK\d+/gi;
 /** Absolute score floors kept from the substring scorer (pin continuity). */
 const MIN_CARD_SCORE = 2;
 const MIN_NODE_SCORE = 1;
@@ -22,16 +20,46 @@ const MAX_TERM_LEN = 12;
 const MAX_PRECONDITIONS = 8;
 
 /**
- * Bigrams + whole codes of a text (card/node profile vocabulary).
+ * ASCII word tokens of a text (recall P0 lever 2, spec 2026-09-10-recall-p0-three-levers
+ * §6.2): alphanumeric runs split at camelCase/letter-digit boundaries, whole
+ * runs kept too, everything lowercased; runs/parts shorter than 2 chars are
+ * dropped (single digits/letters carry no recall signal and only feed false
+ * positives). Same-source contract: profileTokens (card side) and
+ * extractQueryTokens (query side) both consume this — a code visible on one
+ * side is tokenized identically on the other.
+ * @param {string} text Haystack or query text
+ * @returns {Set<string>} Lowercase tokens (whole runs + boundary parts)
+ */
+export function tokenizeCodes(text) {
+  const hay = String(text || '');
+  /** @type {Set<string>} */
+  const tokens = new Set();
+  for (const run of hay.match(/[A-Za-z0-9]+/g) || []) {
+    const low = run.toLowerCase();
+    if (low.length >= 2) tokens.add(low);
+    const parts = run
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/([A-Za-z])(\d+)/g, '$1 $2')
+      .replace(/(\d+)([A-Za-z])/g, '$1 $2')
+      .split(/\s+/);
+    for (const part of parts) {
+      const partLow = part.toLowerCase();
+      if (partLow.length >= 2 && partLow !== low) tokens.add(partLow);
+    }
+  }
+  return tokens;
+}
+
+/**
+ * ASCII code tokens + CJK bigrams of a text (card/node profile vocabulary).
  * @param {string} text Haystack text
- * @returns {Set<string>} Token set (lowercased bigrams + uppercased codes)
+ * @returns {Set<string>} Token set (lowercased bigrams + lowercased ASCII code tokens)
  */
 function profileTokens(text) {
   const hay = String(text || '');
   /** @type {Set<string>} */
   const tokens = new Set();
-  for (const m of hay.matchAll(FS_CODE_RE)) tokens.add(m[0].toUpperCase());
-  for (const m of hay.matchAll(ZJJK_CODE_RE)) tokens.add(m[0].toUpperCase());
+  for (const token of tokenizeCodes(hay)) tokens.add(token);
   for (const run of hay.match(CJK_RUN_RE) || []) {
     for (let i = 0; i + 2 <= run.length; i += 1) {
       tokens.add(run.slice(i, i + 2));
@@ -124,9 +152,10 @@ function corpusProfile(cards) {
 }
 
 /**
- * Tokenize a query: whole FS/ZJJK codes + CJK bigrams, with multi-char
- * semantic terms matched longest-first (consumed chars no longer feed shorter
- * tokens, so one long hit is not double-credited by its substrings).
+ * Tokenize a query: ASCII code tokens (camelCase-split, lowercased) + CJK
+ * bigrams, with multi-char semantic terms matched longest-first (consumed
+ * chars no longer feed shorter tokens, so one long hit is not double-credited
+ * by its substrings).
  * @param {string} text Query text
  * @param {Set<string>} semanticDict Raw card vocabulary terms
  * @returns {Map<string, number>} token → char length
@@ -135,8 +164,9 @@ function extractQueryTokens(text, semanticDict) {
   const hay = String(text || '');
   /** @type {Map<string, number>} */
   const tokens = new Map();
-  for (const m of hay.matchAll(FS_CODE_RE)) tokens.set(m[0].toUpperCase(), m[0].length);
-  for (const m of hay.matchAll(ZJJK_CODE_RE)) tokens.set(m[0].toUpperCase(), m[0].length);
+  for (const token of tokenizeCodes(hay)) {
+    if (!tokens.has(token)) tokens.set(token, token.length);
+  }
 
   for (const run of hay.match(CJK_RUN_RE) || []) {
     const consumed = new Uint8Array(run.length);
@@ -213,20 +243,36 @@ function nodeExcludedByPolarity(node, title) {
 /**
  * Best node for a scored card under the given query weights (spec §7.2):
  * node must clear MIN_NODE_SCORE and cover NODE_SCORE_RATIO of the card score.
+ * The ratio denominator is the node-expressible portion of the card score —
+ * weights of tokens that hit the card but cannot appear in any node haystack
+ * (e.g. a code living only in hash_markers) are excluded, so card-level
+ * identity codes cannot drown real node evidence. When every matched token is
+ * node-expressible the denominator equals cardScore (legacy behavior).
  * @param {{ card: object, stem: string|null, haystack: string, tokens: Set<string>, semanticTerms: string[] }} entry Corpus entry
  * @param {Map<string, number>} weights Query token weights
- * @param {number} cardScore Winning card score
+ * @param {number} cardScore Winning card score (unused when all tokens are node-expressible; kept for signature continuity)
  * @param {string} title Query title (polarity disambiguation)
  * @returns {string|null} Node id or null
  */
 function bestNodeIdFor(entry, weights, cardScore, title) {
+  const nodes = entry.card.nodes || [];
+  let nodeEligibleScore = 0;
+  for (const [token, weight] of weights) {
+    const matchable = nodes.some((node) => {
+      const nodeHay = buildNodeHaystack(node);
+      return token.length <= 2 ? nodeTokensFor(node).has(token) : nodeHay.includes(token);
+    });
+    if (matchable) nodeEligibleScore += weight;
+  }
+  const denominator = nodeEligibleScore > 0 ? nodeEligibleScore : cardScore;
+
   let bestNodeId = null;
   let bestNodeScore = 0;
 
-  for (const node of entry.card.nodes || []) {
+  for (const node of nodes) {
     if (nodeExcludedByPolarity(node, title)) continue;
     const nodeHay = buildNodeHaystack(node);
-    const nodeTokens = profileTokens(nodeHay);
+    const nodeTokens = nodeTokensFor(node);
     let nodeScore = 0;
     for (const [token, weight] of weights) {
       const hit = token.length <= 2
@@ -241,9 +287,28 @@ function bestNodeIdFor(entry, weights, cardScore, title) {
   }
 
   return bestNodeScore >= MIN_NODE_SCORE
-    && bestNodeScore >= cardScore * NODE_SCORE_RATIO
+    && bestNodeScore >= denominator * NODE_SCORE_RATIO
     ? bestNodeId
     : null;
+}
+
+/** Per-node token cache (node hayfields are static for a given node object). */
+const nodeTokensCache = new WeakMap();
+
+/**
+ * Cached profileTokens for a node's haystack (bestNodeIdFor runs the tokenized
+ * membership check twice — eligibility pass + scoring pass). Keyed by the node
+ * object; cloned corpora (cold runs) get their own entries and GC.
+ * @param {object} node Flow-card node
+ * @returns {Set<string>} Token set
+ */
+function nodeTokensFor(node) {
+  let set = nodeTokensCache.get(node);
+  if (!set) {
+    set = profileTokens(buildNodeHaystack(node));
+    nodeTokensCache.set(node, set);
+  }
+  return set;
 }
 
 /**

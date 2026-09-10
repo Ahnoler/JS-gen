@@ -24,6 +24,6 @@
     { "query": "电子签约", "expectFlowRef": "electronic_signing", "expectNodeId": null },
     { "query": "委托支付", "expectFlowRef": "disburse-entrusted-payment", "expectNodeId": "受托支付信息主页-主链3", "pyFlowRef": null, "divergenceAccepted": true, "divergenceReason": "py 关键词层未覆盖该短查询（score 0 无命中）；js 命中受托支付卡；py 侧改造另议（D3）" },
     { "query": "客户集团通用集团查询", "expectFlowRef": "customer-group-general-group", "expectNodeId": "总集团查看关系弹窗", "pyFlowRef": "customer_query", "divergenceAccepted": true, "divergenceReason": "py 词条噪声落客户查询；js 命中通用集团卡；py 侧改造另议（D3）" },
-    { "query": "在 ZJJK00066153 页面新增客户", "expectFlowRef": "customer_onboarding", "expectNodeId": "check_drawer", "note": "ZJJK 码整词匹配" }
+    { "query": "在 ZJJK00066153 页面新增客户", "expectFlowRef": "customer_onboarding", "expectNodeId": "list", "note": "ZJJK 码整词匹配（recall P0 T2：码 token 激活后命中码所在 list 节点=查询所指页面起点；旧 check_drawer 系码 token 大小写失配死亡时的 bigram 巧合，py 侧不断言 nodeId 不受影响）" }
   ]
 }
