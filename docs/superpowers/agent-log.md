@@ -1,5 +1,10 @@
 # Agent 协作日志
 
+## 2026-09-10 22:20 · ZCode 引擎线 — 范围指示（记住）：只补全操作
+
+- 用户指示："我们只补全操作。不需要做别的事情。"——tansun_ui_engine 集成只新增映射表要求的缺失操作类型/handler 使 18 动作可执行；对方引擎其余代码/架构/bug（如 checkSelect 布尔伪成功）不动；JS-gen 推送侧 P1-P6（报告 §4）与消歧/沉降/absent=skip 等打磨项（报告 §5 尾步）均超出范围，勿再主动提议
+- 落档：报告头部新增范围约定（§4/§5 超出项仅作参考存档）+ 记忆 feedback:tansun-scope-operations-only；本单元只提交 agent-log + 报告两文件，他线 WIP 未触碰
+
 ## 2026-09-10 22:05 · ZCode 引擎线 — 更正：18 动作矩阵 radio/select:tree 状态（用户确认）
 
 - 完成：用户确认 radio / select:tree **已在同事引擎最新（未推送）版本实现**——本仓克隆仅含远端唯一提交 2b22613。报告 `2026-09-10-tansun-engine-18-action-mapping-audit.md` 全线更正：矩阵 #14/#15 ❌→「待复验」（复验清单：event 字面量/object_value 读取/absent=skip/布尔伪成功）；§0/§2（仅剩 date）/§5（路线图 7 步重排）/§4 P5/§6 横切 1 同步改写；date（fill 日期升格）用户未提及，仍按缺失对待
