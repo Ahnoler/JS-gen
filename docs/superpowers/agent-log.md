@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 13:44 · ZCode — 开工：KB 召回评测 T4 门禁写入（G1/G2 已 PASS）
+
+- 进行中：13:44；G1 PASS（reviewer 11/11 新标一致 0 分歧）+ G2 PASS（阈值无条件批准，见 `reports/2026-09-09-kb-recall-eval-g1-g2.md`）→ T4 放行
+- 范围：`scripts/characterization/characterize-kb-recall-eval.mjs`（新建门禁）、`scripts/kb/recall-eval.mjs`（仅 JSDoc 口径说明+byTier 输出，算法不动）、`scripts/characterization/fixtures/kb-recall-eval.v1.json`（仅 seed 字段统一，条目/gold 不动）、`scripts/refactor/verify-all.sh`（**只追加一行，独立 commit**）、本文件
+- 禁入区：他线 5 红（step-highlight/layer-tree/export-v3/confirm-notification/network-capture）**不修**；`propose.js`；`data/kb/**` 只读；`.cursor/`；fill/select/radio/stc 热区；评测集条目与 gold 不动（reviewer 更正：runner `execSync` EPERM 系其沙箱所致，撤回阻断项，不为此改代码）
+- 方式：门禁复用 runner 指标引擎（runRecallEval/compareWithBaseline 单一算法源）→ 自证阈值+0.2 必红→还原绿 → verify-all 注册行独立 commit → 三条非阻塞建议顺手落地 → T4 报告交 G3
+
 ## 2026-09-10 11:00 · Cursor Lead — 收工：legacy tssc_multi_select 经 SelectEngine（回链 10:58）
 
 - 完成：`replay_form_action` 历史分支 → `SelectEngine.select_option_for_replay`；移除直调 `JS_TSSC`；升级 `characterize-select-replay-engine`；契约 §2.4 + select unify 兼容注
