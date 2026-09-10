@@ -87,14 +87,18 @@ function stripHintBlock(description) {
  * Fetch one trajectory with phases from the control plane.
  * @param {string} base Control-plane base URL
  * @param {number} id Trajectory id
- * @returns {Promise<object>} Trajectory with phases
+ * @returns {Promise<object>} Trajectory with phases (response envelope stripped)
  */
 async function getTrajectory(base, id) {
   const res = await fetch(`${base}/api/v2/trajectories/${id}/tree`).catch(() => null);
-  if (res && res.ok) return res.json();
+  if (res && res.ok) {
+    const j = await res.json();
+    return j.data ?? j;
+  }
   const res2 = await fetch(`${base}/api/v2/trajectories/${id}`);
   if (!res2.ok) throw new Error(`GET trajectory ${id} failed: ${res2.status}`);
-  return res2.json();
+  const j2 = await res2.json();
+  return j2.data ?? j2;
 }
 
 /**
@@ -167,7 +171,8 @@ async function main() {
         continue;
       }
       const created = await postTrajectory(base, spec);
-      const tid = created.id || (created.trajectory && created.trajectory.id);
+      const body = created && created.data ? created.data : created;
+      const tid = body.id || (body.trajectory && body.trajectory.id);
       if (!tid) throw new Error(`${r.reqId}/${arm}: no trajectory id in response ${JSON.stringify(created).slice(0, 200)}`);
       pair.runs[arm] = { name: spec.name, trajectoryId: tid };
     }
@@ -184,6 +189,12 @@ async function main() {
       };
       const da = descOf(ta);
       const db = descOf(tb);
+      if (!da || !db) {
+        pair.purity = { ok: false, error: `empty description fetched: A len=${da.length} B len=${db.length} (endpoint shape mismatch)` };
+        console.error(`PURITY FAIL ${r.reqId}: ${JSON.stringify(pair.purity)}`);
+        results.push(pair);
+        break;
+      }
       const stripped = stripHintBlock(db);
       pair.purity = {
         aDescription: da,
