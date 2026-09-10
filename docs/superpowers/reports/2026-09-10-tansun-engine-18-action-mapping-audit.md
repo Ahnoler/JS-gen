@@ -4,7 +4,8 @@
 > 目标：JS-gen 18 个录制动作按映射表推给同事执行引擎（D:\dev\tansun_ui_engine），确保全部可执行。
 > 映射表：录制动作 → 伙伴 type + 操作名样式（dataName）+ objectValue。
 > **更正（同日，用户确认）**：`radio` / `select:tree` 已在同事**最新（尚未推送）版本**实现——本仓克隆只含远端唯一提交 2b22613，未含这两者；矩阵 #14/#15 由 ❌ 改为「待复验」，`date`（fill 日期升格）用户未提及，仍按缺失对待。
-> **范围约定（同日，用户指示）**：只补全操作，不做其他事——对方引擎只新增映射表要求的缺失操作类型/handler；JS-gen 推送侧 P1-P6（§4）与消歧/沉降/语义统一等打磨项（§5 尾步）**均不在范围内**，§4/§5 相应条目仅作参考存档。
+> **范围约定（同日，用户二次澄清）**：当前问题=**推送的操作同事引擎无法正确处理，需要做兼容**——在 tansun_ui_engine 侧使 18 映射操作全部被正确执行：①补齐缺失操作 handler（映射表逐行）；②修正已接收操作的错误处理（值字段分流、dataName 前缀语义路由）。**仍不做**：JS-gen 推送链改动（§4 P1-P6）、消歧/沉降/absent=skip 等打磨项（§5 尾步）、对方引擎无关 bug 与重构；radio/select:tree 待同事推送后复验、不在快照上重复实现。执行蓝图见 §7。
+> **注**：§4 P6「前缀=污染」论断在映射表语境下需修正——「图标：/选择：/页签：…」前缀是映射表有意设计的**操作语义通道**（引擎路由读前缀、labelHint 匹配剥前缀），见 §7 批 1。
 
 ---
 
@@ -93,3 +94,15 @@
 2. **值字段双写**：input/radio 族 objectValue 与 operation.value **双写同值**（引擎 input/checkSelect 只读 val）；
 3. **xpath 硬前提**：五族动作都无 label-only 路径（引擎无 scan 缓存体系），element(xpath) 缺失=必 skip——JS-gen 侧 P3/P4 两个「不采集 element」的坑修掉前，两个动作推了也白推；
 4. **登录组件**：引擎 scheduler 链有硬编码临时登录（scheduler/payload.py:30，701994/stepRefId 777488…），functional-module 登录组件接口已有文档但引擎无调用点——与映射无关但联调时会先撞上。
+
+## 7. 兼容实装方案（范围收窄后的执行蓝图，待开工）
+
+> 范围=让本表 18 行推送操作在同事引擎全部被正确处理；落点=tansun_ui_engine（本地克隆，当前 2b22613）；**不改 JS-gen 推送链**。
+
+- **批 1 错误处理修正**：`input_action.py` 值改读 `step.object_value or value`（select_click.py:243 样板）；dataName 前缀解析 helper——前缀是操作语义通道（路由读前缀、labelHint 用剥前缀余部），一并修 fill/select 现有 hint 传参；
+- **批 2 click 族子路由（一）**：`handle_click` 按 dataName 前缀分流到移植 JS：`关闭弹窗`（可见弹窗逆序+headerbtn 选择器族，移植 close_visible_dialog）/`页签：`（workspace_tabs.py chips JS，switch_tab 同通道）/`展开树`（el-tree 递归展开 JS）——纯 click 通道，无新 event；
+- **批 3 click 族子路由（二）**：`表格：{行文本}/{文案}`（_table.py:54 移植，按 `/` 拆行文本与按钮文案）/`树选：`（select-tree-handover 包 tree_picker_click JS）/`邻钮：`（fill_engine.py:685）/`菜单：`（_navigation.py:40 submenu 自动展开）；
+- **批 4 新 event + 行选**：`date`（fill 日期升格，§2 六处清单）——**依赖推送侧 P2 接线，超范围：不接线则引擎永远只收到 input，做了也空转**；`弹窗选择：`行选（select_click 内前置分支：object_value=行文本→表格行选择，绕开 .el-select 硬依赖）；
+- **批 5 同事新版本合入后复验**：radio / select:tree 按矩阵 #14/#15 四条清单核对；click_table_row_radio 依赖其 radio 对表格列场景的支持度，不足再补；
+- **工程约定**：分支 `compat/js-gen-operations`（不推远端，由用户/同事验收后合并）；每批配 `tests/test_*.py`（test_select_click.py 三层断言样板）；除批 4 外不动 enums/payload/registry 共享三处，降低与同事未推送版本的合并冲突面；
+- **已知边界（已向用户言明）**：`date` 行依赖推送接线（P2 超范围）；`展开树` 行录制端不落步骤（P3 超范围）——handler 照做但无步骤可跑，两行是否随兼容一起解决由用户裁决。
