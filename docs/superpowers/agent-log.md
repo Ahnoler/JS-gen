@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 19:30 · ZCode 引擎线 — 开工+收工：click_radio 交接包（纯文档+zip 单元）
+
+- 完成：同事执行引擎缺 radio 操作类型——按 select:tree 同模式产出：spec `docs/superpowers/specs/2026-09-10-radio-operation-spec.md`（双 JS 路=xpath 版 JS_CLICK_RADIO_BY_XPATH 弹窗感知+`[last()]` 隐藏弹窗修正，label 版补扫 dialog/drawer；RadioEngine 录放同体 absent=skip OK 级联语义；autofill/_llm_values 消费面；集成注意五条）+ 交付包 `C:/Users/water/Desktop/radio-handover.zip`（14 文件 58KB：py/ 源码 13 + spec，zip 完整性 OK）
+- 验收：spec 全部代码坐标现场核对（radio_engine.py 74-81 双路编排/select_tree.py:8 label 版/fill_date.py:165 xpath 版/replay_form_action.py:124 接线/_helpers.py:218 absent 语义）；契约对齐 engine-actions-contract §2.4 与 2026-09-09-radio-record-replay-unify-design.md（已落地态）；纯文档+Desktop 产物，无代码改动
+- 遗留移交：`click_table_row_radio`（表格行 radio，replay_table 族）不在本包，同事如需表格列场景另议；他侧 SUT 组件若非 Element UI 同构需按 DOM 回传适配
+- 注意：工作区他线 WIP 未触碰未携带；本单元只提交 agent-log + spec 两个文件；tmp 临时打包脚本已删
+
 ## 2026-09-10 19:00 · ZCode 引擎线 — 开工+收工：select:tree 树形选择器交接包（纯文档+zip 单元）
 
 - 完成：同事执行引擎缺树形选择器实现——按上次 select:click 交接模式产出：spec `docs/superpowers/specs/2026-09-10-select-tree-operation-spec.md`（TsscMultiTree DOM/Vue 链定案 + `$emit('input',code)` 唯一正确 API 坑史表 + select_tree_option P0→P1→P2 三段式 + tree_check_confirm 真实 check 事件契约 + tree_picker_click CDP real-click 兜底 + 结果协议/别名归一/集成注意五条）+ 交付包 `C:/Users/water/Desktop/select-tree-handover.zip`（18 文件 60KB：py/ 源码 17 个 + spec，zip 完整性 OK）
