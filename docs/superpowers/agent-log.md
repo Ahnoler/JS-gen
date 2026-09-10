@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-10 20:40 · ZCode 引擎线 — 开工+收工：18 动作映射支持矩阵调研（4 路并行子智能体，只读）
+
+- 完成：用户拉同事引擎仓 D:\dev\tansun_ui_engine 到本地，要求按 18 动作映射表（click/input/select:click/radio/select:tree + 前缀操作名样式）确保全部可执行——派 4 路只读子智能体（click 族 10 动作 / input-radio 族 6 动作 / 报文入口与执行链路 / JS-gen 推送侧转换器核对）调研完毕，汇总矩阵入库 `docs/superpowers/reports/2026-09-10-tansun-engine-18-action-mapping-audit.md`
+- 核心发现：①引擎白名单只有 click/input/select:click 可跑，**radio/select:tree/date 三 event 不存在**——v3 整包拒/v1 静默丢；②操作名前缀样式只在 JS-gen 传统 5 字段导出，V3 推送=裸名词，且引擎 dataName 前缀会污染 label 精确匹配（建议推送侧维持裸名词+引擎 norm 剥前缀）；③值字段分流=引擎 input/checkSelect 只读 val 不读 objectValue，radio 短平快=走 checkSelect+值写 operation.value；④select_option 承载最完整✅，picker_dialog_select 语义不符（强依赖 .el-select）❌；⑤JS-gen 推送侧 4 个坑：tree_picker_click path_texts 不进 objectValue / fill 日期升格未接 V3 链（恒 input）/ expand_all_el_tree 录制端不落步骤 / workspace_tabs 不采集 element
+- 验收：矩阵 18 动作逐一带 file:line 双仓定位；新增 event 六处改动面（enums/payload 白名单/handler/registry/docs/tests）+ handler 约定（status=ok/skip/error，error=整案终止）已写明；报告含同事侧实施优先级 6 步+联调横切提醒 4 条
+- 遗留移交：①报告 §5 六步给同事排期（或经用户拍板我方直接在 tansun_ui_engine 实装）；②JS-gen 侧 P1-P6 修复清单（报告 §4）待开工；③radio 过渡方案（checkSelect 通道）需与同事约定后启用；④子智能体由本会话代声明，只读未 commit 未写本文件
+- 注意：工作区他线 WIP（archive 两删/plans 改/classify.py/verify-all.sh 等）未触碰未携带；本单元只提交 agent-log + 报告两个文件
+
 ## 2026-09-10 20:00 · ZCode 引擎线 — 开工+收工：click_button 交接包（纯文档+zip 单元）
 
 - 完成：同事执行引擎缺 click button 操作类型——按 radio/tree 同模式产出：spec `docs/superpowers/specs/2026-09-10-click-button-operation-spec.md`（录制 G1 容器优先三层=z-index 最高 overlay+popper 补扫+label 开 trigger；JS_CLICK_ICON_BUTTON 三级=精确文本>icon 宿主>泛化文本兜底含池化消歧；回放 durable 链=xpath_smart→弹窗修正→Playwright .last 兜底+分类沉降；**硬门槛=保存/提交/确认类改道 click_save**；同名消歧/点击前采集/.last 纪律等集成注意六条）+ 交付包 `C:/Users/water/Desktop/click-button-handover.zip`（15 文件 80KB：py/ 源码 14 含 form_save.py 附带参考 + spec，zip 完整性 OK）
