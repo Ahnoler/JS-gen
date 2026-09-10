@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 23:23 · Zcode — 开工：recall-colloquial-bridge 口语桥接（方向 5 重定位实施，B1–B5 已批）
+
+- 工作范围：`scripts/kb/build-colloquial-bridge.mjs`（新建）、`data/kb/colloquial-bridge.json`（新建）、`scripts/characterization/characterize-flow-card-recall.mjs`（+3 pin）、`docs/superpowers/reports/2026-09-10-colloquial-bridge-report.md`（新建）、`docs/superpowers/todo-list.md`、`docs/superpowers/agent-log.md`、`tmp/kb-bridge/**`（证据）；**条件性**含 `src/services/req-draft-traj/propose.js`（仅 T3 五判据全过后的 T4 接线，独立 commit）
+- 禁入区：`kb-recall-eval.v2.json` 与 `kb-recall-failures.v1.json`（**建表期物理隔离**，G2 专查）、`data/kb/synonyms.json`（不复活不照抄）、`verify-all.sh`、`data/kb/req/**`（只读素材）、`.cursor/`；工作区他线 WIP 12 项不触碰不携带
+- 执行方式：主线程单线 T0→T5 一 Task 一 commit；建表脚本与召回模块零 import；双向校验纯语料 grep 禁跑匹配器；零依赖（不引 BM25/embedding/新包）；只认 v2-new 全新地面增量；未达标→资产 archived 不计成果不接线
+
 ## 2026-09-10 23:59 · Zcode — 收工：recall-eval-v2 评测集扩版+门禁切换+T3 重评（回链 22:58 开工 `6e2ceeb7`）
 
 - 完成：T0 盘点+配额表（`d30f273f`）→ T1 v2 骨架脚本搬运 130 条 verbatim（`db4c1582`，保真 diffs=0 130/130 全字段深校验）→ T2 新增 115 条独立标注（`3bc31e8f`：A15/B15/C5/D5/E50/N25，语料出发零匹配器，E 层全词 ban-check，盲态第二标注人复核 E-019/N-034 换靶+9 消歧 note）→ T3 冻结+G1 盲判抽检（`16e6bab0`+`de4ee6a3`：**15 条分歧 1=6.7% ≤10% PASS**，先盲判后对照）→ T4 门禁切换独立 commit（`8f906527`：显式读 v2、runner DEFAULT 保持 v1、结构断言升级 spec §7、floor=新基线−不变 margins、**A 层 ≥0.95 断言**；`33d28f12` 对跑表+阈值提案+证伪自证：+0.2 必红/还原 5 passed 字节一致）→ T5 T3 重评（`939e61a6`：**DoD 字面 PASS**——六项聚合全上行 acc1+0.032/B+5/E+1/零丢失零新增 FP/拒答不变/A 不掉；**归因如实拆解：5 条 B 增量=建表集自身（记忆一致性），全新地面增量=+1/115（E-030 桥「用款→用信」）**——解除停用并接线 propose.js 与否移交 Lead，本线红线未接线）→ T6 报告+台账
