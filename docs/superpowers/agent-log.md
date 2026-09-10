@@ -13,6 +13,12 @@
 - 禁入区：classify.py、verify-all WIP、fill/select、`.cursor/`、discoverL1 JS
 - 方式：map+HTTP fail-soft → 只写回 regions[] → 绿 pin → 收工（L1c-wet 另排）
 
+## 2026-09-10 23:41 · Zcode — 收工：recall-colloquial-bridge G 复核响应（回链 23:23 开工 `d41cb787`；reviewer 判决 `666e0215`）
+
+- 复核结论：**FAIL 成立、处置合规**，2 必改+1 观察+1 Lead 项——收尾 commit `598df438` 逐项落实：F-1 报告改「A 源按抽取规则只取子串对」（规则产物非语料事实，438 对非子串 alias↔alias 普查已登记）；F-2 两裁决脚本 `git add -f` 入库+指向改「汇总原则」；F-3 裁决口径如实记录（规则批量+快速人工 ~7 分钟，B 类 10 条仅 4 条真词法同义=增量 0 部分成因，复用须收紧词法变体）；F-4 表补 `archivedSemantics` 注记（loader 加 status 过滤=口径变更留 Lead，本线零代码改动）
+- 验收：pin 归档态复跑 26 passed；判决不变门禁未重跑（5 passed 当前态）；只 stage 本线 4 文件，他线 WIP 未携带
+- 遗留：F-4 loader status 过滤 → Lead 决策项；无其他
+
 ## 2026-09-10 23:32 · Zcode — 收工：recall-colloquial-bridge T0–T3 未达标按计划归档（回链 23:23 开工 `d41cb787`）
 
 - 完成：T0 基线复现逐位一致+三类素材实证（`024af5bb`）→ T1 抽取器零 import（`3c802f3d`，池 409=卡面 131+需求文档 255+湿测 drift 23）→ T2 双向校验+人工裁决+落表（`3ea6bab5`：**67 条=card 49+req-doc 10+drift 8，A+B 88.1%≥60%/C 11.9%≤40%**，grounding 断言强制回溯 T2-verified 池、drift 全引模块+叶号；+3 pin 后 `characterize-flow-card-recall` **26 passed**）→ T3 on/off 度量（`824967d1`：ON 与 OFF **逐位相同** 0.600/0.725/0.653/0.667/拒答 0.382，**翻转 0 条→全新地面增量 0<4 FAIL；E 层 0.100<0.25 FAIL**；护栏面全绿=零新增 FP/A/B/C/D 不掉/门禁 5 passed/--baseline exit 0）
