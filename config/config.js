@@ -97,7 +97,11 @@ export const SCENARIO_LLM_API_KEY = _resolve('SCENARIO_LLM_API_KEY', LLM_API_KEY
 /** Scenario LLM 请求超时（毫秒；缺省回落 LLM_TIMEOUT_MS） */
 export const SCENARIO_LLM_TIMEOUT_MS = Number(_resolve('SCENARIO_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
 
-/** L1C 低置信区域分类模型（可选；缺省沿用 LLM_MODEL） */
+/**
+ * L1C low-confidence region classify — model name only.
+ * Gateway + API key always use primary LLM_BASE_URL / LLM_API_KEY (no L1C_LLM_BASE_URL).
+ * Enable with L1C_LLM=true; timeout via L1C_LLM_TIMEOUT_MS.
+ */
 export const L1C_LLM_MODEL = _resolve('L1C_LLM_MODEL', LLM_MODEL);
 
 /** 批量动作预算（browser_use max_actions_per_step）：全局默认；0/空 = 不覆盖，走框架默认 10 */
@@ -230,8 +234,12 @@ export const AI_MEMORY_HISTORY = _resolve('AI_MEMORY_HISTORY', 'false').toLowerC
 export const AI_MEMORY_DECISIONS = _resolve('AI_MEMORY_DECISIONS', 'true').toLowerCase() !== 'false';
 export const AI_MEMORY_AUDIT_STRICT = _resolve('AI_MEMORY_AUDIT_STRICT', 'false').toLowerCase() === 'true';
 
-// L1c: low-confidence region classify via LLM (default off → rules + L1d read only)
+// L1c region classify (default off → rules + L1d cache only).
+// Design: toggle / model / classify-timeout are env-configurable; HTTP transport
+// always reuses primary LLM_* (BASE_URL + API_KEY). There is intentionally no
+// L1C_LLM_BASE_URL / L1C_LLM_API_KEY — unlike FORM_LLM_* / SCENARIO_LLM_*.
 export const L1C_LLM = _resolve('L1C_LLM', 'false').toLowerCase() === 'true';
+/** Max wait for one L1c LLM classify call (ms); independent of LLM_TIMEOUT_MS. */
 export const L1C_LLM_TIMEOUT_MS = Number(_resolve('L1C_LLM_TIMEOUT_MS', '8000')) || 8000;
 
 export const AGENT_STDERR_LOG_DIR = _resolve('AGENT_STDERR_LOG_DIR')

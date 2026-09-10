@@ -15,7 +15,9 @@ export const GROUP_REGIONS = [
     name: '区域分类 (L1c)',
     description:
       '规则 + 可选 LLM（`L1C_LLM`）对 feature card 做 L1 区域分类；L1d 进程内缓存按 systemId + signature。'
-      + ' resolve-element 与 scan/fullpage 共用 `classifyRegions` 服务。',
+      + ' resolve-element 与 scan/fullpage 共用 `classifyRegions` 服务。'
+      + ' 环境变量：`L1C_LLM` / `L1C_LLM_MODEL` / `L1C_LLM_TIMEOUT_MS` 可配；'
+      + ' 网关与密钥固定走主 `LLM_BASE_URL` / `LLM_API_KEY`（无独立 L1C_*_BASE_URL/API_KEY）。',
     endpoints: [
       {
         method: 'POST',
@@ -24,7 +26,10 @@ export const GROUP_REGIONS = [
         desc:
           '输入 L1b feature card 数组；返回带 `role` / `label` / `confidence` / `source`（rule|llm|l1d）的分类结果。'
           + ' `L1C_LLM=false`（默认）时仅规则 + L1d 读，不发起 LLM 调用。',
-        reqExample: J({
+        notes: [
+          'config/.env：`L1C_LLM`、`L1C_LLM_MODEL`（缺省=LLM_MODEL）、`L1C_LLM_TIMEOUT_MS`（缺省 8000）。',
+          'HTTP 传输始终用主 LLM_* 网关/密钥；与 FORM_LLM_*（可自带 BASE_URL）不同。',
+        ],        reqExample: J({
           systemId: '42',
           cards: [
             {

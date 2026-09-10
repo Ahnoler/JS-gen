@@ -1,5 +1,8 @@
 /**
  * Region role classification: rule-based + LLM fallback with an in-memory L1d cache.
+ *
+ * LLM transport: callLLM(prompt, L1C_LLM_MODEL) — model from L1C_LLM_MODEL (else LLM_MODEL);
+ * BASE_URL/API_KEY always primary LLM_* (no separate L1C gateway env). Gated by L1C_LLM.
  */
 import { createHash } from 'node:crypto';
 import { callLLM } from '../llm-utils.js';
