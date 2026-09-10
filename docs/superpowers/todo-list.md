@@ -132,7 +132,7 @@
 | **login-retry-heuristic** | P3 | prepare 登录冷启动失败固定等 8s 重试一次（attach-runner.js:197）是启发式非事件驱动，慢环境会误判失败；改事件驱动/指数退避（来源：2026-09-05 会话生命周期梳理 §5.8） |
 | **stop-busy-race** | P3 | record/stop 不等 busy（可能 stale）直接发 cancel_step（record-lifecycle.js:321 注释自认）；**2026-09-10 更新：finally 补发已按 runId 归属守卫无害化（9eb94716），独立改造不再另立** |
 | **engine-wet-trio** | P1 已闭 | 对抗 review 真机湿测三件套：**①②③ 均 PASS（2026-09-10）**。①stop→重录用户确认；②detach→重附后门闩日志 `async gate skipped … runtimeReplaced=true`（traj 721）；③并发 start 200+409（traj 720）。证据 `tmp/engine-wet-trio/report.md`；门闩可调 `RECORD_FINALIZE_GATE_MS`（默认 90000） |
-| **p1-6-replayid** | P2 | replay_done 等待无关联：replayId 全链回带过滤 + 超时发 cancel_step（replay-actions.js:47 / rerun-replay-service.js:73），防旧 replay done 误满足新登录等待 |
+| **p1-6-replayid** | P2 已闭 | replay_done 按 replayId 归属过滤 + 超时 `cancel_step`（`replay-actions.js` / Python `event_dispatch` 回带 / rerun 经 helper）；冷 pin `characterize-replay-id.mjs`；2026-09-10 落地 |
 | **p2-batch-lease** | P3 | BATCH_ITEM_LEASE_MS=600000 恰 10 分钟且录制期无续租；长登录+多阶段可超租→item 被二次 claim 双跑，是否实际发生需湿测 |
 | **p2-toast-cursor** | P3 | step_notice toast 游标跨导航不回卷（scripts/agent/step_notice.py:117，`log_len<cursor` 应重置游标+清 `_step_notice_seen`）；**js_snippets 同名副本在 fill/select 热区，同步待他线冷却** |
 | **dedup-deletion** | 待裁 | src/dedup.js 生产零引用（唯一 importer=characterize-dedup.mjs 门禁），删除需产品侧湿测确认无去重需求，且 AGENTS.md「Consecutive-only dedup」条目与门禁行须同删 |
