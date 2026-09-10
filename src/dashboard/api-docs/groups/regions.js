@@ -26,10 +26,7 @@ export const GROUP_REGIONS = [
         desc:
           '输入 L1b feature card 数组；返回带 `role` / `label` / `confidence` / `source`（rule|llm|l1d）的分类结果。'
           + ' `L1C_LLM=false`（默认）时仅规则 + L1d 读，不发起 LLM 调用。',
-        notes: [
-          'config/.env：`L1C_LLM`、`L1C_LLM_MODEL`（缺省=LLM_MODEL）、`L1C_LLM_TIMEOUT_MS`（缺省 8000）。',
-          'HTTP 传输始终用主 LLM_* 网关/密钥；与 FORM_LLM_*（可自带 BASE_URL）不同。',
-        ],        reqExample: J({
+        reqExample: J({
           systemId: '42',
           cards: [
             {
@@ -65,7 +62,8 @@ export const GROUP_REGIONS = [
           'body 接受 systemId 或 system_id（字符串/数字均可，用于 L1d 缓存键）',
           'cards 缺省或非数组 → 空 items',
           'LLM 失败/超时：单卡 fallback 为 rule，附 fallback_reason=llm_error；不丢输入卡',
-          '配置：L1C_LLM、L1C_LLM_TIMEOUT_MS（见 config/.env.example）',
+          'config/.env：`L1C_LLM`、`L1C_LLM_MODEL`（缺省=LLM_MODEL）、`L1C_LLM_TIMEOUT_MS`（缺省 8000）',
+          'HTTP 传输始终用主 LLM_* 网关/密钥（无 L1C_*_BASE_URL/API_KEY）；与 FORM_LLM_* 不同',
         ],
       },
     ],
