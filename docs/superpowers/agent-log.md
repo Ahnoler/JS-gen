@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 00:05 · ZCode 引擎线 — 回滚+改期：tansun 兼容实装延至周末（回链 23:55 开工）
+
+- 用户指示：同事还在调试，等他调整完最后一版，**周末再做兼容**；改动全部回滚，虚拟环境保留
+- 回滚：tansun_ui_engine 切回 main（工作区 0 改动）、compat/js-gen-operations 分支删除、未提交两文件（data_name.py helper+单测）删除——仓内已无本线痕迹；`.venv` 保留且 dev 依赖装齐（test_select_click+test_payload_adapter 18 passed 实证）；未派任何子智能体
+- 待命：周末开工前置=git fetch 确认同事最后一版（radio/select:tree 若在其中则批 5 复验替代快照基线）→ 重建分支 → 按报告 §7 五批+§7.1 格式核对执行；排期与回滚态已入记忆 tansun-scope-operations-only
+
 ## 2026-09-10 23:55 · ZCode 引擎线 — 开工：tansun 引擎 18 操作兼容实装（回链 23:40 格式核对/23:10 词表冻结）
 
 - 工作范围：D:\dev\tansun_ui_engine 新建分支 compat/js-gen-operations——ui_execute/engine/data_name.py(新)/action_registry.py、ui_execute/engine/actions/{input_action.py, click.py, replay_adapter.py(仅 hint 归一), select_click.py, date_action.py(新), click_subroutes.py(新)}、ui_execute/models/{enums.py, payload.py}、docs/EXECUTION_PAYLOAD_MIGRATION.md、tests/{test_input_action.py, test_click_subroutes.py, test_date_action.py, test_select_click_rowselect.py}(新)+.venv(本地依赖, gitignore 意);JS-gen 仓仅 docs/superpowers/agent-log.md
