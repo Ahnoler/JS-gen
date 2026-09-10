@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 23:42 · Cursor Lead — 开工：L1c-scan-py scan 接 regions/classify
+
+- 进行中：2026-09-10 23:42；根因=`scan_editable_summary` 从不调 classify，与 resolve 双消费者规格缺口
+- 范围：`scripts/controller/actions/l1c_region_classify.py`（新）、`form_scan_actions.py`、冷 pin、todo-list、本文件
+- 禁入区：classify.py、verify-all WIP、fill/select、`.cursor/`、discoverL1 JS
+- 方式：map+HTTP fail-soft → 只写回 regions[] → 绿 pin → 收工（L1c-wet 另排）
+
 ## 2026-09-10 23:32 · Zcode — 收工：recall-colloquial-bridge T0–T3 未达标按计划归档（回链 23:23 开工 `d41cb787`）
 
 - 完成：T0 基线复现逐位一致+三类素材实证（`024af5bb`）→ T1 抽取器零 import（`3c802f3d`，池 409=卡面 131+需求文档 255+湿测 drift 23）→ T2 双向校验+人工裁决+落表（`3ea6bab5`：**67 条=card 49+req-doc 10+drift 8，A+B 88.1%≥60%/C 11.9%≤40%**，grounding 断言强制回溯 T2-verified 池、drift 全引模块+叶号；+3 pin 后 `characterize-flow-card-recall` **26 passed**）→ T3 on/off 度量（`824967d1`：ON 与 OFF **逐位相同** 0.600/0.725/0.653/0.667/拒答 0.382，**翻转 0 条→全新地面增量 0<4 FAIL；E 层 0.100<0.25 FAIL**；护栏面全绿=零新增 FP/A/B/C/D 不掉/门禁 5 passed/--baseline exit 0）
