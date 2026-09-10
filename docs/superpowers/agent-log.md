@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-10 14:40 · ZCode — 收工：拆分回归修复落地（回链 13:58）
+
+- 完成：**4 文件补 import**（`824bd428`，只插行：fill=+json/re/sys+_replay 三兄弟、select/radio=+_replay 三兄弟、login=+JS_FILL_FORM_FIELD）+ **防再犯护栏** `characterize-form-engine-scope-audit.py`（AST 未解析名审计：函数体内每个 Name Load 须解析到模块/自身/祖先闭包作用域，star-import 文件拒审，lazy annotation 剪枝；verify-all 已注册，独立 commit `593f721a`）
+- 验收：**红绿自证三段式**（绿→stash 摘修复 exit=1 精确点名 re/sys/json+_replay 族→指名 pop 恢复绿）；离线 stub 调三处 `*_for_replay` 入口全执行到底；wiring/select×3/tree-select/xpath-fill-select/login-action 7 pin 全绿；verify-all 4 红全为既有基线（step-highlight/layer-tree/export-v3/confirm-notification）零新增；**真机湿测 PASS**：新进程+产品同路径 `replay_action_entries` 打真实 SUT 登录页，用户名/密码 fill 全 ok-label:placeholder，回读 701994 落框（`tmp/wet-login-replay-fix.py`）
+- 遵守：修复只插 import 行；Cursor 线热区（replay_form_action/click_action_engine/_misc）零触碰；用户活会话（remote_session 1480 / PID 29624）未动
+- 遗留移交：**用户当前会话 1480 的 Python 进程（13:50 起）内存里仍是旧模块——重试登录组件回放前须先 detach 重挂（或重启 executor 重建槽位），修复才能生效**；dry-run 中 `wait_for_loading unknown-action` 为自建条目缺元数据所致非回归；login_engine 的 `login` 动作靠本修复排掉一颗未来雷（旧代码一跑登录即 NameError）
+- 提交本文件顺带携带他线条目：无
+
 ## 2026-09-10 13:58 · ZCode — 开工：form_action_engines 拆分回归修复（NameError 三连）
 
 - 进行中：13:58；用户报真机回放 `fill_form_field → NameError: _replay_engine_store`。根因=昨日拆分（dbcc329b）fill/select/radio 三文件的 `*_for_replay` 包装用了 `_replay_engine_store/_ReplayPageAdapter/_ReplayAutofillStub` 而 tree_engine 才补了 import；另发现 login_engine 缺 `JS_FILL_FORM_FIELD`、fill_engine 缺 `import re/sys/json`——call-time 才爆，import 级 wiring 测不出的哑雷
