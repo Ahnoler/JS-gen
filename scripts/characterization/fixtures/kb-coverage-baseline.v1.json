@@ -1,0 +1,568 @@
+{
+  "baselineVersion": "v1",
+  "capturedAt": "2026-09-10T16:31:27.973Z",
+  "source": "node scripts/kb/kb-coverage.mjs --json (fixture kb-coverage.v1.json, sha 375329fde791d4a9)",
+  "note": "floors = these values minus fixed margin 0.05; floors only ever rise (spec 2026-09-11 §Task2)",
+  "metrics": {
+    "m1": {
+      "joinability": 0.8571428571428571,
+      "joinableCards": 72,
+      "denominator": 84,
+      "noCodeCards": [
+        "approval_chain",
+        "collateral-func-ledger",
+        "collateral-func-params",
+        "collateral-func-warning",
+        "customer_360",
+        "guarantee_intro",
+        "loan_account",
+        "rating_flow",
+        "session_login",
+        "system-mgmt-loan-calc",
+        "system-mgmt-org-merge",
+        "system-mgmt-route-mgmt"
+      ]
+    },
+    "m2": {
+      "coverage": 0.20597014925373133,
+      "mappedTrajectories": 69,
+      "denominator": 335,
+      "denominatorNote": "recorded+completed trajectories with page_id"
+    },
+    "m3": {
+      "utilization": 0.32142857142857145,
+      "utilizedCards": 27,
+      "denominator": 84,
+      "deadCardCount": 57,
+      "deadCards": [
+        "approval_chain",
+        "approval_todo",
+        "archive-stock-in",
+        "asset-preserve-ops-counter-entrust",
+        "asset-preserve-ops-outsourced-collection",
+        "collateral-func-ext-assess",
+        "collateral-func-ledger",
+        "collateral-func-params",
+        "collateral-func-warning",
+        "collection-remind-cfg",
+        "collection_scorecard",
+        "collection_strategy",
+        "collection_task",
+        "credit-corp-approval-result",
+        "credit-corp-approval-task",
+        "credit_application",
+        "customer-group-cluster",
+        "customer_360",
+        "digital-loan-desk-data-index",
+        "disburse-account-abnormal",
+        "disburse-entrusted-payment",
+        "duigong_contract_sign",
+        "electronic_signing",
+        "guarantee_intro",
+        "guaranty_contract",
+        "judicial-litigation",
+        "limit",
+        "limit-ctrl-api-grant-use-one",
+        "limit-ctrl-api-ocp-revoke-loop",
+        "loan",
+        "loan-corp-entrust-loan",
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-syndicate-participant-apply",
+        "loan-retail-erheyi-apply",
+        "loan_account",
+        "portal-home-mgmt",
+        "portal-personalization",
+        "portal-public-info",
+        "portal-subapp",
+        "rating-query-view",
+        "rating_flow",
+        "risk-class-default-config",
+        "risk-class-gen-config",
+        "risk-class-ledger",
+        "risk-class-observation-whitelist",
+        "risk-class-query",
+        "session_login",
+        "smart-ctrl-log-query",
+        "smart-ctrl-rule-toggle",
+        "system-mgmt-base-mgmt",
+        "system-mgmt-data-perm",
+        "system-mgmt-gov-bond",
+        "system-mgmt-loan-calc",
+        "system-mgmt-message-center",
+        "system-mgmt-org-merge",
+        "system-mgmt-param-mgmt",
+        "system-mgmt-route-mgmt"
+      ]
+    },
+    "m4": {
+      "uncoveredTrajectories": 266,
+      "distinctUncoveredPages": 263,
+      "top": [
+        {
+          "pageId": "ZJJK00171540PDCP",
+          "count": 3,
+          "pageName": "智能控制执行日志列表",
+          "inSystemPage": true
+        },
+        {
+          "pageId": "ZJJK00069541",
+          "count": 2,
+          "pageName": "查询交易信息管理页",
+          "inSystemPage": true
+        },
+        {
+          "pageId": "AILZ1788182714433",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788183219509",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788183637269",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788186363742",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788187437948",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788189529969",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788190652973",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788190894529",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788191748918",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788191941281",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788192146421",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788237376581",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788237481075",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788237600116",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788237680622",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788252412242",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788252970874",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        },
+        {
+          "pageId": "AILZ1788284706539",
+          "count": 1,
+          "pageName": null,
+          "inSystemPage": false
+        }
+      ]
+    },
+    "m5": {
+      "nodeCoverage": 0.13090781767252355,
+      "orderAgreement": 0.01171875,
+      "offCardRate": 0.8352059925093633,
+      "denominator": {
+        "mappedTrajectories": 69,
+        "withVisitedRegions": 64
+      }
+    },
+    "m6": {
+      "freshness": 0.25,
+      "freshMarkers": 33,
+      "staleMarkers": 99,
+      "staleCardCount": 38,
+      "staleCards": [
+        {
+          "stem": "archive-stock-in",
+          "staleMarkers": [
+            "ZJJK00099979",
+            "FS00003418"
+          ],
+          "totalCodes": 3
+        },
+        {
+          "stem": "asset-preserve-ops-counter-entrust",
+          "staleMarkers": [
+            "ZJJK00210540",
+            "FS00012774",
+            "ZJJK00211331",
+            "ZJJK00210738",
+            "ZJJK00211329"
+          ],
+          "totalCodes": 5
+        },
+        {
+          "stem": "asset-preserve-ops-outsourced-collection",
+          "staleMarkers": [
+            "ZJJK00210620",
+            "FS00005977"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "check-config",
+          "staleMarkers": [
+            "ZJJK00110958",
+            "ZJJK00110959"
+          ],
+          "totalCodes": 4
+        },
+        {
+          "stem": "collateral-func-ext-assess",
+          "staleMarkers": [
+            "FS00004789"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "collection-remind-cfg",
+          "staleMarkers": [
+            "ZJJK00097319"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "credit-corp-approval-result",
+          "staleMarkers": [
+            "ZJJK16071624",
+            "ZJJK00180172"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "credit-retail-credit-config",
+          "staleMarkers": [
+            "ZJJK00110089",
+            "ZJJK00110201",
+            "ZJJK00110515"
+          ],
+          "totalCodes": 6
+        },
+        {
+          "stem": "credit_application",
+          "staleMarkers": [
+            "FS00004853"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "customer-common-cust-relation",
+          "staleMarkers": [
+            "ZJJK00105530",
+            "ZJJK00128513"
+          ],
+          "totalCodes": 5
+        },
+        {
+          "stem": "customer-group-cluster",
+          "staleMarkers": [
+            "ZJJK00107450",
+            "ZJJK00104925",
+            "ZJJK00104897",
+            "ZJJK00104900",
+            "ZJJK00107302",
+            "ZJJK00128510",
+            "FS00004648",
+            "FS00008419"
+          ],
+          "totalCodes": 9
+        },
+        {
+          "stem": "customer-group-general-group",
+          "staleMarkers": [
+            "ZJJK00107648",
+            "ZJJK00105128",
+            "ZJJK00105105",
+            "ZJJK00105106",
+            "ZJJK00107660",
+            "FS00004664"
+          ],
+          "totalCodes": 7
+        },
+        {
+          "stem": "customer-group-group",
+          "staleMarkers": [
+            "ZJJK00107802",
+            "ZJJK00090114",
+            "ZJJK00107808",
+            "ZJJK00107812",
+            "ZJJK00107813",
+            "ZJJK00106437",
+            "ZJJK00095919",
+            "ZJJK00114024",
+            "ZJJK00114016",
+            "ZJJK00100609",
+            "FS00001363",
+            "FS00003077"
+          ],
+          "totalCodes": 13
+        },
+        {
+          "stem": "digital-loan-desk-data-index",
+          "staleMarkers": [
+            "ZJJK00124943",
+            "ZJJK00124950",
+            "ZJJK00128369",
+            "FS00012839",
+            "FS00016710"
+          ],
+          "totalCodes": 5
+        },
+        {
+          "stem": "disburse-account-abnormal",
+          "staleMarkers": [
+            "FS00006227"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "disburse-entrusted-payment",
+          "staleMarkers": [
+            "FS00012829"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "judicial-litigation",
+          "staleMarkers": [
+            "ZJJK00210734"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "loan-corp-entrust-loan",
+          "staleMarkers": [
+            "FS00005843"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "loan-corp-syndicate-lead-apply",
+          "staleMarkers": [
+            "FS00004519",
+            "FS00006404"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "loan-corp-syndicate-participant-apply",
+          "staleMarkers": [
+            "FS00004519",
+            "FS00006404"
+          ],
+          "totalCodes": 3
+        },
+        {
+          "stem": "loan-retail-apply-maintain",
+          "staleMarkers": [
+            "ZJJK00124779"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "loan-retail-erheyi-apply",
+          "staleMarkers": [
+            "FS00006502"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "product_element",
+          "staleMarkers": [
+            "ZJJK00136564",
+            "ZJJK00136733"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "product_library",
+          "staleMarkers": [
+            "ZJJK00094361",
+            "ZJJK00101226",
+            "ZJJK00097067",
+            "ZJJK00107304"
+          ],
+          "totalCodes": 6
+        },
+        {
+          "stem": "rating-query-view",
+          "staleMarkers": [
+            "ZJJK00124779"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "risk-class-corp-org-config",
+          "staleMarkers": [
+            "ZJJK00105243",
+            "ZJJK00105246",
+            "ZJJK00105244",
+            "FS00004677"
+          ],
+          "totalCodes": 5
+        },
+        {
+          "stem": "risk-class-default-config",
+          "staleMarkers": [
+            "ZJJK00114926"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "risk-class-gen-config",
+          "staleMarkers": [
+            "ZJJK00096836",
+            "FS00004827"
+          ],
+          "totalCodes": 3
+        },
+        {
+          "stem": "risk-class-ledger",
+          "staleMarkers": [
+            "ZJJK00116250",
+            "ZJJK00116261"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "risk-class-observation-whitelist",
+          "staleMarkers": [
+            "ZJJK00105249",
+            "FS00004681"
+          ],
+          "totalCodes": 3
+        },
+        {
+          "stem": "risk-class-overdue-config",
+          "staleMarkers": [
+            "ZJJK00096829"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "risk-class-reason-config",
+          "staleMarkers": [
+            "ZJJK00105273",
+            "FS00004683"
+          ],
+          "totalCodes": 3
+        },
+        {
+          "stem": "risk-class-statistics",
+          "staleMarkers": [
+            "ZJJK00097289"
+          ],
+          "totalCodes": 2
+        },
+        {
+          "stem": "smart-ctrl-rule-cfg",
+          "staleMarkers": [
+            "ZJJK00096103",
+            "ZJJK00095815",
+            "ZJJK00096113",
+            "ZJJK00096116",
+            "ZJJK00096200",
+            "FS00003504"
+          ],
+          "totalCodes": 7
+        },
+        {
+          "stem": "smart-ctrl-rule-lib",
+          "staleMarkers": [
+            "ZJJK00096101",
+            "ZJJK00096102",
+            "FS00020620"
+          ],
+          "totalCodes": 4
+        },
+        {
+          "stem": "smart-ctrl-rule-scheme",
+          "staleMarkers": [
+            "ZJJK00095814",
+            "ZJJK00095812",
+            "ZJJK00095813",
+            "FS00003401"
+          ],
+          "totalCodes": 5
+        },
+        {
+          "stem": "system-mgmt-message-center",
+          "staleMarkers": [
+            "FS00001706"
+          ],
+          "totalCodes": 1
+        },
+        {
+          "stem": "system-mgmt-param-mgmt",
+          "staleMarkers": [
+            "FS00001732"
+          ],
+          "totalCodes": 1
+        }
+      ]
+    }
+  }
+}
