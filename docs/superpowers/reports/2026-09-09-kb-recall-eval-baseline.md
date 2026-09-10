@@ -67,23 +67,24 @@
 
 **噪声鲁棒性**：Δ 0.00——追加无关子句对命中无扰动（bigram 词面匹配对噪声子句天然免疫）。
 
-## T4 阈值提案（**待 Lead 批准 = G2，批准后才写入门禁**）
+## T4 阈值写入（G2 批准后落地，2026-09-10）
 
-按 D4「基线 − 余量（D11 上限）」，基线取 v1 三次复跑稳定值（指标为确定性计算，零漂移）：
+**G1/G2 结论**（[`reports/2026-09-09-kb-recall-eval-g1-g2.md`](./2026-09-09-kb-recall-eval-g1-g2.md)）：G1 **PASS**（reviewer 独立抽检 15 条 = 新标 11/11 一致，0 分歧；反作弊六项核对通过）；G2 **PASS**（阈值无条件批准；reviewer 双向复现 exit 0/1）。另：reviewer 撤回其对 runner `execSync` 的阻断结论（EPERM 系其审查沙箱所致），未为此改动代码。
 
-| 指标 | v1 基线 | 余量 | **提案阈值** | 理由 |
-|---|---|---|---|---|
-| Acc@1 | 0.650 | −0.05 | **≥ 0.600** | 检出 ≥5pt 召回回归 |
-| Recall@5 | 0.757 | −0.05 | **≥ 0.707** | 同上 |
-| MRR@5 | 0.694 | −0.08 | **≥ 0.614** | 排序类波动余量略宽 |
-| nDCG@5 | 0.708 | −0.08 | **≥ 0.628** | 同上 |
-| 拒答率 | 0.633 | −0.05 | **≥ 0.583** | 防 FP 恶化 |
-| 噪声 Acc@1 | 0.650 | −0.10 | **≥ 0.550** | 实测 Δ0，余量取上限 |
-| 热 p95 | 0.27 ms | 预算 | **≤ 50 ms** | spec 工程预算（非基线推导） |
-| 冷 p95 | 3.6 ms | 预算 | **≤ 200 ms** | 同上 |
+写入位置：`scripts/characterization/characterize-kb-recall-eval.mjs`（commit `71c24fa7`），4 断言：
+1. 评测集结构（130/30 负/62 卡/无重复/无 stale gold）；
+2. **lockstep pin**：APPROVED+DEFAULT_MARGINS 必须重构出 G2 基线 `{0.65,0.757,0.694,0.708,0.633,0.65}`——门禁与 runner `--baseline` 模式不能静默漂移（同时是防篡改绊线）；
+3. 六项批准 floor（compareWithBaseline，失败打印 perQuery 退化明细）；
+4. 延迟预算（热 p95≤50ms / 冷 p95≤200ms）。
 
-- 阈值性质：**防回归下限**，不是质量目标。B/D 层缺口（同义词桥、ASCII 短码分词）属算法层另立项（spec §2 Out）；算法改进后基线抬升 → 新基线快照 + 阈值变更走 G2 + 评测集不动（冻结）。
-- 批准后动作：`characterize-kb-recall-eval.mjs`（结构校验 + 阈值断言，复用 T3 runner 的 `runRecallEval` 单一指标引擎）+ `verify-all.sh` 追加一行（独立 commit）+ 自证（阈值 +0.2 → 必红 → 还原绿，证据 `tmp/kb-eval/T4-selfproof.txt`）。
+单一指标引擎：门禁复用 runner 的 `runRecallEval`/`compareWithBaseline`，无第二套指标实现。注册：`verify-all.sh` 追加一行（commit `8ae492ed`，独立 commit）。
+
+**门禁自证**（`tmp/kb-eval/T4-selfproof.txt`）：提交态绿（exit 0）→ 阈值 +0.2 且 lockstep pin 同步位移 → 六项 floor 全 FAIL 红（exit 1）→ 还原绿（exit 0）。floor 断言可证伪，防恒真闭环。
+
+**reviewer 三条非阻塞建议落地**（commit `56b52af3`）：
+1. 多 gold 口径入文档：Recall@5/nDCG@5 用**分摊口径**（hits/|gold|，DCG/IDCG），写入 `ndcgAtK` JSDoc 与 runner 文件头；reviewer 二值口径（0.760/0.711）与本口径（0.757/0.708）差异已显式记录，杜绝基线静默漂移 0.003。
+2. seed 标记统一：30 条种子加 `seed: true` 字段、移除 note/whyNegative 前缀；行级手术编辑（冻结文件审计 diff 最小化），changeLog 记录批准来源（reviewer G1/G2 §五.2），query/gold/条目数零改动。
+3. 分层可见性：`metrics.byTier` 随每次运行输出；renderTable 消费。**A 层独立下限未加**——G2 批准的恰是六项，加第七项须单独走批准（已向 Lead 标记，不捆绑落地）。
 
 ## T5 PY 一致性
 
@@ -91,14 +92,15 @@
 
 ## 结论
 
-**DONE_PENDING_GATES**：T0–T3、T5、T6 完成（`55a558ab`→`0e8a9f64`→`5acbbbe4`→`7543157e`→`1e487ca4`）；**T4 门禁写入、G1（reviewer 抽检 15 条）、G2（阈值批准）三项待外部决断**，按 handoff §6/§8 纪律暂停写入。
+**T0–T7 全部完成**：T0–T3、T5、T6 首轮交付（`55a558ab`→`0e8a9f64`→`5acbbbe4`→`7543157e`→`1e487ca4`→`1be0ac8b`→`f67d89f2`）；**T4 于 G1/G2 双 PASS 后写入**（`62aa956f`→`71c24fa7`→`8ae492ed`→`56b52af3`）。G3 终局结论待 reviewer 按 plan Reviewer Checklist 出具。
 
 ## 遗留与通报
 
-1. **并行线冲突通报（需 Lead 知悉）**：本线 T2 执行期间，「flow-card-guided-propose」新线开工（无 agent-log 开工条目；spec/plan 未跟踪文件已落盘），其 WIP 改了 `characterize-req-draft-traj.mjs`（`flowGuided`/`PROPOSE_CACHE_VERSION=2` 红灯 pin，当前该套件红=他线 TDD 进行中，非本线所致——本线复跑时 24 金样例/17 pins/基线全绿）与 duplicate-failure-cue 两文件。该线后续若改 `flow-card-recall.js`（本线 22:44 已声明在途并已提交 `5acbbbe4`），需以本线 `rankFlowCards` 为基线 rebase，避免覆盖。
-2. `verify-all.sh` 注册行（T4 Step 3）待 G2 批准后独立 commit。
+1. ~~并行线冲突通报~~（已解决：flow-card-guided-propose 线已收工提交，未触碰本线 `flow-card-recall.js`；`rankFlowCards` 完好）。
+2. ~~verify-all 注册行~~（已落地：`8ae492ed`）。
 3. 算法缺口（另立项）：同义词桥/受控词表（B 层 0.23）、ASCII 别名分词（D 层 0.33）、低 maxPossible 查询的覆盖率地板收紧（FP 11/30）。评测集与门禁已就位，改进即测得。
 4. 评测集 v2 候选：spec §12 R3（CI 宽，Acc@1 CI [0.55,0.74]）→ 扩到 300+ 条时再议。
+5. A 层独立下限（reviewer 建议 3 的后半）：G2 批准六项为限，加第七项须 Lead 单独批准。
 
 ## 附录：复现命令
 

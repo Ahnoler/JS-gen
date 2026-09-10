@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-10 13:58 · ZCode — 收工：KB 召回评测 T4 门禁写入（回链 13:44）
+
+- 完成：**T4 全链**——门禁 `characterize-kb-recall-eval.mjs`（4 断言：结构/lockstep 防漂移绊线/六项批准 floor+退化明细/延迟预算，单一指标引擎=复用 runner 的 runRecallEval+compareWithBaseline，`71c24fa7`）；verify-all 追加一行独立 commit（`8ae492ed`，gate 内 `ok: characterize-kb-recall-eval`）；**自证三段式** 提交态绿 exit0 → 阈值+0.2 六项全红 exit1 → 还原绿 exit0（`tmp/kb-eval/T4-selfproof.txt`）；**reviewer 三建议落地**（`56b52af3`）：①多 gold 分摊口径入 JSDoc（0.757/0.708 vs 二值 0.760/0.711 差异显式化）②30 条种子统一 `seed:true`（行级手术编辑+changeLog 记批准来源，冻结文件审计 diff 最小）③`metrics.byTier` 每次运行输出（A 层第七项下限未捆绑加，留 Lead 单独批）；报告 T4 章节+结论翻转+todo ⑧ 状态行（本 commit）
+- 验收：门禁 4 passed / runner Acc@1 0.65 不变 / T1 结构自检 OK / runner+门禁 lint 0 warning（characterization 目录在 eslint ignore=按 AGENTS 绕过区）/ verify-all 注册行生效
+- 遵守：reviewer 更正未改任何代码（execSync EPERM 沙箱问题）；他线 5 红未碰；评测集仅元数据级 seed 字段，query/gold/条目数零改动
+- 遗留移交：**G3 终局结论待 reviewer**（材料齐：本 commit + selfproof + 报告 §T4）；A 层独立下限待 Lead 单独批准；算法缺口另立项
+- 提交本文件顺带携带他线条目：无
+
 ## 2026-09-10 13:44 · ZCode — 开工：KB 召回评测 T4 门禁写入（G1/G2 已 PASS）
 
 - 进行中：13:44；G1 PASS（reviewer 11/11 新标一致 0 分歧）+ G2 PASS（阈值无条件批准，见 `reports/2026-09-09-kb-recall-eval-g1-g2.md`）→ T4 放行

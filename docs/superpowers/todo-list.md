@@ -25,7 +25,7 @@
 - **§6.4 前端派单已落地（2026-09-09 SDD）**：Vue `a1ac7d1`→`587f30c`（per-atom 功能下拉 + `functionIdOverrides` 按行提交）；spec [`2026-09-09-req-draft-wizard-function-candidates-design.md`](specs/2026-09-09-req-draft-wizard-function-candidates-design.md)；待 4097 重启 + product-mgmt 湿测（多行不同功能 overrides）
 - **待办：服务器部署**跑三笔新迁移 `20260908231500_req_atom_key_stable` / `20260908233000_req_atom_seq_unique`（遇历史重复会显式报错，人工合并后重跑）/ `20260908235000_req_source_anchor`
 - **through-chains 全量 proposeable（2026-09-08 Zcode 连续执行）**：29/29 模块 `canProposeAtoms=true`（P0 customer-corp+rating → P1 两波 25 模块子智能体编队 → credit-retail 补漏 + product-mgmt B-G 链表格化）；每模块机械核对原文 ZJJK 码/「」短语零缺失；接口型/无码模块（limit-ctrl-api/portal/system-mgmt/meeting-mgmt 等）ZJJK 列如实 `—`；业务口径零删减。commit `3c9b5d39`/`17b1cd6d`/`c35f2983`+补漏。规范=[`guides/through-chains-proposeable-format.md`](guides/through-chains-proposeable-format.md)
-- **KB 召回评测常态化（2026-09-09 Zcode，方向 3，T0–T3/T5/T6 完成）**：130 条独立标注评测集冻结（62 卡覆盖/盲态复核 0% 分歧）+ `rankFlowCards` 真实排序（`matchFlowForAtom` 语义不变）+ `scripts/kb/recall-eval.mjs` 指标运行器 + PY 一致性 62%；**v1 基线 Acc@1 0.65**（B 层改写 0.23 / D 层短码 0.33 = 算法缺口另立项）；报告 [`reports/2026-09-09-kb-recall-eval-baseline.md`](reports/2026-09-09-kb-recall-eval-baseline.md)。**待办：G1 reviewer 抽检 → G2 Lead 批阈值 → T4 门禁写入 + verify-all 注册**
+- **KB 召回评测常态化（2026-09-09/10 Zcode，方向 3，T0–T7 全部完成）**：130 条独立标注评测集冻结（62 卡覆盖/盲态复核 0% 分歧）+ `rankFlowCards` 真实排序（`matchFlowForAtom` 语义不变）+ `scripts/kb/recall-eval.mjs` 指标运行器 + PY 一致性 62%；**v1 基线 Acc@1 0.65**（B 层改写 0.23 / D 层短码 0.33 = 算法缺口另立项）；G1 PASS（新标 11/11）/ G2 PASS（阈值无条件批准）；**T4 门禁已写入**（`characterize-kb-recall-eval.mjs` 4 断言 + verify-all 注册 + 自证红/绿 + reviewer 三建议落地）→ **待 G3 终局结论**；报告 [`reports/2026-09-09-kb-recall-eval-baseline.md`](reports/2026-09-09-kb-recall-eval-baseline.md)
 
 ### ⑧′ 未来方向（下版评审提出 · 下下版开发）
 
@@ -61,7 +61,7 @@
 - **恢复条件**：SUT 管理员给 X0018 角色配置用户（建议绑 WN0001/黄亮）。
 - **恢复后续接（一棒收尾）**：YXPC20260907012045 待发起单【修改】续做——利率/担保/行政区划已全部维护保存（traj 616 续棒实证，配方 `tmp/kb-mainchain/R6-usage-apply/rate-field-recipe.md`，精华已入 credit_usage 卡 4 条规则 71612302）——只差末步流程提交→选人黄亮→用信审批段（701994/WN0001 交替，配方同 R4）→用信批复核验 → R7 合同签订（批复生效后主合同自动创建，止于已保存态）。
 - 附带：R1 建的信贷预客户需完整建档转正才能进评级/授信可选范围（主链前置缺口，见 customer_onboarding 卡 pendingSteps）；T3.1 heal live 验收/P6-4 终验随主链解锁一并做。
-- **引擎管线对抗 review 修复（2026-09-10 凌晨，本周收尾）**：09-09 三路对抗 review（[`reports/2026-09-09-engine-pipeline-adversarial-review.md`](reports/2026-09-09-engine-pipeline-adversarial-review.md)）的 **P0-1 runId 桥接 / P0-2 stop 级联 / P0-3 90s 门闩 / P1-4 Python 事件归属**已离线修复+表征（`583ddeb0`/`9eb94716`/`239711cf`，新门禁 `characterize-runid-bridge` 入 verify-all）；P1-5 batch 409 已重归类（`1eecf87`）。**真机湿测未做**——验收三件套见挂起表 `engine-wet-trio`。
+- **引擎管线对抗 review 修复（2026-09-10 凌晨，本周收尾）**：09-09 三路对抗 review（[`reports/2026-09-09-engine-pipeline-adversarial-review.md`](reports/2026-09-09-engine-pipeline-adversarial-review.md)）的 **P0-1 runId 桥接 / P0-2 stop 级联 / P0-3 90s 门闩 / P1-4 Python 事件归属**已离线修复+表征（`583ddeb0`/`9eb94716`/`239711cf`，新门禁 `characterize-runid-bridge` 入 verify-all）；P1-5 batch 409 已重归类（`1eecf87`）。湿测：**①重录场景 2026-09-10 用户确认 PASS**（控制面 20260909-1956 上服后重新录制正常，误弹不复现）；②③（detach→重附门闩、并发 start）见挂起表 `engine-wet-trio`。
 
 ### ⑦ KB 流程卡供给（2026-09-06 转向：服务主链，不追全量）
 
@@ -131,7 +131,7 @@
 | **PR-LOC-HL** | 前端主力 | 步骤级高亮（bbox 画框）本体由前端开发；前置=screenshot-quality 截图优化完成后做；后端待前端推送结构要求后改数据结构（G 阶段内状态组截图已落 `0e1bee0`） |
 | **login-retry-heuristic** | P3 | prepare 登录冷启动失败固定等 8s 重试一次（attach-runner.js:197）是启发式非事件驱动，慢环境会误判失败；改事件驱动/指数退避（来源：2026-09-05 会话生命周期梳理 §5.8） |
 | **stop-busy-race** | P3 | record/stop 不等 busy（可能 stale）直接发 cancel_step（record-lifecycle.js:321 注释自认）；**2026-09-10 更新：finally 补发已按 runId 归属守卫无害化（9eb94716），独立改造不再另立** |
-| **engine-wet-trio** | P1 | 对抗 review 修复真机湿测三件套（代码已备 583ddeb0/9eb94716，验收必须湿测）：①stop→立即重录压测（P0-2 守卫）②detach→重附后 90s 门闩（P0-3 CAS）③双击/批+手并发 start（P1-5 per-tid 内存互斥未做，现仅 batch 409 归类） |
+| **engine-wet-trio** | P1 部分闭 | 对抗 review 修复真机湿测三件套（代码已备 583ddeb0/9eb94716，验收必须湿测）：①stop→立即重录压测（P0-2 守卫）**已湿测 PASS（2026-09-10 用户确认：重录已无问题，误弹「AI 录制结束」不复现；控制面 20260909-1956 已上服）**②detach→重附后 90s 门闩（P0-3 CAS）待测 ③双击/批+手并发 start（P1-5 per-tid 内存互斥未做，现仅 batch 409 归类）待测 |
 | **p1-6-replayid** | P2 | replay_done 等待无关联：replayId 全链回带过滤 + 超时发 cancel_step（replay-actions.js:47 / rerun-replay-service.js:73），防旧 replay done 误满足新登录等待 |
 | **p2-batch-lease** | P3 | BATCH_ITEM_LEASE_MS=600000 恰 10 分钟且录制期无续租；长登录+多阶段可超租→item 被二次 claim 双跑，是否实际发生需湿测 |
 | **p2-toast-cursor** | P3 | step_notice toast 游标跨导航不回卷（scripts/agent/step_notice.py:117，`log_len<cursor` 应重置游标+清 `_step_notice_seen`）；**js_snippets 同名副本在 fill/select 热区，同步待他线冷却** |
