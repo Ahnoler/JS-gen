@@ -1,10 +1,9 @@
 {
   "snapshotVersion": "v1",
   "changeLog": [
-    "v1 (2026-09-11): initial snapshot per spec 2026-09-11-kb-coverage-retrospective-design §3",
-    "v1.1 (2026-09-11, G-verdict D1/D5): page_level_key no longer dropped by the 40-char guard — redacted to host#/route (query stripped, dialog/anchor suffixes removed); createdDate → ISO (year present, timezone-stable)"
+    "v1 (2026-09-11): initial snapshot per spec 2026-09-11-kb-coverage-retrospective-design §3"
   ],
-  "capturedAt": "2026-09-10T16:40:58.700Z",
+  "capturedAt": "2026-09-10T16:29:58.376Z",
   "counts": {
     "trajectories": 416,
     "withPageId": 370,
@@ -25,7 +24,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 28,
-      "createdDate": "2026-07-22",
+      "createdDate": "Wed Jul 22",
       "urlCodes": {
         "fsFromPath": "FS00005518"
       },
@@ -45,7 +44,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 120,
-      "createdDate": "2026-07-23",
+      "createdDate": "Thu Jul 23",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -60,7 +59,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 1,
       "stepCount": 24,
-      "createdDate": "2026-07-23",
+      "createdDate": "Thu Jul 23",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -93,7 +92,7 @@
       "pageId": null,
       "phaseCount": 3,
       "stepCount": 62,
-      "createdDate": "2026-07-24",
+      "createdDate": "Fri Jul 24",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -111,7 +110,7 @@
       "pageId": null,
       "phaseCount": 12,
       "stepCount": 31,
-      "createdDate": "2026-07-28",
+      "createdDate": "Tue Jul 28",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -126,7 +125,7 @@
       "pageId": null,
       "phaseCount": 3,
       "stepCount": 67,
-      "createdDate": "2026-07-29",
+      "createdDate": "Wed Jul 29",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -144,7 +143,7 @@
       "pageId": null,
       "phaseCount": 5,
       "stepCount": 20,
-      "createdDate": "2026-07-29",
+      "createdDate": "Wed Jul 29",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -159,7 +158,7 @@
       "pageId": null,
       "phaseCount": 4,
       "stepCount": 11,
-      "createdDate": "2026-07-29",
+      "createdDate": "Wed Jul 29",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -175,7 +174,7 @@
       "pageId": null,
       "phaseCount": 4,
       "stepCount": 97,
-      "createdDate": "2026-07-29",
+      "createdDate": "Wed Jul 29",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -194,7 +193,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 12,
       "stepCount": 23,
-      "createdDate": "2026-07-30",
+      "createdDate": "Thu Jul 30",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -210,7 +209,7 @@
       "pageId": null,
       "phaseCount": 5,
       "stepCount": 6,
-      "createdDate": "2026-07-31",
+      "createdDate": "Fri Jul 31",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -225,7 +224,7 @@
       "pageId": "ZJJK00095902",
       "phaseCount": 6,
       "stepCount": 22,
-      "createdDate": "2026-07-31",
+      "createdDate": "Fri Jul 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -248,7 +247,7 @@
       "pageId": "ZJJK00095454",
       "phaseCount": 5,
       "stepCount": 29,
-      "createdDate": "2026-08-03",
+      "createdDate": "Mon Aug 03",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -266,7 +265,7 @@
       "pageId": "ZJJK00095907",
       "phaseCount": 6,
       "stepCount": 22,
-      "createdDate": "2026-08-04",
+      "createdDate": "Tue Aug 04",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -283,7 +282,7 @@
       "pageId": null,
       "phaseCount": 5,
       "stepCount": 20,
-      "createdDate": "2026-08-04",
+      "createdDate": "Tue Aug 04",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -300,7 +299,7 @@
       "pageId": "AILZ1788585494263",
       "phaseCount": 5,
       "stepCount": 19,
-      "createdDate": "2026-08-04",
+      "createdDate": "Tue Aug 04",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -319,7 +318,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 12,
       "stepCount": 44,
-      "createdDate": "2026-08-04",
+      "createdDate": "Tue Aug 04",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -337,7 +336,7 @@
       "pageId": null,
       "phaseCount": 7,
       "stepCount": 62,
-      "createdDate": "2026-08-05",
+      "createdDate": "Wed Aug 05",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -355,7 +354,7 @@
       "pageId": null,
       "phaseCount": 9,
       "stepCount": 3,
-      "createdDate": "2026-08-05",
+      "createdDate": "Wed Aug 05",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -370,7 +369,7 @@
       "pageId": null,
       "phaseCount": 2,
       "stepCount": 0,
-      "createdDate": "2026-08-05",
+      "createdDate": "Wed Aug 05",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -383,7 +382,7 @@
       "pageId": null,
       "phaseCount": 17,
       "stepCount": 52,
-      "createdDate": "2026-08-06",
+      "createdDate": "Thu Aug 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -403,7 +402,7 @@
       "pageId": null,
       "phaseCount": 8,
       "stepCount": 40,
-      "createdDate": "2026-08-07",
+      "createdDate": "Fri Aug 07",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -421,7 +420,7 @@
       "pageId": null,
       "phaseCount": 1,
       "stepCount": 1,
-      "createdDate": "2026-08-08",
+      "createdDate": "Sat Aug 08",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -436,7 +435,7 @@
       "pageId": null,
       "phaseCount": 1,
       "stepCount": 1,
-      "createdDate": "2026-08-08",
+      "createdDate": "Sat Aug 08",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -451,7 +450,7 @@
       "pageId": null,
       "phaseCount": 2,
       "stepCount": 15,
-      "createdDate": "2026-08-10",
+      "createdDate": "Mon Aug 10",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -469,7 +468,7 @@
       "pageId": null,
       "phaseCount": 2,
       "stepCount": 14,
-      "createdDate": "2026-08-10",
+      "createdDate": "Mon Aug 10",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -487,7 +486,7 @@
       "pageId": null,
       "phaseCount": 4,
       "stepCount": 13,
-      "createdDate": "2026-08-10",
+      "createdDate": "Mon Aug 10",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -505,7 +504,7 @@
       "pageId": null,
       "phaseCount": 1,
       "stepCount": 6,
-      "createdDate": "2026-08-10",
+      "createdDate": "Mon Aug 10",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -521,7 +520,7 @@
       "pageId": null,
       "phaseCount": 5,
       "stepCount": 29,
-      "createdDate": "2026-08-10",
+      "createdDate": "Mon Aug 10",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -545,7 +544,7 @@
       "pageId": null,
       "phaseCount": 5,
       "stepCount": 19,
-      "createdDate": "2026-08-11",
+      "createdDate": "Tue Aug 11",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -564,7 +563,7 @@
       "pageId": null,
       "phaseCount": 8,
       "stepCount": 64,
-      "createdDate": "2026-08-11",
+      "createdDate": "Tue Aug 11",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -582,7 +581,7 @@
       "pageId": null,
       "phaseCount": 5,
       "stepCount": 12,
-      "createdDate": "2026-08-11",
+      "createdDate": "Tue Aug 11",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -600,7 +599,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 4,
       "stepCount": 41,
-      "createdDate": "2026-08-13",
+      "createdDate": "Thu Aug 13",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -651,7 +650,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 4,
       "stepCount": 32,
-      "createdDate": "2026-08-13",
+      "createdDate": "Thu Aug 13",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -670,7 +669,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 4,
       "stepCount": 38,
-      "createdDate": "2026-08-13",
+      "createdDate": "Thu Aug 13",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -689,7 +688,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 4,
-      "createdDate": "2026-08-19",
+      "createdDate": "Wed Aug 19",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -709,7 +708,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-08-19",
+      "createdDate": "Wed Aug 19",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -729,7 +728,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-08-19",
+      "createdDate": "Wed Aug 19",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -749,7 +748,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-08-19",
+      "createdDate": "Wed Aug 19",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -769,7 +768,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-08-19",
+      "createdDate": "Wed Aug 19",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -789,7 +788,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-08-19",
+      "createdDate": "Wed Aug 19",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -809,7 +808,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-08-19",
+      "createdDate": "Wed Aug 19",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -829,7 +828,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 3,
       "stepCount": 16,
-      "createdDate": "2026-08-20",
+      "createdDate": "Thu Aug 20",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -860,7 +859,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 5,
-      "createdDate": "2026-08-21",
+      "createdDate": "Fri Aug 21",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -886,7 +885,7 @@
       "pageId": null,
       "phaseCount": 1,
       "stepCount": 1,
-      "createdDate": "2026-08-26",
+      "createdDate": "Wed Aug 26",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -906,7 +905,7 @@
       "pageId": null,
       "phaseCount": 1,
       "stepCount": 1,
-      "createdDate": "2026-08-27",
+      "createdDate": "Thu Aug 27",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -926,7 +925,7 @@
       "pageId": null,
       "phaseCount": 3,
       "stepCount": 0,
-      "createdDate": "2026-08-30",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -939,7 +938,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -952,7 +951,7 @@
       "pageId": "AILZ1788182714433",
       "phaseCount": 0,
       "stepCount": 17,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -994,7 +993,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1007,7 +1006,7 @@
       "pageId": "AILZ1788183219509",
       "phaseCount": 0,
       "stepCount": 18,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1050,7 +1049,7 @@
       "pageId": "AILZ1788183637269",
       "phaseCount": 0,
       "stepCount": 17,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1092,7 +1091,7 @@
       "pageId": "AILZ1788183813539",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1114,7 +1113,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1127,7 +1126,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1140,7 +1139,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1153,7 +1152,7 @@
       "pageId": "AILZ1788186363742",
       "phaseCount": 0,
       "stepCount": 17,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1195,7 +1194,7 @@
       "pageId": "AILZ1788187437948",
       "phaseCount": 0,
       "stepCount": 19,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1238,7 +1237,7 @@
       "pageId": "AILZ1788189529969",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1282,7 +1281,7 @@
       "pageId": "AILZ1788190652973",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1326,7 +1325,7 @@
       "pageId": "AILZ1788190894529",
       "phaseCount": 0,
       "stepCount": 24,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1372,7 +1371,7 @@
       "pageId": "AILZ1788191748918",
       "phaseCount": 0,
       "stepCount": 26,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1418,7 +1417,7 @@
       "pageId": "AILZ1788191941281",
       "phaseCount": 0,
       "stepCount": 26,
-      "createdDate": "2026-08-31",
+      "createdDate": "Mon Aug 31",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1464,7 +1463,7 @@
       "pageId": "AILZ1788192146421",
       "phaseCount": 0,
       "stepCount": 25,
-      "createdDate": "2026-08-31",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1509,7 +1508,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1522,7 +1521,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1535,7 +1534,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1548,7 +1547,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1561,7 +1560,7 @@
       "pageId": "AILZ1788237376581",
       "phaseCount": 0,
       "stepCount": 2,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -1577,7 +1576,7 @@
       "pageId": "AILZ1788237481075",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -1595,7 +1594,7 @@
       "pageId": "AILZ1788237600116",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1622,7 +1621,7 @@
       "pageId": "AILZ1788237680622",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1649,7 +1648,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 1,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -1664,7 +1663,7 @@
       "pageId": "AILZ1788252412242",
       "phaseCount": 0,
       "stepCount": 35,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1707,7 +1706,7 @@
       "pageId": "AILZ1788252834597",
       "phaseCount": 0,
       "stepCount": 6,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1735,7 +1734,7 @@
       "pageId": "AILZ1788252970874",
       "phaseCount": 0,
       "stepCount": 35,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1778,7 +1777,7 @@
       "pageId": "AILZ1788253299313",
       "phaseCount": 0,
       "stepCount": 90,
-      "createdDate": "2026-09-01",
+      "createdDate": "Tue Sep 01",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1851,7 +1850,7 @@
       "pageId": "AILZ1788284706539",
       "phaseCount": 0,
       "stepCount": 3,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1872,7 +1871,7 @@
       "pageId": "AILZ1788284811603",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1894,7 +1893,7 @@
       "pageId": "AILZ1788284868322",
       "phaseCount": 0,
       "stepCount": 8,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1923,7 +1922,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -1936,7 +1935,7 @@
       "pageId": "AILZ1788284956238",
       "phaseCount": 0,
       "stepCount": 1,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -1952,7 +1951,7 @@
       "pageId": "AILZ1788285014124",
       "phaseCount": 0,
       "stepCount": 3,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -1973,7 +1972,7 @@
       "pageId": "AILZ1788285080160",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2003,7 +2002,7 @@
       "pageId": "AILZ1788285221409",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2029,7 +2028,7 @@
       "pageId": "AILZ1788285323874",
       "phaseCount": 0,
       "stepCount": 14,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2064,7 +2063,7 @@
       "pageId": "AILZ1788285490785",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2090,7 +2089,7 @@
       "pageId": "AILZ1788285557434",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2120,7 +2119,7 @@
       "pageId": "AILZ1788285618936",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2150,7 +2149,7 @@
       "pageId": "AILZ1788285700284",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2180,7 +2179,7 @@
       "pageId": "AILZ1788285822109",
       "phaseCount": 0,
       "stepCount": 9,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2211,7 +2210,7 @@
       "pageId": "AILZ1788285926453",
       "phaseCount": 0,
       "stepCount": 8,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2243,7 +2242,7 @@
       "pageId": "AILZ1788286039791",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2273,7 +2272,7 @@
       "pageId": "AILZ1788286142400",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2300,7 +2299,7 @@
       "pageId": "AILZ1788286400206",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2335,7 +2334,7 @@
       "pageId": "AILZ1788286517798",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2365,7 +2364,7 @@
       "pageId": "AILZ1788286618264",
       "phaseCount": 0,
       "stepCount": 15,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2400,7 +2399,7 @@
       "pageId": "AILZ1788286906011",
       "phaseCount": 0,
       "stepCount": 14,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2435,7 +2434,7 @@
       "pageId": "AILZ1788287133582",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2469,7 +2468,7 @@
       "pageId": "AILZ1788287366440",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2503,7 +2502,7 @@
       "pageId": "AILZ1788287532915",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2537,7 +2536,7 @@
       "pageId": "AILZ1788287707638",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2571,7 +2570,7 @@
       "pageId": "AILZ1788287889094",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2597,7 +2596,7 @@
       "pageId": "AILZ1788288009054",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2631,7 +2630,7 @@
       "pageId": "AILZ1788288154214",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2665,7 +2664,7 @@
       "pageId": "AILZ1788288329997",
       "phaseCount": 0,
       "stepCount": 14,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2699,7 +2698,7 @@
       "pageId": "AILZ1788288537641",
       "phaseCount": 0,
       "stepCount": 16,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2734,7 +2733,7 @@
       "pageId": "AILZ1788288876556",
       "phaseCount": 0,
       "stepCount": 19,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2769,7 +2768,7 @@
       "pageId": "AILZ1788289182099",
       "phaseCount": 0,
       "stepCount": 19,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2804,7 +2803,7 @@
       "pageId": "AILZ1788289429554",
       "phaseCount": 0,
       "stepCount": 19,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2839,7 +2838,7 @@
       "pageId": "AILZ1788289675230",
       "phaseCount": 0,
       "stepCount": 20,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2874,7 +2873,7 @@
       "pageId": "AILZ1788290463499",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2904,7 +2903,7 @@
       "pageId": "AILZ1788290652423",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2934,7 +2933,7 @@
       "pageId": "AILZ1788291065198",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2964,7 +2963,7 @@
       "pageId": "AILZ1788291240232",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -2998,7 +2997,7 @@
       "pageId": "AILZ1788291362602",
       "phaseCount": 0,
       "stepCount": 28,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3050,7 +3049,7 @@
       "pageId": "AILZ1788291613066",
       "phaseCount": 0,
       "stepCount": 19,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3091,7 +3090,7 @@
       "pageId": "AILZ1788291856730",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3136,7 +3135,7 @@
       "pageId": "AILZ1788292310516",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3181,7 +3180,7 @@
       "pageId": "AILZ1788292771082",
       "phaseCount": 0,
       "stepCount": 24,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3234,7 +3233,7 @@
       "pageId": "AILZ1788292957433",
       "phaseCount": 0,
       "stepCount": 2,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -3250,7 +3249,7 @@
       "pageId": "AILZ1788293024911",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3272,7 +3271,7 @@
       "pageId": "AILZ1788293095138",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3294,7 +3293,7 @@
       "pageId": "AILZ1788293165865",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3339,7 +3338,7 @@
       "pageId": "AILZ1788293333596",
       "phaseCount": 0,
       "stepCount": 28,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3393,7 +3392,7 @@
       "pageId": "AILZ1788293554214",
       "phaseCount": 0,
       "stepCount": 33,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3452,7 +3451,7 @@
       "pageId": "AILZ1788293781406",
       "phaseCount": 0,
       "stepCount": 34,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3511,7 +3510,7 @@
       "pageId": "AILZ1788294013886",
       "phaseCount": 0,
       "stepCount": 33,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3570,7 +3569,7 @@
       "pageId": "AILZ1788294235781",
       "phaseCount": 0,
       "stepCount": 36,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3629,7 +3628,7 @@
       "pageId": "AILZ1788294472637",
       "phaseCount": 0,
       "stepCount": 35,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3688,7 +3687,7 @@
       "pageId": "AILZ1788294713114",
       "phaseCount": 0,
       "stepCount": 35,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3747,7 +3746,7 @@
       "pageId": "AILZ1788294941129",
       "phaseCount": 0,
       "stepCount": 35,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3806,7 +3805,7 @@
       "pageId": "AILZ1788295179232",
       "phaseCount": 0,
       "stepCount": 36,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3865,7 +3864,7 @@
       "pageId": "AILZ1788295618741",
       "phaseCount": 0,
       "stepCount": 3,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3886,7 +3885,7 @@
       "pageId": "AILZ1788295673905",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3915,7 +3914,7 @@
       "pageId": "AILZ1788295831478",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3938,7 +3937,7 @@
       "pageId": "AILZ1788295928753",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -3960,7 +3959,7 @@
       "pageId": "AILZ1788295985246",
       "phaseCount": 0,
       "stepCount": 21,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4004,7 +4003,7 @@
       "pageId": "AILZ1788296166930",
       "phaseCount": 0,
       "stepCount": 78,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4124,7 +4123,7 @@
       "pageId": "AILZ1788296743245",
       "phaseCount": 0,
       "stepCount": 12,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4162,7 +4161,7 @@
       "pageId": "AILZ1788296867538",
       "phaseCount": 0,
       "stepCount": 106,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4282,7 +4281,7 @@
       "pageId": "AILZ1788297650215",
       "phaseCount": 0,
       "stepCount": 8,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4314,7 +4313,7 @@
       "pageId": "AILZ1788297778758",
       "phaseCount": 0,
       "stepCount": 114,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4433,7 +4432,7 @@
       "pageId": "AILZ1788298591476",
       "phaseCount": 0,
       "stepCount": 7,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4464,7 +4463,7 @@
       "pageId": "AILZ1788298704402",
       "phaseCount": 0,
       "stepCount": 94,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4567,7 +4566,7 @@
       "pageId": "AILZ1788299435774",
       "phaseCount": 0,
       "stepCount": 87,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4662,7 +4661,7 @@
       "pageId": "AILZ1788300347034",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4703,7 +4702,7 @@
       "pageId": "AILZ1788300530633",
       "phaseCount": 0,
       "stepCount": 27,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4764,7 +4763,7 @@
       "pageId": "AILZ1788300914806",
       "phaseCount": 0,
       "stepCount": 50,
-      "createdDate": "2026-09-01",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4841,7 +4840,7 @@
       "pageId": "AILZ1788324563743",
       "phaseCount": 0,
       "stepCount": 50,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4918,7 +4917,7 @@
       "pageId": "AILZ1788324936635",
       "phaseCount": 0,
       "stepCount": 53,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -4985,7 +4984,7 @@
       "pageId": "AILZ1788325371636",
       "phaseCount": 0,
       "stepCount": 53,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5052,7 +5051,7 @@
       "pageId": "AILZ1788325836320",
       "phaseCount": 0,
       "stepCount": 50,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5130,7 +5129,7 @@
       "pageId": null,
       "phaseCount": 3,
       "stepCount": 22,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5167,7 +5166,7 @@
       "pageId": null,
       "phaseCount": 7,
       "stepCount": 98,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5249,7 +5248,7 @@
       "pageId": null,
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5269,7 +5268,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5289,7 +5288,7 @@
       "pageId": "AILZ1788346316768",
       "phaseCount": 0,
       "stepCount": 14,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5321,7 +5320,7 @@
       "pageId": "AILZ1788347395552",
       "phaseCount": 0,
       "stepCount": 3,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5342,7 +5341,7 @@
       "pageId": "AILZ1788347469393",
       "phaseCount": 0,
       "stepCount": 19,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5382,7 +5381,7 @@
       "pageId": "AILZ1788347715895",
       "phaseCount": 0,
       "stepCount": 19,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5422,7 +5421,7 @@
       "pageId": "AILZ1788347972604",
       "phaseCount": 0,
       "stepCount": 25,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5469,7 +5468,7 @@
       "pageId": "AILZ1788348232546",
       "phaseCount": 0,
       "stepCount": 25,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5516,7 +5515,7 @@
       "pageId": "AILZ1788351047088",
       "phaseCount": 0,
       "stepCount": 24,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5555,7 +5554,7 @@
       "pageId": "AILZ1788351474951",
       "phaseCount": 0,
       "stepCount": 25,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5594,7 +5593,7 @@
       "pageId": "AILZ1788351883975",
       "phaseCount": 0,
       "stepCount": 17,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5633,7 +5632,7 @@
       "pageId": "AILZ1788352264036",
       "phaseCount": 0,
       "stepCount": 16,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5672,7 +5671,7 @@
       "pageId": "AILZ1788352412428",
       "phaseCount": 0,
       "stepCount": 18,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5711,7 +5710,7 @@
       "pageId": "AILZ1788352543688",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5749,7 +5748,7 @@
       "pageId": "AILZ1788352787431",
       "phaseCount": 0,
       "stepCount": 15,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5789,7 +5788,7 @@
       "pageId": "AILZ1788352922692",
       "phaseCount": 0,
       "stepCount": 20,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5829,7 +5828,7 @@
       "pageId": "AILZ1788353176965",
       "phaseCount": 0,
       "stepCount": 20,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5869,7 +5868,7 @@
       "pageId": "AILZ1788353368495",
       "phaseCount": 0,
       "stepCount": 27,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5922,7 +5921,7 @@
       "pageId": "AILZ1788353873073",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -5958,7 +5957,7 @@
       "pageId": "AILZ1788354002195",
       "phaseCount": 0,
       "stepCount": 44,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6059,7 +6058,7 @@
       "pageId": "AILZ1788354453770",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6092,7 +6091,7 @@
       "pageId": "AILZ1788354553174",
       "phaseCount": 0,
       "stepCount": 9,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6124,7 +6123,7 @@
       "pageId": "AILZ1788354761951",
       "phaseCount": 0,
       "stepCount": 61,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6233,7 +6232,7 @@
       "pageId": "AILZ1788355356308",
       "phaseCount": 0,
       "stepCount": 69,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6362,7 +6361,7 @@
       "pageId": "AILZ1788356226553",
       "phaseCount": 0,
       "stepCount": 73,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6499,7 +6498,7 @@
       "pageId": "AILZ1788356747642",
       "phaseCount": 0,
       "stepCount": 74,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6636,7 +6635,7 @@
       "pageId": "AILZ1788357288572",
       "phaseCount": 0,
       "stepCount": 76,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6757,7 +6756,7 @@
       "pageId": "AILZ1788357857745",
       "phaseCount": 0,
       "stepCount": 77,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6878,7 +6877,7 @@
       "pageId": "AILZ1788358406533",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6915,7 +6914,7 @@
       "pageId": "AILZ1788361637291",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -6966,7 +6965,7 @@
       "pageId": "AILZ1788361862055",
       "phaseCount": 0,
       "stepCount": 70,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7071,7 +7070,7 @@
       "pageId": "AILZ1788362948707",
       "phaseCount": 0,
       "stepCount": 28,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7131,7 +7130,7 @@
       "pageId": "AILZ1788363412274",
       "phaseCount": 0,
       "stepCount": 30,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7175,7 +7174,7 @@
       "pageId": "AILZ1788363923205",
       "phaseCount": 0,
       "stepCount": 24,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7223,7 +7222,7 @@
       "pageId": "AILZ1788364587299",
       "phaseCount": 0,
       "stepCount": 24,
-      "createdDate": "2026-09-02",
+      "createdDate": "Wed Sep 02",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7271,7 +7270,7 @@
       "pageId": "AILZ1788365160051",
       "phaseCount": 0,
       "stepCount": 28,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7320,7 +7319,7 @@
       "pageId": "AILZ1788365820795",
       "phaseCount": 0,
       "stepCount": 28,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7369,7 +7368,7 @@
       "pageId": "AILZ1788366584304",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7402,7 +7401,7 @@
       "pageId": "AILZ1788366702736",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7435,7 +7434,7 @@
       "pageId": "AILZ1788366811559",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7468,7 +7467,7 @@
       "pageId": "AILZ1788366930549",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7501,7 +7500,7 @@
       "pageId": "AILZ1788367040617",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7534,7 +7533,7 @@
       "pageId": "AILZ1788367201947",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7567,7 +7566,7 @@
       "pageId": "AILZ1788367317296",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7600,7 +7599,7 @@
       "pageId": "AILZ1788367423186",
       "phaseCount": 0,
       "stepCount": 12,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7633,7 +7632,7 @@
       "pageId": "AILZ1788367646641",
       "phaseCount": 0,
       "stepCount": 12,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7666,7 +7665,7 @@
       "pageId": "AILZ1788367788939",
       "phaseCount": 0,
       "stepCount": 14,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7699,7 +7698,7 @@
       "pageId": "AILZ1788367903350",
       "phaseCount": 0,
       "stepCount": 14,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7732,7 +7731,7 @@
       "pageId": "AILZ1788368031852",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7765,7 +7764,7 @@
       "pageId": "AILZ1788368206999",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7798,7 +7797,7 @@
       "pageId": "AILZ1788368365475",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7831,7 +7830,7 @@
       "pageId": "AILZ1788368489149",
       "phaseCount": 0,
       "stepCount": 1,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -7846,7 +7845,7 @@
       "pageId": "AILZ1788368577770",
       "phaseCount": 0,
       "stepCount": 12,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7880,7 +7879,7 @@
       "pageId": "AILZ1788368699469",
       "phaseCount": 0,
       "stepCount": 80,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -7990,7 +7989,7 @@
       "pageId": "AILZ1788371350292",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -8005,7 +8004,7 @@
       "pageId": "AILZ1788371529535",
       "phaseCount": 0,
       "stepCount": 5,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -8020,7 +8019,7 @@
       "pageId": "AILZ1788371663887",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8069,7 +8068,7 @@
       "pageId": "AILZ1788371922144",
       "phaseCount": 0,
       "stepCount": 20,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8118,7 +8117,7 @@
       "pageId": "AILZ1788372093992",
       "phaseCount": 0,
       "stepCount": 21,
-      "createdDate": "2026-09-02",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8168,7 +8167,7 @@
       "pageId": "AILZ1788400730771",
       "phaseCount": 0,
       "stepCount": 3,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8189,7 +8188,7 @@
       "pageId": "AILZ1788400794539",
       "phaseCount": 0,
       "stepCount": 93,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8306,7 +8305,7 @@
       "pageId": "AILZ1788401309315",
       "phaseCount": 0,
       "stepCount": 40,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8374,7 +8373,7 @@
       "pageId": "AILZ1788401598046",
       "phaseCount": 0,
       "stepCount": 39,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8437,7 +8436,7 @@
       "pageId": "AILZ1788401911105",
       "phaseCount": 0,
       "stepCount": 37,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8496,7 +8495,7 @@
       "pageId": "AILZ1788402098450",
       "phaseCount": 0,
       "stepCount": 39,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8552,7 +8551,7 @@
       "pageId": "AILZ1788402343692",
       "phaseCount": 0,
       "stepCount": 39,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8608,7 +8607,7 @@
       "pageId": "AILZ1788402627188",
       "phaseCount": 0,
       "stepCount": 39,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8664,7 +8663,7 @@
       "pageId": "AILZ1788402796380",
       "phaseCount": 0,
       "stepCount": 36,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8718,7 +8717,7 @@
       "pageId": "AILZ1788403098646",
       "phaseCount": 0,
       "stepCount": 17,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8756,7 +8755,7 @@
       "pageId": "AILZ1788403290514",
       "phaseCount": 0,
       "stepCount": 39,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8816,7 +8815,7 @@
       "pageId": "AILZ1788403808345",
       "phaseCount": 0,
       "stepCount": 39,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8871,7 +8870,7 @@
       "pageId": "AILZ1788404115837",
       "phaseCount": 0,
       "stepCount": 22,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8912,7 +8911,7 @@
       "pageId": "AILZ1788404319719",
       "phaseCount": 0,
       "stepCount": 35,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -8966,7 +8965,7 @@
       "pageId": "AILZ1788404624406",
       "phaseCount": 0,
       "stepCount": 17,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9003,7 +9002,7 @@
       "pageId": "AILZ1788404829314",
       "phaseCount": 0,
       "stepCount": 28,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9041,7 +9040,7 @@
       "pageId": "AILZ1788405061501",
       "phaseCount": 0,
       "stepCount": 21,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9079,7 +9078,7 @@
       "pageId": "AILZ1788405342521",
       "phaseCount": 0,
       "stepCount": 59,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9185,7 +9184,7 @@
       "pageId": "AILZ1788405736120",
       "phaseCount": 0,
       "stepCount": 62,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9292,7 +9291,7 @@
       "pageId": "AILZ1788406467801",
       "phaseCount": 0,
       "stepCount": 62,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9395,7 +9394,7 @@
       "pageId": "AILZ1788407039216",
       "phaseCount": 0,
       "stepCount": 63,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9498,7 +9497,7 @@
       "pageId": "AILZ1788407425638",
       "phaseCount": 0,
       "stepCount": 51,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9581,7 +9580,7 @@
       "pageId": "AILZ1788407770008",
       "phaseCount": 0,
       "stepCount": 57,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9664,7 +9663,7 @@
       "pageId": "AILZ1788408234862",
       "phaseCount": 0,
       "stepCount": 52,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9747,7 +9746,7 @@
       "pageId": "AILZ1788408616042",
       "phaseCount": 0,
       "stepCount": 52,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9819,7 +9818,7 @@
       "pageId": "AILZ1788419157745",
       "phaseCount": 0,
       "stepCount": 79,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9897,7 +9896,7 @@
       "pageId": "AILZ1788419800757",
       "phaseCount": 0,
       "stepCount": 7,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9925,7 +9924,7 @@
       "pageId": "AILZ1788419936516",
       "phaseCount": 0,
       "stepCount": 23,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -9972,7 +9971,7 @@
       "pageId": "AILZ1788420192216",
       "phaseCount": 0,
       "stepCount": 27,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10024,7 +10023,7 @@
       "pageId": "AILZ1788420475754",
       "phaseCount": 0,
       "stepCount": 27,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10061,7 +10060,7 @@
       "pageId": "AILZ1788420830659",
       "phaseCount": 0,
       "stepCount": 52,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10097,7 +10096,7 @@
       "pageId": "AILZ1788421195851",
       "phaseCount": 0,
       "stepCount": 64,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10159,7 +10158,7 @@
       "pageId": "AILZ1788422012079",
       "phaseCount": 0,
       "stepCount": 56,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10230,7 +10229,7 @@
       "pageId": null,
       "phaseCount": 0,
       "stepCount": 0,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -10243,7 +10242,7 @@
       "pageId": "AILZ1788423130157",
       "phaseCount": 0,
       "stepCount": 82,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10324,7 +10323,7 @@
       "pageId": "AILZ1788423817736",
       "phaseCount": 0,
       "stepCount": 92,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10405,7 +10404,7 @@
       "pageId": "AILZ1788424606727",
       "phaseCount": 0,
       "stepCount": 147,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10545,7 +10544,7 @@
       "pageId": "AILZ1788425614133",
       "phaseCount": 0,
       "stepCount": 149,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10689,7 +10688,7 @@
       "pageId": "AILZ1788426688875",
       "phaseCount": 0,
       "stepCount": 154,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10833,7 +10832,7 @@
       "pageId": "AILZ1788431538116",
       "phaseCount": 0,
       "stepCount": 122,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10924,7 +10923,7 @@
       "pageId": "AILZ1788432469218",
       "phaseCount": 0,
       "stepCount": 24,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -10964,7 +10963,7 @@
       "pageId": "AILZ1788432798630",
       "phaseCount": 0,
       "stepCount": 126,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11136,7 +11135,7 @@
       "pageId": "AILZ1788433689537",
       "phaseCount": 0,
       "stepCount": 129,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11308,7 +11307,7 @@
       "pageId": "AILZ1788434466621",
       "phaseCount": 0,
       "stepCount": 63,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11382,7 +11381,7 @@
       "pageId": "AILZ1788436439567",
       "phaseCount": 0,
       "stepCount": 122,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11473,7 +11472,7 @@
       "pageId": "AILZ1788437571950",
       "phaseCount": 0,
       "stepCount": 138,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11604,7 +11603,7 @@
       "pageId": "AILZ1788438666892",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11630,7 +11629,7 @@
       "pageId": "AILZ1788438733296",
       "phaseCount": 0,
       "stepCount": 4,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11656,7 +11655,7 @@
       "pageId": "AILZ1788438800306",
       "phaseCount": 0,
       "stepCount": 18,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11698,7 +11697,7 @@
       "pageId": "AILZ1788439090760",
       "phaseCount": 0,
       "stepCount": 17,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11740,7 +11739,7 @@
       "pageId": "AILZ1788439256066",
       "phaseCount": 0,
       "stepCount": 16,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11781,7 +11780,7 @@
       "pageId": "AILZ1788439408714",
       "phaseCount": 0,
       "stepCount": 25,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11818,7 +11817,7 @@
       "pageId": "AILZ1788439602625",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11854,7 +11853,7 @@
       "pageId": "AILZ1788439705143",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11889,7 +11888,7 @@
       "pageId": "AILZ1788439799329",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11924,7 +11923,7 @@
       "pageId": "AILZ1788439895231",
       "phaseCount": 0,
       "stepCount": 10,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11960,7 +11959,7 @@
       "pageId": "AILZ1788439988491",
       "phaseCount": 0,
       "stepCount": 8,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -11993,7 +11992,7 @@
       "pageId": "AILZ1788442024763",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12036,7 +12035,7 @@
       "pageId": "AILZ1788442064108",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12079,7 +12078,7 @@
       "pageId": "AILZ1788442174017",
       "phaseCount": 0,
       "stepCount": 52,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12166,7 +12165,7 @@
       "pageId": "AILZ1788442496666",
       "phaseCount": 0,
       "stepCount": 35,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12222,7 +12221,7 @@
       "pageId": "AILZ1788442740557",
       "phaseCount": 0,
       "stepCount": 40,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12282,7 +12281,7 @@
       "pageId": "AILZ1788443019401",
       "phaseCount": 0,
       "stepCount": 11,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12322,7 +12321,7 @@
       "pageId": "AILZ1788443139262",
       "phaseCount": 0,
       "stepCount": 13,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12362,7 +12361,7 @@
       "pageId": "AILZ1788443256781",
       "phaseCount": 0,
       "stepCount": 26,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12417,7 +12416,7 @@
       "pageId": "AILZ1788443640660",
       "phaseCount": 0,
       "stepCount": 9,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12453,7 +12452,7 @@
       "pageId": "AILZ1788443890029",
       "phaseCount": 0,
       "stepCount": 7,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12480,7 +12479,7 @@
       "pageId": "AILZ1788443973438",
       "phaseCount": 0,
       "stepCount": 29,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12512,7 +12511,7 @@
       "pageId": "AILZ1788444622696",
       "phaseCount": 0,
       "stepCount": 26,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12567,7 +12566,7 @@
       "pageId": "AILZ1788444861373",
       "phaseCount": 0,
       "stepCount": 139,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12776,7 +12775,7 @@
       "pageId": "AILZ1788449086075",
       "phaseCount": 0,
       "stepCount": 95,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12855,7 +12854,7 @@
       "pageId": "AILZ1788449685150",
       "phaseCount": 0,
       "stepCount": 140,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -12986,7 +12985,7 @@
       "pageId": "AILZ1788450763942",
       "phaseCount": 0,
       "stepCount": 138,
-      "createdDate": "2026-09-03",
+      "createdDate": "Thu Sep 03",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13122,7 +13121,7 @@
       "pageId": "AILZ1788451863524",
       "phaseCount": 0,
       "stepCount": 111,
-      "createdDate": "2026-09-03",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13211,7 +13210,7 @@
       "pageId": "AILZ1788462288563",
       "phaseCount": 0,
       "stepCount": 138,
-      "createdDate": "2026-09-03",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13347,7 +13346,7 @@
       "pageId": "ZJJK00108359",
       "phaseCount": 0,
       "stepCount": 50,
-      "createdDate": "2026-09-03",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13415,7 +13414,7 @@
       "pageId": "AILZ1788463737584",
       "phaseCount": 0,
       "stepCount": 226,
-      "createdDate": "2026-09-03",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13597,7 +13596,7 @@
       "pageId": "AILZ1788500227800",
       "phaseCount": 0,
       "stepCount": 74,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13658,7 +13657,7 @@
       "pageId": "AILZ1788500647453",
       "phaseCount": 0,
       "stepCount": 104,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13727,7 +13726,7 @@
       "pageId": "AILZ1788501424057",
       "phaseCount": 0,
       "stepCount": 104,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13796,7 +13795,7 @@
       "pageId": "AILZ1788502396859",
       "phaseCount": 0,
       "stepCount": 142,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -13926,7 +13925,7 @@
       "pageId": "AILZ1788503493873",
       "phaseCount": 0,
       "stepCount": 9,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -13944,7 +13943,7 @@
       "pageId": "AILZ1788585501407",
       "phaseCount": 0,
       "stepCount": 139,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14073,7 +14072,7 @@
       "pageId": "AILZ1788511161075",
       "phaseCount": 0,
       "stepCount": 152,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14203,27 +14202,27 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 4,
       "stepCount": 12,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "产品"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "产品"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -14242,7 +14241,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 4,
       "stepCount": 10,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14280,7 +14279,7 @@
       "pageId": "AILZ1788523269587",
       "phaseCount": 0,
       "stepCount": 152,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14410,7 +14409,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 3,
       "stepCount": 8,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14444,7 +14443,7 @@
       "pageId": "AILZ1789036717850",
       "phaseCount": 5,
       "stepCount": 25,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14525,7 +14524,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 3,
       "stepCount": 6,
-      "createdDate": "2026-09-04",
+      "createdDate": "Fri Sep 04",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14556,7 +14555,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 3,
       "stepCount": 5,
-      "createdDate": "2026-09-04",
+      "createdDate": "Sat Sep 05",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14583,7 +14582,7 @@
       "pageId": "ZJJK00095902",
       "phaseCount": 4,
       "stepCount": 10,
-      "createdDate": "2026-09-04",
+      "createdDate": "Sat Sep 05",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14612,7 +14611,7 @@
       "pageId": "AILZ1788922547717",
       "phaseCount": 6,
       "stepCount": 9,
-      "createdDate": "2026-09-04",
+      "createdDate": "Sat Sep 05",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14640,7 +14639,7 @@
       "pageId": "ZJJK00095454",
       "phaseCount": 6,
       "stepCount": 21,
-      "createdDate": "2026-09-04",
+      "createdDate": "Sat Sep 05",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14681,7 +14680,7 @@
       "pageId": "ZJJK00095044",
       "phaseCount": 1,
       "stepCount": 4,
-      "createdDate": "2026-09-05",
+      "createdDate": "Sat Sep 05",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14701,7 +14700,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 3,
       "stepCount": 32,
-      "createdDate": "2026-09-05",
+      "createdDate": "Sat Sep 05",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14742,7 +14741,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 5,
       "stepCount": 8,
-      "createdDate": "2026-09-05",
+      "createdDate": "Sat Sep 05",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14771,7 +14770,7 @@
       "pageId": "ZJJK00104552",
       "phaseCount": 3,
       "stepCount": 4,
-      "createdDate": "2026-09-05",
+      "createdDate": "Sat Sep 05",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14794,7 +14793,7 @@
       "pageId": "AILZ1788690461421",
       "phaseCount": 3,
       "stepCount": 5,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14829,7 +14828,7 @@
       "pageId": "ZJJK00105242",
       "phaseCount": 4,
       "stepCount": 5,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14859,7 +14858,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 3,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14879,7 +14878,7 @@
       "pageId": "ZJJK00114418",
       "phaseCount": 4,
       "stepCount": 4,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14904,7 +14903,7 @@
       "pageId": "AILZ1788691643897",
       "phaseCount": 4,
       "stepCount": 5,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14926,7 +14925,7 @@
       "pageId": "ZJJK00105702",
       "phaseCount": 4,
       "stepCount": 3,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14947,7 +14946,7 @@
       "pageId": "ZJJK00096718",
       "phaseCount": 3,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14967,7 +14966,7 @@
       "pageId": "ZJJK00105269",
       "phaseCount": 3,
       "stepCount": 4,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -14988,7 +14987,7 @@
       "pageId": "ZJJK00097287",
       "phaseCount": 3,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15008,7 +15007,7 @@
       "pageId": "AILZ1788692313936",
       "phaseCount": 5,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -15023,7 +15022,7 @@
       "pageId": "AILZ1788692373514",
       "phaseCount": 3,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -15038,7 +15037,7 @@
       "pageId": "ZJJK00096096",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15058,7 +15057,7 @@
       "pageId": "ZJJK00096098",
       "phaseCount": 3,
       "stepCount": 0,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -15071,7 +15070,7 @@
       "pageId": "ZJJK00095811",
       "phaseCount": 3,
       "stepCount": 0,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -15084,7 +15083,7 @@
       "pageId": "ZJJK00168657PDCP",
       "phaseCount": 2,
       "stepCount": 0,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -15097,7 +15096,7 @@
       "pageId": "ZJJK00171540PDCP",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15117,7 +15116,7 @@
       "pageId": "ZJJK00171540PDCP",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15137,7 +15136,7 @@
       "pageId": "ZJJK00171540PDCP",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15157,7 +15156,7 @@
       "pageId": "ZJJK00204651PDCP",
       "phaseCount": 1,
       "stepCount": 0,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -15170,7 +15169,7 @@
       "pageId": "ZJJK00105093",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15196,7 +15195,7 @@
       "pageId": "ZJJK00107696",
       "phaseCount": 2,
       "stepCount": 6,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15234,7 +15233,7 @@
       "pageId": "ZJJK00107696",
       "phaseCount": 3,
       "stepCount": 5,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15263,7 +15262,7 @@
       "pageId": "ZJJK00105164",
       "phaseCount": 3,
       "stepCount": 4,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15295,7 +15294,7 @@
       "pageId": "ZJJK00105093",
       "phaseCount": 3,
       "stepCount": 4,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15330,7 +15329,7 @@
       "pageId": "ZJJK00120086",
       "phaseCount": 9,
       "stepCount": 5,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15358,7 +15357,7 @@
       "pageId": "ZJJK00068397",
       "phaseCount": 4,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15378,7 +15377,7 @@
       "pageId": "ZJJK00165655PDCP",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -15394,7 +15393,7 @@
       "pageId": "ZJJK00097340",
       "phaseCount": 4,
       "stepCount": 4,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15423,7 +15422,7 @@
       "pageId": "ZJJK00132384",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15444,7 +15443,7 @@
       "pageId": "ZJJK00114471",
       "phaseCount": 4,
       "stepCount": 3,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15469,7 +15468,7 @@
       "pageId": "ZJJK00115129",
       "phaseCount": 2,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15489,7 +15488,7 @@
       "pageId": "ZJJK00095580",
       "phaseCount": 4,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15510,7 +15509,7 @@
       "pageId": "ZJJK00109789",
       "phaseCount": 4,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15530,7 +15529,7 @@
       "pageId": "ZJJK00110203",
       "phaseCount": 4,
       "stepCount": 6,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15565,7 +15564,7 @@
       "pageId": "ZJJK00110085",
       "phaseCount": 5,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -15580,7 +15579,7 @@
       "pageId": "ZJJK00106077",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15601,7 +15600,7 @@
       "pageId": "ZJJK00105930",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15621,7 +15620,7 @@
       "pageId": "ZJJK00098176",
       "phaseCount": 4,
       "stepCount": 6,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15641,7 +15640,7 @@
       "pageId": "ZJJK00098685",
       "phaseCount": 5,
       "stepCount": 6,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15661,7 +15660,7 @@
       "pageId": "ZJJK00097846",
       "phaseCount": 6,
       "stepCount": 9,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15690,7 +15689,7 @@
       "pageId": "ZJJK00210540PDCP",
       "phaseCount": 2,
       "stepCount": 1,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {
@@ -15705,7 +15704,7 @@
       "pageId": "ZJJK00210620PDCP",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15726,7 +15725,7 @@
       "pageId": "ZJJK00069541",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15748,7 +15747,7 @@
       "pageId": "ZJJK00069541",
       "phaseCount": 3,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Sun Sep 06",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15770,7 +15769,7 @@
       "pageId": "AILZ1788712606735",
       "phaseCount": 5,
       "stepCount": 12,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15807,7 +15806,7 @@
       "pageId": "AILZ1788713243689",
       "phaseCount": 6,
       "stepCount": 10,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15839,7 +15838,7 @@
       "pageId": "AILZ1788713535473",
       "phaseCount": 6,
       "stepCount": 2,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15865,7 +15864,7 @@
       "pageId": "AILZ1788713789881",
       "phaseCount": 6,
       "stepCount": 28,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15911,7 +15910,7 @@
       "pageId": "AILZ1788714193885",
       "phaseCount": 6,
       "stepCount": 16,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15947,7 +15946,7 @@
       "pageId": "AILZ1788714528029",
       "phaseCount": 6,
       "stepCount": 9,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -15979,7 +15978,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 6,
       "stepCount": 7,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16007,7 +16006,7 @@
       "pageId": "ZJJK00066153",
       "phaseCount": 6,
       "stepCount": 7,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16039,7 +16038,7 @@
       "pageId": "AILZ1788717655823",
       "phaseCount": 7,
       "stepCount": 8,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16078,7 +16077,7 @@
       "pageId": "ZJJK00070599",
       "phaseCount": 8,
       "stepCount": 6,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16113,7 +16112,7 @@
       "pageId": "ZJJK00070599",
       "phaseCount": 7,
       "stepCount": 7,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16156,7 +16155,7 @@
       "pageId": "ZJJK00070599",
       "phaseCount": 9,
       "stepCount": 28,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16243,7 +16242,7 @@
       "pageId": "ZJJK00070599",
       "phaseCount": 8,
       "stepCount": 47,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16355,7 +16354,7 @@
       "pageId": "ZJJK00070599",
       "phaseCount": 8,
       "stepCount": 34,
-      "createdDate": "2026-09-06",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16447,7 +16446,7 @@
       "pageId": "AILZ1788743093680",
       "phaseCount": 8,
       "stepCount": 33,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16527,7 +16526,7 @@
       "pageId": "ZJJK00070599",
       "phaseCount": 7,
       "stepCount": 25,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16593,7 +16592,7 @@
       "pageId": "ZJJK00107475",
       "phaseCount": 9,
       "stepCount": 54,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16688,7 +16687,7 @@
       "pageId": "AILZ1788746103107",
       "phaseCount": 5,
       "stepCount": 5,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16720,7 +16719,7 @@
       "pageId": "AILZ1788746635698",
       "phaseCount": 5,
       "stepCount": 12,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16779,7 +16778,7 @@
       "pageId": "AILZ1788749158210",
       "phaseCount": 5,
       "stepCount": 18,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16860,7 +16859,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 6,
       "stepCount": 13,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16903,7 +16902,7 @@
       "pageId": "ZJJK16071624PDCP",
       "phaseCount": 5,
       "stepCount": 4,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -16926,35 +16925,35 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 5,
       "stepCount": 12,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "产品"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "产品"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -16975,7 +16974,7 @@
       "pageId": "ZJJK00108359",
       "phaseCount": 8,
       "stepCount": 29,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -17063,7 +17062,7 @@
       "pageId": "ZJJK00108359",
       "phaseCount": 9,
       "stepCount": 94,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -17233,7 +17232,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 1,
       "stepCount": 18,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -17289,11 +17288,11 @@
       "pageId": "AILZ1788835802623",
       "phaseCount": 1,
       "stepCount": 3,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/login",
+          "key": null,
           "label": "其他"
         }
       ],
@@ -17311,19 +17310,19 @@
       "pageId": "AILZ1788858558738",
       "phaseCount": 1,
       "stepCount": 3,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/home",
+          "key": null,
           "label": "顶栏"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/home",
+          "key": null,
           "label": "其他"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/home",
+          "key": null,
           "label": "弹层"
         }
       ],
@@ -17339,7 +17338,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 1,
       "stepCount": 5,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -17365,15 +17364,15 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 1,
       "stepCount": 4,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "产品"
         }
       ],
@@ -17392,31 +17391,19 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 2,
       "stepCount": 14,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
-          "label": "产品"
         },
         {
           "key": null,
           "label": "产品"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
-          "label": "产品"
-        },
-        {
           "key": null,
-          "label": "主区"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
           "label": "主区"
         }
       ],
@@ -17435,7 +17422,7 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 3,
       "stepCount": 15,
-      "createdDate": "2026-09-07",
+      "createdDate": "Mon Sep 07",
       "urlCodes": null,
       "visitedRegions": [
         {
@@ -17443,15 +17430,7 @@
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
-          "label": "主区"
-        },
-        {
           "key": null,
-          "label": "基本信息"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
           "label": "基本信息"
         }
       ],
@@ -17470,23 +17449,15 @@
       "pageId": "ZJJK00095454",
       "phaseCount": 2,
       "stepCount": 11,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
-          "label": "主区"
-        },
         {
           "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
-          "label": "主区"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
+          "key": null,
           "label": "产品映射"
         }
       ],
@@ -17504,27 +17475,23 @@
       "pageId": "ZJJK00095454",
       "phaseCount": 3,
       "stepCount": 12,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
+          "key": null,
           "label": "主区"
+        },
+        {
+          "key": null,
+          "label": "表格"
         },
         {
           "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
-          "label": "表格"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
-          "label": "主区"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
+          "key": null,
           "label": "dialog"
         }
       ],
@@ -17543,123 +17510,115 @@
       "pageId": "AILZ1788860292559",
       "phaseCount": 2,
       "stepCount": 59,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/home",
-          "label": null
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/home",
+          "key": null,
           "label": "顶栏"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMnt/cpctMgt/cpctMgtPg",
-          "label": null
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMnt/cpctMgt/cpctMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 基本户信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 登记信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 涉税基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 法定代表人/负责人信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 基本户信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 登记信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 涉税基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 法定代表人/负责人信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 其他特色信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 经营情况 / 客户经营概况"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 基本户信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 评级信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 登记信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 法定代表人/负责人信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 登记信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 涉税基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 法定代表人/负责人信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 经营情况 / 客户经营概况"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 实际控制人及其配偶"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/cstMgt/csinfMntSubDmn/cpctMgt/crtCpctInf/hostCstmgrCrtCpctInf/FS00004007HostCstmgrCrtCpctInf",
+          "key": null,
           "label": "客户基本信息 / 对公客户概况 保存 暂存 返回 / 实际控制人及其配偶"
         }
       ],
@@ -17681,15 +17640,15 @@
       "pageId": "AILZ1789036916288",
       "phaseCount": 3,
       "stepCount": 5,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "要素类型"
         }
       ],
@@ -17708,27 +17667,23 @@
       "pageId": "AILZ1789036726232",
       "phaseCount": 3,
       "stepCount": 9,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "要素组件"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
-          "label": null
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -17748,23 +17703,23 @@
       "pageId": "AILZ1788938038344",
       "phaseCount": 3,
       "stepCount": 7,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "产品要素"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "选择要素"
         }
       ],
@@ -17782,27 +17737,23 @@
       "pageId": "ZJJK00095454",
       "phaseCount": 3,
       "stepCount": 6,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
+          "key": null,
           "label": "主区"
+        },
+        {
+          "key": null,
+          "label": "表格"
         },
         {
           "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
-          "label": "表格"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
-          "label": "主区"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
+          "key": null,
           "label": "弹层"
         }
       ],
@@ -17820,11 +17771,11 @@
       "pageId": "ZJJK00095454",
       "phaseCount": 1,
       "stepCount": 3,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/corePdMpng",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -17841,11 +17792,11 @@
       "pageId": "ZJJK00095902",
       "phaseCount": 2,
       "stepCount": 3,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/mntPdStg",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -17863,11 +17814,11 @@
       "pageId": "ZJJK00095902",
       "phaseCount": 2,
       "stepCount": 5,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/mntPdStg",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -17885,15 +17836,15 @@
       "pageId": "ZJJK00095902",
       "phaseCount": 3,
       "stepCount": 4,
-      "createdDate": "2026-09-08",
+      "createdDate": "Tue Sep 08",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/mntPdStg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/mntPdStg",
+          "key": null,
           "label": "弹层"
         }
       ],
@@ -17911,11 +17862,11 @@
       "pageId": "ZJJK00095907",
       "phaseCount": 2,
       "stepCount": 2,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/enqrPdInf",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -17933,11 +17884,11 @@
       "pageId": "ZJJK00095902",
       "phaseCount": 2,
       "stepCount": 4,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/mntPdStg",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -17954,11 +17905,11 @@
       "pageId": "ZJJK00095902",
       "phaseCount": 1,
       "stepCount": 2,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/mntPdStg",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -17975,19 +17926,15 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 4,
       "stepCount": 12,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
-          "label": "主区"
-        },
         {
           "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "基本信息"
         }
       ],
@@ -18006,31 +17953,23 @@
       "pageId": "AILZ1788953739303",
       "phaseCount": 4,
       "stepCount": 10,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "产品要素"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
-          "label": "选择要素"
-        },
-        {
           "key": null,
-          "label": "选择要素"
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
           "label": "选择要素"
         }
       ],
@@ -18051,15 +17990,15 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 4,
       "stepCount": 4,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "弹层"
         }
       ],
@@ -18076,27 +18015,23 @@
       "pageId": "AILZ1789029052917",
       "phaseCount": 2,
       "stepCount": 6,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
-          "label": null
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "产品要素"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "弹层"
         }
       ],
@@ -18115,19 +18050,19 @@
       "pageId": "ZJJK00110131",
       "phaseCount": 4,
       "stepCount": 9,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "产品"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdInfMgt/pdMgtMgtPg",
+          "key": null,
           "label": "主区"
         }
       ],
@@ -18146,11 +18081,11 @@
       "pageId": "AILZ1788948100840",
       "phaseCount": 5,
       "stepCount": 2,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "其他"
         }
       ],
@@ -18166,7 +18101,7 @@
       "pageId": null,
       "phaseCount": 4,
       "stepCount": 0,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -18179,43 +18114,39 @@
       "pageId": "AILZ1788950452801",
       "phaseCount": 5,
       "stepCount": 14,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "产品要素"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "选择要素"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
-          "label": null
-        },
-        {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "主区"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "基本信息"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "产品要素"
         },
         {
-          "key": "test.creditv5p2.tansun.com.cn#/pdMgt/pdElmtMgt/elmtgroupOfIndex",
+          "key": null,
           "label": "选择要素"
         }
       ],
@@ -18236,7 +18167,7 @@
       "pageId": null,
       "phaseCount": 4,
       "stepCount": 0,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -18249,7 +18180,7 @@
       "pageId": null,
       "phaseCount": 5,
       "stepCount": 0,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -18262,7 +18193,7 @@
       "pageId": null,
       "phaseCount": 4,
       "stepCount": 0,
-      "createdDate": "2026-09-09",
+      "createdDate": "Wed Sep 09",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -18275,7 +18206,7 @@
       "pageId": null,
       "phaseCount": 1,
       "stepCount": 0,
-      "createdDate": "2026-09-10",
+      "createdDate": "Thu Sep 10",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -18288,7 +18219,7 @@
       "pageId": "AILZ1789030700807",
       "phaseCount": 1,
       "stepCount": 0,
-      "createdDate": "2026-09-10",
+      "createdDate": "Thu Sep 10",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -18301,7 +18232,7 @@
       "pageId": "AILZ1789030813794",
       "phaseCount": 1,
       "stepCount": 0,
-      "createdDate": "2026-09-10",
+      "createdDate": "Thu Sep 10",
       "urlCodes": null,
       "visitedRegions": [],
       "actionCounts": {}
@@ -21749,5 +21680,5 @@
       "resPath": "/filesMgt/filesRet/filesRetAplyMgtPg"
     }
   ],
-  "contentSha256": "33ad3e617280d07f606f65a592c156e14093c1fc7a353de3a525d8162c97e4b7"
+  "contentSha256": "375329fde791d4a9365f871874af7decbb50c9876dea274ce8b33e5a34cb35d4"
 }

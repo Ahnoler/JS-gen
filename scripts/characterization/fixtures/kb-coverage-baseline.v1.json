@@ -1,5 +1,5 @@
 {
-  "baselineVersion": "v1",
+  "baselineVersion": "v1.1",
   "capturedAt": "2026-09-10T16:31:27.973Z",
   "source": "node scripts/kb/kb-coverage.mjs --json (fixture kb-coverage.v1.json, sha 375329fde791d4a9)",
   "note": "floors = these values minus fixed margin 0.05; floors only ever rise (spec 2026-09-11 §Task2)",
@@ -564,5 +564,22 @@
         }
       ]
     }
+  },
+  "changeLog": [
+    "v1.1 (2026-09-11, G-verdict D1/D5): refreshed to fixture v1.1 (page_level_key recovered, ISO dates); M1/M2/M3 unchanged; M5 metrics kept for provenance only — floors removed per D4"
+  ],
+  "fixtureSha256": "33ad3e617280d07f606f65a592c156e14093c1fc7a353de3a525d8162c97e4b7",
+  "floorPolicy": {
+    "floors": [
+      "m1.joinability",
+      "m2.coverage",
+      "m3.utilization"
+    ],
+    "margin": 0.05,
+    "removed": [
+      "m5.nodeCoverage",
+      "m5.orderAgreement"
+    ],
+    "removedReason": "G-verdict D4: M5 (region-label based) saturated at 91.9% of its matcher ceiling; floors would reward reshaping card node names to match generic region labels. Reinstated only after M5 is rebuilt on page_level_key."
   }
 }

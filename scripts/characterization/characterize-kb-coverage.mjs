@@ -9,9 +9,14 @@
  *     subkeys must be action-type tokens (^[a-z_]+$); free text > 40 chars in
  *     the data area = FAIL; metadata strings (changeLog/redaction.forbidden/
  *     contentSha256) are exempt. Injecting a `task` field MUST turn this red.
- *  3. floors — M1/M2/M3/M5 (joinability/coverage/utilization/nodeCoverage/
- *     orderAgreement) from the frozen baseline minus fixed margin 0.05,
- *     only ever rise. Raising any floor by 0.2 MUST turn this red.
+ *     region.key (redacted page_level_key) is structural identity and is
+ *     exempt from the 40-char cap, but must be populated and query-stripped
+ *     (G-verdict D1 recovery pin).
+ *  3. floors — M1/M2/M3 (joinability/coverage/utilization) from the frozen
+ *     baseline minus fixed margin 0.05, only ever rise. Raising any floor by
+ *     0.2 MUST turn this red. M5 node metrics are INFORMATIONAL until the
+ *     rebuilt page-key-based M5 lands (G-verdict D4: the region-label M5
+ *     rewarded matcher-shaped noise, floors removed).
  *
  * Run:
  *   node scripts/characterization/characterize-kb-coverage.mjs
@@ -95,7 +100,10 @@ run('redaction: data-area keys ⊆ whitelist, actionCounts subkeys are action to
             for (const r of tv) {
               for (const [rk, rv] of Object.entries(r)) {
                 if (!REGION_KEYS.has(rk)) badKeys.push(`region.${rk}`);
-                if (typeof rv === 'string' && rv.length > 40) longTexts.push(`region.${rk}(${rv.length})`);
+                // region.key is the redacted page_level_key (host#/route) — a
+                // structural identity, legitimately > 40 chars (G-verdict D1);
+                // region.label stays under the cap.
+                if (typeof rv === 'string' && rv.length > 40 && rk !== 'key') longTexts.push(`region.${rk}(${rv.length})`);
               }
             }
           }
@@ -126,17 +134,51 @@ run('redaction: data-area keys ⊆ whitelist, actionCounts subkeys are action to
   assert.deepEqual(longTexts, [], `free text >40 chars in data area: ${longTexts.slice(0, 3).join('; ')}`);
 });
 
-run('floors hold: M1/M2/M3/M5 vs frozen baseline (margin 0.05, only rise)', () => {
+run('floors hold: M1/M2/M3 vs frozen baseline (margin 0.05, only rise); M5 informational', () => {
   const result = computeCoverage(fixture);
-  const FLOORS = ['m1.joinability', 'm2.coverage', 'm3.utilization', 'm5.nodeCoverage', 'm5.orderAgreement'];
+  const FLOORS = ['m1.joinability', 'm2.coverage', 'm3.utilization'];
   for (const path of FLOORS) {
     const cur = path.split('.').reduce((o, k) => o[k], result.metrics);
     const base = path.split('.').reduce((o, k) => o[k], baseline.metrics);
-    if (cur === null || base === null) continue; // M5 null only when no mapped regions exist
     const floor = +(base - MARGIN).toFixed(3);
     assert.ok(cur >= floor, `${path} ${cur} < floor ${floor} (baseline ${base} - ${MARGIN})`);
     console.log(`    OK ${path}: current=${cur} floor=${floor}`);
   }
+  // M5: informational only until rebuilt (D4). Print, never gate.
+  const m5 = result.metrics.m5;
+  if (m5 && m5.nodeCoverage !== null) {
+    console.log(`    INFO m5.nodeCoverage=${m5.nodeCoverage} orderAgreement=${m5.orderAgreement} (informational, no floor — D4)`);
+  }
+});
+
+run('D1 recovery: visitedRegions[].key (redacted page_level_key) is populated', () => {
+  let withKey = 0;
+  let regions = 0;
+  const trajWithKey = new Set();
+  for (const t of fixture.trajectories) {
+    for (const r of t.visitedRegions || []) {
+      regions += 1;
+      if (typeof r.key === 'string' && r.key.length > 0) {
+        withKey += 1;
+        trajWithKey.add(t.id);
+      }
+    }
+  }
+  assert.ok(regions > 0, 'fixture must contain visitedRegions');
+  // page_level_key only exists on the SUT's SPA-persisted steps (page:navigate /
+  // page-level actions), not on every action — per-trajectory coverage is the
+  // D1 recovery signal (reviewer measured 28 trajectories in the DB).
+  const ratio = trajWithKey.size / fixture.trajectories.length;
+  console.log(`    regions=${regions} withKey=${withKey} (${trajWithKey.size} trajectories)`);
+  assert.ok(
+    trajWithKey.size >= 20,
+    `trajectories with >=1 non-empty key = ${trajWithKey.size} < 20 — 40-char guard regression (D1; DB truth = 28)`
+  );
+  // query-stripped: a key must never carry '?'
+  const withQuery = (fixture.trajectories || [])
+    .flatMap((t) => t.visitedRegions || [])
+    .filter((r) => typeof r.key === 'string' && r.key.includes('?')).length;
+  assert.equal(withQuery, 0, 'page keys must be query-stripped');
 });
 
 console.log(`\ncharacterize-kb-coverage: ${passed} passed`);

@@ -11,10 +11,12 @@
  *
  * Whitelisted shape (spec §3):
  *  trajectories[]: id, functionId, recordStatus, isSuccessful, pageId,
- *                  phaseCount, stepCount, createdDate (day precision),
+ *                  phaseCount, stepCount, createdDate (ISO day),
  *                  urlCodes {fcnScnEcd, part} (codes only, queries dropped)
- *  steps aggregated per trajectory: visitedRegions [{key,label}] (deduped,
- *                  order-preserving, truncated) + actionCounts {type: n}
+ *  steps aggregated per trajectory: visitedRegions [{key,label}]
+ *                  (key = redacted page_level_key `host#/route` — structural,
+ *                  NOT subject to the 40-char cap; deduped, order-preserving,
+ *                  truncated) + actionCounts {type: n}
  *  pages[]: pageId, pageName, resPath
  *
  * Run: node scripts/kb/coverage-snapshot.mjs [--out path]
@@ -41,7 +43,26 @@ const MAX_TEXT = 40;
 const MAX_VISITED = 200;
 
 /**
- * Redact any string: drop values longer than MAX_TEXT (structural keys are short by design).
+ * Redact a page key: keep only host#/route (page identity), strip query
+ * business values. Mirrors scripts/state.py page_level_key_from_url, minus
+ * the origin scheme and any dialog/anchor suffix. Structural keys may be
+ * long (page: http://host#/route runs 47-135 chars in production) — they
+ * are NOT subject to the 40-char free-text cap (G-verdict D1).
+ * @param {string} key Raw page_level_key value
+ * @returns {string|null} Redacted key, or null when nothing structural remains
+ */
+function redactPageKey(key) {
+  if (typeof key !== 'string') return null;
+  let s = key.split('|dialog:')[0].split('@@anchor:')[0]; // popup/anchor suffixes are dialog-local, not page identity
+  s = s.replace(/^page:https?:\/\//, ''); // host + path
+  s = s.split('?')[0]; // strip query — business values live there
+  s = s.replace(/\/$/, '');
+  return s.length > 0 ? s : null;
+}
+
+/**
+ * Redact any string: drop values longer than MAX_TEXT (free text only —
+ * structural keys go through redactPageKey, not here).
  * @param {unknown} value Candidate string value
  * @returns {string|null} The value, or null when it exceeds the redaction cap
  */
@@ -76,7 +97,8 @@ function extractUrlCodes(rawUrl) {
 
 /**
  * Pull one structural field from element_json wherever it lives (top or nested),
- * skipping anything under text/attributes-bearing branches. Returns first hit.
+ * skipping anything under text/attributes-bearing branches. Returns first hit,
+ * uncapped (callers apply structural redaction, not the free-text cap).
  * @param {object|null} elementJson Parsed element_json value
  * @param {string} key Structural key to look for
  * @returns {string|null} First hit as a string, or null
@@ -88,7 +110,7 @@ function extractStructural(elementJson, key) {
     for (const [k, v] of Object.entries(node)) {
       if (k === key && (typeof v === 'string' || typeof v === 'number')) {
         const s = String(v);
-        if (s.length > 0 && s.length <= MAX_TEXT) return s;
+        if (s.length > 0) return s;
         return null;
       }
       if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
@@ -131,7 +153,7 @@ async function main() {
     pageId: r.page_id || null,
     phaseCount: r.phase_count,
     stepCount: r.step_count,
-    createdDate: r.created_at ? String(r.created_at).slice(0, 10) : null,
+    createdDate: r.created_at ? new Date(r.created_at).toISOString().slice(0, 10) : null,
     urlCodes: extractUrlCodes(r.url),
   }));
 
@@ -156,7 +178,7 @@ async function main() {
         try { ej = JSON.parse(ej); } catch { ej = null; }
       }
       const label = extractStructural(ej, 'region_label');
-      const key = extractStructural(ej, 'page_level_key');
+      const key = redactPageKey(extractStructural(ej, 'page_level_key'));
       if (label !== null || key !== null) {
         const sig = `${key || ''}|${label || ''}`;
         const last = agg.visitedRegions[agg.visitedRegions.length - 1];
@@ -192,6 +214,7 @@ async function main() {
     snapshotVersion: 'v1',
     changeLog: [
       'v1 (2026-09-11): initial snapshot per spec 2026-09-11-kb-coverage-retrospective-design §3',
+      'v1.1 (2026-09-11, G-verdict D1/D5): page_level_key no longer dropped by the 40-char guard — redacted to host#/route (query stripped, dialog/anchor suffixes removed); createdDate → ISO (year present, timezone-stable)',
     ],
     capturedAt: new Date().toISOString(),
     counts: {
