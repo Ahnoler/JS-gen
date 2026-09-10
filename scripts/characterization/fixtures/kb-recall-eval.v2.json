@@ -17,6 +17,12 @@
       "by": "ZCode (T2)",
       "why": "T2 新增 115 条独立标注（A15/B15/C5/D5/E50/N25）：标注唯一输入=语料（84 卡词面 dump+through-chains+湿测叶名），未运行匹配器；E 层 50 条带 pattern（synonym 17/verb 18/domain 15）且经卡面原词全词 ban-check；N 层近域 25 条经语料关键词缺席验证；双人复核记录见 tmp/kb-eval-v2/T2-labeling-log.md",
       "approvedBy": "Lead（spec §10 A1–A6；reviewer G1 抽检于 T3 冻结后）"
+    },
+    {
+      "at": "2026-09-10T23:40:00+08:00",
+      "by": "ZCode (T3)",
+      "why": "T3 冻结：双人复核完成（E-019/N-034 换靶、10 条消歧 note、E-039 措辞），245 条终态结构自检全绿；此后本文件只读（唯一合法变更通道=relabels 例外条目，逐条 why+reviewer 复核）",
+      "approvedBy": "Lead（spec §10）"
     }
   ],
   "entries": [
@@ -2467,5 +2473,13 @@
       "query": "客户管理",
       "why": "过泛：命中客户域菜单层级而非具体流程卡"
     }
+  ],
+  "frozenAt": "2026-09-10T23:40:00+08:00",
+  "labelers": [
+    "ZCode（实施 agent，主标；标注唯一输入=84 卡词面 dump+through-chains+v1 覆盖审计，未运行匹配器）",
+    "盲态复核子智能体（第二标注人：115 条全量语料侧复核，E-LEAK 0/N-SUSPECT 1/AMBIGUOUS 9，未运行匹配器）"
+  ],
+  "reviewers": [
+    "DSH reviewer（G1 门禁：独立抽检 15 条，重心新标、不含 v1 种子）"
   ]
 }
