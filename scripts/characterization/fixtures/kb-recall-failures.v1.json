@@ -1,0 +1,399 @@
+{
+  "failuresVersion": "v1",
+  "generatedAt": "2026-09-10T18:40:00+08:00",
+  "source": "kb-recall-eval.v1.json @ 1e047cc6（run: tmp/kb-p0/baseline.json，基线六项逐位一致）",
+  "splitRule": "每层内按 id 数序交替分配（奇数位→build，偶数位→verify），机械规则防 cherry-pick；B 23=12/11，D 10=5/5，C 2=1/1",
+  "build": [
+    "B-001",
+    "B-006",
+    "B-009",
+    "B-011",
+    "B-013",
+    "B-015",
+    "B-019",
+    "B-021",
+    "B-023",
+    "B-025",
+    "B-028",
+    "B-030",
+    "C-001",
+    "D-001",
+    "D-003",
+    "D-005",
+    "D-007",
+    "D-009"
+  ],
+  "verify": [
+    "B-005",
+    "B-008",
+    "B-010",
+    "B-012",
+    "B-014",
+    "B-016",
+    "B-020",
+    "B-022",
+    "B-024",
+    "B-027",
+    "B-029",
+    "C-008",
+    "D-002",
+    "D-004",
+    "D-006",
+    "D-008",
+    "D-010"
+  ],
+  "failures": [
+    {
+      "id": "B-001",
+      "tier": "B",
+      "query": "把额度临时止付再恢复",
+      "gold": [
+        "limit"
+      ],
+      "top1": "smart-ctrl-rule-toggle",
+      "rank": 3
+    },
+    {
+      "id": "B-005",
+      "tier": "B",
+      "query": "两家机构合并怎么登记",
+      "gold": [
+        "system-mgmt-org-merge"
+      ],
+      "top1": "asset-preserve-ops-outsourced-collection",
+      "rank": 2
+    },
+    {
+      "id": "B-006",
+      "tier": "B",
+      "query": "把一笔贷款的担保物登记进系统",
+      "gold": [
+        "collateral_info"
+      ],
+      "top1": "collateral-func-ledger",
+      "rank": null
+    },
+    {
+      "id": "B-008",
+      "tier": "B",
+      "query": "看看某个客户都有哪些业务往来全景",
+      "gold": [
+        "customer_360"
+      ],
+      "top1": "credit_application",
+      "rank": 4
+    },
+    {
+      "id": "B-009",
+      "tier": "B",
+      "query": "查一个客户的基本资料",
+      "gold": [
+        "customer_query"
+      ],
+      "top1": "rating",
+      "rank": null
+    },
+    {
+      "id": "B-010",
+      "tier": "B",
+      "query": "给企业客户做信用等级评定",
+      "gold": [
+        "rating"
+      ],
+      "top1": "credit-retail-credit-config",
+      "rank": null
+    },
+    {
+      "id": "B-011",
+      "tier": "B",
+      "query": "看看评级最终结果和审批过程",
+      "gold": [
+        "rating-query-view"
+      ],
+      "top1": "rating",
+      "rank": 2
+    },
+    {
+      "id": "B-012",
+      "tier": "B",
+      "query": "发起一笔对公的授信业务",
+      "gold": [
+        "credit_application"
+      ],
+      "top1": "credit_usage",
+      "rank": 2
+    },
+    {
+      "id": "B-013",
+      "tier": "B",
+      "query": "企业借钱用款怎么申请",
+      "gold": [
+        "credit_usage"
+      ],
+      "top1": "customer-group-general-group",
+      "rank": 3
+    },
+    {
+      "id": "B-014",
+      "tier": "B",
+      "query": "贷款批下来了安排打款给客户",
+      "gold": [
+        "loan"
+      ],
+      "top1": "loan-corp-syndicate-lead-apply",
+      "rank": null
+    },
+    {
+      "id": "B-015",
+      "tier": "B",
+      "query": "签正式的借款合同",
+      "gold": [
+        "duigong_contract_sign"
+      ],
+      "top1": "guarantee_intro",
+      "rank": null
+    },
+    {
+      "id": "B-016",
+      "tier": "B",
+      "query": "找个人给这笔贷款做担保",
+      "gold": [
+        "guarantee_intro"
+      ],
+      "top1": "customer_360",
+      "rank": 4
+    },
+    {
+      "id": "B-019",
+      "tier": "B",
+      "query": "逾期了安排人上门要账",
+      "gold": [
+        "collection_task"
+      ],
+      "top1": "collection_scorecard",
+      "rank": 4
+    },
+    {
+      "id": "B-020",
+      "tier": "B",
+      "query": "抵押的房子被法院占了怎么办",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "top1": "guaranty_contract",
+      "rank": 2
+    },
+    {
+      "id": "B-021",
+      "tier": "B",
+      "query": "估算一下抵押物值多少钱",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "top1": "guaranty_contract",
+      "rank": null
+    },
+    {
+      "id": "B-022",
+      "tier": "B",
+      "query": "把催收的活儿外包给外面的公司",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "top1": "customer-group-group",
+      "rank": null
+    },
+    {
+      "id": "B-023",
+      "tier": "B",
+      "query": "和别人打官司要起诉",
+      "gold": [
+        "judicial-litigation"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "B-024",
+      "tier": "B",
+      "query": "按合同约定直接把钱付给交易对手",
+      "gold": [
+        "disburse-entrusted-payment"
+      ],
+      "top1": "limit-ctrl-api-ocp-revoke-loop",
+      "rank": null
+    },
+    {
+      "id": "B-025",
+      "tier": "B",
+      "query": "放款放错了要红字冲回来",
+      "gold": [
+        "disburse-account-abnormal"
+      ],
+      "top1": "loan_account",
+      "rank": null
+    },
+    {
+      "id": "B-027",
+      "tier": "B",
+      "query": "一批产业链上的小企业打包管理",
+      "gold": [
+        "customer-group-cluster"
+      ],
+      "top1": "credit_usage",
+      "rank": null
+    },
+    {
+      "id": "B-028",
+      "tier": "B",
+      "query": "把旗下所有子公司挂到一个总户头下",
+      "gold": [
+        "customer-group-general-group"
+      ],
+      "top1": "product_element",
+      "rank": null
+    },
+    {
+      "id": "B-029",
+      "tier": "B",
+      "query": "股东和实际控制人之间的关系要登记",
+      "gold": [
+        "customer-common-cust-relation"
+      ],
+      "top1": "customer-group-group",
+      "rank": null
+    },
+    {
+      "id": "B-030",
+      "tier": "B",
+      "query": "产品目录里加一个新品并让它可用",
+      "gold": [
+        "product_library"
+      ],
+      "top1": "product_query",
+      "rank": null
+    },
+    {
+      "id": "C-001",
+      "tier": "C",
+      "query": "阶段1：登录被测系统并进入信贷工作台首页",
+      "gold": [
+        "session_login"
+      ],
+      "top1": "customer_onboarding",
+      "rank": null
+    },
+    {
+      "id": "C-008",
+      "tier": "C",
+      "query": "阶段8：押品权证先入库，后面借阅到期归还，结清后正式出库",
+      "gold": [
+        "collateral_custody"
+      ],
+      "top1": "collateral-func-warning",
+      "rank": 2
+    },
+    {
+      "id": "D-001",
+      "tier": "D",
+      "query": "W0",
+      "gold": [
+        "session_login"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-002",
+      "tier": "D",
+      "query": "lmtRgstAndOcp",
+      "gold": [
+        "limit-ctrl-api-grant-use-one"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-003",
+      "tier": "D",
+      "query": "lmtRgst",
+      "gold": [
+        "limit-ctrl-api-grant-use-one",
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-004",
+      "tier": "D",
+      "query": "doOcpRevoke",
+      "gold": [
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-005",
+      "tier": "D",
+      "query": "cstInfQuery",
+      "gold": [
+        "customer_query"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-006",
+      "tier": "D",
+      "query": "enqrPdInf",
+      "gold": [
+        "product_query"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-007",
+      "tier": "D",
+      "query": "mntPdStg",
+      "gold": [
+        "product_stage"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-008",
+      "tier": "D",
+      "query": "cpctMgtPg",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-009",
+      "tier": "D",
+      "query": "FS00006502",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "top1": null,
+      "rank": null
+    },
+    {
+      "id": "D-010",
+      "tier": "D",
+      "query": "360视图",
+      "gold": [
+        "customer_360"
+      ],
+      "top1": "customer_onboarding",
+      "rank": 2
+    }
+  ],
+  "note": "build 仅供 T3 建表；verify 只用于验证，禁止据其反推词条。划分落盘后不得再改。"
+}
