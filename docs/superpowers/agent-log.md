@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 16:43 · Cursor Lead — 收工：P1-5 per-tid record/start 内存互斥
+
+- 完成：回链开工 `1fe635f2`；`startTrajectoryRecording` 入口同步 claim `runtime.aiRecording`（先于异步点）；早退路径释放；冷 pin `characterize-record-start-mutex.mjs`；todo `engine-wet-trio` ③ 代码侧闭合
+- 验收：`node scripts/characterization/cold/characterize-record-start-mutex.mjs` OK；`characterize-record-status-v2.mjs` all ok
+- 遗留：`engine-wet-trio` ② detach→重附 90s 门闩湿测、③ 并发 start 湿测仍待；控制面须重启才加载本互斥
+
 ## 2026-09-10 16:40 · Cursor Lead — 开工：P1-5 per-tid record/start 内存互斥
 
 - 进行中：2026-09-10 16:40；根因=`isAiRecordingActive` 依赖 phase=running，登录窗口内双 start 均可过闸；对抗 review P1-5 互斥未做

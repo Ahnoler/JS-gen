@@ -275,6 +275,18 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     err.statusCode = 400;
     throw err;
   }
+  // P1-5：per-tid 内存互斥——在进入任何异步点之前同步 check-and-set。
+  // isAiRecordingActive 依赖 phase=running，登录窗口内阶段尚未 running，双击/
+  // 批+手并发 start 均可过 DB 闸；runtime.aiRecording 填补该窗口。
+  if (runtime.aiRecording) {
+    const err = new Error('Recording already in progress');
+    err.statusCode = 409;
+    throw err;
+  }
+  runtime.aiRecording = true;
+  let session = null;
+  let enteredPhaseLoop = false;
+  try {
   const traj = await trajectoryDao.getById(tid);
   if (!traj) {
     const err = new Error('Trajectory not found');
@@ -307,7 +319,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
 
   // Login is a prepare-time default op (not in step table). Ensure browser is logged in.
   // Hold the AI-recording lock before login so nested login cannot unlock the canvas.
-  const session = state.sessions.get(runtime.sessionId);
+  session = state.sessions.get(runtime.sessionId);
   lockAiRecording(runtime, session, true);
   if (session) session.dbTrajectoryId = tid;
   await broadcastRecordingLock();
@@ -834,6 +846,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   };
 
   let finalStatus = 'recorded';
+  enteredPhaseLoop = true;
   try {
     for (let i = 0; i < phases.length; i++) {
       const phase = phases[i];
@@ -1258,4 +1271,13 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     events,
     steps: tree?.phases?.flatMap((p) => p.steps || []) || [],
   };
+  } catch (err) {
+    // Early-exit before phase loop (claim / login / enterTransient) — release sync claim.
+    // Phase-loop failures unlock in the inner finally above.
+    if (!enteredPhaseLoop) {
+      lockAiRecording(runtime, session, false);
+      await broadcastRecordingLock().catch(() => {});
+    }
+    throw err;
+  }
 }
