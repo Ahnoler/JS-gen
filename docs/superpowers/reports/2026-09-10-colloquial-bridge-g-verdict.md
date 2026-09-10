@@ -113,3 +113,26 @@
 - `5e3fde12`：agent-log 回执为 **+6 行纯新增**，插在 Cursor Lead 的 23:42/23:44 条目**之下**、本会话 23:32 条目**之上**，未删改他线条目 ✓；两笔 commit **均未携带他线 WIP** ✓。
 
 **收尾要求（一个 commit 即可关线）**：① `git add -f tmp/kb-bridge/T2-bridge.txt`；② 按 F-5 二选一改 `t2-build-table.mjs`（推荐①幂等对齐）；③ 若②选了幂等对齐，顺手在报告 §8 F-2 行补一句「`.txt` 于 `<hash>` 入库」以对齐陈述。**无需重跑任何门禁、无需重跑 T3**。
+
+## 6. 收尾执行复核（2026-09-11 追加）——三笔挂账全部关闭
+
+> 收尾区间：开工 `72691662` → Task 0 `e4be6513` → Task 1 `96d12712` → Task 2 `65af3957`
+> **结论：F-2 / F-5 / R-1 全部关闭并按验收标准复现；口语桥接线 CLOSED（FAIL，不计成果）；唯一未决项 = R-3 数据源（Lead）。**
+
+| 项 | 我的独立复核（不采信自报） | 判 |
+|---|---|---|
+| **F-2** | `T2-bridge.txt` 已入库（+1/−1，`e4be6513`）；`git show HEAD:` 的 `note` 已是「汇总裁决原则…为汇总规则非逐条理由」；本线文件无残留 dirty | **关闭 ✓** |
+| **F-5** | 生成脚本产物字面量 = `status:'archived'` + 两注记**逐字**（key 顺序在 `entries` 之后）+ 头注释 WARNING；**我亲自真跑 `node tmp/kb-bridge/t2-build-table.mjs` → `git status`/`git diff --stat` 全空**，`entries` sha256 `eb4ec272…`（67）不变 | **关闭 ✓**（幂等性由我的独立真跑证明，非"看一眼"） |
+| **R-1** | diff 逐行读过：`loadSynonyms()` **无任何过滤**；`readSynonymsAssetStatus()` 未声明→`null`；`result.synonyms.status` 仅在声明时出现；非 active 仅打 stderr 一行；`metrics`/`compareWithBaseline`/`floors`/`exit code` 零改动 | **关闭 ✓** |
+| **pin 可证伪性** | **我注入 `if (asset.status && asset.status !== 'active') return [];` → 门禁红（`actual: 0, expected: 2`，exit 1）→ `git checkout --` 还原 → 6 passed** | **真 pin ✓** |
+| 门禁 | `characterize-kb-recall-eval` **6 passed**、`characterize-flow-card-recall` **26 passed**、`--baseline` **exit 0**（我用自建 baseline 复跑） | ✓ |
+| 度量等价 | `--synonyms` 复跑与冻结 `T3-on.json`：六项 0.600/0.725/0.653/0.667/0.382/0.600 相同，`perQuery` 与 `negatives` **逐位相同**，整份产物除 `generatedAt`/`gitHead`/新增 `status`/延迟计时外全等 | ✓ |
+| 告警形态 | 我抓到的 stderr：`[recall-eval] synonyms asset status="archived" — 仅限度量口径，禁止接线`，与入库证据 `T3-on.after.stderr.txt` **逐字一致**；JSON 模式 stdout 未被污染 | ✓ |
+| 台账 | 报告 §8 F-2/F-4 行补记含 hash；todo 置 CLOSED 并写明 R-2/R-3/R-4；agent-log 开工（**含显式扩围声明**：`recall-eval.mjs` 等不在 23:23 原范围）+ 收工回链闭环；**未携带他线 WIP** | ✓ |
+| 铁律 | `data/kb/synonyms.json` 未被触碰；`colloquial-bridge.json` `entries` 逐位不变；评测集/阈值/`verify-all.sh`/`data/kb/req` 零改动 | ✓ |
+
+**残留观察（不影响判决，不挂账）**：
+1. pin 的 ③ 号以"门禁自身 exit code"为见证人，未字面断言退出码——可接受（`console.error` 不可能改变退出码，且 JSON 模式与 `--baseline` 两条路径我都实跑过 exit 0）；
+2. `data/kb/flow_lineage.json`（72/84 映射）**仍无任何运行时消费者**（T1b 血缘作用域回退后遗留）——已记入裁定书 §5.2 的可选后续项。
+
+**线状态：CLOSED（FAIL，不计成果；F-1/F-2/F-3/F-4/F-5/R-1 全部关闭）。** 阻塞项：R-3 数据源（Lead 侧），按 [裁定书 §4.3/§4.4](../specs/2026-09-10-colloquial-bridge-closeout-decisions.md) 走 go/no-go 后再议投入。
