@@ -1,29 +1,51 @@
 {
-  "manifestVersion": "v1",
+  "manifestVersion": "v1.1",
   "changeLog": [
     "v1 (2026-09-11): initial freeze. Requirement pool = batch_recording_item.requirement DISTINCT 36 (tmp/kb-ab/requirements-36.json, tunnel read-only 2026-09-11). 12 selected offline (human), card mapping fixed offline from data/kb/flows (flow/aliases/menu_path), NOT from v2 eval set (physical isolation).",
     "v1 (2026-09-11): functionId per requirement verified against system_menu_snapshot v10 (system_node_id=1): 对公客户管理=7, 对公客户评级=9000000011, 客户信息查询=9000000039, 评级查询=9000000055, 产品库管理=9000000740, 查询产品信息=9000000467, 集群客户管理=9000000018, 风险分类统计=9000000144, 贷款计算器=9000000452.",
-    "Selection rationale: 6 query/read-only + inspection requirements (safe, fast, rollbackable) + 4 create-family (customer/product/cluster, difficulty-bearing, stamp-prefixed) + 2 mixed-navigation. Difficulty anchors preserved per spec S4 fallback: stamp customer family (#586/590/592/593/594) and credit_usage (#615) remain the v1.1 substitutes if pilot ceiling trips.",
-    "Cleanup caveat (accepted, documented): SUT customer rows in 信贷预客户 state have NO UI delete (state_actions: only 草稿客户 allows 删除). Create-family runs stamp every name with KBAB<runId>- and attempt list-delete when the state allows it; residue with visible stamp prefix is otherwise documented in cleanupLog and handed over. This mirrors the 2026-09-07 R1 precedent (8 stamp rows retained).",
-    "Known-stale pool entries excluded: 新增项目 family (12-18) has no matching menu/card in system_page (在审议/已上会项目管理 are 公共业务 unrelated); 删除评级 req (#35) is destructive on real data; 录制个人客户 (#36) ambiguous. Numbered-suffix 新增客户 variants (#21-34) are the same task as #2 (numbering artifact from batch template regeneration) - represented by #2."
+    "v1 (2026-09-11): Cleanup caveat (accepted, documented): SUT customer rows in 信贷预客户 state have NO UI delete (state_actions: only 草稿客户 allows 删除). Create-family runs stamp every name with KBAB<runId>- and attempt list-delete when the state allows it; residue with visible stamp prefix is otherwise documented in cleanupLog and handed over. This mirrors the 2026-09-07 R1 precedent (8 stamp rows retained).",
+    "v1.1 (2026-09-11T03:40+08:00): CEILING TRIGGERED - pilot A-arm 2/2 recorded (traj 723/725, isSuccessful=1) >= 0.9 -> per spec S4 switch difficulty anchors. Difficulty evidence (pre-registered, no post-hoc): stamp family #586/#590/#592/#593/#594 all failed (last actions = legal-rep dialog cancel / list query; fake-success gate '0 persisted steps' verdicts; same-family #595 re-run next day recorded => difficulty was task legs + 09-06 engine state, environment now proven fixed by pilot); #615 credit_usage failed (55 steps, died in guarantee/flow-submit legs). Pilot also proved A-arm completes full create incl. legal-rep import (723/724), so plain create is no longer discriminative: v1.1 difficulty重心 = multi-leg tasks (create + list-verify read-back), rating family (R01/R07 never piloted), rating application initiation (write, revocable), cross-module reads. Kept R06/R09/R11 as within-set easy controls; dropped R08/R10/R12 (same-shape query/no-write, no information); added N01/N02/N03/N04 difficulty anchors. Official 12 = R01,R02,R04,R05,R06,R07,R09,R11,N01,N02,N03,N04 (R12 substitute).",
+    "v1.1 (2026-09-11): environmentPrep added to armProtocol: after record/prepare and before record/start, run tmp/kb-ab/close-tianyuan-dialog.py (CDP real-mousedown closes the 天元相关配置 welcome dialog). Applies identically to both arms - harness, not the independent variable. Evidence: page-bind's synthetic footer click cannot close this dialog (same trusted-event class as the mega-menu precedent); agent then pauses per global-dialog guard => zero actions => missing_success_token => traj failed (traj 723 run1). 723 run1 recorded in abortedRuns, excluded from stats; run2 on the same trajectory succeeded."
   ],
-  "frozenAt": "2026-09-11T02:50:00+08:00",
+  "frozenAt": "2026-09-11T03:40:00+08:00",
   "spec": "docs/superpowers/specs/2026-09-11-kb-value-ab-design.md",
   "environment": {
-    "controlPlane": "http://127.0.0.1:4097",
+    "controlPlane": "http://127.0.0.1:4097 (npm start)",
     "sut": "http://test.creditv5p2.tansun.com.cn",
     "systemAccountId": 2,
     "accountName": "黄某某（经理，701994）",
     "passwordSource": "config/.env DB → system_account.id=2; password NEVER written to this manifest",
     "serialExecution": true,
-    "writePrefix": "KBAB<runId>-"
+    "writePrefix": "KBAB<runId>-",
+    "dbPath": "direct 47.101.58.49:3306 via update-db-whitelist.ps1 window (plan main path); SSH tunnel 13306 = fallback only"
   },
   "armProtocol": {
     "paired": true,
-    "alternating": true,
+    "alternating": "R01:A->B, R02:B->A, ... by officialPlan index (odd A-first, even B-first)",
     "armMarker": "name=KBAB<runId>-<arm>-<reqId> ONLY; never in description",
     "oneChance": true,
-    "retryPolicy": "no auto-retry; exceptional retry run records retryOf"
+    "retryPolicy": "no auto-retry; exceptional retry run records retryOf",
+    "environmentPrep": "每条 run：record/prepare 后、record/start 前执行 tmp/kb-ab/close-tianyuan-dialog.py（CDP 真实 mousedown 关天元欢迎弹窗；弹窗不可见则零操作直过）。两臂同一处理——这是 harness 而非自变量"
+  },
+  "pilot": {
+    "reqIds": ["R02", "R06"],
+    "order": "R02:A,B then R06:B,A (alternating)",
+    "ceilingRule": "pilot A-arm success rate >= 0.9 -> switch difficulty anchors per spec S4 (stamp family #586/590/592/593/594 + credit_usage #615), manifest -> v1.1",
+    "optionalCArm": "deferred (kept for report discussion; not run in v1)",
+    "result": {
+      "runs": [
+        { "trajectoryId": 723, "arm": "A", "reqId": "R02", "recordStatus": "recorded", "isSuccessful": 1, "stepCount": 32, "note": "run1 on same traj failed on leftover tianyuan dialog (zero actions, missing_success_token) - environment blocker not task failure; run1 in abortedRuns" },
+        { "trajectoryId": 724, "arm": "B", "reqId": "R02", "recordStatus": "recorded", "isSuccessful": 1, "stepCount": 44 },
+        { "trajectoryId": 725, "arm": "A", "reqId": "R06", "recordStatus": "recorded", "isSuccessful": 1, "stepCount": 5 },
+        { "trajectoryId": 726, "arm": "B", "reqId": "R06", "recordStatus": "recorded", "isSuccessful": 1, "stepCount": 5 }
+      ],
+      "aArmSuccessRate": 1.0,
+      "ceilingTriggered": true,
+      "residueCreated": [
+        { "customerName": "吴强杰", "customerNo": "26091101181825853", "state": "信贷预客户", "run": "723(A,R02)", "cleanup": "不可删（SUT 状态机），cleanupLog 留证移交" },
+        { "customerName": "KB主链R1-20260911-0125", "customerNo": "26091101360078854", "state": "信贷预客户", "run": "724(B,R02)", "cleanup": "不可删，cleanupLog 留证移交" }
+      ]
+    }
   },
   "requirements": [
     {
@@ -34,7 +56,8 @@
       "functionId": 9000000011,
       "endpoint": "评级申请弹窗提交（评级对象=已有客户，模型自动带出）",
       "cleanup": "无写数据（评级若提交成功为流程数据，stamp 无法前置——评级入口要求选已有客户；若申请发起成功按流程撤销；报告如实记录）",
-      "rollbackRisk": "low"
+      "rollbackRisk": "low",
+      "note": "v1.1 保留：从未 pilot 的评级族；评级入口要求已有客户，若发起成功可撤销"
     },
     {
       "reqId": "R02",
@@ -42,29 +65,21 @@
       "module": "客户管理",
       "card": "customer_onboarding",
       "functionId": 7,
-      "endpoint": "对公客户新增保存成功（stamp=KBAB<runId>-客户）",
+      "endpoint": "新增客户抽屉保存成功",
       "cleanup": "列表查 stamp → 状态=草稿客户则删除；信贷预客户不可删（SUT 状态机），留证移交",
-      "rollbackRisk": "medium"
-    },
-    {
-      "reqId": "R03",
-      "requirement": "1、登录系统。\n2、新增对公客户。",
-      "module": "客户管理",
-      "card": "customer_onboarding",
-      "functionId": 7,
-      "endpoint": "对公客户新增保存成功（stamp 前缀）",
-      "cleanup": "同 R02",
-      "rollbackRisk": "medium"
+      "rollbackRisk": "medium",
+      "note": "v1.1 保留为集内中等难度（pilot 已证可过）；agent 自主命名，清理按实际创建名对账"
     },
     {
       "reqId": "R04",
-      "requirement": "1.点击客户管理，点击对公客户管理。\n2.新增一个信贷潜在客户，点击保存。（点击法定代表人/负责人证件号码的引入按钮，客户名称 填写 吴芳军，点击查询，选择一个客户，点击确认。）",
+      "requirement": "1.点击客户管理，点击对公客户管理。 2.新增一个信贷潜在客户，点击保存。（点击法定代表人/负责人证件号码的引入按钮，客户名称 填写 吴芳军，选中后确定）预期结果：保存成功且法人代表引入成功。",
       "module": "客户管理",
       "card": "customer_onboarding",
       "functionId": 7,
-      "endpoint": "信贷潜在客户新增+法人引入（客户名 stamp 前缀）",
+      "endpoint": "新增+法人引入+保存（原池原句）",
       "cleanup": "同 R02",
-      "rollbackRisk": "medium"
+      "rollbackRisk": "medium",
+      "note": "v1.1 保留（原池原句，与 N02 互为原文/复述配对补充）；信贷潜在客户=信贷预客户"
     },
     {
       "reqId": "R05",
@@ -72,9 +87,10 @@
       "module": "评级管理",
       "card": "rating",
       "functionId": 9000000011,
-      "endpoint": "抵达对公客户评级列表页（导航+列表可见即成功，不发起申请）",
-      "cleanup": "无写数据",
-      "rollbackRisk": "low"
+      "endpoint": "对公客户评级页可见",
+      "cleanup": "无写数据（仅导航+页面可见）",
+      "rollbackRisk": "low",
+      "note": "v1.1 保留：跨两模块导航任务"
     },
     {
       "reqId": "R06",
@@ -82,9 +98,10 @@
       "module": "客户管理",
       "card": "customer_query",
       "functionId": 9000000039,
-      "endpoint": "客户查询页列表返回结果",
+      "endpoint": "查询结果列表可见",
       "cleanup": "无写数据",
-      "rollbackRisk": "low"
+      "rollbackRisk": "low",
+      "note": "v1.1 保留为易对照（pilot A=recorded）"
     },
     {
       "reqId": "R07",
@@ -94,17 +111,8 @@
       "functionId": 9000000055,
       "endpoint": "评级查询管理页列表返回结果",
       "cleanup": "无写数据",
-      "rollbackRisk": "low"
-    },
-    {
-      "reqId": "R08",
-      "requirement": "1、登录系统。2、进入产品管理，打开产品库管理，查询产品。",
-      "module": "产品管理",
-      "card": "product_library",
-      "functionId": 9000000740,
-      "endpoint": "产品库列表可见",
-      "cleanup": "无写数据",
-      "rollbackRisk": "low"
+      "rollbackRisk": "low",
+      "note": "v1.1 保留：从未 pilot 的评级查询族（评级列表按经办人数据域过滤——agent 须处理空结果或按已知客户查询，真实难度）"
     },
     {
       "reqId": "R09",
@@ -112,19 +120,10 @@
       "module": "产品管理",
       "card": "product_query",
       "functionId": 9000000467,
-      "endpoint": "查询产品信息列表可见",
+      "endpoint": "产品查询结果可见",
       "cleanup": "无写数据",
-      "rollbackRisk": "low"
-    },
-    {
-      "reqId": "R10",
-      "requirement": "1、登录系统。2、进入客户管理，打开集群客户管理，查询集群客户。",
-      "module": "客户管理",
-      "card": "customer-group-cluster",
-      "functionId": 9000000018,
-      "endpoint": "集群客户管理页列表可见",
-      "cleanup": "无写数据",
-      "rollbackRisk": "low"
+      "rollbackRisk": "low",
+      "note": "v1.1 保留为易对照（跨模块+查询）；R08/R10 同形删除"
     },
     {
       "reqId": "R11",
@@ -134,30 +133,103 @@
       "functionId": 9000000144,
       "endpoint": "风险分类统计页可见",
       "cleanup": "无写数据",
-      "rollbackRisk": "low"
+      "rollbackRisk": "low",
+      "note": "v1.1 保留为易对照（贷后模块，深菜单）"
+    },
+    {
+      "reqId": "N01",
+      "requirement": "1、登录系统。\n2、新增一个对公客户：客户名称用「KBAB26091102-」前缀加日期时间 stamp（全局唯一），证件类型=统一社会信用代码，证件号码自拟合法格式（如 91330100MA2ABCD99X），客户状态=信贷预客户，对公客户类型=企业类。\n3、保存成功后返回客户列表，按该客户名称查询，确认列表可见该客户记录。预期：查询结果含该 stamp 客户且名称一致。",
+      "module": "客户管理",
+      "card": "customer_onboarding",
+      "functionId": 7,
+      "endpoint": "新增保存成功 + 列表按 stamp 查询可见（stamp 族判据腿）",
+      "cleanup": "列表查 stamp → 状态=草稿客户则删除；信贷预客户不可删，留证移交",
+      "rollbackRisk": "medium",
+      "note": "难度锚 ①（spec S4 stamp 族 #586-594）：判定腿=列表回读校验——pilot 证 create 可过但从未校验回读腿"
+    },
+    {
+      "reqId": "N02",
+      "requirement": "1、登录系统。\n2、新增一个对公客户：客户名称用「KBAB26091102-」前缀加日期时间 stamp（全局唯一），证件类型=统一社会信用代码，证件号码自拟合法格式，客户状态=信贷预客户。\n3、在新增表单中点击「法定代表人/负责人证件号码」的引入按钮，在引入弹窗内客户名称填「吴芳军」，查询并选中后确定带回。\n4、点击保存。预期：保存出现操作成功提示，法定代表人已带回表单。",
+      "module": "客户管理",
+      "card": "customer_onboarding",
+      "functionId": 7,
+      "endpoint": "引入弹窗三段式 + 保存成功（#590 死点腿）",
+      "cleanup": "同 N01",
+      "rollbackRisk": "medium",
+      "note": "难度锚 ②（#590 最后一动=法人引入弹窗取消）：把引入写成显式需求腿"
+    },
+    {
+      "reqId": "N03",
+      "requirement": "1、登录系统。\n2、进入客户管理，打开客户信息查询，查询客户「KB测客户-20260905-1315」，记录其客户编号。\n3、清空条件后改用该客户编号再查一次。预期：两次查询命中同一客户（编号一致）。",
+      "module": "客户管理",
+      "card": "customer_query",
+      "functionId": 9000000039,
+      "endpoint": "两次查询一致性校验（多腿读任务）",
+      "cleanup": "无写数据",
+      "rollbackRisk": "low",
+      "note": "难度锚 ③：多腿读任务（R06 只查一次；本条=按名查→记编号→按编号查→比对）"
+    },
+    {
+      "reqId": "N04",
+      "requirement": "1、登录系统。\n2、进入评级管理，打开对公客户评级，发起一条评级申请：评级对象通过客户选择弹窗按客户名称精确查询（用 26090513160716537 对应的「KB测客户-20260905-1315」，或任一可见对公客户），选中带回；评级模型自动带出后提交保存。\n预期：评级申请保存成功（页面出现成功提示或列表可见新评级记录）。",
+      "module": "评级管理",
+      "card": "rating",
+      "functionId": 9000000011,
+      "endpoint": "评级申请发起成功（写流程数据，可撤销）",
+      "cleanup": "若发起成功：列表选中该新评级 → 流程撤销（如状态允许）；不可撤销则如实记录编号移交 cleanupLog。优先用 KBAB 时期创建/已存在的预客户为评级对象",
+      "rollbackRisk": "medium",
+      "note": "难度锚 ④：跨模块写任务（客户选择弹窗三段式+评级模型带出+提交）；R01 的显式化版本"
     },
     {
       "reqId": "R12",
       "requirement": "1、登录系统。2、进入系统管理，打开贷款计算器，做一次试算。",
       "module": "系统管理",
-      "card": "system-mgmt-loan-calc",
+      "card": "loan-calc",
       "functionId": 9000000452,
-      "endpoint": "贷款计算器页打开并完成一次试算（纯计算无落库）",
+      "endpoint": "试算结果出现",
       "cleanup": "无写数据",
-      "rollbackRisk": "low"
+      "rollbackRisk": "low",
+      "note": "v1.1 降为替补（不落库、系统管理模块超信贷主链）；officialPlan 12 条满员时不动用"
     }
   ],
-  "pilot": {
-    "reqIds": ["R02", "R06"],
-    "order": "R02:A,B then R06:B,A (alternating)",
-    "ceilingRule": "pilot A-arm success rate >= 0.9 -> switch difficulty anchors per spec S4 (stamp family #586/590/592/593/594 + credit_usage #615), manifest -> v1.1",
-    "optionalCArm": "deferred (kept for report discussion; not run in v1)"
-  },
+  "droppedRequirements": [
+    { "reqId": "R03", "reason": "与 R02 同质（新增对公客户=同一任务），无信息量", "v1Requirement": "1、登录系统。\n2、新增对公客户。" },
+    { "reqId": "R08", "reason": "同质查询类（产品库管理），由 R09 代表该难度层", "v1Requirement": "1、登录系统。2、进入产品管理，打开产品库管理，查询产品。" },
+    { "reqId": "R10", "reason": "同质查询类（集群客户管理）", "v1Requirement": "1、登录系统。2、进入客户管理，打开集群客户管理，查询集群客户。" }
+  ],
   "officialPlan": {
-    "order": "per-requirement pairs, arm order alternating A->B / B->A by reqId index parity",
-    "runsTotal": 24
+    "reqIds": ["R01", "R02", "R04", "R05", "R06", "R07", "R09", "R11", "N01", "N02", "N03", "N04"],
+    "substitutes": ["R12"],
+    "perReqCleanup": true,
+    "cleanupLogTarget": "manifest.cleanupLog",
+    "runlog": "tmp/kb-ab/runlog.jsonl (one line per run)",
+    "totalRuns": 24
   },
-  "cleanupLog": [],
-  "abortedRuns": [],
-  "notes": "Requirement texts above are copied verbatim from batch_recording_item.requirement (user/QA hand-written, product register). R06-R12 texts: the pool only contains these families in degraded numbered variants; the canonical un-numbered text here preserves the same instruction content and was verified against card menu_path targets. No v2 eval set usage."
+  "cleanupLog": [
+    { "at": "2026-09-11T03:30+08:00", "item": "pilot 建档残留下账：吴强杰 26091101181825853（723）、KB主链R1-20260911-0125 26091101360078854（724）均=信贷预客户，SUT 状态机无删除入口（state_actions 仅草稿客户允许删除），按 09-07 R1 先例留证移交；名称不带 KBAB 前缀（agent 自主命名），已在此登记供对账", "disposition": "retained+documented" }
+  ],
+  "abortedRuns": [
+    {
+      "trajectoryId": 722,
+      "arm": "A",
+      "reqId": "R02",
+      "status": "draft",
+      "reason": "setup 首次 POST 成功但脚本崩于 {code,message,data} 信封解包（f9b9c543 修复）；重试重复建 A 臂（723）。无 prepare/无副作用，审计保留",
+      "excludedFromStats": true
+    },
+    {
+      "trajectoryId": 723,
+      "arm": "A",
+      "reqId": "R02",
+      "attempt": "run1",
+      "status": "failed(missing_success_token)",
+      "reason": "天元相关配置欢迎弹窗残留可见 → agent 环境守卫上报暂停 → 零动作失败。环境阻障非任务失败（harness 关窗法落地后同轨迹 run2 成功 recorded）。run1 不计入统计，run2 为正式观测",
+      "excludedFromStats": true
+    }
+  ],
+  "notes": [
+    "pilot 实录：723/724/725/726 均 recorded（步数 32/44/5/5）；A 臂 2/2=1.0 触发天花板规则；正式 24 跑按 officialPlan.reqIds 执行",
+    "业务数据注入通道（business_data）会驱动表单取值（如吴强杰/证件号），B 臂提示块不改变该通道；create 族 stamp 命名遵守权在 agent，清理时按 doneLogs/业务数据可查的实际创建名对账",
+    "N01/N02 stamp 前缀已写入需求文本（KBAB26091102-），保证 SUT 残留可按前缀对账"
+  ]
 }

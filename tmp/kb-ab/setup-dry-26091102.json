@@ -1,0 +1,198 @@
+{
+  "runId": "26091102",
+  "manifest": "D:\\dev\\JS-gen\\scripts\\kb\\kb-ab-manifest.v1.json",
+  "pairs": [
+    {
+      "reqId": "R01",
+      "armOrder": "A->B",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-R01",
+          "descriptionPreview": "1、登录系统。\n2、对公客户评级。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-R01",
+          "descriptionPreview": "【流程卡模板】对公客户评级\n菜单：评级管理/对公客户评级\n前置条件：\n- 评级对象必须是系统内已有客户（评级申请弹窗中客户名称从客户选择下拉挑选，下拉列=客户名称/客户编号）\n- 评级模型不由人工选择：选定客户后模型名称按客户类型自动带出（"
+        }
+      }
+    },
+    {
+      "reqId": "R02",
+      "armOrder": "B->A",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-R02",
+          "descriptionPreview": "1、登录系统。\n2、新增客户。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-R02",
+          "descriptionPreview": "【流程卡模板】对公客户建档\n菜单：客户管理→对公客户管理（functionId=7；menu //li[@data-id='RES000000101']；pageId=ZJJK00066153；列表 hash≈#/cstMgt/csinfM"
+        }
+      }
+    },
+    {
+      "reqId": "R04",
+      "armOrder": "A->B",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-R04",
+          "descriptionPreview": "1.点击客户管理，点击对公客户管理。 2.新增一个信贷潜在客户，点击保存。（点击法定代表人/负责人证件号码的引入按钮，客户名称 填写 吴芳军，选中后确定）预期结果：保存成功且法人代表引入成功。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-R04",
+          "descriptionPreview": "【流程卡模板】对公客户建档\n菜单：客户管理→对公客户管理（functionId=7；menu //li[@data-id='RES000000101']；pageId=ZJJK00066153；列表 hash≈#/cstMgt/csinfM"
+        }
+      }
+    },
+    {
+      "reqId": "R05",
+      "armOrder": "B->A",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-R05",
+          "descriptionPreview": "1、点击客户管理，点击对公客户管理。2、点击评级管理，点击对公客户评级。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-R05",
+          "descriptionPreview": "【流程卡模板】对公客户评级\n菜单：评级管理/对公客户评级\n前置条件：\n- 评级对象必须是系统内已有客户（评级申请弹窗中客户名称从客户选择下拉挑选，下拉列=客户名称/客户编号）\n- 评级模型不由人工选择：选定客户后模型名称按客户类型自动带出（"
+        }
+      }
+    },
+    {
+      "reqId": "R06",
+      "armOrder": "A->B",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-R06",
+          "descriptionPreview": "1、登录系统。2、进入客户管理，打开客户信息查询，查询客户。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-R06",
+          "descriptionPreview": "【流程卡模板】客户信息查询\n菜单：客户管理→客户信息查询（functionId=9000000039；menu //li[@data-id='RES28003']；pageId=ZJJK00104552；勿挂对公建档 7 / 勿挂 9000"
+        }
+      }
+    },
+    {
+      "reqId": "R07",
+      "armOrder": "B->A",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-R07",
+          "descriptionPreview": "1、登录系统。2、进入评级管理，打开评级查询，查询评级记录。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-R07",
+          "descriptionPreview": "【流程卡模板】评级查询与意见查看\n菜单：评级管理/评级查询\n前置条件：\n- 用户有评级查询菜单权限（不限经办人）；存在评级记录\n- 查看详情按业务类型跳对应详情页：对公→对公客户评级详情（实证跳 FS00005854 只读页）、集团/同业同"
+        }
+      }
+    },
+    {
+      "reqId": "R09",
+      "armOrder": "A->B",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-R09",
+          "descriptionPreview": "1、登录系统。2、进入产品管理，打开查询产品信息，查询一个产品。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-R09",
+          "descriptionPreview": "【流程卡模板】查询产品信息（列表/详情/历史）\n菜单：产品管理→查询产品信息（functionId=9000000467；menu //li[@data-id='RES04069']；pageId=ZJJK00095907；hash=/pd"
+        }
+      }
+    },
+    {
+      "reqId": "R11",
+      "armOrder": "B->A",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-R11",
+          "descriptionPreview": "1、登录系统。2、进入贷后管理，打开风险分类统计，查看统计。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-R11",
+          "descriptionPreview": "【流程卡模板】风险分类统计（客户经理维度）\n菜单：贷后管理/风险分类/风险分类统计\n前置条件：\n- 【SUT 实测 2026-09-06】统计主页与维度子页进入即自动查询（riskClassification/page POST）\n【本原子"
+        }
+      }
+    },
+    {
+      "reqId": "N01",
+      "armOrder": "A->B",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-N01",
+          "descriptionPreview": "1、登录系统。\n2、新增一个对公客户：客户名称用「KBAB26091102-」前缀加日期时间 stamp（全局唯一），证件类型=统一社会信用代码，证件号码自拟合法格式（如 91330100MA2ABCD99X），客户状态=信贷预客户，对公客"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-N01",
+          "descriptionPreview": "【流程卡模板】对公客户建档\n菜单：客户管理→对公客户管理（functionId=7；menu //li[@data-id='RES000000101']；pageId=ZJJK00066153；列表 hash≈#/cstMgt/csinfM"
+        }
+      }
+    },
+    {
+      "reqId": "N02",
+      "armOrder": "B->A",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-N02",
+          "descriptionPreview": "1、登录系统。\n2、新增一个对公客户：客户名称用「KBAB26091102-」前缀加日期时间 stamp（全局唯一），证件类型=统一社会信用代码，证件号码自拟合法格式，客户状态=信贷预客户。\n3、在新增表单中点击「法定代表人/负责人证件号码"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-N02",
+          "descriptionPreview": "【流程卡模板】对公客户建档\n菜单：客户管理→对公客户管理（functionId=7；menu //li[@data-id='RES000000101']；pageId=ZJJK00066153；列表 hash≈#/cstMgt/csinfM"
+        }
+      }
+    },
+    {
+      "reqId": "N03",
+      "armOrder": "A->B",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-N03",
+          "descriptionPreview": "1、登录系统。\n2、进入客户管理，打开客户信息查询，查询客户「KB测客户-20260905-1315」，记录其客户编号。\n3、清空条件后改用该客户编号再查一次。预期：两次查询命中同一客户（编号一致）。"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-N03",
+          "descriptionPreview": "【流程卡模板】客户信息查询\n菜单：客户管理→客户信息查询（functionId=9000000039；menu //li[@data-id='RES28003']；pageId=ZJJK00104552；勿挂对公建档 7 / 勿挂 9000"
+        }
+      }
+    },
+    {
+      "reqId": "N04",
+      "armOrder": "B->A",
+      "runs": {
+        "A": {
+          "dryRun": true,
+          "name": "KBAB26091102-A-N04",
+          "descriptionPreview": "1、登录系统。\n2、进入评级管理，打开对公客户评级，发起一条评级申请：评级对象通过客户选择弹窗按客户名称精确查询（用 26090513160716537 对应的「KB测客户-20260905-1315」，或任一可见对公客户），选中带回；评级"
+        },
+        "B": {
+          "dryRun": true,
+          "name": "KBAB26091102-B-N04",
+          "descriptionPreview": "【流程卡模板】对公客户评级\n菜单：评级管理/对公客户评级\n前置条件：\n- 评级对象必须是系统内已有客户（评级申请弹窗中客户名称从客户选择下拉挑选，下拉列=客户名称/客户编号）\n- 评级模型不由人工选择：选定客户后模型名称按客户类型自动带出（"
+        }
+      }
+    }
+  ]
+}

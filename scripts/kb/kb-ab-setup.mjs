@@ -19,6 +19,8 @@
  *   --dry-run   print the payloads (name/description diff) without POSTing
  *   --pair R02  assemble one requirement pair (default: all requirements)
  *   --runId X   override runId (default: timestamp YYMMDDHHmm)
+ *   --plan      assemble only officialPlan.reqIds (v1.1: the official 12),
+ *               in manifest order; default without --pair
  *
  * No src/** changes; product API only. Serial by construction (caller runs
  * one pair at a time).
@@ -136,9 +138,23 @@ async function main() {
   const base = `http://127.0.0.1:${process.env.PORT || 4097}`;
   const runId = get('--runId', new Date().toISOString().slice(2, 14).replace(/[-T:]/g, '').slice(0, 10));
   const onlyReq = args.includes('--pair') ? get('--pair', '') : null;
+  const usePlan = args.includes('--plan');
   const sysAcc = manifest.environment.systemAccountId;
 
-  const reqs = manifest.requirements.filter((r) => !onlyReq || r.reqId === onlyReq);
+  // --plan: official run order from manifest.officialPlan.reqIds, with the
+  // manifest's v1.1 alternation (odd plan index A-first, even B-first).
+  let ordered;
+  if (args.includes('--plan')) {
+    const planIds = manifest.officialPlan.reqIds;
+    ordered = planIds.map((id) => {
+      const r = manifest.requirements.find((x) => x.reqId === id);
+      if (!r) throw new Error(`officialPlan references unknown reqId ${id}`);
+      return r;
+    });
+  } else {
+    ordered = manifest.requirements;
+  }
+  const reqs = ordered.filter((r) => !onlyReq || r.reqId === onlyReq);
   if (onlyReq && reqs.length === 0) throw new Error(`--pair ${onlyReq}: no such reqId in manifest`);
 
   const flowsDir = resolve(ROOT, 'data/kb/flows');
@@ -152,8 +168,10 @@ async function main() {
     const description = r.requirement; // A-arm phase description = requirement text, verbatim
     const hint = buildHintBlock(card, r.requirement);
     const bDescription = `${hint}\n${description}`;
-    const armOrder = r.armOrder || (manifest.officialPlan.order && null);
-    const first = armOrder || (/^R\d\d+$/.test(r.reqId) && parseInt(r.reqId.slice(1), 10) % 2 === 1 ? 'A' : 'B');
+    // arm order: plan index parity (0-based: even index A-first) unless a
+    // per-requirement override exists.
+    const planIndex = manifest.officialPlan.reqIds ? manifest.officialPlan.reqIds.indexOf(r.reqId) : -1;
+    const first = r.armOrder || (planIndex >= 0 ? (planIndex % 2 === 0 ? 'A' : 'B') : 'A');
     const pair = {
       reqId: r.reqId,
       armOrder: `${first}->${first === 'A' ? 'B' : 'A'}`,

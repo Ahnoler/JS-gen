@@ -1,0 +1,70 @@
+{
+  "runId": "26091101",
+  "manifest": "D:\\dev\\JS-gen\\scripts\\kb\\kb-ab-manifest.v1.json",
+  "pairs": [
+    {
+      "reqId": "R06",
+      "armOrder": "B->A",
+      "runs": {
+        "A": {
+          "name": "KBAB26091101-A-R06",
+          "trajectoryId": 725
+        },
+        "B": {
+          "name": "KBAB26091101-B-R06",
+          "trajectoryId": 726
+        }
+      },
+      "purity": {
+        "aDescription": "1、登录系统。2、进入客户管理，打开客户信息查询，查询客户。",
+        "bContainsHint": true,
+        "aContainsHint": false,
+        "stripEqual": true,
+        "ok": true
+      }
+    }
+  ],
+  "pilotPairs": [
+    {
+      "reqId": "R02",
+      "armOrder": "B->A(manifest)/actual:A=723,B=724",
+      "runs": {
+        "A": {
+          "trajectoryId": 723
+        },
+        "B": {
+          "trajectoryId": 724
+        }
+      },
+      "purity": {
+        "ok": true,
+        "stripEqual": true,
+        "note": "verified post-hoc after envelope-unwrap fix (commit pending)"
+      }
+    },
+    {
+      "reqId": "R06",
+      "armOrder": "B->A",
+      "runs": {
+        "A": {
+          "trajectoryId": 725
+        },
+        "B": {
+          "trajectoryId": 726
+        }
+      },
+      "purity": {
+        "ok": true,
+        "stripEqual": true
+      }
+    }
+  ],
+  "orphans": [
+    {
+      "trajectoryId": 722,
+      "name": "KBAB26091101-A-R02",
+      "reason": "first attempt posted A then crashed unwrapping response envelope; A re-posted as 723 on retry. 722 is a KBAB-prefixed draft row in js_gen only (no SUT side effects, no prepare/run) - kept for audit, excluded from experiment",
+      "disposition": "audit-only, excluded from stats"
+    }
+  ]
+}
