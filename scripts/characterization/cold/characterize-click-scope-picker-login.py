@@ -3,9 +3,10 @@
 
 read_text source-substring pins (same style as characterize-icon-buttons.py):
 
-- G1 click_button container-scope-first: _misc.py must contain the
-  container-scope click probe (overlay-first, page-level fallback) and
-  form_action_engines.py must keep its wiring markers.
+- G1 click_button container-scope-first: click_action_engine.py must contain
+  live container-scope wiring (G1 comment, _JS_CLICK_BUTTON_IN_CONTAINER
+  evaluate, ok-container fallback to JS_CLICK_ICON_BUTTON). The JS constant
+  may still be defined in _misc.py.
 - G3 picker refill verification: JS_PICKER_DIALOG_SELECT must carry the
   refill_verified / refill-not-observed markers, and _workspace.py the
   explicit err-refill-not-verified gate with the one SELECT re-run.
@@ -22,6 +23,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.a
 sys.path.insert(0, ROOT)
 
 MISC = os.path.join(ROOT, "scripts", "controller", "actions", "_misc.py")
+CLICK_ENGINE = os.path.join(ROOT, "scripts", "controller", "actions", "click_action_engine.py")
 ENGINES = os.path.join(ROOT, "scripts", "controller", "actions", "form_action_engines.py")
 WORKSPACE = os.path.join(ROOT, "scripts", "controller", "actions", "_workspace.py")
 PICKER = os.path.join(ROOT, "scripts", "controller", "actions", "js_snippets", "picker_confirm.py")
@@ -39,15 +41,23 @@ def _pin(label, path, needles):
 
 
 def main():
-    # G1: click_button resolves the container scope before page-level click.
-    _pin("G1", MISC, [
-        "_JS_CLICK_BUTTON_IN_CONTAINER",
+    # G1: live ClickEngine click_button container-scope-first wiring.
+    _pin("G1", CLICK_ENGINE, [
         "G1 container-scope-first",
+        "_JS_CLICK_BUTTON_IN_CONTAINER",
         "ok-container:",
-        "ok-click:",
-        "div.todo-item-action",
-        "JS_CLICK_ICON_BUTTON, button_text",
+        "JS_CLICK_ICON_BUTTON",
     ])
+    with open(MISC, "r", encoding="utf-8") as f:
+        misc_text = f.read()
+    with open(CLICK_ENGINE, "r", encoding="utf-8") as f:
+        engine_text = f.read()
+    if "_JS_CLICK_BUTTON_IN_CONTAINER" not in misc_text and (
+        "_JS_CLICK_BUTTON_IN_CONTAINER" not in engine_text
+    ):
+        FAILURES.append(
+            "G1: _JS_CLICK_BUTTON_IN_CONTAINER missing from _misc.py and click_action_engine.py"
+        )
     # G3: picker select refill verification (JS + action layer).
     _pin("G3", PICKER, [
         "refill_verified",

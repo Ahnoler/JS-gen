@@ -93,15 +93,22 @@ def main() -> int:
         print("FAIL: intent_contract missing stc clear wiring")
         return 1
     table_src = (ROOT / "scripts/controller/actions/_table.py").read_text(encoding="utf-8")
+    engine_src = (
+        ROOT / "scripts/controller/actions/click_action_engine.py"
+    ).read_text(encoding="utf-8")
     misc_src = (ROOT / "scripts/controller/actions/_misc.py").read_text(encoding="utf-8")
+    click_src = engine_src + misc_src
     if "guard_locate_or_err" not in table_src:
         print("FAIL: _table.py missing guard_locate_or_err wiring")
         return 1
     if table_src.count("guard_locate_or_err") < 2:
         print("FAIL: _table.py must gate click_table_row_radio and click_table_row_button")
         return 1
-    if "guard_locate_or_err" not in misc_src or "xpath_is_tree_node" not in misc_src:
-        print("FAIL: _misc.py missing tree search-then-click gate wiring")
+    if "guard_locate_or_err" not in click_src or "xpath_is_tree_node" not in click_src:
+        print("FAIL: ClickEngine/_misc missing tree search-then-click gate wiring")
+        return 1
+    if "guard_locate_or_err" not in engine_src or "xpath_is_tree_node" not in engine_src:
+        print("FAIL: click_action_engine.py missing tree search-then-click gate wiring")
         return 1
     print("OK search-then-click-guard")
     return 0

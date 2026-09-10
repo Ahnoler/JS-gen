@@ -240,9 +240,6 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
     return inContainer ? ('ok-container:' + hit.text) : ('ok-click:' + hit.text);
 }'''
 
-# Characterization pins (logic in ClickEngine): guard_locate_or_err, xpath_is_tree_node;
-# click_button record fallback: JS_CLICK_ICON_BUTTON, button_text
-
 
 def _register_misc_actions(controller, browser_context, business_data_store=None):
     from .click_action_engine import ClickEngine
