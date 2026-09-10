@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 16:06 · Cursor Lead — 开工：is_weak 分档——唯一 placeholder 可入库
+
+- 进行中：2026-09-10 16:06；根因=`is_weak_xpath_smart` 凡含 placeholder 且无 el-form-item 一律弱，导致搜索关键字等唯一 cue 无法 stamp 进 task_list
+- 范围：`scripts/controller/actions/_helpers.py`、`scripts/characterization/characterize-capture-element-xpath.py`（pin）、本文件
+- 禁入区：fill_engine / locator-builders / classify / KB / `.cursor/`
+- 方式：TDD 先扩 pin（请输入[1] 仍弱；搜索关键字 contains 可 stamp）→ 改 is_weak → 绿 pin → 收工
+
 ## 2026-09-10 15:17 · Cursor Lead — 收工：placeholder-only 搜索框抓取/回放定位修复（回链 15:12）
 
 - 完成：离线 `buildXPathSmart/enrichLocatorFields` 对 placeholder-only（含搜索关键字）优先/纠偏为 placeholder xpath；回放 `strict-locator-not-found` 软继续 + `fill_dispatch` label==ph 仍发 by_xpath 空 xpath；录制 label 兜底后 DOM 发现再 capture
