@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 17:12 · Cursor Lead — 开工：p1-6 replayId 全链过滤 + 超时 cancel_step
+
+- 进行中：2026-09-10 17:12；根因=`replay_done` 仅按 sessionId 等待，旧 replay 迟到 done 可误满足新登录等待；超时不叫停 Python
+- 范围：`src/services/replay-actions.js`、`scripts/event_dispatch.py`、`src/services/rerun-replay-service.js`、冷 pin、todo-list、本文件
+- 禁入区：`classify.py` / `verify-all.sh` WIP / fill·click 引擎 / `.cursor/`
+- 方式：TDD 冷 pin（ownership + helper 接线）→ 改 helper/Python 回带 → 超时发 cancel_step → 绿 pin → 收工
+
 ## 2026-09-10 17:01 · Cursor Lead — 收工：engine-wet-trio ②③ 真机湿测 PASS
 
 - 完成：回链开工 `78dd209d`；重启控制面加载 `0421744b`；湿测 traj **720/721**
