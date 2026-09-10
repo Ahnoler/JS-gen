@@ -36,6 +36,8 @@ new_keys = [
     'SCENARIO_LLM_TIMEOUT_MS',
     'FORM_LLM_TIMEOUT_MS',
     'L1C_LLM_MODEL',
+    'L1C_LLM_BASE_URL',
+    'L1C_LLM_API_KEY',
 ]
 for k in new_keys:
     check(f'.env.example has {k}', k in env_example)
@@ -63,6 +65,8 @@ config_exports = [
     'SCENARIO_LLM_TIMEOUT_MS',
     'FORM_LLM_TIMEOUT_MS',
     'L1C_LLM_MODEL',
+    'L1C_LLM_BASE_URL',
+    'L1C_LLM_API_KEY',
 ]
 for k in config_exports:
     check(f'config.js exports {k}', f'export const {k}' in config_js)
@@ -78,7 +82,10 @@ check('global-browser.js does NOT inject REVIEWER_LLM_TIMEOUT_MS', 'REVIEWER_LLM
 # ── region-classify.js: L1C_LLM_MODEL consumer (import + passthrough) ──────
 region_classify_js = (ROOT / 'src' / 'services' / 'region-classify.js').read_text(encoding='utf-8')
 check('region-classify.js imports L1C_LLM_MODEL', 'L1C_LLM_MODEL' in region_classify_js)
+check('region-classify.js imports L1C_LLM_BASE_URL', 'L1C_LLM_BASE_URL' in region_classify_js)
+check('region-classify.js imports L1C_LLM_API_KEY', 'L1C_LLM_API_KEY' in region_classify_js)
 check('region-classify.js passes L1C_LLM_MODEL to callLLMWithTimeout', 'callLLMWithTimeout(buildClassifyPrompt(cards), L1C_LLM_MODEL)' in region_classify_js)
+check('region-classify.js passes L1C baseUrl to callLLM', 'baseUrl: L1C_LLM_BASE_URL' in region_classify_js)
 
 # ── executor/session-slot.js: does NOT inject L1C_LLM_MODEL / REVIEWER_LLM_TIMEOUT_MS ──
 session_slot_js = (ROOT / 'executor' / 'session-slot.js').read_text(encoding='utf-8')

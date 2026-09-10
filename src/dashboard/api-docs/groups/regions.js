@@ -14,10 +14,11 @@ export const GROUP_REGIONS = [
     id: 'regions',
     name: '区域分类 (L1c)',
     description:
-      '规则 + 可选 LLM（`L1C_LLM`）对 feature card 做 L1 区域分类；L1d 进程内缓存按 systemId + signature。'
-      + ' resolve-element 与 scan/fullpage 共用 `classifyRegions` 服务。'
-      + ' 环境变量：`L1C_LLM` / `L1C_LLM_MODEL` / `L1C_LLM_TIMEOUT_MS` 可配；'
-      + ' 网关与密钥固定走主 `LLM_BASE_URL` / `LLM_API_KEY`（无独立 L1C_*_BASE_URL/API_KEY）。',
+      'L1c = L1 区域分类：对页面分区 feature card（shell/main/section/overlay…）打 role/label；'
+      + '规则优先，可选 LLM（`L1C_LLM`）；L1d 按 systemId+signature 缓存；'
+      + ' resolve-element 与 scan/fullpage 共用 `classifyRegions`。'
+      + ' 环境变量：`L1C_LLM` / `L1C_LLM_MODEL` / `L1C_LLM_BASE_URL` / `L1C_LLM_API_KEY` / `L1C_LLM_TIMEOUT_MS`'
+      + '（未设回落主 LLM_*）。',
     endpoints: [
       {
         method: 'POST',
@@ -62,8 +63,7 @@ export const GROUP_REGIONS = [
           'body 接受 systemId 或 system_id（字符串/数字均可，用于 L1d 缓存键）',
           'cards 缺省或非数组 → 空 items',
           'LLM 失败/超时：单卡 fallback 为 rule，附 fallback_reason=llm_error；不丢输入卡',
-          'config/.env：`L1C_LLM`、`L1C_LLM_MODEL`（缺省=LLM_MODEL）、`L1C_LLM_TIMEOUT_MS`（缺省 8000）',
-          'HTTP 传输始终用主 LLM_* 网关/密钥（无 L1C_*_BASE_URL/API_KEY）；与 FORM_LLM_* 不同',
+          'config/.env：`L1C_LLM`、`L1C_LLM_MODEL`、`L1C_LLM_BASE_URL`、`L1C_LLM_API_KEY`、`L1C_LLM_TIMEOUT_MS`（未设回落主 LLM_*）',
         ],
       },
     ],

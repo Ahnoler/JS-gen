@@ -98,11 +98,14 @@ export const SCENARIO_LLM_API_KEY = _resolve('SCENARIO_LLM_API_KEY', LLM_API_KEY
 export const SCENARIO_LLM_TIMEOUT_MS = Number(_resolve('SCENARIO_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
 
 /**
- * L1C low-confidence region classify — model name only.
- * Gateway + API key always use primary LLM_BASE_URL / LLM_API_KEY (no L1C_LLM_BASE_URL).
- * Enable with L1C_LLM=true; timeout via L1C_LLM_TIMEOUT_MS.
+ * L1c = L1 region classify：对页面分区 feature card（shell/main/section/overlay/todo…）
+ * 做 role/label 分类。规则优先；低置信或 other/custom:* 时可选 LLM。
+ * resolve-element 与 scan_editable_summary 共用 classifyRegions；L1d 进程内缓存。
+ * 未设置的 BASE_URL/API_KEY/MODEL 回落主 LLM_*（同 FORM_LLM_* / SCENARIO_LLM_*）。
  */
 export const L1C_LLM_MODEL = _resolve('L1C_LLM_MODEL', LLM_MODEL);
+export const L1C_LLM_BASE_URL = _resolve('L1C_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
+export const L1C_LLM_API_KEY = _resolve('L1C_LLM_API_KEY', LLM_API_KEY);
 
 /** 批量动作预算（browser_use max_actions_per_step）：全局默认；0/空 = 不覆盖，走框架默认 10 */
 export const MAX_ACTIONS_PER_STEP = _resolve('MAX_ACTIONS_PER_STEP', '');
@@ -235,9 +238,9 @@ export const AI_MEMORY_DECISIONS = _resolve('AI_MEMORY_DECISIONS', 'true').toLow
 export const AI_MEMORY_AUDIT_STRICT = _resolve('AI_MEMORY_AUDIT_STRICT', 'false').toLowerCase() === 'true';
 
 // L1c region classify (default off → rules + L1d cache only).
-// Design: toggle / model / classify-timeout are env-configurable; HTTP transport
-// always reuses primary LLM_* (BASE_URL + API_KEY). There is intentionally no
-// L1C_LLM_BASE_URL / L1C_LLM_API_KEY — unlike FORM_LLM_* / SCENARIO_LLM_*.
+// What: LLM-assisted labels for low-confidence L1 page regions (not form-fill / reviewer).
+// Env: L1C_LLM, L1C_LLM_MODEL, L1C_LLM_BASE_URL, L1C_LLM_API_KEY, L1C_LLM_TIMEOUT_MS
+// (BASE_URL/API_KEY/MODEL unset → primary LLM_*; same pattern as FORM_LLM_*).
 export const L1C_LLM = _resolve('L1C_LLM', 'false').toLowerCase() === 'true';
 /** Max wait for one L1c LLM classify call (ms); independent of LLM_TIMEOUT_MS. */
 export const L1C_LLM_TIMEOUT_MS = Number(_resolve('L1C_LLM_TIMEOUT_MS', '8000')) || 8000;

@@ -1,12 +1,18 @@
 /**
  * Region role classification: rule-based + LLM fallback with an in-memory L1d cache.
  *
- * LLM transport: callLLM(prompt, L1C_LLM_MODEL) — model from L1C_LLM_MODEL (else LLM_MODEL);
- * BASE_URL/API_KEY always primary LLM_* (no separate L1C gateway env). Gated by L1C_LLM.
+ * L1c = classify L1 page-region feature cards (role/label). LLM gated by L1C_LLM;
+ * transport uses L1C_LLM_MODEL / L1C_LLM_BASE_URL / L1C_LLM_API_KEY (fallback LLM_*).
  */
 import { createHash } from 'node:crypto';
 import { callLLM } from '../llm-utils.js';
-import { L1C_LLM, L1C_LLM_TIMEOUT_MS, L1C_LLM_MODEL } from '../../config/config.js';
+import {
+  L1C_LLM,
+  L1C_LLM_TIMEOUT_MS,
+  L1C_LLM_MODEL,
+  L1C_LLM_BASE_URL,
+  L1C_LLM_API_KEY,
+} from '../../config/config.js';
 
 const SEED = new Set([
   'shell-header',
@@ -127,7 +133,14 @@ async function callLLMWithTimeout(prompt, model) {
     timer = setTimeout(() => reject(new Error('llm_timeout')), L1C_LLM_TIMEOUT_MS);
   });
   try {
-    return await Promise.race([callLLM(prompt, model), timeoutPromise]);
+    return await Promise.race([
+      callLLM(prompt, model, {
+        baseUrl: L1C_LLM_BASE_URL,
+        apiKey: L1C_LLM_API_KEY,
+        timeoutMs: L1C_LLM_TIMEOUT_MS,
+      }),
+      timeoutPromise,
+    ]);
   } finally {
     clearTimeout(timer);
   }
