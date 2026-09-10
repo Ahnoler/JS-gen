@@ -1,0 +1,8 @@
+{"trajectoryId":729,"customerName":"KB主链R1-20260911-0214","customerNo":"26091102181243755","state":"信贷预客户","disposition":"not-deletable-by-SUT-state-machine; documented","at":"2026-09-10T18:19Z"}
+{"trajectoryId":730,"customerName":"KB主链R1-20260911-0224","customerNo":"26091102281021356","state":"信贷预客户","disposition":"not-deletable-by-SUT-state-machine; documented","at":"2026-09-10T18:45Z"}
+{"trajectoryId":731,"customerName":"瑞昇进出口贸易有限公司(信贷潜在客户)","customerNo":"26091102485680657","state":"信贷预客户","disposition":"not-deletable-by-SUT-state-machine; documented","at":"2026-09-10T19:05Z"}
+{"trajectoryId":732,"customerName":"瑞昇进出口贸易有限公司(信贷潜在客户,B臂重跑同stamp)","customerNo":"26091103113741958","state":"信贷预客户","disposition":"not-deletable; documented","at":"2026-09-10T19:23Z"}
+{"trajectoryId":743,"customerName":"KBAB26091102-202609110429","customerNo":null,"state":"信贷预客户","disposition":"attempt delete in cleanup pass; not-deletable if 预客户","at":"2026-09-10T20:32Z"}
+{"trajectoryId":744,"customerName":"KBAB26091102-202609110438","customerNo":"26091104401295560","state":"信贷预客户","disposition":"attempt delete in cleanup pass","at":"2026-09-10T20:41Z"}
+{"trajectoryId":745,"customerName":"KBAB26091102-202609110447","customerNo":"26091104553520861","state":"信贷预客户","disposition":"attempt delete in cleanup pass","at":"2026-09-10T20:58Z"}
+{"trajectoryId":746,"req":"N02","arm":"B","type":"customer","name":"KBAB26091102-202609110504","custNo":null,"evidence":"trajectory_step 1/5/42 fill 客户名称=KBAB26091102-202609110504; final save ok-clicked-44","disposition":"credit-pre-customer not deletable via SUT UI; ledger documented","at":"2026-09-10T21:21:55.526Z"}

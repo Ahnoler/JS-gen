@@ -20,6 +20,9 @@ import sys
 from playwright.async_api import async_playwright
 
 CDP = "http://127.0.0.1:19242"
+# slot-specific CDP ports (9242+slotIndex family, seen live: 19242/19246...).
+# The runner may not know which slot a trajectory got, so probe a range.
+CDP_CANDIDATES = [f"http://127.0.0.1:{p}" for p in (19242, 19243, 19244, 19245, 19246, 19247, 19248, 19249, 19250)]
 
 JS_STATE = """() => {
     const out = { dialogs: [], any: false };
@@ -56,56 +59,64 @@ JS_CLICK_OK = """() => {
 }"""
 
 
-async def main():
+async def close_on(cdp_url):
+    """Probe one CDP endpoint; close the tianyuan dialog if visible. Returns (status, detail)."""
     async with async_playwright() as p:
-        browser = await p.chromium.connect_over_cdp(CDP)
-        target = None
-        for ctx in browser.contexts:
-            for pg in ctx.pages:
-                if "cstMgt" in (pg_hash := pg.url) if False else "cstMgt" in pg.url or True:
-                    pass
-        # pick the page whose URL/hash mentions cstMgt; else first non-blank page
-        pages = [pg for ctx in browser.contexts for pg in ctx.pages]
-        pick = None
-        for pg in pages:
-            if "cstMgt" in pg.url:
-                pick = pg
-                break
-        if pick is None:
+        try:
+            browser = await p.chromium.connect_over_cdp(cdp_url, timeout=5000)
+        except Exception as e:
+            return "unreachable", str(e)[:80]
+        try:
+            pages = [pg for ctx in browser.contexts for pg in ctx.pages]
+            pick = None
             for pg in pages:
-                if pg.url and not pg.url.startswith("about:"):
+                if pg.url and not pg.url.startswith(("about:", "devtools:", "chrome://")):
                     pick = pg
                     break
-        if pick is None:
-            print(json.dumps({"ok": False, "error": "no page found", "urls": [pg.url for pg in pages]}))
-            return 2
-        print("page:", pick.url[:120])
+            if pick is None:
+                return "no-page", [pg.url for pg in pages]
+            st = await pick.evaluate(JS_STATE)
+            ty = st.get("tianyuan")
+            if not ty or not ty.get("visible"):
+                return "none-needed", {"url": pick.url[:100], "any": st.get("any")}
+            clicked = await pick.evaluate(JS_CLICK_OK)
+            if clicked in ("no-button", "no-dialog"):
+                return "error", clicked
+            pt = json.loads(clicked)
+            await pick.mouse.move(pt["x"], pt["y"])
+            await pick.mouse.down()
+            await pick.mouse.up()
+            await asyncio.sleep(1.5)
+            st2 = await pick.evaluate(JS_STATE)
+            ty2 = st2.get("tianyuan")
+            closed = not ty2 or not ty2.get("visible")
+            return ("closed" if closed else "still-open"), {"url": pick.url[:100], "clicked": pt}
+        finally:
+            try:
+                await browser.close()
+            except Exception:
+                pass
 
-        st = await pick.evaluate(JS_STATE)
-        print("before:", json.dumps(st, ensure_ascii=False))
-        ty = st.get("tianyuan")
-        if not ty or not ty.get("visible"):
-            print(json.dumps({"ok": True, "action": "none-needed", "before": st}, ensure_ascii=False))
-            return 0
 
-        clicked = await pick.evaluate(JS_CLICK_OK)
-        print("click-target:", clicked)
-        if clicked in ("no-button", "no-dialog"):
-            print(json.dumps({"ok": False, "error": clicked}, ensure_ascii=False))
-            return 3
-        pt = json.loads(clicked)
-        # REAL mousedown sequence at button center (trusted-event path)
-        await pick.mouse.move(pt["x"], pt["y"])
-        await pick.mouse.down()
-        await pick.mouse.up()
-        await asyncio.sleep(1.5)
-
-        st2 = await pick.evaluate(JS_STATE)
-        print("after:", json.dumps(st2, ensure_ascii=False))
-        ty2 = st2.get("tianyuan")
-        closed = not ty2 or not ty2.get("visible")
-        print(json.dumps({"ok": closed, "clicked": pt, "after": st2}, ensure_ascii=False))
-        return 0 if closed else 4
+async def main():
+    results = []
+    any_closed = False
+    any_open_fail = False
+    for url in CDP_CANDIDATES:
+        status, detail = await close_on(url)
+        if status == "unreachable":
+            continue
+        results.append({"cdp": url, "status": status, "detail": detail})
+        print(f"[{url}] {status}: {json.dumps(detail, ensure_ascii=False)[:160]}")
+        if status in ("closed", "none-needed"):
+            any_closed = True
+        elif status in ("still-open", "error", "no-page"):
+            any_open_fail = True
+    if not results:
+        print(json.dumps({"ok": False, "error": "no CDP endpoint reachable", "tried": CDP_CANDIDATES}))
+        return 5
+    print(json.dumps({"ok": any_closed and not any_open_fail, "results": results}, ensure_ascii=False))
+    return 0 if (any_closed and not any_open_fail) else 4
 
 
 if __name__ == "__main__":
