@@ -41,11 +41,13 @@
 
 params 主要：`text` / `menu_text` / `section` / `region` / `tab_name` 等（按动作）。
 
+`click_button`：组外壳仍 `_replay_close_dialog_idempotent`；内核经 `ClickEngine.click_button_for_replay`。见 [`2026-09-10-click-record-replay-unify-design.md`](./2026-09-10-click-record-replay-unify-design.md)。
+
 ### 2.3 索引点击与表格
 
 | 动作 | params 主要项 | 说明 |
 |---|---|---|
-| `click_element_by_index` | `index`、`text`/`menu_text`、`xpath`、`tag_name`、`parent_text`、`icon_class`、`target_kind` | 多源兜底阶梯（replay_click.py） |
+| `click_element_by_index` | `index`、`text`/`menu_text`、`xpath`、`tag_name`、`parent_text`、`icon_class`、`target_kind` | 经 `ClickEngine`（`click_element_by_index_for_replay` / durable）；禁止只改引擎或只改 `_replay.py`。见 [`2026-09-10-click-record-replay-unify-design.md`](./2026-09-10-click-record-replay-unify-design.md)。 |
 | `click_table_row_radio` | 行语义匹配参数 | Element UI 固定列 radio 语义匹配优先（replay_table.py） |
 
 ### 2.4 表单四件套（`_FORM_ACTIONS`，replay_form_action.py；不走 controller 注册表）

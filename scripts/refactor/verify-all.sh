@@ -130,6 +130,7 @@ run "characterize-fill-replay-engine" "$PY" scripts/characterization/cold/charac
 run "characterize-select-dispatch" "$PY" scripts/characterization/cold/characterize-select-dispatch.py
 run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/characterize-select-replay-engine.py
 run "characterize-radio-replay-engine" "$PY" scripts/characterization/cold/characterize-radio-replay-engine.py
+run "characterize-click-replay-engine" "$PY" scripts/characterization/cold/characterize-click-replay-engine.py
 run "characterize-tssc-multi-select" "$PY" scripts/characterization/cold/characterize-tssc-multi-select.py
 run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs

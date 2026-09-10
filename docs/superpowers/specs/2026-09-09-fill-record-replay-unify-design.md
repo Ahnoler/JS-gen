@@ -170,7 +170,7 @@
 done:  select_option / tssc / tree（select unify A+B）
 done:  fill_form_field（本文）
 done:  click_radio（radio unify Phase B）
-next:  click_element_by_index + click_button — 见 [`2026-09-10-click-record-replay-unify-design.md`](./2026-09-10-click-record-replay-unify-design.md)
+done:  click_element_by_index + click_button（click unify Phase B）
 then:  menu / close / adjacent / table-row-button（点击族余下；单独 design）
 later: login 内嵌 fill 直调收敛（可选）
 ```
