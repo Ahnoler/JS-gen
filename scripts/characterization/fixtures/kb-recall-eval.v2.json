@@ -1,0 +1,1311 @@
+{
+  "evalVersion": "v2",
+  "carriedFromV1": 130,
+  "relabels": [],
+  "relabelsNote": "例外通道：仅当标注新增条目时发现 v1 某条明显错误才启用，须逐条写 why 并经 reviewer 复核；默认必须为空数组",
+  "source": "v1",
+  "relabeledFixture": "scripts/characterization/fixtures/kb-recall-golden.json（24 条，属跨语言契约，不在 v2 范围）",
+  "changeLog": [
+    {
+      "at": "2026-09-10T14:57:37.945Z",
+      "by": "ZCode (T1)",
+      "why": "v2 创建（骨架）：v1 全量 130 条脚本搬运原样保留（含 seed/note/whyNegative 逐字段，仅追加 source:\"v1\"）+ excluded 4 条随迁；新增条目于 T2 独立标注后并入。spec §10 决策 A1–A6。",
+      "approvedBy": "Lead（A1–A6 已批，2026-09-10）"
+    }
+  ],
+  "entries": [
+    {
+      "id": "A-001",
+      "tier": "A",
+      "seed": true,
+      "query": "额度冻结解冻操作",
+      "gold": [
+        "limit"
+      ],
+      "note": "alias 额度冻结/额度解冻",
+      "source": "v1"
+    },
+    {
+      "id": "A-002",
+      "tier": "A",
+      "seed": true,
+      "query": "押品查封后如何处置",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "note": "alias 押品查封/押品处置",
+      "source": "v1"
+    },
+    {
+      "id": "A-003",
+      "tier": "A",
+      "seed": true,
+      "query": "新增担保合同",
+      "gold": [
+        "guaranty_contract"
+      ],
+      "note": "alias 担保合同新增",
+      "source": "v1"
+    },
+    {
+      "id": "A-004",
+      "tier": "A",
+      "seed": true,
+      "query": "放款账户信息与还款账户",
+      "gold": [
+        "loan_account"
+      ],
+      "note": "alias 放款账户信息/还款账户",
+      "source": "v1"
+    },
+    {
+      "id": "A-005",
+      "tier": "A",
+      "seed": true,
+      "query": "催收评分卡配置管理",
+      "gold": [
+        "collection_scorecard"
+      ],
+      "note": "alias 催收评分卡配置",
+      "source": "v1"
+    },
+    {
+      "id": "A-006",
+      "tier": "A",
+      "seed": true,
+      "query": "贷后检查规则配置检查频率",
+      "gold": [
+        "check-config"
+      ],
+      "note": "alias 常规贷后检查规则配置 + kw 检查频率",
+      "source": "v1"
+    },
+    {
+      "id": "A-007",
+      "tier": "A",
+      "seed": true,
+      "query": "新增数据权限",
+      "gold": [
+        "system-mgmt-data-perm"
+      ],
+      "note": "alias 新增数据权限",
+      "source": "v1"
+    },
+    {
+      "id": "A-008",
+      "tier": "A",
+      "seed": true,
+      "query": "公告管理发布公告",
+      "gold": [
+        "system-mgmt-message-center"
+      ],
+      "note": "alias 公告管理 + kw 发布",
+      "source": "v1"
+    },
+    {
+      "id": "A-009",
+      "tier": "A",
+      "seed": true,
+      "query": "机构撤并登记",
+      "gold": [
+        "system-mgmt-org-merge"
+      ],
+      "note": "alias 机构撤并登记",
+      "source": "v1"
+    },
+    {
+      "id": "A-010",
+      "tier": "A",
+      "seed": true,
+      "query": "控制规则库新增规则",
+      "gold": [
+        "smart-ctrl-rule-lib"
+      ],
+      "note": "alias 控制规则库/新增控制规则",
+      "source": "v1"
+    },
+    {
+      "id": "A-011",
+      "tier": "A",
+      "seed": true,
+      "query": "法院查封押品要处置",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "note": "kw 押品查封/押品处置/法院信息 全词面",
+      "source": "v1"
+    },
+    {
+      "id": "A-012",
+      "tier": "A",
+      "seed": true,
+      "query": "设置常规贷后检查频率",
+      "gold": [
+        "check-config"
+      ],
+      "note": "alias 常规贷后检查规则配置 前缀词面",
+      "source": "v1"
+    },
+    {
+      "id": "A-013",
+      "tier": "A",
+      "seed": true,
+      "query": "给角色配数据权限场景",
+      "gold": [
+        "system-mgmt-data-perm"
+      ],
+      "note": "alias 数据权限管理列表/权限场景管理 词素",
+      "source": "v1"
+    },
+    {
+      "id": "A-014",
+      "tier": "A",
+      "seed": true,
+      "query": "押品估值怎么算",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "note": "alias 押品估值管理 词面",
+      "source": "v1"
+    },
+    {
+      "id": "A-015",
+      "tier": "A",
+      "seed": true,
+      "query": "电子签怎么发起",
+      "gold": [
+        "electronic_signing"
+      ],
+      "note": "alias 电子签",
+      "source": "v1"
+    },
+    {
+      "id": "A-016",
+      "tier": "A",
+      "query": "对公客户建档新增客户",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "note": "alias 客户建档 + kw 新增客户",
+      "source": "v1"
+    },
+    {
+      "id": "A-017",
+      "tier": "A",
+      "query": "客户信息查询",
+      "gold": [
+        "customer_query"
+      ],
+      "note": "flow 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-018",
+      "tier": "A",
+      "query": "对公授信申请授信额度",
+      "gold": [
+        "credit_application"
+      ],
+      "note": "kw 授信申请/授信额度",
+      "source": "v1"
+    },
+    {
+      "id": "A-019",
+      "tier": "A",
+      "query": "对公用信申请",
+      "gold": [
+        "credit_usage"
+      ],
+      "note": "flow 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-020",
+      "tier": "A",
+      "query": "对公放款申请新增放款",
+      "gold": [
+        "loan"
+      ],
+      "note": "flow 对公放款申请 + alias 新增放款",
+      "source": "v1"
+    },
+    {
+      "id": "A-021",
+      "tier": "A",
+      "query": "对公合同签订",
+      "gold": [
+        "duigong_contract_sign"
+      ],
+      "note": "flow 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-022",
+      "tier": "A",
+      "query": "引入保证人",
+      "gold": [
+        "guarantee_intro"
+      ],
+      "note": "kw 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-023",
+      "tier": "A",
+      "query": "电子签署线上签约",
+      "gold": [
+        "electronic_signing"
+      ],
+      "note": "flow 电子签署 + alias 线上签约",
+      "source": "v1"
+    },
+    {
+      "id": "A-024",
+      "tier": "A",
+      "query": "对公客户评级",
+      "gold": [
+        "rating",
+        "rating_flow"
+      ],
+      "note": "rating flow 原词，且 rating_flow flow（对公客户评级流程）同前缀，独立标注无法二选一 → 多 gold",
+      "source": "v1"
+    },
+    {
+      "id": "A-025",
+      "tier": "A",
+      "query": "评级查询查看评级详情",
+      "gold": [
+        "rating-query-view"
+      ],
+      "note": "alias 评级查询 + alias 查看评级详情",
+      "source": "v1"
+    },
+    {
+      "id": "A-026",
+      "tier": "A",
+      "query": "贷后检查检查任务",
+      "gold": [
+        "postloan"
+      ],
+      "note": "kw 贷后检查/检查任务（check-config 是规则配置，query 无配置词）",
+      "source": "v1"
+    },
+    {
+      "id": "A-027",
+      "tier": "A",
+      "query": "委外清收登记",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "note": "alias 原词（SUT 菜单名）",
+      "source": "v1"
+    },
+    {
+      "id": "A-028",
+      "tier": "A",
+      "query": "司法诉讼申请",
+      "gold": [
+        "judicial-litigation"
+      ],
+      "note": "flow 前缀 + alias 诉讼申请",
+      "source": "v1"
+    },
+    {
+      "id": "A-029",
+      "tier": "A",
+      "query": "受托支付信息",
+      "gold": [
+        "disburse-entrusted-payment"
+      ],
+      "note": "alias 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-030",
+      "tier": "A",
+      "query": "账务异常处理",
+      "gold": [
+        "disburse-account-abnormal"
+      ],
+      "note": "flow 前缀原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-031",
+      "tier": "A",
+      "query": "押品信息管理押品新增向导页",
+      "gold": [
+        "collateral_info"
+      ],
+      "note": "kw 押品信息管理 + alias 押品新增向导页",
+      "source": "v1"
+    },
+    {
+      "id": "A-032",
+      "tier": "A",
+      "query": "押品估值管理",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "note": "alias 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-033",
+      "tier": "A",
+      "query": "押品台账管理综合查询",
+      "gold": [
+        "collateral-func-ledger"
+      ],
+      "note": "kw 押品台账管理/综合查询",
+      "source": "v1"
+    },
+    {
+      "id": "A-034",
+      "tier": "A",
+      "query": "催收任务管理",
+      "gold": [
+        "collection_task"
+      ],
+      "note": "flow 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-035",
+      "tier": "A",
+      "query": "催收策略配置",
+      "gold": [
+        "collection_strategy"
+      ],
+      "note": "kw 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-036",
+      "tier": "A",
+      "query": "提醒或催收配置",
+      "gold": [
+        "collection-remind-cfg"
+      ],
+      "note": "kw 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-037",
+      "tier": "A",
+      "query": "产品库管理新增产品",
+      "gold": [
+        "product_library"
+      ],
+      "note": "alias 产品库管理 + kw 新增产品",
+      "source": "v1"
+    },
+    {
+      "id": "A-038",
+      "tier": "A",
+      "query": "产品要素库公共要素",
+      "gold": [
+        "product_element"
+      ],
+      "note": "alias 产品要素库 + kw 产品公共要素 词面",
+      "source": "v1"
+    },
+    {
+      "id": "A-039",
+      "tier": "A",
+      "query": "核心产品映射",
+      "gold": [
+        "product_core_mapping"
+      ],
+      "note": "alias 原词",
+      "source": "v1"
+    },
+    {
+      "id": "A-040",
+      "tier": "A",
+      "query": "产品阶段管理新增阶段",
+      "gold": [
+        "product_stage"
+      ],
+      "note": "alias 产品阶段管理 + kw 新增阶段",
+      "source": "v1"
+    },
+    {
+      "id": "B-001",
+      "tier": "B",
+      "seed": true,
+      "query": "把额度临时止付再恢复",
+      "gold": [
+        "limit"
+      ],
+      "note": "止付/恢复 改写 冻结/解冻",
+      "source": "v1"
+    },
+    {
+      "id": "B-002",
+      "tier": "B",
+      "seed": true,
+      "query": "放款时填还款账号",
+      "gold": [
+        "loan_account"
+      ],
+      "note": "口语改写，无卡词原串",
+      "source": "v1"
+    },
+    {
+      "id": "B-003",
+      "tier": "B",
+      "seed": true,
+      "query": "给催收人员配评分规则",
+      "gold": [
+        "collection_scorecard"
+      ],
+      "note": "改写",
+      "source": "v1"
+    },
+    {
+      "id": "B-004",
+      "tier": "B",
+      "seed": true,
+      "query": "发布一条系统公告",
+      "gold": [
+        "system-mgmt-message-center"
+      ],
+      "note": "改写",
+      "source": "v1"
+    },
+    {
+      "id": "B-005",
+      "tier": "B",
+      "seed": true,
+      "query": "两家机构合并怎么登记",
+      "gold": [
+        "system-mgmt-org-merge"
+      ],
+      "note": "合并 改写 撤并",
+      "source": "v1"
+    },
+    {
+      "id": "B-006",
+      "tier": "B",
+      "query": "把一笔贷款的担保物登记进系统",
+      "gold": [
+        "collateral_info"
+      ],
+      "note": "担保物=押品 同义改写",
+      "source": "v1"
+    },
+    {
+      "id": "B-007",
+      "tier": "B",
+      "query": "新客户第一次进信贷系统建档案",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "note": "建档案 改写 客户建档",
+      "source": "v1"
+    },
+    {
+      "id": "B-008",
+      "tier": "B",
+      "query": "看看某个客户都有哪些业务往来全景",
+      "gold": [
+        "customer_360"
+      ],
+      "note": "全景 改写 360视图",
+      "source": "v1"
+    },
+    {
+      "id": "B-009",
+      "tier": "B",
+      "query": "查一个客户的基本资料",
+      "gold": [
+        "customer_query"
+      ],
+      "note": "基本资料 改写 客户信息",
+      "source": "v1"
+    },
+    {
+      "id": "B-010",
+      "tier": "B",
+      "query": "给企业客户做信用等级评定",
+      "gold": [
+        "rating"
+      ],
+      "note": "信用等级评定 改写 评级",
+      "source": "v1"
+    },
+    {
+      "id": "B-011",
+      "tier": "B",
+      "query": "看看评级最终结果和审批过程",
+      "gold": [
+        "rating-query-view"
+      ],
+      "note": "看结果和过程 改写 查询/审批历史",
+      "source": "v1"
+    },
+    {
+      "id": "B-012",
+      "tier": "B",
+      "query": "发起一笔对公的授信业务",
+      "gold": [
+        "credit_application"
+      ],
+      "note": "发起授信业务 改写 授信申请（对公授信 非连续出现）",
+      "source": "v1"
+    },
+    {
+      "id": "B-013",
+      "tier": "B",
+      "query": "企业借钱用款怎么申请",
+      "gold": [
+        "credit_usage"
+      ],
+      "note": "借钱用款 改写 用信",
+      "source": "v1"
+    },
+    {
+      "id": "B-014",
+      "tier": "B",
+      "query": "贷款批下来了安排打款给客户",
+      "gold": [
+        "loan"
+      ],
+      "note": "打款 改写 放款",
+      "source": "v1"
+    },
+    {
+      "id": "B-015",
+      "tier": "B",
+      "query": "签正式的借款合同",
+      "gold": [
+        "duigong_contract_sign"
+      ],
+      "note": "签借款合同 改写 合同签订",
+      "source": "v1"
+    },
+    {
+      "id": "B-016",
+      "tier": "B",
+      "query": "找个人给这笔贷款做担保",
+      "gold": [
+        "guarantee_intro"
+      ],
+      "note": "找人担保 改写 引入保证人",
+      "source": "v1"
+    },
+    {
+      "id": "B-017",
+      "tier": "B",
+      "query": "合同不用纸笔直接网上签",
+      "gold": [
+        "electronic_signing"
+      ],
+      "note": "网上签 改写 电子签/线上签约",
+      "source": "v1"
+    },
+    {
+      "id": "B-018",
+      "tier": "B",
+      "query": "贷款放完之后要跟进检查",
+      "gold": [
+        "postloan"
+      ],
+      "note": "放完跟进检查 改写 贷后检查",
+      "source": "v1"
+    },
+    {
+      "id": "B-019",
+      "tier": "B",
+      "query": "逾期了安排人上门要账",
+      "gold": [
+        "collection_task"
+      ],
+      "note": "上门要账 改写 催收",
+      "source": "v1"
+    },
+    {
+      "id": "B-020",
+      "tier": "B",
+      "query": "抵押的房子被法院占了怎么办",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "note": "被法院占 改写 查封；抵押的房子 改写 押品",
+      "source": "v1"
+    },
+    {
+      "id": "B-021",
+      "tier": "B",
+      "query": "估算一下抵押物值多少钱",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "note": "估算值多少钱 改写 估值",
+      "source": "v1"
+    },
+    {
+      "id": "B-022",
+      "tier": "B",
+      "query": "把催收的活儿外包给外面的公司",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "note": "外包改写 委外；query 含 催收 一词（不可避的业务域词，非卡原串）",
+      "source": "v1"
+    },
+    {
+      "id": "B-023",
+      "tier": "B",
+      "query": "和别人打官司要起诉",
+      "gold": [
+        "judicial-litigation"
+      ],
+      "note": "打官司/起诉 改写 司法诉讼",
+      "source": "v1"
+    },
+    {
+      "id": "B-024",
+      "tier": "B",
+      "query": "按合同约定直接把钱付给交易对手",
+      "gold": [
+        "disburse-entrusted-payment"
+      ],
+      "note": "按约定付给对手 改写 受托支付",
+      "source": "v1"
+    },
+    {
+      "id": "B-025",
+      "tier": "B",
+      "query": "放款放错了要红字冲回来",
+      "gold": [
+        "disburse-account-abnormal"
+      ],
+      "note": "放错红字冲回 改写 账务异常/冲正",
+      "source": "v1"
+    },
+    {
+      "id": "B-026",
+      "tier": "B",
+      "query": "两个公司组了个团要一起管",
+      "gold": [
+        "customer-group-group"
+      ],
+      "note": "组团一起管 改写 集团客户",
+      "source": "v1"
+    },
+    {
+      "id": "B-027",
+      "tier": "B",
+      "query": "一批产业链上的小企业打包管理",
+      "gold": [
+        "customer-group-cluster"
+      ],
+      "note": "产业链打包 改写 集群客户",
+      "source": "v1"
+    },
+    {
+      "id": "B-028",
+      "tier": "B",
+      "query": "把旗下所有子公司挂到一个总户头下",
+      "gold": [
+        "customer-group-general-group"
+      ],
+      "note": "旗下挂总户头 改写 总集团",
+      "source": "v1"
+    },
+    {
+      "id": "B-029",
+      "tier": "B",
+      "query": "股东和实际控制人之间的关系要登记",
+      "gold": [
+        "customer-common-cust-relation"
+      ],
+      "note": "股东/实际控制人关系 改写 关联关系",
+      "source": "v1"
+    },
+    {
+      "id": "B-030",
+      "tier": "B",
+      "query": "产品目录里加一个新品并让它可用",
+      "gold": [
+        "product_library"
+      ],
+      "note": "加新品让它可用 改写 新增产品/启用",
+      "source": "v1"
+    },
+    {
+      "id": "C-001",
+      "tier": "C",
+      "query": "阶段1：登录被测系统并进入信贷工作台首页",
+      "gold": [
+        "session_login"
+      ],
+      "note": "场景=会话入口",
+      "source": "v1"
+    },
+    {
+      "id": "C-002",
+      "tier": "C",
+      "query": "阶段2：在首页待办任务里打开一笔授信审批，点同意并填写审批意见后提交下一步",
+      "gold": [
+        "approval_chain",
+        "approval_todo",
+        "credit-corp-approval-task"
+      ],
+      "note": "审批链场景三卡词面均覆盖（待办任务/同意/审批意见/提交下一步），独立标注无法二选一 → 多 gold",
+      "source": "v1"
+    },
+    {
+      "id": "C-003",
+      "tier": "C",
+      "query": "阶段3：工作台任务事项里看待办任务清单并转交别人处理",
+      "gold": [
+        "approval_todo"
+      ],
+      "note": "alias 任务事项 + kw 转交",
+      "source": "v1"
+    },
+    {
+      "id": "C-004",
+      "tier": "C",
+      "query": "阶段4：授信批复下来后在批复查看任务页核对分项批复和终审意见",
+      "gold": [
+        "credit-corp-approval-result"
+      ],
+      "note": "kw 批复查看/分项批复/终审意见",
+      "source": "v1"
+    },
+    {
+      "id": "C-005",
+      "tier": "C",
+      "query": "阶段5：押品评估走外部评估，先维护外部评估管理人员再设置评估费用",
+      "gold": [
+        "collateral-func-ext-assess"
+      ],
+      "note": "alias 外部评估管理人员维护/评估费用维护 场景化",
+      "source": "v1"
+    },
+    {
+      "id": "C-006",
+      "tier": "C",
+      "query": "阶段6：维护押品种类树和各农合机构估值参数，还有房产估值模型",
+      "gold": [
+        "collateral-func-params"
+      ],
+      "note": "alias 押品种类管理/各农合机构押品估值参数管理/房产估值模型管理 场景化",
+      "source": "v1"
+    },
+    {
+      "id": "C-007",
+      "tier": "C",
+      "query": "阶段7：查押品预警，看保险到期和权证未按期归还的提示",
+      "gold": [
+        "collateral-func-warning"
+      ],
+      "note": "alias 押品保险到期提示结果/权证借阅未按期归还提示 场景化",
+      "source": "v1"
+    },
+    {
+      "id": "C-008",
+      "tier": "C",
+      "query": "阶段8：押品权证先入库，后面借阅到期归还，结清后正式出库",
+      "gold": [
+        "collateral_custody"
+      ],
+      "note": "alias 权证入库/借阅/归还/正式出库 场景化",
+      "source": "v1"
+    },
+    {
+      "id": "C-009",
+      "tier": "C",
+      "query": "阶段9：纸质合同资料整理好后提交档案入库申请",
+      "gold": [
+        "archive-stock-in"
+      ],
+      "note": "alias 档案入库申请 + kw 纸质资料",
+      "source": "v1"
+    },
+    {
+      "id": "C-010",
+      "tier": "C",
+      "query": "阶段10：维护授信系数和拨款转换系数，给农户配授信额度",
+      "gold": [
+        "credit-retail-credit-config"
+      ],
+      "note": "kw 授信系数/拨款转换系数/农户授信额度",
+      "source": "v1"
+    },
+    {
+      "id": "C-011",
+      "tier": "C",
+      "query": "阶段11：社团贷款牵头行发起，维护参团份额，参与行再发起子申请",
+      "gold": [
+        "loan-corp-syndicate-lead-apply",
+        "loan-corp-syndicate-participant-apply"
+      ],
+      "note": "牵头行/参与行 两卡同场景 → 多 gold",
+      "source": "v1"
+    },
+    {
+      "id": "C-012",
+      "tier": "C",
+      "query": "阶段12：委托贷款业务先维护委托人再发起用信",
+      "gold": [
+        "loan-corp-entrust-loan"
+      ],
+      "note": "kw 委托人管理/委托贷款用信申请 场景化",
+      "source": "v1"
+    },
+    {
+      "id": "C-013",
+      "tier": "C",
+      "query": "阶段13：对私客户做二合一申请，评级和用信一起审批",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "note": "kw 二合一/评级信息/用信信息",
+      "source": "v1"
+    },
+    {
+      "id": "C-014",
+      "tier": "C",
+      "query": "阶段14：对私用信在主页里查看流程轨迹，撤销一笔待发起的申请",
+      "gold": [
+        "loan-retail-apply-maintain"
+      ],
+      "note": "kw 流程轨迹/撤销/待发起",
+      "source": "v1"
+    },
+    {
+      "id": "C-015",
+      "tier": "C",
+      "query": "阶段15：数字信贷里建数据指标模板并登记到指标库",
+      "gold": [
+        "digital-loan-desk-data-index"
+      ],
+      "note": "kw 数据指标模板/数据指标库",
+      "source": "v1"
+    },
+    {
+      "id": "D-001",
+      "tier": "D",
+      "query": "W0",
+      "gold": [
+        "session_login"
+      ],
+      "note": "alias 原词",
+      "source": "v1"
+    },
+    {
+      "id": "D-002",
+      "tier": "D",
+      "query": "lmtRgstAndOcp",
+      "gold": [
+        "limit-ctrl-api-grant-use-one"
+      ],
+      "note": "alias 原词（接口码）",
+      "source": "v1"
+    },
+    {
+      "id": "D-003",
+      "tier": "D",
+      "query": "lmtRgst",
+      "gold": [
+        "limit-ctrl-api-grant-use-one",
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "note": "两卡 alias 同名 → 多 gold",
+      "source": "v1"
+    },
+    {
+      "id": "D-004",
+      "tier": "D",
+      "query": "doOcpRevoke",
+      "gold": [
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "note": "alias 原词（接口码）",
+      "source": "v1"
+    },
+    {
+      "id": "D-005",
+      "tier": "D",
+      "query": "cstInfQuery",
+      "gold": [
+        "customer_query"
+      ],
+      "note": "alias 原词（页面码）",
+      "source": "v1"
+    },
+    {
+      "id": "D-006",
+      "tier": "D",
+      "query": "enqrPdInf",
+      "gold": [
+        "product_query"
+      ],
+      "note": "alias 原词（页面码）",
+      "source": "v1"
+    },
+    {
+      "id": "D-007",
+      "tier": "D",
+      "query": "mntPdStg",
+      "gold": [
+        "product_stage"
+      ],
+      "note": "kw 原词（页面码）",
+      "source": "v1"
+    },
+    {
+      "id": "D-008",
+      "tier": "D",
+      "query": "cpctMgtPg",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "note": "kw 原词（页面码）",
+      "source": "v1"
+    },
+    {
+      "id": "D-009",
+      "tier": "D",
+      "query": "FS00006502",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "note": "flow 内 FS 交易码",
+      "source": "v1"
+    },
+    {
+      "id": "D-010",
+      "tier": "D",
+      "query": "360视图",
+      "gold": [
+        "customer_360"
+      ],
+      "note": "alias 原词",
+      "source": "v1"
+    },
+    {
+      "id": "D-011",
+      "tier": "D",
+      "query": "查询交易信息 trdlog",
+      "gold": [
+        "limit-ctrl-api-ocp-revoke-loop"
+      ],
+      "note": "menu 实证通道 + kw trdlog",
+      "source": "v1"
+    },
+    {
+      "id": "D-012",
+      "tier": "D",
+      "query": "反委托",
+      "gold": [
+        "asset-preserve-ops-counter-entrust"
+      ],
+      "note": "kw 原词",
+      "source": "v1"
+    },
+    {
+      "id": "D-013",
+      "tier": "D",
+      "query": "押品种类管理",
+      "gold": [
+        "collateral-func-params"
+      ],
+      "note": "alias 原词",
+      "source": "v1"
+    },
+    {
+      "id": "D-014",
+      "tier": "D",
+      "query": "权证借阅管理",
+      "gold": [
+        "collateral_custody"
+      ],
+      "note": "alias 原词",
+      "source": "v1"
+    },
+    {
+      "id": "D-015",
+      "tier": "D",
+      "query": "评分模型",
+      "gold": [
+        "rating_flow"
+      ],
+      "note": "alias 原词",
+      "source": "v1"
+    },
+    {
+      "id": "N-001",
+      "tier": "N",
+      "seed": true,
+      "query": "写一首关于春天的诗",
+      "gold": [],
+      "whyNegative": "诗歌创作，与 84 卡业务域完全无关",
+      "source": "v1"
+    },
+    {
+      "id": "N-002",
+      "tier": "N",
+      "seed": true,
+      "query": "计算 2 加 3 等于多少",
+      "gold": [],
+      "whyNegative": "纯算术。已知误召回 collection_scorecard（spec 附录 A 指定保留为回归靶子）",
+      "source": "v1"
+    },
+    {
+      "id": "N-003",
+      "tier": "N",
+      "seed": true,
+      "query": "明天股票会涨吗",
+      "gold": [],
+      "whyNegative": "投资咨询，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-004",
+      "tier": "N",
+      "seed": true,
+      "query": "推荐一部好看的电影",
+      "gold": [],
+      "whyNegative": "影视推荐，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-005",
+      "tier": "N",
+      "seed": true,
+      "query": "如何学习 Rust 编程",
+      "gold": [],
+      "whyNegative": "编程学习，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-006",
+      "tier": "N",
+      "seed": true,
+      "query": "北京到上海的高铁票价",
+      "gold": [],
+      "whyNegative": "出行票价，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-007",
+      "tier": "N",
+      "seed": true,
+      "query": "帮我翻译这段英文",
+      "gold": [],
+      "whyNegative": "翻译请求，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-008",
+      "tier": "N",
+      "seed": true,
+      "query": "世界杯冠军是谁",
+      "gold": [],
+      "whyNegative": "体育常识，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-009",
+      "tier": "N",
+      "seed": true,
+      "query": "给我讲个笑话",
+      "gold": [],
+      "whyNegative": "娱乐请求，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-010",
+      "tier": "N",
+      "seed": true,
+      "query": "晚上吃什么比较好",
+      "gold": [],
+      "whyNegative": "饮食闲聊，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-011",
+      "tier": "N",
+      "query": "帮我写一份辞职信",
+      "gold": [],
+      "whyNegative": "日常文书写作，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-012",
+      "tier": "N",
+      "query": "太阳系最大的行星是哪个",
+      "gold": [],
+      "whyNegative": "天文常识，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-013",
+      "tier": "N",
+      "query": "介绍一下量子力学的基本概念",
+      "gold": [],
+      "whyNegative": "科普知识，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-014",
+      "tier": "N",
+      "query": "明天的天气适合爬山吗",
+      "gold": [],
+      "whyNegative": "生活休闲，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-015",
+      "tier": "N",
+      "query": "推荐几本经典小说",
+      "gold": [],
+      "whyNegative": "阅读推荐，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-016",
+      "tier": "N",
+      "query": "怎么做红烧肉",
+      "gold": [],
+      "whyNegative": "烹饪请求，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-017",
+      "tier": "N",
+      "query": "Python 和 Java 哪个更适合初学者",
+      "gold": [],
+      "whyNegative": "编程语言比较，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-018",
+      "tier": "N",
+      "query": "唱一首生日快乐歌",
+      "gold": [],
+      "whyNegative": "娱乐请求，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-019",
+      "tier": "N",
+      "query": "我emo了怎么办",
+      "gold": [],
+      "whyNegative": "情感闲聊，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-020",
+      "tier": "N",
+      "query": "帮我订一张去成都的机票",
+      "gold": [],
+      "whyNegative": "差旅预订，跨域",
+      "source": "v1"
+    },
+    {
+      "id": "N-021",
+      "tier": "N",
+      "query": "贷款展期怎么申请",
+      "gold": [],
+      "whyNegative": "近域：信贷业务语汇，但语料 grep「展期」ABSENT，84 卡无展期流程",
+      "source": "v1"
+    },
+    {
+      "id": "N-022",
+      "tier": "N",
+      "query": "罚息和复利怎么计算",
+      "gold": [],
+      "whyNegative": "近域：语料 grep「罚息」「复利」均 ABSENT；贷款计算器卡仅覆盖利率/还款试算，无罚息复利计算",
+      "source": "v1"
+    },
+    {
+      "id": "N-023",
+      "tier": "N",
+      "query": "员工请假审批流程怎么走",
+      "gold": [],
+      "whyNegative": "近域：HR 流程；语料审批卡均为信贷业务审批链（grep「请假」ABSENT），无请假场景",
+      "source": "v1"
+    },
+    {
+      "id": "N-024",
+      "tier": "N",
+      "query": "反洗钱可疑交易上报",
+      "gold": [],
+      "whyNegative": "近域：合规上报；grep「反洗钱」ABSENT，无对应卡",
+      "source": "v1"
+    },
+    {
+      "id": "N-025",
+      "tier": "N",
+      "query": "柜员现金尾箱交接",
+      "gold": [],
+      "whyNegative": "近域：柜面业务但 grep「尾箱」ABSENT；柜面确认/柜面放款 属其他卡功能",
+      "source": "v1"
+    },
+    {
+      "id": "N-026",
+      "tier": "N",
+      "query": "差旅费报销单填写",
+      "gold": [],
+      "whyNegative": "近域：财务报销；grep「报销」ABSENT",
+      "source": "v1"
+    },
+    {
+      "id": "N-027",
+      "tier": "N",
+      "query": "网点装修招标采购",
+      "gold": [],
+      "whyNegative": "近域：行政采购；grep「招标」ABSENT",
+      "source": "v1"
+    },
+    {
+      "id": "N-028",
+      "tier": "N",
+      "query": "ATM 机吞卡处理",
+      "gold": [],
+      "whyNegative": "近域：自助设备故障；grep「ATM」「吞卡」ABSENT",
+      "source": "v1"
+    },
+    {
+      "id": "N-029",
+      "tier": "N",
+      "query": "手机银行 APP 下载安装",
+      "gold": [],
+      "whyNegative": "近域：移动端；grep「下载安装」「APP 下载」ABSENT（下载合同仅为担保合同卡功能词）",
+      "source": "v1"
+    },
+    {
+      "id": "N-030",
+      "tier": "N",
+      "query": "银行营业网点今天几点开门",
+      "gold": [],
+      "whyNegative": "近域：营业咨询；无营业时间/网点服务类卡",
+      "source": "v1"
+    }
+  ],
+  "excluded": [
+    {
+      "query": "打印企业征信报告",
+      "why": "近域负样本候选被否：「征信」出现在 customer_360/rating 卡词表（语料 grep 实证），独立标注无法判定应否命中 → 宁少勿脏剔除"
+    },
+    {
+      "query": "签合同",
+      "why": "过泛：duigong_contract_sign / guaranty_contract / electronic_signing 三卡均可辩护，无法收敛"
+    },
+    {
+      "query": "查额度",
+      "why": "limit（查询额度信息）与 limit-ctrl-api-ocp-revoke-loop（额度查询统计菜单）语义重叠，无法独立判定"
+    },
+    {
+      "query": "客户管理",
+      "why": "过泛：命中客户域菜单层级而非具体流程卡"
+    }
+  ]
+}
