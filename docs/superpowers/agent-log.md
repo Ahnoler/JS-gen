@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 14:45 · Cursor Lead — 开工：#676 搜索阶段保留用户目标 + query 注入业务数据
+
+- 进行中：14:45；根因=analyze 规则 7/8 抹掉步骤内目标名 + query 阶段 `needs_business_data_context=False` 跳过业务数据 hint，Agent 用 DOM/KB 示例「贷款」填搜索
+- 范围：`scripts/controller/actions/phase/classify.py`、`src/services/trajectory/trajectory-text-extract.js`、`src/services/trajectory/trajectory-meta-service.js`（analyze prompt 规则 7/8）、`scripts/characterization/cold/characterize-phase-boundary.py`、`scripts/characterization/cold/characterize-search-then-click-prompts.py`、`scripts/characterization/cold/characterize-analyze-case-data.mjs`（若需 pin）、本文件；可选 spec 一句
+- 禁入区：`propose.js`、`data/kb/**` 只读、fill/select/radio engine 拆分热区、`.cursor/`、他线 verify-all 大段冲突时只追加不动他人行
+- 方式：TDD 先红 pin → 改 classify/JS inject + analyze 文案 → 绿 pin → 收工
+
 ## 2026-09-10 14:40 · ZCode — 收工：拆分回归修复落地（回链 13:58）
 
 - 完成：**4 文件补 import**（`824bd428`，只插行：fill=+json/re/sys+_replay 三兄弟、select/radio=+_replay 三兄弟、login=+JS_FILL_FORM_FIELD）+ **防再犯护栏** `characterize-form-engine-scope-audit.py`（AST 未解析名审计：函数体内每个 Name Load 须解析到模块/自身/祖先闭包作用域，star-import 文件拒审，lazy annotation 剪枝；verify-all 已注册，独立 commit `593f721a`）
