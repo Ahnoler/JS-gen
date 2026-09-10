@@ -82,3 +82,34 @@
 **待 Lead 决策**：F-4（loader 是否加 `status` 硬拦）；embedding 立项边界。
 
 **线状态：CLOSED（FAIL，不计成果）。** 判决与交付自评一致，无需返工；上述必改项是文档与证据耐久性修正，不触及结论。
+
+## 5. 收尾增量复核（2026-09-10 追加）
+
+> 收尾区间：**`598df438`**（落实 4 文件）+ **`5e3fde12`**（agent-log 回执）
+> **增量裁定：判决维持 FAIL、不计成果；F-1 / F-3 / F-4 关闭；F-2 半落地（保持 OPEN）；新增 F-5（轻必改）。**
+
+| # | 逐项对账 | 复核结果 |
+|---|---|---|
+| F-1 | 报告 §1/§2 改为「A 源**按抽取规则**只取子串对」，登记 438 对普查事实，结论不变 | **关闭 ✓** 措辞与我的普查一致，结论未被稀释 |
+| F-2 | ①两脚本 `git add -f` 入库 ②§2 + `T2-bridge.txt` 指向改「汇总原则」 | **①关闭 ✓**（`git ls-files` 已含两脚本，import 面仍只有 `node:fs`/`node:path`）；**②半落地 ✗**——见下 |
+| F-3 | 报告 §2 如实登记「规则批量 + 快速人工 ~7 分钟」与 B 类 4/10 真词义、6 条注释性关系 | **关闭 ✓** 与我的发现逐条对齐 |
+| F-4 | 表内补 `archivedSemantics` 注记，loader 零改动，留 Lead | **关闭 ✓** `entries` 逐位未变（sha `eb4ec272…`，67 条），新字段对 `loadSynonyms` 与 pin 无影响 |
+
+### F-2 ② 半落地（保持 OPEN）
+
+`598df438` 的 diffstat 只有 4 个文件（表 / 报告 / 两脚本），**`tmp/kb-bridge/T2-bridge.txt` 不在其中**：`git status` 显示它仍是 ` M`，`git show HEAD:tmp/kb-bridge/T2-bridge.txt` 仍是旧文本「裁决规则与**逐条理由**见 t2-build-table.mjs 头注释」。即：**修正只存在于工作区，HEAD 里的悬空指向没修掉**，而报告 §8 台账的 F-2 行已写「§2 与 `T2-bridge.txt` 指向改为汇总原则」——陈述与 HEAD 不符。
+差一步：`git add -f tmp/kb-bridge/T2-bridge.txt`（工作区那处改动就是 `note` 一行，+1/−1，与生成脚本 :155 的新 note 一致，产物与脚本自洽）。
+
+### F-5（新增 · 轻必改）：已入库的生成脚本会把归档资产静默还原
+
+`t2-build-table.mjs` 现在在库里，其产物字面量为 `status: 'candidate'`，且**不含** `archiveNote` / `archivedSemantics`；脚本头还写着常规用法 `Run: node tmp/kb-bridge/t2-build-table.mjs`。**任何人按头注释重跑一次，`data/kb/colloquial-bridge.json` 会被覆盖回 `candidate` 并抹掉 F-4 注记**（同时把 `.txt` 一起重写）。这正是 F-2 想消除的"文档与产物不一致"，只是方向反了过来。
+
+**修法（二选一，都只是一行级改动）**：① 脚本产物对齐归档态（`status: 'archived'` + 两个注记字段），使重跑成为幂等 no-op；② 或在脚本头加显式警示（「重跑会重置归档态与 F-4 注记，勿为再生成 .txt 而运行」）。**在此之前不要为了提交那个 .txt 去跑脚本**——直接 `git add -f` 即可。
+
+### 本次复核同时通过（不再挂账）
+
+- 表 `entries` **逐位未变**（`sha256 eb4ec272…`，67 条，与 `3ea6bab5` 完全相同）→ **T3 度量不受影响，无需重跑**（我仍复核了 off/on 数字口径：0.600/0.725/0.653/0.667/拒答 0.382、E 0.100 的**唯一**改动面只有新增注记字段）。
+- 改后 `characterize-flow-card-recall` 我复跑 **26 passed / exit 0** ✓。
+- `5e3fde12`：agent-log 回执为 **+6 行纯新增**，插在 Cursor Lead 的 23:42/23:44 条目**之下**、本会话 23:32 条目**之上**，未删改他线条目 ✓；两笔 commit **均未携带他线 WIP** ✓。
+
+**收尾要求（一个 commit 即可关线）**：① `git add -f tmp/kb-bridge/T2-bridge.txt`；② 按 F-5 二选一改 `t2-build-table.mjs`（推荐①幂等对齐）；③ 若②选了幂等对齐，顺手在报告 §8 F-2 行补一句「`.txt` 于 `<hash>` 入库」以对齐陈述。**无需重跑任何门禁、无需重跑 T3**。
