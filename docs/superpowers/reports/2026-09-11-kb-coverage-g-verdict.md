@@ -94,3 +94,37 @@
 5. 改报告 §1 M5 行 / §4 头条 / §6.3 结论 + 补 D6 精度标注。
 
 **线状态：PARTIAL（数据面可用，M5 作废待重建）。**
+
+## 7. T5 迭代复核（2026-09-11 追加）——七项全关闭，新增 E1/E3 收口项
+
+> 被审区间：**`ed2ef2cb..1060f61e`**（5 笔）· fixture **v1.1**（sha `33ad3e617280d07f…`，510,795 B）
+> **结论：D1/D2/D3/D4/D5/D6/D8 全部按判决处置到位，我逐项独立复现；线判 PARTIAL→PASS（数据面+门禁），M5 v2 保持 informational。**
+
+| 项 | 我的独立复核 | 判 |
+|---|---|---|
+| **D1** | fixture v1.1 中 `visitedRegions[].key` 非空 **110 条 / 28 条轨迹**（== 我此前的 DB 实测）；**回库验证：314 条原始 `page_level_key` 经其 `redactPageKey` 规则 reduce 后 314/314 落入 fixture key 集合，且 28/28 轨迹的 key 集合完全被覆盖**；key 中 `?` **0** 个、`%`/`=` 残留 **0** 个、`scheme/page:` 前缀 **0** 个；键路径仍严格白名单（39 条） | **关闭 ✓** |
+| **D1 pin 可证伪** | 我把某条 key 污染成 `…?cstNm=%E6%B5%8B…` → 第 4 条 pin 红（`page keys must be query-stripped`）**exit 1**；还原 → **4 passed exit 0** | **真 pin ✓** |
+| **D3** | `primaryCardOf()` 已按 `stemRank` 排序（ZJJK>FS>ROUTE）+ 字母序 tiebreak；`attribution.primaryCardMisaligned=24` 留档，与我实测的 24/69 一致；报告明确"只影响 M5 拿哪张卡算，M2/M3 为多标签计数不受影响"（正确） | **关闭 ✓** |
+| **D2** | M5 已换同类比较（页面 key ↔ 卡 ROUTE marker），`orderAgreement` 废除换 `entryOnCardRate`，`ceiling` 随输出（=1.000）；旧 label 版结论已作废 | **关闭（口径见 E1）** |
+| **D4** | 引擎 `--baseline` 与门禁 `FLOORS` 同步为 M1/M2/M3；baseline 增 `floorPolicy.{floors,margin,removed,removedReason}`；门禁打印 M5 INFO 行 | **关闭 ✓** |
+| **D5** | `createdDate` 全部 `YYYY-MM-DD`（我抽样 416 条全为 ISO） | **关闭 ✓** |
+| **D6** | §1 链分布段补 ROUTE 精度区间（5 片段 ≥10 页、`lmtMgt` 43 页/`cstMgt` 32 页；ROUTE 只作模块级归因） | **关闭 ✓** |
+| **D8** | §4 评级族行已删、头条显式撤回并写明原因是"那 6 条早已 ROUTE 链 6/6 命中"；真实缺口改为 智能控制执行日志 ×3 / 查询交易信息 ×2 / 对私用信 ×2 / AILZ ×18；§6.2 同步订正 | **关闭 ✓** |
+| 门禁 | **4 passed exit 0**；`m2.coverage` 抬 +0.2 → **红 exit 1**；还原 → 0。**M1/M2/M3/M4/M6 与重冻前逐位相同**（0.857 / 0.206 / 0.321 / 266 / 0.250）——重冻未引入度量漂移 | ✓ |
+| 边界 | `src/**`、评测集、阈值、`verify-all.sh`、`data/kb/req/**` 零改动；一 Task 一 commit | ✓ |
+
+### E1（必改 · 口径）：M5 v2 的 1.000 是**构造性饱和**，不是"小样本面事实"
+
+实测：**18/18 条带 key 的轨迹都只有 1 个去重页面 key**（`key counts = [1×18]`）→ `nodeCoverage` **恒等于** `entryOnCardRate`（我逐条验证 18/18 相等），该度量在当前数据下**无法表达任何序列/覆盖信息**。且 18 条的 primaryCard **全部由 ZJJK 链命中**（rank 1），所以"卡的路由 marker 也覆盖入口页路由"是一句**薄但可证**的正向事实。
+
+→ 报告 §1 M5 行「非 matcher 伪影」与 §6.3「这是『路由面卡片描述与实跑一致』的正向证据」应改为：**当前数据下 M5 v2 无判别力（恒等于入口页命中率）；可证的唯一结论是"18 条 ZJJK 命中的卡其 route marker 与入口页路由一致"**。另建议把 `m5.nodeCoverage` 更名为 `pageKeyOnCardRate`（"node" 会误导），或在 `metricNote` 写明退化条件。**纯文档/命名级修正，不动数字。**
+
+### E3（轻 · 门禁）：fixture↔baseline 没锁死
+
+baseline 里有 `fixtureSha256`，但门禁只断言 `fixture.contentSha256` 是 64 字符串，**没断言两者相等** → fixture 被静默替换不会被发现。加一行 `assert.equal(fixture.contentSha256, baseline.fixtureSha256)` 即可。
+
+### E4（观察 · 体积）：旧 fixture 入库用途需注明
+
+`tmp/kb-coverage/fixture-v1-archived.json`（≈500 KB / 21,684 行）已随 D1 修复入库，作为判决取证可以接受；建议在报告注明它是**取证快照、非门禁输入**，避免后人误当第二份 fixture。
+
+**线状态：PASS（数据面 M1–M4/M6 + 门禁；M5 v2 informational）。** 收口只需一个 E-commit：E1 口径与命名、E3 一行断言、E4 一句注明。
