@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
  * Missing replayId → legacy accept (old Python / executor).
  * @param {object|null|undefined} payload replay_done hub payload
  * @param {string} replayId expected id minted for this wait
- * @returns {{ decision: 'accept'|'ignore'|'legacy', reason: string }}
+ * @returns {{ decision: 'accept'|'ignore'|'legacy', reason: string }} ownership decision
  */
 export function replayDoneOwnership(payload, replayId) {
   const got = payload?.replayId ?? payload?.replay_id;
