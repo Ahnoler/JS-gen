@@ -6,6 +6,11 @@
  * standard IR metrics: Acc@1 / Recall@5 / MRR@5 / nDCG@5 / rejection rate /
  * noise robustness / latency p50·p95 (warm + cold).
  *
+ * Multi-gold accounting: per-entry Recall@k and nDCG@k credit ALL matching
+ * golds fractionally (hits/|gold|), not binary any-hit; see ndcgAtK JSDoc.
+ * Re-run-with-same-fixture is deterministic (no LLM in the loop), so baseline
+ * diffs have zero run-to-run noise.
+ *
  * Usage:
  *   node scripts/kb/recall-eval.mjs                       # table + tmp/kb-eval/<ts>.json
  *   node scripts/kb/recall-eval.mjs --json                # machine-readable stdout
@@ -80,6 +85,15 @@ function rankOutcome(entry, cards, k) {
 
 /**
  * nDCG@k with binary relevance; IDCG normalizes by min(|gold|, k) ideal gains.
+ *
+ * Multi-gold accounting (G2 review 2026-09-10, reviewer suggestion #1 — keep
+ * this documented or baselines drift silently): per-entry Recall@5/nDCG@5 use
+ * the *fractional* credit convention (hits / |gold|, DCG / ideal-DCG), then
+ * average over entries. The reviewer's independent recompute used *binary*
+ * per-entry credit (any-hit → 1) giving 0.760/0.711 vs our 0.757/0.708 — both
+ * defensible; the fractional convention is canonical here because it penalizes
+ * partial gold coverage on multi-gold queries. Acc@1/MRR are rank-based and
+ * convention-independent.
  * @param {string[]} top Ranked flowRefs
  * @param {string[]} gold Allowed stems
  * @param {number} k Depth
@@ -167,6 +181,17 @@ export async function runRecallEval({ fixture, cards, k = 5, withLatency = true 
     noiseAccuracyAt1: +(noisyAcc / n).toFixed(3),
     positives: n,
     negatives: negatives.length,
+    // Per-tier Acc@1 (G2 review 2026-09-10, reviewer suggestion #3): the
+    // aggregate floor is insensitive to a B/D-tier collapse; tier splits keep
+    // stratified regressions visible (tier A is the most sensitive detector).
+    byTier: Object.fromEntries(Object.entries(
+      perQuery.reduce((acc, q) => {
+        acc[q.tier] = acc[q.tier] || { n: 0, ok: 0 };
+        acc[q.tier].n += 1;
+        acc[q.tier].ok += q.ok ? 1 : 0;
+        return acc;
+      }, {}),
+    ).map(([tier, v]) => [tier, +(v.ok / v.n).toFixed(3)])),
   };
 
   if (withLatency) {
@@ -261,13 +286,8 @@ function renderTable(result) {
   for (const f of fails) {
     lines.push(`    MISS ${f.id} 「${f.query}」 top1=${f.top5[0] ?? 'null'} gold=${f.gold.join('|')} rank=${f.rank ?? '-'}`);
   }
-  const byTier = {};
-  for (const q of result.perQuery) {
-    byTier[q.tier] = byTier[q.tier] || { n: 0, ok: 0 };
-    byTier[q.tier].n += 1;
-    byTier[q.tier].ok += q.ok ? 1 : 0;
-  }
-  lines.push(`  分层 Acc@1  ${Object.entries(byTier).map(([t, v]) => `${t} ${v.ok}/${v.n}`).join('  ')}`);
+  const byTier = m.byTier || {};
+  lines.push(`  分层 Acc@1  ${Object.entries(byTier).map(([t, v]) => `${t} ${v}`).join('  ')}`);
   return lines;
 }
 
