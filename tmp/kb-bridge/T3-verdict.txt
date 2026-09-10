@@ -1,0 +1,25 @@
+T3 verdict — colloquial bridge v1 on v2 fixture (2026-09-10)
+runner: recall-eval.mjs --synonyms data/kb/colloquial-bridge.json (67 entries loaded, confirmed)
+
+== six metrics OFF ==
+0.6/0.725/0.653/0.667/reject 0.382  byTier {"A":1,"B":0.4,"C":0.9,"D":0.9,"E":0.1}
+== six metrics ON ==
+0.6/0.725/0.653/0.667/reject 0.382  byTier {"A":1,"B":0.4,"C":0.9,"D":0.9,"E":0.1}
+byte-identical: YES (ex latency timing)
+
+flips: 0  (fresh-ground increment = 0; target >=4 → FAIL)
+
+bridge-term literal containment by tier: {"A":{"total":55,"withTerm":17},"B":{"total":45,"withTerm":1},"C":{"total":20,"withTerm":10},"D":{"total":20,"withTerm":1},"E":{"total":50,"withTerm":0}}
+→ E tier 0/50: colloquial queries contain NO bridge term; corpus wording-pairs
+  cannot lexically reach pure paraphrase (口子封住→额度冻结 type). E stays 0.100 (target >=0.25 → FAIL).
+
+in-runner mechanism proof (no top1 change, tail-only effects):
+  A-015 电子签怎么发起: top5 5→2 candidates (injected tokens raise maxPossible;
+    tail cards fall below coverage floor); gold rank 1 unchanged
+  C-013 二合一申请: same pattern, gold rank 1 unchanged
+
+guardrails: A 1.00 ✓ B 0.400 ✓ C 0.900 ✓ D 0.900 ✓ reject 0.382 ✓ zero new FP ✓
+gates: characterize-kb-recall-eval 5 passed; --baseline exit 0; flow-card-recall 26 passed
+
+VERDICT: FAIL on E>=0.25 and fresh-ground>=4 → per plan, skip T4 (no wiring),
+set status:archived, 本版不计成果. Guardrail面全绿=资产无害但不解决E层.

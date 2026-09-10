@@ -1,0 +1,3564 @@
+{
+ "stats": {
+  "total": 409,
+  "expandOk": 183,
+  "termOk": 409,
+  "both": 183
+ },
+ "verified": [
+  {
+   "term": "待办",
+   "expand": [
+    "待办任务"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/approval_todo.json",
+   "evidence": "keyword「待办」⊂ alias「待办任务」（同卡 approval_todo）",
+   "stem": "approval_todo",
+   "expandHitCard": "approval_todo",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "审批",
+   "expand": [
+    "工作流审批"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/approval_todo.json",
+   "evidence": "keyword「审批」⊂ alias「工作流审批」（同卡 approval_todo）",
+   "stem": "approval_todo",
+   "expandHitCard": "approval_todo",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "档案入库",
+   "expand": [
+    "档案入库申请"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/archive-stock-in.json",
+   "evidence": "keyword「档案入库」⊂ alias「档案入库申请」（同卡 archive-stock-in）",
+   "stem": "archive-stock-in",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "入库申请",
+   "expand": [
+    "档案入库申请"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/archive-stock-in.json",
+   "evidence": "keyword「入库申请」⊂ alias「档案入库申请」（同卡 archive-stock-in）",
+   "stem": "archive-stock-in",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "档案入库",
+   "expand": [
+    "新增档案入库申请"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/archive-stock-in.json",
+   "evidence": "keyword「档案入库」⊂ alias「新增档案入库申请」（同卡 archive-stock-in）",
+   "stem": "archive-stock-in",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "入库申请",
+   "expand": [
+    "新增档案入库申请"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/archive-stock-in.json",
+   "evidence": "keyword「入库申请」⊂ alias「新增档案入库申请」（同卡 archive-stock-in）",
+   "stem": "archive-stock-in",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "反委托",
+   "expand": [
+    "反委托资产管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/asset-preserve-ops-counter-entrust.json",
+   "evidence": "keyword「反委托」⊂ alias「反委托资产管理」（同卡 asset-preserve-ops-counter-entrust）",
+   "stem": "asset-preserve-ops-counter-entrust",
+   "expandHitCard": "asset-preserve-ops-counter-entrust",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "反委托",
+   "expand": [
+    "反委托借据"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/asset-preserve-ops-counter-entrust.json",
+   "evidence": "keyword「反委托」⊂ alias「反委托借据」（同卡 asset-preserve-ops-counter-entrust）",
+   "stem": "asset-preserve-ops-counter-entrust",
+   "expandHitCard": "asset-preserve-ops-counter-entrust",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "委外清收",
+   "expand": [
+    "委外清收登记"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/asset-preserve-ops-outsourced-collection.json",
+   "evidence": "keyword「委外清收」⊂ alias「委外清收登记」（同卡 asset-preserve-ops-outsourced-collection）",
+   "stem": "asset-preserve-ops-outsourced-collection",
+   "expandHitCard": "asset-preserve-ops-outsourced-collection",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "委外清收",
+   "expand": [
+    "委外清收管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/asset-preserve-ops-outsourced-collection.json",
+   "evidence": "keyword「委外清收」⊂ alias「委外清收管理」（同卡 asset-preserve-ops-outsourced-collection）",
+   "stem": "asset-preserve-ops-outsourced-collection",
+   "expandHitCard": "asset-preserve-ops-outsourced-collection",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "贷后检查规则配置",
+   "expand": [
+    "常规贷后检查规则配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/check-config.json",
+   "evidence": "keyword「贷后检查规则配置」⊂ alias「常规贷后检查规则配置」（同卡 check-config）",
+   "stem": "check-config",
+   "expandHitCard": "check-config",
+   "termHitIn": "postloan-check"
+  },
+  {
+   "term": "贷后检查规则配置",
+   "expand": [
+    "首次贷后检查规则配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/check-config.json",
+   "evidence": "keyword「贷后检查规则配置」⊂ alias「首次贷后检查规则配置」（同卡 check-config）",
+   "stem": "check-config",
+   "expandHitCard": "check-config",
+   "termHitIn": "postloan-check"
+  },
+  {
+   "term": "记账台账",
+   "expand": [
+    "押品记账台账"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral-func-ledger.json",
+   "evidence": "keyword「记账台账」⊂ alias「押品记账台账」（同卡 collateral-func-ledger）",
+   "stem": "collateral-func-ledger",
+   "expandHitCard": "collateral-func-ledger",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "担保物担保详情统计",
+   "expand": [
+    "担保物担保详情统计台账"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral-func-ledger.json",
+   "evidence": "keyword「担保物担保详情统计」⊂ alias「担保物担保详情统计台账」（同卡 collateral-func-ledger）",
+   "stem": "collateral-func-ledger",
+   "expandHitCard": "collateral-func-ledger",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "缓释拆分",
+   "expand": [
+    "缓释拆分结果台账"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral-func-ledger.json",
+   "evidence": "keyword「缓释拆分」⊂ alias「缓释拆分结果台账」（同卡 collateral-func-ledger）",
+   "stem": "collateral-func-ledger",
+   "expandHitCard": "collateral-func-ledger",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "押品样本数据",
+   "expand": [
+    "押品样本数据管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral-func-params.json",
+   "evidence": "keyword「押品样本数据」⊂ alias「押品样本数据管理」（同卡 collateral-func-params）",
+   "stem": "collateral-func-params",
+   "expandHitCard": "collateral-func-params",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "房产估值模型",
+   "expand": [
+    "房产估值模型管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral-func-params.json",
+   "evidence": "keyword「房产估值模型」⊂ alias「房产估值模型管理」（同卡 collateral-func-params）",
+   "stem": "collateral-func-params",
+   "expandHitCard": "collateral-func-params",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "权证入库",
+   "expand": [
+    "权证入库管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral_custody.json",
+   "evidence": "keyword「权证入库」⊂ alias「权证入库管理」（同卡 collateral_custody）",
+   "stem": "collateral_custody",
+   "expandHitCard": "collateral_custody",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "权证借阅",
+   "expand": [
+    "权证借阅管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral_custody.json",
+   "evidence": "keyword「权证借阅」⊂ alias「权证借阅管理」（同卡 collateral_custody）",
+   "stem": "collateral_custody",
+   "expandHitCard": "collateral_custody",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "押品估值",
+   "expand": [
+    "押品估值管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral_valuation.json",
+   "evidence": "keyword「押品估值」⊂ alias「押品估值管理」（同卡 collateral_valuation）",
+   "stem": "collateral_valuation",
+   "expandHitCard": "collateral_valuation",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "估值计算器",
+   "expand": [
+    "汽车估值计算器"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral_valuation.json",
+   "evidence": "keyword「估值计算器」⊂ alias「汽车估值计算器」（同卡 collateral_valuation）",
+   "stem": "collateral_valuation",
+   "expandHitCard": "collateral_valuation",
+   "termHitIn": "collateral-info"
+  },
+  {
+   "term": "估值计算器",
+   "expand": [
+    "房产估值计算器"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral_valuation.json",
+   "evidence": "keyword「估值计算器」⊂ alias「房产估值计算器」（同卡 collateral_valuation）",
+   "stem": "collateral_valuation",
+   "expandHitCard": "collateral_valuation",
+   "termHitIn": "collateral-info"
+  },
+  {
+   "term": "押品估值",
+   "expand": [
+    "押品估值数据查询"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collateral_valuation.json",
+   "evidence": "keyword「押品估值」⊂ alias「押品估值数据查询」（同卡 collateral_valuation）",
+   "stem": "collateral_valuation",
+   "expandHitCard": "collateral_valuation",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "催收评分",
+   "expand": [
+    "催收评分卡配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collection_scorecard.json",
+   "evidence": "alias「催收评分」⊂ keyword「催收评分卡配置」（同卡 collection_scorecard）",
+   "stem": "collection_scorecard",
+   "expandHitCard": "collection_scorecard",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "催收策略",
+   "expand": [
+    "催收策略配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collection_strategy.json",
+   "evidence": "alias「催收策略」⊂ keyword「催收策略配置」（同卡 collection_strategy）",
+   "stem": "collection_strategy",
+   "expandHitCard": "collection_strategy",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "催收策略配置",
+   "expand": [
+    "新增催收策略配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collection_strategy.json",
+   "evidence": "keyword「催收策略配置」⊂ alias「新增催收策略配置」（同卡 collection_strategy）",
+   "stem": "collection_strategy",
+   "expandHitCard": "collection_strategy",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "催收任务",
+   "expand": [
+    "催收任务编号"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collection_task.json",
+   "evidence": "alias「催收任务」⊂ keyword「催收任务编号」（同卡 collection_task）",
+   "stem": "collection_task",
+   "expandHitCard": "collection_task",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "催收任务",
+   "expand": [
+    "新增催收任务"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/collection_task.json",
+   "evidence": "keyword「催收任务」⊂ alias「新增催收任务」（同卡 collection_task）",
+   "stem": "collection_task",
+   "expandHitCard": "collection_task",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "批复查看",
+   "expand": [
+    "授信批复查看"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-corp-approval-result.json",
+   "evidence": "keyword「批复查看」⊂ alias「授信批复查看」（同卡 credit-corp-approval-result）",
+   "stem": "credit-corp-approval-result",
+   "expandHitCard": "credit-corp-approval-result",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "批复查看",
+   "expand": [
+    "批复查看任务页"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-corp-approval-result.json",
+   "evidence": "keyword「批复查看」⊂ alias「批复查看任务页」（同卡 credit-corp-approval-result）",
+   "stem": "credit-corp-approval-result",
+   "expandHitCard": "credit-corp-approval-result",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "对公授信批复",
+   "expand": [
+    "对公授信批复信息大页面"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-corp-approval-result.json",
+   "evidence": "keyword「对公授信批复」⊂ alias「对公授信批复信息大页面」（同卡 credit-corp-approval-result）",
+   "stem": "credit-corp-approval-result",
+   "expandHitCard": "credit-corp-approval-result",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "待办任务",
+   "expand": [
+    "待办任务审批"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-corp-approval-task.json",
+   "evidence": "keyword「待办任务」⊂ alias「待办任务审批」（同卡 credit-corp-approval-task）",
+   "stem": "credit-corp-approval-task",
+   "expandHitCard": "credit-corp-approval-task",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "流程操作",
+   "expand": [
+    "流程操作同意"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-corp-approval-task.json",
+   "evidence": "keyword「流程操作」⊂ alias「流程操作同意」（同卡 credit-corp-approval-task）",
+   "stem": "credit-corp-approval-task",
+   "expandHitCard": "credit-corp-approval-task",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "同意",
+   "expand": [
+    "流程操作同意"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-corp-approval-task.json",
+   "evidence": "keyword「同意」⊂ alias「流程操作同意」（同卡 credit-corp-approval-task）",
+   "stem": "credit-corp-approval-task",
+   "expandHitCard": "credit-corp-approval-task",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "任务事项",
+   "expand": [
+    "任务事项待办处理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-corp-approval-task.json",
+   "evidence": "keyword「任务事项」⊂ alias「任务事项待办处理」（同卡 credit-corp-approval-task）",
+   "stem": "credit-corp-approval-task",
+   "expandHitCard": "credit-corp-approval-task",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "流程提交",
+   "expand": [
+    "审批意见流程提交"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-corp-approval-task.json",
+   "evidence": "keyword「流程提交」⊂ alias「审批意见流程提交」（同卡 credit-corp-approval-task）",
+   "stem": "credit-corp-approval-task",
+   "expandHitCard": "credit-corp-approval-task",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "授信系数",
+   "expand": [
+    "授信系数管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-retail-credit-config.json",
+   "evidence": "keyword「授信系数」⊂ alias「授信系数管理」（同卡 credit-retail-credit-config）",
+   "stem": "credit-retail-credit-config",
+   "expandHitCard": "credit-retail-credit-config",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "农户授信额度",
+   "expand": [
+    "农户授信额度配置管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit-retail-credit-config.json",
+   "evidence": "keyword「农户授信额度」⊂ alias「农户授信额度配置管理」（同卡 credit-retail-credit-config）",
+   "stem": "credit-retail-credit-config",
+   "expandHitCard": "credit-retail-credit-config",
+   "termHitIn": "credit-interbank"
+  },
+  {
+   "term": "对公授信",
+   "expand": [
+    "新增对公授信管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/credit_application.json",
+   "evidence": "alias「对公授信」⊂ keyword「新增对公授信管理」（同卡 credit_application）",
+   "stem": "credit_application",
+   "expandHitCard": "credit_application",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "关联关系",
+   "expand": [
+    "关联关系维护"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-common-cust-relation.json",
+   "evidence": "keyword「关联关系」⊂ alias「关联关系维护」（同卡 customer-common-cust-relation）",
+   "stem": "customer-common-cust-relation",
+   "expandHitCard": "customer-common-cust-relation",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "关联关系",
+   "expand": [
+    "关联关系日志"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-common-cust-relation.json",
+   "evidence": "keyword「关联关系」⊂ alias「关联关系日志」（同卡 customer-common-cust-relation）",
+   "stem": "customer-common-cust-relation",
+   "expandHitCard": "customer-common-cust-relation",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "关联关系",
+   "expand": [
+    "关联关系过滤配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-common-cust-relation.json",
+   "evidence": "keyword「关联关系」⊂ alias「关联关系过滤配置」（同卡 customer-common-cust-relation）",
+   "stem": "customer-common-cust-relation",
+   "expandHitCard": "customer-common-cust-relation",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "过滤配置",
+   "expand": [
+    "关联关系过滤配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-common-cust-relation.json",
+   "evidence": "keyword「过滤配置」⊂ alias「关联关系过滤配置」（同卡 customer-common-cust-relation）",
+   "stem": "customer-common-cust-relation",
+   "expandHitCard": "customer-common-cust-relation",
+   "termHitIn": "customer-common"
+  },
+  {
+   "term": "集群客户",
+   "expand": [
+    "集群客户管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-cluster.json",
+   "evidence": "keyword「集群客户」⊂ alias「集群客户管理」（同卡 customer-group-cluster）",
+   "stem": "customer-group-cluster",
+   "expandHitCard": "customer-group-cluster",
+   "termHitIn": "customer-common"
+  },
+  {
+   "term": "总集团",
+   "expand": [
+    "总集团客户管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-general-group.json",
+   "evidence": "keyword「总集团」⊂ alias「总集团客户管理」（同卡 customer-group-general-group）",
+   "stem": "customer-group-general-group",
+   "expandHitCard": "customer-group-general-group",
+   "termHitIn": "customer-common"
+  },
+  {
+   "term": "总集团",
+   "expand": [
+    "创建总集团"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-general-group.json",
+   "evidence": "keyword「总集团」⊂ alias「创建总集团」（同卡 customer-group-general-group）",
+   "stem": "customer-group-general-group",
+   "expandHitCard": "customer-group-general-group",
+   "termHitIn": "customer-common"
+  },
+  {
+   "term": "创建总集团",
+   "expand": [
+    "创建总集团向导页"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-general-group.json",
+   "evidence": "alias「创建总集团」⊂ keyword「创建总集团向导页」（同卡 customer-group-general-group）",
+   "stem": "customer-group-general-group",
+   "expandHitCard": "customer-group-general-group",
+   "termHitIn": "customer-group"
+  },
+  {
+   "term": "总集团",
+   "expand": [
+    "总集团成员维护"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-general-group.json",
+   "evidence": "keyword「总集团」⊂ alias「总集团成员维护」（同卡 customer-group-general-group）",
+   "stem": "customer-group-general-group",
+   "expandHitCard": "customer-group-general-group",
+   "termHitIn": "customer-common"
+  },
+  {
+   "term": "集团客户",
+   "expand": [
+    "集团客户管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-group.json",
+   "evidence": "keyword「集团客户」⊂ alias「集团客户管理」（同卡 customer-group-group）",
+   "stem": "customer-group-group",
+   "expandHitCard": "customer-group-group",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "集团客户",
+   "expand": [
+    "集团客户信息维护"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-group.json",
+   "evidence": "keyword「集团客户」⊂ alias「集团客户信息维护」（同卡 customer-group-group）",
+   "stem": "customer-group-group",
+   "expandHitCard": "customer-group-group",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "集团客户",
+   "expand": [
+    "查看集团客户信息"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-group.json",
+   "evidence": "keyword「集团客户」⊂ alias「查看集团客户信息」（同卡 customer-group-group）",
+   "stem": "customer-group-group",
+   "expandHitCard": "customer-group-group",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "评级列表",
+   "expand": [
+    "集团评级列表"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-group.json",
+   "evidence": "keyword「评级列表」⊂ alias「集团评级列表」（同卡 customer-group-group）",
+   "stem": "customer-group-group",
+   "expandHitCard": "customer-group-group",
+   "termHitIn": "customer-group"
+  },
+  {
+   "term": "额度列表",
+   "expand": [
+    "集团额度列表"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer-group-group.json",
+   "evidence": "keyword「额度列表」⊂ alias「集团额度列表」（同卡 customer-group-group）",
+   "stem": "customer-group-group",
+   "expandHitCard": "customer-group-group",
+   "termHitIn": "credit-interbank"
+  },
+  {
+   "term": "查询",
+   "expand": [
+    "查询客户信息"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer_query.json",
+   "evidence": "keyword「查询」⊂ alias「查询客户信息」（同卡 customer_query）",
+   "stem": "customer_query",
+   "expandHitCard": "customer_query",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "查询",
+   "expand": [
+    "客户查询"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/customer_query.json",
+   "evidence": "keyword「查询」⊂ alias「客户查询」（同卡 customer_query）",
+   "stem": "customer_query",
+   "expandHitCard": "customer_query",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "数据指标模板",
+   "expand": [
+    "数据指标模板配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/digital-loan-desk-data-index.json",
+   "evidence": "keyword「数据指标模板」⊂ alias「数据指标模板配置」（同卡 digital-loan-desk-data-index）",
+   "stem": "digital-loan-desk-data-index",
+   "expandHitCard": "digital-loan-desk-data-index",
+   "termHitIn": "digital-loan-desk"
+  },
+  {
+   "term": "数据指标库",
+   "expand": [
+    "数据指标库配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/digital-loan-desk-data-index.json",
+   "evidence": "keyword「数据指标库」⊂ alias「数据指标库配置」（同卡 digital-loan-desk-data-index）",
+   "stem": "digital-loan-desk-data-index",
+   "expandHitCard": "digital-loan-desk-data-index",
+   "termHitIn": "digital-loan-desk"
+  },
+  {
+   "term": "账务异常",
+   "expand": [
+    "账务异常管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/disburse-account-abnormal.json",
+   "evidence": "keyword「账务异常」⊂ alias「账务异常管理」（同卡 disburse-account-abnormal）",
+   "stem": "disburse-account-abnormal",
+   "expandHitCard": "disburse-account-abnormal",
+   "termHitIn": "disburse"
+  },
+  {
+   "term": "账务异常",
+   "expand": [
+    "账务异常详情"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/disburse-account-abnormal.json",
+   "evidence": "keyword「账务异常」⊂ alias「账务异常详情」（同卡 disburse-account-abnormal）",
+   "stem": "disburse-account-abnormal",
+   "expandHitCard": "disburse-account-abnormal",
+   "termHitIn": "disburse"
+  },
+  {
+   "term": "受托支付",
+   "expand": [
+    "受托支付信息"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/disburse-entrusted-payment.json",
+   "evidence": "keyword「受托支付」⊂ alias「受托支付信息」（同卡 disburse-entrusted-payment）",
+   "stem": "disburse-entrusted-payment",
+   "expandHitCard": "disburse-entrusted-payment",
+   "termHitIn": "digital-loan-desk"
+  },
+  {
+   "term": "受托支付",
+   "expand": [
+    "受托支付变更"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/disburse-entrusted-payment.json",
+   "evidence": "keyword「受托支付」⊂ alias「受托支付变更」（同卡 disburse-entrusted-payment）",
+   "stem": "disburse-entrusted-payment",
+   "expandHitCard": "disburse-entrusted-payment",
+   "termHitIn": "digital-loan-desk"
+  },
+  {
+   "term": "签订合同",
+   "expand": [
+    "待签订合同管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/duigong_contract_sign.json",
+   "evidence": "alias「签订合同」⊂ keyword「待签订合同管理」（同卡 duigong_contract_sign）",
+   "stem": "duigong_contract_sign",
+   "expandHitCard": "duigong_contract_sign",
+   "termHitIn": "loan-corp"
+  },
+  {
+   "term": "签订合同",
+   "expand": [
+    "已签订合同管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/duigong_contract_sign.json",
+   "evidence": "alias「签订合同」⊂ keyword「已签订合同管理」（同卡 duigong_contract_sign）",
+   "stem": "duigong_contract_sign",
+   "expandHitCard": "duigong_contract_sign",
+   "termHitIn": "loan-corp"
+  },
+  {
+   "term": "电子签",
+   "expand": [
+    "模拟电子签"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/electronic_signing.json",
+   "evidence": "alias「电子签」⊂ keyword「模拟电子签」（同卡 electronic_signing）",
+   "stem": "electronic_signing",
+   "expandHitCard": "electronic_signing",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "电子签",
+   "expand": [
+    "电子签合同状态生效"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/electronic_signing.json",
+   "evidence": "alias「电子签」⊂ keyword「电子签合同状态生效」（同卡 electronic_signing）",
+   "stem": "electronic_signing",
+   "expandHitCard": "electronic_signing",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "保证人",
+   "expand": [
+    "引入保证人"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/guarantee_intro.json",
+   "evidence": "alias「保证人」⊂ keyword「引入保证人」（同卡 guarantee_intro）",
+   "stem": "guarantee_intro",
+   "expandHitCard": "guarantee_intro",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "保证人",
+   "expand": [
+    "保证人不可重复"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/guarantee_intro.json",
+   "evidence": "alias「保证人」⊂ keyword「保证人不可重复」（同卡 guarantee_intro）",
+   "stem": "guarantee_intro",
+   "expandHitCard": "guarantee_intro",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "独立新增",
+   "expand": [
+    "独立新增担保"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/guaranty_contract.json",
+   "evidence": "keyword「独立新增」⊂ alias「独立新增担保」（同卡 guaranty_contract）",
+   "stem": "guaranty_contract",
+   "expandHitCard": "guaranty_contract",
+   "termHitIn": "postloan-warn"
+  },
+  {
+   "term": "撤诉",
+   "expand": [
+    "撤诉申请"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/judicial-litigation.json",
+   "evidence": "keyword「撤诉」⊂ alias「撤诉申请」（同卡 judicial-litigation）",
+   "stem": "judicial-litigation",
+   "expandHitCard": "judicial-litigation",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "司法诉讼",
+   "expand": [
+    "司法诉讼主页"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/judicial-litigation.json",
+   "evidence": "keyword「司法诉讼」⊂ alias「司法诉讼主页」（同卡 judicial-litigation）",
+   "stem": "judicial-litigation",
+   "expandHitCard": "judicial-litigation",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "注册并占用",
+   "expand": [
+    "额度注册并占用"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/limit-ctrl-api-grant-use-one.json",
+   "evidence": "keyword「注册并占用」⊂ alias「额度注册并占用」（同卡 limit-ctrl-api-grant-use-one）",
+   "stem": "limit-ctrl-api-grant-use-one",
+   "expandHitCard": "limit-ctrl-api-grant-use-one",
+   "termHitIn": "limit-ctrl-api"
+  },
+  {
+   "term": "额度冻结",
+   "expand": [
+    "额度冻结-新版"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/limit.json",
+   "evidence": "keyword「额度冻结」⊂ alias「额度冻结-新版」（同卡 limit）",
+   "stem": "limit",
+   "expandHitCard": "limit",
+   "termHitIn": "credit-retail"
+  },
+  {
+   "term": "额度解冻",
+   "expand": [
+    "额度解冻-新版"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/limit.json",
+   "evidence": "keyword「额度解冻」⊂ alias「额度解冻-新版」（同卡 limit）",
+   "stem": "limit",
+   "expandHitCard": "limit",
+   "termHitIn": "limit-quota"
+  },
+  {
+   "term": "委托贷款",
+   "expand": [
+    "委托贷款代理协议编号"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-corp-entrust-loan.json",
+   "evidence": "alias「委托贷款」⊂ keyword「委托贷款代理协议编号」（同卡 loan-corp-entrust-loan）",
+   "stem": "loan-corp-entrust-loan",
+   "expandHitCard": "loan-corp-entrust-loan",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "委托贷款",
+   "expand": [
+    "委托贷款用信申请"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-corp-entrust-loan.json",
+   "evidence": "alias「委托贷款」⊂ keyword「委托贷款用信申请」（同卡 loan-corp-entrust-loan）",
+   "stem": "loan-corp-entrust-loan",
+   "expandHitCard": "loan-corp-entrust-loan",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "牵头行",
+   "expand": [
+    "牵头行发起"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-corp-syndicate-lead-apply.json",
+   "evidence": "keyword「牵头行」⊂ alias「牵头行发起」（同卡 loan-corp-syndicate-lead-apply）",
+   "stem": "loan-corp-syndicate-lead-apply",
+   "expandHitCard": "loan-corp-syndicate-lead-apply",
+   "termHitIn": "loan-corp"
+  },
+  {
+   "term": "参与行",
+   "expand": [
+    "参与行发起"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-corp-syndicate-participant-apply.json",
+   "evidence": "keyword「参与行」⊂ alias「参与行发起」（同卡 loan-corp-syndicate-participant-apply）",
+   "stem": "loan-corp-syndicate-participant-apply",
+   "expandHitCard": "loan-corp-syndicate-participant-apply",
+   "termHitIn": "loan-corp"
+  },
+  {
+   "term": "修改",
+   "expand": [
+    "对私用信申请修改查看"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-retail-apply-maintain.json",
+   "evidence": "keyword「修改」⊂ alias「对私用信申请修改查看」（同卡 loan-retail-apply-maintain）",
+   "stem": "loan-retail-apply-maintain",
+   "expandHitCard": "loan-retail-apply-maintain",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "流程轨迹",
+   "expand": [
+    "流程轨迹查看"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-retail-apply-maintain.json",
+   "evidence": "keyword「流程轨迹」⊂ alias「流程轨迹查看」（同卡 loan-retail-apply-maintain）",
+   "stem": "loan-retail-apply-maintain",
+   "expandHitCard": "loan-retail-apply-maintain",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "呈批表",
+   "expand": [
+    "查看业务呈批表"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-retail-apply-maintain.json",
+   "evidence": "keyword「呈批表」⊂ alias「查看业务呈批表」（同卡 loan-retail-apply-maintain）",
+   "stem": "loan-retail-apply-maintain",
+   "expandHitCard": "loan-retail-apply-maintain",
+   "termHitIn": "loan-corp"
+  },
+  {
+   "term": "撤销",
+   "expand": [
+    "对私用信撤销删除"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-retail-apply-maintain.json",
+   "evidence": "keyword「撤销」⊂ alias「对私用信撤销删除」（同卡 loan-retail-apply-maintain）",
+   "stem": "loan-retail-apply-maintain",
+   "expandHitCard": "loan-retail-apply-maintain",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "删除",
+   "expand": [
+    "对私用信撤销删除"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-retail-apply-maintain.json",
+   "evidence": "keyword「删除」⊂ alias「对私用信撤销删除」（同卡 loan-retail-apply-maintain）",
+   "stem": "loan-retail-apply-maintain",
+   "expandHitCard": "loan-retail-apply-maintain",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "二合一",
+   "expand": [
+    "新增对私用信申请-二合一"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-retail-erheyi-apply.json",
+   "evidence": "keyword「二合一」⊂ alias「新增对私用信申请-二合一」（同卡 loan-retail-erheyi-apply）",
+   "stem": "loan-retail-erheyi-apply",
+   "expandHitCard": "loan-retail-erheyi-apply",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "二合一",
+   "expand": [
+    "二合一用信申请"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan-retail-erheyi-apply.json",
+   "evidence": "keyword「二合一」⊂ alias「二合一用信申请」（同卡 loan-retail-erheyi-apply）",
+   "stem": "loan-retail-erheyi-apply",
+   "expandHitCard": "loan-retail-erheyi-apply",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "放款账户",
+   "expand": [
+    "放款账户信息"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/loan_account.json",
+   "evidence": "keyword「放款账户」⊂ alias「放款账户信息」（同卡 loan_account）",
+   "stem": "loan_account",
+   "expandHitCard": "loan_account",
+   "termHitIn": "disburse"
+  },
+  {
+   "term": "角色",
+   "expand": [
+    "角色卡片库"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-home-mgmt.json",
+   "evidence": "keyword「角色」⊂ alias「角色卡片库」（同卡 portal-home-mgmt）",
+   "stem": "portal-home-mgmt",
+   "expandHitCard": "portal-home-mgmt",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "卡片库",
+   "expand": [
+    "角色卡片库"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-home-mgmt.json",
+   "evidence": "keyword「卡片库」⊂ alias「角色卡片库」（同卡 portal-home-mgmt）",
+   "stem": "portal-home-mgmt",
+   "expandHitCard": "portal-home-mgmt",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "自定义首页",
+   "expand": [
+    "自定义首页(管理员侧)"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-home-mgmt.json",
+   "evidence": "keyword「自定义首页」⊂ alias「自定义首页(管理员侧)」（同卡 portal-home-mgmt）",
+   "stem": "portal-home-mgmt",
+   "expandHitCard": "portal-home-mgmt",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "角色",
+   "expand": [
+    "角色首页配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-home-mgmt.json",
+   "evidence": "keyword「角色」⊂ alias「角色首页配置」（同卡 portal-home-mgmt）",
+   "stem": "portal-home-mgmt",
+   "expandHitCard": "portal-home-mgmt",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "角色切换",
+   "expand": [
+    "机构角色切换"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-personalization.json",
+   "evidence": "keyword「角色切换」⊂ alias「机构角色切换」（同卡 portal-personalization）",
+   "stem": "portal-personalization",
+   "expandHitCard": "portal-personalization",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "公共信息配置",
+   "expand": [
+    "门户公共信息配置管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-public-info.json",
+   "evidence": "keyword「公共信息配置」⊂ alias「门户公共信息配置管理」（同卡 portal-public-info）",
+   "stem": "portal-public-info",
+   "expandHitCard": "portal-public-info",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "搜索历史",
+   "expand": [
+    "搜索历史管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-public-info.json",
+   "evidence": "keyword「搜索历史」⊂ alias「搜索历史管理」（同卡 portal-public-info）",
+   "stem": "portal-public-info",
+   "expandHitCard": "portal-public-info",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "启用",
+   "expand": [
+    "子应用启用"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-subapp.json",
+   "evidence": "keyword「启用」⊂ alias「子应用启用」（同卡 portal-subapp）",
+   "stem": "portal-subapp",
+   "expandHitCard": "portal-subapp",
+   "termHitIn": "asset-preserve-ops"
+  },
+  {
+   "term": "禁用",
+   "expand": [
+    "子应用禁用"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/portal-subapp.json",
+   "evidence": "keyword「禁用」⊂ alias「子应用禁用」（同卡 portal-subapp）",
+   "stem": "portal-subapp",
+   "expandHitCard": "portal-subapp",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "贷后检查",
+   "expand": [
+    "对公首次贷后检查"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/postloan.json",
+   "evidence": "keyword「贷后检查」⊂ alias「对公首次贷后检查」（同卡 postloan）",
+   "stem": "postloan",
+   "expandHitCard": "postloan",
+   "termHitIn": "asset-preserve-ops"
+  },
+  {
+   "term": "贷后检查",
+   "expand": [
+    "对公常规贷后检查"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/postloan.json",
+   "evidence": "keyword「贷后检查」⊂ alias「对公常规贷后检查」（同卡 postloan）",
+   "stem": "postloan",
+   "expandHitCard": "postloan",
+   "termHitIn": "asset-preserve-ops"
+  },
+  {
+   "term": "贷后检查",
+   "expand": [
+    "对私首次贷后检查"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/postloan.json",
+   "evidence": "keyword「贷后检查」⊂ alias「对私首次贷后检查」（同卡 postloan）",
+   "stem": "postloan",
+   "expandHitCard": "postloan",
+   "termHitIn": "asset-preserve-ops"
+  },
+  {
+   "term": "贷后检查",
+   "expand": [
+    "对私常规贷后检查"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/postloan.json",
+   "evidence": "keyword「贷后检查」⊂ alias「对私常规贷后检查」（同卡 postloan）",
+   "stem": "postloan",
+   "expandHitCard": "postloan",
+   "termHitIn": "asset-preserve-ops"
+  },
+  {
+   "term": "贷后检查",
+   "expand": [
+    "贷后检查任务"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/postloan.json",
+   "evidence": "keyword「贷后检查」⊂ alias「贷后检查任务」（同卡 postloan）",
+   "stem": "postloan",
+   "expandHitCard": "postloan",
+   "termHitIn": "asset-preserve-ops"
+  },
+  {
+   "term": "检查任务",
+   "expand": [
+    "贷后检查任务"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/postloan.json",
+   "evidence": "keyword「检查任务」⊂ alias「贷后检查任务」（同卡 postloan）",
+   "stem": "postloan",
+   "expandHitCard": "postloan",
+   "termHitIn": "postloan-check"
+  },
+  {
+   "term": "核心产品映射",
+   "expand": [
+    "维护核心产品映射"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_core_mapping.json",
+   "evidence": "keyword「核心产品映射」⊂ alias「维护核心产品映射」（同卡 product_core_mapping）",
+   "stem": "product_core_mapping",
+   "expandHitCard": "product_core_mapping",
+   "termHitIn": "product-mgmt"
+  },
+  {
+   "term": "要素分组",
+   "expand": [
+    "产品要素分组"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_element.json",
+   "evidence": "keyword「要素分组」⊂ alias「产品要素分组」（同卡 product_element）",
+   "stem": "product_element",
+   "expandHitCard": "product_element",
+   "termHitIn": "postloan-risk-class"
+  },
+  {
+   "term": "公共要素",
+   "expand": [
+    "产品公共要素"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_element.json",
+   "evidence": "alias「公共要素」⊂ keyword「产品公共要素」（同卡 product_element）",
+   "stem": "product_element",
+   "expandHitCard": "product_element",
+   "termHitIn": "product-mgmt"
+  },
+  {
+   "term": "个性化要素",
+   "expand": [
+    "产品个性化要素"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_element.json",
+   "evidence": "alias「个性化要素」⊂ keyword「产品个性化要素」（同卡 product_element）",
+   "stem": "product_element",
+   "expandHitCard": "product_element",
+   "termHitIn": "product-mgmt"
+  },
+  {
+   "term": "要素分组",
+   "expand": [
+    "要素分组主页"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_element.json",
+   "evidence": "keyword「要素分组」⊂ alias「要素分组主页」（同卡 product_element）",
+   "stem": "product_element",
+   "expandHitCard": "product_element",
+   "termHitIn": "postloan-risk-class"
+  },
+  {
+   "term": "产品库",
+   "expand": [
+    "产品库管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_library.json",
+   "evidence": "keyword「产品库」⊂ alias「产品库管理」（同卡 product_library）",
+   "stem": "product_library",
+   "expandHitCard": "product_library",
+   "termHitIn": "digital-loan-desk"
+  },
+  {
+   "term": "启用",
+   "expand": [
+    "产品启用"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_library.json",
+   "evidence": "keyword「启用」⊂ alias「产品启用」（同卡 product_library）",
+   "stem": "product_library",
+   "expandHitCard": "product_library",
+   "termHitIn": "asset-preserve-ops"
+  },
+  {
+   "term": "产品树",
+   "expand": [
+    "刷新产品树"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_library.json",
+   "evidence": "keyword「产品树」⊂ alias「刷新产品树」（同卡 product_library）",
+   "stem": "product_library",
+   "expandHitCard": "product_library",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "查询",
+   "expand": [
+    "查询产品信息"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_query.json",
+   "evidence": "keyword「查询」⊂ alias「查询产品信息」（同卡 product_query）",
+   "stem": "product_query",
+   "expandHitCard": "product_query",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "查询",
+   "expand": [
+    "产品信息查询"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_query.json",
+   "evidence": "keyword「查询」⊂ alias「产品信息查询」（同卡 product_query）",
+   "stem": "product_query",
+   "expandHitCard": "product_query",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "查询产品",
+   "expand": [
+    "查询产品信息"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_query.json",
+   "evidence": "alias「查询产品」⊂ keyword「查询产品信息」（同卡 product_query）",
+   "stem": "product_query",
+   "expandHitCard": "product_query",
+   "termHitIn": "loan-retail"
+  },
+  {
+   "term": "查询",
+   "expand": [
+    "查询产品"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_query.json",
+   "evidence": "keyword「查询」⊂ alias「查询产品」（同卡 product_query）",
+   "stem": "product_query",
+   "expandHitCard": "product_query",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "查询",
+   "expand": [
+    "产品查询列表"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_query.json",
+   "evidence": "keyword「查询」⊂ alias「产品查询列表」（同卡 product_query）",
+   "stem": "product_query",
+   "expandHitCard": "product_query",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "产品阶段",
+   "expand": [
+    "产品阶段管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_stage.json",
+   "evidence": "keyword「产品阶段」⊂ alias「产品阶段管理」（同卡 product_stage）",
+   "stem": "product_stage",
+   "expandHitCard": "product_stage",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "产品阶段",
+   "expand": [
+    "维护产品阶段"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_stage.json",
+   "evidence": "keyword「产品阶段」⊂ alias「维护产品阶段」（同卡 product_stage）",
+   "stem": "product_stage",
+   "expandHitCard": "product_stage",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "产品阶段",
+   "expand": [
+    "刷新产品阶段"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/product_stage.json",
+   "evidence": "alias「产品阶段」⊂ keyword「刷新产品阶段」（同卡 product_stage）",
+   "stem": "product_stage",
+   "expandHitCard": "product_stage",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "生成配置",
+   "expand": [
+    "风险分类生成配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/risk-class-gen-config.json",
+   "evidence": "alias「生成配置」⊂ keyword「风险分类生成配置」（同卡 risk-class-gen-config）",
+   "stem": "risk-class-gen-config",
+   "expandHitCard": "risk-class-gen-config",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "观察期白名单",
+   "expand": [
+    "观察期白名单配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/risk-class-observation-whitelist.json",
+   "evidence": "alias「观察期白名单」⊂ keyword「观察期白名单配置」（同卡 risk-class-observation-whitelist）",
+   "stem": "risk-class-observation-whitelist",
+   "expandHitCard": "risk-class-observation-whitelist",
+   "termHitIn": "postloan-check"
+  },
+  {
+   "term": "批量导入",
+   "expand": [
+    "白名单批量导入"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/risk-class-observation-whitelist.json",
+   "evidence": "keyword「批量导入」⊂ alias「白名单批量导入」（同卡 risk-class-observation-whitelist）",
+   "stem": "risk-class-observation-whitelist",
+   "expandHitCard": "risk-class-observation-whitelist",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "脱期法配置",
+   "expand": [
+    "脱期法配置矩阵"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/risk-class-overdue-config.json",
+   "evidence": "keyword「脱期法配置」⊂ alias「脱期法配置矩阵」（同卡 risk-class-overdue-config）",
+   "stem": "risk-class-overdue-config",
+   "expandHitCard": "risk-class-overdue-config",
+   "termHitIn": "postloan-check"
+  },
+  {
+   "term": "认定理由配置",
+   "expand": [
+    "分类认定理由配置"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/risk-class-reason-config.json",
+   "evidence": "alias「认定理由配置」⊂ keyword「分类认定理由配置」（同卡 risk-class-reason-config）",
+   "stem": "risk-class-reason-config",
+   "expandHitCard": "risk-class-reason-config",
+   "termHitIn": "postloan-check"
+  },
+  {
+   "term": "表达式",
+   "expand": [
+    "表达式编辑器"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/smart-ctrl-rule-cfg.json",
+   "evidence": "keyword「表达式」⊂ alias「表达式编辑器」（同卡 smart-ctrl-rule-cfg）",
+   "stem": "smart-ctrl-rule-cfg",
+   "expandHitCard": "smart-ctrl-rule-cfg",
+   "termHitIn": "smart-ctrl"
+  },
+  {
+   "term": "关联方案",
+   "expand": [
+    "控制规则关联方案"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/smart-ctrl-rule-lib.json",
+   "evidence": "keyword「关联方案」⊂ alias「控制规则关联方案」（同卡 smart-ctrl-rule-lib）",
+   "stem": "smart-ctrl-rule-lib",
+   "expandHitCard": "smart-ctrl-rule-lib",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "一键失效",
+   "expand": [
+    "规则一键失效及恢复"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/smart-ctrl-rule-toggle.json",
+   "evidence": "alias「一键失效」⊂ keyword「规则一键失效及恢复」（同卡 smart-ctrl-rule-toggle）",
+   "stem": "smart-ctrl-rule-toggle",
+   "expandHitCard": "smart-ctrl-rule-toggle",
+   "termHitIn": "smart-ctrl"
+  },
+  {
+   "term": "失效规则",
+   "expand": [
+    "批量失效规则"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/smart-ctrl-rule-toggle.json",
+   "evidence": "keyword「失效规则」⊂ alias「批量失效规则」（同卡 smart-ctrl-rule-toggle）",
+   "stem": "smart-ctrl-rule-toggle",
+   "expandHitCard": "smart-ctrl-rule-toggle",
+   "termHitIn": "postloan-check"
+  },
+  {
+   "term": "生效规则",
+   "expand": [
+    "批量生效规则"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/smart-ctrl-rule-toggle.json",
+   "evidence": "alias「生效规则」⊂ keyword「批量生效规则」（同卡 smart-ctrl-rule-toggle）",
+   "stem": "smart-ctrl-rule-toggle",
+   "expandHitCard": "smart-ctrl-rule-toggle",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "机构管理",
+   "expand": [
+    "账务机构管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/system-mgmt-base-mgmt.json",
+   "evidence": "alias「机构管理」⊂ keyword「账务机构管理」（同卡 system-mgmt-base-mgmt）",
+   "stem": "system-mgmt-base-mgmt",
+   "expandHitCard": "system-mgmt-base-mgmt",
+   "termHitIn": "customer-corp"
+  },
+  {
+   "term": "密码策略",
+   "expand": [
+    "密码策略管理"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/system-mgmt-base-mgmt.json",
+   "evidence": "keyword「密码策略」⊂ alias「密码策略管理」（同卡 system-mgmt-base-mgmt）",
+   "stem": "system-mgmt-base-mgmt",
+   "expandHitCard": "system-mgmt-base-mgmt",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "国债收益率平均值",
+   "expand": [
+    "国债收益率平均值维护"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/system-mgmt-gov-bond.json",
+   "evidence": "keyword「国债收益率平均值」⊂ alias「国债收益率平均值维护」（同卡 system-mgmt-gov-bond）",
+   "stem": "system-mgmt-gov-bond",
+   "expandHitCard": "system-mgmt-gov-bond",
+   "termHitIn": "system-mgmt"
+  },
+  {
+   "term": "发布",
+   "expand": [
+    "消息发布"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/system-mgmt-message-center.json",
+   "evidence": "keyword「发布」⊂ alias「消息发布」（同卡 system-mgmt-message-center）",
+   "stem": "system-mgmt-message-center",
+   "expandHitCard": "system-mgmt-message-center",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "机构撤并",
+   "expand": [
+    "机构撤并登记"
+   ],
+   "sourceKind": "corpus-card",
+   "sourceRef": "data/kb/flows/system-mgmt-org-merge.json",
+   "evidence": "keyword「机构撤并」⊂ alias「机构撤并登记」（同卡 system-mgmt-org-merge）",
+   "stem": "system-mgmt-org-merge",
+   "expandHitCard": "system-mgmt-org-merge",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "流程状态联动",
+   "expand": [
+    "提交流程审批"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/archive/chapters\\03-档案入库.md:27",
+   "evidence": "流程状态联动（提交流程审批）",
+   "module": "archive",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "影像信息",
+   "expand": [
+    "公共影像组件"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/archive/chapters\\06-档案盘库.md:18",
+   "evidence": "影像信息（公共影像组件）",
+   "module": "archive",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "基本信息",
+   "expand": [
+    "查看基本信息"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/archive/chapters\\07-档案出库.md:8",
+   "evidence": "基本信息（查看基本信息）",
+   "module": "archive",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "archive"
+  },
+  {
+   "term": "表中选中一条借据记录",
+   "expand": [
+    "单选"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/asset-preserve-npl/chapters\\04-不良资产核销.md:3506",
+   "evidence": "表中选中一条借据记录（单选）",
+   "module": "asset-preserve-npl",
+   "expandHitCard": "credit-corp-approval-result",
+   "termHitIn": "asset-preserve-npl"
+  },
+  {
+   "term": "已退回",
+   "expand": [
+    "退回"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/collateral-func/chapters\\08-押品外部评估配置管理.md:12",
+   "evidence": "已退回（退回）",
+   "module": "collateral-func",
+   "expandHitCard": "approval_chain",
+   "termHitIn": "collateral-func"
+  },
+  {
+   "term": "主页",
+   "expand": [
+    "押品信息管理主页"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/collateral-info/chapters\\02-新增押品基本信息.md:8",
+   "evidence": "主页（押品信息管理主页）",
+   "module": "collateral-info",
+   "expandHitCard": "collateral_info",
+   "termHitIn": "collateral-info"
+  },
+  {
+   "term": "已生效",
+   "expand": [
+    "有效"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/collateral-info/chapters\\07-变更已生效信息.md:9",
+   "evidence": "已生效（有效）",
+   "module": "collateral-info",
+   "expandHitCard": "collateral-func-warning",
+   "termHitIn": "collateral-info"
+  },
+  {
+   "term": "值后状态变更为已生效",
+   "expand": [
+    "有效"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/collateral-info/through-chains.md:31",
+   "evidence": "值后状态变更为已生效（有效）",
+   "module": "collateral-info",
+   "expandHitCard": "collateral-func-warning",
+   "termHitIn": "collateral-info"
+  },
+  {
+   "term": "产品名称",
+   "expand": [
+    "产品树"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/collection/chapters\\03-催收策略调整.md:16",
+   "evidence": "产品名称（产品树）",
+   "module": "collection",
+   "expandHitCard": "product_core_mapping",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "产品类别",
+   "expand": [
+    "产品树"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/collection/chapters\\04-催收评分卡配置.md:14",
+   "evidence": "产品类别（产品树）",
+   "module": "collection",
+   "expandHitCard": "product_core_mapping",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "填写意见提交审批",
+   "expand": [
+    "提交流程"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/collection/through-chains.md:21",
+   "evidence": "填写意见提交审批（提交流程）",
+   "module": "collection",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "存在生效产品",
+   "expand": [
+    "产品树"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/collection/through-chains.md:57",
+   "evidence": "存在生效产品（产品树）",
+   "module": "collection",
+   "expandHitCard": "product_core_mapping",
+   "termHitIn": "collection"
+  },
+  {
+   "term": "已撤销",
+   "expand": [
+    "撤销申请"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/credit-interbank/chapters\\02-同业授信管理-总体描述.md:18",
+   "evidence": "已撤销（撤销申请）",
+   "module": "credit-interbank",
+   "expandHitCard": "judicial-litigation",
+   "termHitIn": "credit-interbank"
+  },
+  {
+   "term": "拨款系数",
+   "expand": [
+    "拨款转换系数"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/credit-retail/chapters\\06-授信配置管理.md:4",
+   "evidence": "拨款系数（拨款转换系数）",
+   "module": "credit-retail",
+   "expandHitCard": "credit-retail-credit-config",
+   "termHitIn": "credit-retail"
+  },
+  {
+   "term": "征信结果",
+   "expand": [
+    "查看征信报告"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/customer-common/chapters\\09-征信管理.md:4",
+   "evidence": "征信结果（查看征信报告）",
+   "module": "customer-common",
+   "expandHitCard": "rating",
+   "termHitIn": "customer-common"
+  },
+  {
+   "term": "引入客户",
+   "expand": [
+    "客户放大镜"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/customer-common/through-chains.md:22",
+   "evidence": "引入客户（客户放大镜）",
+   "module": "customer-common",
+   "expandHitCard": "credit_usage",
+   "termHitIn": "customer-common"
+  },
+  {
+   "term": "的替代录入路径",
+   "expand": [
+    "旁路"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/customer-corp/through-chains.md:174",
+   "evidence": "的替代录入路径（旁路）",
+   "module": "customer-corp",
+   "expandHitCard": "disburse-account-abnormal",
+   "termHitIn": "customer-corp"
+  },
+  {
+   "term": "该集团所属总集团内的成员",
+   "expand": [
+    "放大镜"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/customer-group/chapters\\04-集团客户管理.md:67",
+   "evidence": "「该集团所属总集团内的成员」（放大镜）",
+   "module": "customer-group",
+   "expandHitCard": "credit_usage",
+   "termHitIn": "customer-group"
+  },
+  {
+   "term": "数标",
+   "expand": [
+    "数据指标"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/digital-loan-desk/chapters\\05-进件受理.md:37",
+   "evidence": "数标（数据指标）",
+   "module": "digital-loan-desk",
+   "expandHitCard": "digital-loan-desk-data-index",
+   "termHitIn": "digital-loan-desk"
+  },
+  {
+   "term": "流程轨迹",
+   "expand": [
+    "零售"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/disburse/chapters\\02-放款管理.md:39",
+   "evidence": "「流程轨迹」（零售）",
+   "module": "disburse",
+   "expandHitCard": "loan",
+   "termHitIn": "disburse"
+  },
+  {
+   "term": "用信利率信息",
+   "expand": [
+    "通用"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/loan-retail/chapters\\05-新增对私用信申请-三合一.md:24",
+   "evidence": "用信利率信息（通用）",
+   "module": "loan-retail",
+   "expandHitCard": "approval_chain",
+   "termHitIn": "loan-retail"
+  },
+  {
+   "term": "管理员侧",
+   "expand": [
+    "首页管理"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/portal/chapters\\03-首页-个性化设置.md:42",
+   "evidence": "管理员侧（首页管理）",
+   "module": "portal",
+   "expandHitCard": "portal-home-mgmt",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "系统编号",
+   "expand": [
+    "编码"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/portal/chapters\\07-系统管理-外系统接入管理.md:12",
+   "evidence": "系统编号（编码）",
+   "module": "portal",
+   "expandHitCard": "smart-ctrl-rule-cfg",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "水印文字",
+   "expand": [
+    "文本"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/portal/chapters\\10-系统管理-公共信息配置与搜索历史.md:24",
+   "evidence": "水印文字（文本）",
+   "module": "portal",
+   "expandHitCard": "loan-retail-apply-maintain",
+   "termHitIn": "portal"
+  },
+  {
+   "term": "分类查询",
+   "expand": [
+    "查询"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/postloan-risk-class/chapters\\00-总体概述.md:18",
+   "evidence": "分类查询（查询）",
+   "module": "postloan-risk-class",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "postloan-risk-class"
+  },
+  {
+   "term": "产品要素管理",
+   "expand": [
+    "要素库"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/product-mgmt/chapters\\01-总体概述.md:29",
+   "evidence": "产品要素管理（要素库）",
+   "module": "product-mgmt",
+   "expandHitCard": "product_element",
+   "termHitIn": "product-mgmt"
+  },
+  {
+   "term": "产品要素管理",
+   "expand": [
+    "产品要素库"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/product-mgmt/chapters\\01-总体概述.md:32",
+   "evidence": "产品要素管理（产品要素库）",
+   "module": "product-mgmt",
+   "expandHitCard": "product_element",
+   "termHitIn": "product-mgmt"
+  },
+  {
+   "term": "查看产品信息主页",
+   "expand": [
+    "基本信息"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/product-mgmt/chapters\\03-配置产品信息.md:20",
+   "evidence": "查看产品信息主页（基本信息）",
+   "module": "product-mgmt",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "product-mgmt"
+  },
+  {
+   "term": "产品要素编辑主页",
+   "expand": [
+    "设置管控要素"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/product-mgmt/chapters\\03-配置产品信息.md:24",
+   "evidence": "产品要素编辑主页（设置管控要素）",
+   "module": "product-mgmt",
+   "expandHitCard": "product_stage",
+   "termHitIn": "product-mgmt"
+  },
+  {
+   "term": "流程跟踪信息主页",
+   "expand": [
+    "流程轨迹弹窗"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/rating/chapters\\03-对公客户评级.md:18",
+   "evidence": "流程跟踪信息主页（流程轨迹弹窗）",
+   "module": "rating",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "rating"
+  },
+  {
+   "term": "弹审批意见窗",
+   "expand": [
+    "签署意见"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/rating/chapters\\04-同业客户评级.md:45",
+   "evidence": "弹审批意见窗（签署意见）",
+   "module": "rating",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "rating"
+  },
+  {
+   "term": "退回",
+   "expand": [
+    "打回"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/rating/chapters\\05-集团客户评级.md:25",
+   "evidence": "退回（打回）",
+   "module": "rating",
+   "expandHitCard": "loan-retail-apply-maintain",
+   "termHitIn": "rating"
+  },
+  {
+   "term": "维护同业客户信息",
+   "expand": [
+    "同业"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/rating/through-chains.md:126",
+   "evidence": "维护同业客户信息（同业）",
+   "module": "rating",
+   "expandHitCard": "customer_query",
+   "termHitIn": "rating"
+  },
+  {
+   "term": "进入借据选择向导页",
+   "expand": [
+    "向导页"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/repay/chapters\\02-对公还款管理.md:33",
+   "evidence": "「进入借据选择向导页」（向导页）",
+   "module": "repay",
+   "expandHitCard": "collateral_info",
+   "termHitIn": "repay"
+  },
+  {
+   "term": "打开抽屉组件",
+   "expand": [
+    "抽屉"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/repay/chapters\\02-对公还款管理.md:33",
+   "evidence": "「打开抽屉组件」（抽屉）",
+   "module": "repay",
+   "expandHitCard": "credit_application",
+   "termHitIn": "repay"
+  },
+  {
+   "term": "维护审批意见",
+   "expand": [
+    "审批人"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/repay/chapters\\02-对公还款管理.md:93",
+   "evidence": "维护审批意见（审批人）",
+   "module": "repay",
+   "expandHitCard": "smart-ctrl-log-query",
+   "termHitIn": "repay"
+  },
+  {
+   "term": "开消息模板选择器弹窗",
+   "expand": [
+    "单选"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/system-mgmt/chapters\\06-消息中心.md:27",
+   "evidence": "开消息模板选择器弹窗（单选）",
+   "module": "system-mgmt",
+   "expandHitCard": "credit-corp-approval-result",
+   "termHitIn": "system-mgmt"
+  },
+  {
+   "term": "组织管理",
+   "expand": [
+    "路由管理"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/system-mgmt/chapters\\08-组织管理.md:4",
+   "evidence": "组织管理（路由管理）",
+   "module": "system-mgmt",
+   "expandHitCard": "system-mgmt-route-mgmt",
+   "termHitIn": "system-mgmt"
+  },
+  {
+   "term": "基础管理",
+   "expand": [
+    "用户管理"
+   ],
+   "sourceKind": "corpus-req-doc",
+   "sourceRef": "data/kb/req/system-mgmt/through-chains.md:49",
+   "evidence": "基础管理（用户管理）",
+   "module": "system-mgmt",
+   "expandHitCard": "system-mgmt-base-mgmt",
+   "termHitIn": "system-mgmt"
+  },
+  {
+   "term": "权限移交",
+   "expand": [
+    "权限转移"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "collateral-info/wet-test.md 叶6:34",
+   "evidence": "SUT「权限转移」vs 文档「权限移交」",
+   "module": "collateral-info",
+   "expandHitCard": "collateral_info",
+   "termHitIn": "collateral-info"
+  },
+  {
+   "term": "准入",
+   "expand": [
+    "准入校验"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "collateral-info/wet-test.md 叶9:42 ZJJK00095044",
+   "evidence": "SUT「准入校验」vs 文档「准入」",
+   "module": "collateral-info",
+   "expandHitCard": "collateral_info",
+   "termHitIn": "collateral-info"
+  },
+  {
+   "term": "提交流程",
+   "expand": [
+    "流程提交"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "credit-corp/wet-test.md 叶20:31 ZJJK00106505",
+   "evidence": "SUT「流程提交」vs 文档「提交流程」",
+   "module": "credit-corp",
+   "expandHitCard": "credit-corp-approval-task",
+   "termHitIn": "credit-corp"
+  },
+  {
+   "term": "对私客户管理",
+   "expand": [
+    "个人客户管理"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "customer-corp/wet-test.md 叶29:50 ZJJK00067207",
+   "evidence": "SUT「个人客户管理」vs 文档「对私客户管理」",
+   "module": "customer-corp",
+   "expandHitCard": "customer_360",
+   "termHitIn": "customer-corp"
+  },
+  {
+   "term": "新增",
+   "expand": [
+    "创建"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "customer-group/wet-test.md 叶15:39 ZJJK00107648",
+   "evidence": "SUT「创建」vs 文档「新增」",
+   "module": "customer-group",
+   "expandHitCard": "customer-group-general-group",
+   "termHitIn": "customer-group"
+  },
+  {
+   "term": "模板管理",
+   "expand": [
+    "模板配置"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "digital-loan-desk/wet-test.md 叶16:40 ZJJK00124943",
+   "evidence": "SUT「模板配置」vs 文档「模板管理」",
+   "module": "digital-loan-desk",
+   "expandHitCard": "digital-loan-desk-data-index",
+   "termHitIn": "digital-loan-desk"
+  },
+  {
+   "term": "对公放款管理",
+   "expand": [
+    "对公放款申请"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "disburse/wet-test.md 叶1:22 ZJJK00106459",
+   "evidence": "SUT「对公放款申请」vs 文档「对公放款管理」",
+   "module": "disburse",
+   "expandHitCard": "loan",
+   "termHitIn": "disburse"
+  },
+  {
+   "term": "零售放款管理",
+   "expand": [
+    "零售放款申请"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "disburse/wet-test.md 叶11:32 ZJJK00068667",
+   "evidence": "SUT「零售放款申请」vs 文档「零售放款管理」",
+   "module": "disburse",
+   "expandHitCard": "loan",
+   "termHitIn": "disburse"
+  },
+  {
+   "term": "新增",
+   "expand": [
+    "申请"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "disburse/wet-test.md 叶15:41 ZJJK00125075",
+   "evidence": "SUT「申请」vs 文档「新增」",
+   "module": "disburse",
+   "expandHitCard": "archive-stock-in",
+   "termHitIn": "disburse"
+  },
+  {
+   "term": "贷款业务类型",
+   "expand": [
+    "业务发生类型"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "loan-retail/wet-test.md 叶3:30 ZJJK00108099",
+   "evidence": "SUT「业务发生类型」vs 文档「贷款业务类型」",
+   "module": "loan-retail",
+   "expandHitCard": "risk-class-default-config",
+   "termHitIn": "loan-retail"
+  },
+  {
+   "term": "产品名称",
+   "expand": [
+    "业务种类"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "postloan-risk-class/wet-test.md 叶26:61 ZJJK00096712",
+   "evidence": "SUT「业务种类」vs 文档「产品名称」",
+   "module": "postloan-risk-class",
+   "expandHitCard": "risk-class-gen-config",
+   "termHitIn": "postloan-risk-class"
+  },
+  {
+   "term": "风险分类默认配置",
+   "expand": [
+    "风险默认分类配置"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "postloan-risk-class/wet-test.md 叶29:64 ZJJK00096714",
+   "evidence": "SUT「风险默认分类配置」vs 文档「风险分类默认配置」",
+   "module": "postloan-risk-class",
+   "expandHitCard": "risk-class-default-config",
+   "termHitIn": "postloan-risk-class"
+  },
+  {
+   "term": "其他",
+   "expand": [
+    "其它"
+   ],
+   "sourceKind": "wet-test-drift",
+   "sourceRef": "smart-ctrl/wet-test.md 叶42:92 ZJJK00171540PDCP",
+   "evidence": "SUT「其它」vs 文档「其他」",
+   "module": "smart-ctrl",
+   "expandHitCard": "smart-ctrl-log-query",
+   "termHitIn": "smart-ctrl"
+  }
+ ],
+ "rejected": [
+  {
+   "term": "基本信息",
+   "expand": "维护调阅档案信息",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "申请日期",
+   "expand": "调阅到期日期收起",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选择调阅单",
+   "expand": "非向导页",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "出库受理明细页面",
+   "expand": "非向导页",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "影像信息",
+   "expand": "维护影像资料",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "已入库档案被借出",
+   "expand": "已借出",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "存在在库档案",
+   "expand": "含已借出纸质档案",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选已入库且无在途档案",
+   "expand": "标在途",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "审批中",
+   "expand": "审查审批中",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "销状态为空的借据数据",
+   "expand": "排除已添加的借据",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "评估价值",
+   "expand": "或市场价值",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "债务人",
+   "expand": "及其他还款义务人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "域中输入核销后债务人",
+   "expand": "或其他还款义务人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选中一条草稿态记录",
+   "expand": "流程状态为草稿",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选择客户/业务类型",
+   "expand": "含客户类型必选校验",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "栏位下拉选择受理结果",
+   "expand": "受理或不予受理",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "法人行级保全经理",
+   "expand": "本人经办",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "借据数不可编辑",
+   "expand": "随借据联动",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "正文未命名",
+   "expand": "不编造",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "弹出审批意见弹窗",
+   "expand": "签署意见组件",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "为前章已列复用组件",
+   "expand": "正文载明复用",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "总行级按租户过滤",
+   "expand": "非专区租户",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "登记日期",
+   "expand": "当前营业日期",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "资产移交",
+   "expand": "正移交",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "最终有权审批人",
+   "expand": "有权机构决议",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "手工盘库流程",
+   "expand": "权证实物盘库流程",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "市两套详情页分列两行",
+   "expand": "文档明示两套页面",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "有效标志",
+   "expand": "店铺有效标志",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "盘库管理主页",
+   "expand": "押品实物管理员",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "标签录入",
+   "expand": "需先打印标签",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "新增押品基本信息.txt",
+   "expand": "~5500 行",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "准入校验规则链",
+   "expand": "全部通过才准入",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "发起页为表单",
+   "expand": "发起押品权限转移",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "主页规则基本重复",
+   "expand": "源以重复节点呈现",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "内部评估流程管理.txt",
+   "expand": "~1000 行",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "评估价值",
+   "expand": "评价与价值录入",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "批链通过后回写正式表",
+   "expand": "过程表暂存",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "二级",
+   "expand": "三级",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "审批角色",
+   "expand": "网点负责人审批",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "状态说明",
+   "expand": "关键状态机",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "客户经理",
+   "expand": "用户级经办人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "所属机构",
+   "expand": "机构树",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "肖定会",
+   "expand": "同一证件号",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "任务状态",
+   "expand": "生效状态代码",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "规则创建人所属机构",
+   "expand": "机构树",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "产品类别",
+   "expand": "生效产品树",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "关闭",
+   "expand": "查看态仅关闭",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "每期到期后提醒",
+   "expand": "除到期外",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "修改时间",
+   "expand": "区间",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "全部用户",
+   "expand": "用户级经办人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选客户类型",
+   "expand": "默认个人客户",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "状态说明",
+   "expand": "任务状态机",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "待处理",
+   "expand": "无处理日期",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "否决规则同新增",
+   "expand": "生成已否决批复",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "的额度联动",
+   "expand": "额度编号是否延续",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "批复选择",
+   "expand": "单选生效批复",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "状态说明",
+   "expand": "核心状态机",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "业务流程",
+   "expand": "客户经理全流程",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "总体概述",
+   "expand": "段落 2–24",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "总体描述",
+   "expand": "段落 26–69",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "打回",
+   "expand": "打回首节点",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "已处理",
+   "expand": "有处理日期",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "新增同业授信",
+   "expand": "段落 71–198",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "暂无数据",
+   "expand": "同业客户存量 0 条",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "无条件",
+   "expand": "空条件",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "四级部门负责人复核",
+   "expand": "部门负责人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "综合岗业务分配",
+   "expand": "部门综合员",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "部门负责人审定",
+   "expand": "部门负责人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "部门负责人审批",
+   "expand": "网点负责人任务",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "意见",
+   "expand": "审批意见提交",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "变更同业授信",
+   "expand": "段落 815–996",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "支持列头排序",
+   "expand": "取消排序恢复默认",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "主页操作规则",
+   "expand": "变更同业授信主页",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "存在同业客户",
+   "expand": "客户管理侧已建档",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "人为法人行级客户经理",
+   "expand": "本人经办数据权限",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "申请编号",
+   "expand": "编号规则生成",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "按分类保存明细",
+   "expand": "仅存有值分类",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "竣工时间",
+   "expand": "竣工须大于开工",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "额度注销服务",
+   "expand": "外部额度公共服务",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "授信系数",
+   "expand": "最高授信率",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "删除",
+   "expand": "逻辑删除",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "均为确认后标记已删除",
+   "expand": "不物理删除",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "灰名单管理",
+   "expand": "维护灰名单申请",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "关联关系日志",
+   "expand": "查询关联关系日志",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "客户圈",
+   "expand": "客户集群圈",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "机构权限",
+   "expand": "本机构及下级",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "客户移交管理",
+   "expand": "查看客户移交",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "业务移交管理",
+   "expand": "移交业务申请",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "集团移交管理",
+   "expand": "创建集团移交",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "中是否全角色可走通",
+   "expand": "需多角色账号",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "未点打印",
+   "expand": "打印动作规避",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "变更黑名单",
+   "expand": "人工认定名单",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "新增灰名单申请",
+   "expand": "潜在风险名单",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "业务移交",
+   "expand": "未结清合同移交",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "客户状态机",
+   "expand": "状态说明",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "客户已创建",
+   "expand": "关联客户编号",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "登记注册地址",
+   "expand": "地址五级联动弹窗",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "指定不可操作时禁操作",
+   "expand": "除非指定忽略",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "状态说明",
+   "expand": "无状态定义",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "合作方结构同评估机构",
+   "expand": "无评估人员子功能",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "登记注册地址",
+   "expand": "地址五级联动",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "仅填集群名称",
+   "expand": "必填",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "打开导入弹窗",
+   "expand": "见集群成员导入",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "向导页仅填总集团名称",
+   "expand": "必填",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "管户机构",
+   "expand": "机构选择器",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "创建机构",
+   "expand": "机构选择器",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "集团",
+   "expand": "属某总集团",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "创建集团客户",
+   "expand": "挂某总集团",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "提款",
+   "expand": "提款查申请信息",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "已签约",
+   "expand": "完成签约确认",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "被业务引用的指标模板",
+   "expand": "含挂载指标",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "失效",
+   "expand": "仅已生效可失效",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "启用状态",
+   "expand": "默认启用只读",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "验证失败",
+   "expand": "可重试回待验证",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "复核认定环节",
+   "expand": "复核岗人工核查",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "申请中",
+   "expand": "提交后仍申请中",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "仅产品允许提额时显示",
+   "expand": "并显示额度信息",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "贷款申请组件",
+   "expand": "新增对私贷款申请",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "提款组件",
+   "expand": "新增对私提款申请",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "申请进度",
+   "expand": "查询申请进度",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "提款入口",
+   "expand": "查询提款列表",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "签约中心",
+   "expand": "查看签约列表",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "外部认证页",
+   "expand": "外部系统",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "授权准入协议签署",
+   "expand": "进件协议签署组件",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "档给出顶层业务流程图",
+   "expand": "总体流程",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "放款申请状态",
+   "expand": "申请维度",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "核算借据信息查询",
+   "expand": "借据联动场景",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "档原文的编号系列口径",
+   "expand": "未给单页编号",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "保证金管理",
+   "expand": "查询保证金列表",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "费用管理",
+   "expand": "查询费用列表",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "业务变更管理",
+   "expand": "查询借据变更",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "贷款还款明细查询",
+   "expand": "垫款详情还款记录",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "打印垫款通知书",
+   "expand": "仅垫款借据",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "部门经理审批对公用信申请",
+   "expand": "疑似复用对公用信模板文案",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "复用组件",
+   "expand": "同公共组件",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "基本信息",
+   "expand": "叶3",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "的用信批复",
+   "expand": "含产品维度子批复",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "跳新增用信申请大页面",
+   "expand": "仅带用信批复数据",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "影像系统",
+   "expand": "报告影像目录下载",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "客户编号经引入弹窗",
+   "expand": "客户放大镜复用",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "借款人已完成授信",
+   "expand": "无在途授信",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "续贷添加合同",
+   "expand": "或银社团合同",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "或二合一申请",
+   "expand": "联合申报",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "撤销或生成待签订合同",
+   "expand": "跨入合同域",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "抽屉向导",
+   "expand": "同牵头行向导页",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "功能列表",
+   "expand": "表格",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "三合一",
+   "expand": "对应三合一场景",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "生效合同",
+   "expand": "合同状态枚举校验",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "统一消息平台",
+   "expand": "消息发送",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "电子签章系统",
+   "expand": "签章模板配置",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "后自动生成信审会主任",
+   "expand": "参会主任",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "安排信审会",
+   "expand": "信审会办公室主任",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "业务要素",
+   "expand": "摘要",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "信审会审核",
+   "expand": "信审会主任",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "最终有权人审批",
+   "expand": "最终有权审批人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "会议记录员的待办任务",
+   "expand": "会议纪要线上审批",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "记录会议",
+   "expand": "会议记录人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "会议纪要审核",
+   "expand": "信审会办公室主任",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "会议纪要审定",
+   "expand": "信审会主任",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "且系统管理员组角色",
+   "expand": "检查管理组长",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "发起人",
+   "expand": "反显当前发起人",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "与门户加载行为的关系",
+   "expand": "预加载何时触发",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "系统链接",
+   "expand": "均系统返显",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选择图片",
+   "expand": "从图片库中选择",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "多角色共有",
+   "expand": "见搜索历史管理节引注",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "系统生成待填报任务",
+   "expand": "填报",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "整改责任人",
+   "expand": "整改申请",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "断所选文件不为空文件",
+   "expand": "文件大小大于零",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选择检查问题类型",
+   "expand": "下拉选择",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选择专项检查拦截等级",
+   "expand": "下拉选择",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "择问题库所属机构编号",
+   "expand": "树形选择器选择",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "选择检查范围",
+   "expand": "下拉选择",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "查询条件过滤列表用户",
+   "expand": "只显示生效用户",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "据输入的专项检查编号",
+   "expand": "文本框直接输入",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "完成核对后提交审批",
+   "expand": "同审批链",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "客户经理任务页",
+   "expand": "保理",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "为流程锚点",
+   "expand": "流程节点配置",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "客户合同选择弹窗",
+   "expand": "新增带入合同",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "认定理由配置",
+   "expand": "影响理由可选集",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "影像资料步骤",
+   "expand": "公共影像组件查看",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "系统自动生成任务",
+   "expand": "分类频度跑批",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "确认失效",
+   "expand": "生成失效申请",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "已生效",
+   "expand": "列表确认生效",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "已失效",
+   "expand": "确认失效审批通过",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "签署意见",
+   "expand": "填报审批意见",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "逻辑删除",
+   "expand": "置已删除",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "产品要素主页",
+   "expand": "组件要素列表",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "自动生成唯一阶段编号",
+   "expand": "编号服务",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "产品版本历史",
+   "expand": "按版本查看详情",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "目录",
+   "expand": "目录递归含子节点",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "待湿测",
+   "expand": "湿测铁证清单",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "删除记录",
+   "expand": "确认文案为删除",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "请选择有效数据",
+   "expand": "多页未选记录拦截",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "复用时不另加行",
+   "expand": "跨视图复用口径",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "自动生成唯一方案编号",
+   "expand": "重复则循环再生成",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "入自定义参数行与删除",
+   "expand": "仅自定义行",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "新增控制规则",
+   "expand": "规则库建档",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "控制配置",
+   "expand": "开发人员配置规则",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "数据源返回",
+   "expand": "数据源弹窗",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "法人行级客户经理",
+   "expand": "本人经办业务",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "风险探测解除",
+   "expand": "查询页一键解除",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "按钮在特定状态下隐藏",
+   "expand": "页面按状态显隐",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "查询审查用户",
+   "expand": "基础管理组内",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "内部人员",
+   "expand": "存在内部用户记录",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "密码类型唯一",
+   "expand": "同类型不重复",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "查询审查用户",
+   "expand": "叶6",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "租户管理",
+   "expand": "叶8",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "操作IP地址",
+   "expand": "叶18",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "贷款计算器",
+   "expand": "还款计划试算",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "机构",
+   "expand": "机构树多选",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "查询临时转授权",
+   "expand": "转授权列表组件",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "流程操作组件",
+   "expand": "审批流通用组件",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "智能控制方案校验",
+   "expand": "校验结果弹窗确认",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "下一节点选人",
+   "expand": "流程选人组件",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "形多选下一节点审批人",
+   "expand": "仅叶子节点可选",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "作者为非被授权人角色",
+   "expand": "被授权人角色只读",
+   "sourceKind": "corpus-req-doc",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "核销查询/查询执行结果",
+   "expand": "核销管理→核销执行",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "处置方案申请",
+   "expand": "抵债资产处置申请",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "发起流程",
+   "expand": "发起入库",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "不动产抵押注销办理",
+   "expand": "不动产抵押注销业务",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "提醒催收配置",
+   "expand": "提醒/催收配置",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "拦截等级",
+   "expand": "拦截等级标识",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "导入",
+   "expand": "潜在风险客户名单管理",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "文本域/日期",
+   "expand": "文本域/日期控件",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "交易信息查询",
+   "expand": "台账查询→交易日志信息",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  },
+  {
+   "term": "控制类型/提示信息",
+   "expand": "风控措施/规则提示信息",
+   "sourceKind": "wet-test-drift",
+   "why": "expand absent from all card surfaces"
+  }
+ ]
+}
