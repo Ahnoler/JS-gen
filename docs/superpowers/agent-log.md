@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 00:12 · Zcode — 收工：colloquial-bridge 收尾 F-2/F-5/R-1/台账（回链 00:04 开工 `72691662`；Lead 裁定 `dc31f756`）
+
+- 完成：Task 0（`e4be6513`）F-2 `T2-bridge.txt` 修正入库（+1/−1）+ F-5 生成脚本幂等化（table 字面量对齐 archived 态、两注记原样复制、头注释警示；**幂等以真跑+空 diff 证明**，`entries` sha256 `eb4ec272…` 67 条逐位不变）→ Task 1（`96d12712`）R-1 最小留痕：`readSynonymsAssetStatus()`（未声明→null，历史产物形状不变）+ CLI `result.synonyms.status` 记录 + 非 active stderr 一行告警（**loader 仍不过滤**，加载条数/metrics/阈值/exit code 全未动）+ pin「status is provenance only」三态断言（临时资产写 tmp/）→ Task 2（本 commit）台账对齐：报告 §8 F-2/F-4 行补记 + todo 置 **CLOSED（FAIL，不计成果；F-1/F-3/F-4 关闭，F-2/F-5/R-1 已收口；R-2 词面桥关闭/R-3 BLOCKED/R-4 押后）**
+- 验收：`characterize-kb-recall-eval` **6 passed**；`characterize-flow-card-recall` **26 passed**；`--baseline` exit 0；`--synonyms data/kb/colloquial-bridge.json` 复跑六项指标与 `T3-on.json` **逐位相同**（差异仅 generatedAt/gitHead/新增 status 字段/延迟计时；stderr 告警一行留痕 `T3-on.after.stderr.txt`）；铁律零违反（未过滤/未动 metrics/未动 synonyms.json/未动 entries）
+- 遗留移交：R-3 数据源在 Lead（可达只读端点或导出样本 ≥500 条/≥5 模块，spec §4.3；go/no-go=配对 ≥200+≥3 模块+盲抽 20 条 ≥60% 口语判真）；无其他
+
 ## 2026-09-11 00:04 · Zcode — 开工：colloquial-bridge 收尾（Lead 裁定 `dc31f756`，F-2/F-5/R-1/台账 三 commit）
 
 - 工作范围：`tmp/kb-bridge/T2-bridge.txt`（F-2 入库，force-add）、`tmp/kb-bridge/t2-build-table.mjs`（F-5 幂等化）、`scripts/kb/recall-eval.mjs` + `scripts/characterization/characterize-kb-recall-eval.mjs`（R-1 留痕+pin，**扩围**——不在 23:23 原声明内，特此声明）、`docs/superpowers/reports/2026-09-10-colloquial-bridge-report.md`（§8 对账）、`docs/superpowers/todo-list.md`、本文件、`tmp/kb-bridge/T3-on.after.json`（等价性证据）

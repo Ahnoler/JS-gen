@@ -88,8 +88,8 @@
 | # | reviewer 发现 | 落实 |
 |---|---|---|
 | F-1（必改） | 「A 类全部为子串式」是**抽取规则产物非语料事实**（`extractCardSynonyms()` 仅收包含对；非子串 alias↔alias 对普查有 438 对） | §1/§2 两处已改为「A 源**按规则**只取子串对」并登记 438 对普查事实；结论（领域↔领域）不变 |
-| F-2（必改） | ①两裁决脚本被 gitignore 拦在库外（报告指向悬空）；②头注释只有汇总规则，无逐条理由 | ①`t2-build-table.mjs`/`t2-verify.mjs` 已 `git add -f` 入库；②§2 与 `T2-bridge.txt` 指向改为「**汇总原则**非逐条理由」 |
+| F-2（必改） | ①两裁决脚本被 gitignore 拦在库外（报告指向悬空）；②头注释只有汇总规则，无逐条理由 | ①`t2-build-table.mjs`/`t2-verify.mjs` 已 `git add -f` 入库；②§2 与 `T2-bridge.txt` 指向改为「**汇总原则**非逐条理由」。**收尾补记（Lead 裁定 `dc31f756` Task 0，`e4be6513`）**：`T2-bridge.txt` 修正入库（+1/−1）；生成脚本幂等化（产物字面量对齐 archived 态+头注释警示，真跑 `git diff` 为空证明重跑安全），`entries` sha256 `eb4ec272…` 逐位不变 |
 | F-3（观察） | B 类 10 条仅 4 条真词法同义，另 6 条为注释性关系（b2 只查共享 ≥2 字）=增量 0 部分成因；183 条 7 分钟裁决实为规则批量+快速人工 | §2 已如实登记裁决口径与 B 类质量观察；将来复用 B 侧收紧为「词法变体」（同头/同尾或最长公共子串 ≥ 半长） |
-| F-4（Lead 项） | `loadSynonyms()` 不读 `status` → archived 无强制力 | 表内已补 `archivedSemantics` 注记（「不得接线，仅作续跑基线」）；**loader 加 status 过滤=口径变更，留 Lead 决策，本线不动代码** |
+| F-4（Lead 项） | `loadSynonyms()` 不读 `status` → archived 无强制力 | 表内已补 `archivedSemantics` 注记（「不得接线，仅作续跑基线」）；**loader 加 status 过滤=口径变更，留 Lead 决策，本线不动代码**。**收尾补记（`96d12712`）**：R-1 最小留痕已实施——loader 仍不过滤，`result.synonyms.status` 记录声明态 + 非 active stderr 一行告警（不碰加载条数/metrics/exit code），pin 6 passed |
 
 reviewer 独立补强量化（登记存照）：67 条中 27 条 term 可与 v2 某 query 字面相遇；条目×query 命中 30 对，单条注入后 17 对改变 rankFlowCards 返回（分数/尾部）、0 对改变 gold 名次——与「机制点火但 top1 零翻转」一致，且排除 ON 静默空跑。本收尾仅改文档/注记/证据留存三处文件级改动，判决与门禁不重跑（门禁当前态：5 passed + 26 passed）。
