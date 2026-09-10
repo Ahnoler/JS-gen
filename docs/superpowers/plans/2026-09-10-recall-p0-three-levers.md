@@ -10,12 +10,23 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-10-recall-p0-three-levers-design.md`
 
+## Approved Decisions（2026-09-10 Lead 裁定：全部按 reviewer 推荐）
+
+| # | 决策 | 采纳结论 |
+|---|---|---|
+| A1 | 防泄漏（D6） | v1 上**构建/验证五五分离**；划分冻结、分层平衡、报告须给 verify 集**逐条**结果 |
+| A2 | 作用域系数 | **先保守 1.15 / 0.92**；转正 <6 条可升至 1.30 / 0.85，升级须同 commit 附对比度量 |
+| A3 | DoD 门槛 | 认可下限，另加硬约束：**A 层 1.00 不回退**；T2 九条 null ≥6 转正；**T3 verify 集必须上行** |
+| A4 | 组织方式 | 三杠杆一 spec，**独立 commit / 独立度量 / 独立回退** |
+| A5 | `propose.js` | **允许动**（无在途声明、工作区干净、基线 `b927a170`）；开工声明须列入；只新增参数不改语义 |
+
 **冻结基线（v1，须逐项对比）**：Acc@1 **0.650** · Recall@5 **0.757** · MRR@5 **0.694** · nDCG@5 **0.708** · 拒答 **0.633** · 噪声 **0.650**；分层 **A 1.00 / C 0.867 / D 0.333 / B 0.233**。
 
 ## Global Constraints
 
 - **承接条件**（G3 §8.3）：改 `flow-card-recall.js` → **同 commit** 复跑评测与门禁；**floor 只升不降**；口径与冻结评测集不动。
-- **不动**：`src/services/req-draft-traj/propose.js`（他线热区）、`scripts/refactor/verify-all.sh`（门禁已注册 :159）、`kb-recall-eval.v1.json`（冻结）。
+- **`propose.js`**：A5 允许动，但**只新增** `moduleKey`/`_modules` 注入，不改既有语义；开工声明必须列入该文件；冲突先协调。
+- **不动**：`scripts/refactor/verify-all.sh`（门禁已注册 :159）、`kb-recall-eval.v1.json`（冻结）、`data/kb/req/**`（只读）。
 - **不引依赖**：不得加入 embedding / BM25 / 向量库 / 新 npm 包。
 - **口径不动**：`Recall@5/nDCG@5` 维持 multi-gold 分数化（`hits/|gold|`、`DCG/IDCG`）。
 - **证据**：每个 Task 落 `tmp/kb-p0/<task-id>/`；不达标**单项回退**，不连坐。
@@ -28,6 +39,7 @@
 | `data/kb/flow_lineage.json`（新建） | 卡→模块血缘 + `unmapped`/`ambiguous` | 1a |
 | `scripts/kb/promote_draft.mjs` | 晋升时补写 `moduleKey`（防再丢） | 1a |
 | `src/services/req-draft-traj/flow-card-recall.js` | 作用域系数 / 分词 / 查询扩展 | 1b,2,3 |
+| `src/services/req-draft-traj/propose.js` | **仅注入** `moduleKey` 与 `_modules`（A5 允许；不改既有语义） | 1b |
 | `data/kb/synonyms.json`（新建） | 业务受控词表 | 3 |
 | `scripts/characterization/characterize-flow-card-recall.mjs` | 三组新 pin（既有 17 条不得变） | 1b,2,3 |
 | `scripts/characterization/fixtures/kb-recall-failures.v1.json`（新建） | 冻结失败清单 + 构建/验证分离划分 | 0 |
@@ -99,7 +111,7 @@ node -e "const l=require('./data/kb/flow_lineage.json');console.log('mapped='+Ob
 #### 1b. 作用域三态（算法）
 
 **Interfaces:**
-- 新增具名常量导出：`SAME_MODULE_BOOST`、`OTHER_MODULE_PENALTY`（默认 1.30 / 0.85）
+- 新增具名常量导出：`SAME_MODULE_BOOST`、`OTHER_MODULE_PENALTY` —— **先取保守值 1.15 / 0.92**（A2；A 层 1.00 零容错）。仅在「11 条跨模块靶子转正 <6 条」时才允许升至 1.30 / 0.85，**升级须同 commit 附对比度量**
 - `rankFlowCards({ title, taskDraft, cards, k, moduleKey })` —— **`moduleKey` 缺省时行为与今完全一致**
 - `cards` 可携带 `_modules`（由调用方从血缘注入）；**flow-card-recall 不得直接读文件**（保持纯函数可测）
 
@@ -128,9 +140,17 @@ await runAsync('moduleKey absent => identical to legacy ranking', async () => { 
 - [ ] **Step 2: 运行确认失败**
 - [ ] **Step 3: 实现**（乘系数 → 再走既有阈值判定）
 - [ ] **Step 4: 运行确认通过 + 复跑既有 17 条**
-- [ ] **Step 5: 接调用方**（注入 `moduleKey` 与 `_modules`）
+- [ ] **Step 5: 接调用方**（在 `propose.js` 注入 `moduleKey` 与 `_modules`）
 
-> ⚠️ **本任务唯一的跨文件风险点**：注入点若必须落在 `propose.js`（他线热区），**先报 Lead 协调，不得擅自改**。
+> **A5 已放行**：`propose.js` 当前无在途声明覆盖、工作区干净、基线 `b927a170`。要求：① 开工声明把 `propose.js` 列入文件集；② 只**新增**参数与透传，不改既有语义；③ 若届时出现他线在途声明，先协调再动。
+
+```js
+// 目标形态（示意）：propose 侧把模块归属喂进去，recall 模块保持纯函数
+const cards = await listFlowCardsDetailed({});
+const lineage = /* 读 data/kb/flow_lineage.json */;
+const cardsWithScope = cards.map((c) => ({ ...c, _modules: lineage.cards[c._stem] || [] }));
+const hit = matchFlowForAtom({ title, taskDraft, cards: cardsWithScope, moduleKey });
+```
 
 - [ ] **Step 6: 度量（DoD）**
 
