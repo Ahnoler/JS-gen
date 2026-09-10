@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-11 02:35 · Zcode — 开工：KB 价值 A/B（方向 2，spec `e6abfdc2`；真机对照实验）+ 覆盖线 E-commit
+
+- **先收覆盖线尾巴**：G-recheck `4baffd25` 判 PASS pending E-commit——E1（`nodeCoverage`→`pageKeyOnCardRate`+退化条件注记：实测 18/18 单 key 构造性退化）+ E3（门禁锁 `fixture.contentSha256===baseline.fixtureSha256`，证伪红/还原绿）+ E4（报告注明 tmp 取证快照非门禁输入）→ `e6bde302`，覆盖线关线
+- **A/B 线开工**：spec [`2026-09-11-kb-value-ab-design.md`](specs/2026-09-11-kb-value-ab-design.md) + plan `e6abfdc2`——12 需求×2 臂配对交替录制，测【流程卡模板】提示的价值；自变量唯一（卡由 T0 冻结映射给定，不经召回）；门禁只保协议不设成功率 floor；统计口径 n=12/臂只接受大效应（≥30pp）
+- 工作范围：`scripts/kb/kb-ab-manifest.v1.json`、`scripts/kb/kb-ab-setup.mjs`、`scripts/kb/kb-ab-eval.mjs`、`scripts/characterization/characterize-kb-ab.mjs`、`docs/superpowers/reports/2026-09-11-kb-ab-*.md`、`docs/superpowers/todo-list.md`、本文件、`tmp/kb-ab/**`（runlog/证据）；**T0 只读导库**
+- 禁入区：`src/**` 零改动、v2 评测集需求（物理隔离）、`data/kb/req/**`、评测集/阈值/`verify-all.sh`、他线 WIP（工作区 Cursor 未提交改动不碰）、库里他人 `KB测…` 遗留数据
+- 执行方式：T0→T5 一 Task 一 commit；SUT 写入一律 `KBAB<runId>-` 前缀+只做可回滚操作+逐条清理留证；单条串行固定账号；失败不重试（异常标 `aborted`/`retryOf` 全记录）；臂标记只进 `name` 不进 description；证伪×2 贴 commit message；LLM 走 .env 既有网关
+- 风险预告：T2 跑批需起 4097+executor+Chrome 真机——**会先核对 4097 无他线在途录制再起**（记忆红线：engine-wet-trio 未做但那是主链录制前置，本线是独立 A/B 录制不受影响；若 4097 已被占用则顺延并上报）
+
 ## 2026-09-11 02:05 · Zcode — 收工：覆盖回溯 T5 小迭代（回链 01:20 开工 `ed2ef2cb`；G 判决 `38e0ef7d` 七项全处置）
 
 - 完成：`ed2ef2cb` 开工 → **`996163e0` D1+D5**：`redactPageKey()` 结构键免 40 守卫（只留 `host#/route`，剥 scheme/page: 前缀+query+dialog/anchor 后缀）+ `extractStructural` 不再截断 + `createdDate`→ISO；fixture 重冻 **v1.1**（sha `33ad3e617280d07f`，key 28 轨迹/110 region 非空=reviewer DB 真值；**回库 314/314 原值 reduce 落入 fixture key 集合**）；门禁 +D1 恢复 pin（≥20 轨迹带 key+key 无 `?`；region.key 免长文本断言）→ **`93c848a5` D3+D2+D4**：primaryCard 改链优先级（`primaryCardMisaligned=24` 与复核数逐位一致）+ 头注释对齐；M5 重建=visited 页面 key↔primary 卡 ROUTE-chain markers 同类比较（`node.enter` 是中文菜单描述非路由、`node.page` 是显示名，均不可比——orderAgreement 废除换 `entryOnCardRate`；上限=`m5.ceiling`）；v2 基线 n=18：**1.000/1.000/0.000/上限 1.000（9 个去重路由的小样本面事实，非 matcher 伪影）**；M5 两项出 floor（engine+gate FLOORS 同步，INFO 行打印；基线 v1.1 `floorPolicy` 记录）→ **`bf2dade8` D6+D8+报告三处必改**：§1 M5 行 v2 重写、D6 ROUTE 精度区间标注（5 泛化片段 ≥10 页，只作模块级归因）、§4 头条**撤回「补 rating 码」**（评级族 6 条 ROUTE 6/6 已映射）换真实缺口（智能控制执行日志 ×3 补 1 marker/查询交易信息 ×2/对私用信 ×2/AILZ ×18）、§6 结论改写（M5 旧「系统性脱节 0.835」=label 词表伪影；轨迹反哺卡节点须待 page_level_key 落值面扩大后重新论证）、§7 复核入口刷新、§8 七项处置台账
