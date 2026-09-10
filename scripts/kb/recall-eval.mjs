@@ -15,6 +15,7 @@
  *   node scripts/kb/recall-eval.mjs                       # table + tmp/kb-eval/<ts>.json
  *   node scripts/kb/recall-eval.mjs --json                # machine-readable stdout
  *   node scripts/kb/recall-eval.mjs --baseline <file>     # diff vs baseline, exit 1 on breach
+ *   node scripts/kb/recall-eval.mjs --synonyms            # controlled-vocabulary expansion (recall P0 lever 3, data/kb/synonyms.json)
  *   node scripts/kb/recall-eval.mjs --fixture <path> --k 5
  */
 import { execSync } from 'node:child_process';
@@ -29,6 +30,8 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const DEFAULT_FIXTURE = resolve(ROOT, 'scripts/characterization/fixtures/kb-recall-eval.v1.json');
 /** Unified noise clause (identical to the 2026-09-09 reviewer probe for comparability). */
 export const NOISE_CLAUSE = '（顺便问一下，今天天气怎么样，晚饭吃什么）';
+/** Controlled-vocabulary asset for --synonyms mode (recall P0 lever 3). */
+export const DEFAULT_SYNONYMS = resolve(ROOT, 'data/kb/synonyms.json');
 /** Default diff margins (spec §6 approved caps, D11) used by --baseline mode. */
 export const DEFAULT_MARGINS = {
   accuracyAt1: 0.05,
@@ -74,10 +77,11 @@ export function loadEvalFixture(path) {
  * @param {{ query: string, gold: string[] }} entry Eval entry
  * @param {object[]} cards Flow-card corpus
  * @param {number} k Ranking depth
+ * @param {Array<object>|null} [synonyms] Controlled-vocabulary entries passed through to rankFlowCards (recall P0 lever 3; null = unexpanded)
  * @returns {{ top5: string[], rank: number|null, ok: boolean }} top-k flowRefs, first-gold 1-based rank, top-1 hit
  */
-function rankOutcome(entry, cards, k) {
-  const ranked = rankFlowCards({ title: entry.query, taskDraft: '', cards, k });
+function rankOutcome(entry, cards, k, synonyms = null) {
+  const ranked = rankFlowCards({ title: entry.query, taskDraft: '', cards, k, synonyms });
   const top = (ranked.candidates || []).map((c) => c.flowRef);
   const rank = top.findIndex((s) => entry.gold.includes(s));
   return { top5: top, rank: rank >= 0 ? rank + 1 : null, ok: Boolean(top.length) && entry.gold.includes(top[0]) };
@@ -125,10 +129,10 @@ function pct(sorted, q) {
 /**
  * Run the full eval: ranking metrics over positives, rejection over negatives,
  * noise robustness over A–D, warm/cold latency on the product match path.
- * @param {{ fixture: object, cards: object[], k?: number, withLatency?: boolean }} opts Eval inputs: validated fixture, real corpus, ranking depth, latency toggle
+ * @param {{ fixture: object, cards: object[], k?: number, withLatency?: boolean, synonyms?: Array<object>|null }} opts Eval inputs: validated fixture, real corpus, ranking depth, latency toggle, optional controlled-vocabulary entries (recall P0 --synonyms mode)
  * @returns {Promise<{ evalVersion: string, k: number, metrics: object, perQuery: Array<object>, negatives: Array<object>, noise: object }>} Eval result (metrics + per-query detail)
  */
-export async function runRecallEval({ fixture, cards, k = 5, withLatency = true } = {}) {
+export async function runRecallEval({ fixture, cards, k = 5, withLatency = true, synonyms = null } = {}) {
   const positives = fixture.entries.filter((e) => e.tier !== 'N');
   const negatives = fixture.entries.filter((e) => e.tier === 'N');
   const stems = new Set(cards.map((c) => c._stem));
@@ -145,7 +149,7 @@ export async function runRecallEval({ fixture, cards, k = 5, withLatency = true 
   /** @type {Array<object>} */
   const perQuery = [];
   for (const entry of positives) {
-    const { top5, rank, ok } = rankOutcome(entry, cards, k);
+    const { top5, rank, ok } = rankOutcome(entry, cards, k, synonyms);
     acc1 += ok ? 1 : 0;
     const hitsInTop = entry.gold.filter((g) => top5.slice(0, k).includes(g)).length;
     rec5 += hitsInTop / entry.gold.length;
@@ -159,7 +163,7 @@ export async function runRecallEval({ fixture, cards, k = 5, withLatency = true 
   const negRows = [];
   let rejected = 0;
   for (const entry of negatives) {
-    const hit = matchFlowForAtom({ title: entry.query, taskDraft: '', cards });
+    const hit = matchFlowForAtom({ title: entry.query, taskDraft: '', cards, synonyms });
     const rej = hit.flowRef === null;
     if (rej) rejected += 1;
     negRows.push({ id: entry.id, query: entry.query, got: hit.flowRef, score: hit.score, rejected: rej });
@@ -167,7 +171,7 @@ export async function runRecallEval({ fixture, cards, k = 5, withLatency = true 
 
   let noisyAcc = 0;
   for (const entry of positives) {
-    const ranked = rankFlowCards({ title: entry.query + NOISE_CLAUSE, taskDraft: '', cards, k });
+    const ranked = rankFlowCards({ title: entry.query + NOISE_CLAUSE, taskDraft: '', cards, k, synonyms });
     const top = (ranked.candidates || [])[0];
     if (top && entry.gold.includes(top.flowRef)) noisyAcc += 1;
   }
@@ -292,6 +296,21 @@ function renderTable(result) {
 }
 
 /**
+ * Load the controlled-vocabulary asset (recall P0 lever 3). Missing file is a
+ * hard error in --synonyms mode (explicit opt-in must be explicit); empty
+ * entries list degrades to no-op per spec §7.
+ * @param {string} path synonyms.json path
+ * @returns {Array<{term: string, expand: string[], scope?: string|null}>} Entries
+ */
+export function loadSynonyms(path = DEFAULT_SYNONYMS) {
+  const asset = JSON.parse(readFileSync(path, 'utf8'));
+  if (!asset || !Array.isArray(asset.entries)) {
+    throw new Error(`synonyms asset malformed (entries): ${path}`);
+  }
+  return asset.entries;
+}
+
+/**
  * CLI entry.
  * @returns {Promise<number>} Process exit code
  */
@@ -305,13 +324,20 @@ async function main() {
   const fixturePath = get('--fixture', DEFAULT_FIXTURE);
   const k = Number(get('--k', '5'));
   const baselinePath = args.includes('--baseline') ? get('--baseline', null) : null;
+  const synonymsMode = args.includes('--synonyms');
+  const synonymsIdx = args.indexOf('--synonyms');
+  const synonymsPath = synonymsMode
+    ? (synonymsIdx + 1 < args.length && !args[synonymsIdx + 1].startsWith('--') ? args[synonymsIdx + 1] : DEFAULT_SYNONYMS)
+    : null;
 
   const fixture = loadEvalFixture(fixturePath);
   const cards = await listFlowCardsDetailed({});
-  const result = await runRecallEval({ fixture, cards, k });
+  const synonyms = synonymsPath ? loadSynonyms(synonymsPath) : null;
+  const result = await runRecallEval({ fixture, cards, k, synonyms });
   result.generatedAt = new Date().toISOString();
   result.gitHead = execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim();
   result.corpusCards = cards.length;
+  if (synonyms) result.synonyms = { path: synonymsPath, entries: synonyms.length };
 
   let exitCode = 0;
   if (baselinePath) {

@@ -79,6 +79,7 @@ async function main() {
       applyFlowTemplateHintToDescription,
       getFlowTemplateHintForTrajectory,
       tokenizeCodes,
+      SYNONYM_WEIGHT,
     } = recallMod;
 
     await runAsync('getFlowCard reads card from temp dir', async () => {
@@ -358,6 +359,38 @@ async function main() {
     await runAsync('ASCII short-code query reaches its gold card (D-001 regression)', async () => {
       const hit = matchFlowForAtom({ title: 'W0', taskDraft: '', cards: realCards });
       assert.equal(hit.flowRef, 'session_login');
+    });
+
+    await runAsync('synonym expansion bridges query word to card vocabulary', async () => {
+      const cards = [
+        { _stem: 'limit_card', flow: '额度管控卡', aliases: ['额度冻结', '额度解冻'], keywords: ['额度冻结', '额度解冻', '部分冻结', '风险冻结'] },
+        { _stem: 'other_a', flow: '机构维护卡', aliases: ['机构信息'], keywords: ['机构维护', '机构调整'] },
+        { _stem: 'other_b', flow: '参数配置卡', aliases: ['参数管理'], keywords: ['参数配置', '参数生效'] },
+      ];
+      const synonyms = [{ term: '止付', expand: ['冻结'], scope: null, source: 'pin' }];
+      const off = matchFlowForAtom({ title: '额度临时止付再恢复', taskDraft: '', cards });
+      const on = matchFlowForAtom({ title: '额度临时止付再恢复', taskDraft: '', cards, synonyms });
+      assert.equal(on.flowRef, 'limit_card', 'expansion must bridge 止付→冻结');
+      assert.ok(typeof SYNONYM_WEIGHT === 'number' && SYNONYM_WEIGHT > 0 && SYNONYM_WEIGHT < 1,
+        `SYNONYM_WEIGHT must be a (0,1) factor, got ${SYNONYM_WEIGHT}`);
+      assert.notEqual(off.flowRef, null, 'sanity: unexpanded query still ranks the card via 额度');
+      assert.ok(on.score >= off.score, 'additive expansion never lowers the same-card score');
+    });
+
+    await runAsync('synonym scope mismatch blocks injection', async () => {
+      const cards = [{ _stem: 'limit_card', flow: '额度管控卡', aliases: ['额度冻结'], keywords: ['额度冻结'] }];
+      const synonyms = [{ term: '止付', expand: ['冻结'], scope: 'other-module', source: 'pin' }];
+      const hit = matchFlowForAtom({ title: '额度临时止付再恢复', taskDraft: '', cards, synonyms, moduleKey: 'customer-mgmt' });
+      assert.equal(hit.flowRef, null, 'scoped entry must not fire for a non-matching module');
+      const allowed = matchFlowForAtom({ title: '额度临时止付再恢复', taskDraft: '', cards, synonyms, moduleKey: 'other-module' });
+      assert.equal(allowed.flowRef, 'limit_card', 'scoped entry fires when moduleKey matches');
+    });
+
+    await runAsync('synonyms absent => identical to legacy ranking', async () => {
+      const cards = [{ _stem: 'a', flow: '冻结申请操作', keywords: ['冻结', '申请'] }];
+      const without = rankFlowCards({ title: '冻结申请操作', taskDraft: '', cards, k: 3 });
+      const explicitNull = rankFlowCards({ title: '冻结申请操作', taskDraft: '', cards, k: 3, synonyms: undefined });
+      assert.deepEqual(without, explicitNull);
     });
 
     await runAsync('recall perf: 800-char single query under 200ms', async () => {

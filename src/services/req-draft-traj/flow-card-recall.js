@@ -69,6 +69,52 @@ function profileTokens(text) {
 }
 
 /**
+ * Weight factor for controlled-vocabulary query expansion (recall P0 lever 3,
+ * spec 2026-09-10-recall-p0-three-levers §6.3): injected expand tokens count
+ * at this fraction of their own idf × len weight — a low-weight ADDITIVE
+ * signal, never a rewrite of the original query.
+ */
+export const SYNONYM_WEIGHT = 0.5;
+
+/**
+ * Controlled-vocabulary query expansion (recall P0 lever 3): for each synonym
+ * entry whose `term` occurs in the query text and whose `scope` admits the
+ * query's module (scope null = global; otherwise must equal moduleKey), the
+ * `expand` strings are tokenized with the SAME query tokenizer (so card-vocab
+ * semantic terms get longest-match treatment) and injected as additional query
+ * tokens at SYNONYM_WEIGHT × their own weight. Tokens already present in the
+ * query keep their full weight (expansion only ever ADDS signal). Purely
+ * additive and opt-in: callers that pass no `synonyms` see byte-identical
+ * behavior (spec §7 graceful degradation — an empty/missing table = no-op).
+ * @param {Map<string, number>} tokens Query token map (mutated: injected tokens added)
+ * @param {string} hay Raw query text (title + taskDraft, lowercased for matching)
+ * @param {Set<string>} semanticDict Raw card vocabulary terms
+ * @param {Array<{term: string, expand: string[], scope?: string|null}>} synonyms Controlled vocabulary entries
+ * @param {string|null} moduleKey Query's module key (null = only scope-less entries apply)
+ * @returns {Map<string, number>|null} token → weight multiplier for injected tokens, or null when nothing was injected
+ */
+function applySynonymExpansion(tokens, hay, semanticDict, synonyms, moduleKey) {
+  if (!Array.isArray(synonyms) || synonyms.length === 0) return null;
+  const lowHay = hay.toLowerCase();
+  /** @type {Map<string, number>} */
+  const scales = new Map();
+  for (const entry of synonyms) {
+    if (!entry || !entry.term || !Array.isArray(entry.expand) || entry.expand.length === 0) continue;
+    if (entry.scope && (!moduleKey || entry.scope !== moduleKey)) continue;
+    if (!lowHay.includes(String(entry.term).toLowerCase())) continue;
+    for (const exp of entry.expand) {
+      for (const [token, len] of extractQueryTokens(String(exp), semanticDict)) {
+        if (!tokens.has(token)) {
+          tokens.set(token, len);
+          scales.set(token, SYNONYM_WEIGHT);
+        }
+      }
+    }
+  }
+  return scales.size > 0 ? scales : null;
+}
+
+/**
  * @param {object} card
  * @returns {string}
  */
@@ -195,12 +241,15 @@ function extractQueryTokens(text, semanticDict) {
 /**
  * idf-weighted match weights: for each query token, df = cards containing it
  * (token-set membership for bigram/code tokens, substring for long semantic
- * terms), idf = log(1 + N/df), weight = idf × len.
+ * terms), idf = log(1 + N/df), weight = idf × len. Tokens present in
+ * `weightScales` (synonym-injected) get their weight and maxPossible
+ * contribution multiplied by the scale factor.
  * @param {Map<string, number>} tokens Query tokens
  * @param {ReturnType<typeof corpusProfile>} corpus Card corpus profile
+ * @param {Map<string, number>|null} [weightScales] token → multiplier for synonym-injected tokens
  * @returns {{ weights: Map<string, number>, maxPossible: number }} Token weights and their sum over matchable tokens
  */
-function tokenWeights(tokens, corpus) {
+function tokenWeights(tokens, corpus, weightScales = null) {
   /** @type {Map<string, number>} */
   const weights = new Map();
   let maxPossible = 0;
@@ -216,7 +265,8 @@ function tokenWeights(tokens, corpus) {
       }
     }
     if (df === 0) continue;
-    const weight = Math.log(1 + corpus.n / df) * len;
+    const scale = weightScales?.get(token) ?? 1;
+    const weight = Math.log(1 + corpus.n / df) * len * scale;
     weights.set(token, weight);
     maxPossible += weight;
   }
@@ -317,19 +367,27 @@ function nodeTokensFor(node) {
  * score-descending list so eval metrics (MRR/nDCG) can consume real rankings.
  * candidates only contain cards that clear the score floors; empty result
  * returns candidates: [].
- * @param {{ title?: string, taskDraft?: string, cards?: object[], k?: number }} opts Match options: query text (title + taskDraft), flow-card corpus, candidate list length
+ *
+ * Controlled-vocabulary expansion (recall P0 lever 3): when `synonyms` is
+ * provided, query tokens bridged from the table are injected at
+ * SYNONYM_WEIGHT × their own weight (scope-gated by `moduleKey`). Without
+ * `synonyms` the ranking is byte-identical to legacy behavior.
+ * @param {{ title?: string, taskDraft?: string, cards?: object[], k?: number, synonyms?: Array<object>|null, moduleKey?: string|null }} opts Match options: query text (title + taskDraft), flow-card corpus, candidate list length, optional controlled-vocabulary entries, optional query module key (gates scoped entries)
  * @returns {{ flowRef: string|null, nodeId: string|null, score: number|null, candidates: Array<{ flowRef: string|null, score: number, nodeId: string|null }> }} Top-1 mirror of matchFlowForAtom plus the top-k candidate list
  */
-export function rankFlowCards({ title, taskDraft, cards, k = 5 } = {}) {
+export function rankFlowCards({ title, taskDraft, cards, k = 5, synonyms = null, moduleKey = null } = {}) {
   if (!cards?.length) {
     return { flowRef: null, nodeId: null, score: null, candidates: [] };
   }
   const corpus = corpusProfile(cards);
-  const tokens = extractQueryTokens(`${title || ''}${taskDraft || ''}`, corpus.semanticDict);
+  const queryText = `${title || ''}${taskDraft || ''}`;
+  const tokens = extractQueryTokens(queryText, corpus.semanticDict);
   if (!tokens.size) {
     return { flowRef: null, nodeId: null, score: null, candidates: [] };
   }
-  const { weights, maxPossible } = tokenWeights(tokens, corpus);
+  const queryModuleKey = moduleKey ? String(moduleKey) : null;
+  const weightScales = applySynonymExpansion(tokens, queryText, corpus.semanticDict, synonyms, queryModuleKey);
+  const { weights, maxPossible } = tokenWeights(tokens, corpus, weightScales);
   if (maxPossible <= 0) {
     return { flowRef: null, nodeId: null, score: null, candidates: [] };
   }
@@ -378,11 +436,11 @@ export function rankFlowCards({ title, taskDraft, cards, k = 5 } = {}) {
  * Deterministic flow-card recall for atom recording (spec §7.2):
  * bigram/code tokens + longest semantic match, idf × len scoring, relative
  * coverage floor and polarity disambiguation.
- * @param {{ title?: string, taskDraft?: string, cards?: object[] }} opts Match options: query text (title + taskDraft) and flow-card corpus
+ * @param {{ title?: string, taskDraft?: string, cards?: object[], synonyms?: Array<object>|null, moduleKey?: string|null }} opts Match options: query text (title + taskDraft), flow-card corpus, optional controlled-vocabulary entries, optional query module key (gates scoped synonym entries)
  * @returns {{ flowRef: string|null, nodeId: string|null, score: number|null }} Winning card score exposed for observability
  */
-export function matchFlowForAtom({ title, taskDraft, cards } = {}) {
-  const { flowRef, nodeId, score } = rankFlowCards({ title, taskDraft, cards, k: 1 });
+export function matchFlowForAtom({ title, taskDraft, cards, synonyms, moduleKey } = {}) {
+  const { flowRef, nodeId, score } = rankFlowCards({ title, taskDraft, cards, k: 1, synonyms, moduleKey });
   return { flowRef, nodeId, score };
 }
 

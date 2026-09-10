@@ -1,0 +1,22 @@
+{
+  "synonymVersion": "v1",
+  "note": "业务受控词表（recall P0 T3）。构建纪律（D6/A1）：词条只依据 kb-recall-failures.v1.json 的 build 集 + 业务通识；verify 集条目在建表期间未读取。scope=null=全局生效（v1 全部为 null：词项均为领域特定词，通用词留待 v2 配 scope）；expand 项尽量取 gold 卡既有词表原文，使查询扩展精确命中卡面。",
+  "entries": [
+    { "term": "止付", "expand": ["冻结"], "scope": null, "source": "失败反推 B-001（把额度临时止付再恢复 → limit 卡词面=额度冻结/解冻）" },
+    { "term": "担保物", "expand": ["押品"], "scope": null, "source": "失败反推 B-006（担保物登记→押品登记）" },
+    { "term": "基本资料", "expand": ["客户信息查询"], "scope": null, "source": "失败反推 B-009（查基本资料→客户信息查询，expand=gold 卡 flow 原词）" },
+    { "term": "审批过程", "expand": ["审批历史"], "scope": null, "source": "失败反推 B-011（评级审批过程→评级查询卡关键词审批历史）" },
+    { "term": "用款", "expand": ["用信"], "scope": null, "source": "失败反推 B-013（企业借钱用款→对公用信申请）" },
+    { "term": "借钱", "expand": ["用信申请"], "scope": null, "source": "失败反推 B-013（借钱→用信申请，expand=gold 卡 alias 原词）" },
+    { "term": "借款合同", "expand": ["对公合同签订", "签订合同"], "scope": null, "source": "失败反推 B-015（签借款合同→对公合同签订）" },
+    { "term": "要账", "expand": ["催收"], "scope": null, "source": "失败反推 B-019（上门要账→催收任务管理）" },
+    { "term": "抵押物", "expand": ["押品"], "scope": null, "source": "失败反推 B-021（估算抵押物→押品估值）" },
+    { "term": "估算", "expand": ["估值"], "scope": null, "source": "失败反推 B-021（估算值多少钱→押品估值）" },
+    { "term": "打官司", "expand": ["司法诉讼"], "scope": null, "source": "失败反推 B-023（打官司→司法诉讼申请）" },
+    { "term": "起诉", "expand": ["诉讼"], "scope": null, "source": "失败反推 B-023（起诉→诉讼申请）" },
+    { "term": "红字冲回", "expand": ["冲正"], "scope": null, "source": "失败反推 B-025（红字冲回→账务异常贷款发放冲正）" },
+    { "term": "总户头", "expand": ["总集团"], "scope": null, "source": "失败反推 B-028（子公司挂总户头→总集团客户管理）" },
+    { "term": "新品", "expand": ["新增产品"], "scope": null, "source": "失败反推 B-030（加新品→产品库新增产品）" },
+    { "term": "产品目录", "expand": ["产品库"], "scope": null, "source": "失败反推 B-030（产品目录→产品库管理）" }
+  ]
+}
