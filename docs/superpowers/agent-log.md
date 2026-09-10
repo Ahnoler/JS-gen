@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 18:07 · Cursor Lead — 开工：p2-async-actionlog 增量 sync
+
+- 进行中：2026-09-10 18:07；根因=每步全量 `entries` + `emit_json` flush → O(n²) 管道字节与背压拉长 cancel
+- 范围：`scripts/state.py`、`src/services/trajectory/action-log-copy.js`、`trajectory-recording-runner.js`、冷 pin、todo-list、本文件
+- 禁入区：classify/verify-all WIP、fill/select、`.cursor/`
+- 方式：TDD `syncMode=delta|full` + 副本 merge；周期 full 兜底；讲解原理后绿 pin 收工
+
 ## 2026-09-10 18:01 · Cursor Lead — 收工：p2-batch-lease 录制期续租
 
 - 完成：回链开工 `17d7185c`；DAO `renewItemLease`（CAS worker_token + preparing|recording）；`runRecord` 经 `startItemLeaseRenewal` 周期续租（lease/3，下限 30s，`finally` 停表）
