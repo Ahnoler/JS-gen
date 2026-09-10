@@ -4,6 +4,7 @@ import { PROJECT_DIR } from '#config/config.js';
 import * as execSession from '../executor-session-client.js';
 import { writeAgentEvent, sessionRuntimeReady, waitForAgentEvent } from '../routes/browser-session/agent-io.js';
 import { buildRerunResumeInstruction } from '../routes/browser-session/heal-instruction.js';
+import { runReplayActions } from './replay-actions.js';
 
 /**
  * 处理 rerun-replay（从失败步骤重跑）的编排逻辑：校验 action_file、
@@ -63,17 +64,26 @@ export async function rerunReplay({
         console.log('[rerun] Session runtime not ready — skipping _replay reproduce');
       } else {
         try {
-          const replayPayload = {
-            actions: replayActions,
-            seed_action_log: true,
-            is_replay: true,
-          };
           let replayResult;
           if (session.useExecutor && session.executorNodeUuid) {
-            const doneP = execSession.waitForSessionEvent(session.sessionId, 'replay_done', 180000);
-            writeAgentEvent(session, 'replay_actions', replayPayload);
-            replayResult = await doneP;
+            // P1-6：经 runReplayActions（replayId 归属 + 超时 cancel_step）
+            const out = await runReplayActions({
+              execSession,
+              sessionId: session.sessionId,
+              nodeUuid: session.executorNodeUuid,
+              actions: replayActions,
+              timeoutMs: 180000,
+              stopOnFail: false,
+              isReplay: true,
+              seedActionLog: true,
+            });
+            replayResult = out.result || {};
           } else {
+            const replayPayload = {
+              actions: replayActions,
+              seed_action_log: true,
+              is_replay: true,
+            };
             const doneP = waitForAgentEvent('replay_done', 180000);
             writeAgentEvent(session, 'replay_actions', replayPayload);
             replayResult = await doneP;

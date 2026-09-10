@@ -311,10 +311,12 @@ function testWiringReplayErrorChannel() {
   assert.match(helper, /event: 'replay_actions'/, 'helper 下发 replay_actions stdin 事件');
   assert.match(helper, /forwardStdin/, 'helper 经 execSession.forwardStdin 下发');
   assert.match(helper, /Promise\.race\(\[/, 'helper 持有 doneP/errP 竞速模式');
-  assert.match(helper, /waitForSessionEvent\(sessionId, 'replay_done', timeoutMs\)/,
-    '监听 replay_done（调用方超时）');
+  assert.match(helper, /waitForOwnedReplayDone\(execSession, sessionId, replayId, timeoutMs\)/,
+    '监听 replay_done（replayId 归属 + 调用方超时）');
   assert.match(helper, /waitForSessionEvent\(sessionId, errorEvent, timeoutMs\)/,
     'replay_error 经 waitForSessionEvent 监听');
+  assert.match(helper, /cancel_step/, '超时发 cancel_step 叫停 Python');
+  assert.match(helper, /replayId/, '下发/回带 replayId');
 }
 
 function testWiringTables() {

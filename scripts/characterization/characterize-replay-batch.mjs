@@ -479,8 +479,9 @@ function testStructureForwardContract() {
   assert.match(helper, /event: 'replay_actions'/, 'replay forwarded as replay_actions (helper)');
   assert.match(helper, /is_replay: isReplay/, 'helper forwards caller-supplied is_replay');
   assert.match(helper, /stop_on_fail: stopOnFail/, 'helper forwards caller-supplied stop_on_fail');
-  assert.match(helper, /waitForSessionEvent\(sessionId, 'replay_done', timeoutMs\)/,
-    'helper awaits replay_done with caller timeoutMs');
+  assert.match(helper, /waitForOwnedReplayDone\(execSession, sessionId, replayId, timeoutMs\)/,
+    'helper awaits owned replay_done with caller timeoutMs');
+  assert.match(helper, /cancel_step/, 'helper cancels Python on replay_done timeout');
 }
 
 function testWiringSharedModule() {

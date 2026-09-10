@@ -217,10 +217,14 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         entries = data.get("actions", [])
         seed_action_log = bool(data.get("seed_action_log"))
         stop_on_fail = bool(data.get("stop_on_fail"))
+        replay_id = data.get("replayId") or data.get("replay_id")
         browser_context = session_state.get('browser_context')
         business_data_store = session_state.get('business_data_store', {})
         if not browser_context or not entries:
-            emit_json({"event": "replay_done", "data": {"count": 0, "error": "no browser_context or empty actions"}})
+            early = {"count": 0, "error": "no browser_context or empty actions"}
+            if replay_id:
+                early["replayId"] = replay_id
+            emit_json({"event": "replay_done", "data": early})
             return 'continue'
 
         # Self-heal / trajectory replay: sequential ops via scripts/controller/actions/_replay.py
@@ -284,6 +288,8 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         }
         if summary.get("stoppedAt") is not None:
             done_data["stoppedAt"] = summary["stoppedAt"]
+        if replay_id:
+            done_data["replayId"] = replay_id
         emit_json({"event": "replay_done", "data": done_data})
         return 'continue'
 

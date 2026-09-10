@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 17:15 · Cursor Lead — 收工：p1-6 replayId 全链过滤 + 超时 cancel_step
+
+- 完成：回链开工 `6e84fa6b`；`runReplayActions` 铸造 replayId → Python `replay_done` 回带 → `waitForOwnedReplayDone` 过滤；超时发 `cancel_step`；rerun executor 路改走 helper（`seedActionLog`）
+- 验收：`characterize-replay-id` / special-element / replay-batch / page-bind / menu-scan OK
+- 遗留：冷 pin 未入 verify-all（该文件他线 WIP）；legacy 无 replayId 仍放行并打 `replay_done_missing_replayid`
+
 ## 2026-09-10 17:12 · Cursor Lead — 开工：p1-6 replayId 全链过滤 + 超时 cancel_step
 
 - 进行中：2026-09-10 17:12；根因=`replay_done` 仅按 sessionId 等待，旧 replay 迟到 done 可误满足新登录等待；超时不叫停 Python
