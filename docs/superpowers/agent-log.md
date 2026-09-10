@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 23:40 · ZCode 引擎线 — 推送接口数据格式核对（回链 23:10）
+
+- 用户要求重看推送接口数据格式——全链路重读：JS-gen 侧 transaction-export.js（importDemand 报文：transcationEventTypeList→transcationProperties，六 type=eventTypeName/eventTypeValue）与同事引擎侧两套接收（V2/V3 structured：scheduler/payload.py:105→ExecutionPayload→_step_to_transaction 压平 transaction JSON；V1 老格式：ExecuteRequest+transactionList 直收，payload.py:164 id>0 硬校验）逐字段对齐
+- 关键事实：①objectValue 双写位确认（payload.py:374 xpathObjectValue+:380 objectValue），批 4 行选读 object_value 前提成立；②V3 通道 primaryLocator.method+value 双非空硬校验（payload.py:333-334）——elementType 空步骤不是静默 skip 而是**整单拒**，比 v1 响；③**前缀路由新增上游验证点**：dataName 来自 step.name，ATP 组装 payloadJson 时 propertiesName（裸名词）是否保前缀待联调实证——若平台剥前缀，引擎子路径路由退化为主路径+labelHint 兜底；④引擎已自带 component.menuXPath 逐级菜单点击注入（payload.py:385-416 菜单切换-N），与映射表「菜单：」并存不冲突；⑤新增 §7.1 全量字段核对表+报文样例入报告
+- 验收：全部结论带 file:line（payload.py:318-382/323-325/331-341/385-416、scheduler/payload.py:105-154、case_executor.py:428/394、transaction-export.js:126-139）；本单元只提交 agent-log + 报告两文件，他线 WIP 未触碰
+
 ## 2026-09-10 23:10 · ZCode 引擎线 — 词表冻结（回链 22:45）：六 type 支撑 18 操作
 
 - 用户定盘："不改变这六个推送 type，这六个操作类型要支持我们的18个操作"——type 词表=click/input/select:click/select:tree/radio/date 共六个**不新增第七种**；18 操作全部在六 type 内表达（click=10/input=2/select:click=2/select:tree=1/radio=2/date=fill 日期升格），dataName 前缀=type 内子操作路由键，处理三层模型=type 定 handler→前缀定子路径→剥前缀文本作 labelHint

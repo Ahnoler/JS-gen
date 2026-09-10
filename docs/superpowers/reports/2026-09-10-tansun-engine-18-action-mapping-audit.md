@@ -108,3 +108,41 @@
 - **批 5 同事新版本合入后复验**：radio / select:tree 按矩阵 #14/#15 四条清单核对（字面量/object_value/absent=skip/布尔伪成功）；click_table_row_radio 依赖其 radio 对表格列场景的支持度，不足再补（补法仍是 radio type 内分支，非新 type）；
 - **工程约定**：分支 `compat/js-gen-operations`（不推远端，由用户/同事验收后合并）；每批配 `tests/test_*.py`（test_select_click.py 三层断言样板）；除批 4（date 进 enums/payload/registry）外不动共享三处，降低与同事未推送版本的合并冲突面；
 - **已知边界（推送侧事实，仅备案不改）**：`展开树` 录制端不落步骤（P3）；V3 推送链日期未接升格（P2）——引擎侧六 type 支持照做，步骤是否实际到达属推送侧行为。
+
+### §7.1 推送接口数据格式核对（2026-09-10 深夜补，全链路实证）
+
+> 应用户要求重读推送接口数据格式。JS-gen 推送侧（`transaction-export.js`）与同事引擎接收侧（`scheduler/payload.py` → `models/payload.py` → `CaseModel.steps` → `StepModel`）逐字段对齐结论：
+
+**两条推送通道是两套报文，同事引擎两套都吃：**
+
+1. **importDemand 建交易通道（JS-gen → 伙伴平台 ATP）**：`{transcationEventTypeList:[{transcationName,systemId,projectId,transcationType:'web',testFrame:'playwright',transcationProperties:[{options,elementType,eventTypeName,eventTypeValue,objectValue,propertiesName,mothed:'By.XPATH'}]}]}`。`eventTypeValue` ∈ 六 type 词表（`EVENT_TYPE_NAME` 中文标签映射），`elementType`=xpath，`propertiesName`=裸名词+同交易内去重加后缀。**引擎不直接吃这个报文**——它先落 ATP 平台，调度平台再组装成 payloadJson 下发。
+2. **payloadJson 执行通道（ATP/调度平台 Pull → 引擎 scheduler/payload.py:105）**：V2/V3 结构化报文（schemaVersion 2.0/3.0）→ `ExecutionPayload` → 每 component 拆一个 `ExecuteRequest`，`_step_to_transaction`（payload.py:318-382）把 Step 压平成老版 transaction JSON 字符串。**V1 老格式**（无 schemaVersion）直接按 `ExecuteRequest`+`transactionList` 收（payload.py:164-177，id 必须>0）。
+
+**字段级核对（V3 Step → transaction → StepModel → handler 可见值）：**
+
+| 报文字段 | 映射 | handler 侧 | 影响 |
+|---|---|---|---|
+| operation.type | 白名单校验 payload.py:323-325 → `event` | `step.event`（Event 枚举） | 六 type 词表冻结点=这行校验；未在白名单即 PAYLOAD_INVALID 整单拒 |
+| step.name | → `dataName` | `step.data_name` | **三层模型的子操作路由键就是这里**；ATP 组装时 propertiesName→name 是否保前缀待联调实证 |
+| operation.value | → `val` | 经 `_data_source.resolve(step.data_source, step.val, context)`（case_executor.py:428） | dataSource=constant 时原样透传；quantity 走上下文变量池 |
+| operation.objectValue | → `objectValue` **双写**（payload.py:374 `xpathObjectValue` + :380 `objectValue`） | `step.object_value` | 值字段分流结论不变：handler 只有显式读才有 |
+| elementTarget.primaryLocator | → `element`+`mothed`（CSS_SELECTOR→By.CSS 归一，COORDINATE→element 空+location 坐标，payload.py:331-341） | `step.element`/`step.mothed` | **primaryLocator.method+value 双非空硬校验（:333-334），缺即整单拒**——推送侧 elementType=null 的步骤（如 expand_all_el_tree）在 V3 通道必炸，v1 通道才静默 |
+| elementTarget.scrollIntoView | → `isScroll` | `step.is_scroll` | isScroll=1 时 resolver 30s 无可见节点抛 EXCEPTION（locator.py 语义）——新子路径建议 0 |
+| operation.waitSeconds / elementTarget.timeoutSeconds | → `waitTime` | 定位后 visible wait（case_executor.py:421-422） | handler 不自处理 |
+| operation.menuPath | 仅 executeAgent 用（:348-349 `' > '.join`） | — | 六 type 不用；菜单导航走 component.menuXPath |
+| component.menuXPath | → 自动注入逐级 click 步骤（payload.py:385-416，dataName=`菜单切换-N`，isScroll=1，screenshot=1） | 普通 click 步骤 | **引擎已自带菜单导航**，映射表 click_menu_item 的「菜单：」前缀只覆盖组件内菜单点击，二者并存不冲突 |
+| eleType | 非 ele（page/tab/collapse/dialog/step）→ operation 强制置 None 跳过执行（payload.py:146-154 + case_executor.py:394） | — | 分组容器步骤不消耗 type 词表 |
+| dataSource/transmit/screenshotPolicy/executionHints | 全链透传 | 截图 executor 统一做 | 无新增兼容点 |
+
+**对蓝图的三点修正：**
+
+1. **批 1 的 dataName 前缀路由多一个上游验证点**：前缀活在 `step.name`→`dataName`，而 ATP 组装 payloadJson 时 name 取自建交易的 propertiesName（裸名词）还是我们映射表的带前缀样式，**联调第一步必须实证**——若平台侧剥前缀，引擎侧前缀路由拿不到键，兼容方案退化为「element xpath 主路径 + labelHint 兜底」，仍可跑但丢失子路径语义。给同事的联调清单加一条：抓一单真实 payloadJson 看步骤 name 实样。
+2. **V3 通道 primaryLocator 硬校验改变了「推送侧也缺」动作的爆炸面**：elementType 为空的步骤（expand_all_el_tree/workspace_tabs 未采集）不是静默 skip，而是 **PAYLOAD_INVALID 整单拒**（比 v1 更响）。在词表冻结+不改推送链前提下，这些步骤到达引擎前就会被平台组装拦下——引擎侧子路径照做，但联调排期必须把「推送侧补采集」排进同一窗口，否则主路径根本到不了引擎。
+3. **select:click 的 objectValue 双写位已确认**：payload.py:374/380 两处都写，引擎 `step.object_value` 必有值——批 4 行选分支读 object_value 的前提成立；radio/input 同理（前提是推送侧 value/objectValue 双写，属推送侧行为，备案）。
+
+**报文样例（引擎侧单步 transaction，payload.py:352-382 实产）**：
+```json
+{"id":123,"dataName":"选择：结算方式","eleType":"ele","val":"","event":"select:click",
+ "element":"//label[text()='结算方式']/..//input","mothed":"By.XPATH","location":"","waitTime":0,
+ "dataSource":"constant","transmit":0,"screenshot":0,"xpathObjectValue":"银行转账","objectValue":"银行转账","isScroll":0}
+```
