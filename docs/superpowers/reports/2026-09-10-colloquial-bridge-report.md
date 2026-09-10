@@ -2,14 +2,14 @@
 
 > 日期：2026-09-10 · 执行：Zcode 主会话
 > 规格/计划：[`specs/2026-09-10-recall-colloquial-bridge-design.md`](../specs/2026-09-10-recall-colloquial-bridge-design.md) · [`plans/2026-09-10-recall-colloquial-bridge.md`](../plans/2026-09-10-recall-colloquial-bridge.md)
-> 提交链：开工 `d41cb787` → T0 `024af5bb` → T1 `3c802f3d` → T2 `3ea6bab5` → T3 `824967d1` → 归档+本报告
-> **总判定：T3 未达标 → 按计划跳过 T4（不接线），资产置 `status:"archived"`，本版不计成果。**
+> 提交链：开工 `d41cb787` → T0 `024af5bb` → T1 `3c802f3d` → T2 `3ea6bab5` → T3 `824967d1` → 归档+本报告 → **G 复核：FAIL 成立+2 必改 1 观察 1 Lead 项**（reviewer 判决文件 [`2026-09-10-colloquial-bridge-g-verdict.md`](2026-09-10-colloquial-bridge-g-verdict.md)，`666e0215`）→ 收尾修正（F-1/F-2/F-3，即本修订版）
+> **总判定：T3 未达标 → 按计划跳过 T4（不接线），资产置 `status:"archived"`，本版不计成果。**（G 复核**采纳**，判决不变；修订仅措辞/证据留存/口径，见 §8）
 
 ## 1. 素材来源统计（三类）
 
 | 源 | 素材池 | 说明 |
 |---|---|---|
-| A corpus-card | 131 | 84 卡 `flow/aliases/keywords` 内部同义表述（**全部为子串式短长形**，无一对互不为子串） |
+| A corpus-card | 131 | 84 卡 `flow/aliases/keywords` 内部同义表述；**A 源按抽取规则只取子串对**（reviewer F-1 勘误：`extractCardSynonyms()` 仅在 alias↔keyword 互为包含时 push，物理上产不出非子串对——这是**规则产物，不是语料事实**；reviewer 全量普查：非子串且共享 ≥2 字的 alias↔alias 对有 **438 对**未进入候选，如 退回上一步↔退回指定步骤、待办任务↔任务事项、审批处理↔流程审批） |
 | B corpus-req-doc | 255 | 30 模块 `chapters/`+`through-chains.md` 括号内替代说法 |
 | C wet-test-drift | 23 | `wet-test.md` wording 类「SUT vs 文档」措辞对，全部带模块+叶号 |
 | 合计 | **409** | 抽取脚本 `scripts/kb/build-colloquial-bridge.mjs`，零 import 召回/评测模块 |
@@ -20,11 +20,13 @@
 |---|---|---|
 | 候选池 | 409 | A 131 / B 255 / C 23 |
 | 双向校验通过（机械） | **183** | expand 侧命中卡面 + term 侧出现在语料（纯 grep，禁跑匹配器）；A 131 全过、B 39、C 13 |
-| 非子集单 expand | 44 | **A 类 131 条全是「短形 ⊂ 长形」**（委外清收→委外清收登记型）；互不为子串的只有 B 32 + C 12 |
+| 非子集单 expand | 44 | A 源按抽取规则只产子串对（F-1 勘误，非语料事实）；互不为子串的 44 条全部来自 B 32 + C 12 |
 | 落表（裁决后） | **67** | A 49（子串对保留 1 个以上特征注入 bigram 的强项）+ B 10 + C 8 |
 | 配比 | A+B **88.1%** ≥60% / C **11.9%** ≤40% | B3 达标 |
 
-裁决规则（逐条理由在 `tmp/kb-bridge/t2-build-table.mjs` 头注释）：剔纯句片段、过泛词（新增/查询/已生效/产品名称…）、纯管理尾缀注入（管理/信息/配置/维护/申请）、状态短语作 expand、规则/主页垃圾形。**Grounding 强制**：终表每条必须回溯命中 T2-verified 池记录，sourceRef/evidence 由脚本从池回填（G1 抽检可回原文）。
+汇总裁决规则（`tmp/kb-bridge/t2-build-table.mjs` 头注释，**两脚本已随收尾 commit 入库**——F-2 勘误：tmp/ 被 gitignore，原先只 `-f` 追了 9 个数据文件，`t2-verify.mjs`/`t2-build-table.mjs` 不在库、报告指向悬空；头注释是**汇总原则**而非逐条理由，原表述已改）：剔纯句片段、过泛词（新增/查询/已生效/产品名称…）、纯管理尾缀注入（管理/信息/配置/维护/申请）、状态短语作 expand、规则/主页垃圾形。**Grounding 强制**（reviewer 认可保留）：终表每条必须回溯命中 T2-verified 池记录，sourceRef/evidence 由脚本从池回填（reviewer 全量核引文 **67/67** 回原文全对上，C 类 8/8 均为 wording 行且叶号正确）。
+
+**裁决口径（reviewer F-3 修正，如实记录）**：183 条裁决在 ~7 分钟内完成（T1 23:24 → T2 23:31），实为「**规则批量裁决 + 快速人工过一遍**」而非逐条深裁。质量观察：落表 B 类 10 条中仅 **4 条真词法同义**（拨款系数→拨款转换系数、数标→数据指标、产品要素管理→产品要素库、退回→打回），另 6 条为位置/组件/动作注释（b2 规则只要求共享 ≥2 字即放行）——这是「增量 0」的**部分成因**；将来复用 B 侧须收紧为「词法变体」（同头/同尾词或最长公共子串 ≥ 半长）。
 
 ## 3. T3 on/off 度量（frozen v2, 245 条）
 
@@ -67,7 +69,7 @@
 | 交付 | 位置 |
 |---|---|
 | ① 三类素材来源统计与配比 | §1/§2（A 131+B 255+C 23；落表 67：49+10+8，A+B 88.1%/C 11.9%） |
-| ② 候选→裁决漏斗 | §2（409→183→44→67，grounding 断言 + 逐条规则） |
+| ② 候选→裁决漏斗 | §2（409→183→44→67，grounding 断言 + 汇总裁决规则，`t2-build-table.mjs` 已入库） |
 | ③ on/off 两套数字 | §3（逐位相同；翻转清单=空，含 2 条尾部效应非翻转，`tmp/kb-bridge/T3-verdict.txt`） |
 | ④ 接线三证据 | **不适用**（T3 FAIL，未接线——B5 条件只挂在接线门上） |
 | 桥接表（archived） | `data/kb/colloquial-bridge.json`（67 条，每条 source 带 file+line/叶） |
@@ -78,3 +80,16 @@
 1. **词面桥接机制本身已三度验证**：机制 pin 全绿、零新增 FP、护栏面全部无恙——它是一条安全的扩展通道，但**弹药（口语桥素材）不存在于仓库语料**。
 2. E 层的正确路径只剩两条：**(a)** 建口语语料（把用户/操作员真实说法录进来——例如从生产轨迹的 LLM 意图描述里回收 query 侧口语，这是「湿测 drift」的口语版）；**(b)** 语义侧基础设施（embedding 立项，原封不动的 Lead 决策项）。
 3. `applySynonymExpansion` 机制保留 opt-in 状态（与 P0 线裁定一致）；`colloquial-bridge.json` archived 保留，若将来回收了口语语料可按同一 SOP 续建，**无需改任何代码**。
+
+## 8. G 复核响应与修订台账（2026-09-10，reviewer 判决 `666e0215`）
+
+复核结论：**FAIL 判定成立、处置合规**，本线全部数字被独立复算逐位确认（含 67/67 引文回原文全对上）；判 2 必改 + 1 观察 + 1 Lead 项，本节为逐项落实：
+
+| # | reviewer 发现 | 落实 |
+|---|---|---|
+| F-1（必改） | 「A 类全部为子串式」是**抽取规则产物非语料事实**（`extractCardSynonyms()` 仅收包含对；非子串 alias↔alias 对普查有 438 对） | §1/§2 两处已改为「A 源**按规则**只取子串对」并登记 438 对普查事实；结论（领域↔领域）不变 |
+| F-2（必改） | ①两裁决脚本被 gitignore 拦在库外（报告指向悬空）；②头注释只有汇总规则，无逐条理由 | ①`t2-build-table.mjs`/`t2-verify.mjs` 已 `git add -f` 入库；②§2 与 `T2-bridge.txt` 指向改为「**汇总原则**非逐条理由」 |
+| F-3（观察） | B 类 10 条仅 4 条真词法同义，另 6 条为注释性关系（b2 只查共享 ≥2 字）=增量 0 部分成因；183 条 7 分钟裁决实为规则批量+快速人工 | §2 已如实登记裁决口径与 B 类质量观察；将来复用 B 侧收紧为「词法变体」（同头/同尾或最长公共子串 ≥ 半长） |
+| F-4（Lead 项） | `loadSynonyms()` 不读 `status` → archived 无强制力 | 表内已补 `archivedSemantics` 注记（「不得接线，仅作续跑基线」）；**loader 加 status 过滤=口径变更，留 Lead 决策，本线不动代码** |
+
+reviewer 独立补强量化（登记存照）：67 条中 27 条 term 可与 v2 某 query 字面相遇；条目×query 命中 30 对，单条注入后 17 对改变 rankFlowCards 返回（分数/尾部）、0 对改变 gold 名次——与「机制点火但 top1 零翻转」一致，且排除 ON 静默空跑。本收尾仅改文档/注记/证据留存三处文件级改动，判决与门禁不重跑（门禁当前态：5 passed + 26 passed）。
