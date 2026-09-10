@@ -136,7 +136,7 @@
 | **p2-batch-lease** | P3 已闭 | 录制期 `renewItemLease` + `startItemLeaseRenewal`（约 lease/3，下限 30s）防超租二次 claim；冷 pin `characterize-batch-item-lease-renew.mjs`；2026-09-10 落地 |
 | **p2-toast-cursor** | P3 已闭 | step_notice：`log_len < cursor` 时回卷游标并清 `_step_notice_seen`，再以 cursor=0 重扫（`rewind_notify_cursor_if_shrunk`）；冷 pin 扩 `characterize-step-notice-scan.py`；2026-09-10 落地（未改 js_snippets） |
 | **dedup-deletion** | 待裁 | src/dedup.js 生产零引用（唯一 importer=characterize-dedup.mjs 门禁），删除需产品侧湿测确认无去重需求，且 AGENTS.md「Consecutive-only dedup」条目与门禁行须同删 |
-| **p2-async-actionlog** | P3 | action_log_sync 每动作全量重发（O(n²)）+ emit_json 同步 stdout，大轨迹管道背压拉长 cancel 窗口（性能项，需真机量测后改增量/限频） |
+| **p2-async-actionlog** | P3 已闭 | `action_log_sync` 默认 `syncMode=delta`（仅未同步 id + removedIds），每 50 次 full 兜底；Node `applyActionLogSync` 合并副本；冷 pin `characterize-action-log-sync-delta.{py,mjs}`；2026-09-10 落地 |
 
 ## 更新记录
 
