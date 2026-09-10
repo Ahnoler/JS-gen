@@ -185,6 +185,16 @@ async def scan_editable_summary_impl(browser_context, business_data_store, butto
         return raw
     if not isinstance(result, dict):
         return _err('invalid-scan-result')
+    try:
+        from .l1c_region_classify import classify_scan_regions
+        sid = str(
+            (business_data_store or {}).get('systemId')
+            or (business_data_store or {}).get('system_id')
+            or ''
+        )
+        classify_scan_regions(result, system_id=sid)
+    except Exception:
+        pass
     primary_container = (result.get('container') or 'main').strip() or 'main'
     # build_editable_summary → buttons[{text, section}] (no kind/xpath).
     summary = build_editable_summary([result], primary_container=primary_container)

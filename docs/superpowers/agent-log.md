@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 23:44 · Cursor Lead — 收工：L1c-scan-py scan 接 regions/classify
+
+- 完成：回链开工 `1dc516b4`；新建 `l1c_region_classify.py`（map/apply/HTTP fail-soft）；`scan_editable_summary_impl` 在 `build_editable_summary` 前调用；只写回 `regions[]`
+- 验收：`characterize-l1c-scan-py.py` OK；`characterize-scan-editable-summary.py` OK
+- 遗留：`L1c-wet` 仍挂（`L1C_LLM=true` + BiB）；冷 pin 未入 verify-all（WIP）；fields `region_*` 不跟 classify（assignRegion id 异源）
+
 ## 2026-09-10 23:42 · Cursor Lead — 开工：L1c-scan-py scan 接 regions/classify
 
 - 进行中：2026-09-10 23:42；根因=`scan_editable_summary` 从不调 classify，与 resolve 双消费者规格缺口
