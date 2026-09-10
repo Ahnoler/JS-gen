@@ -9,8 +9,8 @@
  *   ③ ROUTE  — system_page.res_path contains a card hash_marker route
  *              fragment (len ≥ 4, non-UML)
  * Multi-label: every hit card is recorded; primaryCard = the hit from the
- * highest-priority chain (ZJJK > FS > ROUTE), first stem alphabetically for
- * stability. Anti-cheat rules (spec §4): task text is NOT used for matching;
+ * highest-priority chain (ZJJK > FS > ROUTE), first stem alphabetically as
+ * tiebreak. Anti-cheat rules (spec §4): task text is NOT used for matching;
  * function_id is NOT a card mapping key (reported as a fact only).
  *
  * Determinism: object keys are inserted in sorted order where iteration
@@ -90,6 +90,39 @@ export function mapTrajectory(traj, pageByPageId, chains) {
 }
 
 /**
+ * Pick the primary card by chain priority (ZJJK > FS > ROUTE), alphabetical
+ * stem order as the tiebreak (G-verdict D3: the previous implementation took
+ * the first alphabetically-sorted hit regardless of chain, which misassigned
+ * 24/69 primary cards).
+ * @param {string[]} hitCards Sorted hit card stems
+ * @param {Map<string, number>} stemRank stem → best (lowest) chain rank for this trajectory
+ * @returns {string|null} Primary card stem
+ */
+function primaryCardOf(hitCards, stemRank) {
+  if (hitCards.length === 0) return null;
+  return [...hitCards].sort((a, b) => stemRank.get(a) - stemRank.get(b) || a.localeCompare(b))[0];
+}
+
+/**
+ * Best (lowest) chain rank at which one stem was hit for one trajectory.
+ * @param {{pageId: string|null, urlCodes: object|null}} traj Redacted trajectory
+ * @param {string} stem Card stem to rank
+ * @param {Map<string, object>} pageByPageId pageId → system_page row
+ * @param {{zj: Map<string, Set<string>>, fs: Map<string, Set<string>>, route: Map<string, Set<string>>}} chains Marker indexes
+ * @returns {number} 1 (ZJJK) / 2 (FS) / 3 (ROUTE), or 99 when not actually hit
+ */
+function mapTrajectoryStemRank(traj, stem, pageByPageId, chains) {
+  if (traj.pageId && chains.zj.get(traj.pageId)?.has(stem)) return 1;
+  const page = traj.pageId ? pageByPageId.get(traj.pageId) : null;
+  const resPath = (page && page.resPath) || '';
+  const fsInPath = resPath.match(/FS\d{8,12}/);
+  if (fsInPath && chains.fs.get(fsInPath[0])?.has(stem)) return 2;
+  if (resPath && [...chains.route.values()].some((set) => set.has(stem)) &&
+      [...chains.route.entries()].some(([frag, set]) => frag.length >= 4 && resPath.includes(frag) && set.has(stem))) return 3;
+  return 99;
+}
+
+/**
  * Longest common subsequence length (order-agreement denominator side).
  * @param {string[]} a Sequence A
  * @param {string[]} b Sequence B
@@ -143,15 +176,21 @@ export function computeCoverage(fixture, corpus) {
   // ---- trajectory-side mapping (multi-label + primaryCard) ----
   const eligible = fixture.trajectories.filter((t) => t.recordStatus === 'recorded' || t.recordStatus === 'completed');
   const withPageId = eligible.filter((t) => t.pageId);
-  /** @type {Map<string, {cards: string[], chains: string[]}>} */
+  /** @type {Map<string, {cards: string[], chains: string[], primaryCard: string|null}>} */
   const trajMap = new Map();
   let multiCard = 0;
+  let primaryNotTopChain = 0;
   for (const t of eligible) {
     if (!t.pageId) continue;
-    const { cards: hitCards, chains } = { ...mapTrajectory(t, pageByPageId, { zj, fs, route }) };
+    const { cards: hitCards, chains } = mapTrajectory(t, pageByPageId, { zj, fs, route });
     if (hitCards.length > 0) {
-      trajMap.set(t.id, { cards: hitCards, chains });
+      const stemRank = new Map(); // per-trajectory: stem -> best chain rank
+      for (const s of hitCards) stemRank.set(s, mapTrajectoryStemRank(t, s, pageByPageId, { zj, fs, route }));
+      const primary = primaryCardOf(hitCards, stemRank);
+      trajMap.set(t.id, { cards: hitCards, chains, primaryCard: primary });
       if (hitCards.length > 1) multiCard += 1;
+      // D3 audit: how often the alphabetical-first card differs from the chain-priority primary
+      if (primary !== null && hitCards[0] !== primary) primaryNotTopChain += 1;
     }
   }
   const mapAmbiguityRate = withPageId.length > 0 ? multiCard / withPageId.length : 0;
@@ -197,36 +236,73 @@ export function computeCoverage(fixture, corpus) {
     top: uncoveredTop,
   };
 
-  // ---- M5 node agreement (on mapped trajectories only) ----
+  // ---- M5 node agreement (rebuilt on page identity, G-verdict D2) ----
+  // Old M5 compared visitedRegions[].label (generic region names: 主区/顶栏/侧栏
+  // = 47.5% of entries) against card node page names — a vocabulary-overlap
+  // metric that saturated at 91.9% of its own per-trajectory matcher ceiling.
+  // Rebuilt on page identity: visitedRegions[].key (redacted page_level_key,
+  // host#/route) vs the primary card's ROUTE-chain hash_markers (len ≥ 4,
+  // non-code) — route-to-route, same type. node.enter is a Chinese menu
+  // description (NOT a route) and node.page a display name, so neither is a
+  // comparable page key; route markers are the card's page-identity claims.
+  // Definitions (informational, no floor until accepted — D4):
+  //   nodeCoverage   = per-trajectory fraction of distinct visited page keys
+  //                    covered by the primary card's route markers (mean)
+  //   entryOnCard    = first visited page key belongs to the primary card
+  //   offCardRate    = visited page keys not found on the primary card / total
+  //   ceiling        = per-trajectory best over ALL hit cards of that
+  //                    trajectory's coverage (matcher upper bound)
   const cardByStem = new Map(cards.map((c) => [c._stem, c]));
+  const routeMarkersOf = (c) => (c.hash_markers || []).filter((m) => m.length >= 4 && !/^(ZJJK|FS|UML|RES)/.test(m));
   let nodeCoverSum = 0;
-  let orderAgreeSum = 0;
-  let offCardHits = 0;
-  let regionHitsTotal = 0;
-  let mappedWithRegions = 0;
-  for (const [tid, { cards: cs }] of trajMap) {
+  let entryOnCardSum = 0;
+  let offCardPages = 0;
+  let pageKeysTotal = 0;
+  let mappedWithPages = 0;
+  let ceilingCoverSum = 0;
+  const offCardPageCounter = new Map(); // visited key -> count (not found on the primary card)
+  for (const [tid, { cards: hitCards, primaryCard }] of trajMap) {
+    if (!primaryCard) continue;
     const t = eligible.find((x) => x.id === tid);
-    const regions = (t.visitedRegions || []).map((r) => normPage(r.label)).filter(Boolean);
-    if (regions.length === 0) continue;
-    mappedWithRegions += 1;
-    regionHitsTotal += regions.length;
-    // primary card = first of the sorted hit list (chain-rank + alpha stable)
-    const card = cardByStem.get(cs[0]);
-    const cardPages = (card.nodes || []).map((n) => normPage(n.page)).filter(Boolean);
-    if (cardPages.length === 0) continue;
-    let covered = 0;
-    for (const rp of regions) {
-      if (cardPages.some((cp) => cp.includes(rp) || rp.includes(cp))) covered += 1;
-      else offCardHits += 1;
+    const visitedKeys = [...new Set((t.visitedRegions || []).map((r) => normPage(r.key)).filter(Boolean))];
+    if (visitedKeys.length === 0) continue;
+    mappedWithPages += 1;
+    pageKeysTotal += visitedKeys.length;
+    const lowerKeys = visitedKeys.map((k) => k.toLowerCase());
+    const coveredBy = (stem) => {
+      const rms = routeMarkersOf(cardByStem.get(stem)).map((m) => m.toLowerCase());
+      return lowerKeys.filter((k) => rms.some((m) => k.includes(m))).length;
+    };
+    const primaryCovered = coveredBy(primaryCard);
+    nodeCoverSum += primaryCovered / visitedKeys.length;
+    entryOnCardSum += primaryCovered > 0 && routeMarkersOf(cardByStem.get(primaryCard)).some((m) => lowerKeys[0].includes(m.toLowerCase())) ? 1 : 0;
+    offCardPages += visitedKeys.length - primaryCovered;
+    for (let i = 0; i < visitedKeys.length; i++) {
+      const rms = routeMarkersOf(cardByStem.get(primaryCard)).map((m) => m.toLowerCase());
+      if (!rms.some((m) => lowerKeys[i].includes(m))) {
+        const display = visitedKeys[i].replace(/^[^#]*/, '');
+        offCardPageCounter.set(display, (offCardPageCounter.get(display) || 0) + 1);
+      }
     }
-    nodeCoverSum += covered / regions.length;
-    orderAgreeSum += regions.length > 0 ? lcsLength(regions, cardPages) / regions.length : 0;
+    // ceiling: best coverage over all hit cards for this trajectory
+    let best = 0;
+    for (const stem of hitCards) {
+      const cov = coveredBy(stem) / visitedKeys.length;
+      if (cov > best) best = cov;
+    }
+    ceilingCoverSum += best;
   }
   const m5 = {
-    nodeCoverage: mappedWithRegions > 0 ? nodeCoverSum / mappedWithRegions : null,
-    orderAgreement: mappedWithRegions > 0 ? orderAgreeSum / mappedWithRegions : null,
-    offCardRate: regionHitsTotal > 0 ? offCardHits / regionHitsTotal : null,
-    denominator: { mappedTrajectories: trajMap.size, withVisitedRegions: mappedWithRegions },
+    metricNote: 'v2 (G-verdict D2 rebuild): visited page keys (page_level_key host#/route) vs primary card route markers — same-type page-identity comparison. Informational, no floor until accepted (D4). orderAgreement retired: LCS over label/region vocab was the saturation artifact.',
+    nodeCoverage: mappedWithPages > 0 ? nodeCoverSum / mappedWithPages : null,
+    entryOnCardRate: mappedWithPages > 0 ? entryOnCardSum / mappedWithPages : null,
+    offCardRate: pageKeysTotal > 0 ? offCardPages / pageKeysTotal : null,
+    ceiling: mappedWithPages > 0 ? ceilingCoverSum / mappedWithPages : null,
+    denominator: { mappedTrajectories: trajMap.size, withPageKeys: mappedWithPages, distinctPageKeys: pageKeysTotal },
+    offCardTop: [...offCardPageCounter.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 10)
+      .map(([k, n]) => ({ pageKey: k, count: n })),
   };
 
   // ---- M6 freshness: card ZJJK/FS markers still present in system_page ----
@@ -267,7 +343,13 @@ export function computeCoverage(fixture, corpus) {
   return {
     fixtureVersion: fixture.snapshotVersion,
     metrics: { m1, m2, m3, m4, m5, m6 },
-    attribution: { chainDistribution: chainDist, mapAmbiguityRate: mapAmbiguityRate, multiCardTrajectories: multiCard, functionIdFacts },
+    attribution: {
+      chainDistribution: chainDist,
+      mapAmbiguityRate: mapAmbiguityRate,
+      multiCardTrajectories: multiCard,
+      primaryCardMisaligned: primaryNotTopChain,
+      functionIdFacts,
+    },
     lists: { deadCards, uncoveredTop, staleCards },
     cardStems: stems,
   };
@@ -286,7 +368,8 @@ function main() {
 
   if (args.includes('--baseline')) {
     const baseline = JSON.parse(readFileSync(get('--baseline', ''), 'utf8'));
-    const FLOORS = ['m1.joinability', 'm2.coverage', 'm3.utilization', 'm5.nodeCoverage', 'm5.orderAgreement'];
+    // D4: M5 floors removed — node metrics are informational until rebuilt.
+    const FLOORS = ['m1.joinability', 'm2.coverage', 'm3.utilization'];
     const MARGIN = 0.05;
     let pass = true;
     const rows = [];
@@ -312,7 +395,7 @@ function main() {
     console.log(`M2 coverage      ${m2.coverage}  (${m2.mappedTrajectories}/${m2.denominator})`);
     console.log(`M3 utilization   ${m3.utilization}  (${m3.utilizedCards}/${m3.denominator}; dead: ${m3.deadCardCount})`);
     console.log(`M4 uncovered     ${m4.uncoveredTrajectories} trajs / ${m4.distinctUncoveredPages} pages (top: ${m4.top[0] ? m4.top[0].pageId + '×' + m4.top[0].count : '-'})`);
-    console.log(`M5 nodeCoverage  ${m5.nodeCoverage}  orderAgreement ${m5.orderAgreement}  offCardRate ${m5.offCardRate}  (n=${m5.denominator.withVisitedRegions})`);
+    console.log(`M5 nodeCoverage  ${m5.nodeCoverage}  entryOnCard ${m5.entryOnCardRate}  offCardRate ${m5.offCardRate}  ceiling ${m5.ceiling}  (n=${m5.denominator.withPageKeys} trajs / ${m5.denominator.distinctPageKeys} keys)`);
     console.log(`M6 freshness     ${m6.freshness}  (${m6.freshMarkers}/${m6.freshMarkers + m6.staleMarkers}; stale cards: ${m6.staleCardCount})`);
   }
   if (result.baselineDiff && !result.baselineDiff.pass) process.exitCode = 1;
