@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 18:20 · Cursor Lead — 开工：dedup-deletion 删装配期死 dedup
+
+- 进行中：2026-09-10 18:20；根因=`src/dedup.js` 生产零引用（装配管线已删），仅 `characterize-dedup` 门禁消费；活录 coalesce 仍在 `state.py`
+- 范围：删 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS/CLAUDE/README/jsdoc/verify-all（仅去 dedup 行，保留他线 WIP）；todo-list、本文件
+- 禁入区：classify.py、fill/select、`.cursor/`、他线 verify-all 新增 pin 行
+- 方式：零引用复核 → 删源+门禁+文档 → 收工（用户选定待裁=产品授权砍）
+
 ## 2026-09-10 18:09 · Cursor Lead — 收工：p2-async-actionlog 增量 sync
 
 - 完成：回链开工 `8f3de3b1`；Python `_emit_action_log_sync` 默认 delta + 孤儿/周期(50) full；Node `applyActionLogSync`；runner 接线
