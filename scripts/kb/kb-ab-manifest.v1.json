@@ -28,22 +28,66 @@
     "environmentPrep": "每条 run：record/prepare 后、record/start 前执行 tmp/kb-ab/close-tianyuan-dialog.py（CDP 真实 mousedown 关天元欢迎弹窗；弹窗不可见则零操作直过）。两臂同一处理——这是 harness 而非自变量"
   },
   "pilot": {
-    "reqIds": ["R02", "R06"],
+    "reqIds": [
+      "R02",
+      "R06"
+    ],
     "order": "R02:A,B then R06:B,A (alternating)",
     "ceilingRule": "pilot A-arm success rate >= 0.9 -> switch difficulty anchors per spec S4 (stamp family #586/590/592/593/594 + credit_usage #615), manifest -> v1.1",
     "optionalCArm": "deferred (kept for report discussion; not run in v1)",
     "result": {
       "runs": [
-        { "trajectoryId": 723, "arm": "A", "reqId": "R02", "recordStatus": "recorded", "isSuccessful": 1, "stepCount": 32, "note": "run1 on same traj failed on leftover tianyuan dialog (zero actions, missing_success_token) - environment blocker not task failure; run1 in abortedRuns" },
-        { "trajectoryId": 724, "arm": "B", "reqId": "R02", "recordStatus": "recorded", "isSuccessful": 1, "stepCount": 44 },
-        { "trajectoryId": 725, "arm": "A", "reqId": "R06", "recordStatus": "recorded", "isSuccessful": 1, "stepCount": 5 },
-        { "trajectoryId": 726, "arm": "B", "reqId": "R06", "recordStatus": "recorded", "isSuccessful": 1, "stepCount": 5 }
+        {
+          "trajectoryId": 723,
+          "arm": "A",
+          "reqId": "R02",
+          "recordStatus": "recorded",
+          "isSuccessful": 1,
+          "stepCount": 32,
+          "note": "run1 on same traj failed on leftover tianyuan dialog (zero actions, missing_success_token) - environment blocker not task failure; run1 in abortedRuns"
+        },
+        {
+          "trajectoryId": 724,
+          "arm": "B",
+          "reqId": "R02",
+          "recordStatus": "recorded",
+          "isSuccessful": 1,
+          "stepCount": 44
+        },
+        {
+          "trajectoryId": 725,
+          "arm": "A",
+          "reqId": "R06",
+          "recordStatus": "recorded",
+          "isSuccessful": 1,
+          "stepCount": 5
+        },
+        {
+          "trajectoryId": 726,
+          "arm": "B",
+          "reqId": "R06",
+          "recordStatus": "recorded",
+          "isSuccessful": 1,
+          "stepCount": 5
+        }
       ],
-      "aArmSuccessRate": 1.0,
+      "aArmSuccessRate": 1,
       "ceilingTriggered": true,
       "residueCreated": [
-        { "customerName": "吴强杰", "customerNo": "26091101181825853", "state": "信贷预客户", "run": "723(A,R02)", "cleanup": "不可删（SUT 状态机），cleanupLog 留证移交" },
-        { "customerName": "KB主链R1-20260911-0125", "customerNo": "26091101360078854", "state": "信贷预客户", "run": "724(B,R02)", "cleanup": "不可删，cleanupLog 留证移交" }
+        {
+          "customerName": "吴强杰",
+          "customerNo": "26091101181825853",
+          "state": "信贷预客户",
+          "run": "723(A,R02)",
+          "cleanup": "不可删（SUT 状态机），cleanupLog 留证移交"
+        },
+        {
+          "customerName": "KB主链R1-20260911-0125",
+          "customerNo": "26091101360078854",
+          "state": "信贷预客户",
+          "run": "724(B,R02)",
+          "cleanup": "不可删，cleanupLog 留证移交"
+        }
       ]
     }
   },
@@ -193,20 +237,56 @@
     }
   ],
   "droppedRequirements": [
-    { "reqId": "R03", "reason": "与 R02 同质（新增对公客户=同一任务），无信息量", "v1Requirement": "1、登录系统。\n2、新增对公客户。" },
-    { "reqId": "R08", "reason": "同质查询类（产品库管理），由 R09 代表该难度层", "v1Requirement": "1、登录系统。2、进入产品管理，打开产品库管理，查询产品。" },
-    { "reqId": "R10", "reason": "同质查询类（集群客户管理）", "v1Requirement": "1、登录系统。2、进入客户管理，打开集群客户管理，查询集群客户。" }
+    {
+      "reqId": "R03",
+      "reason": "与 R02 同质（新增对公客户=同一任务），无信息量",
+      "v1Requirement": "1、登录系统。\n2、新增对公客户。"
+    },
+    {
+      "reqId": "R08",
+      "reason": "同质查询类（产品库管理），由 R09 代表该难度层",
+      "v1Requirement": "1、登录系统。2、进入产品管理，打开产品库管理，查询产品。"
+    },
+    {
+      "reqId": "R10",
+      "reason": "同质查询类（集群客户管理）",
+      "v1Requirement": "1、登录系统。2、进入客户管理，打开集群客户管理，查询集群客户。"
+    }
   ],
   "officialPlan": {
-    "reqIds": ["R01", "R02", "R04", "R05", "R06", "R07", "R09", "R11", "N01", "N02", "N03", "N04"],
-    "substitutes": ["R12"],
+    "reqIds": [
+      "R01",
+      "R02",
+      "R04",
+      "R05",
+      "R06",
+      "R07",
+      "R09",
+      "R11",
+      "N01",
+      "N02",
+      "N03",
+      "N04"
+    ],
+    "substitutes": [
+      "R12"
+    ],
     "perReqCleanup": true,
     "cleanupLogTarget": "manifest.cleanupLog",
     "runlog": "tmp/kb-ab/runlog.jsonl (one line per run)",
     "totalRuns": 24
   },
   "cleanupLog": [
-    { "at": "2026-09-11T03:30+08:00", "item": "pilot 建档残留下账：吴强杰 26091101181825853（723）、KB主链R1-20260911-0125 26091101360078854（724）均=信贷预客户，SUT 状态机无删除入口（state_actions 仅草稿客户允许删除），按 09-07 R1 先例留证移交；名称不带 KBAB 前缀（agent 自主命名），已在此登记供对账", "disposition": "retained+documented" }
+    {
+      "at": "2026-09-11T03:30+08:00",
+      "item": "pilot 建档残留下账：吴强杰 26091101181825853（723）、KB主链R1-20260911-0125 26091101360078854（724）均=信贷预客户，SUT 状态机无删除入口（state_actions 仅草稿客户允许删除），按 09-07 R1 先例留证移交；名称不带 KBAB 前缀（agent 自主命名），已在此登记供对账",
+      "disposition": "retained+documented"
+    },
+    {
+      "at": "2026-09-11T06:10+08:00",
+      "item": "正式批 24 run（727-750）残留终局：7 笔新建客户（729 KB主链R1-20260911-0214/26091102181243755、730 KB主链R1-20260911-0224/26091102281021356、731 瑞昇/26091102485680657、732 瑞昇B/26091103113741958、743 KBAB26091102-202609110429/26091104304103959、744 KBAB26091102-202609110438/26091104401295560、745 KBAB26091102-202609110447/26091104553520861、746 KBAB26091102-202609110504/26091105094428662）均为「信贷预客户」状态——SUT 状态机删除入口仅对草稿客户开放（09-07 R1 先例 8 次实证），无法经 UI 删除，按先例留证移交；N03 双臂纯只读零写入；N04 双臂仅开评级弹窗未提交成功（无流程数据落库）。他人 KB测… 数据零触碰（N03 仅查询 KB测客户-20260905-1315）",
+      "disposition": "retained+documented (cleanup-ledger.jsonl 逐条带证据步号)"
+    }
   ],
   "abortedRuns": [
     {

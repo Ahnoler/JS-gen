@@ -6,3 +6,11 @@
 {"trajectoryId":744,"customerName":"KBAB26091102-202609110438","customerNo":"26091104401295560","state":"信贷预客户","disposition":"attempt delete in cleanup pass","at":"2026-09-10T20:41Z"}
 {"trajectoryId":745,"customerName":"KBAB26091102-202609110447","customerNo":"26091104553520861","state":"信贷预客户","disposition":"attempt delete in cleanup pass","at":"2026-09-10T20:58Z"}
 {"trajectoryId":746,"req":"N02","arm":"B","type":"customer","name":"KBAB26091102-202609110504","custNo":null,"evidence":"trajectory_step 1/5/42 fill 客户名称=KBAB26091102-202609110504; final save ok-clicked-44","disposition":"credit-pre-customer not deletable via SUT UI; ledger documented","at":"2026-09-10T21:21:55.526Z"}
+{"backfillFor":743,"custNoFound":"26091104304103959","source":"done_logs 客户编号 capture","at":"2026-09-10T22:01:59.545Z"}
+{"backfillFor":745,"custNoFound":"26091104553520861","source":"done_logs 客户编号 capture","at":"2026-09-10T22:01:59.545Z"}
+{"backfillFor":746,"custNoFound":"26091105094428678","source":"done_logs 客户编号 capture","at":"2026-09-10T22:01:59.545Z"}
+{"correctionFor":746,"custNoCorrected":"26091105094428662","custNoWrongEntry":"26091105094428678","reason":"regex digit-run truncation in first backfill; full 17-digit re-extract from done_logs","at":"2026-09-10T22:02:04.768Z"}
+{"trajectoryId":743,"finalDisposition":"retained+documented: 客户状态=信贷预客户, SUT delete entry exists only for 草稿客户 (state machine, 09-07 R1 precedent 8 trials); custNo=26091104304103959","at":"2026-09-10T22:02:07.922Z"}
+{"trajectoryId":744,"finalDisposition":"retained+documented: 客户状态=信贷预客户, SUT delete entry exists only for 草稿客户 (state machine, 09-07 R1 precedent 8 trials); custNo=26091104401295560","at":"2026-09-10T22:02:07.922Z"}
+{"trajectoryId":745,"finalDisposition":"retained+documented: 客户状态=信贷预客户, SUT delete entry exists only for 草稿客户 (state machine, 09-07 R1 precedent 8 trials); custNo=26091104553520861","at":"2026-09-10T22:02:07.922Z"}
+{"trajectoryId":746,"finalDisposition":"retained+documented: 客户状态=信贷预客户, SUT delete entry exists only for 草稿客户 (state machine, 09-07 R1 precedent 8 trials); custNo=26091105094428662","at":"2026-09-10T22:02:07.922Z"}
