@@ -271,6 +271,38 @@ export async function transitionItem(itemId, fromStatuses, toStatus, {
 }
 
 /**
+ * Extend lease_expires_at for an in-flight preparing/recording item (CAS on worker token).
+ * Used so long prepare+record does not expire and get reclaimed by claimNextItem.
+ * @param {number} itemId Item ID
+ * @param {object} [opts]
+ * @param {string|null} [opts.expectedWorkerToken] Required current worker_token
+ * @param {number} [opts.leaseMs] Lease duration from now
+ * @param {string[]} [opts.fromStatuses] Allowed statuses (default preparing|recording)
+ * @param {import('knex').Knex|null} [opts.trx] Optional transaction
+ * @returns {Promise<boolean>} true when a row was updated
+ */
+export async function renewItemLease(itemId, {
+  expectedWorkerToken = null,
+  leaseMs = 600000,
+  fromStatuses = ['preparing', 'recording'],
+  trx = null,
+} = {}) {
+  const db = trx || getDB();
+  const statuses = Array.isArray(fromStatuses) ? fromStatuses : [fromStatuses];
+  const q = db(ITEM_TABLE)
+    .where({ id: Number(itemId) })
+    .whereIn('status', statuses);
+  if (expectedWorkerToken != null) q.andWhere({ worker_token: expectedWorkerToken });
+
+  const leaseExpires = new Date(Date.now() + Number(leaseMs || 600000));
+  const n = await q.update({
+    lease_expires_at: leaseExpires,
+    updated_at: new Date(),
+  });
+  return n > 0;
+}
+
+/**
  * Atomically claim the next FIFO item for analysis or recording.
  * @param {object} opts Claim options
  * @param {string[]} opts.statuses Eligible item statuses

@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 18:01 · Cursor Lead — 收工：p2-batch-lease 录制期续租
+
+- 完成：回链开工 `17d7185c`；DAO `renewItemLease`（CAS worker_token + preparing|recording）；`runRecord` 经 `startItemLeaseRenewal` 周期续租（lease/3，下限 30s，`finally` 停表）
+- 验收：`node scripts/characterization/cold/characterize-batch-item-lease-renew.mjs` OK
+- 遗留：冷 pin 未入 verify-all（WIP）；控制面重启后生效；下一 P3 可排 `p2-async-actionlog` / `stop-busy-race`（后者文案已注明 finally 无害化）
+
 ## 2026-09-10 17:59 · Cursor Lead — 开工：p2-batch-lease 录制期续租
 
 - 进行中：2026-09-10 17:59；根因=`BATCH_ITEM_LEASE_MS=600000` 录制中不续租，长跑 item 过期可被二次 claim

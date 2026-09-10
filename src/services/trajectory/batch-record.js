@@ -23,6 +23,47 @@ import {
 
 let recordWorkers = 0;
 
+/**
+ * Renew interval: ~1/3 of lease, floored at 30s so short leases still tick before expiry.
+ * @param {number} [leaseMs]
+ * @returns {number}
+ */
+export function leaseRenewIntervalMs(leaseMs = BATCH_ITEM_LEASE_MS) {
+  return Math.max(30_000, Math.floor(Number(leaseMs || 600_000) / 3));
+}
+
+/**
+ * Periodically renew a claimed item lease while prepare/record is in flight.
+ * @param {object} opts
+ * @param {number} opts.itemId
+ * @param {string} opts.workerToken
+ * @param {number} [opts.leaseMs]
+ * @param {number} [opts.renewEveryMs] Override interval (tests)
+ * @param {(itemId: number, opts: object) => Promise<unknown>} [opts.renew]
+ * @returns {() => void} stop function
+ */
+export function startItemLeaseRenewal({
+  itemId,
+  workerToken,
+  leaseMs = BATCH_ITEM_LEASE_MS,
+  renewEveryMs = null,
+  renew = (id, o) => batchDao.renewItemLease(id, o),
+} = {}) {
+  const every = renewEveryMs != null
+    ? Number(renewEveryMs)
+    : leaseRenewIntervalMs(leaseMs);
+  const timer = setInterval(() => {
+    Promise.resolve(renew(itemId, {
+      expectedWorkerToken: workerToken,
+      leaseMs,
+    })).catch((err) => {
+      console.warn('[batch] lease renew failed:', err?.message || err);
+    });
+  }, every);
+  if (typeof timer.unref === 'function') timer.unref();
+  return () => clearInterval(timer);
+}
+
 async function computeClusterFreeSlots() {
   const dbNodes = await executorNodeDao.list().catch(() => []);
   const byUuid = new Map(dbNodes.map((n) => [n.nodeUuid, n]));
@@ -101,6 +142,12 @@ async function runRecord(item, token) {
   }
 
   await emitProgress(batchId, { ...item, status: 'preparing' });
+
+  const stopRenew = startItemLeaseRenewal({
+    itemId: item.id,
+    workerToken: token,
+    leaseMs: BATCH_ITEM_LEASE_MS,
+  });
 
   try {
     await prepareTrajectoryRecording(tid);
@@ -243,5 +290,7 @@ async function runRecord(item, token) {
     });
     await emitProgress(batchId);
     await maybeFinalizeJob(batchId);
+  } finally {
+    stopRenew();
   }
 }

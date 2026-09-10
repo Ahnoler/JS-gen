@@ -133,7 +133,7 @@
 | **stop-busy-race** | P3 | record/stop 不等 busy（可能 stale）直接发 cancel_step（record-lifecycle.js:321 注释自认）；**2026-09-10 更新：finally 补发已按 runId 归属守卫无害化（9eb94716），独立改造不再另立** |
 | **engine-wet-trio** | P1 已闭 | 对抗 review 真机湿测三件套：**①②③ 均 PASS（2026-09-10）**。①stop→重录用户确认；②detach→重附后门闩日志 `async gate skipped … runtimeReplaced=true`（traj 721）；③并发 start 200+409（traj 720）。证据 `tmp/engine-wet-trio/report.md`；门闩可调 `RECORD_FINALIZE_GATE_MS`（默认 90000） |
 | **p1-6-replayid** | P2 已闭 | replay_done 按 replayId 归属过滤 + 超时 `cancel_step`（`replay-actions.js` / Python `event_dispatch` 回带 / rerun 经 helper）；冷 pin `characterize-replay-id.mjs`；2026-09-10 落地 |
-| **p2-batch-lease** | P3 | BATCH_ITEM_LEASE_MS=600000 恰 10 分钟且录制期无续租；长登录+多阶段可超租→item 被二次 claim 双跑，是否实际发生需湿测 |
+| **p2-batch-lease** | P3 已闭 | 录制期 `renewItemLease` + `startItemLeaseRenewal`（约 lease/3，下限 30s）防超租二次 claim；冷 pin `characterize-batch-item-lease-renew.mjs`；2026-09-10 落地 |
 | **p2-toast-cursor** | P3 已闭 | step_notice：`log_len < cursor` 时回卷游标并清 `_step_notice_seen`，再以 cursor=0 重扫（`rewind_notify_cursor_if_shrunk`）；冷 pin 扩 `characterize-step-notice-scan.py`；2026-09-10 落地（未改 js_snippets） |
 | **dedup-deletion** | 待裁 | src/dedup.js 生产零引用（唯一 importer=characterize-dedup.mjs 门禁），删除需产品侧湿测确认无去重需求，且 AGENTS.md「Consecutive-only dedup」条目与门禁行须同删 |
 | **p2-async-actionlog** | P3 | action_log_sync 每动作全量重发（O(n²)）+ emit_json 同步 stdout，大轨迹管道背压拉长 cancel 窗口（性能项，需真机量测后改增量/限频） |
