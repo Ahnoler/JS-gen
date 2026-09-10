@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 23:10 · ZCode 引擎线 — 词表冻结（回链 22:45）：六 type 支撑 18 操作
+
+- 用户定盘："不改变这六个推送 type，这六个操作类型要支持我们的18个操作"——type 词表=click/input/select:click/select:tree/radio/date 共六个**不新增第七种**；18 操作全部在六 type 内表达（click=10/input=2/select:click=2/select:tree=1/radio=2/date=fill 日期升格），dataName 前缀=type 内子操作路由键，处理三层模型=type 定 handler→前缀定子路径→剥前缀文本作 labelHint
+- 落档：报告 §7 重写为词表冻结版五批蓝图（原"date 依赖 P2 接线空转"边界降为推送侧事实备案：引擎照做，步骤到达与否属推送侧行为）；记忆 tansun-scope-operations-only 同步三轮定盘语义
+- 本单元只提交 agent-log + 报告两文件，他线 WIP 未触碰；实装开工待用户发令
+
 ## 2026-09-10 22:45 · ZCode 引擎线 — 范围二次澄清（回链 22:20）：推送操作兼容
 
 - 用户澄清："推送的操作，同事引擎无法正确处理，所以需要进行兼容"——22:20"只补全操作"被误读为收窄，实际语义=**在 tansun_ui_engine 侧做兼容使 18 映射操作全部正确执行**：①补缺失 handler；②修已接收操作错误处理（值字段分流 object_value or val、dataName 前缀=操作语义通道：路由读前缀+labelHint 剥前缀）
