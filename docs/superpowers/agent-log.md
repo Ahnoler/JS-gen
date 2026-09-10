@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 00:52 · Zcode — 收工：KB 覆盖回溯 T3 报告+T4 台账（回链 00:26 开工 `ca4763b6`）
+
+- 完成：T3（`5b05c5d8`）基线报告 [`reports/2026-09-11-kb-coverage-retro.md`](reports/2026-09-11-kb-coverage-retro.md)——M1–M6 全表（含分母）+ 12 无码卡 + 57 死卡 + 38 陈旧卡清单 + Top20 缺口与页面族 + 结论（KB=少数高频交易深知识非广覆盖；投资方向=做准 27 张活卡+按真实频次补缺口，评级申请族×6 补 rating 卡 ZJJK 码为性价比最高单点）；T4（本 commit）台账：todo-list 新线状态 + 本条收工
+- 验收：**报告数值与引擎输出逐位一致**（`node scripts/kb/kb-coverage.mjs --json` 复核 M1 72/84、M2 69/335、M3 27/84 dead 57、M4 266/263、M5 0.131/0.012/0.835 n=64、M6 33/132 stale 38、chains ZJJK 58/FS 0/ROUTE 58、ambiguity 0.101）；`characterize-kb-coverage` **3 passed**（脱敏硬断言+floor lockstep+证伪钩子）；红线零违反（src/** 零改动、SELECT only、评测集/阈值/verify-all/data/kb/req 零改动）
+- 提交链：`ca4763b6` 开工 → `8612b6c4` T0 快照 → `c52b929c` sha 确定性修正（capturedAt 剔出内容哈希）→ `dfa3a1c2` T1 引擎 → `d5de67dc` T2 门禁+双重证伪 → `5b05c5d8` T3 报告 → 本 commit
+- 遗留移交（reviewer 清单四项，数据均已备齐）：①抽 10 条 fixture 回库比对（白名单字段级）②独立复算 M1/M2/M3/M6（纯离线：fixture+data/kb/flows）③亲手证伪脱敏断言与 floor 各一次（`KB_COVERAGE_FIXTURE`/`KB_COVERAGE_BASELINE` env 钩子，指向 tmp/ 不动冻结件）④确认未用 task 文本匹配、未拿 function_id 当卡片映射。补码/建卡处置归 Lead（属卡治理，非本线）
+
 ## 2026-09-11 00:26 · Zcode — 开工：KB 覆盖回溯（方向 A，spec+plan `ecfc4ab6`；只读零产品改动）
 
 - **隧道实证**：本机 13306 已 LISTENING（reviewer 后台 job 同机）且 SELECT COUNT(trajectory)=416 成功——口令问题消解，走标准路径：实施方自产 fixture（reviewer 按抽检流程查），无需 Lead 定口令归属
