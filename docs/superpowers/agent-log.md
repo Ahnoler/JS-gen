@@ -663,6 +663,12 @@
 - 方式：TDD 改 characterization 期望 → 改 `mapStepToTransactionEvent`；V2/V3 推送共用此函数
 - 注意：已收工，见上方 15:31 条目
 
+## 2026-09-10 · ZCode 重构线 — 开工：form_action_engines.py 按引擎拆分
+
+- 范围：scripts/controller/actions/form_action_engines.py（拆为 5 引擎文件+base+barrel）+ 新建 form_engine_base/login/fill/select/radio/tree_engine.py；特征化 pin 迁移（25 个 read_text 脚本，逐批改读新路径）；docs/superpowers/{specs,plans}/2026-09-10-form-action-engines-split-*.md
+- 禁入区：他线 WIP（session_runner.py、kb-flow-cards/req-draft-traj/propose-cache、Cursor 未提交的 specs/plans/docs）；src/ 下任何文件（本轮不触碰）
+- 方式：先调研（2 个 Explore 子智能体并行：pin 清单+依赖图）→ spec+plan 落盘 commit → 逐引擎微步搬运（barrel 保持 import 兼容）→ 每步 verify-all；子智能体不 commit，主会话验收代提交
+
 ## 2026-09-08 · ZCode V3导出线 — 收工：弹窗与触发行同层级（2475f9fb）
 
 - 完成：弹窗 propertiesPID 改指触发 ele 的父节点（同级展示）+ reorderPopupSubtrees 弹窗子树移到触发行后并重编 ID；layer-tree 工具交错渲染同步
