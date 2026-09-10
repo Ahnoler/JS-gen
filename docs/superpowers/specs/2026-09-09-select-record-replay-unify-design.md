@@ -82,7 +82,7 @@ D6 将落库动作名统一为 `select_option`（`target_kind` 仍可为 `form_t
 | API | `resolve_select_dispatch(*, label, element=None, field_kind=None, page=None) -> SelectDispatch` |
 | 接线-引擎 | `_select_option_impl` 用 router 替代裸 `if kind == 'tssc-multi-select'` |
 | 接线-回放 | `select_option` 分支先 router；`path=tssc` → 现有 `JS_TSSC` 路径；收敛 hotfix 内联探测 |
-| 兼容 | `action_name == 'tssc_multi_select'` → 强制 `path=tssc`（或等价 reason=`legacy_action`） |
+| 兼容 | `action_name == 'tssc_multi_select'` → 强制 `path=tssc`（或等价 reason=`legacy_action`）；**Phase B 后**该支路经 `SelectEngine.select_option_for_replay`，禁止直调 `JS_TSSC_*` |
 | 文档 | 更新 `engine-actions-contract` §2.4：`select_option` 注明「经 select_dispatch；可能 tssc」 |
 
 ### 3.2 回放外壳（A 阶段保留）
@@ -119,7 +119,7 @@ Router **只**决定调哪段 JS，不替代上述策略。
 |---|---|
 | 引擎入口 | `select_option_for_replay(...)` **或** `select_option(..., mode='replay'\|'record')` |
 | 回放主路径 | `select_option` → 解析 entry/params → 调引擎 replay 入口 → 注解结果 |
-| 禁止 | 回放主路径直接 `page.evaluate(JS_SELECT_OPTION)` / `JS_TSSC_*`（除引擎内部） |
+| 禁止 | 回放主路径直接 `page.evaluate(JS_SELECT_OPTION)` / `JS_TSSC_*`（除引擎内部）；含历史 `tssc_multi_select` 动作名分支 |
 | 可选包 | `select_tree_option` 同步迁入；`click_radio` **默认本阶段不做**，除非实施时成本低 |
 
 ### 4.2 必须参数化的引擎副作用

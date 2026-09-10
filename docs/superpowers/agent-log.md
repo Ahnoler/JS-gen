@@ -1,5 +1,18 @@
 # Agent 协作日志
 
+## 2026-09-10 11:00 · Cursor Lead — 收工：legacy tssc_multi_select 经 SelectEngine（回链 10:58）
+
+- 完成：`replay_form_action` 历史分支 → `SelectEngine.select_option_for_replay`；移除直调 `JS_TSSC`；升级 `characterize-select-replay-engine`；契约 §2.4 + select unify 兼容注
+- 验收：select-replay-engine / select-dispatch / tssc-multi-select **GREEN**
+- 遗留：无
+
+## 2026-09-10 10:58 · Cursor Lead — 开工：legacy tssc_multi_select 回放经 SelectEngine
+
+- 进行中：10:58；历史 `action_name=tssc_multi_select` 禁直调 JS_TSSC，改经 `SelectEngine.select_option_for_replay`
+- 范围：`replay_form_action.py`、`characterize-select-replay-engine.py`、select unify / contract 短注、本文件
+- 禁入区：click 族、fill、`.cursor/`、他线 WIP
+- 方式：薄接线 + 升级 cold pin；不另开大 plan
+
 ## 2026-09-10 10:12 · Cursor Subagent — 收工：click index+button unify SDD close（回链 09:59）
 
 - 完成：契约 §2.2 `click_button` / §2.3 `click_element_by_index` 经 `ClickEngine`；AGENTS 一句；verify-all 注册 `characterize-click-replay-engine`；click design 已落地；fill §8 index+button done；Task 5 文档/门禁收尾（**未 commit**，待主会话验收）

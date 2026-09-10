@@ -15,7 +15,6 @@ from ._helpers import (
 from ._js_snippets import (
     JS_FIND_LABELED_SELECT,
     JS_SELECT_VALUE_BY_XPATH,
-    JS_TSSC_MULTI_SELECT,
 )
 from .form_action_engines import FillEngine, RadioEngine, SelectEngine, TreeEngine
 from .replay_js import _JS_LOCATE_BY_XPATH, _JS_READ_VALUE_BY_XPATH
@@ -97,14 +96,27 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         return await _with_xpath_first(_tree)
 
     if action_name == 'tssc_multi_select':
+        # Legacy action_name compat (D6): force tssc via dispatch + SelectEngine
+        # (no direct JS_TSSC evaluate on the replay main path).
         dispatch = await resolve_select_dispatch(label=label, element=el, force_path='tssc')
         sys.stderr.write(
-            f'[replay-select] dispatch path={dispatch.path} reason={dispatch.reason}\n'
+            f'[replay-select] dispatch path={dispatch.path} reason={dispatch.reason} '
+            f'legacy_action=tssc_multi_select label={label!r}\n'
         )
         sys.stderr.flush()
+        el_force = dict(el) if isinstance(el, dict) else {}
+        if not str(el_force.get('target_kind') or '').strip():
+            el_force['target_kind'] = 'form_tssc_multi_select'
 
         async def _tssc():
-            r = await page.evaluate(JS_TSSC_MULTI_SELECT, [label, value])
+            r = await SelectEngine.select_option_for_replay(
+                page,
+                label,
+                value,
+                xpath_smart=xpath_smart or '',
+                element=el_force,
+                exact_option=True,
+            )
             await page.wait_for_timeout(WAIT_500_MS)
             return r
         return await _with_xpath_first(_tssc)
