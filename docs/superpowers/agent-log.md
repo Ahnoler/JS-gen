@@ -1,5 +1,19 @@
 # Agent 协作日志
 
+## 2026-09-10 16:53 · Cursor Lead — 开工：engine-wet-trio ②③ 真机湿测
+
+- 进行中：2026-09-10 16:53；验收=② detach→重附后旧 90s 门闩不得误伤新 run；③ 并发 start 第二路 409
+- 范围：tmp 湿测脚本/报告、todo-list/agent-log；**重启控制面**加载 `0421744b`；用一次性 draft 轨迹
+- 禁入区：他线 WIP（classify/verify-all/plans）、生产主链轨迹不乱录
+- 方式：重启 4097 → 建湿测 traj → ③ 并发 start → ② finalize 后门闩窗口内 detach/prepare/start 并等门闩日志
+
+## 2026-09-10 16:53 · ZCode — 线关闭确认：KB 召回评测常态化 G3 PASS（回链 T0 09-09 22:44 / T4 09-10 13:44）
+
+- G3 终局 **PASS**（reviewer 结论 `reports/2026-09-09-kb-recall-eval-g3.md`，commit `13abd9a2`）：三 gate 全过，反作弊六项零触发，冻结文件改动实证内容零漂移，分摊口径重算逐位一致；**本线正式关闭**
+- 遗留三条归属（均无需本线动手）：①A 层第七项下限（建议 A≥0.95）待 Lead 批；②`entries.length >= 130` → `=== 130` 留下次动文件时顺手改；③冻结文件批准人追认待 Lead 在 todo 补一句
+- 方向 5（混合检索）接口约定已由 reviewer 成文于 G3 报告 §三：改 `flow-card-recall.js` 同 commit 附评测复跑；floor 只升不降（下调须 Lead 批+绊线同 commit）；冻结文件 v2 走 changeLog；分摊口径=契约；py 收敛另开任务
+- 本条目仅确认关闭，无代码改动；`verify-all` 注册行现为 `:159`（他线追加所致，行号随他线漂移）
+
 ## 2026-09-10 16:43 · Cursor Lead — 收工：P1-5 per-tid record/start 内存互斥
 
 - 完成：回链开工 `1fe635f2`；`startTrajectoryRecording` 入口同步 claim `runtime.aiRecording`（先于异步点）；早退路径释放；冷 pin `characterize-record-start-mutex.mjs`；todo `engine-wet-trio` ③ 代码侧闭合
