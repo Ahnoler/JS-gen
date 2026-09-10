@@ -1,7 +1,7 @@
 # Design: `click_element_by_index` / `click_button` 录制/回放统一（直接 Phase B）
 
 **日期**：2026-09-10  
-**状态**：设计获批（用户选 **A 范围** = index+button；**B 深度** = 跳过 `click_dispatch`，经 `ClickEngine`）— 计划待 writing-plans  
+**状态**：设计获批（用户选 **A 范围** = index+button；**B 深度** = 跳过 `click_dispatch`，经 `ClickEngine`）— 计划 [`../plans/2026-09-10-click-record-replay-unify.md`](../plans/2026-09-10-click-record-replay-unify.md)  
 **前置**：[`2026-09-09-radio-record-replay-unify-design.md`](./2026-09-09-radio-record-replay-unify-design.md)、[`2026-09-09-fill-record-replay-unify-design.md`](./2026-09-09-fill-record-replay-unify-design.md)  
 **契约**：[`2026-09-05-engine-actions-contract.md`](./2026-09-05-engine-actions-contract.md) §2.2–2.3  
 **用户裁决**：产品回放写动作/主点击经引擎 `mode=replay`；本轮只交付 **index + button**；menu/close 等另开。
