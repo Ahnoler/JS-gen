@@ -1,5 +1,7 @@
 {
   "synonymVersion": "v1",
+  "status": "unvalidated",
+  "statusNote": "G3 FAIL + Lead 裁定（2026-09-10）：verify 集独立增量=0（A3），未接线生产路径。素材保留、未启用、待评测集 v2（≥100 条独立新查询，另立项）重建并验证泛化后重评；通过前不得接线 propose.js、不得把 offline 度量（0.790/0.917/0.843/0.860）当成果引用。生产口径=T2 链态 0.740。",
   "note": "业务受控词表（recall P0 T3）。构建纪律（D6/A1）：词条只依据 kb-recall-failures.v1.json 的 build 集 + 业务通识；verify 集条目在建表期间未读取。scope=null=全局生效（v1 全部为 null：词项均为领域特定词，通用词留待 v2 配 scope）；expand 项尽量取 gold 卡既有词表原文，使查询扩展精确命中卡面。",
   "entries": [
     { "term": "止付", "expand": ["冻结"], "scope": null, "source": "失败反推 B-001（把额度临时止付再恢复 → limit 卡词面=额度冻结/解冻）" },

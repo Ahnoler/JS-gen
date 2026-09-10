@@ -361,6 +361,31 @@ async function main() {
       assert.equal(hit.flowRef, 'session_login');
     });
 
+    await runAsync('node-ratio denominator ignores card-level-only tokens (hash_markers code)', async () => {
+      // 卡级独占码场景（recall P0 收尾 pin）：FS/ZJJK 码只活在 hash_markers，
+      // 任何节点的 id/page/enter 都不可表达 → 分母必须排除该权重（nodeEligibleScore），
+      // 否则 NODE_SCORE_RATIO 被抬高、正确节点被误杀 nodeId=null。
+      // 曾因 T2 分词激活码 token 后触发（'对公客户转正并补齐任务页信息'→convert 误杀），此 pin 防回归。
+      const card = {
+        _stem: 'code_card',
+        flow: '转正操作卡',
+        keywords: ['转正'],
+        hash_markers: ['FS00004007'],
+        nodes: [
+          { id: 'list', page: '转正列表页', enter: '菜单 转正管理' },
+          { id: 'convert', page: '客户转正场景', enter: '列表选客户→【修改】→【客户转正】' },
+        ],
+      };
+      const hit = matchFlowForAtom({
+        title: '对公客户转正并补齐任务页信息',
+        taskDraft: '1、在对公客户主页点击【客户转正】，进入 FS00004007。\n',
+        cards: [card],
+      });
+      assert.equal(hit.flowRef, 'code_card');
+      assert.equal(hit.nodeId, 'convert',
+        'code living only in hash_markers must not inflate the node-ratio denominator');
+    });
+
     await runAsync('synonym expansion bridges query word to card vocabulary', async () => {
       const cards = [
         { _stem: 'limit_card', flow: '额度管控卡', aliases: ['额度冻结', '额度解冻'], keywords: ['额度冻结', '额度解冻', '部分冻结', '风险冻结'] },
