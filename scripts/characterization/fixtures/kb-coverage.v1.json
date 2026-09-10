@@ -3,7 +3,7 @@
   "changeLog": [
     "v1 (2026-09-11): initial snapshot per spec 2026-09-11-kb-coverage-retrospective-design §3"
   ],
-  "capturedAt": "2026-09-10T16:28:04.653Z",
+  "capturedAt": "2026-09-10T16:29:58.376Z",
   "counts": {
     "trajectories": 416,
     "withPageId": 370,
@@ -21680,5 +21680,5 @@
       "resPath": "/filesMgt/filesRet/filesRetAplyMgtPg"
     }
   ],
-  "contentSha256": "8758eabe4e30bd5006a58c9bcded10bfdf6bb16bafa13d923e65c0540c29d05f"
+  "contentSha256": "375329fde791d4a9365f871874af7decbb50c9876dea274ce8b33e5a34cb35d4"
 }

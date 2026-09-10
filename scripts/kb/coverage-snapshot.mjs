@@ -40,12 +40,20 @@ function loadEnv() {
 const MAX_TEXT = 40;
 const MAX_VISITED = 200;
 
-/** Redact any string: drop values longer than MAX_TEXT (structural keys are short by design). */
+/**
+ * Redact any string: drop values longer than MAX_TEXT (structural keys are short by design).
+ * @param {unknown} value Candidate string value
+ * @returns {string|null} The value, or null when it exceeds the redaction cap
+ */
 function redactString(value) {
   return typeof value === 'string' && value.length > MAX_TEXT ? null : value;
 }
 
-/** Extract only whitelisted codes from a trajectory URL (drop query business values). */
+/**
+ * Extract only whitelisted codes from a trajectory URL (drop query business values).
+ * @param {string|null} rawUrl Raw trajectory URL
+ * @returns {Record<string, string>|null} Whitelisted codes, or null when none present
+ */
 function extractUrlCodes(rawUrl) {
   if (!rawUrl) return null;
   let parsed;
@@ -69,6 +77,9 @@ function extractUrlCodes(rawUrl) {
 /**
  * Pull one structural field from element_json wherever it lives (top or nested),
  * skipping anything under text/attributes-bearing branches. Returns first hit.
+ * @param {object|null} elementJson Parsed element_json value
+ * @param {string} key Structural key to look for
+ * @returns {string|null} First hit as a string, or null
  */
 function extractStructural(elementJson, key) {
   if (elementJson === null || elementJson === undefined) return null;
@@ -198,7 +209,10 @@ async function main() {
     trajectories,
     pages,
   };
-  const contentSha = createHash('sha256').update(JSON.stringify(body)).digest('hex');
+  // Data-plane sha: capturedAt is excluded (time-varying provenance must not
+  // change the content hash — two runs over identical data must agree).
+  const { capturedAt: _capturedAt, ...dataPlane } = body;
+  const contentSha = createHash('sha256').update(JSON.stringify(dataPlane)).digest('hex');
   const fixture = { ...body, contentSha256: contentSha };
 
   const outPath = process.argv.includes('--out')
