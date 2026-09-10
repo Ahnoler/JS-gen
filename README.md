@@ -217,7 +217,7 @@ DB_NAME=js_gen
 | --- | --- | --- |
 | 服务 | `PORT`、`HOST` | HTTP 监听地址，默认 `4097`、`0.0.0.0`。 |
 | 主 LLM | `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`、`LLM_TIMEOUT_MS` | Agent 主模型和请求超时，默认超时 120 秒。 |
-| 角色 LLM | `FORM_LLM_*`、`REVIEWER_LLM_*`、`SCENARIO_LLM_*`、`L1C_LLM_MODEL` | 表单、阶段审查、场景摘要和低置信区域分类；未设置时回落主 LLM。 |
+| 角色 LLM | `FORM_LLM_*`、`REVIEWER_LLM_*`、`SCENARIO_LLM_*`、`L1C_LLM_*` | 表单、阶段审查、场景摘要、L1c 区域分类（分区 feature card 打 role/label）；未设置时回落主 LLM。 |
 | Python | `PYTHON_EXE`、`PROJECT_DIR` | Python 解释器和项目根目录。解释器依次查显式配置、项目内 `python/python.exe`、系统 PATH。 |
 | MySQL | `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASS`、`DB_NAME`、`DB_POOL_MIN/MAX` | 数据库和连接池配置。 |
 | Executor | `USE_EXECUTOR`、`EXECUTOR_TOKEN`、`EXECUTOR_CAPACITY`、`EXECUTOR_CDP_PORT_BASE` | 是否使用远程执行机、鉴权、并发容量和 CDP 端口基数。 |
