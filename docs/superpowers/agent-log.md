@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 19:00 · ZCode 引擎线 — 开工+收工：select:tree 树形选择器交接包（纯文档+zip 单元）
+
+- 完成：同事执行引擎缺树形选择器实现——按上次 select:click 交接模式产出：spec `docs/superpowers/specs/2026-09-10-select-tree-operation-spec.md`（TsscMultiTree DOM/Vue 链定案 + `$emit('input',code)` 唯一正确 API 坑史表 + select_tree_option P0→P1→P2 三段式 + tree_check_confirm 真实 check 事件契约 + tree_picker_click CDP real-click 兜底 + 结果协议/别名归一/集成注意五条）+ 交付包 `C:/Users/water/Desktop/select-tree-handover.zip`（18 文件 60KB：py/ 源码 17 个 + spec，zip 完整性 OK）
+- 验收：spec 内全部代码坐标经现场核对（tree_engine.py/select_dispatch.py:59-73/replay_form_action.py:89/select_engine.py:550 fall-through 注释/replay_names.py 别名表）；zip testzip 通过；纯文档+Desktop 产物，无代码改动
+- 遗留移交：同事侧集成后如有形态不匹配（他们 SUT 树组件非 TsscMultiTree 系）需回传组件 DOM 结构再适配；select_option 的 tree path fall-through 现状已在 spec §7.2 言明
+- 注意：工作区他线 WIP 12 项（agent-log archive 两删/plans 改/classify.py/verify-all.sh/kb recall 线在途）未触碰未携带；本单元只提交 agent-log + spec 两个文件；tmp 临时打包脚本已删
+
 ## 2026-09-10 21:10 · Zcode — 收工：recall-p0-three-levers KB 召回 P0 三杠杆（回链 18:36 开工 `1e047cc6`）
 
 - 完成：T0 失败清单冻结+build/verify 五五划分（`06dbe12d`，B 12/11·D 5/5·C 1/1 机械交替）；T1a 血缘资产 mapped 72/84=85.7% + unmapped 12/ambiguous 1 显式 + promote_draft 补写 moduleKey（`b0e0e534`）；**T1b 作用域 FAIL 整体回退**（保守 1.15/.92 与授权上限 1.30/.85 均 2/11 转正<6，9 条余项中 7 条 gold raw=0=词面鸿沟非排序问题——已向 T3 归类建议，无代码残留）；T2 camelCase/ASCII 分词 D 层 0.333→**0.933**、9/9 null 转正、修复死 FS/ZJJK token 与 node-ratio 分母（`01572239`）；T3 受控词表 16 词条只据 build 集建表、B 层 0.233→**0.400**、build 0→10/18 上行、FP 零新增（`2ae8e4e1`）；T4 报告入库
