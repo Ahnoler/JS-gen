@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 17:56 · Cursor Lead — 开工：login-retry-heuristic 事件沉降 + 指数退避
+
+- 进行中：2026-09-10 17:56；根因=prepare 登录失败固定睡 8s 再试，慢环境误判/快环境空等
+- 范围：`src/services/trajectory/prepare-login-retry.js`（新建）、`trajectory-attach-runner.js`、冷 pin、todo-list、本文件
+- 禁入区：classify/verify-all WIP、fill/select、`.cursor/`
+- 方式：TDD 纯重试器（settle + 指数退避 + budget）→ attach-runner 接线 wait_for_loading settle → 绿 pin → 收工
+
 ## 2026-09-10 17:51 · Cursor Lead — 收工：p2-toast-cursor 导航/跨页 notify 游标回卷
 
 - 完成：回链开工 `f3b9e1a7`；`rewind_notify_cursor_if_shrunk` + scan shrink 后 cursor=0 重扫；清 `_step_notice_seen`
