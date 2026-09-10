@@ -144,10 +144,13 @@ run('floors hold: M1/M2/M3 vs frozen baseline (margin 0.05, only rise); M5 infor
     assert.ok(cur >= floor, `${path} ${cur} < floor ${floor} (baseline ${base} - ${MARGIN})`);
     console.log(`    OK ${path}: current=${cur} floor=${floor}`);
   }
+  // E3 (G-recheck): fixture and baseline must be locked together — a silently
+  // swapped fixture would otherwise go unnoticed.
+  assert.equal(fixture.contentSha256, baseline.fixtureSha256, 'fixture sha does not match baseline.fixtureSha256 — fixture/baseline pair broken');
   // M5: informational only until rebuilt (D4). Print, never gate.
   const m5 = result.metrics.m5;
-  if (m5 && m5.nodeCoverage !== null) {
-    console.log(`    INFO m5.nodeCoverage=${m5.nodeCoverage} orderAgreement=${m5.orderAgreement} (informational, no floor — D4)`);
+  if (m5 && m5.pageKeyOnCardRate !== null) {
+    console.log(`    INFO m5.pageKeyOnCardRate=${m5.pageKeyOnCardRate} entryOnCard=${m5.entryOnCardRate} (informational, no floor — D4; degenerate = entryOnCardRate while all mapped-with-key trajs hold 1 key, E1)`);
   }
 });
 

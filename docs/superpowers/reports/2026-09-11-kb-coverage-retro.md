@@ -15,7 +15,7 @@
 | M2 | coverage | **0.206**（69/335） | recorded+completed 且带 page_id（335 条） | 真实录制里**只有 1/5 能映射到卡** |
 | M3 | utilization | **0.321**（27/84） | 84 卡 | **57 张死卡**（从未被真实录制命中，清单见 §3） |
 | M4 | uncovered | 266 条 / 263 页 | 未映射轨迹 | Top 缺口见 §4；18/20 是 AILZ 组件码（不在 system_page） |
-| M5 | nodeCoverage / entryOnCard / offCardRate | **v2：1.000 / 1.000 / 0.000**（上限 1.000） | 69 条映射轨迹中 **18 条**带页面 key（page_level_key；全 fixture 仅 9 个去重路由） | v1 作废（D2：label 词表重合非行为，饱和于自身 matcher 上限的 91.9%；orderAgreement 0.0117 已等于精确串等上界）。v2=页面 key↔卡路由 marker 同类比较；**1.0 饱和是小样本面事实**（key 只存在于产品管理族录制，族内卡共享 `pdMgt/pdInfMgt` markers），非 matcher 伪影；**informational 不设 floor（D4）**，样本面扩大后再议门槛。重建定义与台账见 §8 |
+| M5 | nodeCoverage / entryOnCard / offCardRate | **v2：1.000 / 1.000 / 0.000**（上限 1.000） | 69 条映射轨迹中 **18 条**带页面 key（page_level_key；**18/18 各持恰好 1 个去重 key**） | v1 作废（D2：label 词表重合非行为）。v2=页面 key↔卡路由 marker 同类比较；**当前数据下无判别力（E1，G 复核实测）：单 key 构造性使 nodeCoverage ≡ entryOnCardRate**——已更名 `pageKeyOnCardRate` 并在 metricNote 写明退化条件；可证的唯一结论=「18 条 ZJJK 命中的卡其 route marker 与入口页路由一致」（薄但可证的正向事实）。**informational 不设 floor（D4）**，等样本面扩大再议门槛 |
 | M6 | freshness | **0.250**（33/132 个 ZJJK/FS 码） | 卡 hash_markers 中的页面码 | **38 张卡带陈旧码**（清单见 §5；与库核对：抽查 3 个 stale 全不在 system_page、1 个 fresh 在） |
 
 映射链命中分布：**ZJJK 58 / FS 0 / ROUTE 58**（多链命中按链计入；FS 链全军覆没——全库只有 1 条 URL 带 `fcnScnEcd`，且 `res_path` 中无 FS 码）。映射歧义率 **0.101**（34 条轨迹命中多卡）。**D6 精度标注：ROUTE 链是弱匹配链**——5 个泛化片段各命中 ≥10 个页面（`lmtMgt` 43 页、`cstMgt` 32 页…），58 条 ROUTE 命中里相当部分是「同模块泛命中」而非「卡↔页面精确对应」；ZJJK 链（58 条）是精确主键命中，ZJJK 计数可信，ROUTE 计数只作模块级归因、不作卡级结论。
@@ -63,12 +63,13 @@ Top20 中 **18 条是 `AILZ…` 组件编号**（不在 `system_page`，是录�
    ① **给 `smart-ctrl-log-query` 卡补 `ZJJK00171540PDCP` marker**（智能控制执行日志 ×3，dead 卡 + 页面码现成）——最便宜的真实缺口；
    ② **查询交易信息管理页（×2）与对私用信管理页（×2）无卡**——真实业务有、KB 无，候选建卡；
    ③ AILZ 组件码录制（18 条）需要另外的接入路径（组件级映射），页面码体系够不着。
-3. **卡↔实跑一致性（M5 v2，样本面尚小）**：`page_level_key` 只在产品管理族录制里落了值（28 条轨迹/9 个去重路由），该族映射轨迹的页面序列与 primary 卡路由 markers **完全吻合（v2：1.000/卡外 0，n=18）**——这是「路由面卡片描述与实跑一致」的正向证据，但只覆盖产品管理一个族，**不构成全局结论**；旧 M5 的「系统性脱节 0.835 卡外」是 label 词表重合伪影，已作废。**「轨迹反哺卡节点」方向要重新立项论证**：先扩大 `page_level_key` 落值面（录制端结构键铺开）再量化，当前证据不足。
+3. **卡↔实跑一致性（M5 v2，G 复核 E1 口径修正）**：`page_level_key` 只在产品管理族录制里落了值（28 条轨迹；映射子集 18/18 各持恰好 1 个去重页面 key），该度量当前**构造性退化为入口页命中率**（`nodeCoverage ≡ entryOnCardRate`，已更名 `pageKeyOnCardRate`）——**无判别力**；可证的唯一结论是「18 条 ZJJK 命中的卡其 route marker 与入口页路由一致」。旧 M5 的「系统性脱节 0.835 卡外」是 label 词表重合伪影，已作废。**「轨迹反哺卡节点」方向要重新立项论证**：先扩大 `page_level_key` 落值面（录制端结构键铺开、多页轨迹出现）再量化，当前证据不足。
 4. **值不值得继续投**：覆盖 20%+利用率 32% 本身不是否定结论——hit 的 27 张卡正是 recall 评测里 B 层 0.400 那批的供给面。**KB 的投资逻辑应该从「铺广度」转向「把 27 张活的做准 + 按真实频次补缺口」**，而不是先扩卡数。门禁（M1/M2/M3 floor）已固化（**M5 已按 G 判决 D4 移出 floor**——label 版 M5 会奖励「改卡节点页名去凑 region 标签」的无意义动作；v2 informational 运行，等样本面扩大再议门槛），后续任何卡增补/码修复都在三条地板上可度量。
 
 ## 7. 复核指引（reviewer）
 
-- 脱敏：抽 10 条 fixture 轨迹回库比对（白名单字段级一致；`task`/`name`/业务 query 值不入库——`grep '"task"' fixture` = 0）；**T5 已复核**：fixture v1.1 中 `visitedRegions[].key` 28 轨迹/110 region 非空，库里 314 步 `page_level_key` 原值 314/314 reduce 后落入 fixture key 集合（`host#/route`，query 已剥，无 `?`）；
+- 脱敏：抽 10 条 fixture 轨迹回库比对（白名单字段级一致；`task`/`name`/业务 query 值不入库——`grep '"task"' fixture` = 0）；**T5 已复核**：fixture v1.1 中 `visitedRegions[].key` 28 轨迹/110 region 非空，库里 314 步 `page_level_key` 原值 314/314 reduce 后落入 fixture key 集合（`host#/route`，query 已剥，无 `?`）；**E3 已锁死**：门禁断言 `fixture.contentSha256 === baseline.fixtureSha256`（篡改 baseline sha → 红 exit 1，还原 → 4 passed）；
+- **E4 注明**：`tmp/kb-coverage/fixture-v1-archived.json`（≈500 KB）是 D1 修复时的**取证快照（v1 原样存档），非门禁输入**——门禁唯一 fixture 是 `fixtures/kb-coverage.v1.json`（v1.1）；
 - 独立复算：M1/M2/M3/M6 从 fixture + `data/kb/flows` 可纯离线重算；
 - 证伪：`KB_COVERAGE_FIXTURE`（塞 `task` 字段 → 必红）/ `KB_COVERAGE_BASELINE`（抬 0.2 → 必红），两次输出已在 T2 commit message（G 复核已亲手复跑两侧证伪）；
 - 边界：`src/**` 零改动、只 SELECT、评测集/阈值/verify-all/data/kb/req 零改动。

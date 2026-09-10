@@ -246,8 +246,14 @@ export function computeCoverage(fixture, corpus) {
   // description (NOT a route) and node.page a display name, so neither is a
   // comparable page key; route markers are the card's page-identity claims.
   // Definitions (informational, no floor until accepted — D4):
-  //   nodeCoverage   = per-trajectory fraction of distinct visited page keys
-  //                    covered by the primary card's route markers (mean)
+  //   pageKeyOnCardRate = per-trajectory fraction of distinct visited page keys
+  //                    covered by the primary card's route markers (mean).
+  //                    DEGENERATE on current data: every mapped-with-key
+  //                    trajectory holds exactly ONE distinct page key, so this
+  //                    equals entryOnCardRate by construction (G-recheck E1) —
+  //                    rename from nodeCoverage reflects that it carries no
+  //                    sequence/coverage information until multi-key
+  //                    trajectories exist.
   //   entryOnCard    = first visited page key belongs to the primary card
   //   offCardRate    = visited page keys not found on the primary card / total
   //   ceiling        = per-trajectory best over ALL hit cards of that
@@ -293,8 +299,8 @@ export function computeCoverage(fixture, corpus) {
     ceilingCoverSum += best;
   }
   const m5 = {
-    metricNote: 'v2 (G-verdict D2 rebuild): visited page keys (page_level_key host#/route) vs primary card route markers — same-type page-identity comparison. Informational, no floor until accepted (D4). orderAgreement retired: LCS over label/region vocab was the saturation artifact.',
-    nodeCoverage: mappedWithPages > 0 ? nodeCoverSum / mappedWithPages : null,
+    metricNote: 'v2 (G-verdict D2 rebuild): visited page keys (page_level_key host#/route) vs primary card route markers — same-type page-identity comparison. Informational, no floor until accepted (D4). orderAgreement retired: LCS over label/region vocab was the saturation artifact. pageKeyOnCardRate (formerly nodeCoverage) is DEGENERATE on current data: 18/18 mapped-with-key trajectories hold exactly one distinct page key, so it equals entryOnCardRate by construction (G-recheck E1); the only provable claim is that all 18 ZJJK-mapped cards\' route markers match their entry-page route.',
+    pageKeyOnCardRate: mappedWithPages > 0 ? nodeCoverSum / mappedWithPages : null,
     entryOnCardRate: mappedWithPages > 0 ? entryOnCardSum / mappedWithPages : null,
     offCardRate: pageKeysTotal > 0 ? offCardPages / pageKeysTotal : null,
     ceiling: mappedWithPages > 0 ? ceilingCoverSum / mappedWithPages : null,
@@ -395,7 +401,7 @@ function main() {
     console.log(`M2 coverage      ${m2.coverage}  (${m2.mappedTrajectories}/${m2.denominator})`);
     console.log(`M3 utilization   ${m3.utilization}  (${m3.utilizedCards}/${m3.denominator}; dead: ${m3.deadCardCount})`);
     console.log(`M4 uncovered     ${m4.uncoveredTrajectories} trajs / ${m4.distinctUncoveredPages} pages (top: ${m4.top[0] ? m4.top[0].pageId + '×' + m4.top[0].count : '-'})`);
-    console.log(`M5 nodeCoverage  ${m5.nodeCoverage}  entryOnCard ${m5.entryOnCardRate}  offCardRate ${m5.offCardRate}  ceiling ${m5.ceiling}  (n=${m5.denominator.withPageKeys} trajs / ${m5.denominator.distinctPageKeys} keys)`);
+    console.log(`M5 pageKeyOnCard ${m5.pageKeyOnCardRate}  entryOnCard ${m5.entryOnCardRate}  offCardRate ${m5.offCardRate}  ceiling ${m5.ceiling}  (n=${m5.denominator.withPageKeys} trajs / ${m5.denominator.distinctPageKeys} keys)`);
     console.log(`M6 freshness     ${m6.freshness}  (${m6.freshMarkers}/${m6.freshMarkers + m6.staleMarkers}; stale cards: ${m6.staleCardCount})`);
   }
   if (result.baselineDiff && !result.baselineDiff.pass) process.exitCode = 1;
