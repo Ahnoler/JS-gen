@@ -1,5 +1,17 @@
 # Agent 协作日志
 
+## 2026-09-10 22:50 · Zcode — 收工：recall-p0 closeout G3 收尾四项（回链 22:32 开工 `62fca4c5`）
+
+- 完成：依据 G3 结论 + Lead 裁定第三条路（机制保留/词表停用/不接线/T3 不计成果）落收尾四项——
+  ①`data/kb/synonyms.json` 顶层 +`status:"unvalidated"`+statusNote（entries 16 条程序校验未动）；
+  ②报告 [`reports/2026-09-10-recall-p0-report.md`](reports/2026-09-10-recall-p0-report.md) 口径更正六处：头部口径块 + 结果总览改四列（**+T2 列=生产 0.740/0.847/0.784/0.798/0.633，B 0.233**；+T3 列标注 offline only 存档）+ Task 表 T3「FAIL→停用待评测集 v2 重评」+ T3 章节裁定块 + 回退/门禁/遗留/复现命令段同步；
+  ③补 pin `node-ratio denominator ignores card-level-only tokens`（hash_markers 独占码场景钉住 bestNodeIdFor 分母=nodeEligibleScore；**证伪实证：临时还原旧分母 cardScore → 新 pin 与存量 pin 一起转红 → 还原 23 passed、源文件与 HEAD 字节一致**——与 T2 存量 convert pin 构成同场景双保险）；
+  ④todo-list 线状态同步关闭 + 本收工条目
+- 验收：`characterize-flow-card-recall` **23 passed**（22+1）；生产口径门禁 `recall-eval.mjs --baseline` **exit 0**（0.740/0.847/0.784/0.798/0.633/0.740 全高于 floor）；py 契约 ok；lint 新增 0
+- 红线遵守：未 revert `2ae8e4e1`；未接线 `propose.js`；未删词表；未再跑 T3 度量当成果；`kb-recall-eval.v1.json`/门禁阈值/`verify-all.sh`/`data/kb/req/**` 未动
+- 遗留移交：**T3 重评前置=评测集 v2 扩版（≥100 条独立新查询，另立项）→ v2 建表验证独立正增量 → 通过后接线 propose 并计成果（同一套 G1/G2/G3）**；移交 Lead：N-002 存量 FP（地板收紧须批）；证据 `tmp/kb-p0/closeout/`
+- 工作区他线 WIP（agent-log archive 两删/classify.py/verify-all.sh 等 12 项）全程未触碰未携带
+
 ## 2026-09-10 22:32 · Zcode — 开工：recall-p0 closeout G3 收尾四项
 
 - 进行中：2026-09-10 22:32；依据=G3 结论（T0/T1a/T2/T4 PASS、T1b FAIL 已正确回退、**T3 FAIL**=verify 独立增量 0+未接线）+ Lead 裁定第三条路：**机制保留、词表停用、不接线、T3 不计成果**；生产口径统一为 T2 链态 0.740/0.847/0.784/0.798

@@ -1,5 +1,7 @@
 # KB 召回 P0 三杠杆 — 实施报告（血缘作用域 / camelCase 分词 / 受控词表）
 
+> **⚠️ 口径更正（2026-09-10 G3 后，以此为准）**：`+T3 词表`一列需**显式传 `--synonyms`（offline）才成立**；机制未接线生产路径。**生产实际生效 = T2 链态：Acc@1 0.740 / Recall@5 0.847 / MRR@5 0.784 / nDCG@5 0.798 / 拒答 0.633；分层 A 1.00 · B 0.233 · C 0.867 · D 0.933**。T3 offline 数字（0.790/0.917/0.843/0.860）**不作为成果计入**——G3 判 T3 FAIL（A3 verify 集独立增量=0），Lead 裁定：**机制保留（opt-in、不传参字节不变）、词表停用（`data/kb/synonyms.json` status=unvalidated）、不接线 propose.js、待评测集 v2 扩版重评后再议**。
+
 - **时刻**：2026-09-10 18:32 – 21:10（+08:00）
 - **执行者**：ZCode（主会话，按 spec 决策 A1–A5 实施）
 - **规格**：[`specs/2026-09-10-recall-p0-three-levers-design.md`](../specs/2026-09-10-recall-p0-three-levers-design.md)（§11 已裁定）/ [`plans/2026-09-10-recall-p0-three-levers.md`](../plans/2026-09-10-recall-p0-three-levers.md)
@@ -8,20 +10,22 @@
 
 ## 结果总览（六项 + 分层，base → T2 → T3 链态）
 
-| 指标 | 基线 | +T2 分词 | +T3 词表 | Δ（终态 vs 基线） |
+> 生产口径 = **+T2 一列**（T3 需显式传 `--synonyms` 才成立，未接线生产；offline 列仅存档备查）。
+
+| 指标 | 基线 | +T2 分词（**=生产**） | +T3 词表（offline only） | 生产 Δ（vs 基线） |
 |---|---|---|---|---|
-| Acc@1 | 0.650 | 0.740 | **0.790** | **+0.140** |
-| Recall@5 | 0.757 | 0.847 | **0.917** | **+0.160** |
-| MRR@5 | 0.694 | 0.784 | **0.843** | **+0.149** |
-| nDCG@5 | 0.708 | 0.798 | **0.860** | **+0.152** |
-| 拒答率 | 0.633 | 0.633 | **0.633** | 0.000（FP 集逐条同基线，零新增） |
-| 噪声 Acc@1 | 0.650 | 0.740 | **0.790** | **+0.140** |
-| 分层 A | 1.00 | 1.00 | **1.00** | 保持（零容错 ✓） |
-| 分层 B | 0.233 | 0.233 | **0.400** | +0.167 |
-| 分层 C | 0.867 | 0.867 | **0.867** | 不动 ✓ |
+| Acc@1 | 0.650 | **0.740** | 0.790（offline） | **+0.090** |
+| Recall@5 | 0.757 | **0.847** | 0.917（offline） | **+0.090** |
+| MRR@5 | 0.694 | **0.784** | 0.843（offline） | **+0.090** |
+| nDCG@5 | 0.708 | **0.798** | 0.860（offline） | **+0.090** |
+| 拒答率 | 0.633 | **0.633** | 0.633（offline） | 0.000（FP 集逐条同基线，零新增） |
+| 噪声 Acc@1 | 0.650 | **0.740** | 0.790（offline） | **+0.090** |
+| 分层 A | 1.00 | 1.00 | 1.00 | 保持（零容错 ✓） |
+| 分层 B | 0.233 | **0.233** | 0.400（offline） | 0.000（B 层改善全在被裁停用的 T3） |
+| 分层 C | 0.867 | 0.867 | 0.867 | 不动 ✓ |
 | 分层 D | 0.333 | **0.933** | 0.933 | **+0.600** |
 
-三杠杆结局：**T2 分词 PASS（落地）、T3 词表 PASS（落地）、T1b 作用域 FAIL（整体回退）**。
+三杠杆结局：**T2 分词 PASS（落地，=当前生产）、T1b 作用域 FAIL（整体回退）、T3 词表 FAIL（G3 判定：A3 verify 集独立增量=0；机制保留、词表停用、不接线、不计成果，待评测集 v2 重评）**。
 
 ## Task 交付清单
 
@@ -31,7 +35,7 @@
 | T1a 血缘资产 + promote 补写 moduleKey | `b0e0e534` | PASS | `tmp/kb-p0/T1-lineage.txt`（mapped 72/84=85.7% ≥84%；unmapped 12 + ambiguous 1 显式；幂等双跑；`--baseline` exit 0） |
 | T1b 作用域三态 | **回退（无代码提交）** | **FAIL** | `tmp/kb-p0/T1b-verdict.txt` + `T1b-after.json`（1.15/.92）+ `T1b-exp-13085.json`（1.30/.85） |
 | T2 camelCase/ASCII 分词 | `01572239` | PASS | `tmp/kb-p0/T2-verdict.txt` + `T2-after.json` |
-| T3 受控词表 | `2ae8e4e1` | PASS（附归因披露） | `tmp/kb-p0/T3-verdict.txt` + `T3-after.json` + `T3-build-set.txt` |
+| T3 受控词表 | `2ae8e4e1` | **FAIL → 停用待评测集 v2 重评**（机制保留、不接线、不计成果） | `tmp/kb-p0/T3-verdict.txt` + `T3-after.json` + `T3-build-set.txt` |
 | T4 收尾 | 本 commit | — | `tmp/kb-p0/T4-verify-perentry.txt` + `gate.txt` |
 
 ## T1b 作用域杠杆：FAIL 根因（为何回退）
@@ -49,15 +53,15 @@ A2 保守系数 1.15/0.92 → 11 条跨模块靶子仅 **2/11 转正**（B-005 �
 - 金样例（跨语言契约）1 条 nodeId 期望手术更新：`在 ZJJK00066153 页面新增客户` expectNodeId `check_drawer`→`list`——旧值系码 token 大小写失配死亡时的 bigram 巧合；码 token 激活后命中码所在 `list` 节点=查询所指页面起点（py 侧只断言 flowRef，`characterize-kb-recall.py` ok，不受影响）。24/24 绿。
 - **N-002 如实登记**：`计算 2 加 3 等于多少`→collection_scorecard 分数**逐位不变**（6.734591659972948）——它是基线存量 FP（「计算」bigram 撞「计算方式」），T2 未引入该命中（该 query 无 ASCII token）。回 null 需收紧覆盖率地板=改口径（红线禁止）或 query 特判（禁止）。**移交 Lead**。
 
-## T3 词表杠杆：B 层 0.233 → 0.400（verify 上行 + 归因披露）
+## T3 词表杠杆：offline B 层 0.233 → 0.400 —— **G3 判 FAIL，已停用（不计成果）**
+
+> **裁定（2026-09-10 Lead，第三条路）**：机制保留（`applySynonymExpansion` opt-in、不传参字节不变，不 revert `2ae8e4e1`）、**词表停用**（`data/kb/synonyms.json` 顶层 `status: "unvalidated"`）、**不接线 propose.js**、**T3 offline 数字不计成果**。重评前置 = 评测集 v2 扩版（≥100 条独立新查询，另立项）→ 在 v2 上建表并验证**独立正增量** → 通过后才接线并计入成果（届时走同一套 G1/G2/G3）。G3 FAIL 依据 = **A3 硬约束「verify 集必须单独上行」按其立法本意（词表自身泛化证据）判未达标**：verify +4 全归因 T2 分词，词表对 verify 独立增量=0；且机制未接线生产路径。
 
 - `data/kb/synonyms.json`：**16 词条全部 source 可溯**（`失败反推 <build-id>`），expand 项尽量取 gold 卡词面原词。
 - **D6 纪律执行**：建表唯一输入 = build 集 18 条（`T3-build-set.txt`）；verify 17 条建表期间未读取；任务书 A.1 清单中的 verify 侧条目（B-005/010/012/014/022/024/027/029）**未用于建词条**（防 G3 反作弊命中）。
 - 实现：`SYNONYM_WEIGHT=0.5` 具名导出；`applySynonymExpansion` 注入 expand 项（经同源分词器，卡面语义词条走最长匹配）；已有 token 不覆盖（只加信号）；`scope` 有值且 ≠ moduleKey → 不注入；不传 `synonyms` = 字节级不变（pin 断言）。runner 加 `--synonyms` 模式（单指标引擎：复用 `runRecallEval`）。
-- **build 集 18 条：0/18 → 10/18**（词表转正 5 条 B：B-001 止付→冻结/limit、B-009 基本资料→客户信息查询、B-013 借钱→用信/credit_usage、B-015 借款合同→对公合同签订、B-023 打官司→司法诉讼；另 5 条 D 为 T2 归因）。
-- **verify 集 17 条：0/17 → 4/17 上行**（非「只在 build 上行」；逐条见下节）。
-- FP：11 条与基线逐条相同——词表零新增误召回。
-- **归因披露（如实报告）**：T3 词表对 verify 的独立增量 = 0（T3 vs T2 diff：build +5 全词表、verify +0）。verify 的 +4 全部归因 T2 分词。词条只据 build 反推，verify B 层改写模式未被覆盖，系 D6 纪律的预期结果而非过拟合证据。**若 reviewer/Lead 判定「词表自身 verify 增量>0」才达标，按 A4 词表单项回退**（回到 `01572239` 链态 = T2 态，B 层 0.233），不连坐。
+- offline 度量（**存档备查，不作为成果**）：build 集 0/18 → 10/18（词表转正 B-001 止付→冻结/limit、B-009 基本资料→客户信息查询、B-013 借钱→用信/credit_usage、B-015 借款合同→对公合同签订、B-023 打官司→司法诉讼；另 5 条 D 为 T2 归因）；verify 0/17 → 4/17（全 T2 归因）；FP 11 条与基线逐条相同。
+- 素材价值：16 词条 + build/verify 划分 + 注入机制（权重缩放/scope 门控/同源分词）全部保留，v2 重建时词条与 `source` 追溯链可直接复用。
 
 ### verify 集逐条结果（A1 硬约束）
 
@@ -91,35 +95,36 @@ A2 保守系数 1.15/0.92 → 11 条跨模块靶子仅 **2/11 转正**（B-005 �
 ## 回退与否
 
 - **T1b 作用域：已回退**（整体，A4 单项回退；回退后 17 pins 绿 + `--baseline` exit 0 复验）。
-- T1a / T2 / T3：全部保留（各自 DoD 达标）。
+- **T3 词表：机制保留、词表停用**（Lead 裁定，见 T3 章节顶部；`2ae8e4e1` 不 revert——opt-in 机制无生产影响）。
+- T1a / T2：保留（T2 = 当前生产链态）。
 
 ## 门禁与 lint
 
-- `node scripts/kb/recall-eval.mjs --synonyms --baseline tmp/kb-eval/baseline-v1.json` → **exit 0**，六项 OK（终态 0.790/0.917/0.843/0.860/0.633/0.790，全部高于 floor）。
+- **生产口径（T2 链态，无任何 flag）**：`node scripts/kb/recall-eval.mjs --baseline tmp/kb-eval/baseline-v1.json` → **exit 0**，六项 OK（**0.740/0.847/0.784/0.798/0.633/0.740**，全部高于 floor）。
+- `node scripts/kb/recall-eval.mjs --synonyms --baseline tmp/kb-eval/baseline-v1.json` → **exit 0**（offline 链态 0.790/0.917/0.843/0.860/0.633/0.790；**存档备查，不作为成果**）。
 - `node scripts/characterization/characterize-kb-recall-eval.mjs` → **4 passed**（评测集结构 / lockstep pin / 六项 floor / 延迟预算——floor 只升不降 ✓）。
-- `node scripts/characterization/characterize-flow-card-recall.mjs` → **22 passed**（存量 17 + T2 2 条 + T3 3 条；scope 2 条随 T1b 回退移除）。
+- `node scripts/characterization/characterize-flow-card-recall.mjs` → **23 passed**（存量 17 + T2 2 条 + T3 3 条 + 收尾 1 条 bestNodeIdFor 分母 pin；scope 2 条随 T1b 回退移除）。
 - `./python/python.exe scripts/characterization/characterize-kb-recall.py` → **ok**（24 条跨语言契约；py agreement 不受影响——py 侧不消费 synonyms/tokenizeCodes）。
 - lint 归因：`flow-card-recall.js` warning 数 HEAD 态 16 = 工作区态 16，逐条同规则同函数仅行号平移（44→72→118…），**新增 warning = 0**；`recall-eval.mjs` / `promote_draft.mjs` / `build-flow-lineage.mjs` / `synonyms.json` 零 warning。
 - `verify-all.sh` 未改（红线）；`kb-recall-eval.v1.json` 未改（冻结）；`data/kb/req/**` 只读；无新依赖。
 
 ## 遗留与移交
 
-1. **N-002（计算2加3→collection_scorecard）**：基线存量 FP，本轮三杠杆均不触碰其成因（bigram 撞「计算方式」）。候选修法=覆盖率地板收紧（**改口径，须 Lead 批准**）或 embedding 兜底（另立项）。
-2. **T1b 作用域杠杆的归类偏差**：35 条失败清单中 11 条「跨模块误召回」实际 7/11 是词面鸿沟（gold raw=0）——作用域系数不是正确的杠杆。建议下版评审时把该类改归词表/节点级；作用域思路保留（血缘资产已在），若未来同域卡密度上升可复评。
-3. **T3 verify 归因**：词表对 verify 独立增量=0（披露见上）；是否达标由 reviewer/Lead 裁，不达标则词表单项回退。
-4. **词表 v2**：评测集扩 v2 后按 D6 在新查询上复验；scope 门控字段已就位（产品侧装配 moduleKey 另立任务）。
-5. **verify 侧 B 层 11 条 + C 层 2 条 + D-010**：需节点级信号/同域消歧/低地板查询处理，归「方向 4：切片」或 embedding 立项。
+1. **T3 重评前置**（另立项）：评测集 v2 扩版（≥100 条独立新查询）→ v2 上重建词表并验证独立正增量 → 通过后接线 propose 并计入成果（同一套 G1/G2/G3）；在此之前 `propose.js` 不接线、`data/kb/synonyms.json` 保持 `status: "unvalidated"`。
+2. **N-002（计算2加3→collection_scorecard）**：基线存量 FP，本轮三杠杆均不触碰其成因（bigram 撞「计算方式」）。候选修法=覆盖率地板收紧（**改口径，须 Lead 批准**）或 embedding 兜底（另立项）。
+3. **T1b 作用域杠杆的归类偏差**：35 条失败清单中 11 条「跨模块误召回」实际 7/11 是词面鸿沟（gold raw=0）——作用域系数不是正确的杠杆。reviewer 已就地更正 spec §3.3 归类并写入方法学教训（可见性检验应作为失败分类前置）；作用域思路保留（血缘资产已在），若未来同域卡密度上升可复评。
+4. **verify 侧 B 层 11 条 + C 层 2 条 + D-010**：需节点级信号/同域消歧/低地板查询处理，归「方向 4：切片」或 embedding 立项。
 
 ## 复现命令
 
 ```bash
-node scripts/kb/recall-eval.mjs --synonyms                       # 终态指标表（0.790/0.917/0.843/0.860/0.633/0.790）
-node scripts/kb/recall-eval.mjs --synonyms --baseline tmp/kb-eval/baseline-v1.json   # exit 0
-node scripts/kb/recall-eval.mjs                                  # 无词表态（=T2 态 0.740/0.847/0.784/0.798/0.633/0.740）
-node scripts/characterization/characterize-flow-card-recall.mjs  # 22 passed
+node scripts/kb/recall-eval.mjs                                  # 生产口径（T2 链态 0.740/0.847/0.784/0.798/0.633/0.740）
+node scripts/kb/recall-eval.mjs --baseline tmp/kb-eval/baseline-v1.json   # 生产门禁 exit 0
+node scripts/kb/recall-eval.mjs --synonyms                       # offline 链态（0.790/...；存档备查，不作为成果）
+node scripts/characterization/characterize-flow-card-recall.mjs  # 23 passed
 node scripts/characterization/characterize-kb-recall-eval.mjs    # 4 passed
 node scripts/kb/build-flow-lineage.mjs                           # 幂等重建血缘资产
 ./python/python.exe scripts/characterization/characterize-kb-recall.py  # py 契约 ok
 ```
 
-证据目录：`tmp/kb-p0/`（baseline.json / T0-failures.txt / T1-lineage.txt / T1b-verdict.txt / T1b-after.json / T1b-exp-13085.json / T2-verdict.txt / T2-after.json / T3-verdict.txt / T3-after.json / T3-build-set.txt / T4-verify-perentry.txt / gate.txt）。
+证据目录：`tmp/kb-p0/`（baseline.json / T0-failures.txt / T1-lineage.txt / T1b-verdict.txt / T1b-after.json / T1b-exp-13085.json / T2-verdict.txt / T2-after.json / T3-verdict.txt / T3-after.json / T3-build-set.txt / T4-verify-perentry.txt / gate.txt / closeout/）。
