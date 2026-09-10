@@ -11,6 +11,12 @@
       "by": "ZCode (T1)",
       "why": "v2 创建（骨架）：v1 全量 130 条脚本搬运原样保留（含 seed/note/whyNegative 逐字段，仅追加 source:\"v1\"）+ excluded 4 条随迁；新增条目于 T2 独立标注后并入。spec §10 决策 A1–A6。",
       "approvedBy": "Lead（A1–A6 已批，2026-09-10）"
+    },
+    {
+      "at": "2026-09-10T15:07:30.589Z",
+      "by": "ZCode (T2)",
+      "why": "T2 新增 115 条独立标注（A15/B15/C5/D5/E50/N25）：标注唯一输入=语料（84 卡词面 dump+through-chains+湿测叶名），未运行匹配器；E 层 50 条带 pattern（synonym 17/verb 18/domain 15）且经卡面原词全词 ban-check；N 层近域 25 条经语料关键词缺席验证；双人复核记录见 tmp/kb-eval-v2/T2-labeling-log.md",
+      "approvedBy": "Lead（spec §10 A1–A6；reviewer G1 抽检于 T3 冻结后）"
     }
   ],
   "entries": [
@@ -1288,6 +1294,1160 @@
       "gold": [],
       "whyNegative": "近域：营业咨询；无营业时间/网点服务类卡",
       "source": "v1"
+    },
+    {
+      "id": "A-041",
+      "tier": "A",
+      "query": "观察期白名单配置",
+      "gold": [
+        "risk-class-observation-whitelist"
+      ],
+      "note": "flow 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-042",
+      "tier": "A",
+      "query": "脱期法配置",
+      "gold": [
+        "risk-class-overdue-config"
+      ],
+      "note": "flow 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-043",
+      "tier": "A",
+      "query": "风险分类台账",
+      "gold": [
+        "risk-class-ledger"
+      ],
+      "note": "flow 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-044",
+      "tier": "A",
+      "query": "分类查询生成认定表",
+      "gold": [
+        "risk-class-query"
+      ],
+      "note": "alias 分类查询/生成认定表",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-045",
+      "tier": "A",
+      "query": "风险分类统计",
+      "gold": [
+        "risk-class-statistics"
+      ],
+      "note": "flow 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-046",
+      "tier": "A",
+      "query": "法人机构分类配置",
+      "gold": [
+        "risk-class-corp-org-config"
+      ],
+      "note": "flow 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-047",
+      "tier": "A",
+      "query": "分类认定理由配置",
+      "gold": [
+        "risk-class-reason-config"
+      ],
+      "note": "alias 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-048",
+      "tier": "A",
+      "query": "风险分类生成配置",
+      "gold": [
+        "risk-class-gen-config"
+      ],
+      "note": "flow 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-049",
+      "tier": "A",
+      "query": "风险默认分类配置",
+      "gold": [
+        "risk-class-default-config"
+      ],
+      "note": "alias 全词（SUT 菜单名）",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-050",
+      "tier": "A",
+      "query": "子应用管理",
+      "gold": [
+        "portal-subapp"
+      ],
+      "note": "flow 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-051",
+      "tier": "A",
+      "query": "公共信息配置",
+      "gold": [
+        "portal-public-info"
+      ],
+      "note": "alias 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-052",
+      "tier": "A",
+      "query": "首页管理角色卡片库",
+      "gold": [
+        "portal-home-mgmt"
+      ],
+      "note": "flow+alias",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-053",
+      "tier": "A",
+      "query": "首页个性化设置",
+      "gold": [
+        "portal-personalization"
+      ],
+      "note": "flow 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-054",
+      "tier": "A",
+      "query": "国债收益利率平均值配置",
+      "gold": [
+        "system-mgmt-gov-bond"
+      ],
+      "note": "alias 全词",
+      "source": "v2-new"
+    },
+    {
+      "id": "A-055",
+      "tier": "A",
+      "query": "贷款计算器利率试算",
+      "gold": [
+        "system-mgmt-loan-calc"
+      ],
+      "note": "flow 贷款计算器+试算",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-031",
+      "tier": "B",
+      "query": "到点没还上自动发短信通知的规则在哪里开",
+      "gold": [
+        "collection-remind-cfg"
+      ],
+      "source": "v2-new"
+    },
+    {
+      "id": "B-032",
+      "tier": "B",
+      "query": "给不同欠款人群配置不同的追讨手段",
+      "gold": [
+        "collection_strategy"
+      ],
+      "source": "v2-new"
+    },
+    {
+      "id": "B-033",
+      "tier": "B",
+      "query": "借出去的权证到期没还回来哪里有提示",
+      "gold": [
+        "collateral-func-warning"
+      ],
+      "note": "alias 权证借阅未按期归还提示",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-034",
+      "tier": "B",
+      "query": "系统界面水印怎么加上去",
+      "gold": [
+        "portal-public-info"
+      ],
+      "note": "水印配置=同页页签；竞争卡 collateral-func-ledger（台账导出水印）经「系统界面」消歧",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-035",
+      "tier": "B",
+      "query": "接入一个外部子系统要在哪里配置",
+      "gold": [
+        "portal-subapp"
+      ],
+      "note": "子系统路由接入",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-036",
+      "tier": "B",
+      "query": "我想把首页换成自己常用的样子",
+      "gold": [
+        "portal-personalization"
+      ],
+      "note": "个人侧自定义首页（管理员侧=portal-home-mgmt，主语「我」消歧）",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-037",
+      "tier": "B",
+      "query": "管理员给某个角色配一套默认首页卡片",
+      "gold": [
+        "portal-home-mgmt"
+      ],
+      "note": "角色卡片库/角色首页配置（主语「管理员」消歧）",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-038",
+      "tier": "B",
+      "query": "最新的 LPR 数值在哪里维护",
+      "gold": [
+        "system-mgmt-param-mgmt"
+      ],
+      "note": "alias LPR 管理",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-039",
+      "tier": "B",
+      "query": "登录密码复杂度要求在哪里设置",
+      "gold": [
+        "system-mgmt-base-mgmt"
+      ],
+      "note": "alias 密码策略管理",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-040",
+      "tier": "B",
+      "query": "智能控制执行过的动作在哪里查记录",
+      "gold": [
+        "smart-ctrl-log-query"
+      ],
+      "note": "alias 智能控制记录查询",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-041",
+      "tier": "B",
+      "query": "这笔业务的审批走到哪一步了哪里看流转记录",
+      "gold": [
+        "approval_chain"
+      ],
+      "note": "alias 审批历史；approval_todo 的流程跟踪弹窗为竞争入口，gold 取审批历史专职卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-042",
+      "tier": "B",
+      "query": "一批规则先统一停用过段时间再分批恢复",
+      "gold": [
+        "smart-ctrl-rule-toggle"
+      ],
+      "note": "alias 批量失效规则/批量生效规则",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-043",
+      "tier": "B",
+      "query": "新建控制方案任务页并把已有规则引入进来",
+      "gold": [
+        "smart-ctrl-rule-scheme"
+      ],
+      "note": "alias 方案配置任务页/引入控制（「新建方案」消歧，非规则侧关联）",
+      "source": "v2-new"
+    },
+    {
+      "id": "B-044",
+      "tier": "B",
+      "query": "委外清收的台账和登记入口在哪里",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "source": "v2-new"
+    },
+    {
+      "id": "B-045",
+      "tier": "B",
+      "query": "押品外部评估的机构人员名单和评估费用怎么维护",
+      "gold": [
+        "collateral-func-ext-assess"
+      ],
+      "note": "aliases 外部评估管理人员维护/评估费用维护",
+      "source": "v2-new"
+    },
+    {
+      "id": "C-016",
+      "tier": "C",
+      "query": "管理员先给新来的客户经理建系统账号并配好角色，再把数据权限按场景分配到位",
+      "gold": [
+        "system-mgmt-base-mgmt",
+        "system-mgmt-data-perm"
+      ],
+      "note": "建账号/角色=基础管理，数据权限=数据权限卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "C-017",
+      "tier": "C",
+      "query": "先给对公客户做完评级，评级生效后发起授信申请，批复下来核对无误再申请用信",
+      "gold": [
+        "rating",
+        "credit_application",
+        "credit-corp-approval-result",
+        "credit_usage"
+      ],
+      "note": "评级→授信→批复查看→用信四段链",
+      "source": "v2-new"
+    },
+    {
+      "id": "C-018",
+      "tier": "C",
+      "query": "押品先在系统里建档立卡，权证移库入库保管，后续借阅到期归还全程登记",
+      "gold": [
+        "collateral_info",
+        "collateral_custody"
+      ],
+      "note": "新增押品+权证出入库",
+      "source": "v2-new"
+    },
+    {
+      "id": "C-019",
+      "tier": "C",
+      "query": "集团客户先建档案，再把成员子公司逐个导入维护，在档案里查看集团评级和额度",
+      "gold": [
+        "customer-group-group"
+      ],
+      "note": "集团五步骤任务页+查看档案",
+      "source": "v2-new"
+    },
+    {
+      "id": "C-020",
+      "tier": "C",
+      "query": "催收先配好评分卡和策略，再新建任务派给人员处理并留下处理记录",
+      "gold": [
+        "collection_scorecard",
+        "collection_strategy",
+        "collection_task"
+      ],
+      "note": "三卡接力",
+      "source": "v2-new"
+    },
+    {
+      "id": "D-016",
+      "tier": "D",
+      "query": "corpCrgReplyPrimPg",
+      "gold": [
+        "credit-corp-approval-result"
+      ],
+      "note": "对公授信批复 pageId（语料实证仅此卡含）",
+      "source": "v2-new"
+    },
+    {
+      "id": "D-017",
+      "tier": "D",
+      "query": "wf_usecredit_004",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "note": "二合一流程实例码（语料实证仅此卡含）",
+      "source": "v2-new"
+    },
+    {
+      "id": "D-018",
+      "tier": "D",
+      "query": "ZJJK00095907",
+      "gold": [
+        "product_query"
+      ],
+      "note": "查询产品信息 pageId（语料实证仅此卡含）",
+      "source": "v2-new"
+    },
+    {
+      "id": "D-019",
+      "tier": "D",
+      "query": "FS00004789",
+      "gold": [
+        "collateral-func-ext-assess"
+      ],
+      "note": "外部评估流程 FS 码（语料实证仅此卡含）",
+      "source": "v2-new"
+    },
+    {
+      "id": "D-020",
+      "tier": "D",
+      "query": "UML00048975",
+      "gold": [
+        "collateral-func-warning"
+      ],
+      "note": "预警 UML 锚点（语料实证仅此卡含）",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-001",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "把客户的口子先封住不让他接着支取",
+      "gold": [
+        "limit"
+      ],
+      "note": "冻结=封住口子",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-002",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "把欠款的人按风险打分定档",
+      "gold": [
+        "collection_scorecard"
+      ],
+      "note": "评分卡=打分定档",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-003",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "房本凭证要拿出来用先登记事后还回",
+      "gold": [
+        "collateral_custody"
+      ],
+      "note": "权证借阅/归还",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-004",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "抵押的厂房被法院贴了封条怎么登记",
+      "gold": [
+        "collateral_seizure"
+      ],
+      "note": "查封=贴封条",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-005",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "这套商铺现在行情价多少给算一算",
+      "gold": [
+        "collateral_valuation"
+      ],
+      "note": "估值=行情价",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-006",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "把这家公司的底档资料调出来看看",
+      "gold": [
+        "customer_query"
+      ],
+      "note": "客户信息=底档；与 E-024 区分=底档资料查询 vs 行内全貌视图",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-007",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "新企业头一回来行里立户怎么走",
+      "gold": [
+        "customer_onboarding"
+      ],
+      "note": "建档=立户",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-008",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "给这家企业的信用水平定个档",
+      "gold": [
+        "rating"
+      ],
+      "note": "评级=定档",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-009",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "上次定的档现在是几档去哪儿调阅",
+      "gold": [
+        "rating-query-view"
+      ],
+      "note": "评级查询=调阅定档结果",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-010",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "贷款批文下来了头一笔钱往外放的申请",
+      "gold": [
+        "loan"
+      ],
+      "note": "放款=钱往外放；竞争卡 credit_usage（批复后首个动作是支取额度）经「往外放=出账动作」消歧",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-011",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "扣款的银行卡换成另一张去哪儿改",
+      "gold": [
+        "loan_account"
+      ],
+      "note": "还款账户=扣款卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-012",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "跟客户谈好的条款在系统里把正式文本立起来",
+      "gold": [
+        "duigong_contract_sign"
+      ],
+      "note": "签订=正式文本立起来",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-013",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "客户不来网点在手机上把字签掉",
+      "gold": [
+        "electronic_signing"
+      ],
+      "note": "线上签约=手机上把字签掉",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-014",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "找个有实力的第三方给借款人兜底怎么录",
+      "gold": [
+        "guarantee_intro"
+      ],
+      "note": "引入保证人=第三方兜底",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-015",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "关联企业圈成一条链统一维护",
+      "gold": [
+        "customer-group-cluster"
+      ],
+      "note": "集群=圈成链；消歧：伞形=总集团（E-046）、母子挂靠=关联关系（E-048）",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-016",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "智能风控要拦的动作先在库里定义出来",
+      "gold": [
+        "smart-ctrl-rule-lib"
+      ],
+      "note": "控制规则库=在库里定义",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-017",
+      "tier": "E",
+      "pattern": "colloquial-synonym",
+      "query": "不动产的分类树和各机构的作价口径在哪儿配",
+      "gold": [
+        "collateral-func-params"
+      ],
+      "note": "押品种类/估值参数=分类树/作价口径",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-018",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "智能风控要拦的判断逻辑先写出来再发布出去",
+      "gold": [
+        "smart-ctrl-rule-cfg"
+      ],
+      "note": "控制规则配置/发布",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-019",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "几本押品相关的账册要能分开查分开导出",
+      "gold": [
+        "collateral-func-ledger"
+      ],
+      "note": "押品台账管理=4 本台账分别查询+导出；T2 双人复核裁定原 route-mgmt 靶不可辩护（该卡是前端菜单路由非系统对接），整条换靶",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-020",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "拖账的户头移交专人接着跟",
+      "gold": [
+        "collection_task"
+      ],
+      "note": "催收任务/转办",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-021",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "款放出去之后每季度去企业现场转一转看看经营",
+      "gold": [
+        "postloan"
+      ],
+      "note": "贷后检查=现场走访",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-022",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "批下来的盘子头一笔支取在哪儿发起",
+      "gold": [
+        "credit_usage"
+      ],
+      "note": "用信申请=支取盘子；竞争卡 loan（放款）经「支取=额度维度」消歧",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-023",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "轮到我名下处理的几件事从哪里进去办",
+      "gold": [
+        "approval_todo"
+      ],
+      "note": "待办任务；approval_chain（首页待办第六类卡片页）为并存入口竞争卡，gold 取工作台任务事项主卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-024",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "这家企业在我们行里的全貌调出来看看",
+      "gold": [
+        "customer_360"
+      ],
+      "note": "客户360视图=行内全貌",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-025",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "纸质件都齐了要移交保管怎么申请",
+      "gold": [
+        "archive-stock-in"
+      ],
+      "note": "档案入库=移交保管（纸质资料为卡面 keyword，改用纸质件）",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-026",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "个人的评级和支用一次办完的那个申请",
+      "gold": [
+        "loan-retail-erheyi-apply"
+      ],
+      "note": "二合一",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-027",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "银行只当中介、钱是别人出的那种业务怎么发起",
+      "gold": [
+        "loan-corp-entrust-loan"
+      ],
+      "note": "委托贷款",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-028",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "几家行拼盘的大额业务主办那家先发起申请",
+      "gold": [
+        "loan-corp-syndicate-lead-apply"
+      ],
+      "note": "银社团牵头行",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-029",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "拼盘里跟投的那家行怎么发起自己的那份",
+      "gold": [
+        "loan-corp-syndicate-participant-apply"
+      ],
+      "note": "参与行",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-030",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "个人用款申请填错了信息要改一改在哪操作",
+      "gold": [
+        "loan-retail-apply-maintain"
+      ],
+      "note": "对私用信修改",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-031",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "批文长什么样在哪个页面上看",
+      "gold": [
+        "credit-corp-approval-result"
+      ],
+      "note": "批复查看",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-032",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "款不进借款人的户头直接划给上游卖货的怎么弄",
+      "gold": [
+        "disburse-entrusted-payment"
+      ],
+      "note": "受托支付",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-033",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "收不回来的户头行里接手自己管着要登记",
+      "gold": [
+        "asset-preserve-ops-counter-entrust"
+      ],
+      "note": "反委托",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-034",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "到点没还上的自动发条通知出来在哪儿开",
+      "gold": [
+        "collection-remind-cfg"
+      ],
+      "note": "提醒催收配置",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-035",
+      "tier": "E",
+      "pattern": "colloquial-verb",
+      "query": "新收进来的楼先在系统里立卷建卡",
+      "gold": [
+        "collateral_info"
+      ],
+      "note": "押品新增",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-036",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "烂账打包交给外面的专业户去清",
+      "gold": [
+        "asset-preserve-ops-outsourced-collection"
+      ],
+      "note": "委外清收=烂账外包",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-037",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "状子已经递到法院了系统里走哪条",
+      "gold": [
+        "judicial-litigation"
+      ],
+      "note": "司法诉讼=递状子",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-038",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "全行都要看到的通知在哪儿发",
+      "gold": [
+        "system-mgmt-message-center"
+      ],
+      "note": "公告/消息发布",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-039",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "头一回例检和往后定期检的间隔规矩在哪儿定",
+      "gold": [
+        "check-config"
+      ],
+      "note": "首次/常规贷后检查规则（复核人建议：归检→例检）",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-040",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "轮到我处理的那笔在详情里放行并选好下一棒的人",
+      "gold": [
+        "credit-corp-approval-task"
+      ],
+      "note": "审批任务页同意+流程选人；approval_chain 的 approver_picker 为竞争，gold 取任务详情专职卡（menu=任务事项→任务详情）",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-041",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "贷款品种分几段推进的树形结构在哪儿维护",
+      "gold": [
+        "product_stage"
+      ],
+      "note": "产品阶段树",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-042",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "组品种要用的公共零件和分组在哪儿配",
+      "gold": [
+        "product_element"
+      ],
+      "note": "产品要素库=公共零件",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-043",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "总行定义的贷款品种先录进去再放开用",
+      "gold": [
+        "product_library"
+      ],
+      "note": "新增产品+产品启用",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-044",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "某个品种的详情和历史版本调出来看看",
+      "gold": [
+        "product_query"
+      ],
+      "note": "查询产品信息（列表/详情/历史）",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-045",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "品种和后台账务系统之间的对应关系在哪儿挂",
+      "gold": [
+        "product_core_mapping"
+      ],
+      "note": "核心产品映射",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-046",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "在所有集团之上再立一个总的伞形户头",
+      "gold": [
+        "customer-group-general-group"
+      ],
+      "note": "总集团（「所有集团之上」消歧 vs 集团客户管理；「集团」为 alias 总集团 子串非全词，经 ban-check 全词规则放行）",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-047",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "款放出去了账上却没体现这种例外在哪儿处理",
+      "gold": [
+        "disburse-account-abnormal"
+      ],
+      "note": "账务异常",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-048",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "两个客户是母子公司要在系统里挂上这层关系",
+      "gold": [
+        "customer-common-cust-relation"
+      ],
+      "note": "客户关联关系；竞争卡 customer-group-group（集团建档挂成员）经「仅登记关系非建集团」消歧（「关系」为 keyword 关联关系 子串非全词）",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-049",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "给这笔业务配套的附属文书要补立一份",
+      "gold": [
+        "guaranty_contract"
+      ],
+      "note": "担保合同=附属文书",
+      "source": "v2-new"
+    },
+    {
+      "id": "E-050",
+      "tier": "E",
+      "pattern": "colloquial-domain",
+      "query": "界面想改成自己用着顺手的样式",
+      "gold": [
+        "portal-personalization"
+      ],
+      "note": "个性化设置",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-031",
+      "tier": "N",
+      "query": "还款期限延长怎么办理",
+      "gold": [],
+      "whyNegative": "展期/还款管理模块未建卡（repay 分册 through-chains 无卡，84 卡无对应）",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-032",
+      "tier": "N",
+      "query": "提前还款违约金怎么算",
+      "gold": [],
+      "whyNegative": "提前还款试算属 repay 域 NCMS 接口，未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-033",
+      "tier": "N",
+      "query": "预约还款日期怎么改",
+      "gold": [],
+      "whyNegative": "预约还款（schedRepayApplication）未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-034",
+      "tier": "N",
+      "query": "信贷档案借阅要怎么登记",
+      "gold": [],
+      "whyNegative": "档案借阅流程未建卡（archive-stock-in 卡仅覆盖档案入库链；T2 复核裁定原「还款计划表」版与 system-mgmt-loan-calc keyword「还款计划」字面相撞，整条换靶）",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-035",
+      "tier": "N",
+      "query": "罚息减免申请怎么提",
+      "gold": [],
+      "whyNegative": "罚息减免流程未建卡（v1 N-022 计算类之外的申请类近域）",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-036",
+      "tier": "N",
+      "query": "贴现业务怎么办理",
+      "gold": [],
+      "whyNegative": "credit-interbank 分册无卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-037",
+      "tier": "N",
+      "query": "保函开立需要什么材料",
+      "gold": [],
+      "whyNegative": "保函业务未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-038",
+      "tier": "N",
+      "query": "信用证开证流程怎么走",
+      "gold": [],
+      "whyNegative": "信用证业务未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-039",
+      "tier": "N",
+      "query": "银行承兑汇票签发手续",
+      "gold": [],
+      "whyNegative": "银承签发未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-040",
+      "tier": "N",
+      "query": "借款人变更申请怎么办",
+      "gold": [],
+      "whyNegative": "借据要素变更未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-041",
+      "tier": "N",
+      "query": "抵债资产怎么处置",
+      "gold": [],
+      "whyNegative": "asset-preserve-npl 分册无卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-042",
+      "tier": "N",
+      "query": "不良贷款核销条件是什么",
+      "gold": [],
+      "whyNegative": "核销流程未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-043",
+      "tier": "N",
+      "query": "以物抵债怎么操作",
+      "gold": [],
+      "whyNegative": "以物抵债未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-044",
+      "tier": "N",
+      "query": "信贷资产转让流程",
+      "gold": [],
+      "whyNegative": "资产转让未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-045",
+      "tier": "N",
+      "query": "贷款结清证明去哪里开",
+      "gold": [],
+      "whyNegative": "结清证明开具未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-046",
+      "tier": "N",
+      "query": "抵押登记注销手续怎么办",
+      "gold": [],
+      "whyNegative": "押品注销未建卡（现存押品卡覆盖登记/出入库/查封）",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-047",
+      "tier": "N",
+      "query": "授信年审要准备哪些材料",
+      "gold": [],
+      "whyNegative": "授信年审流程未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-048",
+      "tier": "N",
+      "query": "首套房利率优惠政策有哪些",
+      "gold": [],
+      "whyNegative": "利率政策咨询非系统操作，未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-049",
+      "tier": "N",
+      "query": "跨行大额转账限额是多少",
+      "gold": [],
+      "whyNegative": "支付清算域未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-050",
+      "tier": "N",
+      "query": "对公账户信息变更怎么预约",
+      "gold": [],
+      "whyNegative": "核心系统账户域未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-051",
+      "tier": "N",
+      "query": "反洗钱客户风险等级怎么划分",
+      "gold": [],
+      "whyNegative": "AML 客户评级未建卡（风险分类卡是贷款五级分类，非客户 AML 等级）",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-052",
+      "tier": "N",
+      "query": "印章保管和使用怎么登记",
+      "gold": [],
+      "whyNegative": "印章管理未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-053",
+      "tier": "N",
+      "query": "网点装修施工怎么备案",
+      "gold": [],
+      "whyNegative": "行政事务域未建卡",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-054",
+      "tier": "N",
+      "query": "会议室预约在哪个系统",
+      "gold": [],
+      "whyNegative": "meeting-mgmt 分册无卡（仅信审会链，未 promote）",
+      "source": "v2-new"
+    },
+    {
+      "id": "N-055",
+      "tier": "N",
+      "query": "手机银行上怎么查贷款余额",
+      "gold": [],
+      "whyNegative": "digital-mobile 面客移动端分册无卡",
+      "source": "v2-new"
     }
   ],
   "excluded": [
