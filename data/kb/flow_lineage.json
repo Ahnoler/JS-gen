@@ -1,0 +1,247 @@
+{
+  "lineageVersion": "v1",
+  "generatedAt": "2026-09-10T10:34:32.028Z",
+  "source": "data/kb/req/*/drafts/*.json（flow/aliases 去空白精确反查）",
+  "cards": {
+    "approval_chain": [
+      "rating"
+    ],
+    "archive-stock-in": [
+      "archive"
+    ],
+    "asset-preserve-ops-counter-entrust": [
+      "asset-preserve-ops"
+    ],
+    "asset-preserve-ops-outsourced-collection": [
+      "asset-preserve-ops"
+    ],
+    "check-config": [
+      "postloan-check"
+    ],
+    "collateral-func-ext-assess": [
+      "collateral-func"
+    ],
+    "collateral-func-ledger": [
+      "collateral-func"
+    ],
+    "collateral-func-params": [
+      "collateral-func"
+    ],
+    "collateral-func-warning": [
+      "collateral-func"
+    ],
+    "collateral_custody": [
+      "collateral-func"
+    ],
+    "collateral_info": [
+      "collateral-info"
+    ],
+    "collateral_valuation": [
+      "collateral-info"
+    ],
+    "collection-remind-cfg": [
+      "collection"
+    ],
+    "collection_scorecard": [
+      "collection"
+    ],
+    "collection_strategy": [
+      "collection"
+    ],
+    "collection_task": [
+      "collection"
+    ],
+    "credit-corp-approval-result": [
+      "credit-corp",
+      "credit-retail"
+    ],
+    "credit-corp-approval-task": [
+      "credit-corp"
+    ],
+    "credit-retail-credit-config": [
+      "credit-retail"
+    ],
+    "credit_application": [
+      "credit-corp"
+    ],
+    "credit_usage": [
+      "loan-corp"
+    ],
+    "customer-common-cust-relation": [
+      "customer-common"
+    ],
+    "customer-group-cluster": [
+      "customer-group"
+    ],
+    "customer-group-general-group": [
+      "customer-group"
+    ],
+    "customer-group-group": [
+      "customer-group"
+    ],
+    "customer_onboarding": [
+      "customer-corp"
+    ],
+    "digital-loan-desk-data-index": [
+      "digital-loan-desk"
+    ],
+    "disburse-account-abnormal": [
+      "disburse"
+    ],
+    "disburse-entrusted-payment": [
+      "disburse"
+    ],
+    "judicial-litigation": [
+      "asset-preserve-npl"
+    ],
+    "limit-ctrl-api-grant-use-one": [
+      "limit-ctrl-api"
+    ],
+    "limit-ctrl-api-ocp-revoke-loop": [
+      "limit-ctrl-api"
+    ],
+    "loan-corp-entrust-loan": [
+      "loan-corp"
+    ],
+    "loan-corp-syndicate-lead-apply": [
+      "loan-corp"
+    ],
+    "loan-corp-syndicate-participant-apply": [
+      "loan-corp"
+    ],
+    "loan-retail-apply-maintain": [
+      "loan-retail"
+    ],
+    "loan-retail-erheyi-apply": [
+      "loan-retail"
+    ],
+    "loan": [
+      "disburse"
+    ],
+    "portal-home-mgmt": [
+      "portal"
+    ],
+    "portal-personalization": [
+      "portal"
+    ],
+    "portal-public-info": [
+      "portal"
+    ],
+    "portal-subapp": [
+      "portal"
+    ],
+    "postloan": [
+      "postloan-check"
+    ],
+    "product_core_mapping": [
+      "product-mgmt"
+    ],
+    "product_element": [
+      "product-mgmt"
+    ],
+    "product_library": [
+      "product-mgmt"
+    ],
+    "product_query": [
+      "product-mgmt"
+    ],
+    "product_stage": [
+      "product-mgmt"
+    ],
+    "rating-query-view": [
+      "rating"
+    ],
+    "rating": [
+      "rating"
+    ],
+    "risk-class-corp-org-config": [
+      "postloan-risk-class"
+    ],
+    "risk-class-default-config": [
+      "postloan-risk-class"
+    ],
+    "risk-class-gen-config": [
+      "postloan-risk-class"
+    ],
+    "risk-class-ledger": [
+      "postloan-risk-class"
+    ],
+    "risk-class-observation-whitelist": [
+      "postloan-risk-class"
+    ],
+    "risk-class-overdue-config": [
+      "postloan-risk-class"
+    ],
+    "risk-class-query": [
+      "postloan-risk-class"
+    ],
+    "risk-class-reason-config": [
+      "postloan-risk-class"
+    ],
+    "risk-class-statistics": [
+      "postloan-risk-class"
+    ],
+    "smart-ctrl-log-query": [
+      "smart-ctrl"
+    ],
+    "smart-ctrl-rule-cfg": [
+      "smart-ctrl"
+    ],
+    "smart-ctrl-rule-lib": [
+      "smart-ctrl"
+    ],
+    "smart-ctrl-rule-scheme": [
+      "smart-ctrl"
+    ],
+    "smart-ctrl-rule-toggle": [
+      "smart-ctrl"
+    ],
+    "system-mgmt-base-mgmt": [
+      "system-mgmt"
+    ],
+    "system-mgmt-data-perm": [
+      "system-mgmt"
+    ],
+    "system-mgmt-gov-bond": [
+      "system-mgmt"
+    ],
+    "system-mgmt-loan-calc": [
+      "system-mgmt"
+    ],
+    "system-mgmt-message-center": [
+      "system-mgmt"
+    ],
+    "system-mgmt-org-merge": [
+      "system-mgmt"
+    ],
+    "system-mgmt-param-mgmt": [
+      "system-mgmt"
+    ],
+    "system-mgmt-route-mgmt": [
+      "system-mgmt"
+    ]
+  },
+  "unmapped": [
+    "approval_todo",
+    "collateral_seizure",
+    "customer_360",
+    "customer_query",
+    "duigong_contract_sign",
+    "electronic_signing",
+    "guarantee_intro",
+    "guaranty_contract",
+    "limit",
+    "loan_account",
+    "rating_flow",
+    "session_login"
+  ],
+  "ambiguous": [
+    {
+      "stem": "credit-corp-approval-result",
+      "modules": [
+        "credit-corp",
+        "credit-retail"
+      ]
+    }
+  ]
+}

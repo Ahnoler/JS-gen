@@ -153,6 +153,7 @@ function convertDraft(item) {
     keywords: draft.keywords || [],
     menu_path: draft.menu_path || '',
     preconditions: draft.preconditions || [],
+    moduleKey,
   };
   return { nodes, rules, exceptions, source, base, stemTokens: stemTokens(item.file) };
 }
@@ -308,6 +309,9 @@ function applyMerge(path, conv) {
       result.writtenNodes += 1;
     }
   }
+
+  // 血缘防再丢（P0 T1a）：既有卡缺 moduleKey 时以本次晋升草稿的模块补写；已有值则不覆盖
+  if (!card.moduleKey) card.moduleKey = conv.base.moduleKey;
 
   card.rules = Array.isArray(card.rules) ? card.rules : [];
   const keywords = new Set(card.rules.map((r) => r?.keyword));
