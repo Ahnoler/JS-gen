@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 02:05 · Zcode — 收工：覆盖回溯 T5 小迭代（回链 01:20 开工 `ed2ef2cb`；G 判决 `38e0ef7d` 七项全处置）
+
+- 完成：`ed2ef2cb` 开工 → **`996163e0` D1+D5**：`redactPageKey()` 结构键免 40 守卫（只留 `host#/route`，剥 scheme/page: 前缀+query+dialog/anchor 后缀）+ `extractStructural` 不再截断 + `createdDate`→ISO；fixture 重冻 **v1.1**（sha `33ad3e617280d07f`，key 28 轨迹/110 region 非空=reviewer DB 真值；**回库 314/314 原值 reduce 落入 fixture key 集合**）；门禁 +D1 恢复 pin（≥20 轨迹带 key+key 无 `?`；region.key 免长文本断言）→ **`93c848a5` D3+D2+D4**：primaryCard 改链优先级（`primaryCardMisaligned=24` 与复核数逐位一致）+ 头注释对齐；M5 重建=visited 页面 key↔primary 卡 ROUTE-chain markers 同类比较（`node.enter` 是中文菜单描述非路由、`node.page` 是显示名，均不可比——orderAgreement 废除换 `entryOnCardRate`；上限=`m5.ceiling`）；v2 基线 n=18：**1.000/1.000/0.000/上限 1.000（9 个去重路由的小样本面事实，非 matcher 伪影）**；M5 两项出 floor（engine+gate FLOORS 同步，INFO 行打印；基线 v1.1 `floorPolicy` 记录）→ **`bf2dade8` D6+D8+报告三处必改**：§1 M5 行 v2 重写、D6 ROUTE 精度区间标注（5 泛化片段 ≥10 页，只作模块级归因）、§4 头条**撤回「补 rating 码」**（评级族 6 条 ROUTE 6/6 已映射）换真实缺口（智能控制执行日志 ×3 补 1 marker/查询交易信息 ×2/对私用信 ×2/AILZ ×18）、§6 结论改写（M5 旧「系统性脱节 0.835」=label 词表伪影；轨迹反哺卡节点须待 page_level_key 落值面扩大后重新论证）、§7 复核入口刷新、§8 七项处置台账
+- 验收：`characterize-kb-coverage` **4 passed**（shape/脱敏硬断言/M1-M3 floor/D1 恢复 pin）；引擎连跑两次逐位一致（data plane）；`--baseline` exit 0；他线 WIP（verify-all.sh/classify.py/plans 归档）零触碰；红线零违反（src/** 零改动、SELECT only、评测集/阈值/verify-all/data/kb/req 零改动）
+- 提交链：`ed2ef2cb` → `996163e0` → `93c848a5` → `bf2dade8` → 本 commit
+- 遗留移交（等 reviewer 三验后关线）：①D1 恢复证据=门禁第 4 pin（28 轨迹）+回库 314/314 ②新 M5 上限分析=`metrics.m5.ceiling`（=1.000，小样本面事实已写入报告 §1/§8）③D8 订正=报告 §4+§8。**实质遗留（Lead/卡治理）**：`page_level_key` 落值面只有产品管理族（录制端结构键铺开另议）；M5 门槛等样本面扩大再议
+
 ## 2026-09-11 01:20 · Zcode — 开工：覆盖回溯 T5 小迭代（G 判决 `38e0ef7d` D1/D2/D3/D8 必改 + D4/D5 警告）
 
 - 判决要点：数据面与门禁通过（M1/M2/M3/M4/M6 可用作决策）；M5 作废待重建——D1 根因=40 字守卫误伤结构键 `page_level_key`（库里 47–135 字全被剥成 null，fixture 2408 region key 全空）；D2=M5 饱和（上限 0.1424 的 91.9%）量的是词表非行为；D3=primaryCard 字母序非链优先级（24/69 错配）；D8=报告 §4「补 rating 码」头条是事实错误（那 6 条 ROUTE 链 6/6 已映射）
