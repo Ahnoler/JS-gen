@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 18:36 · Zcode — 开工：recall-p0-three-levers KB 召回 P0 三杠杆
+
+- 进行中：2026-09-10 18:36；目标=按已确认 spec（决策 A1–A5 已裁定）用三条零依赖杠杆提召回分：血缘作用域三态 / camelCase·ASCII 分词 / 受控词表扩展；冻结基线 Acc@1 0.650·Recall@5 0.757·MRR@5 0.694·nDCG@5 0.708·拒答 0.633·噪声 0.650 不得回退
+- 范围：`scripts/characterization/fixtures/kb-recall-failures.v1.json`（新）、`scripts/kb/build-flow-lineage.mjs`（新）、`data/kb/flow_lineage.json`（新）、`data/kb/synonyms.json`（新）、`src/services/req-draft-traj/flow-card-recall.js`、**`src/services/req-draft-traj/propose.js`（仅注入 moduleKey/_modules 参数，不改既有语义——A5 已放行）**、`scripts/kb/promote_draft.mjs`、`scripts/characterization/characterize-flow-card-recall.mjs`（既有 17 pin 不动）、`docs/superpowers/reports/2026-09-10-recall-p0-report.md`（新）、tmp/kb-p0/**、todo-list、本文件
+- 禁入区：`scripts/refactor/verify-all.sh`（本线禁改且现为他线 WIP）、`scripts/characterization/fixtures/kb-recall-eval.v1.json`（冻结）、`data/kb/req/**`（只读）、`.cursor/`、`scripts/controller/actions/phase/classify.py`（他线 WIP）、fill/select/radio/click 引擎热区
+- 方式：T0（基线复现逐位一致 + 35 失败清单冻结 + build/verify 五五划分落盘）→ T1a 血缘资产 → T1b 作用域三态（pin 先行）→ T2 分词（pin 先行）→ T3 词表（只据 build 集建表，verify 禁看）→ T4 报告；一任务一 commit、证据落 tmp/kb-p0/&lt;task-id&gt;/、不达标单项回退；工作区 12 项他线 WIP 全部避开不携带
+
 ## 2026-09-10 18:35 · ZCode 引擎线 — 开工+收工：mega-menu 不收起交接文档（纯文档单元）
 
 - 完成：同事侧执行引擎反馈「子菜单出现后不再隐藏」——按本仓真机定案（probe-menu-close-v2.py 单变量实证：关=面板外真实 mousedown，hover/Escape/合成点击全无效；合成 el.click() 可开）写排查四步+修复三件套配方，交接文档入库 `docs/superpowers/guides/menu-nav-megamenu-close-handover.md`
