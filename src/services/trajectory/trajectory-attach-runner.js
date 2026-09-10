@@ -18,7 +18,9 @@ import {
   getTrajectoryRuntime,
 } from './trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
+import { runPrepareLoginWithColdStartRetry } from './prepare-login-retry.js';
 import { bindRecordingPageId } from './recording-page-bind.js';
+import { runReplayActions } from '../replay-actions.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import { attachTrajectoryLive } from './trajectory-attach-service.js';
 import { getFlowCard } from '../kb-flow-cards.js';
@@ -223,7 +225,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
   emitStage('login', 'running', { accountId });
   let login = { skipped: false, done: false, accountId };
   // Auth dry-run login segment: the agent performs the login itself as the
-  // recorded phase — skip the prepare-time default login (incl. its 8s retry).
+  // recorded phase — skip the prepare-time default login (incl. cold-start retry).
   // Flag is read-only here; it lives until the runtime is torn down at detach.
   if (runtime.skipDefaultLogin || skipDefaultLogin) {
     login = { skipped: true, done: true, accountId };
@@ -234,19 +236,23 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
       login = { skipped: true, done: true, accountId };
       emitStage('login', 'skipped', { accountId });
     } else {
-      try {
-        await runDefaultLogin(runtime, account);
-      } catch (firstErr) {
-        // 冷启动时序：新 slot 首次导航后 SPA 首屏尚未挂载完，replay login 会打在
-        // 未初始化页面上（label-not-found 全集）。固定 8s 收窄为「失败即等 8s 重试一次」，
-        // 重试时页面已就绪，能显著吸收该间歇；仅影响首次 login，不改成功路径。
-        // 慢环境可经 PREPARE_LOGIN_RETRY_DELAY_MS 上调（挂起项 login-retry-heuristic
-        // 的事件驱动重设计另议，此处只解除写死时延）。
-        const retryDelayMs = Number(process.env.PREPARE_LOGIN_RETRY_DELAY_MS) || 8000;
-        console.warn(`[prepare] login first attempt failed, retry once after ${retryDelayMs}ms: ${firstErr?.message || firstErr}`);
-        await new Promise((r) => setTimeout(r, retryDelayMs));
-        await runDefaultLogin(runtime, account);
-      }
+      // 冷启动：首屏未挂载时 login 易 label-not-found。失败后先 wait_for_loading 沉降，
+      // 再指数退避重试（login-retry-heuristic），替代固定睡 8s。
+      await runPrepareLoginWithColdStartRetry({
+        runLogin: () => runDefaultLogin(runtime, account),
+        settle: async () => {
+          if (!runtime?.sessionId || !runtime?.executorNodeUuid) return;
+          await runReplayActions({
+            execSession,
+            sessionId: runtime.sessionId,
+            nodeUuid: runtime.executorNodeUuid,
+            actions: [{ action: 'wait_for_loading' }],
+            timeoutMs: 30000,
+            stopOnFail: false,
+            isReplay: true,
+          });
+        },
+      });
       login = { skipped: false, done: true, accountId };
       emitStage('login', 'done', { accountId });
     }

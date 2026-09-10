@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 17:57 · Cursor Lead — 收工：login-retry-heuristic 事件沉降 + 指数退避
+
+- 完成：回链开工 `0c697eba`；新建 `prepare-login-retry.js`；attach-runner 失败后 `wait_for_loading` settle + 指数退避（替代固定 8s）
+- 验收：`characterize-prepare-login-retry.mjs` OK
+- 遗留：冷 pin 未入 verify-all（WIP）；控制面重启后生效；下一 P3 可排 `p2-batch-lease`
+
 ## 2026-09-10 17:56 · Cursor Lead — 开工：login-retry-heuristic 事件沉降 + 指数退避
 
 - 进行中：2026-09-10 17:56；根因=prepare 登录失败固定睡 8s 再试，慢环境误判/快环境空等
