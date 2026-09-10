@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-10 09:56 · Cursor Lead — 收工：click index+button unify plan（回链 09:46）
+
+- 完成：plan `docs/superpowers/plans/2026-09-10-click-record-replay-unify.md`（T1 pin → T2 ClickEngine for_replay → T3 `_replay` 接线 → T4 record 薄委托 → T5 契约/verify-all）；spec 链 plan
+- 验收：plan 覆盖 C1–C4 / O1–O3；menu/close Out；与 radio Phase B 同形
+- 遗留：用户选 Subagent-Driven 或 Inline 后开实现开工条目
+
 ## 2026-09-10 09:46 · Cursor Lead — 开工：click index+button 录放统一 design（直接 Phase B）
 
 - 进行中：09:46；用户选范围 A（index+button）+ 深度 B（跳过 click_dispatch，经 ClickEngine）
