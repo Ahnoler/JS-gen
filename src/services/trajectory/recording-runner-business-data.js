@@ -21,7 +21,7 @@ import { prepareBusinessDataInjection } from './trajectory-record-lifecycle.js';
  * }>} 业务数据注入上下文
  */
 export async function prepareRecordingBusinessContext(tid) {
-  // 业务数据：仅填表/引入类阶段注入；导航/登录/查询不挂，避免「填写」污染分类。
+  // 业务数据：填表/引入/查询(搜索)阶段注入（#676）；导航/无凭证登录不挂。
   const { businessDataFile, businessData, businessDataBlock, successGatesBlock } =
     await prepareBusinessDataInjection(tid);
   const {

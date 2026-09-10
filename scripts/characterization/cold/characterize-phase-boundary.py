@@ -209,6 +209,34 @@ def main() -> int:
     assert_true(classify_task_mode(fill_biz) == 'form_fill', 'fill+业务数据 still form_fill')
     assert_true(needs_business_data_context(fill_biz), 'fill phase keeps 业务数据')
 
+    # #676: search/locate phases must receive 业务数据 (search keywords live there)
+    search_tree = (
+        '先在产品树搜索框填写关键字（若有查询按钮则点查询），'
+        '再点击选中一级分类「KB测一级-20260907-1835」。'
+        '预期结果：该一级分类节点被选中。'
+    )
+    assert_true(classify_task_mode(search_tree) == 'query', '#676 search-tree → query')
+    assert_true(
+        needs_business_data_context(
+            search_tree, {'一级分类': 'KB测一级-20260907-1835'}
+        ),
+        '#676 query/search phase must inject 业务数据 hint',
+    )
+    pure_query = '按客户名称查询。预期结果：列表展示匹配行。'
+    assert_true(classify_task_mode(pure_query) == 'query', 'pure query mode')
+    assert_true(
+        needs_business_data_context(pure_query, {'客户名称': '测试公司'}),
+        '#676 pure query phase must inject 业务数据 hint',
+    )
+    # Contract mode=query must not veto biz inject (reviewer path)
+    assert_true(
+        needs_business_data_context(
+            search_tree,
+            {'_phase_intent': {'mode': 'query'}, '一级分类': 'KB测一级-20260907-1835'},
+        ),
+        '#676 contract mode=query still injects 业务数据',
+    )
+
     # Customer-picker dialog (评级申请选客户) → introduce, not bare other
     pick_t = '在客户选择弹窗中选择目标对公客户。预期结果：选中目标客户并进入评级申请流程。'
     b_pick = compile_boundary(pick_t)

@@ -28,8 +28,11 @@ NEEDLES: dict[str, tuple[str, ...]] = {
         "brief_plan",
     ),
     "src/services/trajectory/trajectory-meta-service.js": (
-        "先在搜索框填写关键字",
+        "先搜索/查询再点击",
         "不要为此增删 phase 条数",
+        # #676: must not strip user-named targets into vague「关键字」
+        "必须原样保留",
+        "禁止把具体名抹成",
     ),
 }
 

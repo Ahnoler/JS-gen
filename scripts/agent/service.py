@@ -284,7 +284,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
         else:
             mode = 'other'
             contract = None
-        # Only fill / introduce phases keep 业务数据 in the model-visible task.
+    # Only fill / introduce / query phases keep 业务数据 in the model-visible task.
         want_biz = (not heal_mode) and needs_business_data_context(phase_core, business_data_ref)
         if not want_biz:
             agent_task = phase_core
@@ -493,7 +493,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     sys.stderr.write(f"kb dict candidates skipped: {e}\n")
                     sys.stderr.flush()
         else:
-            sys.stderr.write("Skip business-data hint (phase is not fill/introduce)\n")
+            sys.stderr.write("Skip business-data hint (phase is not fill/introduce/query)\n")
             sys.stderr.flush()
     except Exception as e:
         sys.stderr.write(f"business data hint skipped: {e}\n")

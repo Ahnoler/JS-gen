@@ -23,7 +23,9 @@ export function stripBusinessDataBlock(text) {
 
 /**
  * Whether this phase goal should receive 业务数据 for the AI.
- * Fill / modify / introduce only — not login, pure open-page navigate, or list query.
+ * Fill / modify / introduce / **query(search)** — search keywords & locate
+ * targets live in 关键数据 (#676). Not login (unless credential co-occurrence)
+ * or pure open-page navigate.
  * @param {string} phaseText phase goal text
  * @returns {boolean} true when the phase should receive business-data injection
  */
@@ -46,9 +48,8 @@ export function phaseNeedsBusinessData(phaseText) {
   const actionHasWrite = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交/.test(beforeExpect);
   if (openPage && !actionHasWrite) return false;
 
-  const isQuery = /查询|搜索|查找/.test(t)
-    && !/新增|创建|录入|填写|修改|编辑|引入|保存|提交|校验/.test(t);
-  if (isQuery) return false;
+  // #676: query/search/locate phases need 业务数据 (keywords / target names)
+  if (/查询|搜索|查找|选中|定位/.test(t)) return true;
 
   if (/新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|变更|维护/.test(t)) return true;
   if (/引入|选人|客户选择|选择客户|选择.*客户/.test(t)) return true;

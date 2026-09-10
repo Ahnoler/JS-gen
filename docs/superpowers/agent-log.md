@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+# Agent 协作日志
+
+## 2026-09-10 14:55 · Cursor Lead — 收工：#676 搜索保留用户目标 + query 注入业务数据（回链 14:45）
+
+- 完成：`needs_business_data_context` / `phaseNeedsBusinessData` 对 query/search 改为注入；analyze 规则 7/8 改为「关键数据整段不抄、步骤内目标名必须原样保留」；STC prompt pin + phase-boundary + analyze-case-data 表征更新；spec §5.2 一句
+- 验收：`characterize-phase-boundary` / `characterize-search-then-click-prompts` / `characterize-analyze-case-data` / `characterize-case-data` GREEN
+- 遗留：#676 须 **重新 analyze** 再录 Phase1（旧 phase 描述仍是泛化「关键字」）；活会话 Python 须 detach 重挂才能加载 classify 新逻辑
+
 ## 2026-09-10 14:45 · Cursor Lead — 开工：#676 搜索阶段保留用户目标 + query 注入业务数据
 
 - 进行中：14:45；根因=analyze 规则 7/8 抹掉步骤内目标名 + query 阶段 `needs_business_data_context=False` 跳过业务数据 hint，Agent 用 DOM/KB 示例「贷款」填搜索

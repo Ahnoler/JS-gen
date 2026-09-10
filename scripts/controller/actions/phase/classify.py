@@ -108,10 +108,9 @@ def needs_business_data_context(
 ) -> bool:
     """Whether to show 【业务数据】to the model for this phase.
 
-    Only fill / modify / introduce (incl. introduce-then-save). Not login,
-    pure open-page navigate, or list query — except a login phase whose
-    business data carries credential keys (username/password/账号/密码), which
-    opts in so the agent can read the injected credentials instead of guessing.
+    Fill / modify / introduce / **query(search)** get the hint — search keywords
+    and locate targets live in 关键数据 (#676). Not pure open-page navigate,
+    or login without credential keys (auth dry-run opts login in when keys exist).
     """
     t = classification_task_text(task_text)
     if not t:
@@ -121,17 +120,19 @@ def needs_business_data_context(
         mode = contract.get('mode')
         if mode == 'login':
             return _store_has_auth_credentials(business_data_store)
-        if mode in ('navigate', 'query'):
+        if mode == 'navigate':
             return False
+        if mode == 'query':
+            return True
         if mode in ('create', 'modify', 'introduce_pick'):
             return True
         boundary = business_data_store.get('_phase_boundary') or {}
         if boundary.get('role') == 'navigate':
             return False
-        if boundary.get('role') in ('maintain', 'introduce'):
+        if boundary.get('role') in ('maintain', 'introduce', 'query'):
             return True
     mode = classify_task_mode(t)
-    if mode in ('form_fill', 'form_modify'):
+    if mode in ('form_fill', 'form_modify', 'query'):
         return True
     if business_data_store:
         boundary = business_data_store.get('_phase_boundary') or {}
@@ -140,8 +141,6 @@ def needs_business_data_context(
         contract = business_data_store.get('_phase_intent') or {}
         if contract.get('mode') == 'introduce_pick':
             return True
-    if mode == 'query':
-        return False
     if mode == 'login':
         # Credential-keyed store opts the login phase in (auth dry-run);
         # plain login phases without credentials stay excluded.
