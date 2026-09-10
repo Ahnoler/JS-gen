@@ -1,0 +1,33 @@
+=== corpus-card
+  待办 -> 待办任务 | data/kb/flows/approval_todo.json | keyword「待办」⊂ alias「待办任务」（同卡 approval_todo）
+  审批 -> 工作流审批 | data/kb/flows/approval_todo.json | keyword「审批」⊂ alias「工作流审批」（同卡 approval_todo）
+  档案入库 -> 档案入库申请 | data/kb/flows/archive-stock-in.json | keyword「档案入库」⊂ alias「档案入库申请」（同卡 archive-stock-in）
+  入库申请 -> 档案入库申请 | data/kb/flows/archive-stock-in.json | keyword「入库申请」⊂ alias「档案入库申请」（同卡 archive-stock-in）
+  档案入库 -> 新增档案入库申请 | data/kb/flows/archive-stock-in.json | keyword「档案入库」⊂ alias「新增档案入库申请」（同卡 archive-stock-in）
+  入库申请 -> 新增档案入库申请 | data/kb/flows/archive-stock-in.json | keyword「入库申请」⊂ alias「新增档案入库申请」（同卡 archive-stock-in）
+  反委托 -> 反委托资产管理 | data/kb/flows/asset-preserve-ops-counter-entrust.json | keyword「反委托」⊂ alias「反委托资产管理」（同卡 asset-preserve-ops-counter-entrust）
+  反委托 -> 反委托借据 | data/kb/flows/asset-preserve-ops-counter-entrust.json | keyword「反委托」⊂ alias「反委托借据」（同卡 asset-preserve-ops-counter-entrust）
+  委外清收 -> 委外清收登记 | data/kb/flows/asset-preserve-ops-outsourced-collection.json | keyword「委外清收」⊂ alias「委外清收登记」（同卡 asset-preserve-ops-outsourced-collecti
+  委外清收 -> 委外清收管理 | data/kb/flows/asset-preserve-ops-outsourced-collection.json | keyword「委外清收」⊂ alias「委外清收管理」（同卡 asset-preserve-ops-outsourced-collecti
+=== corpus-req-doc
+  流程状态联动 -> 提交流程审批 | data/kb/req/archive/chapters\03-档案入库.md:27 | 流程状态联动（提交流程审批）
+  基本信息 -> 维护调阅档案信息 | data/kb/req/archive/chapters\04-档案调阅.md:7 | 基本信息（维护调阅档案信息）
+  申请日期 -> 调阅到期日期收起 | data/kb/req/archive/chapters\05-档案归还.md:13 | 申请日期（调阅到期日期收起）
+  选择调阅单 -> 非向导页 | data/kb/req/archive/chapters\05-档案归还.md:15 | 「选择调阅单」（非向导页）
+  影像信息 -> 公共影像组件 | data/kb/req/archive/chapters\06-档案盘库.md:18 | 影像信息（公共影像组件）
+  基本信息 -> 查看基本信息 | data/kb/req/archive/chapters\07-档案出库.md:8 | 基本信息（查看基本信息）
+  出库受理明细页面 -> 非向导页 | data/kb/req/archive/chapters\07-档案出库.md:15 | 「出库受理明细页面」（非向导页）
+  影像信息 -> 维护影像资料 | data/kb/req/archive/chapters\08-档案销毁.md:7 | 影像信息（维护影像资料）
+  已入库档案被借出 -> 已借出 | data/kb/req/archive/through-chains.md:23 | 已入库档案被借出（已借出）
+  存在在库档案 -> 含已借出纸质档案 | data/kb/req/archive/through-chains.md:50 | 存在在库档案（含已借出纸质档案）
+=== wet-test-drift
+  核销查询/查询执行结果 -> 核销管理→核销执行 | asset-preserve-npl/wet-test.md 叶35:62 ZJJK00210569 | SUT「核销管理→核销执行」vs 文档「核销查询/查询执行结果」
+  处置方案申请 -> 抵债资产处置申请 | asset-preserve-ops/wet-test.md 叶140:170 ZJJK00210659 | SUT「抵债资产处置申请」vs 文档「处置方案申请」
+  发起流程 -> 发起入库 | collateral-func/wet-test.md 叶1:21 | SUT「发起入库」vs 文档「发起流程」
+  不动产抵押注销办理 -> 不动产抵押注销业务 | collateral-func/wet-test.md 叶35:65 | SUT「不动产抵押注销业务」vs 文档「不动产抵押注销办理」
+  权限移交 -> 权限转移 | collateral-info/wet-test.md 叶6:34 | SUT「权限转移」vs 文档「权限移交」
+  准入 -> 准入校验 | collateral-info/wet-test.md 叶9:42 ZJJK00095044 | SUT「准入校验」vs 文档「准入」
+  提醒催收配置 -> 提醒/催收配置 | collection/wet-test.md 叶35:77 ZJJK00097317 | SUT「提醒/催收配置」vs 文档「提醒催收配置」
+  提交流程 -> 流程提交 | credit-corp/wet-test.md 叶20:31 ZJJK00106505 | SUT「流程提交」vs 文档「提交流程」
+  拦截等级 -> 拦截等级标识 | customer-common/wet-test.md 叶3:22 ZJJK00105222 | SUT「拦截等级标识」vs 文档「拦截等级」
+  导入 -> 潜在风险客户名单管理 | customer-common/wet-test.md 叶9:28 ZJJK00105237 | SUT「潜在风险客户名单管理」vs 文档「导入」
