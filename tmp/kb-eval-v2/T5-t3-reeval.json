@@ -1,0 +1,35 @@
+{
+  "verdict": "PASS (DoD letter) — with attribution disclosure: generalization increment on v2-new ground is positive but thin (+1/115 new entries)",
+  "protocol": "v1-failure-built vocabulary (data/kb/synonyms.json, 16 entries, status=unvalidated, built 2026-09-10 from v1 failure set — NEVER from v2) tested on frozen v2, synonyms on vs off, same fixture, same runner",
+  "isolation": "build-side assets untouched this line (git log data/kb/synonyms.json empty since b7bdb8e8 annotation; no vocabulary/alias asset reads v2 entries — T0..T6 commits contain zero vocabulary changes)",
+  "aggregate": {
+    "accuracyAt1": { "off": 0.6, "on": 0.632, "delta": 0.032 },
+    "recallAt5": { "off": 0.725, "on": 0.761, "delta": 0.036 },
+    "mrrAt5": { "off": 0.653, "on": 0.687, "delta": 0.034 },
+    "ndcgAt5": { "off": 0.667, "on": 0.702, "delta": 0.035 },
+    "rejectionRate": { "off": 0.382, "on": 0.382, "delta": 0 },
+    "noiseAccuracyAt1": { "off": 0.6, "on": 0.632, "delta": 0.032 }
+  },
+  "perTier": { "A": "55/55 -> 55/55", "B": "18/45 -> 23/45", "C": "18/20 -> 18/20", "D": "18/20 -> 18/20", "E": "5/50 -> 6/50" },
+  "gained": [
+    { "id": "B-001", "tier": "B", "source": "v1", "attribution": "BUILD-SET ENTRY (P0/T3 反推来源) — memory-consistency, not generalization" },
+    { "id": "B-009", "tier": "B", "source": "v1", "attribution": "BUILD-SET ENTRY — memory-consistency" },
+    { "id": "B-013", "tier": "B", "source": "v1", "attribution": "BUILD-SET ENTRY — memory-consistency" },
+    { "id": "B-015", "tier": "B", "source": "v1", "attribution": "BUILD-SET ENTRY — memory-consistency" },
+    { "id": "B-023", "tier": "B", "source": "v1", "attribution": "BUILD-SET ENTRY — memory-consistency" },
+    { "id": "E-030", "tier": "E", "source": "v2-new", "attribution": "GENUINE GENERALIZATION: colloquial query 「个人用款申请填错了信息要改一改在哪操作」 never seen in build; bridge = vocabulary entry 用款->用信, injected token hits gold card alias 对私用信申请修改查看 (loan-retail-apply-maintain)" }
+  ],
+  "lost": [],
+  "newFp": [],
+  "rejectionFlips": { "fixed": 0, "newFp": 0 },
+  "dodChecklist": {
+    "E/B 独立正增量 > 0": "B +5/45, E +1/50 — both > 0 (E increment is 100% on v2-new ground)",
+    "聚合不退化": "all six aggregates improved or unchanged",
+    "拒答不降": "0.382 -> 0.382 (zero rejection flips)",
+    "A 层不掉": "55/55 -> 55/55"
+  },
+  "honestReading": "5 of 6 gains land on v1-carried entries that ARE the P0/T3 build set (expected memory effect, zero surprise). The only fresh-ground gain is E-030 (+1/50 colloquial entries). DoD letter = PASS; whether +1/115 new-entry generalization suffices to lift the T3 deactivation (wire propose.js, count as成果) is a Lead decision — this line does NOT wire (red line: 不接线 propose.js).",
+  "files": ["T5-off.json", "T5-on.json", "T5-contrast.txt"],
+  "measuredAt": "2026-09-10",
+  "runner": "node scripts/kb/recall-eval.mjs --fixture scripts/characterization/fixtures/kb-recall-eval.v2.json [--synonyms] --json"
+}
