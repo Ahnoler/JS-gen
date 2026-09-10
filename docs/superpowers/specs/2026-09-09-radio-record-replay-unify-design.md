@@ -137,8 +137,9 @@
 ```
 done:  select_option / tssc / tree（select unify A+B）
 done:  fill_form_field（fill unify A+B）
-now:   click_radio（本文；表单四件套收尾）
-then:  click_element_by_index / click_button / menu / close 组（点击族；单独 design）
+done:  click_radio（本文）
+next:  click_element_by_index + click_button — 见 [`2026-09-10-click-record-replay-unify-design.md`](./2026-09-10-click-record-replay-unify-design.md)
+then:  menu / close / adjacent / table-row-button
 later: autofill 内嵌 radio/fill 直调收敛；login 内嵌 fill（可选）
 ```
 

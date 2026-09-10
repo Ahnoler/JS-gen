@@ -1,5 +1,17 @@
 # Agent 协作日志
 
+## 2026-09-10 09:46 · Cursor Lead — 开工：click index+button 录放统一 design（直接 Phase B）
+
+- 进行中：09:46；用户选范围 A（index+button）+ 深度 B（跳过 click_dispatch，经 ClickEngine）
+- 范围：`docs/superpowers/specs/2026-09-10-click-record-replay-unify-design.md`；fill/radio §8 路线图指针；本文件
+- 禁入区：实现代码、menu/close、`.cursor/`、他线 WIP（flow-card plan 等）
+- 方式：落盘 design → 用户审阅 spec → writing-plans；本单元不写引擎代码
+
+## 2026-09-10 09:50 · ZCode — 收工：phase-done 湿测①标记 PASS + spec 收尾（文档零代码）
+
+- 完成：用户确认**重新录制已无问题**（误弹「AI 录制结束」不复现，控制面 20260909-1956 上服后实测）——`engine-wet-trio` 挂起表①stop→立即重录压测标记湿测 PASS（②③仍待测）；todo-list §⑥ 对应行同步；gitignored 本地件 spec 横幅补湿测状态；plans/2026-09-07-phase-done-cross-run-fix.md 头部加状态横幅。前端仓库的 spec 副本（vue-project docs/）已删（后端副本为唯一真源）。
+- 注意：本条纯文档标记（todo-list/agent-log/两份本地件），零代码改动，未 commit（等用户指令）。
+
 ## 2026-09-10 00:55 · Cursor Lead — 收工：search-then-click SDD close（回链 09-09 22:02）
 
 - 完成：Tasks 1–7 — `88b0772e`（guard+cold pin）/ `20fad726`+`1f9b053a`（phase mark/clear）/ `ffa9cb9f`（gate table+tree）/ `376fbce8`（dup-failure）/ `b7bd4a1d`（prompts+analyze）/ `1ae7f055`（KB+SKILL）；spec 状态→已实现
