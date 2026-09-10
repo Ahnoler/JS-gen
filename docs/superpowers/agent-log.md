@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 16:40 · Cursor Lead — 开工：P1-5 per-tid record/start 内存互斥
+
+- 进行中：2026-09-10 16:40；根因=`isAiRecordingActive` 依赖 phase=running，登录窗口内双 start 均可过闸；对抗 review P1-5 互斥未做
+- 范围：`src/services/trajectory/trajectory-recording-runner.js`、`scripts/characterization/cold/characterize-record-start-mutex.mjs`（新建）、todo-list `engine-wet-trio`、本文件
+- 禁入区：`classify.py` / `verify-all.sh` WIP / fill·click 引擎 / KB / `.cursor/`
+- 方式：TDD 冷 pin（入口同步 claim `runtime.aiRecording` 先于任何 await）→ 改 runner → 绿 pin → 收工
+
 ## 2026-09-10 16:09 · Cursor Lead — 收工：is_weak 分档——唯一 placeholder 可入库
 
 - 完成：回链开工 `e6b9127c`；改动 `is_weak_xpath_smart` 分档（搜索/过滤 cue + 请输入XXX 可 stamp；请输入[1]/??? 仍弱）
