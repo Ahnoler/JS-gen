@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 09:59 · Cursor Lead — 开工：click index+button 录放统一 SDD 实现
+
+- 进行中：09:59；用户选 Subagent-Driven；plan `2026-09-10-click-record-replay-unify.md` T1–T5
+- 范围：`characterize-click-replay-engine.py`、`click_action_engine.py`、`_replay.py`、`_misc.py`、契约/AGENTS/verify-all、design 状态、本文件；ledger `.superpowers/sdd/2026-09-10-click-record-replay-unify/`
+- 禁入区：menu/close 内核迁入；fill/select/radio；search-then-click 语义改动；`.cursor/`；他线 WIP
+- 方式：SDD 每任务子智能体实现（不 commit）→ 主会话验收后提交
+
 ## 2026-09-10 09:56 · Cursor Lead — 收工：click index+button unify plan（回链 09:46）
 
 - 完成：plan `docs/superpowers/plans/2026-09-10-click-record-replay-unify.md`（T1 pin → T2 ClickEngine for_replay → T3 `_replay` 接线 → T4 record 薄委托 → T5 契约/verify-all）；spec 链 plan
