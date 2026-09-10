@@ -47,7 +47,11 @@ function loadJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
-/** region_id 形如 "page:http://…#/cstMgt/…/cpctMgtPg|main" → 提取 URL hash 段文本 */
+/**
+ * region_id 形如 "page:http://…#/cstMgt/…/cpctMgtPg|main" → 提取 URL hash 段文本
+ * @param {string} regionId region_id 原文
+ * @returns {string} URL hash 段文本
+ */
 function regionKey(regionId) {
   const m = /region_id[":=]?\s*"?page:([^|"\n]+)/.exec(regionId || '');
   if (m) return m[1];
@@ -55,7 +59,11 @@ function regionKey(regionId) {
   return m2 ? m2[1] : String(regionId || '');
 }
 
-/** visitedRegions：按步序聚合 element_json.region_id 的 page 段（去重、保序） */
+/**
+ * visitedRegions：按步序聚合 element_json.region_id 的 page 段（去重、保序）
+ * @param {Array<{step_number: number, element_json: string|null}>} steps step 行
+ * @returns {Array<{key: string, stepNumber: number}>} 去重保序的 region 序列
+ */
 function visitedRegionsFromSteps(steps) {
   const out = [];
   for (const s of steps) {
@@ -67,7 +75,12 @@ function visitedRegionsFromSteps(steps) {
   return out;
 }
 
-/** P5 路由命中：visitedRegion.key 是否含卡 hash_markers 任一 marker（大小写不敏感） */
+/**
+ * P5 路由命中：visitedRegion.key 是否含卡 hash_markers 任一 marker（大小写不敏感）
+ * @param {Array<{key: string}>} regions visitedRegions
+ * @param {string[]} markers 卡 hash_markers
+ * @returns {Array<{key: string}>} 命中 marker 的 region 子集
+ */
 function markerHits(regions, markers) {
   const hits = [];
   for (const r of regions) {
