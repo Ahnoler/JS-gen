@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-11 00:26 · Zcode — 开工：KB 覆盖回溯（方向 A，spec+plan `ecfc4ab6`；只读零产品改动）
+
+- **隧道实证**：本机 13306 已 LISTENING（reviewer 后台 job 同机）且 SELECT COUNT(trajectory)=416 成功——口令问题消解，走标准路径：实施方自产 fixture（reviewer 按抽检流程查），无需 Lead 定口令归属
+- 工作范围（**只新增**）：`scripts/kb/coverage-snapshot.mjs`、`scripts/kb/kb-coverage.mjs`、`scripts/characterization/fixtures/kb-coverage.v1.json`、`scripts/characterization/characterize-kb-coverage.mjs`、`docs/superpowers/reports/2026-09-11-kb-coverage-retro.md`、`docs/superpowers/todo-list.md`、本文件、`tmp/kb-coverage/**`（证据）
+- 禁入区：`src/**` 零改动（尤其 `flow-card-guided-propose` 在途线）、`data/kb/req/**`、评测集/阈值/`verify-all.sh`、写库（SELECT only）、浏览器/SUT、他线 WIP
+- 脱敏铁律：fixture 白名单（spec §3）外键 0、>40 字自由文本 0；`task`/`name`/URL query/`element_json.text`/`params.value`/`extracted_content`/客户名证件号**禁止入库**；`task` 文本不作匹配依据、`function_id` 不作卡片映射
+- 执行方式：T0→T4 一 Task 一 commit；映射三链（ZJJK/FS/路由片段）记命中来源；M1–M6 离线可复算+确定性（连跑两次逐位一致）；floor 只升不降（初始 margin 0.05）；脱敏断言与 floor 各证伪一次留痕
+
 ## 2026-09-11 00:12 · Zcode — 收工：colloquial-bridge 收尾 F-2/F-5/R-1/台账（回链 00:04 开工 `72691662`；Lead 裁定 `dc31f756`）
 
 - 完成：Task 0（`e4be6513`）F-2 `T2-bridge.txt` 修正入库（+1/−1）+ F-5 生成脚本幂等化（table 字面量对齐 archived 态、两注记原样复制、头注释警示；**幂等以真跑+空 diff 证明**，`entries` sha256 `eb4ec272…` 67 条逐位不变）→ Task 1（`96d12712`）R-1 最小留痕：`readSynonymsAssetStatus()`（未声明→null，历史产物形状不变）+ CLI `result.synonyms.status` 记录 + 非 active stderr 一行告警（**loader 仍不过滤**，加载条数/metrics/阈值/exit code 全未动）+ pin「status is provenance only」三态断言（临时资产写 tmp/）→ Task 2（本 commit）台账对齐：报告 §8 F-2/F-4 行补记 + todo 置 **CLOSED（FAIL，不计成果；F-1/F-3/F-4 关闭，F-2/F-5/R-1 已收口；R-2 词面桥关闭/R-3 BLOCKED/R-4 押后）**
