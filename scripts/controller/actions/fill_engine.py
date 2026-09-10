@@ -1,5 +1,9 @@
 """FillEngine — split from form_action_engines.py (S4)."""
 
+import json
+import re
+import sys
+
 from scripts.state import _record_action
 from ._helpers import (
     _ok, _err, _is_ok_result,
@@ -23,7 +27,12 @@ from .form_scan_utils import (
     _JS_READ_CERT_TYPE,
     _resolve_control, lookup_field_kind, _task_done_impl,
 )
-from .form_engine_base import _FormActionEngineBase
+from .form_engine_base import (
+    _FormActionEngineBase,
+    _ReplayAutofillStub,
+    _ReplayPageAdapter,
+    _replay_engine_store,
+)
 from .result_protocol import err_with, affordances
 from .replay_timing import WAIT_300_MS
 

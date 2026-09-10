@@ -26,7 +26,12 @@ from .form_scan_utils import (
     match_select_option_candidate,
     _resolve_control, lookup_field_kind, resolve_select_fallback, _task_done_impl,
 )
-from .form_engine_base import _FormActionEngineBase
+from .form_engine_base import (
+    _FormActionEngineBase,
+    _ReplayAutofillStub,
+    _ReplayPageAdapter,
+    _replay_engine_store,
+)
 from .result_protocol import err_with, ok_marked
 from .select_dispatch import resolve_select_dispatch
 from .select_match import suggest_field_for_value

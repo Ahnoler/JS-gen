@@ -6,7 +6,7 @@ import time
 
 from scripts.state import _record_action
 from ._helpers import _ok, _err, _is_ok_result, _wait_if_loading
-from ._js_snippets import JS_CLICK_LOGIN_BUTTON
+from ._js_snippets import JS_CLICK_LOGIN_BUTTON, JS_FILL_FORM_FIELD
 from .form_engine_base import _FormActionEngineBase
 from .replay_timing import WAIT_3000_MS
 

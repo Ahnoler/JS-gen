@@ -9,7 +9,12 @@ from ._helpers import (
     _wait_if_loading, _capture_element, stamp_recorded_xpath_smart,
 )
 from ._js_snippets import JS_CLICK_RADIO, JS_CLICK_RADIO_BY_XPATH
-from .form_engine_base import _FormActionEngineBase
+from .form_engine_base import (
+    _FormActionEngineBase,
+    _ReplayAutofillStub,
+    _ReplayPageAdapter,
+    _replay_engine_store,
+)
 from .form_scan_utils import _resolve_control, lookup_field_kind, _is_query_mode, _with_submit_cue, _task_done_impl
 
 
