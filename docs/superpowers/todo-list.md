@@ -129,7 +129,7 @@
 | **PR-BATCH 小缺口** | P3 | 列表页 batchTaskName 筛选入口、顶栏徽标文案（后端参数已支持） |
 | **screenshot-quality** | 前置 | 优化截图功能（用户 2026-09-09：截图仍有问题）；**是 PR-LOC-HL 步骤级高亮的前置** |
 | **PR-LOC-HL** | 前端主力 | 步骤级高亮（bbox 画框）本体由前端开发；前置=screenshot-quality 截图优化完成后做；后端待前端推送结构要求后改数据结构（G 阶段内状态组截图已落 `0e1bee0`） |
-| **login-retry-heuristic** | P3 | prepare 登录冷启动失败固定等 8s 重试一次（attach-runner.js:197）是启发式非事件驱动，慢环境会误判失败；改事件驱动/指数退避（来源：2026-09-05 会话生命周期梳理 §5.8） |
+| **login-retry-heuristic** | P3 已闭 | prepare 登录冷启动：失败后 `wait_for_loading` 沉降 + 指数退避重试（`prepare-login-retry.js`，默认 3 次 / 1s→2s→4s / budget 24s；env `PREPARE_LOGIN_RETRY_*`）；冷 pin `characterize-prepare-login-retry.mjs`；2026-09-10 落地 |
 | **stop-busy-race** | P3 | record/stop 不等 busy（可能 stale）直接发 cancel_step（record-lifecycle.js:321 注释自认）；**2026-09-10 更新：finally 补发已按 runId 归属守卫无害化（9eb94716），独立改造不再另立** |
 | **engine-wet-trio** | P1 已闭 | 对抗 review 真机湿测三件套：**①②③ 均 PASS（2026-09-10）**。①stop→重录用户确认；②detach→重附后门闩日志 `async gate skipped … runtimeReplaced=true`（traj 721）；③并发 start 200+409（traj 720）。证据 `tmp/engine-wet-trio/report.md`；门闩可调 `RECORD_FINALIZE_GATE_MS`（默认 90000） |
 | **p1-6-replayid** | P2 已闭 | replay_done 按 replayId 归属过滤 + 超时 `cancel_step`（`replay-actions.js` / Python `event_dispatch` 回带 / rerun 经 helper）；冷 pin `characterize-replay-id.mjs`；2026-09-10 落地 |
