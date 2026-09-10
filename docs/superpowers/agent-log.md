@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-10 23:32 · Zcode — 收工：recall-colloquial-bridge T0–T3 未达标按计划归档（回链 23:23 开工 `d41cb787`）
+
+- 完成：T0 基线复现逐位一致+三类素材实证（`024af5bb`）→ T1 抽取器零 import（`3c802f3d`，池 409=卡面 131+需求文档 255+湿测 drift 23）→ T2 双向校验+人工裁决+落表（`3ea6bab5`：**67 条=card 49+req-doc 10+drift 8，A+B 88.1%≥60%/C 11.9%≤40%**，grounding 断言强制回溯 T2-verified 池、drift 全引模块+叶号；+3 pin 后 `characterize-flow-card-recall` **26 passed**）→ T3 on/off 度量（`824967d1`：ON 与 OFF **逐位相同** 0.600/0.725/0.653/0.667/拒答 0.382，**翻转 0 条→全新地面增量 0<4 FAIL；E 层 0.100<0.25 FAIL**；护栏面全绿=零新增 FP/A/B/C/D 不掉/门禁 5 passed/--baseline exit 0）
+- 结构性归因：E 层 50 条 query **0 条含任何桥接 term**——语料三类素材全是「领域词↔领域词」措辞变体，E 层是「口语↔领域词」零词面重叠；机制点火已证（A-015/C-013 尾部 top5 收窄、gold top1 不变），但 top1 零翻转
+- 处置（按计划未达标路径）：**跳过 T4，`propose.js` 零改动；`data/kb/colloquial-bridge.json` 置 `status:"archived"`**（归档后 pin 仍 26 passed，资产无害保留可续建）；报告 [`reports/2026-09-10-colloquial-bridge-report.md`](reports/2026-09-10-colloquial-bridge-report.md)（漏斗 409→183→44→67 + on/off 全表 + 结构性归因 + 方向 5 净结论：E 层正解=回收口语语料（生产轨迹 LLM 意图描述）或 embedding 立项）
+- 遗留：无红线违规（建表期零读评测文件/零 import/零依赖/verify-all.sh 与 data/kb/req 未动/不接线）；scope 门控机制 pin 与 B5 证明保留（将来接线时直接复用）；**本版不计成果**
+
 ## 2026-09-10 23:23 · Zcode — 开工：recall-colloquial-bridge 口语桥接（方向 5 重定位实施，B1–B5 已批）
 
 - 工作范围：`scripts/kb/build-colloquial-bridge.mjs`（新建）、`data/kb/colloquial-bridge.json`（新建）、`scripts/characterization/characterize-flow-card-recall.mjs`（+3 pin）、`docs/superpowers/reports/2026-09-10-colloquial-bridge-report.md`（新建）、`docs/superpowers/todo-list.md`、`docs/superpowers/agent-log.md`、`tmp/kb-bridge/**`（证据）；**条件性**含 `src/services/req-draft-traj/propose.js`（仅 T3 五判据全过后的 T4 接线，独立 commit）

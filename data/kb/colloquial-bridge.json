@@ -1,6 +1,6 @@
 {
   "bridgeVersion": "v1",
-  "status": "candidate",
+  "status": "archived",
   "builtFrom": [
     "corpus-card",
     "corpus-req-doc",
@@ -545,5 +545,6 @@
       "scope": null,
       "source": "wet-test-drift postloan-risk-class/wet-test.md 叶29:64 ZJJK00096714 — SUT「风险默认分类配置」vs 文档「风险分类默认配置」"
     }
-  ]
+  ],
+  "archiveNote": "2026-09-10 T3 度量未达标（E 0.100<0.25；全新地面增量 0<4）→ 按计划跳过接线、本版不计成果；资产保留为无害（护栏全绿）但归档"
 }
