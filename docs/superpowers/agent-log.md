@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 23:10 · Cursor Lead — 开工：合约主权 Task 8 湿测
+
+- 进行中：2026-09-11 23:10；验收=多阶段 AI 录制 + form save；阶段边界 reviewer version；冲突仅 advisory/gate；报告 `docs/superpowers/reports/2026-09-11-contract-sovereignty-wet.md`
+- 范围：启停控制面/执行机日志、录制 API 调用、湿测报告、todo-list 挂起条、本文件；**不改**运行时代码
+- 禁入区：`classify.py`、他线 WIP、合约主权实现代码回改
+- 方式：启动服务 → prepare/start 多阶段录制 → 查日志/obs → 写报告
+
 
 ## 2026-09-11 15:50 · Cursor Lead — 收工：remove local BiB mount (SDD)（回链 15:25 开工）
 
