@@ -2,7 +2,7 @@
 
 ## 2026-09-11 07:40 · Cursor — 收工：合约主权 Task 3（is_action_in_scope submit-via）（回链 07:30 开工）
 - 完成：`is_action_in_scope` 落在 `intent_gates.py`，拒绝码 `submit_via_violation` 与 `should_block_index_submit` 同判定；`click_action_engine.click_element_by_index` 实接线；re-export `_phase_intent.py`；冷测 pin 扩 Task3
-- 提交：本刀 `feat(phase): is_action_in_scope gate for submit-via violations`（开工 `d06adc87`）
+- 提交：`5b86d6b1` `feat(phase): is_action_in_scope gate for submit-via violations`（开工 `d06adc87`）
 - 验收：`characterize-contract-sovereignty.py` Task1+Task2+Task3 OK；`characterize-phase-intent.py` OK；`characterize-phase-reviewer.py` PASS
 - 注意：无合约 / `_heal_mode` 或 `_heal_contract.mode==heal` → 放行；未改 heal-mode 写入路径；未做 out_of_scope NLP
 - 遗留移交：Tasks 4–8 未做
