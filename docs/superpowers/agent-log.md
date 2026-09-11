@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 08:15 · Cursor — 开工：合约主权 Task 5（validate_done wiring + done_rejected）
+- 进行中：2026-09-11 08:15。执行 plan Task 5 only（回链 Task 4 收工 `57d1dbd8` / PR #34）
+- 范围：`scripts/controller/actions/phase/intent_gates.py`（`evaluate_phase_done` 纯 helper）、`scripts/controller/actions/phase/intent.py` / `_phase_intent.py`（re-export）、`scripts/agent/service.py`（done 接受接线）、`scripts/characterization/characterize-phase-done-validate.py`（新建）、本文件
+- 禁入区：Tasks 6–8（recontract / verify-all / wet）；browser-use 重写；heal-mode 写入路径；他线 WIP
+- 方式：TDD fail-first pin → helper + service 接线；拒绝发 `done_rejected`、注入 Executor 观察、不召开 Planner；同分支 `cursor/contract-version-sovereignty-70c5`
+
 ## 2026-09-11 07:55 · Cursor — 收工：合约主权 Task 4（Planner advisory + filter）（回链 07:45 开工）
 - 完成：`filter_planner_advice` 入 `agent_utils.py`；`planner-prompt.md` JSON 强制 `compatible_with_contract`，done/save 口气改为 advisory warning；pin `characterize-planner-advisory-filter.py`
 - 提交：`57d1dbd8` `feat(agent): demote planner to advisory with compatible_with_contract filter`（开工 `96439bf9`）
