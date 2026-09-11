@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 01:35 · Cursor Lead — 收工：done_rejected 事件嗅探 r3（回链 01:25）
+
+- 完成：traj **757** session `9c17ae3f-…`；临时 relay tee 落盘 `tmp/contract-sovereignty-wet/done-rejected-r3/events.jsonl`；报告专项节已更新；嗅探补丁已 `git checkout` 回滚
+- 验收：字面事件 `done_rejected` · `authority=gate` · `reasons=[submit_required,success_unmet]` · `missing_evidence=[toast_ok,url_change]` · `contract_version=1`
+- 遗留：可选重启 executor 清掉内存中 tee；产品路径仍不写 stderr（仅 sniff 捕获）
+
 ## 2026-09-12 01:25 · Cursor Lead — 开工：done_rejected 事件嗅探湿测 r3
 
 - 进行中：2026-09-12 01:25；验收=`events.jsonl` / executor 日志出现字面 `{"event":"done_rejected"...}` 且含 `missing_evidence`（期望 `toast_ok`）

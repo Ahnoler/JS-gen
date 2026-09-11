@@ -61,7 +61,7 @@ Phase 3 done
 - **Planner advisory discard** 本跑无触发样本。  
 - **done_rejected 专项**见下节（2026-09-11 晚补跑）。
 
-## 补跑：done_rejected 专项（traj 755 / 756）
+## 补跑：done_rejected 专项（traj 755 / 756 / 757）
 
 目标：诱导未保存成功即 `done()`，钉住字面 `done_rejected` + `missing_evidence`（`toast_ok`）。
 
@@ -69,6 +69,7 @@ Phase 3 done
 |---|---|---|
 | r1 | **755** | ❌ 全局「单元测试配置」弹窗挡住；阶段内零动作 done → `[recorder] done rejected: zero actions`；reviewer `submit.required=False success.kinds=[]`；`steps=0 recorded` |
 | r2 | **756** | ⚠️ 合约形态已对齐，字面事件未捕获（见下） |
+| r3 | **757** | ✅ 临时嗅探钉住字面 `done_rejected`（见下） |
 
 ### r2 关键证据（session `afa3aa80-…`）
 
@@ -82,18 +83,30 @@ Phase 3 done
 4. **字面 `done_rejected` / `missing_evidence`：** 在 executor stderr / agent-stderr / 控制面日志中 **均未检索到**。  
    原因：`evaluate_phase_done` 的 `done_rejected` 只经 **stdout JSON → WS 转发**，不写 stderr；本 harness 未订阅/落盘该事件流。budget extend 可由 pending 字段单独触发，**不能**当作 `done_rejected` 已发出的充分证据。
 
-证据目录：`tmp/contract-sovereignty-wet/done-rejected/`（r1）、`…/done-rejected-r2/`（r2）。
+### r3 关键证据（session `9c17ae3f-…`，2026-09-12）
+
+1. **探针：** 手写 2 阶段；阶段2「只点新增 → `done(success=false)`」；临时在 `executor/session-handler.js` `relayAgentEvent` tee `done_rejected` → `events.jsonl`（跑完已回滚，未入产品提交）。
+2. **阶段2 合约（rules_fallback）：**  
+   `mode=create` · `refill=all_editable` · `submit.required=True` · `success.kinds=['toast_ok','url_change']`
+3. **路径：** 先有 recorder Premature（drawer 仍开）→ 后续 `done` 越过 recorder → `evaluate_phase_done` 发 stdout 事件。
+4. **字面事件（嗅探落盘）：** `tmp/contract-sovereignty-wet/done-rejected-r3/events.jsonl`
+
+```json
+{"event":"done_rejected","session_id":"9c17ae3f-e9b1-4064-bfed-20c5652d3986","data":{"phase":2,"contract_version":1,"authority":"gate","reasons":["submit_required","success_unmet"],"remaining":[],"missing_evidence":["toast_ok","url_change"]}}
+```
+
+5. **终态：** `recordStatus=failed`，`stepCount=3`，detach 200。
+
+证据目录：`tmp/contract-sovereignty-wet/done-rejected/`（r1）、`…/done-rejected-r2/`（r2）、`…/done-rejected-r3/`（r3）。
 
 ### 专项结论
 
 | 项 | 结果 |
 |---|---|
-| 诱导 create + `toast_ok` 合约 | ✅（r2） |
-| recorder 过早 done 门闩（pending_write） | ✅（r2） |
-| 字面 `done_rejected` / `missing_evidence` 湿测钉死 | ❌ 未捕获 |
-
-若要闭环字面项：下一跑在录制期间订阅控制面/执行机 agent stdout 事件（或临时给 `evaluate_phase_done` 加一行 stderr echo，另开刀），在 `toast_ok` 合约下抓到 `{"event":"done_rejected",…}`。
+| 诱导 create + `toast_ok` 合约 | ✅（r2 / r3） |
+| recorder 过早 done 门闩（pending_write / overlay） | ✅（r2 / r3） |
+| 字面 `done_rejected` / `missing_evidence` 湿测钉死 | ✅（r3，`authority=gate`，`missing_evidence` 含 `toast_ok`） |
 
 ## 服务状态
 
-湿测与补跑结束后控制面与 executor **仍保持运行**（未在本报告中停止）。
+湿测与补跑结束后控制面与 executor **仍保持运行**（未在本报告中停止）。r3 后嗅探补丁已回滚；executor 需重启一次以丢掉内存中的临时 tee（可选）。
