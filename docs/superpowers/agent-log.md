@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 07:30 · Cursor — 开工：合约主权 Task 3（is_action_in_scope submit-via）
+- 进行中：2026-09-11 07:30。执行 plan Task 3 only（回链 Task 2 收工 `f1008153` / PR #34）
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`scripts/controller/actions/phase/intent.py`、`scripts/controller/actions/_phase_intent.py`、`scripts/controller/actions/click_action_engine.py`（一处实调）、`scripts/characterization/cold/characterize-contract-sovereignty.py`、本文件
+- 禁入区：Tasks 4–8；heal-mode 行为改写（仅允许 heal 合约放行）；NLP out_of_scope；KB；browser-use 重写；他线 WIP
+- 方式：TDD fail-first → wrap `should_block_index_submit` → click 路径接线；同分支 `cursor/contract-version-sovereignty-70c5`
+
 ## 2026-09-11 07:25 · Cursor — 收工：合约主权 Task 2（validate_done 硬门闩栈）（回链 07:16 开工）
 - 完成：`DoneDecision` + `validate_done` 落在 `intent_gates.py`，包裹现有 `overlay_blocks_done` / `has_contract_success` / `check_pending_write_gate` / submit.required；re-export `_phase_intent.py`；冷测 pin 扩 Task1+Task2
 - 提交：`f1008153` `feat(phase): validate_done authority stack for contract sovereignty`（开工 `8f683003`）
