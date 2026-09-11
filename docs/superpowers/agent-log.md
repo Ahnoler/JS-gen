@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 09:47 · Cursor Lead — 收工：L1c-wet L1C_LLM=true 湿测 PASS
+
+- 完成：回链开工 `f7533a74`；`.env` 开 `L1C_LLM=true` 并重启控制面；classify 低置信 `source=llm` / 二次 `l1d` / 高置信 `rule`；BiB resolve traj 678 inventory 60 hits（本页仅高置信分区）
+- 验收：`node tmp/l1c-wet/wet-classify.mjs` exit 0；报告 `docs/superpowers/reports/2026-09-11-l1c-wet.md`
+- 遗留：`.env` 现保持 `L1C_LLM=true`（不需要可改回 false 重启）；本页无 other 区故 BiB 未再打出 llm——以共用 classify 服务为准
+
 ## 2026-09-11 09:43 · Cursor Lead — 开工：L1c-wet L1C_LLM=true 湿测
 
 - 进行中：2026-09-11 09:43；验收=`L1C_LLM=true` 下低置信 feature card `source=llm`；执行机 LMY online
