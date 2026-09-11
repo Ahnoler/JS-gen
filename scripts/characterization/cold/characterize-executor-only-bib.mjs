@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Cold pin: BiB/session CDP requires USE_EXECUTOR (no control-plane local fallback).
+ * See also characterize-remove-local-bib-mount.mjs (local mount code removal).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
