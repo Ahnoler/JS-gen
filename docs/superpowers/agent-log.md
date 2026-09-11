@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 09:43 · Cursor Lead — 开工：L1c-wet L1C_LLM=true 湿测
+
+- 进行中：2026-09-11 09:43；验收=`L1C_LLM=true` 下低置信 feature card `source=llm`；执行机 LMY online
+- 范围：`config/.env`（开 L1C）、`tmp/l1c-wet/` 报告、todo-list、本文件；不改 classify.py / verify-all WIP
+- 禁入区：fill/select、`.cursor/`、他线 WIP
+- 方式：开 env → 重启控制面 → API classify 对照 → BiB/resolve 或 scan 路径证据 → 收工
+
 ## 2026-09-11 06:45 · Zcode — 收工：KB 价值 A/B 全线 T0–T5 完成（回链 02:35 开工；结论=③证据不足 +8.3pp）
 
 - **完成（提交链）**：pilot 4/4（`ea5d04c9` 含天花板触发→manifest v1.1 难度锚重冻）→ **正式 24 run（727–750）全落地** → T2/T3 证据+引擎+门禁（`cf1751e6`）→ lint 清零（`c1ef3ad7`）→ runlog 收尾（`5af3ab23`）→ 清理终局（`e82bad07`）→ **T4 报告+P5/P6 修复（`9bda883c`）** → 本条 T5
