@@ -121,7 +121,7 @@
 |----|--------|-----|
 | **L1-picker-wet** | 挂起 | 多「新增」Vue 选择器冒烟；等执行机 / BiB 重载 |
 | **page-state-wet** | 挂起 | dialog/drawer 内/外同文案按钮碰撞湿测 |
-| **L1c-wet** | P1 挂起 | `L1C_LLM=true` BiB 湿测低置信区域；依赖 L1c-scan-py 接线（已闭）+ 控制面/执行机同版本 |
+| **L1c-wet** | P1 已闭 | `L1C_LLM=true` 湿测 PASS（2026-09-11）：classify 低置信 `source=llm` + L1d 二次命中 + 高置信 rule；BiB resolve traj 678 inventory 通路 OK（本页无低置信区）。报告 [`reports/2026-09-11-l1c-wet.md`](reports/2026-09-11-l1c-wet.md) |
 | **L1c-scan-py** | P1 已闭 | `scan_editable_summary` best-effort `POST /api/v2/regions/classify`，只写回 `regions[]`（fail-soft）；`l1c_region_classify.py`；冷 pin `characterize-l1c-scan-py.py`；2026-09-10 落地 |
 | **AG-fullpage-wet** | 按需 | 无 label inventory BiB/UI 冒烟 |
 | **session-lifecycle-wet** | 挂起 | A attach → streamDetach → B 同 Chrome 409 `grace_owned`；需在线执行机 + 已加载新控制面 |
