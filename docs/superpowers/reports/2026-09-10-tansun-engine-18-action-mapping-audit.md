@@ -4,6 +4,7 @@
 > 目标：JS-gen 18 个录制动作按映射表推给同事执行引擎（D:\dev\tansun_ui_engine），确保全部可执行。
 > 映射表：录制动作 → 伙伴 type + 操作名样式（dataName）+ objectValue。
 > **更正（同日，用户确认）**：`radio` / `select:tree` 已在同事**最新（尚未推送）版本**实现——本仓克隆只含远端唯一提交 2b22613，未含这两者；矩阵 #14/#15 由 ❌ 改为「待复验」，`date`（fill 日期升格）用户未提及，仍按缺失对待。
+> **第二次更正（2026-09-11，同事已推送 1bf04f0+5e12ff1）**：radio / select:tree / click_button 兜底已**实码入库**（见 §8 重评估）；实装基线从 2b22613 换为 TY_UI_ENGINE_1.0.0（5e12ff1）。
 > **范围约定（同日，用户二次澄清）**：当前问题=**推送的操作同事引擎无法正确处理，需要做兼容**——在 tansun_ui_engine 侧使 18 映射操作全部被正确执行：①补齐缺失操作 handler（映射表逐行）；②修正已接收操作的错误处理（值字段分流、dataName 前缀语义路由）。**仍不做**：JS-gen 推送链改动（§4 P1-P6）、消歧/沉降/absent=skip 等打磨项（§5 尾步）、对方引擎无关 bug 与重构；radio/select:tree 待同事推送后复验、不在快照上重复实现。执行蓝图见 §7。
 > **词表冻结（同日，用户定盘）**：推送 type 就六个——`click / input / select:click / select:tree / radio / date`，**不新增第七种**；18 操作全部在这六个 type 内表达，dataName 前缀是 type 内子操作路由键（见 §7）。
 > **注**：§4 P6「前缀=污染」论断在映射表语境下需修正——「图标：/选择：/页签：…」前缀是映射表有意设计的**操作语义通道**（引擎路由读前缀、labelHint 匹配剥前缀），见 §7 批 1。
@@ -146,3 +147,44 @@
  "element":"//label[text()='结算方式']/..//input","mothed":"By.XPATH","location":"","waitTime":0,
  "dataSource":"constant","transmit":0,"screenshot":0,"xpathObjectValue":"银行转账","objectValue":"银行转账","isScroll":0}
 ```
+
+---
+
+## 8. 同事新提交重评估（2026-09-11，基线 2b22613 → TY_UI_ENGINE_1.0.0/5e12ff1）
+
+> 同事推送两笔：**1bf04f0「补充操作事件」**（+1385 行：radio.py 206 行新文件 / select_tree.py 918 行新文件 / click.py 重写 +248 行 / enums+payload+registry）与 **5e12ff1「修改配置」**（config.py 默认值：MinIO/ATP 地址+密钥——同事自用配置，与本线无关，注意其中含 API key 明文）。全量测试 `pytest tests/ --ignore=tests/test_agent_e2e.py` = **216 passed**（test_agent_e2e 4 errors 为本机缺 Playwright 浏览器环境，非代码问题）。
+
+### 8.1 已落地的（对照 18 动作矩阵）
+
+| 项 | 状态 | 实证 |
+|---|---|---|
+| **radio event + handler** | ✅ 已实现 | radio.py 新文件；`radio`+`click_radio` 双注册（:205-206）；值取 `object_value or value or val`（:179）；absent=skip 语义（`label-not-found`→status ok method=absent-skip，:195）；[last()] 弹窗修正+drawer 感知在 JS 内；**布尔伪成功已堵**（pick() 精确→包含分序，非布尔关键字不再 toggle 假 ok） |
+| **select:tree event + handler** | ✅ 已实现，**event 名=`select_tree_option` 不是 `select:tree`** | select_tree.py 918 行；`_EVENT_ALIASES = {"select:tree": "select_tree_option"}`（payload.py:293-294）——**V3 报文里 `select:tree` 会被别名归一后收下**，兼容面已覆盖；另注册 `tree_check_confirm`/`tree_picker_click` 两个独立 event |
+| **click_button 兜底三层** | ✅ 已实现 | click.py 重写：JS_CLICK_BUTTON_IN_CONTAINER（z-index 最高 overlay+popper 补扫+label 开 trigger，移植自 JS-gen _misc.py G1）→ JS_CLICK_ICON_BUTTON（精确文本→icon aria/tooltip/Vue content→泛化兜底+**ambiguous 不盲点返回 err**）；locator 点击失败也落兜底（:267-273）；还有 JS_STAMP_ICON_ARIA_LABELS 图标打标 |
+| **click 元素失败兜底链** | ✅ xpath replay→locator→**按钮文本兜底**→坐标（原来没有中间层） | click.py handle_click 新结构 |
+| **tree_picker_click 独立 event** | ✅ 已实现（超出映射表预期） | select_tree.py:865 handler；path 收 JSON 数组（`_parse_json`），CDP real-click 兜底+回显验证 |
+| **popup eleType** | ✅ 枚举+跳过执行同步 | enums.py POPUP + payload.py 描述更新 |
+
+### 8.2 与映射表的差异点（实装时须适配，勿按旧蓝图硬做）
+
+1. **event 名错位**：映射表推 `select:tree`，引擎原生枚举是 `select_tree_option`（靠 `_EVENT_ALIASES` 桥接）。复验重点=V3 报文 `operation.type="select:tree"` 实测走通 alias；若 ATP 平台对 type 值有自己的白名单（转发前校验），alias 救不了平台侧——联调时验证。
+2. **radio 的 label 语义**：handle_radio 用 `data_name` 当 label（JS_CLICK_RADIO 按 form label 找组）——映射表 dataName 样式是「单选：{label}」**带前缀**，label 匹配会失败；但 element xpath 主路径在前（`step.element` 非空先走 JS_CLICK_RADIO_BY_XPATH），xpath 命中则前缀无碍；xpath miss 才落 label 路，**前缀剥离防御仍有价值**（与原批 1 结论一致）。
+3. **tree_picker_click 的 path 载体**：handler 读 `_selection(step,value)`（object_value or value or val）再 `JSON.parse`——映射表要求的 path_texts 数组须以 JSON 字符串进 objectValue；**我们推送侧 P1（path_texts 进 objectValue）从"建议"变"硬前提"**，且格式必须是 JSON 数组字符串（如 `["集团","子公司","审批"]`），不是 `/` 拼接。
+4. **select:click 行选（picker_dialog_select）仍未覆盖**：handle_select_click 未动，表格行仍必返 no-select-found——原批 4 行选分支照做。
+5. **date event 仍缺**：六 type 词表之一，未在本次提交；批 4 照做（六处清单）。
+6. **值字段分流已部分自愈**：radio/select_tree/click_button 新 handler 都读 `object_value or value or val`——**input 族仍只读 val**（input_action.py 未动），批 1 的 input 修正范围收窄为仅此一处。
+7. **dataName 前缀路由面收窄**：click 兜底已用 `object_value or value or data_name` 取按钮文本（含 data_name 兜底）——「图标：新增」会整串当按钮文本找（带前缀匹配大概率 miss→err-icon-label-miss→整案 error）。**批 1 前缀剥离 helper 仍需要**，且落点变为：click 的 button_text、radio 的 label、select_tree 的 label、input 的 hint 四处统一走 parse_data_name。
+
+### 8.3 更新后的实装计划（周末版，基线=TY_UI_ENGINE_1.0.0）
+
+| 批 | 内容 | 相比原计划的变化 |
+|---|---|---|
+| ~~批 2/3 click 子路由~~ | **整批取消**——click.py 兜底已由同事实现（G1 容器+icon 三层+ambiguous 防盲点全部到位） | 省掉最大一块；仅存「关闭弹窗/展开树/页签：/表格：/树选：/邻钮：/菜单：」七前缀无专属子路径——见下行 |
+| 批 1（收窄重定义） | dataName 前缀解析 helper + 四处接线（click button_text / radio label / select_tree label / input hint）：**路由到七前缀子路径 + 剥前缀作 labelHint** | helper 职责从"修 fill/select hint"扩展为"子路由+剥前缀"两用；input 值字段改读 object_value or val 保留 |
+| 批 2（新） | **七前缀子路径注册**：关闭弹窗（close_dialog JS 移植）/展开树（expand JS）/页签：/表格：/树选：/邻钮：/菜单：——挂在 click handler 前缀路由层（批 1 helper 产出的 route_key 分发），miss 落回同事新兜底链 | 从"在 handle_click 里分流"改为"独立子路由模块（click_subroutes.py），handle_click 前置调用"，与同事代码冲突面最小 |
+| 批 3（并入批 2） | —— | 原批 3 内容并入批 2 |
+| 批 4（不变+一行） | date event 六处清单 + select:click「弹窗选择：」行选分支 | 无变化；date 仍依赖推送侧升格接线（备案） |
+| 批 5（升级为验证批） | select:tree alias 实测 + radio/树三兄弟（select_tree_option/tree_check_confirm/tree_picker_click）用映射表报文样例逐个过——他们已实现，只验不修 | 从"复验"升级为"用真实 V3 报文打样"；click_table_row_radio 若 radio 表格列场景缺，补 radio 内分支 |
+| 新增批 0 | `git fetch` 后在 TY_UI_ENGINE_1.0.0 上重建 compat/js-gen-operations；跑通全量测试基线（当前 216 passed） | 原计划的开工前置正式化 |
+
+**仍不做**（范围不变）：JS-gen 推送链 P1-P6、消歧/沉降/absent=skip 打磨、对方 MinIO/ATP 配置（5e12ff1 是同事环境配置，勿动勿评）。

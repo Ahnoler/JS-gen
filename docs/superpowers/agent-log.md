@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 09:30 · ZCode 引擎线 — 同事新提交重评估，周末实装计划同步更新（回链 00:05 改期）
+
+- 完成：同事已推送 1bf04f0「补充操作事件」（+1385 行：radio.py 206 行/select_tree.py 918 行/click.py 重写+248 行/enums+payload+registry）+5e12ff1「修改配置」（config 默认值=同事环境，勿动）——逐文件审阅后报告新增 §8 重评估：radio（双注册+object_value or value+absent=skip+布尔伪成功已堵）/select_tree 三 event（`_EVENT_ALIASES` 把 select:tree 归一到 select_tree_option）/click 兜底三层（G1+icon+ambiguous 防盲点）全落地；全量 pytest 216 passed（test_agent_e2e 4 errors=本机缺浏览器非代码）
+- 计划变化（§8.3）：原批 2/3 click 子路由**取消**（同事已做）；批 1 收窄重定义=前缀 helper 四处接线（click button_text/radio label/select_tree label/input hint）+input 值字段；新批 2=七前缀子路径（关闭弹窗/展开树/页签：/表格：/树选：/邻钮：/菜单：，独立 click_subroutes.py，miss 落回同事兜底链）；批 4 不变（date event+select:click 行选——两者仍缺）；批 5 升级=真实 V3 报文打样验证（radio/树三兄弟/alias 桥接）；**硬前提=tree_picker_click 的 path 须 JSON 数组字符串进 objectValue（推送侧 P1 从建议变硬前提）**
+- 基线变更：2b22613 → TY_UI_ENGINE_1.0.0（5e12ff1）；实装排期不变（周末），本单元只读调研未动 tansun 仓；只提交 JS-gen agent-log+报告两文件，他线 WIP 未触碰
+
 ## 2026-09-11 10:22 · Cursor Lead — 开工：resolve placeholder-only「搜索关键字」(SDD)
 
 - 进行中：2026-09-11 10:22；验收=inventory+needle 命中裸 placeholder input；冷测 GREEN
