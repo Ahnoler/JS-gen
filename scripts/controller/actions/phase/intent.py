@@ -16,7 +16,7 @@ from scripts.controller.actions.phase.intent_gates import (  # noqa: F401
     Any, DoneDecision, _DEVIATE_CLICK_LABELS, _MAINTAIN_DIALOG_TITLE_RE, _PICKER_DIALOG_TITLE_RE,
     annotations, check_pending_write_gate, contract_allows_form_assistant, contract_force_refill,
     contract_summary_hint, emit_phase_observability, get_phase_intent, has_contract_success,
-    is_cycle_deviate_fingerprint, is_introduce_phase, is_maintain_form_phase, mark_quality_failed,
-    overlay_blocks_done, phase_intent_active, re, record_success_token,
+    is_action_in_scope, is_cycle_deviate_fingerprint, is_introduce_phase, is_maintain_form_phase,
+    mark_quality_failed, overlay_blocks_done, phase_intent_active, re, record_success_token,
     recovery_prescription_message, should_block_index_submit, validate_done,
 )

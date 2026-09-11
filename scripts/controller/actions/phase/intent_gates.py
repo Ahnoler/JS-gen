@@ -320,6 +320,58 @@ def validate_done(business_data: dict, *, section: str | None = None) -> DoneDec
     )
 
 
+_INDEX_CLICK_ACTIONS = frozenset({'click_element', 'click_element_by_index'})
+
+
+def _heal_contract_active(business_data: dict | None) -> bool:
+    """True when heal-mode / heal contract is already set on the store."""
+    if not business_data:
+        return False
+    if business_data.get('_heal_mode'):
+        return True
+    hc = business_data.get('_heal_contract')
+    return isinstance(hc, dict) and hc.get('mode') == 'heal'
+
+
+def is_action_in_scope(
+    business_data: dict | None,
+    action_name: str,
+    params: dict | None = None,
+) -> tuple[bool, str]:
+    """Return (allowed, reject_code). reject_code empty when allowed.
+
+    Minimal Task 3 rule: index/element clicks in save/submit context are denied
+    with ``submit_via_violation`` iff ``should_block_index_submit`` says so.
+    No NLP matcher for out_of_scope strings.
+    """
+    if _heal_contract_active(business_data):
+        return True, ''
+    contract = get_active_contract(business_data)
+    if not contract:
+        return True, ''
+    if action_name not in _INDEX_CLICK_ACTIONS:
+        return True, ''
+    raw = params if isinstance(params, dict) else {}
+    btn_label = str(
+        raw.get('btn_label') or raw.get('button_text') or raw.get('text') or ''
+    )
+    if not btn_label:
+        return True, ''
+    blocked = should_block_index_submit(
+        contract,
+        btn_label,
+        in_form_overlay=bool(raw.get('in_form_overlay')),
+        dialog_title=str(raw.get('dialog_title') or ''),
+        is_picker_ui=bool(raw.get('is_picker_ui')),
+        container_id=str(raw.get('container_id') or ''),
+        query_ui=bool(raw.get('query_ui')),
+        business_data_store=business_data,
+    )
+    if blocked:
+        return False, 'submit_via_violation'
+    return True, ''
+
+
 def done_accept_reason(
     contract: dict[str, Any] | None,
     *,
