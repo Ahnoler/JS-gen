@@ -1,4 +1,4 @@
-import * as trajectoryService from '../../services/trajectory-service.js';
+import * as trajectoryService from '#src/services/trajectory-service.js';
 import { sendErr } from './trajectory-shared.js';
 
 /**
