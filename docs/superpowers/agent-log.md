@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 07:55 · Cursor — 收工：合约主权 Task 4（Planner advisory + filter）（回链 07:45 开工）
+- 完成：`filter_planner_advice` 入 `agent_utils.py`；`planner-prompt.md` JSON 强制 `compatible_with_contract`，done/save 口气改为 advisory warning；pin `characterize-planner-advisory-filter.py`
+- 提交：本刀 `feat(agent): demote planner to advisory with compatible_with_contract filter`（开工 `96439bf9`）
+- 验收：`characterize-planner-advisory-filter.py` OK；`characterize-contract-sovereignty.py` Task1–3 OK；`characterize-agent-prompt-packs.py` OK；`characterize-phase-intent.py` OK
+- 注意：browser-use 不暴露 planner JSON 消费点，本刀未改 `agent/service.py` 运行时丢弃（避免重写 browser-use）。未来接线点=`scripts/agent/service.py` `Agent(..., extend_planner_system_message=PLANNER_SYSTEM_PROMPT)` 旁，若库侧出现 planner 输出回调再 `filter_planner_advice(advice, get_active_contract(bd))`
+- 遗留移交：Tasks 5–8 未做
+
 ## 2026-09-11 07:45 · Cursor — 开工：合约主权 Task 4（Planner advisory + filter）
 - 进行中：2026-09-11 07:45。执行 plan Task 4 only（回链 Task 3 收工 `5b86d6b1` / PR #34）
 - 范围：`scripts/prompts/planner-prompt.md`、`scripts/agent_utils.py`（`filter_planner_advice`）、`scripts/characterization/characterize-planner-advisory-filter.py`（新建）、本文件

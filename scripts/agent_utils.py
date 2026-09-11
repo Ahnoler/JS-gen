@@ -180,6 +180,45 @@ else:
     PLANNER_SYSTEM_PROMPT = _prompt_content[_planner_idx:].strip() if _planner_idx != -1 else ''
 
 
+_DONE_AS_INSTRUCTION_RE = re.compile(
+    r'done\s*\(|结束阶段|调用\s*done|call\s+done',
+    re.I,
+)
+
+
+def _planner_next_steps_instruct_done(next_steps) -> bool:
+    """True when next_steps treat done()/结束阶段 as an executable instruction."""
+    if next_steps is None:
+        return False
+    if isinstance(next_steps, str):
+        items = [next_steps]
+    elif isinstance(next_steps, (list, tuple)):
+        items = [str(x) for x in next_steps]
+    else:
+        items = [str(next_steps)]
+    return bool(_DONE_AS_INSTRUCTION_RE.search('\n'.join(items)))
+
+
+def filter_planner_advice(advice: dict, contract: dict | None) -> dict | None:
+    """Return None if advice must be discarded; else sanitized advice.
+
+    Discard when compatible_with_contract is False/missing, or next_steps
+    mention done()/结束阶段 as executable instruction.
+    """
+    if not isinstance(advice, dict):
+        return None
+    if advice.get('compatible_with_contract') is not True:
+        return None
+    if _planner_next_steps_instruct_done(advice.get('next_steps')):
+        return None
+    out = dict(advice)
+    if isinstance(out.get('next_steps'), list):
+        out['next_steps'] = list(out['next_steps'])
+    if isinstance(out.get('challenges'), list):
+        out['challenges'] = list(out['challenges'])
+    return out
+
+
 def patch_planner_prompt():
     """Monkey-patch PlannerPrompt.get_system_message() to use extend as override.
 
@@ -213,10 +252,11 @@ Your output format should be always a JSON object with the following fields:
 {{
     "state_analysis": "Brief analysis of the current state and what has been done so far",
     "progress_evaluation": "Evaluation of progress towards the ultimate goal (as percentage and description)",
-    "challenges": "List any potential challenges or roadblocks",
-    "next_steps": "List 2-3 concrete next steps to take",
-    "reasoning": "Explain your reasoning for the suggested next steps"
-}}
+                "challenges": "List any potential challenges or roadblocks",
+                "next_steps": "List 2-3 concrete next steps to take",
+                "reasoning": "Explain your reasoning for the suggested next steps",
+                "compatible_with_contract": true
+            }}
 
 Ignore the other AI messages output structures.
 
