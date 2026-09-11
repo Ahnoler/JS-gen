@@ -356,7 +356,7 @@ export const GROUP_TRAJECTORY = [
           'HTTP 202 Accepted；v2 信封 body.code 仍为 200',
           'mode 默认 record；可选 draft（仅 analyze+草稿，跳过 prepare/record/detach）',
           'name 可选，缺省按 文件名_MMDD-HHmm 生成；创建后不可改',
-          'mode=draft 不要求 USE_EXECUTOR；mode=record 且 USE_EXECUTOR=false → 503',
+          'mode=draft 不要求执行机；mode=record 要求 USE_EXECUTOR=true（false → 503）',
           'mode 非法（非 record|draft）→ 400',
           'requestHash / 幂等校验包含 mode（同 Key 不同 mode → 409）',
           '仅 .xlsx；无效行记 rejected，有效行继续；无有效行则 400',

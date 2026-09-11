@@ -78,13 +78,11 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
   }
 
   if (!USE_EXECUTOR) {
-    // Local path: single-live only — refuse if another traj already holds a stream.
-    const anyLive = remoteSessionService.listLiveBindings?.()?.some((b) => b.attached && Number(b.trajectoryId) !== tid);
-    if (anyLive) {
-      const err = new Error('Local (non-executor) mode only supports one live trajectory; detach the other first');
-      err.statusCode = 409;
-      throw err;
-    }
+    const err = new Error(
+      'USE_EXECUTOR=false is no longer supported — start npm run executor and set USE_EXECUTOR=true',
+    );
+    err.statusCode = 503;
+    throw err;
   }
 
   const stages = {

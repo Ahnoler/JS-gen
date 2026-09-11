@@ -6,8 +6,8 @@ import { state } from '../../state.js';
 /**
  * Browser-session route registration — create/step/continue/rerun/delete
  * sessions, trajectory + business-data persist, watcher/CDP quick actions, and
- * WebSocket event wiring for both local shared-browser and remote executor
- * modes.
+ * WebSocket event wiring for executor-backed browser sessions
+ * (`USE_EXECUTOR=false` is unsupported → 503).
  *
  * Prefix: /api/browser/*
  */
@@ -21,13 +21,13 @@ import * as remoteSessionService from '../../services/remote-session-service.js'
 import * as execSession from '../../executor-session-client.js';
 import * as slotLease from '../../executor-slot-lease.js';
 import {
-  PYTHON_EXE, AGENT_SCRIPT, killTree, killOrphans,
+  killTree, killOrphans,
 } from '../../runtime/agent-process.js';
 import { setupSSE, createPushChannel } from '../../runtime/sse-channel.js';
 import { resolveModelId } from '../../runtime/resolve-model.js';
 import { broadcastSessions, broadcastWatcherStatus } from './broadcasts.js';
 import { bindExecutorSessionEvents } from './executor-events.js';
-import { ensureGlobalBrowser, teardownRemoteBridge } from './global-browser.js';
+import { teardownRemoteBridge } from './global-browser.js';
 import { writeAgentEvent, sessionRuntimeReady, waitForAgentEvent } from './agent-io.js';
 import { executeAgentStep } from './step-execution.js';
 import { rerunReplay } from '../../services/rerun-replay-service.js';
@@ -64,50 +64,42 @@ export default function registerBrowserSessionRoutes(app) {
     const sessionId = crypto.randomUUID();
     const modelId = resolveModelId(model);
 
-    if (USE_EXECUTOR) {
-      try {
-        const opened = await execSession.openSession({ sessionId, model: modelId });
-        const session = {
-          sessionId,
-          stepIndex: 0,
-          trajectories: [],
-          createdAt: new Date().toISOString(),
-          model: modelId,
-          lastTask: null,
-          lastMaxSteps: null,
-          businessDataFile: null,
-          useExecutor: true,
-          executorNodeUuid: opened.nodeUuid,
-          executorSlotIndex: opened.slotIndex,
-          busy: false,
-          lastActionLog: [],
-          persistedActionIds: new Set(),
-        };
-        state.sessions.set(sessionId, session);
-        bindExecutorSessionEvents(session);
-        console.log(`[browser-session] Created session ${sessionId} on executor ${opened.nodeUuid}`);
-        broadcastSessions();
-        broadcastWatcherStatus();
-        return res.json({ sessionId, model: modelId, executorNodeUuid: opened.nodeUuid });
-      } catch (err) {
-        const status = err.statusCode || 503;
-        const body = { error: err.message };
-        if (err.holders) body.holders = err.holders;
-        return res.status(status).json(body);
-      }
+    if (!USE_EXECUTOR) {
+      return res.status(503).json({
+        error: 'USE_EXECUTOR=false is no longer supported — start npm run executor and set USE_EXECUTOR=true',
+      });
     }
 
-    if (!existsSync(PYTHON_EXE)) return res.status(500).json({ error: `Python not found at ${PYTHON_EXE}` });
-    if (!existsSync(AGENT_SCRIPT)) return res.status(500).json({ error: `Agent script not found at ${AGENT_SCRIPT}` });
-
-    try { await ensureGlobalBrowser(modelId); } catch (err) { return res.status(500).json({ error: err.message }); }
-
-    const gb = state.globalBrowser;
-    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null, businessDataFile: null });
-    console.log(`[browser-session] Created session ${sessionId} (shared browser)`);
-    broadcastSessions();
-    broadcastWatcherStatus();
-    res.json({ sessionId, model: gb.model });
+    try {
+      const opened = await execSession.openSession({ sessionId, model: modelId });
+      const session = {
+        sessionId,
+        stepIndex: 0,
+        trajectories: [],
+        createdAt: new Date().toISOString(),
+        model: modelId,
+        lastTask: null,
+        lastMaxSteps: null,
+        businessDataFile: null,
+        useExecutor: true,
+        executorNodeUuid: opened.nodeUuid,
+        executorSlotIndex: opened.slotIndex,
+        busy: false,
+        lastActionLog: [],
+        persistedActionIds: new Set(),
+      };
+      state.sessions.set(sessionId, session);
+      bindExecutorSessionEvents(session);
+      console.log(`[browser-session] Created session ${sessionId} on executor ${opened.nodeUuid}`);
+      broadcastSessions();
+      broadcastWatcherStatus();
+      return res.json({ sessionId, model: modelId, executorNodeUuid: opened.nodeUuid });
+    } catch (err) {
+      const status = err.statusCode || 503;
+      const body = { error: err.message };
+      if (err.holders) body.holders = err.holders;
+      return res.status(status).json(body);
+    }
   });
 
   /** Execute one agent step (SSE stream). */

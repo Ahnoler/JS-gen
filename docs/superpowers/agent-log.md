@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 10:12 · Cursor Lead — 收工：executor-only BiB 1+2+3 门闩（回链 10:05 / `72a35f70`）
+
+- 完成（待用户许可再 commit 代码）：`USE_EXECUTOR` 默认 `true`；resolve 删除本地 `remoteBridge` 分支，false→503；attach/prepare、`attachLive`/`detachLive`/`getLiveStatus`、`POST /api/browser/session` 同门闩；README/.env.example/api-docs 改口径；冷测 `characterize-executor-only-bib.mjs` + verify-all 注册
+- 验收：`node scripts/characterization/cold/characterize-executor-only-bib.mjs` → OK；touched files `node --check` 通过
+- 遗留：①物理删除 `ensureGlobalBrowser` / 本机 remote-bridge 挂载实现（本刀仅 503，文件仍在）②「搜索关键字」placeholder inventory 缺口（另刀）③代码 commit 待用户一声
+
 ## 2026-09-11 10:05 · Cursor Lead — 开工：executor-only BiB（1+2 resolve 门闩 → 3 attach/session 门闩）
 
 - 进行中：2026-09-11 10:05；验收=`USE_EXECUTOR` 默认 true + resolve/attach/session 在 false 时 503；true 路径行为不变

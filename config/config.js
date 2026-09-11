@@ -192,8 +192,12 @@ export const DASHBOARD_WS_TOKEN = _resolve('DASHBOARD_WS_TOKEN', '');
 /** 可选：直接配置账号中心 JWT 验签密钥（query_jwt_secret 返回的字符串）；未配置时自动调接口获取并缓存 1h */
 export const SSO_JWT_SECRET = _resolve('SSO_JWT_SECRET', '');
 
-/** Route browser sessions to online executor agent instead of local globalBrowser */
-export const USE_EXECUTOR = _resolve('USE_EXECUTOR', 'false').toLowerCase() === 'true';
+/**
+ * Browser sessions / BiB / resolve-element require an online executor agent.
+ * Default true. USE_EXECUTOR=false is unsupported (APIs return 503) — start
+ * `npm run executor` in this same repo for local development.
+ */
+export const USE_EXECUTOR = _resolve('USE_EXECUTOR', 'true').toLowerCase() === 'true';
 
 /** Max non-empty Excel rows accepted by batch import (whole file rejected when exceeded). */
 export const BATCH_IMPORT_MAX_ROWS = parseInt(_resolve('BATCH_IMPORT_MAX_ROWS', '500'), 10);

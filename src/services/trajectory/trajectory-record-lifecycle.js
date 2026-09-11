@@ -10,7 +10,6 @@ import { runReplayActions } from '../replay-actions.js';
 import { findActiveAuthComponent, resolveAuthComponentSteps } from '../operation-component-service.js';
 import { state } from '../../state.js';
 import { USE_EXECUTOR } from '#config/config.js';
-import * as remoteBridge from '../../cdp/remote-bridge.js';
 import { getTrajectoryTree } from './trajectory-query-service.js';
 import {
   getTrajectoryRuntime,
@@ -602,94 +601,79 @@ export async function resolveTrajectoryElement(trajectoryId, {
   }
   const systemId = await resolveSystemIdForTrajectory(tid);
 
-  if (USE_EXECUTOR) {
-    if (!runtime.executorNodeUuid) {
-      const err = new Error('Executor node missing on trajectory runtime');
-      err.statusCode = 400;
-      throw err;
-    }
-    const requestId = randomUUID();
-    // P2-#2：按 requestId 过滤消费——并发/迟到的其他 resolve 结果不再被误拿
-    //（executor 侧已回带 requestId）。旧执行机不回带（payload 无 requestId）按
-    // 兼容窗口放行，行为与原实现一致。常驻监听 + 自管超时：错配结果继续等下一个，
-    // 与 waitForSessionEvent（once 订阅，首条即止）语义不同，不能直接套用。
-    let resultTimer = null;
-    let unsubResult = () => {};
-    const resultP = new Promise((resolve, reject) => {
-      unsubResult = execSession.onSessionEvent(
-        runtime.sessionId,
-        'session.bib_resolve_element_result',
-        (payload) => {
-          if (payload?.requestId != null && String(payload.requestId) !== String(requestId)) return;
-          if (resultTimer) clearTimeout(resultTimer);
-          resultTimer = null;
-          unsubResult();
-          resolve(payload);
-        },
-      );
-      resultTimer = setTimeout(() => {
+  if (!USE_EXECUTOR) {
+    const err = new Error(
+      'USE_EXECUTOR=false is no longer supported — start npm run executor and set USE_EXECUTOR=true',
+    );
+    err.statusCode = 503;
+    throw err;
+  }
+  if (!runtime.executorNodeUuid) {
+    const err = new Error('Executor node missing on trajectory runtime');
+    err.statusCode = 400;
+    throw err;
+  }
+  const requestId = randomUUID();
+  // P2-#2：按 requestId 过滤消费——并发/迟到的其他 resolve 结果不再被误拿
+  //（executor 侧已回带 requestId）。旧执行机不回带（payload 无 requestId）按
+  // 兼容窗口放行，行为与原实现一致。常驻监听 + 自管超时：错配结果继续等下一个，
+  // 与 waitForSessionEvent（once 订阅，首条即止）语义不同，不能直接套用。
+  let resultTimer = null;
+  let unsubResult = () => {};
+  const resultP = new Promise((resolve, reject) => {
+    unsubResult = execSession.onSessionEvent(
+      runtime.sessionId,
+      'session.bib_resolve_element_result',
+      (payload) => {
+        if (payload?.requestId != null && String(payload.requestId) !== String(requestId)) return;
+        if (resultTimer) clearTimeout(resultTimer);
         resultTimer = null;
         unsubResult();
-        reject(new Error('Timeout waiting for session.bib_resolve_element_result'));
-      }, 20000);
-    });
-    // 预挂 no-op：sendToExecutor 同步抛错时 await 不会到达，超时 rejection 不能成为
-    // unhandledRejection（waitForSessionEvent 同款防御）。
-    resultP.catch(() => {});
-    execSession.sendToExecutor(runtime.executorNodeUuid, 'session.bib_resolve_element', {
-      sessionId: runtime.sessionId,
-      labelText: label,
-      actionType: act,
-      params: p,
-      mode: resolveMode,
-      pageLabel: pageLabel || p.pageLabel || p.page_label || '',
-      requestId,
-    });
-    const payload = await resultP;
-    if (payload?.error) {
-      const msg = String(payload.error);
-      const err = new Error(msg);
-      err.statusCode = /not attached|not available|required/i.test(msg) ? 400 : 404;
-      throw err;
-    }
-    if (payload?.ambiguous && Array.isArray(payload.matches)) {
-      return applyL1cRegionClassify({
-        trajectoryId: tid,
-        ambiguous: true,
-        matches: payload.matches,
-        ...(payload.truncated ? { truncated: true } : {}),
-      }, { systemId });
-    }
-    if (!payload?.element) {
-      const err = new Error(`No form field found for label: ${label || act}`);
-      err.statusCode = 404;
-      throw err;
-    }
-    return applyL1cRegionClassify({
-      trajectoryId: tid,
-      matchedLabel: payload.matchedLabel || label,
-      element: payload.element,
-    }, { systemId });
-  }
-
-  const resolved = await remoteBridge.resolveElementByLabelText(label, {
+        resolve(payload);
+      },
+    );
+    resultTimer = setTimeout(() => {
+      resultTimer = null;
+      unsubResult();
+      reject(new Error('Timeout waiting for session.bib_resolve_element_result'));
+    }, 20000);
+  });
+  // 预挂 no-op：sendToExecutor 同步抛错时 await 不会到达，超时 rejection 不能成为
+  // unhandledRejection（waitForSessionEvent 同款防御）。
+  resultP.catch(() => {});
+  execSession.sendToExecutor(runtime.executorNodeUuid, 'session.bib_resolve_element', {
+    sessionId: runtime.sessionId,
+    labelText: label,
     actionType: act,
     params: p,
     mode: resolveMode,
     pageLabel: pageLabel || p.pageLabel || p.page_label || '',
+    requestId,
   });
-  if (resolved?.ambiguous) {
+  const payload = await resultP;
+  if (payload?.error) {
+    const msg = String(payload.error);
+    const err = new Error(msg);
+    err.statusCode = /not attached|not available|required/i.test(msg) ? 400 : 404;
+    throw err;
+  }
+  if (payload?.ambiguous && Array.isArray(payload.matches)) {
     return applyL1cRegionClassify({
       trajectoryId: tid,
       ambiguous: true,
-      matches: resolved.matches,
-      ...(resolved.truncated ? { truncated: true } : {}),
+      matches: payload.matches,
+      ...(payload.truncated ? { truncated: true } : {}),
     }, { systemId });
+  }
+  if (!payload?.element) {
+    const err = new Error(`No form field found for label: ${label || act}`);
+    err.statusCode = 404;
+    throw err;
   }
   return applyL1cRegionClassify({
     trajectoryId: tid,
-    matchedLabel: resolved.matchedLabel,
-    element: resolved.element,
+    matchedLabel: payload.matchedLabel || label,
+    element: payload.element,
   }, { systemId });
 }
 

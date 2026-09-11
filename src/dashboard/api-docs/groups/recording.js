@@ -102,7 +102,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/resolve-element',
         summary: '按 label / actionType+params 从已附着页面解析定位器',
-        desc: '需 record/prepare 且 BiB 已附着。默认 `mode: inventory`（全页可操作控件池，可选 label/action 过滤）；`mode: needle` 为旧版按 label 针搜。无 labelText 且命中 ≥1 时 inventory 始终返回 ambiguous 列表供 UI 选择；0 命中 → 404。',
+        desc: '需 record/prepare 且 BiB 已附着（执行机路径；`USE_EXECUTOR=false` → 503）。默认 `mode: inventory`（全页可操作控件池，可选 label/action 过滤）；`mode: needle` 为旧版按 label 针搜。无 labelText 且命中 ≥1 时 inventory 始终返回 ambiguous 列表供 UI 选择；0 命中 → 404。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           mode: 'inventory',

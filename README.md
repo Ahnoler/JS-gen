@@ -52,18 +52,16 @@ Node.js Express 控制面（server.mjs，默认 :4097）
   ├── /ws             前端状态、进度、截图和画面
   └── /ws/executor    Executor 注册、心跳、Session 指令和事件
        │
-       ├── USE_EXECUTOR=false
-       │     └── Node 直接启动 Python Agent + Playwright + Chromium
-       │
-       └── USE_EXECUTOR=true
+       └── USE_EXECUTOR=true（唯一支持模式；false → 503）
              └── Executor Agent + Python Agent + Chrome
+                 （本仓开发：控制面 + `npm run executor` 同开）
 
 MySQL：系统树、账号、交易、阶段、步骤、批任务和配置数据
 MinIO：可选截图对象存储
 LLM 网关：需求分析、阶段审查、场景摘要、表单规划和 Agent 决策
 ```
 
-本地模式适合开发，控制面所在机器必须具备 Python 环境和 Chromium。Executor 模式适合生产或多节点部署，控制面负责调度，Executor 节点负责启动 Python/Chrome 并按 slot 隔离 CDP 端口。
+产品与本地开发统一走 Executor：控制面调度，执行机节点启动 Python/Chrome 并按 slot 隔离 CDP 端口。`src/cdp/*` 定位库由执行机 BiB bridge 复用（同仓共享源），控制面不再本机挂 Chrome。
 
 ## 项目结构
 
@@ -220,7 +218,7 @@ DB_NAME=js_gen
 | 角色 LLM | `FORM_LLM_*`、`REVIEWER_LLM_*`、`SCENARIO_LLM_*`、`L1C_LLM_*` | 表单、阶段审查、场景摘要、L1c 区域分类（分区 feature card 打 role/label）；未设置时回落主 LLM。 |
 | Python | `PYTHON_EXE`、`PROJECT_DIR` | Python 解释器和项目根目录。解释器依次查显式配置、项目内 `python/python.exe`、系统 PATH。 |
 | MySQL | `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASS`、`DB_NAME`、`DB_POOL_MIN/MAX` | 数据库和连接池配置。 |
-| Executor | `USE_EXECUTOR`、`EXECUTOR_TOKEN`、`EXECUTOR_CAPACITY`、`EXECUTOR_CDP_PORT_BASE` | 是否使用远程执行机、鉴权、并发容量和 CDP 端口基数。 |
+| Executor | `USE_EXECUTOR`（默认 true；false 不支持→503）、`EXECUTOR_TOKEN`、`EXECUTOR_CAPACITY`、`EXECUTOR_CDP_PORT_BASE` | 浏览器 Session/BiB 必须走在线执行机；鉴权、并发容量和 CDP 端口基数。 |
 | Executor 心跳 | `EXECUTOR_HEARTBEAT_TIMEOUT_MS`、`EXECUTOR_DISCONNECT_TIMEOUT_MS` | 节点过期和断线后会话处理。 |
 | MinIO | `MINIO_ENDPOINT`、`MINIO_PORT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`MINIO_BUCKET`、`MINIO_PUBLIC_URL` | 截图对象存储。 |
 | 截图重试 | `SCREENSHOT_PENDING_DIR`、`SCREENSHOT_RETRY_INTERVAL_MS`、`SCREENSHOT_MAX_RETRY`、`SCREENSHOT_PENDING_TTL_MS` | MinIO 不可用时的本地暂存和补传。 |

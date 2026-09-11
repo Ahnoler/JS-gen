@@ -143,7 +143,8 @@
 | **p2-batch-lease** | P3 已闭 | 录制期 `renewItemLease` + `startItemLeaseRenewal`（约 lease/3，下限 30s）防超租二次 claim；冷 pin `characterize-batch-item-lease-renew.mjs`；2026-09-10 落地 |
 | **p2-toast-cursor** | P3 已闭 | step_notice：`log_len < cursor` 时回卷游标并清 `_step_notice_seen`，再以 cursor=0 重扫（`rewind_notify_cursor_if_shrunk`）；冷 pin 扩 `characterize-step-notice-scan.py`；2026-09-10 落地（未改 js_snippets） |
 | **dedup-deletion** | 已闭 | 删死代码 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS/CLAUDE/README/jsdoc/verify-all 去门禁；活录 coalesce 仍在 `state.py`；2026-09-10 Lead 选定待裁落地 |
-| **p2-async-actionlog** | P3 已闭 | `action_log_sync` 默认 `syncMode=delta`（仅未同步 id + removedIds），每 50 次 full 兜底；Node `applyActionLogSync` 合并副本；冷 pin `characterize-action-log-sync-delta.{py,mjs}`；2026-09-10 落地 |
+| **executor-only-bib** | P3 已闭（门闩） | `USE_EXECUTOR` 默认 true；false→503（resolve/attach/session）；冷测 `characterize-executor-only-bib.mjs`；**遗留**：物理删除 `ensureGlobalBrowser`/本机 bridge 挂载（另刀） |
+| **resolve-placeholder-search** | P3 | resolve inventory/needle 漏收 `.el-form-item` 外 placeholder（如「搜索关键字」）；与 executor-only 无关，另修 `page-locator-helpers` + needle |
 
 ## 更新记录
 

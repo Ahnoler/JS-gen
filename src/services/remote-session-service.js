@@ -276,8 +276,11 @@ export async function supersedeStaleForTrajectory(
  */
 export async function attachLive(opts = {}) {
   if (!USE_EXECUTOR) {
-    const bridge = await import('../cdp/remote-bridge.js');
-    return bridge.attachLive(opts);
+    const err = new Error(
+      'USE_EXECUTOR=false is no longer supported — start npm run executor and set USE_EXECUTOR=true',
+    );
+    err.statusCode = 503;
+    throw err;
   }
 
   const wantSessionId = opts.sessionId || opts.browserSessionId;
@@ -467,8 +470,11 @@ export async function attachLive(opts = {}) {
  */
 export async function detachLive(opts = {}) {
   if (!USE_EXECUTOR) {
-    const bridge = await import('../cdp/remote-bridge.js');
-    return bridge.detachLive(opts);
+    const err = new Error(
+      'USE_EXECUTOR=false is no longer supported — start npm run executor and set USE_EXECUTOR=true',
+    );
+    err.statusCode = 503;
+    throw err;
   }
 
   let remoteSessionId = opts.remoteSessionId != null ? Number(opts.remoteSessionId) : null;
@@ -565,8 +571,11 @@ export async function detachLive(opts = {}) {
  */
 export async function getLiveStatus(opts = {}) {
   if (!USE_EXECUTOR) {
-    const bridge = await import('../cdp/remote-bridge.js');
-    return bridge.getRemoteStatus();
+    const err = new Error(
+      'USE_EXECUTOR=false is no longer supported — start npm run executor and set USE_EXECUTOR=true',
+    );
+    err.statusCode = 503;
+    throw err;
   }
 
   const tid = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
