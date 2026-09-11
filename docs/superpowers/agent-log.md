@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 08:50 · Cursor — 收工：合约主权 Task 6（explicit recontract）（回链 08:35 开工）
+- 完成：`begin_recontract` 落在 `intent_contract.py`（有旧约则 history+1、version+1；无旧约则 `ensure_contract_version`）；`clear_planner_advisory_buffer`；显式触发 `scripts/event_dispatch.py` `event=recontract`（亦接受无 event 时 `type=recontract`）→ emit `recontract` old/new version、清 planner buffer、`build_agent_system_message` 重建并补丁 live Agent
+- 提交：`7b809bdc` `feat(phase): explicit recontract bumps contract version and history`（开工 `35e8092a`）
+- 验收：`characterize-contract-sovereignty.py` Task1–3+Task6 OK；`characterize-phase-done-validate.py` OK；`characterize-planner-advisory-filter.py` OK；`characterize-phase-runtime.py` / `characterize-phase-reviewer.py` PASS；stdin `_dispatch_event` 烟测 emit `{"old_version":1,"new_version":2}`
+- 注意：未开自动 recontract（done/scope/service 续跑不调用 `begin_recontract`）；未改 heal 写入路径；未注册 verify-all（Task 7）
+- 遗留移交：Tasks 7–8（verify-all 注册 sovereignty + planner-advisory pins / wet）
+
 ## 2026-09-11 08:35 · Cursor — 开工：合约主权 Task 6（explicit recontract）
 - 进行中：2026-09-11 08:35。执行 plan Task 6 only（回链 Task 5 收工 `5c30372b` / PR #34）
 - 范围：`scripts/controller/actions/phase/intent_contract.py`（`begin_recontract`）、`phase/intent.py` / `_phase_intent.py`（re-export）、`scripts/event_dispatch.py`（显式 `event=recontract` 触发）、`scripts/characterization/cold/characterize-contract-sovereignty.py`（Task6 pin）、本文件
