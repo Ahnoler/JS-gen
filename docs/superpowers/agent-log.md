@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 08:35 · Cursor — 开工：合约主权 Task 6（explicit recontract）
+- 进行中：2026-09-11 08:35。执行 plan Task 6 only（回链 Task 5 收工 `5c30372b` / PR #34）
+- 范围：`scripts/controller/actions/phase/intent_contract.py`（`begin_recontract`）、`phase/intent.py` / `_phase_intent.py`（re-export）、`scripts/event_dispatch.py`（显式 `event=recontract` 触发）、`scripts/characterization/cold/characterize-contract-sovereignty.py`（Task6 pin）、本文件
+- 禁入区：Tasks 7–8（verify-all / wet）；自动 recontract（重复拒绝不触发）；browser-use 重写；heal-mode 写入路径；他线 WIP
+- 方式：TDD fail-first 冷测 version 1→2 + history +1 → helper + 一条 stdin 显式触发；同分支 `cursor/contract-version-sovereignty-70c5`
+
 ## 2026-09-11 08:25 · Cursor — 收工：合约主权 Task 5（validate_done wiring + done_rejected）（回链 08:15 开工）
 - 完成：`evaluate_phase_done` 纯 helper 落在 `intent_gates.py`（heal bypass + `validate_done`）；拒绝发 `done_rejected`（authority=gate + reasons/remaining/missing_evidence）；观察串复用 `recovery_prescription_message` 并写入 `_done_rejected_observation`；`service.py` 续跑循环 done 接受只走 helper，拒绝不结束、注入 HumanMessage、不召开 Planner
 - 提交：`5c30372b` `feat(agent): route phase done through validate_done; emit done_rejected`（开工 `b0d535c7`）
