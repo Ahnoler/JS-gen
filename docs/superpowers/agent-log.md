@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 10:05 · Cursor Lead — 开工：executor-only BiB（1+2 resolve 门闩 → 3 attach/session 门闩）
+
+- 进行中：2026-09-11 10:05；验收=`USE_EXECUTOR` 默认 true + resolve/attach/session 在 false 时 503；true 路径行为不变
+- 范围：`config/config.js`、`.env.example`、`trajectory-record-lifecycle.js`、`trajectory-attach-runner.js`、`remote-session-service.js`、`register.js`、README/api-docs、spec/plan、cold pin、本文件
+- 禁入区：`classify.py` / `verify-all.sh` WIP、placeholder「搜索关键字」修复（另刀）、物理删除 remote-bridge
+- 方式：TDD 冷测 → 1+2 → 3 门闩 → 验收
+
 ## 2026-09-11 09:47 · Cursor Lead — 收工：L1c-wet L1C_LLM=true 湿测 PASS
 
 - 完成：回链开工 `f7533a74`；`.env` 开 `L1C_LLM=true` 并重启控制面；classify 低置信 `source=llm` / 二次 `l1d` / 高置信 `rule`；BiB resolve traj 678 inventory 60 hits（本页仅高置信分区）
