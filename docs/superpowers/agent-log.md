@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 01:58 · Cursor Lead — 开工：done_rejected 默认可观测
+
+- 进行中：2026-09-12 01:58；验收=拒答时 stderr 含 `done_rejected authority=gate`；`session-message` 转发 `done_rejected`；录制 `events[]` 可含该类型；冷 pin 绿
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`src/routes/browser-session/session-message.js`、`src/services/trajectory/trajectory-recording-runner.js`、相关 characterization / api-docs 备注、本文件
+- 禁入区：改 validate_done 门闩语义、合并 recorder Premature、他线 WIP
+- 方式：TDD 扩 pin → stderr echo + WS/录制观测转发 → 跑 pin
+
 ## 2026-09-12 01:35 · Cursor Lead — 收工：done_rejected 事件嗅探 r3（回链 01:25）
 
 - 完成：traj **757** session `9c17ae3f-…`；临时 relay tee 落盘 `tmp/contract-sovereignty-wet/done-rejected-r3/events.jsonl`；报告专项节已更新；嗅探补丁已 `git checkout` 回滚
