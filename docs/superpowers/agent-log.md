@@ -2,7 +2,7 @@
 
 ## 2026-09-11 07:25 · Cursor — 收工：合约主权 Task 2（validate_done 硬门闩栈）（回链 07:16 开工）
 - 完成：`DoneDecision` + `validate_done` 落在 `intent_gates.py`，包裹现有 `overlay_blocks_done` / `has_contract_success` / `check_pending_write_gate` / submit.required；re-export `_phase_intent.py`；冷测 pin 扩 Task1+Task2
-- 提交：本刀 `feat(phase): validate_done authority stack for contract sovereignty`（开工 `8f683003`）
+- 提交：`f1008153` `feat(phase): validate_done authority stack for contract sovereignty`（开工 `8f683003`）
 - 验收：`characterize-contract-sovereignty.py` Task1+Task2 OK；`characterize-phase-intent.py` OK；`characterize-phase-reviewer.py` PASS
 - 稳定拒绝码（未完成 create）：`reasons=('submit_required','success_unmet')`，`missing_evidence=('toast_ok',)`
 - 注意：`remaining=()` — 代码库没有 in_scope 勾销清单，本刀不另造 checklist；`index_submit_blocked` 需要 click 上下文（btn/overlay），`validate_done` 不发明；`overlay_blocks` 仅当 store 已有 overlay/error 快照（live overlay 仍由 recorder 探 DOM）
