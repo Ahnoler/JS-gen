@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 09:10 · Cursor — 收工：合约主权 Task 7（verify-all 注册）（回链 09:00 开工）
+- 完成：`verify-all.sh` 在 `characterize-phase-reviewer-flow` 旁登记 `characterize-contract-sovereignty` / `characterize-planner-advisory-filter` / `characterize-phase-done-validate`；spec 仍为 `approved`（未改 spec 正文）；todo-list 挂起表加 `contract-sovereignty-wet` 指向 plan / PR #34
+- 提交：`b5b7b3c5` `test: register contract-sovereignty characterization in verify-all`（开工 `631c8252`）
+- 验收：三 pin python3 均 OK；`bash -n scripts/refactor/verify-all.sh` OK；未跑全量 verify-all
+- 注意：未动 verify-all 他线 WIP；未做 Task 8 湿测
+- 遗留移交：Task 8 湿测清单（执行机 + 多阶段录制 + `docs/superpowers/reports/2026-09-11-contract-sovereignty-wet.md`）
+
 ## 2026-09-11 09:00 · Cursor — 开工：合约主权 Task 7（verify-all 注册）
 - 进行中：2026-09-11 09:00。执行 plan Task 7 only（回链 Task 6 收工 `7b809bdc` / PR #34）
 - 范围：`scripts/refactor/verify-all.sh`（注册 sovereignty / planner-advisory / phase-done-validate pins）、本文件；可选 `docs/superpowers/todo-list.md` 短挂起条；确认 spec status=approved（不改 spec 正文）
