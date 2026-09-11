@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 09:00 · Cursor — 开工：合约主权 Task 7（verify-all 注册）
+- 进行中：2026-09-11 09:00。执行 plan Task 7 only（回链 Task 6 收工 `7b809bdc` / PR #34）
+- 范围：`scripts/refactor/verify-all.sh`（注册 sovereignty / planner-advisory / phase-done-validate pins）、本文件；可选 `docs/superpowers/todo-list.md` 短挂起条；确认 spec status=approved（不改 spec 正文）
+- 禁入区：Task 8 湿测；verify-all 他线 WIP 行；运行时代码
+- 方式：登记门禁 → python3 跑新 pin + `bash -n`；同分支 `cursor/contract-version-sovereignty-70c5`
+
 ## 2026-09-11 08:50 · Cursor — 收工：合约主权 Task 6（explicit recontract）（回链 08:35 开工）
 - 完成：`begin_recontract` 落在 `intent_contract.py`（有旧约则 history+1、version+1；无旧约则 `ensure_contract_version`）；`clear_planner_advisory_buffer`；显式触发 `scripts/event_dispatch.py` `event=recontract`（亦接受无 event 时 `type=recontract`）→ emit `recontract` old/new version、清 planner buffer、`build_agent_system_message` 重建并补丁 live Agent
 - 提交：`7b809bdc` `feat(phase): explicit recontract bumps contract version and history`（开工 `35e8092a`）
