@@ -107,6 +107,29 @@ def get_phase_intent(business_data_store: dict | None) -> dict[str, Any] | None:
     return raw if isinstance(raw, dict) else None
 
 
+def get_active_contract(business_data: dict | None) -> dict | None:
+    """Return the stored phase contract, or None when absent."""
+    if not business_data:
+        return None
+    c = business_data.get('_phase_intent') or business_data.get('_phase_contract')
+    return c if isinstance(c, dict) else None
+
+
+def ensure_contract_version(contract: dict) -> dict:
+    """Copy contract and stamp version>=1 when missing or invalid."""
+    out = dict(contract)
+    if int(out.get('version') or 0) < 1:
+        out['version'] = 1
+    return out
+
+
+def append_contract_history(business_data: dict, contract: dict) -> None:
+    """Append a copy of contract onto business_data['_contract_history']."""
+    hist = business_data.setdefault('_contract_history', [])
+    if isinstance(hist, list):
+        hist.append(dict(contract))
+
+
 def phase_intent_active(business_data_store: dict | None) -> bool:
     """True when contract is in effect for this phase."""
     if not business_data_store:
@@ -265,6 +288,7 @@ def apply_phase_contract(
         c = sanitize_contract_for_mode(dict(contract))
     except Exception:
         c = dict(contract)
+    c = ensure_contract_version(c)
     mode = c.get('mode') or 'other'
     refill = c.get('refill') or 'none'
     if 'allow_form_assistant' not in c:
