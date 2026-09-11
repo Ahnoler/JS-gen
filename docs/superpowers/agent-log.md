@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 07:45 · Cursor — 开工：合约主权 Task 4（Planner advisory + filter）
+- 进行中：2026-09-11 07:45。执行 plan Task 4 only（回链 Task 3 收工 `5b86d6b1` / PR #34）
+- 范围：`scripts/prompts/planner-prompt.md`、`scripts/agent_utils.py`（`filter_planner_advice`）、`scripts/characterization/characterize-planner-advisory-filter.py`（新建）、本文件
+- 禁入区：Tasks 5–8（service done 接线 / recontract / verify-all / wet）；browser-use 重写；heal-mode；他线 WIP
+- 方式：TDD fail-first pin → filter + prompt 降权；同分支 `cursor/contract-version-sovereignty-70c5`
+
 ## 2026-09-11 07:40 · Cursor — 收工：合约主权 Task 3（is_action_in_scope submit-via）（回链 07:30 开工）
 - 完成：`is_action_in_scope` 落在 `intent_gates.py`，拒绝码 `submit_via_violation` 与 `should_block_index_submit` 同判定；`click_action_engine.click_element_by_index` 实接线；re-export `_phase_intent.py`；冷测 pin 扩 Task3
 - 提交：`5b86d6b1` `feat(phase): is_action_in_scope gate for submit-via violations`（开工 `d06adc87`）
