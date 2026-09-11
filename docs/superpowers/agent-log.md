@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 02:05 · ZCode 引擎线 — 开工：tansun 兼容实装周末连续执行（回链 09-11 §8.3 计划+§9.4 湿测契约，用户发令）
+
+- 工作范围：D:\dev\tansun_ui_engine 分支 compat/js-gen-operations（自 TY_UI_ENGINE_1.0.0=5e12ff1 建）——ui_execute/engine/data_name.py(新)/actions/{input_action.py,radio.py,select_tree.py,replay_adapter.py,click.py,click_subroutes.py(新),date_action.py(新),select_click.py}/action_registry.py、ui_execute/models/{enums.py,payload.py}、docs/EXECUTION_PAYLOAD_MIGRATION.md、tests/{test_data_name.py,test_input_prefix.py,test_click_subroutes.py,test_date_action.py,test_select_click_rowselect.py}(新)；JS-gen 仓仅 agent-log；tmp/tansun-wet/（湿测产物）
+- 禁入区：tansun 仓其余全部（scheduler/executor/locator/config.py——5e12ff1 同事环境配置勿动）、tests 存量 16 件（只跑不改）；JS-gen 主仓 src/scripts（他线 WIP）
+- 执行方式：主会话批 0（分支+216 passed 基线+chromium 后台装）→ 写 data_name 前缀 helper → 4 并行子智能体（A=input/radio/select_tree 前缀接线+replay_adapter hint 归一+input 值字段；B=click 前缀剥离+七子路径 click_subroutes.py 前置路由；C1=date event 六处清单；C2=select_click 弹窗行选+tssc 表格分支）——子智能体不 commit 不写本文件，主会话全量 pytest+diff 审查后分批代提交；收尾 §9.4 人机分工湿测（用户导航）
+- 计划依据：报告 2026-09-10-tansun-engine-18-action-mapping-audit.md §7/§7.1/§8/§9 为唯一蓝图
+
 ## 2026-09-12 02:05 · Cursor Lead — 收工：done_rejected 默认可观测（回链 01:58）
 
 - 完成：`evaluate_phase_done` 拒答 stderr `[phase_done] done_rejected authority=gate …`；`session-message` 转发 `done_rejected`；recording runner `events[]` 收录；api-docs recording 备注；pin `characterize-phase-done-validate` 扩 stderr + 源码钉
