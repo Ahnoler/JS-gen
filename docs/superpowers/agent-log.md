@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 06:20 · Cursor — 开工：合约主权 Task 1（version + get_active_contract）
+- 进行中：2026-09-11 06:20。执行 `docs/superpowers/plans/2026-09-11-contract-sovereignty-orchestration.md` **仅 Task 1**
+- 范围：`scripts/characterization/cold/characterize-contract-sovereignty.py`（新建）、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/_phase_intent.py`、`scripts/controller/actions/phase/intent.py`（re-export）、必要时 `scripts/controller/actions/phase/reviewer.py`（normalize 盖 version）、本文件
+- 禁入区：Tasks 2–8（validate_done / is_action_in_scope / planner demotion / service wiring / recontract / verify-all / wet）；heal-mode；他线 WIP（classify.py、verify-all form-engine-scope-audit、browser-use 重写）
+- 方式：TDD 冷测 fail-first → 最小 API → pin PASS；子智能体不派发
+
 ## 2026-09-11 · Grok Bot · 开场+收工：合约主权编排实现计划
 
 - 范围：新建 docs/superpowers/plans/2026-09-11-contract-sovereignty-orchestration.md；spec 状态 → approved；**不改**运行时代码
