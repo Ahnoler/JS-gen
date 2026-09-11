@@ -33,9 +33,25 @@ function sliceFunctionBody(src, fnName) {
   const needle = `export async function ${fnName}`;
   const idx = src.indexOf(needle);
   assert.ok(idx >= 0, `${fnName} must be exported from remote-bridge/index.js`);
-  const braceStart = src.indexOf('{', idx);
-  assert.ok(braceStart >= 0, `${fnName} body not found`);
+  const paramOpen = src.indexOf('(', idx);
+  assert.ok(paramOpen >= 0, `${fnName} param list not found`);
   let depth = 0;
+  let paramClose = -1;
+  for (let i = paramOpen; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '(') depth += 1;
+    else if (ch === ')') {
+      depth -= 1;
+      if (depth === 0) {
+        paramClose = i;
+        break;
+      }
+    }
+  }
+  assert.ok(paramClose >= 0, `${fnName} param list close not found`);
+  const braceStart = src.indexOf('{', paramClose);
+  assert.ok(braceStart >= 0, `${fnName} body not found`);
+  depth = 0;
   for (let i = braceStart; i < src.length; i++) {
     const ch = src[i];
     if (ch === '{') depth += 1;
