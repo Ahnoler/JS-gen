@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 08:25 · Cursor — 收工：合约主权 Task 5（validate_done wiring + done_rejected）（回链 08:15 开工）
+- 完成：`evaluate_phase_done` 纯 helper 落在 `intent_gates.py`（heal bypass + `validate_done`）；拒绝发 `done_rejected`（authority=gate + reasons/remaining/missing_evidence）；观察串复用 `recovery_prescription_message` 并写入 `_done_rejected_observation`；`service.py` 续跑循环 done 接受只走 helper，拒绝不结束、注入 HumanMessage、不召开 Planner
+- 提交：`5c30372b` `feat(agent): route phase done through validate_done; emit done_rejected`（开工 `b0d535c7`）
+- 验收：`characterize-phase-done-validate.py` OK；`characterize-contract-sovereignty.py` Task1–3 OK；`characterize-planner-advisory-filter.py` OK；`characterize-phase-runtime.py` PASS；`characterize-phase-reviewer.py` PASS；`characterize-phase-intent.py` OK；`characterize-budget-extend.py` OK
+- 注意：未重写 browser-use；phase_end 软质量门仍用 `has_contract_success`/`missing_success_token`（runtime pin）；Recorder 既有 premature-done 守卫未改
+- 遗留移交：Tasks 6–8 未做（recontract / verify-all / wet）
+
 ## 2026-09-11 08:15 · Cursor — 开工：合约主权 Task 5（validate_done wiring + done_rejected）
 - 进行中：2026-09-11 08:15。执行 plan Task 5 only（回链 Task 4 收工 `57d1dbd8` / PR #34）
 - 范围：`scripts/controller/actions/phase/intent_gates.py`（`evaluate_phase_done` 纯 helper）、`scripts/controller/actions/phase/intent.py` / `_phase_intent.py`（re-export）、`scripts/agent/service.py`（done 接受接线）、`scripts/characterization/characterize-phase-done-validate.py`（新建）、本文件
