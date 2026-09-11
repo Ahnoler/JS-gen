@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-11 · Grok Bot · 开场+收工：合约主权编排实现计划
+
+- 范围：新建 docs/superpowers/plans/2026-09-11-contract-sovereignty-orchestration.md；spec 状态 → approved；**不改**运行时代码
+- 结论：用户审阅通过 design spec，按 writing-plans 拆 Task1–8（version / validate_done / scope / planner demotion / service wiring / recontract / verify-all / wet）
+- 他线 WIP 未携带
+- 下一步：用户选 subagent-driven 或 inline 执行计划
+
+
 ## 2026-09-11 约 06:00 · Grok Bot · 开场+收工：合约主权编排 design spec
 
 - 范围：docs/superpowers/specs/2026-09-11-contract-sovereignty-orchestration-design.md（新建）；本刀**不改** scripts/ / src/ 运行时

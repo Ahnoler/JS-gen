@@ -1,7 +1,7 @@
 # Design: 合约主权编排（Planner / Executor / Reviewer）
 
 **Date:** 2026-09-11  
-**Status:** draft (awaiting user review)  
+**Status:** approved (user 2026-09-11)  
 **Problem focus:** planner / executor / reviewer 结论冲突、谁说了算不清  
 **Chosen model:** A — 合约主权（Contract Sovereignty）
 
