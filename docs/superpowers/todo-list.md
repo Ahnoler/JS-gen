@@ -145,7 +145,7 @@
 | **dedup-deletion** | 已闭 | 删死代码 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS/CLAUDE/README/jsdoc/verify-all 去门禁；活录 coalesce 仍在 `state.py`；2026-09-10 Lead 选定待裁落地 |
 | **executor-only-bib** | P3 已闭（含物理删除） | `USE_EXECUTOR` 默认 true；false→503（resolve/attach/session）；冷测 `characterize-executor-only-bib.mjs`；物理删除 `ensureGlobalBrowser`/控制面 CDP attach 已落地（plan `2026-09-11-remove-local-bib-mount`，`1455185c`..`2a9a7e3e`） |
 | **resolve-placeholder-search** | P3 已闭 | resolve inventory/needle 漏收 `.el-form-item` 外 placeholder（如「搜索关键字」）；`228d2b62`→`6c77c363`→`1bbfb9ef`；冷 pin GREEN；**湿测 PASS**（2026-09-11 用户：executor restart 后关键字搜索抓取成功） |
-| **contract-sovereignty-wet** | 挂起 | 合约主权 Tasks 1–7 门禁已入 verify-all（`characterize-contract-sovereignty` / `characterize-planner-advisory-filter` / `characterize-phase-done-validate`）；湿测清单 Task 8 见 [`plans/2026-09-11-contract-sovereignty-orchestration.md`](plans/2026-09-11-contract-sovereignty-orchestration.md) / [PR #34](https://github.com/Ahnoler/JS-gen/pull/34) |
+| **contract-sovereignty-wet** | P3 已闭（主路径） | Task 8 湿测 traj **754**（客户信息查询 3 阶段，`recorded` 8 步）；阶段边界 `phase_reviewer`+`phase_intent=True` PASS；early-done 触发 recorder Premature done（formErrors）⚠️未钉字面 `done_rejected`；报告 [`reports/2026-09-11-contract-sovereignty-wet.md`](reports/2026-09-11-contract-sovereignty-wet.md) |
 
 ## 更新记录
 
