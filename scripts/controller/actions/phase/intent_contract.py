@@ -130,6 +130,38 @@ def append_contract_history(business_data: dict, contract: dict) -> None:
         hist.append(dict(contract))
 
 
+_PLANNER_ADVISORY_KEYS = (
+    '_planner_advice',
+    '_planner_advisory',
+    '_planner_advisory_buffer',
+)
+
+
+def clear_planner_advisory_buffer(business_data: dict | None) -> None:
+    """Drop any stored planner advisory so recontract does not keep old advice."""
+    if not isinstance(business_data, dict):
+        return
+    for key in _PLANNER_ADVISORY_KEYS:
+        business_data.pop(key, None)
+
+
+def begin_recontract(business_data: dict, new_contract: dict) -> dict:
+    """Explicit recontract: archive the old contract, bump version, apply the new one.
+
+    Auto recontract stays off — callers must invoke this from an explicit
+    session/control-plane instruction. Returns the active contract after apply.
+    """
+    old = get_active_contract(business_data)
+    if old:
+        append_contract_history(business_data, old)
+        new_contract = dict(new_contract)
+        new_contract['version'] = int(old.get('version') or 1) + 1
+    else:
+        new_contract = ensure_contract_version(new_contract)
+    apply_phase_contract(business_data, new_contract)
+    return get_active_contract(business_data)
+
+
 def phase_intent_active(business_data_store: dict | None) -> bool:
     """True when contract is in effect for this phase."""
     if not business_data_store:
