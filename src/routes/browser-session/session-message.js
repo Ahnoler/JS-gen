@@ -98,6 +98,10 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
       case 'phase_boundary_obs':
         send('phase_boundary_obs', data);
         break;
+      case 'done_rejected':
+        // Contract-sovereignty gate reject (validate_done) — observability only.
+        send('done_rejected', data);
+        break;
       case 'action_log_sync':
         send('action_log_sync', data);
         break;

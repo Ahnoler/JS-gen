@@ -7,6 +7,7 @@ observability emission. Lazy-imports _phase_boundary and phase.reviewer.
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -332,7 +333,9 @@ def evaluate_phase_done(
     event is ``done_rejected`` with gate authority, reasons, remaining, and
     missing_evidence; the same fields are injected into the observation string
     (via ``recovery_prescription_message``) and stored on
-    ``business_data['_done_rejected_observation']``. Does not consult Planner.
+    ``business_data['_done_rejected_observation']``. Also writes one
+    ``[phase_done] done_rejected authority=gate …`` line to stderr for wet/ops
+    visibility. Does not consult Planner.
     """
     store = business_data if isinstance(business_data, dict) else {}
     if _heal_contract_active(store):
@@ -357,6 +360,12 @@ def evaluate_phase_done(
         f"remaining={data['remaining']} "
         f"missing_evidence={data['missing_evidence']}."
     )
+    # Same visibility surface as recorder Premature lines (agent-stderr / executor tee).
+    try:
+        sys.stderr.write(f'[phase_done] {reason}\n')
+        sys.stderr.flush()
+    except Exception:
+        pass
     obs = recovery_prescription_message(contract, reason=reason)
     if 'done_rejected' not in obs:
         obs = f'{obs} {reason}'.strip()

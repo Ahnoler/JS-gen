@@ -384,7 +384,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // ── agent 事件处理段落（命名分段，闭包共享 runtime/session/tid/events）──
 
   /**
-   * Push a phase observation event (phase_intent_obs / phase_boundary_obs / phase_end).
+   * Push a phase observation event (phase_intent_obs / phase_boundary_obs /
+   * done_rejected / phase_end).
    * @param {string} type event type
    * @param {object|null} payload event payload
    * @returns {void}
@@ -646,7 +647,12 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       try { phaseActivity?.(); } catch {}
     }
     const work = (async () => {
-      if (type === 'phase_intent_obs' || type === 'phase_boundary_obs' || type === 'phase_end') {
+      if (
+        type === 'phase_intent_obs'
+        || type === 'phase_boundary_obs'
+        || type === 'done_rejected'
+        || type === 'phase_end'
+      ) {
         if (type === 'phase_end' && payload?.quality_failed === true) {
           // 假成功防线 v3：QUALITY FAIL（pending_fields/missing_success_token 等）只进
           // phase_end 事件——在此捕获，终局门闩消费（09-07 #612/#614/19:55 教训）。

@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 02:05 · Cursor Lead — 收工：done_rejected 默认可观测（回链 01:58）
+
+- 完成：`evaluate_phase_done` 拒答 stderr `[phase_done] done_rejected authority=gate …`；`session-message` 转发 `done_rejected`；recording runner `events[]` 收录；api-docs recording 备注；pin `characterize-phase-done-validate` 扩 stderr + 源码钉
+- 验收：`characterize-phase-done-validate` OK；`characterize-contract-sovereignty` Task1/2/3/6 OK
+- 遗留：未改 recorder Premature 与 gate 双层语义合并；planner advisory 湿测样本仍缺
+
 ## 2026-09-12 01:58 · Cursor Lead — 开工：done_rejected 默认可观测
 
 - 进行中：2026-09-12 01:58；验收=拒答时 stderr 含 `done_rejected authority=gate`；`session-message` 转发 `done_rejected`；录制 `events[]` 可含该类型；冷 pin 绿

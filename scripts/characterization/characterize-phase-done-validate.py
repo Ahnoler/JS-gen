@@ -8,7 +8,9 @@ Pure helper — no Agent spin-up.
 """
 from __future__ import annotations
 
+import io
 import sys
+from contextlib import redirect_stderr
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -51,7 +53,9 @@ NAV_CONTRACT = {
 def main() -> int:
     create_bd: dict = {}
     apply_phase_contract(create_bd, CREATE_CONTRACT)
-    accepted, event, obs = evaluate_phase_done(create_bd, phase=3)
+    err_buf = io.StringIO()
+    with redirect_stderr(err_buf):
+        accepted, event, obs = evaluate_phase_done(create_bd, phase=3)
     assert accepted is False, 'unfinished create must not accept done'
     assert event is not None and event.get('event') == 'done_rejected', event
     data = event.get('data') or {}
@@ -71,25 +75,38 @@ def main() -> int:
     assert 'submit_required' in obs or 'success_unmet' in obs, obs
     assert 'gate' in obs, obs
     assert create_bd.get('_done_rejected_observation') == obs
+    err_text = err_buf.getvalue()
+    assert 'done_rejected authority=gate' in err_text, err_text
+    assert 'missing_evidence=' in err_text, err_text
+    assert 'toast_ok' in err_text, err_text
 
-    none_ok, none_event, none_obs = evaluate_phase_done({}, phase=1)
+    none_err = io.StringIO()
+    with redirect_stderr(none_err):
+        none_ok, none_event, none_obs = evaluate_phase_done({}, phase=1)
     assert none_ok is False, 'empty store must reject'
     assert none_event and none_event.get('event') == 'done_rejected'
     assert 'no_contract' in list((none_event.get('data') or {}).get('reasons') or [])
     assert none_obs
+    assert 'done_rejected authority=gate' in none_err.getvalue(), none_err.getvalue()
 
-    heal_bd = {'_heal_mode': True, '_heal_contract': {'mode': 'heal'}}
-    heal_ok, heal_event, heal_obs = evaluate_phase_done(heal_bd, phase=2)
+    heal_err = io.StringIO()
+    with redirect_stderr(heal_err):
+        heal_bd = {'_heal_mode': True, '_heal_contract': {'mode': 'heal'}}
+        heal_ok, heal_event, heal_obs = evaluate_phase_done(heal_bd, phase=2)
     assert heal_ok is True, 'heal-mode must bypass validate_done'
     assert heal_event is None
     assert heal_obs == ''
+    assert 'done_rejected' not in heal_err.getvalue(), heal_err.getvalue()
 
-    nav_bd: dict = {}
-    apply_phase_contract(nav_bd, NAV_CONTRACT)
-    nav_ok, nav_event, nav_obs = evaluate_phase_done(nav_bd, phase=0)
+    nav_err = io.StringIO()
+    with redirect_stderr(nav_err):
+        nav_bd: dict = {}
+        apply_phase_contract(nav_bd, NAV_CONTRACT)
+        nav_ok, nav_event, nav_obs = evaluate_phase_done(nav_bd, phase=0)
     assert nav_ok is True, 'navigate with no submit/kinds must accept'
     assert nav_event is None
     assert nav_obs == ''
+    assert 'done_rejected' not in nav_err.getvalue(), nav_err.getvalue()
 
     src = (ROOT / 'scripts' / 'agent' / 'service.py').read_text(encoding='utf-8')
     assert 'evaluate_phase_done' in src, 'service.py must call evaluate_phase_done'
@@ -102,6 +119,20 @@ def main() -> int:
     )
     assert 'planner_llm' not in chunk, 'done reject must not call Planner'
     assert 'filter_planner_advice' not in chunk, 'done reject must not re-litigate via Planner'
+
+    # Control-plane / recording observability surface (Task 8 follow-up)
+    sess = (ROOT / 'src' / 'routes' / 'browser-session' / 'session-message.js').read_text(
+        encoding='utf-8'
+    )
+    assert "case 'done_rejected':" in sess, 'session-message must forward done_rejected'
+    assert "send('done_rejected'" in sess, 'session-message must send done_rejected to channel'
+    runner = (
+        ROOT / 'src' / 'services' / 'trajectory' / 'trajectory-recording-runner.js'
+    ).read_text(encoding='utf-8')
+    assert "type === 'done_rejected'" in runner or "'done_rejected'" in runner, (
+        'recording runner must observe done_rejected into events[]'
+    )
+    assert 'pushPhaseObservation' in runner
     print('characterize-phase-done-validate: OK')
     return 0
 

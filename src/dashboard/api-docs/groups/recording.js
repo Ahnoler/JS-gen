@@ -65,6 +65,13 @@ export const GROUP_RECORDING = [
             { type: 'phase_start', phaseNumber: 1 },
             { type: 'phase_boundary_obs', phaseNumber: 1, phase_boundary: { role: 'maintain' } },
             { type: 'phase_intent_obs', phaseNumber: 1 },
+            {
+              type: 'done_rejected',
+              phaseNumber: 1,
+              authority: 'gate',
+              reasons: ['success_unmet'],
+              missing_evidence: ['toast_ok'],
+            },
             { type: 'phase_done', phaseNumber: 1 },
           ],
           steps: [],
@@ -72,7 +79,8 @@ export const GROUP_RECORDING = [
         notes: [
           '400：未 attach / 无匹配 phase / 缺账号',
           '409：session busy',
-          'events[] 可含 phase_boundary_obs / phase_intent_obs（录制可观测，不入 MySQL）',
+          'events[] 可含 phase_boundary_obs / phase_intent_obs / done_rejected（录制可观测，不入 MySQL）',
+          'done_rejected：validate_done 拒答；authority=gate；含 reasons / missing_evidence；亦写 agent stderr',
           'AI_PHASE_BOUNDARY 默认 on；设 off 回退旧意图合约',
         ],
       },
