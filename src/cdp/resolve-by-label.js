@@ -314,6 +314,28 @@ ${PAGE_LOCATOR_HELPERS}
           if (action === 'select_option') kind = 'form_select';
           pushUnique(el, m.label, true, kind);
         }
+        if (!out.length) {
+          const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea'));
+          const exactHosts = [];
+          const fuzzyHosts = [];
+          for (const inp of inputs) {
+            if (!isVisible(inp)) continue;
+            if (inp.closest && inp.closest('.el-form-item')) continue;
+            if (inp.closest && inp.closest('.el-select, .el-date-editor, .el-pagination, .el-popover, .tree-popover')) continue;
+            const ph = placeholderLabel(inp);
+            if (!ph) continue;
+            if (textExact(ph, needle)) exactHosts.push({ inp, ph });
+            else if (textFuzzy(ph, needle)) fuzzyHosts.push({ inp, ph });
+          }
+          const chosenHosts = exactHosts.length ? exactHosts : fuzzyHosts;
+          for (const m of chosenHosts) {
+            let kind = 'form_input';
+            if (m.inp.closest && m.inp.closest('.el-date-editor')) kind = 'form_date';
+            else if (m.inp.closest && m.inp.closest('.el-select')) kind = 'form_select';
+            if (action === 'select_option') kind = 'form_select';
+            pushUnique(m.inp, m.ph, true, kind);
+          }
+        }
       }
       return out;
     }
