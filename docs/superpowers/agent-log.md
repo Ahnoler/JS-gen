@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 15:50 · Cursor Lead — 收工：remove local BiB mount (SDD)（回链 15:25 开工）
+
+- 完成：`1455185c` RED pin → `8ee479ed` 删 `ensureGlobalBrowser` → `2a9a7e3e` 本地 CDP attach 掏空 + phase-highlight 去 `getAttachedCdpClient` + pin slicer 修 → `99d91f8b` docs；plan `2026-09-11-remove-local-bib-mount`
+- 验收：冷 pin `characterize-remove-local-bib-mount` + `characterize-executor-only-bib` **GREEN**；各任务 SDD review ✅
+- 湿测：本机控制面在线但 executor `2f21bad1-…` **not connected** → resolve 678 500；移交：重启 `npm run executor` 后复验 prepare/attach/resolve
+- 遗留 minor：`persist-live.js` 仍写 global-browser stdout fan-out（注释）
+
 ## 2026-09-11 15:25 · Cursor Lead — 开工：remove local BiB mount (SDD)
 
 - 进行中：2026-09-11 15:25；验收=冷 pin GREEN + ensureGlobalBrowser/本地 CDP attach 物理删除；executor BiB 仍可用
