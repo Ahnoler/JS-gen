@@ -320,6 +320,50 @@ def validate_done(business_data: dict, *, section: str | None = None) -> DoneDec
     )
 
 
+def evaluate_phase_done(
+    business_data: dict | None,
+    *,
+    phase: int | str | None = None,
+    section: str | None = None,
+) -> tuple[bool, dict | None, str]:
+    """Route phase done through ``validate_done`` (heal-mode bypasses).
+
+    Returns ``(accepted, event_or_none, executor_observation)``. On reject the
+    event is ``done_rejected`` with gate authority, reasons, remaining, and
+    missing_evidence; the same fields are injected into the observation string
+    (via ``recovery_prescription_message``) and stored on
+    ``business_data['_done_rejected_observation']``. Does not consult Planner.
+    """
+    store = business_data if isinstance(business_data, dict) else {}
+    if _heal_contract_active(store):
+        return True, None, ''
+    decision = validate_done(store, section=section)
+    if decision.accepted:
+        return True, None, ''
+    contract = get_active_contract(store)
+    version = (contract or {}).get('version')
+    data = {
+        'phase': phase,
+        'contract_version': version,
+        'authority': 'gate',
+        'reasons': list(decision.reasons),
+        'remaining': list(decision.remaining),
+        'missing_evidence': list(decision.missing_evidence),
+    }
+    event = {'event': 'done_rejected', 'data': data}
+    reason = (
+        f"done_rejected authority=gate phase={phase} "
+        f"contract_version={version} reasons={data['reasons']} "
+        f"remaining={data['remaining']} "
+        f"missing_evidence={data['missing_evidence']}."
+    )
+    obs = recovery_prescription_message(contract, reason=reason)
+    if 'done_rejected' not in obs:
+        obs = f'{obs} {reason}'.strip()
+    store['_done_rejected_observation'] = obs
+    return False, event, obs
+
+
 _INDEX_CLICK_ACTIONS = frozenset({'click_element', 'click_element_by_index'})
 
 

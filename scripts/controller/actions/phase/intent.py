@@ -19,4 +19,5 @@ from scripts.controller.actions.phase.intent_gates import (  # noqa: F401
     is_action_in_scope, is_cycle_deviate_fingerprint, is_introduce_phase, is_maintain_form_phase,
     mark_quality_failed, overlay_blocks_done, phase_intent_active, re, record_success_token,
     recovery_prescription_message, should_block_index_submit, validate_done,
+    evaluate_phase_done,
 )
