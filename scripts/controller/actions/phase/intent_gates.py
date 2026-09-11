@@ -7,6 +7,7 @@ observability emission. Lazy-imports _phase_boundary and phase.reviewer.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from .intent_contract import (
@@ -14,6 +15,7 @@ from .intent_contract import (
     _MAINTAIN_DIALOG_TITLE_RE,
     _PICKER_DIALOG_TITLE_RE,
     contract_force_refill,
+    get_active_contract,
     get_phase_intent,
     phase_intent_active,
 )
@@ -249,6 +251,74 @@ def has_contract_success(business_data_store: dict | None) -> bool:
         if isinstance(tok, dict) and tok.get('kind') in kinds:
             return True
     return False
+
+
+@dataclass(frozen=True)
+class DoneDecision:
+    """Machine result of the contract-sovereignty done() hard-gate stack."""
+
+    accepted: bool
+    reasons: tuple[str, ...]
+    remaining: tuple[str, ...]
+    missing_evidence: tuple[str, ...]
+
+
+def _missing_success_kinds(business_data: dict | None, contract: dict) -> tuple[str, ...]:
+    """Success kinds required by the contract that have not been recorded."""
+    kinds = list((contract.get('success') or {}).get('kinds') or [])
+    if not kinds or has_contract_success(business_data):
+        return ()
+    return tuple(str(k) for k in kinds if str(k).strip())
+
+
+def validate_done(business_data: dict, *, section: str | None = None) -> DoneDecision:
+    """Hard-gate stack for Executor done(): reject unless contract evidence is met.
+
+    Gate order: no_contract → overlay_blocks (only when store already holds an
+    overlay/error snapshot) → submit_required → pending_write → success_unmet.
+    ``index_submit_blocked`` needs click context (btn label / overlay); this
+    function does not invent one. ``remaining`` stays empty — in_scope is not
+    a checklist store today.
+    """
+    contract = get_active_contract(business_data)
+    if not contract:
+        return DoneDecision(
+            accepted=False,
+            reasons=('no_contract',),
+            remaining=(),
+            missing_evidence=(),
+        )
+
+    store = business_data if isinstance(business_data, dict) else {}
+    reasons: list[str] = []
+    success_ok = has_contract_success(store)
+
+    open_overlay = store.get('_open_overlay') or store.get('openOverlay')
+    form_errors = store.get('_form_errors') or store.get('formErrors')
+    error_notifs = store.get('_error_notifs') or store.get('errorNotifs')
+    if overlay_blocks_done(contract) and (open_overlay or form_errors or error_notifs):
+        reasons.append('overlay_blocks')
+
+    from scripts.controller.actions.phase.reviewer import coerce_bool
+    submit = contract.get('submit') if isinstance(contract.get('submit'), dict) else {}
+    if coerce_bool(submit.get('required')) and not success_ok:
+        reasons.append('submit_required')
+
+    ok_pending, _pending = check_pending_write_gate(store, section=section or '')
+    if not ok_pending:
+        reasons.append('pending_write')
+
+    missing = _missing_success_kinds(store, contract)
+    if not success_ok:
+        reasons.append('success_unmet')
+
+    return DoneDecision(
+        accepted=not reasons,
+        reasons=tuple(reasons),
+        remaining=(),
+        missing_evidence=missing if 'success_unmet' in reasons else (),
+    )
+
 
 def done_accept_reason(
     contract: dict[str, Any] | None,
