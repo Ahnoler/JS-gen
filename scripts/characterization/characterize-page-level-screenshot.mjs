@@ -54,8 +54,6 @@ const ok = (n) => console.log(`ok: ${n}`);
   assert.match(persist, /replacePageLevelScreenshot/);
   const executor = readFileSync(join(root, 'src/routes/browser-session/executor-events.js'), 'utf8');
   assert.match(executor, /page_level_screenshot/);
-  const global = readFileSync(join(root, 'src/routes/browser-session/global-browser.js'), 'utf8');
-  assert.match(global, /page_level_screenshot/);
   const runner = readFileSync(join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
   assert.match(runner, /page_level_screenshot/);
   const route = readFileSync(join(root, 'src/routes/v2/export-mgmt.js'), 'utf8');

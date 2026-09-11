@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Characterization: role-level LLM env unification (keys, config exports, spawn injection, timeouts).
 
-String-level assertions that .env.example, config.js, global-browser.js, reviewer.py,
+String-level assertions that .env.example, config.js, executor/session-slot.js, reviewer.py,
 _llm_values.py, _scenario_describer.py, and agent_utils.py all carry the expected
 role-level LLM configuration markers. No live LLM calls.
 """
@@ -71,13 +71,13 @@ config_exports = [
 for k in config_exports:
     check(f'config.js exports {k}', f'export const {k}' in config_js)
 
-# ── global-browser.js: SCENARIO_LLM_MODEL injection ────────────────────────
-gb_js = (ROOT / 'src' / 'routes' / 'browser-session' / 'global-browser.js').read_text(encoding='utf-8')
-check('global-browser.js injects SCENARIO_LLM_MODEL', 'SCENARIO_LLM_MODEL' in gb_js)
-check('global-browser.js injects REVIEWER_LLM_MODEL', 'REVIEWER_LLM_MODEL' in gb_js)
-check('global-browser.js injects FORM_LLM_TIMEOUT_MS', 'FORM_LLM_TIMEOUT_MS' in gb_js)
-check('global-browser.js does NOT inject L1C_LLM_MODEL', 'L1C_LLM_MODEL' not in gb_js)
-check('global-browser.js does NOT inject REVIEWER_LLM_TIMEOUT_MS', 'REVIEWER_LLM_TIMEOUT_MS' not in gb_js)
+# ── executor/session-slot.js: SCENARIO/FORM/REVIEWER LLM env injection ───────
+session_slot_js = (ROOT / 'executor' / 'session-slot.js').read_text(encoding='utf-8')
+check('session-slot.js injects SCENARIO_LLM_MODEL', 'SCENARIO_LLM_MODEL' in session_slot_js)
+check('session-slot.js injects REVIEWER_LLM_MODEL', 'REVIEWER_LLM_MODEL' in session_slot_js)
+check('session-slot.js injects FORM_LLM_TIMEOUT_MS', 'FORM_LLM_TIMEOUT_MS' in session_slot_js)
+check('session-slot.js does NOT inject L1C_LLM_MODEL', 'L1C_LLM_MODEL' not in session_slot_js)
+check('session-slot.js does NOT inject REVIEWER_LLM_TIMEOUT_MS', 'REVIEWER_LLM_TIMEOUT_MS' not in session_slot_js)
 
 # ── region-classify.js: L1C_LLM_MODEL consumer (import + passthrough) ──────
 region_classify_js = (ROOT / 'src' / 'services' / 'region-classify.js').read_text(encoding='utf-8')
@@ -86,11 +86,6 @@ check('region-classify.js imports L1C_LLM_BASE_URL', 'L1C_LLM_BASE_URL' in regio
 check('region-classify.js imports L1C_LLM_API_KEY', 'L1C_LLM_API_KEY' in region_classify_js)
 check('region-classify.js passes L1C_LLM_MODEL to callLLMWithTimeout', 'callLLMWithTimeout(buildClassifyPrompt(cards), L1C_LLM_MODEL)' in region_classify_js)
 check('region-classify.js passes L1C baseUrl to callLLM', 'baseUrl: L1C_LLM_BASE_URL' in region_classify_js)
-
-# ── executor/session-slot.js: does NOT inject L1C_LLM_MODEL / REVIEWER_LLM_TIMEOUT_MS ──
-session_slot_js = (ROOT / 'executor' / 'session-slot.js').read_text(encoding='utf-8')
-check('session-slot.js does NOT inject L1C_LLM_MODEL', 'L1C_LLM_MODEL' not in session_slot_js)
-check('session-slot.js does NOT inject REVIEWER_LLM_TIMEOUT_MS', 'REVIEWER_LLM_TIMEOUT_MS' not in session_slot_js)
 
 # ── reviewer.py: _get_reviewer_llm + timeout chain ──────────────────────────
 reviewer_py = (ROOT / 'scripts' / 'controller' / 'actions' / 'phase' / 'reviewer.py').read_text(encoding='utf-8')
