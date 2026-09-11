@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 23:20 · Cursor Lead — 收工：合约主权 Task 8 湿测（回链 23:10 开工）
+
+- 完成：启控制面+LMY executor；traj **754** 三阶段 AI 录制（客户信息查询+表单填查）→ `recorded` 8 步；detach ok；报告 `docs/superpowers/reports/2026-09-11-contract-sovereignty-wet.md`；todo 挂起条收口
+- 验收：阶段边界 `phase_reviewer ok … phase_intent=True` ×3；阶段2 Premature done（formErrors 请选择客户类别）forcing continue；**未**见字面 `done_rejected`/planner discard
+- 遗留：若要钉 `done_rejected`/`missing_evidence` 字面观测，另跑缺 success 证据的 done；服务仍在跑（未停）
+
 ## 2026-09-11 23:10 · Cursor Lead — 开工：合约主权 Task 8 湿测
 
 - 进行中：2026-09-11 23:10；验收=多阶段 AI 录制 + form save；阶段边界 reviewer version；冲突仅 advisory/gate；报告 `docs/superpowers/reports/2026-09-11-contract-sovereignty-wet.md`
