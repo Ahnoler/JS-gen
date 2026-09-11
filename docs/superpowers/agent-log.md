@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-12 02:40 · ZCode 引擎线 — 收工：tansun 兼容实装五批落地（回链 02:05 开工）
+
+- 完成（tansun_ui_engine 分支 compat/js-gen-operations，4 笔 commit）：**cb30ef8** 批1=data_name 前缀解析 helper+input 值 objectValue 优先+radio/select_tree/replay_adapter 三路 hint 剥前缀；**e0e87a9** 批2=click 七前缀子路径（关闭弹窗/展开树/页签/表格行按钮/树选/邻钮/菜单，click_subroutes.py 前置路由，miss 落回同事兜底链，裸路由 miss=skip，按钮文本剥前缀）；**eb564e3** 批4a=date event 六处清单（单日期移植 fill_date.py+daterange 双 input $emit('input',[s,e])，JS-gen 无 daterange 参考实现为按规格新写）；**75bd130** 批4b=select_click「弹窗选择」表格行选+tssc 远程表格分支（16×250ms 静置轮询防残留首行误点，字典路径 10s→3s 短等不变行为）
+- 验收：全量 pytest **279 passed**（基线 216+新增 63 用例，test_agent_e2e 4 errors=本机缺 %ComSpec% 存量环境问题）；diff 审查 10 改+8 新文件全在允许清单；**批 5 离线打样 ALL PASS**——14 步真实形态 V3 payloadJson 全链转换，断言全中（select:tree 别名归一→select_tree_option/date 过白名单单+区间/tree path JSON 数组保真/objectValue 与 val 双写无损/前缀 dataName 透传）；打样脚本=AppData\Local\Temp\tansun-wet\offline-payload-check.py
+- 子智能体四路并行（A 批1/B 批2/C1 批4a/C2 批4b）文件集互不相交，由本会话代声明代提交，无越界改动；有价值偏离已复核接受（close_dialog 补 ESC 兜底层、tree_picker 去 form-label 谓词、菜单 textContent 匹配隐藏项、daterange 新写）
+- 遗留移交：①§9.4 人机分工湿测待用户参与（chromium 后台安装中，用户导航+本会话验证 18 操作）；②SUT 待用户定（test.creditv5p2 或同事系统）；③分支未推送，用户/同事验收后合并；④V3 空元素步骤整单拒已实证（样例空 xpath 步骤被 primaryLocator 校验拦下）——推送侧 P3/P4 硬前提再确认
+- 注意：JS-gen 本单元只提交 agent-log 一文件；他线 WIP（Cursor done_rejected 线）未触碰未携带
+
 ## 2026-09-12 02:05 · ZCode 引擎线 — 开工：tansun 兼容实装周末连续执行（回链 09-11 §8.3 计划+§9.4 湿测契约，用户发令）
 
 - 工作范围：D:\dev\tansun_ui_engine 分支 compat/js-gen-operations（自 TY_UI_ENGINE_1.0.0=5e12ff1 建）——ui_execute/engine/data_name.py(新)/actions/{input_action.py,radio.py,select_tree.py,replay_adapter.py,click.py,click_subroutes.py(新),date_action.py(新),select_click.py}/action_registry.py、ui_execute/models/{enums.py,payload.py}、docs/EXECUTION_PAYLOAD_MIGRATION.md、tests/{test_data_name.py,test_input_prefix.py,test_click_subroutes.py,test_date_action.py,test_select_click_rowselect.py}(新)；JS-gen 仓仅 agent-log；tmp/tansun-wet/（湿测产物）
