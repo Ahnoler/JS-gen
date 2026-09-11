@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 15:25 · Cursor Lead — 开工：remove local BiB mount (SDD)
+
+- 进行中：2026-09-11 15:25；验收=冷 pin GREEN + ensureGlobalBrowser/本地 CDP attach 物理删除；executor BiB 仍可用
+- 范围：`src/routes/browser-session/global-browser.js`、`register.js`、`src/cdp/remote-bridge/index.js`、`phase-highlight-screenshot.js`、cold pins、`characterize-llm-role-env.py`、page-level screenshot pin、verify-all（仅本 pin 行）、todo-list、README、本文件；plan `docs/superpowers/plans/2026-09-11-remove-local-bib-mount.md`
+- 禁入区：`classify.py`、他线 verify-all WIP、整删 `remote-bridge/`、`state.globalBrowser` 字段迁移、`.cursor/`
+- 方式：SDD Task1–5；子智能体不 commit，主会话审查后代提交
+
 ## 2026-09-11 · Cursor Subagent — 收工：挂载功能列 docs 收口（Vue `90ee152` · `2750958` · `477db1d`）
 
 - 完成：JS-gen mount-function spec/plan 标已实现 + §6 勾选；`2026-09-09` §6.4 spec 交叉引用 overrides 改由挂载列
