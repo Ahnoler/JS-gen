@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 23:32 · Cursor Lead — 开工：合约主权 done_rejected 专项湿测
+
+- 进行中：2026-09-11 23:32；验收=stderr 出现字面 `done_rejected authority=gate` + `missing_evidence`（或 `success_unmet`/`submit_required`）
+- 范围：录制 API、报告增补、本文件；不改运行时代码
+- 方式：对公客户管理多阶段；阶段指令诱导未保存即 done；盯 executor 日志
+
 ## 2026-09-11 23:20 · Cursor Lead — 收工：合约主权 Task 8 湿测（回链 23:10 开工）
 
 - 完成：启控制面+LMY executor；traj **754** 三阶段 AI 录制（客户信息查询+表单填查）→ `recorded` 8 步；detach ok；报告 `docs/superpowers/reports/2026-09-11-contract-sovereignty-wet.md`；todo 挂起条收口
