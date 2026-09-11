@@ -1,5 +1,10 @@
 # Agent 协作日志
 
+## 2026-09-11 11:05 · ZCode 引擎线 — 报告增补 §9 湿测收尾门 + tssc 分形态复核（回链 09:30）
+
+- 用户两项指示落档：①tssc_multi_select 复核=字典形态✅（handle_select_click 零改动可跑）/远程表格形态❌（面板只等 .el-select-dropdown__item 10s 超时，须移植 JS_TSSC_MULTI_SELECT 过滤静置）——矩阵行更正+批 4 加 tssc 表格分支（857f16df）；②报告新增 §9 真实业务场景端到端湿测=**本线验收收尾门**：L1 每批收尾即跑（18 操作单操作 payloadJson 场景清单+判据=业务结果成立），L2 端到端全链（录制→推送 ATP→下发→执行→整案 paas，18 操作各至少一次）；执行纪律五条（就地归因/同事主干只记录/平台未就绪须降级标注/产物落 tmp/tansun-wet/审批推进须授权）
+- 本单元只提交 agent-log+报告两文件，tansun 仓未动；他线 WIP 未触碰
+
 ## 2026-09-11 09:30 · ZCode 引擎线 — 同事新提交重评估，周末实装计划同步更新（回链 00:05 改期）
 
 - 完成：同事已推送 1bf04f0「补充操作事件」（+1385 行：radio.py 206 行/select_tree.py 918 行/click.py 重写+248 行/enums+payload+registry）+5e12ff1「修改配置」（config 默认值=同事环境，勿动）——逐文件审阅后报告新增 §8 重评估：radio（双注册+object_value or value+absent=skip+布尔伪成功已堵）/select_tree 三 event（`_EVENT_ALIASES` 把 select:tree 归一到 select_tree_option）/click 兜底三层（G1+icon+ambiguous 防盲点）全落地；全量 pytest 216 passed（test_agent_e2e 4 errors=本机缺浏览器非代码）
