@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-11 10:22 · Cursor Lead — 开工：resolve placeholder-only「搜索关键字」(SDD)
+
+- 进行中：2026-09-11 10:22；验收=inventory+needle 命中裸 placeholder input；冷测 GREEN
+- 范围：`src/cdp/page-locator-helpers.js`、`src/cdp/resolve-by-label.js`、gen `_locator_helpers_js.py`、cold pin、verify-all（仅本 pin 行）、todo-list、本文件；plan `docs/superpowers/plans/2026-09-11-resolve-placeholder-search.md`
+- 禁入区：`classify.py`、他线 verify-all WIP（form-engine-scope-audit）、`.cursor/`、物理删 remote-bridge
+- 方式：SDD Task1 红测 → Task2 inventory → Task3 needle → Task4 文档；子智能体不 commit
+
 ## 2026-09-11 10:12 · Cursor Lead — 收工：executor-only BiB 1+2+3 门闩（回链 10:05 / `72a35f70`）
 
 - 完成（待用户许可再 commit 代码）：`USE_EXECUTOR` 默认 `true`；resolve 删除本地 `remoteBridge` 分支，false→503；attach/prepare、`attachLive`/`detachLive`/`getLiveStatus`、`POST /api/browser/session` 同门闩；README/.env.example/api-docs 改口径；冷测 `characterize-executor-only-bib.mjs` + verify-all 注册
