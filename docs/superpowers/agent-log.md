@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-11 约 06:00 · Grok Bot · 开场+收工：合约主权编排 design spec
+
+- 范围：docs/superpowers/specs/2026-09-11-contract-sovereignty-orchestration-design.md（新建）；本刀**不改** scripts/ / src/ 运行时
+- 结论：用户确认权威模型 A（合约主权）及三段设计（权威边界 / 冲突与 done 仲裁 / 状态机与落点）；写成 draft spec 待用户审阅
+- 方式：对话定稿 → 写 spec → 本条目；他线 WIP 未携带
+- 状态：等待用户 review spec；通过后再写 plans/
+
+
 ## 2026-09-11 10:40 · Cursor Lead — 收工：resolve placeholder-only「搜索关键字」(SDD)（回链 10:22 开工）
 
 - 完成：`228d2b62` 红测 pin + verify-all 注册 → `6c77c363` inventory bare placeholder（`page-locator-helpers.js` + gen `_locator_helpers_js.py`）→ `1bbfb9ef` needle placeholder fallback（`resolve-by-label.js`）
