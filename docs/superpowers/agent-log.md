@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 00:05 · Cursor Lead — 收工：done_rejected 专项补跑（回链 23:32）
+
+- 完成：r1 traj **755**（弹窗挡/零动作）；r2 traj **756** 阶段2 合约已 `create`+`submit.required=True`+`toast_ok`；触发 Premature done pending_fields + budget extend；终态 failed/27 步
+- 验收：**字面 `done_rejected` 未捕获**（事件只走 stdout JSON/WS，stderr 无）；报告已增补专项节
+- 遗留：若要钉字面事件，需订阅 agent stdout 事件流（或另刀 stderr echo）
+
 ## 2026-09-11 23:32 · Cursor Lead — 开工：合约主权 done_rejected 专项湿测
 
 - 进行中：2026-09-11 23:32；验收=stderr 出现字面 `done_rejected authority=gate` + `missing_evidence`（或 `success_unmet`/`submit_required`）

@@ -57,13 +57,43 @@ Phase 3 done
 ## 结论
 
 - **Acceptance #4 主路径（多阶段 + 阶段边界 reviewer）PASS。**  
-- **early-done 门闩有真机触发**，但本跑落到 recorder「可见表单错误 → forcing continue」，**未能**用湿测钉住字面 `done_rejected` / `missing_evidence` 观测字段。  
+- **early-done 门闩有真机触发**，但主跑落到 recorder「可见表单错误 → forcing continue」，**未能**用湿测钉住字面 `done_rejected` / `missing_evidence` 观测字段。  
 - **Planner advisory discard** 本跑无触发样本。  
+- **done_rejected 专项**见下节（2026-09-11 晚补跑）。
 
-### 建议（非本 Task 必做）
+## 补跑：done_rejected 专项（traj 755 / 756）
 
-若要补齐 checklist 字面项：另开一跑刻意诱导 `validate_done` 拒绝（缺 success evidence 的 done），并抓 stderr `done_rejected authority=gate`；或在观测通道把 recorder Premature done 与 `done_rejected` 事件对齐。
+目标：诱导未保存成功即 `done()`，钉住字面 `done_rejected` + `missing_evidence`（`toast_ok`）。
+
+| 跑次 | traj | 结果 |
+|---|---|---|
+| r1 | **755** | ❌ 全局「单元测试配置」弹窗挡住；阶段内零动作 done → `[recorder] done rejected: zero actions`；reviewer `submit.required=False success.kinds=[]`；`steps=0 recorded` |
+| r2 | **756** | ⚠️ 合约形态已对齐，字面事件未捕获（见下） |
+
+### r2 关键证据（session `afa3aa80-…`）
+
+1. **阶段2 合约（reviewer）已是目标形态：**  
+   `mode=create` · `submit.required=True` · `success.kinds=['toast_ok']` · `phase_intent=True`  
+   （`logs/agent-stderr/afa3aa80-51ed-4ff6-a684-dea1a9ad561e.log`）
+2. Agent 实际走了填表 + `click_save`（未严格遵守「立刻 done 不保存」探针），后因校验/未填完字段触发：  
+   `[recorder] ⚠ Premature done() — pending fields ['投资主体类型', '联网核查状态']`  
+   随后 `[budget] extend round=1 +10 steps (introduce=1 pending=2)`
+3. 终态：`recordStatus=failed`，`stepCount=27`，`isDone=0`
+4. **字面 `done_rejected` / `missing_evidence`：** 在 executor stderr / agent-stderr / 控制面日志中 **均未检索到**。  
+   原因：`evaluate_phase_done` 的 `done_rejected` 只经 **stdout JSON → WS 转发**，不写 stderr；本 harness 未订阅/落盘该事件流。budget extend 可由 pending 字段单独触发，**不能**当作 `done_rejected` 已发出的充分证据。
+
+证据目录：`tmp/contract-sovereignty-wet/done-rejected/`（r1）、`…/done-rejected-r2/`（r2）。
+
+### 专项结论
+
+| 项 | 结果 |
+|---|---|
+| 诱导 create + `toast_ok` 合约 | ✅（r2） |
+| recorder 过早 done 门闩（pending_write） | ✅（r2） |
+| 字面 `done_rejected` / `missing_evidence` 湿测钉死 | ❌ 未捕获 |
+
+若要闭环字面项：下一跑在录制期间订阅控制面/执行机 agent stdout 事件（或临时给 `evaluate_phase_done` 加一行 stderr echo，另开刀），在 `toast_ok` 合约下抓到 `{"event":"done_rejected",…}`。
 
 ## 服务状态
 
-湿测结束后控制面与 executor **仍保持运行**（未在本报告中停止）。
+湿测与补跑结束后控制面与 executor **仍保持运行**（未在本报告中停止）。
