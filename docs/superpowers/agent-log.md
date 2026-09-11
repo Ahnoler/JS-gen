@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-11 07:16 · Cursor — 开工：合约主权 Task 2（validate_done 硬门闩栈）
+- 进行中：2026-09-11 07:16。执行 plan Task 2 only（回链 Task 1 收工 / PR #34）
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`scripts/controller/actions/phase/intent.py`、`scripts/controller/actions/_phase_intent.py`、`scripts/characterization/cold/characterize-contract-sovereignty.py`、本文件
+- 禁入区：Tasks 3–8（is_action_in_scope / planner demotion / service wiring / recontract / verify-all / wet）；heal-mode；KB；browser-use 重写；他线 WIP
+- 方式：TDD 冷测 fail-first → wrap 现有 gates → pin PASS；同分支 `cursor/contract-version-sovereignty-70c5`
+
 ## 2026-09-11 06:35 · Cursor — 收工：合约主权 Task 1（version + get_active_contract）（回链 06:20 开工）
 - 完成：冷测 pin `scripts/characterization/cold/characterize-contract-sovereignty.py`；`get_active_contract` / `ensure_contract_version` / `append_contract_history` 落在 `intent_contract.py`；`apply_phase_contract` 与 reviewer `normalize_reviewer_payload` 盖 `version>=1`；存储键仍为 `_phase_intent`；re-export `_phase_intent.py` + `phase/intent.py`
 - 提交：`bfe0336d` `feat(phase): contract version + get_active_contract for sovereignty`（回链开工 `66bac2f0`）
