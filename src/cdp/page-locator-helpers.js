@@ -295,6 +295,13 @@ export const PAGE_LOCATOR_HELPERS = `
       return 'form_tree_select';
     }
     if (node.closest('.el-form-item') && (node.matches('input, textarea') || node.closest('.el-input, .el-textarea'))) return 'form_input';
+    const tagBare = (node.tagName || '').toLowerCase();
+    if ((tagBare === 'input' || tagBare === 'textarea')
+      && node.getAttribute
+      && normalizeControlText(node.getAttribute('placeholder'))
+      && !node.closest('.el-form-item, .el-select, .el-date-editor, .el-pagination, .el-popover, .tree-popover')) {
+      return 'form_input';
+    }
     if ((node.getAttribute && (node.getAttribute('aria-label') || node.getAttribute('title'))) && !(node.innerText || '').trim()) return 'icon';
     {
       const clsI = String(node.className || '');
@@ -1173,6 +1180,7 @@ export const PAGE_LOCATOR_HELPERS = `
         '.el-form-item .el-date-editor',
         '.el-form-item .el-radio, .el-form-item .el-radio-group .el-radio',
         '.el-form-item .el-checkbox, .el-form-item .el-checkbox-group .el-checkbox',
+        'input:not([type="hidden"]), textarea',
         'button.el-button, .el-button, button',
         '.todo-item-action',
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"]',
@@ -1188,6 +1196,12 @@ export const PAGE_LOCATOR_HELPERS = `
         let host = normalizeHost(el) || el;
         const formItem = host.closest && host.closest('.el-form-item');
         if (formItem && host === formItem) host = inventoryPickControl(formItem) || host;
+        const tagHost = (host.tagName || '').toLowerCase();
+        if ((tagHost === 'input' || tagHost === 'textarea') && !formItem) {
+          const ph = inventoryNorm(host.getAttribute && host.getAttribute('placeholder'));
+          if (!ph) continue;
+          if (host.closest('.el-select, .el-date-editor, .el-pagination, .el-popover, .tree-popover')) continue;
+        }
         if (seen) {
           if (seen.has(host)) continue;
           seen.add(host);
