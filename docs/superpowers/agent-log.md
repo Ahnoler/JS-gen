@@ -2,7 +2,7 @@
 
 ## 2026-09-11 06:35 · Cursor — 收工：合约主权 Task 1（version + get_active_contract）（回链 06:20 开工）
 - 完成：冷测 pin `scripts/characterization/cold/characterize-contract-sovereignty.py`；`get_active_contract` / `ensure_contract_version` / `append_contract_history` 落在 `intent_contract.py`；`apply_phase_contract` 与 reviewer `normalize_reviewer_payload` 盖 `version>=1`；存储键仍为 `_phase_intent`；re-export `_phase_intent.py` + `phase/intent.py`
-- 提交：`c845be60` `feat(phase): contract version + get_active_contract for sovereignty`（回链开工 `66bac2f0`）
+- 提交：`bfe0336d` `feat(phase): contract version + get_active_contract for sovereignty`（回链开工 `66bac2f0`）
 - 验收：`python3 scripts/characterization/cold/characterize-contract-sovereignty.py` → Task1 OK；`python3 scripts/characterization/cold/characterize-phase-intent.py` → OK；`characterize-phase-reviewer.py` / `characterize-phase-save-cue-promote.py` PASS
 - 遗留移交：Tasks 2–8 未做（validate_done / scope / planner demotion / service wiring / recontract / verify-all / wet）
 - 注意：未改 heal-mode、未碰他线 WIP、未重建 CHANGELOG.md
