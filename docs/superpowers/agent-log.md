@@ -1,5 +1,10 @@
 # Agent 协作日志
 
+## 2026-09-11 · Cursor Subagent — 收工：挂载功能列 docs 收口（Vue `90ee152` · `2750958` · `477db1d`）
+
+- 完成：JS-gen mount-function spec/plan 标已实现 + §6 勾选；`2026-09-09` §6.4 spec 交叉引用 overrides 改由挂载列
+- 遗留：4097 重启 + product-mgmt 湿测（多行不同挂载 overrides）
+
 ## 2026-09-11 · Grok Bot · 开场+收工：合约主权编排实现计划
 
 - 范围：新建 docs/superpowers/plans/2026-09-11-contract-sovereignty-orchestration.md；spec 状态 → approved；**不改**运行时代码

@@ -3,6 +3,7 @@
 > 日期：2026-09-09  
 > 状态：已实现（Vue commits `a1ac7d1` · `587f30c`）；待 4097 重启 + product-mgmt 湿测（多行不同功能 overrides）  
 > 计划：[`../plans/2026-09-09-req-draft-wizard-function-candidates.md`](../plans/2026-09-09-req-draft-wizard-function-candidates.md)  
+> **2026-09-11 更新**：原「功能」列已拆为「召回候选」（只读）+「挂载功能」（模块叶子下拉）；`functionIdOverrides` **改由挂载列**写入，不再取自原功能列 pick。见 [`2026-09-11-req-draft-mount-function-column-design.md`](./2026-09-11-req-draft-mount-function-column-design.md)（Vue `90ee152` · `2750958` · `477db1d`）。
 > 前置：[`2026-09-08-kb-remediation-design.md`](./2026-09-08-kb-remediation-design.md) §6.4；向导假流式 [`2026-09-08-req-draft-keydata-and-streaming-ux-design.md`](./2026-09-08-req-draft-keydata-and-streaming-ux-design.md)  
 > 仓库：Vue `vue-project`（`dev`）；后端契约已就绪，本版不改 JS-gen 运行时
 
@@ -83,6 +84,8 @@ functionIdOverrides[key] = fnPickByAtomKey[key]
 ```
 
 禁止再统一赋值为左侧单一 id。
+
+> **2026-09-11**：上式 pick map 已更名为 `mountPickByAtomKey`，仅挂载功能列写入；召回列不参与 overrides（见挂载功能列 spec §5）。
 
 ## 5. 范围
 
