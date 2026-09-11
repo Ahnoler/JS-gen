@@ -61,7 +61,7 @@ MinIO：可选截图对象存储
 LLM 网关：需求分析、阶段审查、场景摘要、表单规划和 Agent 决策
 ```
 
-产品与本地开发统一走 Executor：控制面调度，执行机节点启动 Python/Chrome 并按 slot 隔离 CDP 端口。`src/cdp/*` 定位库由执行机 BiB bridge 复用（同仓共享源），控制面不再本机挂 Chrome。
+产品与本地开发统一走 Executor：控制面调度，执行机节点启动 Python/Chrome 并按 slot 隔离 CDP 端口。`src/cdp/*` 定位库由执行机 BiB bridge 复用（同仓共享源），控制面不再本机挂 Chrome。**本机 `ensureGlobalBrowser` spawn 与控制面 CDP attach 已移除；BiB 仅经 Executor。**
 
 ## 项目结构
 

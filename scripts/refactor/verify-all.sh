@@ -141,6 +141,7 @@ run "characterize-backfill" node scripts/characterization/characterize-backfill.
 run "characterize-refill-contract" "$PY" scripts/characterization/characterize-refill-contract.py
 run "characterize-executor-orphan-reconcile" node scripts/characterization/characterize-executor-orphan-reconcile.mjs
 run "characterize-executor-only-bib" node scripts/characterization/cold/characterize-executor-only-bib.mjs
+run "characterize-remove-local-bib-mount" node scripts/characterization/cold/characterize-remove-local-bib-mount.mjs
 run "characterize-resolve-placeholder-search" node scripts/characterization/cold/characterize-resolve-placeholder-search.mjs
 run "characterize-system-import-json" node scripts/characterization/characterize-system-import-json.mjs
 run "characterize-menu-scan" node scripts/characterization/characterize-menu-scan.mjs

@@ -6,7 +6,6 @@ import { deriveRegionRef, assembleRegionTree } from '../region-tree.js';
 import { replacePhaseHighlightScreenshot } from '../screenshot-service.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import * as execSession from '../../executor-session-client.js';
-import { getAttachedCdpClient } from '../../cdp/remote-bridge.js';
 
 /**
  * Wrap a phase-screenshot capture error into a standard result object.
@@ -69,7 +68,7 @@ export function buildMetadata(buffer, meta) {
 /**
  * Capture the phase screenshot PNG buffer (+ raw meta) only — no metadata build, no persist.
  * Shared by the done highlight shot and the in-phase state-group shots so elements/regionTree
- * metadata stays homogeneous across both. Direct CDP client, executor BiB branch, or local fallback.
+ * metadata stays homogeneous across both. Direct CDP client or executor BiB branch only.
  * @param {object} [root0] capture options
  * @param {object} [root0.cdpClient] CDP client for direct capture
  * @param {string} [root0.sessionId] executor session id (for BiB capture)
@@ -106,11 +105,7 @@ export async function capturePhaseBuffer({
       buffer = Buffer.from(payload.pngBase64, 'base64');
       meta = payload?.meta || null;
     } else {
-      const local = getAttachedCdpClient();
-      if (!local) return { ok: false, skipped: 'no_cdp' };
-      const captured = await runPhaseScreenshotCapture(local);
-      buffer = captured.buffer;
-      meta = captured.meta;
+      return { ok: false, skipped: 'no_cdp' };
     }
 
     return { ok: true, buffer, meta };

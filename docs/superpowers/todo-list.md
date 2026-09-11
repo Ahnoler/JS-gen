@@ -143,8 +143,8 @@
 | **p2-batch-lease** | P3 已闭 | 录制期 `renewItemLease` + `startItemLeaseRenewal`（约 lease/3，下限 30s）防超租二次 claim；冷 pin `characterize-batch-item-lease-renew.mjs`；2026-09-10 落地 |
 | **p2-toast-cursor** | P3 已闭 | step_notice：`log_len < cursor` 时回卷游标并清 `_step_notice_seen`，再以 cursor=0 重扫（`rewind_notify_cursor_if_shrunk`）；冷 pin 扩 `characterize-step-notice-scan.py`；2026-09-10 落地（未改 js_snippets） |
 | **dedup-deletion** | 已闭 | 删死代码 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS/CLAUDE/README/jsdoc/verify-all 去门禁；活录 coalesce 仍在 `state.py`；2026-09-10 Lead 选定待裁落地 |
-| **executor-only-bib** | P3 已闭（门闩） | `USE_EXECUTOR` 默认 true；false→503（resolve/attach/session）；冷测 `characterize-executor-only-bib.mjs`；**遗留**：物理删除 `ensureGlobalBrowser`/本机 bridge 挂载（另刀） |
-| **resolve-placeholder-search** | P3 已闭 | resolve inventory/needle 漏收 `.el-form-item` 外 placeholder（如「搜索关键字」）；`228d2b62` 红测 pin + verify-all → `6c77c363` `collectL2Hosts` bare placeholder + gen py → `1bbfb9ef` needle fallback；冷 pin `characterize-resolve-placeholder-search` **GREEN**（4/4）；**湿测待执行机 restart** 加载新 JS（重启前 traj 678 仍旧「找不到」） |
+| **executor-only-bib** | P3 已闭（含物理删除） | `USE_EXECUTOR` 默认 true；false→503（resolve/attach/session）；冷测 `characterize-executor-only-bib.mjs`；物理删除 `ensureGlobalBrowser`/控制面 CDP attach 已落地（plan `2026-09-11-remove-local-bib-mount`，`1455185c`..`2a9a7e3e`） |
+| **resolve-placeholder-search** | P3 已闭 | resolve inventory/needle 漏收 `.el-form-item` 外 placeholder（如「搜索关键字」）；`228d2b62`→`6c77c363`→`1bbfb9ef`；冷 pin GREEN；**湿测 PASS**（2026-09-11 用户：executor restart 后关键字搜索抓取成功） |
 | **contract-sovereignty-wet** | 挂起 | 合约主权 Tasks 1–7 门禁已入 verify-all（`characterize-contract-sovereignty` / `characterize-planner-advisory-filter` / `characterize-phase-done-validate`）；湿测清单 Task 8 见 [`plans/2026-09-11-contract-sovereignty-orchestration.md`](plans/2026-09-11-contract-sovereignty-orchestration.md) / [PR #34](https://github.com/Ahnoler/JS-gen/pull/34) |
 
 ## 更新记录

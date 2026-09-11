@@ -1,5 +1,25 @@
 # Agent 协作日志
 
+
+## 2026-09-11 15:50 · Cursor Lead — 收工：remove local BiB mount (SDD)（回链 15:25 开工）
+
+- 完成：`1455185c` RED pin → `8ee479ed` 删 `ensureGlobalBrowser` → `2a9a7e3e` 本地 CDP attach 掏空 + phase-highlight 去 `getAttachedCdpClient` + pin slicer 修 → `99d91f8b` docs；plan `2026-09-11-remove-local-bib-mount`
+- 验收：冷 pin `characterize-remove-local-bib-mount` + `characterize-executor-only-bib` **GREEN**；各任务 SDD review ✅
+- 湿测：本机控制面在线但 executor `2f21bad1-…` **not connected** → resolve 678 500；移交：重启 `npm run executor` 后复验 prepare/attach/resolve
+- 遗留 minor：`persist-live.js` 仍写 global-browser stdout fan-out（注释）
+
+## 2026-09-11 15:25 · Cursor Lead — 开工：remove local BiB mount (SDD)
+
+- 进行中：2026-09-11 15:25；验收=冷 pin GREEN + ensureGlobalBrowser/本地 CDP attach 物理删除；executor BiB 仍可用
+- 范围：`src/routes/browser-session/global-browser.js`、`register.js`、`src/cdp/remote-bridge/index.js`、`phase-highlight-screenshot.js`、cold pins、`characterize-llm-role-env.py`、page-level screenshot pin、verify-all（仅本 pin 行）、todo-list、README、本文件；plan `docs/superpowers/plans/2026-09-11-remove-local-bib-mount.md`
+- 禁入区：`classify.py`、他线 verify-all WIP、整删 `remote-bridge/`、`state.globalBrowser` 字段迁移、`.cursor/`
+- 方式：SDD Task1–5；子智能体不 commit，主会话审查后代提交
+
+## 2026-09-11 · Cursor Subagent — 收工：挂载功能列 docs 收口（Vue `90ee152` · `2750958` · `477db1d`）
+
+- 完成：JS-gen mount-function spec/plan 标已实现 + §6 勾选；`2026-09-09` §6.4 spec 交叉引用 overrides 改由挂载列
+- 遗留：4097 重启 + product-mgmt 湿测（多行不同挂载 overrides）
+
 ## 2026-09-11 09:10 · Cursor — 收工：合约主权 Task 7（verify-all 注册）（回链 09:00 开工）
 - 完成：`verify-all.sh` 在 `characterize-phase-reviewer-flow` 旁登记 `characterize-contract-sovereignty` / `characterize-planner-advisory-filter` / `characterize-phase-done-validate`；spec 仍为 `approved`（未改 spec 正文）；todo-list 挂起表加 `contract-sovereignty-wet` 指向 plan / PR #34
 - 提交：`b5b7b3c5` `test: register contract-sovereignty characterization in verify-all`（开工 `631c8252`）
@@ -91,6 +111,7 @@
 - 范围：`scripts/characterization/cold/characterize-contract-sovereignty.py`（新建）、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/_phase_intent.py`、`scripts/controller/actions/phase/intent.py`（re-export）、必要时 `scripts/controller/actions/phase/reviewer.py`（normalize 盖 version）、本文件
 - 禁入区：Tasks 2–8（validate_done / is_action_in_scope / planner demotion / service wiring / recontract / verify-all / wet）；heal-mode；他线 WIP（classify.py、verify-all form-engine-scope-audit、browser-use 重写）
 - 方式：TDD 冷测 fail-first → 最小 API → pin PASS；子智能体不派发
+
 
 ## 2026-09-11 · Grok Bot · 开场+收工：合约主权编排实现计划
 

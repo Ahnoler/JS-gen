@@ -3,7 +3,7 @@
  * Consumers keep importing from '../cdp/remote-bridge.js' unchanged.
  */
 export {
-  notifyManualRecordingChanged, getRemoteStatus, refreshCdpEndpoints, clearCdpEndpoints,
+  notifyManualRecordingChanged, getRemoteStatus, clearCdpEndpoints,
   attachLive, detachLive, parseRemoteFrame, resolveBibTarget, initRemoteBridgeWs,
   resolveElementByLabelText, getAttachedCdpClient,
 } from './remote-bridge/index.js';
