@@ -40,7 +40,7 @@
 | 15 | click_radio | radio | 同事最新版已实现（未推送） | 🟡→待复验 | 本仓快照无此 event（checkSelect 布尔伪成功 misc.py:176 为快照现状）；推送后复验：event 字面量=`radio`、值读 object_value or val、[last()]+scrollIntoView、absent=skip（radio-handover.zip 可对照） |
 | 16 | click_table_row_button | click | 无等价 | ❌ | 全缺：行文本→tr→行内按钮（禁盲点带结构化错误）；「表格：行/文案」按 `/` 拆 |
 | 17 | click_table_row_radio | radio | 无等价 | ❌ | 全缺；与 #13 共用表格行定位基建 |
-| — | （表外）tssc_multi_select | select:click | handle_select_click | ✅ | 推送照发，el-select 场景可跑 |
+| — | （表外）tssc_multi_select | select:click | handle_select_click | 🟡 | **分形态（09-11 复核 JS-gen `js_snippets/tssc_multi_select.py` 头注）**：字典选项形态（`.el-select-dropdown__item`，如要素类型）✅ 零改动可跑；**远程表格形态（`.select-table` 的 `tr.el-table__row`，如要素名称）❌**——handle_select_click 只等 `.el-select-dropdown__item`，表格面板 10s 超时→Escape→error；且远程搜索异步 ~300ms 须过滤静置（禁见行就点，历史坑：误点残留首行 ok-p1:部署方式）。修复入批 4 tssc 分支 |
 
 ## 2. 新增 event 改动面（同事引擎，select:click 样板六处）
 
@@ -183,7 +183,7 @@
 | 批 1（收窄重定义） | dataName 前缀解析 helper + 四处接线（click button_text / radio label / select_tree label / input hint）：**路由到七前缀子路径 + 剥前缀作 labelHint** | helper 职责从"修 fill/select hint"扩展为"子路由+剥前缀"两用；input 值字段改读 object_value or val 保留 |
 | 批 2（新） | **七前缀子路径注册**：关闭弹窗（close_dialog JS 移植）/展开树（expand JS）/页签：/表格：/树选：/邻钮：/菜单：——挂在 click handler 前缀路由层（批 1 helper 产出的 route_key 分发），miss 落回同事新兜底链 | 从"在 handle_click 里分流"改为"独立子路由模块（click_subroutes.py），handle_click 前置调用"，与同事代码冲突面最小 |
 | 批 3（并入批 2） | —— | 原批 3 内容并入批 2 |
-| 批 4（不变+一行） | date event 六处清单 + select:click「弹窗选择：」行选分支 | 无变化；date 仍依赖推送侧升格接线（备案） |
+| 批 4（两处新增） | date event 六处清单 + select:click 面板内行选分支——**两个分支：①「弹窗选择：」（picker_dialog_select，objectValue=行文本）；②tssc_multi_select 远程表格形态（`.select-table` tr，移植 JS_TSSC_MULTI_SELECT 含过滤静置，字典形态走原链不动）**——本质同为"面板内表格行选择" | 09-11 复核后新增 ②；date 仍依赖推送侧升格接线（备案） |
 | 批 5（升级为验证批） | select:tree alias 实测 + radio/树三兄弟（select_tree_option/tree_check_confirm/tree_picker_click）用映射表报文样例逐个过——他们已实现，只验不修 | 从"复验"升级为"用真实 V3 报文打样"；click_table_row_radio 若 radio 表格列场景缺，补 radio 内分支 |
 | 新增批 0 | `git fetch` 后在 TY_UI_ENGINE_1.0.0 上重建 compat/js-gen-operations；跑通全量测试基线（当前 216 passed） | 原计划的开工前置正式化 |
 
