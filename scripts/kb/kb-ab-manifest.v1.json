@@ -5,6 +5,7 @@
     "v1 (2026-09-11): functionId per requirement verified against system_menu_snapshot v10 (system_node_id=1): 对公客户管理=7, 对公客户评级=9000000011, 客户信息查询=9000000039, 评级查询=9000000055, 产品库管理=9000000740, 查询产品信息=9000000467, 集群客户管理=9000000018, 风险分类统计=9000000144, 贷款计算器=9000000452.",
     "v1 (2026-09-11): Cleanup caveat (accepted, documented): SUT customer rows in 信贷预客户 state have NO UI delete (state_actions: only 草稿客户 allows 删除). Create-family runs stamp every name with KBAB<runId>- and attempt list-delete when the state allows it; residue with visible stamp prefix is otherwise documented in cleanupLog and handed over. This mirrors the 2026-09-07 R1 precedent (8 stamp rows retained).",
     "v1.1 (2026-09-11T03:40+08:00): CEILING TRIGGERED - pilot A-arm 2/2 recorded (traj 723/725, isSuccessful=1) >= 0.9 -> per spec S4 switch difficulty anchors. Difficulty evidence (pre-registered, no post-hoc): stamp family #586/#590/#592/#593/#594 all failed (last actions = legal-rep dialog cancel / list query; fake-success gate '0 persisted steps' verdicts; same-family #595 re-run next day recorded => difficulty was task legs + 09-06 engine state, environment now proven fixed by pilot); #615 credit_usage failed (55 steps, died in guarantee/flow-submit legs). Pilot also proved A-arm completes full create incl. legal-rep import (723/724), so plain create is no longer discriminative: v1.1 difficulty重心 = multi-leg tasks (create + list-verify read-back), rating family (R01/R07 never piloted), rating application initiation (write, revocable), cross-module reads. Kept R06/R09/R11 as within-set easy controls; dropped R08/R10/R12 (same-shape query/no-write, no information); added N01/N02/N03/N04 difficulty anchors. Official 12 = R01,R02,R04,R05,R06,R07,R09,R11,N01,N02,N03,N04 (R12 substitute).",
+    "v1.1 (2026-09-11, post-G-verdict audit completion, reviewer 2422771e F2): abortedRuns completed with 727 attempt1 (tianyuan-dialog env block) and 747 attempt1 (executor offline / prepare 409). Previously 747 attempt1 existed only inside runlog attempt2's retryOf/notes and 727 attempt1 only as a runlog excluded row. No arm definition / requirement / card mapping / officialPlan change; manifestVersion intentionally NOT bumped (same practice as the e82bad07 cleanupLog append) so the frozen eval snapshots stay byte-identical and the gate's version pin stays valid.",
     "v1.1 (2026-09-11): environmentPrep added to armProtocol: after record/prepare and before record/start, run tmp/kb-ab/close-tianyuan-dialog.py (CDP real-mousedown closes the 天元相关配置 welcome dialog). Applies identically to both arms - harness, not the independent variable. Evidence: page-bind's synthetic footer click cannot close this dialog (same trusted-event class as the mega-menu precedent); agent then pauses per global-dialog guard => zero actions => missing_success_token => traj failed (traj 723 run1). 723 run1 recorded in abortedRuns, excluded from stats; run2 on the same trajectory succeeded."
   ],
   "frozenAt": "2026-09-11T03:40:00+08:00",
@@ -304,6 +305,24 @@
       "attempt": "run1",
       "status": "failed(missing_success_token)",
       "reason": "天元相关配置欢迎弹窗残留可见 → agent 环境守卫上报暂停 → 零动作失败。环境阻障非任务失败（harness 关窗法落地后同轨迹 run2 成功 recorded）。run1 不计入统计，run2 为正式观测",
+      "excludedFromStats": true
+    },
+    {
+      "trajectoryId": 727,
+      "arm": "A",
+      "reqId": "R01",
+      "attempt": 1,
+      "status": "failed(env-blocked: tianyuan dialog)",
+      "reason": "天元相关配置欢迎弹窗阻障 → 环境守卫暂停 → 零业务动作（runlog 727/attempt1 记 outcome=env-blocked(tianyuan dialog, multi-CDP guard)）。环境阻障非任务失败；attempt2（同 trajectory id）为正式观测，计 P1=failed。G-verdict F2（2026-09-11）补登记：此前只在 runlog 有 excluded 行，未入本清单",
+      "excludedFromStats": true
+    },
+    {
+      "trajectoryId": 747,
+      "arm": "A",
+      "reqId": "N03",
+      "attempt": 1,
+      "status": "aborted(executor-offline, prepare 409)",
+      "reason": "record/prepare 返回 409（所有 executor 节点 offline；executor WS 1006 半开掉线而服务端 offline 行未清）→ 无 prepare、无页面动作、无副作用。executor 重启后 attempt2 为正式观测（P1=recorded）。G-verdict F2（2026-09-11）补登记：此前只存在于 runlog attempt2 行的 retryOf/notes，无独立条目",
       "excludedFromStats": true
     }
   ],

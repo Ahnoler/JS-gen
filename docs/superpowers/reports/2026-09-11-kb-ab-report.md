@@ -5,12 +5,13 @@
 - 跑批证据：`tmp/kb-ab/runlog.jsonl`（25 行 / 24 条轨迹 727–750，727 双 attempt）、`tmp/kb-ab/cleanup-ledger.jsonl`
 - 收数引擎：`scripts/kb/kb-ab-eval.mjs`（`--json`，连跑两次逐位一致，`tmp/kb-ab/eval-final.json`）
 - 协议门禁：`scripts/characterization/characterize-kb-ab.mjs`（GREEN；证伪×2 见 §7）
-- 提交链：`e6abfdc2`/`51374183`（spec/plan）→ `ea5d04c9`（manifest v1.1）→ `cf1751e6`（T2 证据+T3 引擎）→ `c1ef3ad7`/`5af3ab23`/`e82bad07`
+- 提交链：`e6abfdc2`/`51374183`（spec/plan）→ `ea5d04c9`（manifest v1.1）→ `cf1751e6`（T2 证据+T3 引擎）→ `c1ef3ad7`（lint 归零）→ `5af3ab23`（runlog 750）→ `e82bad07`（清理收口）→ `433ca3de`（runlog wallS 标注）→ `9bda883c`（T4 报告）→ `dcfe1063`（T5 台账）
 
 ## 1. 结论（三类口径，spec §先验功效）
 
 > **③ 证据不足。**
 > A 臂 5/12（41.7%），B 臂 6/12（50.0%），差值 +8.3pp。n=12/臂时先验功效只够检出 ≥30pp 的差异（20pp 级需 n≥40/臂），+8.3pp 落在噪声区间内，两臂 Wilson 95% CI 大面积重叠（A [0.193, 0.680]，B [0.254, 0.746]）。**不得据此宣称"前置流程卡模板有效"或"无效"——两者都不成立。** 若未来要把 ±20pp 级差异下成结论，需要 n≥40/臂（80 次录制）；若只验证"大效应存在"（≥30pp），本轮规模可复用。
+> **配对检验（reviewer 复核补充）**：不一致对 B 独赢 3 / A 独赢 2 → **精确 McNemar 双侧 p = 1.000**。即本轮不只是在"功效不足"意义上无结论，**配对层面本身就没有信号**——这比功效估算更强地支持结论③。
 
 ## 2. 原始逐 run 表（P1=record_status 口径，spec §3 冻结）
 
@@ -41,7 +42,7 @@
 | 749 | A | N04 评级发起 | rating | failed | 17 | 527 | 评级弹窗循环（候选客户全带在途评级流，同 R01 墙） |
 | 750 | B | N04 评级发起 | rating | failed | 14 | 482 | 同一墙（paired SUT 状态） |
 
-† 747 attempt1（prepare 409 无可用执行机，executor WS 1006 半开掉线而服务端节点行未清）登记于 runlog 且不计观测；attempt2 为正式观测——**非按结果剔除**（attempt1 无任何页面动作，环境阻障类 aborted，白名单理由在案）。
+† 747 attempt1（prepare 409 无可用执行机，executor WS 1006 半开掉线而服务端节点行未清）登记于 runlog **与 `manifest.abortedRuns`**（G-verdict F2 补登记）且不计观测；attempt2 为正式观测——**非按结果剔除**（attempt1 无任何页面动作，环境阻障类 aborted，白名单理由在案）。
 
 ## 3. 每臂汇总
 
@@ -51,12 +52,13 @@
 | Wilson 95% CI | [19.3%, 68.0%] | [25.4%, 74.6%] |
 | 差值（B−A） | +8.3pp（CI 重叠，不显著） | |
 | 配对结局 | A 独赢 2 对（R04/N01）、B 独赢 3 对（R02/R05/N02）、双成 3 对、双败 4 对 | |
+| **配对检验（McNemar 精确双侧）** | **p = 1.000**（不一致对 3 vs 2，无信号） | |
 | 步数（成功 run 中位） | 9 | 11 |
 | 步数（全部 run 均值） | 13.3 | 13.7 |
 | P3 人工介入步 | 0 | 0 |
 | P4 返工（error 步） | 0 | 0 |
 
-成本解读：B 臂成功 run 中位步数略高（11 vs 9），但 B 独赢的 3 对全是"多腿任务"（R02 33 步、N02 39 步 vs A 预算耗尽失败）——卡的价值形态是**把预算内做不完的多腿链路做完**，不是省步数。单腿简单任务（R06/R07）两臂等价。
+成本解读：B 臂成功 run 中位步数略高（11 vs 9）。**B 独赢的 3 对中只有 2 对支持"卡的价值形态 = 把预算内做不完的多腿链路做完"**：R02（B 33 步 vs A 预算 23/23 耗尽）、N02（B 39 步 vs A 预算 29/29 耗尽）。**第三对 R05 不构成该论证**（G-verdict F3 订正）：其 A 臂 `#733` 正是 §6.2 已登记的"navigate 零步异步降级"（B 臂仅 4 步），该不一致来自降级机制的配对内随机——R11 两臂同降级→双败即其反证。单腿简单任务（R06/R07）两臂等价。**配对检验：不一致对 3 vs 2 → 精确 McNemar 双侧 p = 1.000（无信号）。**
 
 ## 4. 天花板判定回顾（T0）
 
@@ -66,10 +68,10 @@ pilot（723–726，R02/R06）A 臂 2/2 = 1.0 ≥ 0.9 → 触发换锚规则，m
 
 - P3 人工介入：两臂全程 0 manual 步（全自动录制）。
 - P4 返工：两臂 0 个带 error 步（失败 run 的失败体现为 missing_success_token / 预算耗尽 / SUT 拒绝，不是步级报错）。
-- P5 卡遵循度（marker 路由 + 卡按钮命中率，A/B 合计）：region 32 段中 29 段命中卡 `hash_markers`（90.6%）；`click_button`/`click_element_by_index` 文案 114 次中 92 次命中卡 `nodes[].buttons`（80.7%）。两臂对称（A: 14/15 段、48/57 次；B: 15/17 段、44/57 次）——B 臂有卡但遵循度并不比 A 高，说明成功差异不来自"更贴卡地走"，而来自卡提示块对任务分解本身的引导（见 §3 成本解读）。
+- P5 卡遵循度（marker 路由 + 卡按钮命中率，A/B 合计）：region 32 段中 29 段命中卡 `hash_markers`（90.6%）；`click_button`/`click_element_by_index` 文案 114 次中 92 次命中卡 `nodes[].buttons`（80.7%）。两臂对称（A: 14/15 段、48/57 次；B: 15/17 段、44/57 次）——B 臂有卡但遵循度并不比 A 高：**即便存在差异，也不是来自"更贴卡地走"**（差异本身未达可判定水平，见 §1/§3；P5 只作机制描述，不作收益论证）。
 - P6 越界：3 个未命中卡 marker 的 region（734 的 `cpctMgtPg`、737/738 的 `rtgEnqrMgtPg`）——均为**卡 marker 词表与页面 hash 码错位**（rating-query-view 卡只带菜单码 `ZJJK00103247/ZJJK00124779`，页面 region 是路由 hash `rtgEnqrMgtPg`；734 是登录回放导航落在客户管理中转页），非越界操作。写黑名单按钮（删除/停用/注销/作废/强制/退回）两臂合计 **0 命中**。
 - 24 run 全部写入带 `KBAB<runId>-` 前缀或纯只读；N03 双臂对他人 `KB测…` 数据零触碰（仅查询）。
-- 残留：8 笔新建客户全为「信贷预客户」，SUT 状态机删除入口仅对草稿客户开放（09-07 R1 先例 8 次实证）→ 无法经 UI 删除，按先例留证移交（`cleanup-ledger.jsonl` 逐条带证据步号 + manifest `cleanupLog` 终局条目）。
+- 残留：**正式批 8 笔 + pilot 2 笔**（pilot：723 吴强杰 `26091101181825853`、724 KB主链R1-20260911-0125 `26091101360078854`，见 manifest `cleanupLog[0]`）新建客户全为「信贷预客户」，SUT 状态机删除入口仅对草稿客户开放（09-07 R1 先例 8 次实证）→ 无法经 UI 删除，按先例留证移交（`cleanup-ledger.jsonl` 逐条带证据步号 + manifest `cleanupLog` 终局条目）。
 
 ## 6. 如实登记的干扰项
 
@@ -92,4 +94,19 @@ pilot（723–726，R02/R06）A 臂 2/2 = 1.0 ≥ 0.9 → 触发换锚规则，m
 1. **结论升级路径**：要下 ±20pp 级结论 → 扩到 n≥40/臂；建议只复用 5 个多腿锚（R02/R04/N01/N02/N04 类），砍掉两臂等价的单腿锚（R06/R07 类不提供信息量）。
 2. **744 类门伪**：引擎侧修法明确（legacy `has_contract_success` 引入 boundary 的 kind 别名表），留给引擎线按 P1 排期；本线不动 `src/**`。
 3. **零步降级**：navigate-only phase 的 success token 建议豁免"业务动作>0"检查（登录回放已代导航是合法形态）——同属引擎线。
-4. **残留数据**：8 笔信贷预客户等 SUT 状态机放开删除或 DB 侧清理窗口（`cleanup-ledger.jsonl` 有全部 custNo）。
+4. **残留数据**：正式批 8 笔 + pilot 2 笔信贷预客户等 SUT 状态机放开删除或 DB 侧清理窗口（`cleanup-ledger.jsonl` 有全部 custNo）。
+
+## 9. G 复核响应台账（reviewer 判决 `2422771e`）
+
+| # | reviewer 发现 | 处置 | 落点 |
+|---|---|---|---|
+| F1（必改） | runlog `#728` 行写 `recorded/isSuccessful:1/stepCount:null`，与库终态 `failed / is_successful=0 / step_count=0` 及本报告 §2 矛盾，且未像 733/741/742 那样标注 | 该行改为 **DB 冻结口径**（`outcome:"failed"`、`isSuccessful:0`、`stepCount:0`），runner 回读值保留为 `runnerReadback:"recorded"`，并加 `finalStatusCaliber` 说明 | `tmp/kb-ab/runlog.jsonl` |
+| F2（必改） | 交付称两条 aborted「已登记 `manifest.abortedRuns`」——实测只有 722 / 723-run1；727 attempt1 只在 runlog，747 attempt1 无独立条目 | 两条补入 `abortedRuns`（完整 reason + `excludedFromStats:true`），`changeLog` 增补审计说明。**不升 `manifestVersion`**（沿用 `e82bad07` 追加 `cleanupLog` 的既有做法）→ 冻结快照 `eval-final*.json` 保持逐位一致、门禁版本钉 `v1.1` 继续有效 | `scripts/kb/kb-ab-manifest.v1.json` |
+| F3（必改） | §3「B 独赢 3 对**全是**多腿任务」不成立——第三对 R05 的 A 臂 `#733` 是 §6.2 自己登记的零步异步降级 | §3 限缩为 **R02/N02 两对**支持价值形态，R05 单列并注明受 §6.2 干扰；**§1/§3 增补精确 McNemar 双侧 p = 1.000** | 本报告 §1/§3 |
+| F4（轻） | 残留只写「8 笔」，漏 pilot 2 笔 | §5 改为「正式批 8 笔 + pilot 2 笔」并给出 pilot custNo | 本报告 §5 |
+| F5（轻） | 头部提交链漏列 3 笔 | 提交链补全至 `dcfe1063` | 本报告头部 |
+
+**口径声明**：以上均为**登记与表述修正**——未改动任何观测量、任何 run 的 P1 取值、任何统计量（A 5/12、B 6/12、+8.3pp、两臂 Wilson CI 逐位不变）；跑批不重跑；门禁复跑仍 GREEN（见 §7）。
+
+**复核侧接受项**（reviewer 独立复现，未要求改动）：纯度 12/12 逐字相同（reviewer 从库自查）· P1/Wilson/配对结局独立重数一致 · 引擎两次运行并与冻结快照逐位一致 · 写黑名单 122 次点击 0 命中 · N03 双臂步骤全为查询类 · `src/**` 零改动 · 需求与 v2 评测集 0 条完全相同。
+
