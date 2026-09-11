@@ -351,7 +351,12 @@ def normalize_reviewer_payload(raw: str) -> dict[str, Any] | None:
         est_i = 0
     if est_i > 0:
         out['estimated_steps'] = est_i
-    return sanitize_contract_for_mode(out)
+    sanitized = sanitize_contract_for_mode(out)
+    try:
+        from scripts.controller.actions.phase.intent_contract import ensure_contract_version
+        return ensure_contract_version(sanitized)
+    except Exception:
+        return sanitized
 
 
 def _build_user_payload(

@@ -259,31 +259,28 @@ class ClickEngine:
                             is_picker_ui = True
 
                 try:
-                    from scripts.controller.actions._phase_intent import (
-                        get_phase_intent,
-                        should_block_index_submit,
+                    from scripts.controller.actions._phase_intent import is_action_in_scope
+                    allowed, _reject = is_action_in_scope(
+                        self.business_data_store,
+                        'click_element_by_index',
+                        {
+                            'btn_label': btn_label,
+                            'in_form_overlay': in_form_overlay,
+                            'dialog_title': dialog_title,
+                            'is_picker_ui': is_picker_ui,
+                            'container_id': '',
+                            'query_ui': is_picker_ui or bool(
+                                (self.business_data_store or {}).get('_query_ui')
+                            ),
+                        },
                     )
-                    contract = get_phase_intent(self.business_data_store)
+                    block = not allowed
                 except Exception:
-                    sys.stderr.write("[click] get_phase_intent failed (submit-block fallback)" + '\n')
+                    sys.stderr.write("[click] is_action_in_scope failed (submit-block fallback)" + '\n')
                     sys.stderr.flush()
-                    contract = None
-                    should_block_index_submit = None  # type: ignore
-
-                block = False
-                if should_block_index_submit is not None:
-                    block = should_block_index_submit(
-                        contract,
-                        btn_label,
-                        in_form_overlay=in_form_overlay,
-                        dialog_title=dialog_title,
-                        is_picker_ui=is_picker_ui,
-                        container_id='',
-                        query_ui=is_picker_ui or bool((self.business_data_store or {}).get('_query_ui')),
-                        business_data_store=self.business_data_store,
+                    block = compact.startswith(('保存', '提交')) or (
+                        in_form_overlay and not is_picker_ui
                     )
-                elif compact.startswith(('保存', '提交')) or (in_form_overlay and not is_picker_ui):
-                    block = True
 
                 # Hard allow: never trap picker confirm in use-click-save ↔ not-form-save loop
                 if block and compact.startswith(('确认', '确定')) and is_picker_ui:
