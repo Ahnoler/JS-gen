@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 01:25 · Cursor Lead — 开工：done_rejected 事件嗅探湿测 r3
+
+- 进行中：2026-09-12 01:25；验收=`events.jsonl` / executor 日志出现字面 `{"event":"done_rejected"...}` 且含 `missing_evidence`（期望 `toast_ok`）
+- 范围：临时嗅探 `executor/session-handler.js`（relay tee）、`tmp/contract-sovereignty-wet/done-rejected-r3/`、报告增补、本文件；跑完后**回滚嗅探补丁**
+- 禁入区：合约主权实现回改、`classify.py`、他线 WIP
+- 方式：重启 executor 加载嗅探 → 对公客户管理手写 2 阶段；探针 `done(success=false)` 不保存 → 收盘 events.jsonl
+
 ## 2026-09-11 00:05 · Cursor Lead — 收工：done_rejected 专项补跑（回链 23:32）
 
 - 完成：r1 traj **755**（弹窗挡/零动作）；r2 traj **756** 阶段2 合约已 `create`+`submit.required=True`+`toast_ok`；触发 Premature done pending_fields + budget extend；终态 failed/27 步
