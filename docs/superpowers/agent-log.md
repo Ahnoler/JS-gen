@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-13 01:10 · ZCode 引擎线 — 收工：tansun 引擎 select:tree 对齐叶模式策略（他仓 commit 1cd1533，回链 00:40 线）
+
+- 触发：同事（经用户转达）建议引擎仓 select:tree 同步 JS-gen 叶模式三级策略（协议不动，只改内部实现）
+- 完成：tansun_ui_engine（TUE_1.0.1_LMY）**1cd1533**，单文件 `ui_execute/engine/actions/select_tree.py` +235/−4——复用本仓移植过去的 `_real_click`/`JS_REAL_CLICK_ECHO`/`_popover_has`/`_click_path`，新增 `JS_TREE_SEARCH_FILL/SEARCH_MATCHES/DFS_PATH`（逐字移植）+ `_real_click_at`（坐标 CDP 真点）+ `_tree_search_clear` + `_tree_click_leaf_search` 编排；接线 `select:tree` 与 `tree_picker_click` 支持单叶子名（路径数组模式不变）
+- 设计取舍（已提请用户与同事确认）：叶子名直达失败仅**结构性**错误（弹层没开/触发器找不到/树数据不可达）才回落合成 JS；**歧义与数据无此叶不回退**——合成注入在该 SUT 会假成功，宁明确失败不假 ok
+- 验收：ruff 全过、3 个 JS 片段 node --check 过、引擎仓本地测试 40 passed；**真机复验未做**（MCP 会话过期被踢到登录页），验收用例照抄 00:40 条目两条即可（对公流贷=直达 / KB测子类-…=DFS），预期日志 `ok:via=search-real-click` / `ok:via=data-dfs-path`
+- 同批在库：f4c1345（date 三闸门+菜单按名点击/直达路由+导航与页面就绪门闩），均已 commit 未 push
+
 ## 2026-09-13 00:40 · ZCode 引擎线 — 收工：叶模式兜底二段湿测 PASS，全链闭环（回链 00:14 开工）
 
 - 完成：兜底实施 commit **c60309e4**（JS_TREE_PICKER_DFS_PATH + 导出 + 叶模式无果分支 + _tree_picker_walk_path + prompt 同步）。
