@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 09:50 · Cursor Lead — 开工：planner discard 湿测 r3（加长拖延诱导 done 口气）
+
+- 进行中：2026-09-12 09:50；验收=stderr `[planner] discard`（优先 `next_steps_instruct_done`）或 `events[]` 含 `planner_advice_discarded`
+- 范围：录制 API、`tmp/.../planner-discard-r3/`、报告增补、本文件；不改运行时代码
+- 禁入区：他线 WIP、合约门闩回改
+- 方式：阶段2 填名后 ≥12 次 get_page_state 再 done(success=false)
+
 ## 2026-09-12 · Grok Bot · 开场+收工：落地 atomize prompt 修订（Opencode 对齐）
 
 - 范围：覆盖 scripts/prompts/req-draft-traj-atomize-prompt.md；样板保留 docs/superpowers/prompt-engineering/product-element-taskdraft-samples.md；**不改** propose.js（可选字段 preconditions/dataDependsOn 暂写在 taskDraft 文首亦可）
