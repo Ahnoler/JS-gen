@@ -55,7 +55,9 @@ function Set-EngineEnv {
     # 需要联调「自动拉取」时把 SCHEDULER_PULL_LOOP_ENABLED 改成 true，
     # 或改用 POST /api/scheduler/manual-pull 走调试槽位单次拉取。
     $env:SCHEDULER_ENABLED = "true"
-    $env:SCHEDULER_BASE_URL = "http://test.atp.tansun.com.cn/"
+    # 换 ATP 地址两种方式：① 改下面这行默认值；② 启动前先 $env:SCHEDULER_BASE_URL="http://新地址"。
+    # base_url 只填 origin（不含路径）：引擎会自行拼接 /api/scheduler/engine/... 
+    if (-not $env:SCHEDULER_BASE_URL) { $env:SCHEDULER_BASE_URL = "http://test.atp.tansun.com.cn/" }
     $env:SCHEDULER_EXECUTE_IP = $ExecuteIp
     $env:SCHEDULER_PULL_LOOP_ENABLED = "false"
     # SCHEDULER_API_KEY 不在此设置：沿用引擎仓 config.py 的默认值，避免密钥落到本仓
@@ -89,6 +91,7 @@ function Start-Engine {
 
     Set-EngineEnv
     Write-Host "启动 tansun_ui_engine（$EngineHost`:$EnginePort，ATP 注册开 / 自动 Pull 关）..."
+    Write-Host "  ATP 注册地址: $env:SCHEDULER_BASE_URL   上报执行机 IP: $env:SCHEDULER_EXECUTE_IP"
     $proc = Start-Process -FilePath $Python `
         -ArgumentList "-m", "ui_execute" `
         -WorkingDirectory $EngineDir `
