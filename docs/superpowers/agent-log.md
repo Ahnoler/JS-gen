@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 09:20 · Cursor Lead — 开工：planner advisory discard 接线 + 湿测
+
+- 进行中：2026-09-12 09:20；验收=`Agent._run_planner` 经 `filter_planner_advice`；丢弃时 stderr `[planner] discard`；湿测至少一条 discard 证据
+- 范围：`scripts/agent_utils.py`、`scripts/session_runner.py`、`scripts/agent/service.py`、`characterize-planner-advisory-filter.py`、湿测 tmp/报告、本文件
+- 禁入区：改 validate_done、tansun 他线、整改 browser_use 上游包
+- 方式：猴子补丁接线 → 冷 pin → 诱导冲突的 planner 湿测
+
 ## 2026-09-12 09:12 · ZCode 引擎线 — 开工：报文转换链路文档 + §9.4 人机分工湿测（续）
 
 - 进行中：09:12；湿测已 PASS 1 项（radio 表格单选，证据 tmp/tansun-wet/01-radio-table-row.json）；本任务单元=新增报文转换链路参考文档 + 继续 §9.4 清单（下一项=修改按钮点击）
