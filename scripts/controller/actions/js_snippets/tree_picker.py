@@ -208,3 +208,39 @@ JS_TREE_PICKER_SEARCH_MATCHES = '''async (args) => {
     }
     return JSON.stringify({ ok: true, count: matches.length, matches: matches });
 }'''
+
+
+# ── 兜底二段：数据侧 DFS 寻路（2026-09-13）────────────────────────────────────
+# SUT 树搜索会剥关键词特殊字符（`KB测子类-…`→`KB测子类…`，带 `-` 叶子名永远 0 结果，
+# 活体实证）。树数据全量在客户端（lazy=false，vm.data 嵌套 {label, children}）——
+# 搜索无果时在数据里做带父链 DFS，把叶子名还原成根→叶标签路径数组，交由
+# Python 侧 path 真点编排逐级点击。纯内存遍历，不产生额外 DOM 操作。
+
+JS_TREE_PICKER_DFS_PATH = '''async (args) => {
+    const [leaf] = args || [];
+    const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
+    const visible = (el) => el && (el.offsetParent !== null || el.getClientRects().length > 0);
+    const want = norm(leaf);
+    if (!want) return JSON.stringify({ ok: false, error: 'err-tree-args-empty' });
+    const pop = [...document.querySelectorAll('.el-popover, .el-popper')]
+        .filter((p) => visible(p) && p.querySelector('.search-item input') && p.querySelector('.el-tree'))[0];
+    if (!pop) return JSON.stringify({ ok: false, error: 'err-tree-popover-not-open' });
+    const treeEl = pop.querySelector('.el-tree');
+    let vm = treeEl && treeEl.__vue__;
+    while (vm && !Array.isArray(vm.data)) vm = vm.$parent;
+    if (!vm || !Array.isArray(vm.data)) {
+        return JSON.stringify({ ok: false, error: 'err-tree-data-not-found' });
+    }
+    const candidates = [];
+    const dfs = (nodes, path) => {
+        for (const n of nodes || []) {
+            if (!n) continue;
+            const label = norm(n.label || n.name || '');
+            const next = path.concat([label]);
+            if (label === want) candidates.push(next);
+            if (n.children && n.children.length) dfs(n.children, next);
+        }
+    };
+    dfs(vm.data, []);
+    return JSON.stringify({ ok: true, count: candidates.length, candidates: candidates });
+}'''

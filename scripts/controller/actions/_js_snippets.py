@@ -40,6 +40,7 @@ from .js_snippets.todo_cards import JS_LIST_TODO_CARDS, JS_WF_SUBMIT_GUARD
 from .js_snippets.tree_check import JS_TREE_CHECK_CONFIRM
 from .js_snippets.tree_picker import (
     JS_TREE_PICKER_CLICK,
+    JS_TREE_PICKER_DFS_PATH,
     JS_TREE_PICKER_SEARCH_FILL,
     JS_TREE_PICKER_SEARCH_MATCHES,
 )

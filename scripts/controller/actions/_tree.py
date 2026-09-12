@@ -12,6 +12,7 @@ import json
 from scripts.state import _record_action
 from ._helpers import _ok, _as_dict
 from ._js_snippets import (JS_TREE_CHECK_CONFIRM, JS_TREE_PICKER_CLICK,
+                           JS_TREE_PICKER_DFS_PATH,
                            JS_TREE_PICKER_SEARCH_FILL,
                            JS_TREE_PICKER_SEARCH_MATCHES,
                            JS_STRIP_STALE_WRAPPERS, JS_REAL_CLICK_ECHO,
@@ -56,6 +57,62 @@ async def _tree_picker_search_clear(page, label_text: str) -> None:
         pass
 
 
+async def _tree_picker_walk_path(page, label_text: str, path_list: list) -> str:
+    """DFS 解析出的根→叶路径逐级真实点击（KB-I5 run7 real-click 编排语义）。
+
+    前置：弹层在开。首级已渲染则不再真点触发器（toggle 会把它关掉）；
+    下一级已可见（先前展开）也跳过本级点击——同理防折叠。
+    """
+    async def popper_has(text):
+        op = _as_dict(await page.evaluate(JS_TREE_POPOVER_OPEN, [text]))
+        return isinstance(op, dict) and bool(op.get('open'))
+
+    if not await popper_has(path_list[0]):
+        rc = await _real_click_via_cdp(page, label_text=label_text)
+        if not (rc == 'skipped-open' or rc.startswith('ok-real-click')):
+            return 'err-tree-trigger-not-found:' + label_text + ' | ' + rc[:80]
+        await page.wait_for_timeout(600)
+
+    clicked = []
+    for i, level in enumerate(path_list):
+        found = False
+        for _ in range(5):
+            if await popper_has(level):
+                found = True
+                break
+            await page.wait_for_timeout(800)
+        if not found:
+            break
+        nxt = path_list[i + 1] if i + 1 < len(path_list) else ''
+        if nxt and await popper_has(nxt):
+            clicked.append(level)
+            continue
+        rl = await _real_click_via_cdp(page, text=level)
+        if not rl.startswith('ok-real-click'):
+            break
+        clicked.append(level)
+        await page.wait_for_timeout(800)
+
+    if len(clicked) != len(path_list):
+        missed = path_list[len(clicked)] if len(clicked) < len(path_list) else ''
+        return ('err-tree-node-not-found:' + label_text + ':' + missed +
+                ' | walked=' + '/'.join(clicked))
+    er = await page.evaluate(JS_REAL_CLICK_ECHO, [label_text, path_list[-1]])
+    eok, epayload = _workspace_result(er)
+    if not eok:
+        return 'err-tree-no-echo:' + label_text + ':' + path_list[-1] + ' | ' + epayload[:80]
+    try:
+        parsed = json.loads(epayload[3:]) if epayload.startswith('ok:') else {}
+    except Exception:
+        parsed = {}
+    return 'ok:' + json.dumps({
+        'ok': True,
+        'echo': parsed.get('echo', path_list[-1]),
+        'clicked': clicked,
+        'via': 'data-dfs-path',
+    }, ensure_ascii=False)
+
+
 async def _tree_picker_click_leaf_search(page, label_text: str, leaf: str) -> str:
     """叶子名直达流：开弹层 → 搜索框填叶名+真点查询 → 真点唯一可见叶子 → 回显校验。
 
@@ -93,8 +150,26 @@ async def _tree_picker_click_leaf_search(page, label_text: str, leaf: str) -> st
                 break
         await page.wait_for_timeout(500)
     if not matches:
+        # 兜底二段：搜索无果（如 SUT 搜索剥连字符致带 `-` 叶子名永不命中）→
+        # 清搜索还原全树 → 数据侧 DFS 把叶子名还原成根→叶路径 → path 真点编排
         await _tree_picker_search_clear(page, label_text)
-        return 'err-tree-node-not-found:' + label_text + ':' + leaf + ' (搜索后无该叶子)'
+        dfs = _as_dict(await page.evaluate(JS_TREE_PICKER_DFS_PATH, [leaf]))
+        if not (isinstance(dfs, dict) and dfs.get('ok')):
+            err = str(dfs.get('error', 'unknown'))[:60] if isinstance(dfs, dict) else 'unknown'
+            return ('err-tree-node-not-found:' + label_text + ':' + leaf +
+                    ' (搜索无果且树数据不可达:' + err + ')')
+        seen, uniq = set(), []
+        for c in dfs.get('candidates') or []:
+            key = json.dumps(c, ensure_ascii=False)
+            if key not in seen:
+                seen.add(key)
+                uniq.append([str(s) for s in c])
+        if not uniq:
+            return 'err-tree-node-not-found:' + label_text + ':' + leaf + ' (树数据中无该叶子)'
+        if len(uniq) > 1:
+            return ('err-tree-ambiguous-leaf:%s:%s:%d — 同名叶子 %d 条路径，'
+                    '请改用 path_texts 根→叶路径消歧' % (label_text, leaf, len(uniq), len(uniq)))
+        return await _tree_picker_walk_path(page, label_text, uniq[0])
     if len(matches) > 1:
         await _tree_picker_search_clear(page, label_text)
         return ('err-tree-ambiguous-leaf:%s:%s:%d — 同名叶子 %d 个，'
@@ -165,7 +240,11 @@ def _register_tree_actions(controller, browser_context):
         'VERIFIES the field input echoes the leaf text; (b) option_text = leaf '
         'name only — opens the trigger, fills the popover built-in search box, '
         'REALLY clicks 查询, then REALLY clicks the single visible leaf (the '
-        'filter reveals the ancestor chain + leaf at once); ≥2 same-named leaves '
+        'filter reveals the ancestor chain + leaf at once); if the search '
+        'yields nothing (the SUT search strips chars like \'-\' from keywords), '
+        'the fallback resolves the leaf into a root→leaf path from the tree\'s '
+        'client-side data and REALLY clicks each level (via=data-dfs-path); '
+        '≥2 same-named leaves '
         '→ err-tree-ambiguous-leaf (give path_texts instead). path_texts wins '
         'when both are given. Returns ok with echo on verified success. Errors: '
         'err-tree-label-not-found / err-tree-trigger-not-found / '
