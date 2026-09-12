@@ -301,7 +301,7 @@ JS_VERIFY_FORM_STRUCTURE = '''(arg) => {
         actualLabels.length = 0;
         for (let i = 0; i < deduped.length; i++) actualLabels.push(deduped[i]);
     }
-    const expectedLabels = expected.map(f => f.label || f);
+    const expectedLabels = expected.map(f => (f && typeof f === 'object') ? (f.label ?? '') : f);
     const requiredLabels = expected.filter(f => f.is_required || f.isRequired).map(f => f.label);
     const optionalLabels = expected.filter(f => !(f.is_required || f.isRequired)).map(f => f.label);
     const missing_required = requiredLabels.filter(l => !actualLabels.includes(l));
