@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 · OpenCode — 收工：src/services 模块与方法注释（回链 `108503ba`）
+
+- 完成：为 `src/services/**/*.js` 补齐或增强文件级多行 JSDoc 与具名函数级详细 JSDoc；实现代码未改。服务注释提交：`5614cd8a`。
+- 验收：全量服务文件具备文件头 JSDoc，静态扫描确认全部具名函数具有相邻 JSDoc；定向 ESLint 与 `git diff --check` 通过；全仓 `npm run lint` 为 0 error。
+- 备注：全仓 lint 仍报告 154 个既有 warning，均位于 `.venv/`、`executor/`、`scripts/maintenance/` 与 `src/dao/`，不在本次服务目录范围。
+- 遗留：无。
+
 ## 2026-09-12 · OpenCode — 开工：src/services 模块与方法注释
 
 - 进行中：为 `src/services/**/*.js` 添加或补全文件级多行说明，以及每个具名函数/方法的相对详细多行 JSDoc；只改注释，不改变运行时代码。
