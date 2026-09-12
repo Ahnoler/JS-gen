@@ -47,6 +47,21 @@ def main() -> int:
     assert planner_advice_discard_reason(
         {'compatible_with_contract': True, 'next_steps': ['调用 done() 结束']}
     ) == 'next_steps_instruct_done'
+    # task_done(...) must not trip the done()-instruction detector (r4 wet false positive).
+    assert planner_advice_discard_reason(
+        {
+            'compatible_with_contract': True,
+            'next_steps': ["task_done(label='客户状态') 清除 pending"],
+        }
+    ) is None
+    assert filter_planner_advice(
+        {
+            'compatible_with_contract': True,
+            'next_steps': ["task_done(label='客户状态') 清除 pending"],
+            'challenges': [],
+        },
+        c,
+    ) is not None
 
     bad = json.dumps(
         {

@@ -180,8 +180,9 @@ else:
     PLANNER_SYSTEM_PROMPT = _prompt_content[_planner_idx:].strip() if _planner_idx != -1 else ''
 
 
+# Phase-tool done() / 结束阶段 only — do not match task_done(...).
 _DONE_AS_INSTRUCTION_RE = re.compile(
-    r'done\s*\(|结束阶段|调用\s*done|call\s+done',
+    r'(?<![A-Za-z_])done\s*\(|结束阶段|调用\s*done|call\s+done',
     re.I,
 )
 

@@ -133,6 +133,25 @@ JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
       return null;
     }
   };
+  // 状态级关闭：合成写值不会触发 Element 的 pick/点击外部收盘，只改 DOM 样式会被
+  // popper 依 pickerVisible=true 重绘时重新显示（真机实证 WET-2026-0912-DATEPANEL：
+  // 面板残留盖住后续点击目标）；与引擎 date_action.py 修复保持同源。
+  const closePickerVm = (input) => {
+    try {
+      const w = input && input.closest && (
+        input.closest('.el-range-editor') || input.closest('.el-date-editor') || input.closest('.tsscdatepicker')
+      );
+      let vm = (w && w.__vue__) || (input && input.__vue__);
+      let guard = 0;
+      while (vm && vm.$options && !/date/i.test(String((vm.$options && vm.$options.name) || '')) && guard < 12) {
+        vm = vm.$parent;
+        guard += 1;
+      }
+      if (!vm || !/date/i.test(String((vm.$options && vm.$options.name) || ''))) return;
+      if ('pickerVisible' in vm) vm.pickerVisible = false;
+      else if (typeof vm.handleClose === 'function') vm.handleClose();
+    } catch (e) {}
+  };
   if (!xpath) return 'xpath-empty';
   if (isNaN(new Date(val).getTime())) return 'invalid-date:' + val;
   let target = tryXpath(xpath, null);
@@ -153,6 +172,7 @@ JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
   commitDateVue(target, val);
   setFn(target, val);
   target.blur();
+  closePickerVm(target);
   document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x => {
     x.style.display = 'none';
     x.classList.add('is-hidden');

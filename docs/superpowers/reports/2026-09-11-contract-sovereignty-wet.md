@@ -36,7 +36,7 @@
 | 控制面 + executor 在线 | ✅ | CP listening :4097；executor `registered … status: 'online'` |
 | 多阶段 AI 录制 + 表单操作 | ✅ | 3 phases；阶段2 `fill_form_field(客户名称)` + 多次点击查询；阶段3 列表出结果并记录客户号 |
 | 阶段边界 reviewer 立法 | ✅ | 每阶段前 `phase_reviewer ok … phase_intent=True source=llm`（login / query / query） |
-| 阶段中冲突仅 gate / advisory | ✅（接线+冷测；湿测见下） | 2026-09-12：`filter_planner_advice` 已挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard`；冷 pin OK；湿测 traj **760** 见 `[planner] run`（接线），字面 discard 仍依赖 LLM 产出 incompatible 建议 |
+| 阶段中冲突仅 gate / advisory | ✅（接线+冷测+湿 discard） | 2026-09-12：`filter_planner_advice` 已挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard`；冷 pin OK；湿测 r4 traj **762** 字面 `[planner] discard reason=next_steps_instruct_done` |
 | 过早 done → `done_rejected` / `missing_evidence` | ✅（r4） | 见专项 r4：默认 stderr + `events[]` |
 | 无 recontract 时合约不静默改写 | ✅（负向） | 全程无 `recontract` 日志；无显式 version bump 行 |
 
@@ -76,8 +76,12 @@ Phase 3 done
 | `characterize-planner-advisory-filter` | ✅（含 discard/kept/fence/接线源码钉） |
 | 湿测 traj **759** | ⚠️ 14 步；未见 discard（LLM 未产出 incompatible） |
 | 湿测 traj **760** | ✅ 接线：`[planner] run`（session `547c35ee`）；未捕获字面 discard（探针过早 failed/1 步） |
+| 湿测 traj **761**（r3 加长拖延） | ⚠️ session `29f68d19`：多次 `[planner] kept compatible_with_contract=true`（建议 get_page_state / 填表保存）；**0** discard。阶段合约 fallback 为 `mode=modify`+全量 refill，planner 建议填保存属合约内，filter 正确放行 |
+| 湿测 traj **762**（r4 中途 done(true)） | ✅ session `72a4e367`：多次 kept 后出现字面 `[planner] discard reason=next_steps_instruct_done`（stderr + executor tee）；`events[]` 未收到（start 长请求中断，不影响 stderr 钉） |
 
-证据：`tmp/contract-sovereignty-wet/planner-discard/`。字面 `compatible_with_contract=false` 丢弃路径以冷测为准；湿测确认 filter 已在 live planner 路径上执行。
+证据：`tmp/contract-sovereignty-wet/planner-discard/`、`…/planner-discard-r3/`、`…/planner-discard-r4/`。
+
+**r4 钉要点**：探针在填名+≥8 次观察后强制 `done(success=true)`（gate 拒）再拖延；planner 随后在 `next_steps` 写出含 `task_done(...)` 的补救建议，当时命中过宽的 `_DONE_AS_INSTRUCTION_RE`（`done\s*\(`）→ discard——仍证明 live filter 湿路径已通。**收口后**：正则已改为 `(?<![A-Za-z_])done\s*\(`，`task_done(...)` 不再误 discard（冷 pin 覆盖）；真 done 口气（`done(` / `调用 done` / `结束阶段`）仍 discard。
 
 ## 补跑：done_rejected 专项（traj 755 / 756 / 757）
 

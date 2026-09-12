@@ -1,18 +1,57 @@
 # Agent 协作日志
 
-## 2026-09-12 · OpenCode — 收工：src/services 模块与方法注释（回链 `108503ba`）
+## 2026-09-12 · OpenCode — 开工：src/services JSDoc 中文化
 
-- 完成：为 `src/services/**/*.js` 补齐或增强文件级多行 JSDoc 与具名函数级详细 JSDoc；实现代码未改。服务注释提交：`5614cd8a`。
-- 验收：全量服务文件具备文件头 JSDoc，静态扫描确认全部具名函数具有相邻 JSDoc；定向 ESLint 与 `git diff --check` 通过；全仓 `npm run lint` 为 0 error。
-- 备注：全仓 lint 仍报告 154 个既有 warning，均位于 `.venv/`、`executor/`、`scripts/maintenance/` 与 `src/dao/`，不在本次服务目录范围。
-- 遗留：无。
+- 进行中：将 `5614cd8a` 新增或扩展的 `src/services/**/*.js` 文件级与具名函数级 JSDoc 翻译为中文；JSDoc 标签、类型、实现代码与导出契约保持不变。
+- 范围：`src/services/**`、`docs/superpowers/agent-log.md`；已先解决本文件的拉取合并冲突，采用远端协作日志内容并补写本任务条目。
+- 禁入区：服务模块的在途实现逻辑、`src/services/` 外所有文件及当前工作区的其他改动；提交时只暂存本次注释与本文件。
+- 方式：按互不重叠目录翻译并进行静态检查，复核仅注释差异和 lint 后提交。
 
-## 2026-09-12 · OpenCode — 开工：src/services 模块与方法注释
+## 2026-09-12 11:35 · ZCode 引擎线 — 开工+收工：同事引擎 mega 菜单不收起修复（他仓 commit 8356af4）
 
-- 进行中：为 `src/services/**/*.js` 添加或补全文件级多行说明，以及每个具名函数/方法的相对详细多行 JSDoc；只改注释，不改变运行时代码。
-- 范围：`src/services/**`、`docs/superpowers/agent-log.md`；按目录分批审查并执行 `npm run lint` 验收。
-- 禁入区：`src/` 的 services 以外目录、`scripts/`、路由、DAO、配置、测试与现有他线 WIP；不重排或重构函数。
-- 方式：先提交本声明使服务目录归属可见，再分批补全注释，最终复核 diff 与 lint 后写收工条目。
+- 触发：用户报告引擎执行实际任务时子菜单无法关闭（截图：产品管理面板残留盖住页面）
+- 根因（真机实证）：本 SUT mega 菜单只认面板外 **trusted mousedown**；引擎 `菜单：` 只发合成 `el.click()`，通用链 mousedown 也是 `dispatchEvent`（isTrusted=false）、Escape 亦无效 → 面板残留。用户失败链的菜单步是 `[click] 菜单切换-1/2`（走通用链，非 `菜单：` 子路由）
+- 修复（**他仓** `D:/dev/tansun_ui_engine` compat/js-gen-operations，commit **8356af4**，3 文件）：移植 JS-gen `page_id.py:190` 选点 + `_replay.py:204` 真实鼠标 down/up → `dismiss_mega_menu()`；`menu_item()` 与「菜单切换」前缀两条成功路径挂钩；5 条 pin（含禁止简化成合成 click 的防再犯断言）
+- 验收：冷测 28 passed；**真机同调用对照** 开面板 8 项 → 合成 mousedown 仍 8 项 → 真实 move/down/up 后 **0** 项，800ms 复查仍 0；证据 `tmp/tansun-wet/22-menu-panel-dismiss.json`
+- 遗留：① 引擎进程级整合复跑待用户执行（运行中实例 PID 30472 早于修复、不热加载；且该链含凭据）；② **合并波及备案**：用户 11:02 合入上游（b67a605）带来 `.gitignore tests/` 并删 20 个测试文件（281→70 用例），`test_select_click_rowselect.py` import 断裂致全量唯一 1 failed，与本修复无关；③ 「菜单切换」父级分支未挂载问题（WET-2026-0912-MENUBRANCH）仍未修
+
+## 2026-09-12 10:55 · Cursor Lead — 收工：合约主权收口（回链 10:50）
+
+- 完成：① `todo-list` `contract-sovereignty-wet` → **P3 已闭**（754/758/762）；② `_DONE_AS_INSTRUCTION_RE` 收紧 `(?<![A-Za-z_])done\s*\(` + pin（`task_done` 不误伤）；`planner_advice_discarded` 转发已在 `session-message.js` / recording-runner（r4 events=0 系 start 中断非缺接线）；④ CP `339435`/executor `339431` 已停
+- 验收：`characterize-planner-advisory-filter: OK`；报告注记已更
+- 遗留：Premature vs gate 文档、out_of_scope 触碰丢弃、push/PR 仍待用户授权
+
+## 2026-09-12 10:50 · Cursor Lead — 开工：合约主权收口（台账 + done 正则 + 停服务）
+
+- 进行中：2026-09-12 10:50；验收=todo-list 闭线、`task_done` 不误 discard、CP/executor 已停
+- 范围：`docs/superpowers/todo-list.md`、`scripts/agent_utils.py`、`characterize-planner-advisory-filter.py`、报告注记、本文件；停 4097/LMY
+- 禁入区：他线 WIP、classify.py、合约门闩语义大改、push/PR（未授权）
+- 方式：收紧 `_DONE_AS_INSTRUCTION_RE` + pin；核对 `planner_advice_discarded` 转发；停服务
+
+## 2026-09-12 11:00 · ZCode 引擎线 — 补记：WET-2026-0912-DATEPANEL 缺陷双侧修复（回链 09:12 / 10:45）
+
+- 触发：用户复看第 20 项截图追问「daterange 不会自动关闭日期弹框吗」——属实，面板残留盖住表格
+- 根因（实证）：`closePanels()` 只改 DOM 样式，组件 `vm.pickerVisible` 仍 true，Element popper 按自身状态重绘把压制覆盖回去；样式压制对 Vue 重渲染无效。单日期路径同病根（第 05 项 `knownCosmetic` 已记录同一残留）
+- 修复：`closePickerVm()` 状态级关闭（=`pickerVisible=false`，回落 `handleClose()`），两分支 blur 后调用，样式压制留作兜底
+  - 引擎 `ui_execute/engine/actions/date_action.py` + pin test — commit **013a67d**（pytest 281 passed）
+  - JS-gen 源头 `scripts/controller/actions/js_snippets/fill_date.py` — commit **b9694d1b**（**禁入区第二次解禁说明**：用户追问即授权修此缺陷；同目录同病根，已单独 commit 可审计）
+- 真机复验：修复后集成 JS 返回 `ok-date-range`，t0/500ms/2000ms 面板均关闭不被重新拉起，三层值一致；证据 `tmp/tansun-wet/20b-daterange-panel-closed-fix.png`
+- 边界：JS-gen 单日期路径的独立真机复验待做（当页无单日期控件；逻辑与引擎修复同源，关闭机制已同 SUT 真机证明）——下次落到带单日期页面顺手复验
+- 报告已同步：`docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md` §三·补
+
+## 2026-09-12 10:45 · ZCode 引擎线 — 收工：§9.4 人机分工湿测 20/20 全 PASS（回链 09:12）
+
+- 完成：**20 项全 PASS**（六 type 全覆盖+click 八子路径全命中：radio表格/input×2/date单日期/select:click字典/select:tree/页签/邻钮/弹窗查询/行选/确认回填/关闭弹窗/tssc两形态/表格行按钮/表单radio/展开树/菜单：/daterange）；收官报告 `docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md`；证据 JSON+截图 `tmp/tansun-wet/`（gitignore 本地，Temp 同步副本）
+- 湿测产出修复（均用户授权/指令）：① WET-2026-0912-CLOSEBTN 带空格按钮「取 消」匹配失败落「确 定」变保存——双侧修复 engine `873d534`（含 pin test，280 passed）+ JS-gen 源头 `b4b832e0`；② expand_all_el_tree 移出 META_STEP_ACTIONS 前端可见 `4adcf94e`（三消费点语义核验+verify-all 3 红经 stash 对照=存量红）
+- **禁入区解禁说明**：开工条目声明「不改 src/ 与 scripts/ 代码」，会话中经用户两条明确指令（「JS-gen 源头的缺陷，你也修复吧」「既然是推送步骤的话，请你还是在前端展示吧」）解禁，仅动 `scripts/controller/actions/js_snippets/close_dialog.py` 与 `src/models/meta-step-actions.js` 两文件，均单独 commit 可审计
+- 验收：逐项业务证据回读（含 SUT 业务校验拦截/隐私保护两处用户判读）；pytest 280 passed；eslint pre-commit 全过
+- 遗留移交：expand_all_el_tree 录制步骤 locator=null 推送侧硬校验拒（payload.py:333-334）→推送链元素抓取随引擎联调窗口排期；L2 端到端全链湿测 L1 收官后安排；两分支待用户+同事评审后推送/合并
+
+## 2026-09-12 10:25 · Cursor Lead — 收工：planner discard 湿测 r4（回链 10:15）
+
+- 完成：traj **762** session `72a4e367`；字面 `[planner] discard reason=next_steps_instruct_done`（stderr）；多次 kept 后命中；证据 `tmp/.../planner-discard-r4/`；报告已记
+- 验收：live filter 湿 discard ✅；触发串含 `task_done(`（regex `done\s*\(`）；`events[]` 因 start 请求中断为 0
+- 遗留：可选收紧 `_DONE_AS_INSTRUCTION_RE` 避免误伤 `task_done`；`planner_advice_discarded` 事件面未在本跑收到
 
 ## 2026-09-12 10:15 · Cursor Lead — 开工：planner discard 湿测 r4（中途 done(true) 拒后再拖延）
 

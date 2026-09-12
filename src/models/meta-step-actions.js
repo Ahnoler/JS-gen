@@ -22,7 +22,6 @@ export const META_STEP_ACTIONS = Object.freeze([
   'check_field_value',
   'verify_field_value',
   'wait_for_loading',
-  'expand_all_el_tree',
   'take_screenshot',
   'save_trajectory',
   'save_business_data',
