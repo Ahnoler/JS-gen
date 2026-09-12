@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 10:00 · Cursor Lead — 收工：planner discard 湿测 r3（回链 09:50）
+
+- 完成：traj **761** session `29f68d19`；≥3 次 `[planner] kept compatible_with_contract=true`；**无** `[planner] discard`；证据 `tmp/.../planner-discard-r3/`；报告已记
+- 验收：live filter 解析 JSON 并放行合约内建议（modify+toast 路径）✅；字面 discard 湿样本仍缺（LLM 未出 false/done 口气）
+- 遗留：若要坚持字面 discard 湿钉，需 out_of_scope 冲突探针或扩展 filter 对 out_of_scope 触碰的丢弃（规格已写、实现未全）
+
 ## 2026-09-12 09:50 · Cursor Lead — 开工：planner discard 湿测 r3（加长拖延诱导 done 口气）
 
 - 进行中：2026-09-12 09:50；验收=stderr `[planner] discard`（优先 `next_steps_instruct_done`）或 `events[]` 含 `planner_advice_discarded`
