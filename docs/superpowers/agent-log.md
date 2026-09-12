@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 10:25 · Cursor Lead — 收工：planner discard 湿测 r4（回链 10:15）
+
+- 完成：traj **762** session `72a4e367`；字面 `[planner] discard reason=next_steps_instruct_done`（stderr）；多次 kept 后命中；证据 `tmp/.../planner-discard-r4/`；报告已记
+- 验收：live filter 湿 discard ✅；触发串含 `task_done(`（regex `done\s*\(`）；`events[]` 因 start 请求中断为 0
+- 遗留：可选收紧 `_DONE_AS_INSTRUCTION_RE` 避免误伤 `task_done`；`planner_advice_discarded` 事件面未在本跑收到
+
 ## 2026-09-12 10:15 · Cursor Lead — 开工：planner discard 湿测 r4（中途 done(true) 拒后再拖延）
 
 - 进行中：2026-09-12 10:15；验收=stderr `[planner] discard` 或 `events[]` 含 `planner_advice_discarded`
