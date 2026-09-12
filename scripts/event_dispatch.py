@@ -42,69 +42,6 @@ def _convert_action_params(action_name, params):
     return {k: v for k, v in (params or {}).items() if k in sig}
 
 
-def _apply_override_system_message(agent, text: str) -> None:
-    """Rebuild a live Agent's system prompt from the same phase-start assembler."""
-    if agent is None or not text:
-        return
-    try:
-        settings = getattr(agent, 'settings', None)
-        if settings is not None:
-            settings.override_system_message = text
-    except Exception:
-        pass
-    try:
-        from langchain_core.messages import SystemMessage
-        sys_msg = SystemMessage(content=text)
-        mm = getattr(agent, '_message_manager', None)
-        if mm is None:
-            return
-        mm.system_prompt = sys_msg
-        hist = getattr(getattr(mm, 'state', None), 'history', None)
-        messages = getattr(hist, 'messages', None) if hist is not None else None
-        if not messages:
-            return
-        for managed in messages:
-            inner = getattr(managed, 'message', managed)
-            kind = getattr(inner, 'type', None) or inner.__class__.__name__
-            if kind in ('system', 'SystemMessage'):
-                if hasattr(managed, 'message'):
-                    managed.message = sys_msg
-                break
-    except Exception:
-        pass
-
-
-def apply_session_recontract(business_data, new_contract, *, emit_fn=None, agent=None):
-    """Explicit recontract: bump+history, emit event, clear planner buffer, rebuild system msg.
-
-    Does not run on done-reject or other automatic paths.
-    """
-    from .controller.actions._phase_intent import (
-        begin_recontract,
-        clear_planner_advisory_buffer,
-        get_active_contract,
-    )
-    from .agent_utils import build_agent_system_message
-
-    store = business_data if isinstance(business_data, dict) else {}
-    old = get_active_contract(store)
-    old_version = (old or {}).get('version')
-    clear_planner_advisory_buffer(store)
-    active = begin_recontract(store, new_contract if isinstance(new_contract, dict) else {})
-    event = {
-        'event': 'recontract',
-        'data': {
-            'old_version': old_version,
-            'new_version': (active or {}).get('version'),
-        },
-    }
-    if emit_fn:
-        emit_fn(event)
-    text = build_agent_system_message(active)
-    _apply_override_system_message(agent, text)
-    return active
-
-
 async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action_queue=None):
     event = msg.get("event")
 
@@ -366,36 +303,6 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             },
         })
         sys.stderr.write("intervene rejected (410 Gone — use manual recording)\n")
-        sys.stderr.flush()
-        return 'continue'
-
-    if event == "recontract" or (not event and msg.get("type") == "recontract"):
-        data = msg.get("data") or {}
-        new_contract = data.get("contract")
-        if not isinstance(new_contract, dict):
-            new_contract = data.get("new_contract")
-        if not isinstance(new_contract, dict) or not new_contract:
-            emit_json({
-                "event": "error",
-                "data": {"message": "recontract requires data.contract"},
-            })
-            return 'continue'
-        bd = session_state.get('business_data_store') if session_state else None
-        if not isinstance(bd, dict):
-            emit_json({
-                "event": "error",
-                "data": {"message": "recontract: no business_data_store"},
-            })
-            return 'continue'
-        agent = None
-        try:
-            from .agent.service import _last_agent
-            agent = _last_agent
-        except Exception:
-            agent = None
-        apply_session_recontract(bd, new_contract, emit_fn=emit_json, agent=agent)
-        new_ver = (bd.get('_phase_intent') or {}).get('version')
-        sys.stderr.write(f"[recontract] applied version={new_ver}\n")
         sys.stderr.flush()
         return 'continue'
 

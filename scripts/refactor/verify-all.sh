@@ -59,9 +59,6 @@ run "characterize-phase-runtime" "$PY" scripts/characterization/characterize-pha
 run "characterize-recorder-phase-reset" "$PY" scripts/characterization/characterize-recorder-phase-reset.py
 run "characterize-phase-reviewer" "$PY" scripts/characterization/characterize-phase-reviewer.py
 run "characterize-phase-reviewer-flow" "$PY" scripts/characterization/characterize-phase-reviewer-flow.py
-run "characterize-contract-sovereignty" "$PY" scripts/characterization/cold/characterize-contract-sovereignty.py
-run "characterize-planner-advisory-filter" "$PY" scripts/characterization/characterize-planner-advisory-filter.py
-run "characterize-phase-done-validate" "$PY" scripts/characterization/characterize-phase-done-validate.py
 run "characterize-save-section" "$PY" scripts/characterization/characterize-save-section.py
 run "characterize-real-click" "$PY" scripts/characterization/characterize-real-click.py
 run "characterize-tree-check-confirm" "$PY" scripts/characterization/characterize-tree-check-confirm.py

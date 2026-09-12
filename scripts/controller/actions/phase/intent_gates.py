@@ -7,8 +7,6 @@ observability emission. Lazy-imports _phase_boundary and phase.reviewer.
 from __future__ import annotations
 
 import re
-import sys
-from dataclasses import dataclass
 from typing import Any
 
 from .intent_contract import (
@@ -16,7 +14,6 @@ from .intent_contract import (
     _MAINTAIN_DIALOG_TITLE_RE,
     _PICKER_DIALOG_TITLE_RE,
     contract_force_refill,
-    get_active_contract,
     get_phase_intent,
     phase_intent_active,
 )
@@ -252,178 +249,6 @@ def has_contract_success(business_data_store: dict | None) -> bool:
         if isinstance(tok, dict) and tok.get('kind') in kinds:
             return True
     return False
-
-
-@dataclass(frozen=True)
-class DoneDecision:
-    """Machine result of the contract-sovereignty done() hard-gate stack."""
-
-    accepted: bool
-    reasons: tuple[str, ...]
-    remaining: tuple[str, ...]
-    missing_evidence: tuple[str, ...]
-
-
-def _missing_success_kinds(business_data: dict | None, contract: dict) -> tuple[str, ...]:
-    """Success kinds required by the contract that have not been recorded."""
-    kinds = list((contract.get('success') or {}).get('kinds') or [])
-    if not kinds or has_contract_success(business_data):
-        return ()
-    return tuple(str(k) for k in kinds if str(k).strip())
-
-
-def validate_done(business_data: dict, *, section: str | None = None) -> DoneDecision:
-    """Hard-gate stack for Executor done(): reject unless contract evidence is met.
-
-    Gate order: no_contract → overlay_blocks (only when store already holds an
-    overlay/error snapshot) → submit_required → pending_write → success_unmet.
-    ``index_submit_blocked`` needs click context (btn label / overlay); this
-    function does not invent one. ``remaining`` stays empty — in_scope is not
-    a checklist store today.
-    """
-    contract = get_active_contract(business_data)
-    if not contract:
-        return DoneDecision(
-            accepted=False,
-            reasons=('no_contract',),
-            remaining=(),
-            missing_evidence=(),
-        )
-
-    store = business_data if isinstance(business_data, dict) else {}
-    reasons: list[str] = []
-    success_ok = has_contract_success(store)
-
-    open_overlay = store.get('_open_overlay') or store.get('openOverlay')
-    form_errors = store.get('_form_errors') or store.get('formErrors')
-    error_notifs = store.get('_error_notifs') or store.get('errorNotifs')
-    if overlay_blocks_done(contract) and (open_overlay or form_errors or error_notifs):
-        reasons.append('overlay_blocks')
-
-    from scripts.controller.actions.phase.reviewer import coerce_bool
-    submit = contract.get('submit') if isinstance(contract.get('submit'), dict) else {}
-    if coerce_bool(submit.get('required')) and not success_ok:
-        reasons.append('submit_required')
-
-    ok_pending, _pending = check_pending_write_gate(store, section=section or '')
-    if not ok_pending:
-        reasons.append('pending_write')
-
-    missing = _missing_success_kinds(store, contract)
-    if not success_ok:
-        reasons.append('success_unmet')
-
-    return DoneDecision(
-        accepted=not reasons,
-        reasons=tuple(reasons),
-        remaining=(),
-        missing_evidence=missing if 'success_unmet' in reasons else (),
-    )
-
-
-def evaluate_phase_done(
-    business_data: dict | None,
-    *,
-    phase: int | str | None = None,
-    section: str | None = None,
-) -> tuple[bool, dict | None, str]:
-    """Route phase done through ``validate_done`` (heal-mode bypasses).
-
-    Returns ``(accepted, event_or_none, executor_observation)``. On reject the
-    event is ``done_rejected`` with gate authority, reasons, remaining, and
-    missing_evidence; the same fields are injected into the observation string
-    (via ``recovery_prescription_message``) and stored on
-    ``business_data['_done_rejected_observation']``. Also writes one
-    ``[phase_done] done_rejected authority=gate …`` line to stderr for wet/ops
-    visibility. Does not consult Planner.
-    """
-    store = business_data if isinstance(business_data, dict) else {}
-    if _heal_contract_active(store):
-        return True, None, ''
-    decision = validate_done(store, section=section)
-    if decision.accepted:
-        return True, None, ''
-    contract = get_active_contract(store)
-    version = (contract or {}).get('version')
-    data = {
-        'phase': phase,
-        'contract_version': version,
-        'authority': 'gate',
-        'reasons': list(decision.reasons),
-        'remaining': list(decision.remaining),
-        'missing_evidence': list(decision.missing_evidence),
-    }
-    event = {'event': 'done_rejected', 'data': data}
-    reason = (
-        f"done_rejected authority=gate phase={phase} "
-        f"contract_version={version} reasons={data['reasons']} "
-        f"remaining={data['remaining']} "
-        f"missing_evidence={data['missing_evidence']}."
-    )
-    # Same visibility surface as recorder Premature lines (agent-stderr / executor tee).
-    try:
-        sys.stderr.write(f'[phase_done] {reason}\n')
-        sys.stderr.flush()
-    except Exception:
-        pass
-    obs = recovery_prescription_message(contract, reason=reason)
-    if 'done_rejected' not in obs:
-        obs = f'{obs} {reason}'.strip()
-    store['_done_rejected_observation'] = obs
-    return False, event, obs
-
-
-_INDEX_CLICK_ACTIONS = frozenset({'click_element', 'click_element_by_index'})
-
-
-def _heal_contract_active(business_data: dict | None) -> bool:
-    """True when heal-mode / heal contract is already set on the store."""
-    if not business_data:
-        return False
-    if business_data.get('_heal_mode'):
-        return True
-    hc = business_data.get('_heal_contract')
-    return isinstance(hc, dict) and hc.get('mode') == 'heal'
-
-
-def is_action_in_scope(
-    business_data: dict | None,
-    action_name: str,
-    params: dict | None = None,
-) -> tuple[bool, str]:
-    """Return (allowed, reject_code). reject_code empty when allowed.
-
-    Minimal Task 3 rule: index/element clicks in save/submit context are denied
-    with ``submit_via_violation`` iff ``should_block_index_submit`` says so.
-    No NLP matcher for out_of_scope strings.
-    """
-    if _heal_contract_active(business_data):
-        return True, ''
-    contract = get_active_contract(business_data)
-    if not contract:
-        return True, ''
-    if action_name not in _INDEX_CLICK_ACTIONS:
-        return True, ''
-    raw = params if isinstance(params, dict) else {}
-    btn_label = str(
-        raw.get('btn_label') or raw.get('button_text') or raw.get('text') or ''
-    )
-    if not btn_label:
-        return True, ''
-    blocked = should_block_index_submit(
-        contract,
-        btn_label,
-        in_form_overlay=bool(raw.get('in_form_overlay')),
-        dialog_title=str(raw.get('dialog_title') or ''),
-        is_picker_ui=bool(raw.get('is_picker_ui')),
-        container_id=str(raw.get('container_id') or ''),
-        query_ui=bool(raw.get('query_ui')),
-        business_data_store=business_data,
-    )
-    if blocked:
-        return False, 'submit_via_violation'
-    return True, ''
-
 
 def done_accept_reason(
     contract: dict[str, Any] | None,

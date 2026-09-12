@@ -180,159 +180,6 @@ else:
     PLANNER_SYSTEM_PROMPT = _prompt_content[_planner_idx:].strip() if _planner_idx != -1 else ''
 
 
-# Phase-tool done() / 结束阶段 only — do not match task_done(...).
-_DONE_AS_INSTRUCTION_RE = re.compile(
-    r'(?<![A-Za-z_])done\s*\(|结束阶段|调用\s*done|call\s+done',
-    re.I,
-)
-
-
-def _planner_next_steps_instruct_done(next_steps) -> bool:
-    """True when next_steps treat done()/结束阶段 as an executable instruction."""
-    if next_steps is None:
-        return False
-    if isinstance(next_steps, str):
-        items = [next_steps]
-    elif isinstance(next_steps, (list, tuple)):
-        items = [str(x) for x in next_steps]
-    else:
-        items = [str(next_steps)]
-    return bool(_DONE_AS_INSTRUCTION_RE.search('\n'.join(items)))
-
-
-def filter_planner_advice(advice: dict, contract: dict | None) -> dict | None:
-    """Return None if advice must be discarded; else sanitized advice.
-
-    Discard when compatible_with_contract is False/missing, or next_steps
-    mention done()/结束阶段 as executable instruction.
-    """
-    if not isinstance(advice, dict):
-        return None
-    if advice.get('compatible_with_contract') is not True:
-        return None
-    if _planner_next_steps_instruct_done(advice.get('next_steps')):
-        return None
-    out = dict(advice)
-    if isinstance(out.get('next_steps'), list):
-        out['next_steps'] = list(out['next_steps'])
-    if isinstance(out.get('challenges'), list):
-        out['challenges'] = list(out['challenges'])
-    return out
-
-
-def planner_advice_discard_reason(advice: dict | None) -> str | None:
-    """Why ``filter_planner_advice`` would discard, or None if kept."""
-    if not isinstance(advice, dict):
-        return 'not_a_dict'
-    if advice.get('compatible_with_contract') is not True:
-        return 'compatible_with_contract!=true'
-    if _planner_next_steps_instruct_done(advice.get('next_steps')):
-        return 'next_steps_instruct_done'
-    return None
-
-
-def apply_planner_advice_filter(plan: str | None, contract: dict | None = None) -> str | None:
-    """Parse planner JSON, apply ``filter_planner_advice``, log discards.
-
-    Non-JSON plans pass through unchanged. Discarded advice returns ``None``
-    (so MessageManager.add_plan skips injection) and writes a stderr line
-    ``[planner] discard …``; challenges still logged when present.
-    """
-    if plan is None or plan == '':
-        return plan
-    text = plan if isinstance(plan, str) else str(plan)
-    # Strip common markdown fences so compatible_with_contract is still parsed.
-    stripped = text.strip()
-    if stripped.startswith('```'):
-        stripped = stripped.strip('`')
-        if stripped.lower().startswith('json'):
-            stripped = stripped[4:]
-        stripped = stripped.strip()
-        if stripped.endswith('```'):
-            stripped = stripped[:-3].strip()
-    try:
-        advice = json.loads(stripped)
-    except Exception:
-        try:
-            sys.stderr.write('[planner] pass-through non-json\n')
-            sys.stderr.flush()
-        except Exception:
-            pass
-        return plan
-    if not isinstance(advice, dict):
-        return plan
-    reason = planner_advice_discard_reason(advice)
-    if reason is None:
-        kept = filter_planner_advice(advice, contract)
-        if kept is None:
-            return plan
-        try:
-            sys.stderr.write(
-                f"[planner] kept compatible_with_contract=true "
-                f"contract_version={(contract or {}).get('version') if isinstance(contract, dict) else None} "
-                f"next_steps={kept.get('next_steps')!r}\n"
-            )
-            sys.stderr.flush()
-        except Exception:
-            pass
-        try:
-            return json.dumps(kept, ensure_ascii=False)
-        except Exception:
-            return plan
-    # Discard path
-    try:
-        version = (contract or {}).get('version') if isinstance(contract, dict) else None
-        sys.stderr.write(
-            f"[planner] discard reason={reason} "
-            f"compatible_with_contract={advice.get('compatible_with_contract')!r} "
-            f"contract_version={version} "
-            f"next_steps={advice.get('next_steps')!r}\n"
-        )
-        challenges = advice.get('challenges')
-        if challenges:
-            sys.stderr.write(f"[planner] discard challenges={challenges!r}\n")
-        sys.stderr.flush()
-    except Exception:
-        pass
-    try:
-        emit_json({
-            'event': 'planner_advice_discarded',
-            'data': {
-                'reason': reason,
-                'compatible_with_contract': advice.get('compatible_with_contract'),
-                'contract_version': (contract or {}).get('version') if isinstance(contract, dict) else None,
-                'next_steps': advice.get('next_steps'),
-                'challenges': advice.get('challenges'),
-            },
-        })
-    except Exception:
-        pass
-    return None
-
-
-def patch_planner_advice_filter():
-    """Monkey-patch Agent._run_planner to discard incompatible advisory JSON."""
-    from browser_use.agent.service import Agent
-
-    _original_run_planner = Agent._run_planner
-
-    async def _patched_run_planner(self):
-        sys.stderr.write('[planner] run\n')
-        sys.stderr.flush()
-        plan = await _original_run_planner(self)
-        contract = None
-        try:
-            bd = getattr(self, '_jsgen_business_data', None)
-            if isinstance(bd, dict):
-                from scripts.controller.actions.phase.intent_contract import get_active_contract
-                contract = get_active_contract(bd)
-        except Exception:
-            contract = None
-        return apply_planner_advice_filter(plan, contract)
-
-    Agent._run_planner = _patched_run_planner
-
-
 def patch_planner_prompt():
     """Monkey-patch PlannerPrompt.get_system_message() to use extend as override.
 
@@ -366,11 +213,10 @@ Your output format should be always a JSON object with the following fields:
 {{
     "state_analysis": "Brief analysis of the current state and what has been done so far",
     "progress_evaluation": "Evaluation of progress towards the ultimate goal (as percentage and description)",
-                "challenges": "List any potential challenges or roadblocks",
-                "next_steps": "List 2-3 concrete next steps to take",
-                "reasoning": "Explain your reasoning for the suggested next steps",
-                "compatible_with_contract": true
-            }}
+    "challenges": "List any potential challenges or roadblocks",
+    "next_steps": "List 2-3 concrete next steps to take",
+    "reasoning": "Explain your reasoning for the suggested next steps"
+}}
 
 Ignore the other AI messages output structures.
 
