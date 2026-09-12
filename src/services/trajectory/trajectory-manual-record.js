@@ -1,8 +1,8 @@
 /**
- * Manual trajectory recording service.
+ * 轨迹手动录制服务。
  *
- * Toggles live executor manual capture, validates optional phase ownership,
- * coordinates screenshot capture, and updates the in-memory activity marker.
+ * 切换在线执行器的手动采集，校验可选的阶段归属，
+ * 协调截图采集，并更新内存中的活动标记。
  * Manual recording toggle for a live trajectory session (manual_record_start/stop
  * + screenshot capture + optimistic ack). Extracted from
  * trajectory-record-lifecycle.js — move-only, no logic changes.

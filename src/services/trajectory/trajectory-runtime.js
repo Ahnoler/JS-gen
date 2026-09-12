@@ -1,9 +1,8 @@
 /**
- * In-memory trajectory runtime registry.
+ * 内存中的轨迹运行时注册表。
  *
- * Maintains the control-plane binding between a trajectory, its executor node,
- * and its live session. Entries are process-local and are purged when the
- * session or executor disappears; persistent trajectory data remains in DAOs.
+ * 维护轨迹、其执行器节点及在线会话之间的控制面绑定。条目仅在当前进程中有效，
+ * 会话或执行器消失时会被清除；持久化的轨迹数据仍保留在 DAO 中。
  */
 import * as execSession from '../../executor-session-client.js';
 import * as slotLease from '../../executor-slot-lease.js';

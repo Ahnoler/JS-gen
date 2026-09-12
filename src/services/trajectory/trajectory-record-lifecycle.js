@@ -1,10 +1,9 @@
 /**
- * Trajectory recording lifecycle service.
+ * 轨迹录制生命周期服务。
  *
- * Coordinates AI and manual recording state, default authentication replay,
- * live element resolution, and terminal stop/confirmation transitions. It
- * owns lifecycle validation and delegates phase execution, persistence, and
- * runtime binding to the focused trajectory services.
+ * 协调 AI 与手动录制状态、默认认证回放、在线元素解析及终止停止/确认转换。
+ * 它负责生命周期校验，并将阶段执行、持久化和运行时绑定
+ * 委托给职责聚焦的轨迹服务。
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
@@ -24,11 +23,10 @@ import { classifyRegions } from '../region-classify.js';
 import { displayGroupOf, isTaxonomyRegionToken, uniquifyDisplayGroups } from '../../cdp/display-group.js';
 
 /**
- * Resolve the owning system id from a trajectory's function hierarchy.
- * Lookup failures are fail-soft because system classification is supplemental
- * to the recording lifecycle.
- * @param {number} tid trajectory DB id
- * @returns {Promise<string>} owning system id, or an empty string when unknown
+ * 从轨迹的功能层级中解析所属系统 id。
+ * 查询失败时采用软失败，因为系统分类只是录制生命周期的补充。
+ * @param {number} tid 轨迹 DB id
+ * @returns {Promise<string>} 所属系统 id，未知时为空字符串
  */
 async function resolveSystemIdForTrajectory(tid) {
   try {
@@ -44,12 +42,12 @@ async function resolveSystemIdForTrajectory(tid) {
 }
 
 /**
- * Derive a stable region identifier from a classifier result and prior row.
- * Overlay and section roles use their cleaned title as a scoped identifier;
- * other roles use the classifier role directly.
- * @param {object} classified region classification result
- * @param {object} [existing] prior region fields used as fallback
- * @returns {string} normalized region identifier
+ * 根据分类器结果和原有行生成稳定的区域标识符。
+ * 覆盖层和分区角色使用清理后的标题作为作用域标识符；
+ * 其他角色直接使用分类器角色。
+ * @param {object} classified 区域分类结果
+ * @param {object} [existing] 用作回退的既有区域字段
+ * @returns {string} 规范化的区域标识符
  */
 function regionIdFromClassified(classified, existing = {}) {
   const role = String(classified.role || 'other');
@@ -70,11 +68,11 @@ function regionIdFromClassified(classified, existing = {}) {
 }
 
 /**
- * Merge classifier output into an element or preview region in place.
- * Existing refined labels and collision-safe ids take precedence over coarse
- * classifier values, while confidence and display-group fields are refreshed.
- * @param {object|null} target mutable region-bearing payload
- * @param {object|null} classified classifier result
+ * 就地将分类器输出合并到元素或预览区域中。
+ * 既有的细化标签和防冲突 id 优先于粗粒度分类器值，同时刷新
+ * 置信度和展示分组字段。
+ * @param {object|null} target 可变的带区域信息载荷
+ * @param {object|null} classified 分类器结果
  * @returns {void}
  */
 function patchRegionFields(target, classified) {
@@ -114,8 +112,8 @@ function patchRegionFields(target, classified) {
 }
 
 /**
- * Remove the transient feature-card payload after region classification.
- * @param {object|null} target element or preview payload
+ * 在区域分类后移除临时的 feature-card 载荷。
+ * @param {object|null} target 元素或预览载荷
  * @returns {void}
  */
 function stripFeatureCard(target) {
@@ -125,13 +123,13 @@ function stripFeatureCard(target) {
 }
 
 /**
- * Classify feature-card regions in a resolve payload and merge the results.
- * The operation is best effort: malformed or unavailable classifier data leaves
- * the original payload intact so element resolution can still proceed.
- * @param {object|null} payload resolved element or ambiguous match payload
- * @param {object} [options] classifier options
- * @param {string} [options.systemId] owning system id
- * @returns {Promise<object|null>} payload with region fields updated when possible
+ * 对解析载荷中的 feature-card 区域分类并合并结果。
+ * 此操作尽力而为：分类器数据格式错误或不可用时保留原始载荷，
+ * 以便元素解析仍可继续。
+ * @param {object|null} payload 已解析元素或歧义匹配载荷
+ * @param {object} [options] 分类器选项
+ * @param {string} [options.systemId] 所属系统 id
+ * @returns {Promise<object|null>} 可更新区域字段时更新后的载荷
  */
 async function applyL1cRegionClassify(payload, { systemId = '' } = {}) {
   if (!payload || typeof payload !== 'object') return payload;
@@ -291,12 +289,12 @@ const LOGGED_IN_PROBE_SIGS = new Set(['home', 'token', 'left-login']);
  * @returns {Promise<string|null>} 已登录签名，或 null（未登录 / 无法判定）
  */
 /**
- * Probe the attached browser for an existing authenticated page before login.
- * Unknown probe actions and all executor errors return null so callers retain
- * the normal login replay fallback.
- * @param {object} runtime trajectory runtime with executor/session identifiers
- * @param {string} url system login URL to visit before probing
- * @returns {Promise<string|null>} recognized login signature, or null
+ * 在登录前探测已附加浏览器中是否已有已认证页面。
+ * 未知探测动作及所有执行器错误均返回 null，使调用方保留
+ * 常规登录回放回退路径。
+ * @param {object} runtime 带执行器/会话标识符的轨迹运行时
+ * @param {string} url 探测前要访问的系统登录 URL
+ * @returns {Promise<string|null>} 识别出的登录签名，或 null
  */
 async function probeLoggedInBeforeLogin(runtime, url) {
   try {

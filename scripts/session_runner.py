@@ -13,7 +13,7 @@ from browser_use.browser.context import BrowserContextConfig
 
 from .agent_utils import (
     emit_json,
-    patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, create_llm,
+    patch_message_manager, patch_planner_prompt, patch_planner_advice_filter, patch_icon_tooltip_labels, create_llm,
 )
 from .controller import build_controller
 from .controller.actions.network_capture import attach_network_capture
@@ -301,6 +301,7 @@ async def _teardown_session(browser, browser_context, reader_task, cdp_task, cdp
 async def run_session(args):
     patch_message_manager()
     patch_planner_prompt()
+    patch_planner_advice_filter()
     patch_icon_tooltip_labels()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None), timeout=_env_llm_timeout_sec())
 

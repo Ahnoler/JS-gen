@@ -1,9 +1,8 @@
 /**
- * Trajectory session replay coordinator.
+ * 轨迹会话回放协调器。
  *
- * Validates selected persisted steps, prepares executor actions, and delegates
- * execution to the replay batch runner while maintaining runtime busy/abort
- * state and the product replay event contract.
+ * 校验选定的持久化步骤，准备执行器操作，并将执行委托给回放批处理运行器，
+ * 同时维护运行时忙碌/中止状态和产品回放事件契约。
  *
  * Re-execute selected DB steps in a live executor session.
  *
@@ -25,9 +24,9 @@ import {
 import { runReplayBatch } from './replay-batch-runner.js';
 
 /**
- * Convert snake_case database columns to the camelCase shape used by models.
- * @param {object|null} row database result row
- * @returns {object|null} converted row, or null for an absent row
+ * 将 snake_case 数据库列转换为模型使用的 camelCase 结构。
+ * @param {object|null} row 数据库结果行
+ * @returns {object|null} 转换后的行，不存在的行返回 null
  */
 function fromDbRowCompat(row) {
   if (!row) return null;
@@ -40,19 +39,19 @@ function fromDbRowCompat(row) {
 }
 
 /**
- * Build the common trajectory identifiers included in replay events.
- * @param {number} tid trajectory DB id
- * @returns {{trajectoryId: number, trajectoryDbId: number}} event scope
+ * 构建回放事件中包含的通用轨迹标识符。
+ * @param {number} tid 轨迹 DB id
+ * @returns {{trajectoryId: number, trajectoryDbId: number}} 事件作用域
  */
 function trajScope(tid) {
   return { trajectoryId: tid, trajectoryDbId: tid };
 }
 
 /**
- * Broadcast a replay event with both product trajectory identifiers.
- * @param {string} type event name
- * @param {number} tid trajectory DB id
- * @param {object} [extra] event-specific fields
+ * 广播带有两个产品轨迹标识符的回放事件。
+ * @param {string} type 事件名称
+ * @param {number} tid 轨迹 DB id
+ * @param {object} [extra] 事件专属字段
  * @returns {void}
  */
 function emitReplay(type, tid, extra = {}) {
@@ -60,9 +59,9 @@ function emitReplay(type, tid, extra = {}) {
 }
 
 /**
- * Normalize a possibly string step identifier for executor ordering.
- * @param {number|string|null} id candidate step id
- * @returns {number|null} finite numeric id, or null for invalid input
+ * 规范化可能为字符串的步骤标识符，以供执行器排序。
+ * @param {number|string|null} id 候选步骤 id
+ * @returns {number|null} 有限数值 id，无效输入时返回 null
  */
 function toNumericStepId(id) {
   if (id == null || id === '') return null;
@@ -198,15 +197,15 @@ export async function stopTrajectoryStepsReplay(trajectoryId) {
 }
 
 /**
- * Load, validate, enrich, and order a replay batch before execution begins.
- * Includes hidden meta checkpoints in the selected range, restores bound auth
- * placeholders, and rejects attached sessions that are already busy.
- * @param {number} trajectoryId trajectory DB id
- * @param {object} [options] replay options
- * @param {Array<number>} [options.stepIds] selected step DB ids
- * @param {boolean} [options.isReplay] suppress persistence when true; defaults to true
- * @returns {Promise<object>} prepared runtime, session, actions, rows, and ids
- * @throws {Error} with statusCode 400, 404, or 409 when preparation fails
+ * 在执行开始前加载、校验、补充并排序回放批次。
+ * 包括选定范围内隐藏的元检查点，恢复绑定的认证占位符，
+ * 并拒绝已处于忙碌状态的附加会话。
+ * @param {number} trajectoryId 轨迹 DB id
+ * @param {object} [options] 回放选项
+ * @param {Array<number>} [options.stepIds] 选定的步骤 DB id
+ * @param {boolean} [options.isReplay] 为 true 时禁止持久化；默认为 true
+ * @returns {Promise<object>} 准备好的运行时、会话、操作、行和 id
+ * @throws {Error} 准备失败时带有 statusCode 400、404 或 409
  */
 async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true } = {}) {
   const tid = Number(trajectoryId);

@@ -40,10 +40,10 @@ import { phaseEventOwnership, waitForSessionEventOwned } from './run-event-owner
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
 /**
- * Notify browser-session observers after the recording lock state changes.
- * The route dependency is loaded lazily to avoid a static service-route cycle;
- * notification failures are intentionally non-fatal to the recording runner.
- * @returns {Promise<void>} resolves after the best-effort notification attempt
+ * 录制锁状态变更后通知浏览器会话观察者。
+ * 路由依赖采用惰性加载以避免静态服务-路由循环；
+ * 通知失败被有意设为对录制运行器非致命。
+ * @returns {Promise<void>} 尽力通知尝试完成后兑现
  */
 async function broadcastRecordingLock() {
   try {
@@ -53,12 +53,12 @@ async function broadcastRecordingLock() {
 }
 
 /**
- * Synchronize the AI-recording and busy flags on the runtime and live session.
- * Keeping both flags aligned prevents concurrent lifecycle actions from treating
- * an active executor session as available.
- * @param {object} runtime mutable trajectory runtime entry
- * @param {object|null|undefined} session live executor session, when available
- * @param {boolean} locked whether AI recording is active
+ * 同步运行时和在线会话上的 AI 录制及忙碌标记。
+ * 保持两个标记一致，防止并发的生命周期操作将活动执行器会话
+ * 视为可用。
+ * @param {object} runtime 可变的轨迹运行时条目
+ * @param {object|null|undefined} session 可用时的在线执行器会话
+ * @param {boolean} locked AI 录制是否处于活动状态
  * @returns {void}
  */
 function lockAiRecording(runtime, session, locked) {
@@ -80,9 +80,9 @@ async function appendRecordedStep(...args) {
 }
 
 /**
- * Lazily forward coalesced-step deletion to the persistence module.
- * @param {...unknown} args arguments forwarded to removeRecordedStepsByDbIds
- * @returns {Promise<object>} persistence result
+ * 惰性转发合并步骤删除到持久化模块。
+ * @param {...unknown} args 转发给 removeRecordedStepsByDbIds 的参数
+ * @returns {Promise<object>} 持久化结果
  */
 async function removeRecordedStepsByDbIds(...args) {
   const mod = await import('./trajectory-persist-service.js');
@@ -90,9 +90,9 @@ async function removeRecordedStepsByDbIds(...args) {
 }
 
 /**
- * Lazily forward step screenshot handling to the live persistence route.
- * @param {...unknown} args route helper arguments
- * @returns {Promise<unknown>} delegated screenshot result
+ * 惰性转发步骤截图处理到在线持久化路由。
+ * @param {...unknown} args 路由辅助函数参数
+ * @returns {Promise<unknown>} 委托的截图结果
  */
 async function stashOrApplyStepScreenshot(...args) {
   const mod = await import('../../routes/browser-session/persist-live.js');
@@ -100,9 +100,9 @@ async function stashOrApplyStepScreenshot(...args) {
 }
 
 /**
- * Lazily flush a screenshot waiting for its persisted step id.
- * @param {...unknown} args route helper arguments
- * @returns {Promise<unknown>} delegated flush result
+ * 惰性写入正在等待其持久化步骤 id 的截图。
+ * @param {...unknown} args 路由辅助函数参数
+ * @returns {Promise<unknown>} 委托的写入结果
  */
 async function flushPendingStepScreenshot(...args) {
   const mod = await import('../../routes/browser-session/persist-live.js');
@@ -110,9 +110,9 @@ async function flushPendingStepScreenshot(...args) {
 }
 
 /**
- * Lazily forward page-level screenshot persistence to avoid an import cycle.
- * @param {...unknown} args route helper arguments
- * @returns {Promise<unknown>} delegated screenshot result
+ * 惰性转发页面级截图持久化以避免导入循环。
+ * @param {...unknown} args 路由辅助函数参数
+ * @returns {Promise<unknown>} 委托的截图结果
  */
 async function applyPageLevelScreenshot(...args) {
   const mod = await import('../../routes/browser-session/persist-live.js');
@@ -419,7 +419,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // ── agent 事件处理段落（命名分段，闭包共享 runtime/session/tid/events）──
 
   /**
-   * Push a phase observation event (phase_intent_obs / phase_boundary_obs / phase_end).
+   * Push a phase observation event (phase_intent_obs / phase_boundary_obs /
+   * done_rejected / phase_end).
    * @param {string} type event type
    * @param {object|null} payload event payload
    * @returns {void}
@@ -681,7 +682,13 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       try { phaseActivity?.(); } catch {}
     }
     const work = (async () => {
-      if (type === 'phase_intent_obs' || type === 'phase_boundary_obs' || type === 'phase_end') {
+      if (
+        type === 'phase_intent_obs'
+        || type === 'phase_boundary_obs'
+        || type === 'done_rejected'
+        || type === 'planner_advice_discarded'
+        || type === 'phase_end'
+      ) {
         if (type === 'phase_end' && payload?.quality_failed === true) {
           // 假成功防线 v3：QUALITY FAIL（pending_fields/missing_success_token 等）只进
           // phase_end 事件——在此捕获，终局门闩消费（09-07 #612/#614/19:55 教训）。

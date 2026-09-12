@@ -1,10 +1,9 @@
 /**
- * Trajectory phase service.
+ * 轨迹阶段服务。
  *
- * Manages phase descriptions and statuses, selective or full trajectory
- * clearing, phase creation, and ordered description synchronization. Phase
- * changes also maintain step bindings, export-dirty state, and trajectory
- * counts expected by the product tree API.
+ * 管理阶段描述和状态、选择性或完整的轨迹清理、阶段创建及有序描述同步。
+ * 阶段变更还会维护步骤绑定、导出脏状态，以及产品树 API
+ * 所需的轨迹计数。
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';

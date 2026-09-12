@@ -1,10 +1,9 @@
 /**
- * Public trajectory recording facade.
+ * 公共轨迹录制门面。
  *
- * Re-exports runtime, attachment, lifecycle, manual-recording, and replay
- * operations from their focused modules. New implementation code should use
- * the owning module directly; this surface preserves the service API used by
- * routes and other established callers.
+ * 从各职责聚焦模块重新导出运行时、附加、生命周期、手动录制和回放操作。
+ * 新实现代码应直接使用所属模块；该接口面保留路由及其他既有调用方
+ * 使用的服务 API。
  */
 export {
   getTrajectoryRuntime,

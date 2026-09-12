@@ -568,6 +568,11 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
         register_new_step_callback=make_step_callback((get_current_phase() or step_index) * 100),
         register_done_callback=make_done_callback(output_path, business_data_ref),
     )
+    # For planner advisory filter (compatible_with_contract / done-instruction discard).
+    try:
+        agent._jsgen_business_data = business_data_ref
+    except Exception:
+        pass
     _last_agent = agent
     sys.stderr.write(f"Agent created, starting run...\n");
     sys.stderr.flush()
@@ -592,17 +597,35 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
             if cancel_flag_path.exists():
                 break
             # 评估续跑条件
-            from ..controller.actions._phase_intent import check_pending_write_gate, has_contract_success
+            from ..controller.actions._phase_intent import check_pending_write_gate, evaluate_phase_done
             from ..controller.actions.section_scope import resolve_phase_section
             _sec = resolve_phase_section(business_data_ref)
             ok_pending, pending_labels = check_pending_write_gate(business_data_ref, section=_sec)
             introduce_count = _count_introduce_fields(business_data_ref)
             needs_agent = business_data_ref.get('_assistant_needs_agent') or []
-            # done 触发且工作完成 → 不续跑
-            if done_fired and ok_pending and introduce_count == 0 and not needs_agent:
-                break
-            # 工作完成（无论 done）→ 不续跑
-            if ok_pending and introduce_count == 0 and not needs_agent:
+            # done() 只走 validate_done；拒绝则发 done_rejected、注入观察、不召开 Planner
+            done_rejected = False
+            if done_fired:
+                _accepted, _rej_event, _rej_obs = evaluate_phase_done(
+                    business_data_ref,
+                    phase=get_current_phase() or step_index,
+                    section=_sec,
+                )
+                if _accepted:
+                    break
+                done_rejected = True
+                if _rej_event:
+                    emit_json(_rej_event)
+                if _rej_obs:
+                    try:
+                        from langchain_core.messages import HumanMessage
+                        agent._message_manager._add_message_with_tokens(
+                            HumanMessage(content=_rej_obs)
+                        )
+                    except Exception:
+                        pass
+            # 工作完成（无论 done）→ 不续跑；done 被 gate 拒绝则仍留 executing
+            if not done_rejected and ok_pending and introduce_count == 0 and not needs_agent:
                 break
             # 计算 extension
             used = agent.state.n_steps if hasattr(agent, 'state') else max_steps

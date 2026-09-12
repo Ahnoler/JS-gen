@@ -1,9 +1,8 @@
 /**
- * Trajectory query service.
+ * 轨迹查询服务。
  *
- * Reads trajectory, phase, step, business-data, and screenshot records and
- * assembles the tree/action-flow shapes consumed by product APIs. Query output
- * hides meta steps by default while retaining explicit opt-in support.
+ * 读取轨迹、阶段、步骤、业务数据和截图记录，并组装产品 API 使用的树形结构和操作流。
+ * 查询输出默认隐藏元步骤，同时保留显式选择启用的支持。
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
@@ -14,18 +13,18 @@ import { filterMetaSteps, isMetaStep } from '../../models/meta-step-actions.js';
 import { countBusinessSteps } from './action-log-copy.js';
 
 /**
- * Parse a JSON value without allowing malformed persisted data to break reads.
- * @param {string} str serialized JSON value
- * @returns {object} parsed object, or an empty object on failure
+ * 解析 JSON 值，避免格式错误的持久化数据中断读取。
+ * @param {string} str 序列化的 JSON 值
+ * @returns {object} 解析后的对象，失败时为空对象
  */
 function safeJson(str) {
   try { return JSON.parse(str); } catch { return {}; }
 }
 
 /**
- * Add query-layer metadata to a step without mutating the DAO result.
- * @param {object} step persisted step row
- * @returns {object} copied step with meta and group-shot flags
+ * 为步骤添加查询层元数据，不修改 DAO 结果。
+ * @param {object} step 已持久化的步骤行
+ * @returns {object} 带有元步骤和组截图标记的步骤副本
  */
 function annotateStep(step) {
   if (!step || typeof step !== 'object') return step;

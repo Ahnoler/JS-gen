@@ -281,21 +281,21 @@ export async function persistSessionTrajectory({
  * @returns {Promise<number>} 轨迹 ID
  */
 /**
- * Append normalized steps and phase metadata to an existing trajectory.
- * New steps are renumbered after the current maximum, unbound steps are linked
- * to matching phases, and trajectory counts/meta are refreshed before return.
- * @param {object} existing existing trajectory row
- * @param {object} options append payload and metadata
- * @param {Array<object>} options.steps steps to append
- * @param {string} [options.task] additional task text
- * @param {string} [options.model] model name override
- * @param {string} [options.url] URL candidate
- * @param {boolean} [options.isDone] completion flag
- * @param {boolean} [options.isSuccessful] success flag
- * @param {number} [options.functionId] function id override
- * @param {Record<string|number,string>} [options.phaseDescriptions] phase descriptions
- * @param {string} [options.logText] operation-log text
- * @returns {Promise<number>} existing trajectory id
+ * 向现有轨迹追加规范化步骤和阶段元数据。
+ * 新步骤会在当前最大编号之后重新编号，未绑定的步骤会关联到匹配阶段，
+ * 并会在返回前刷新轨迹计数和元数据。
+ * @param {object} existing 现有轨迹行
+ * @param {object} options 追加载荷和元数据
+ * @param {Array<object>} options.steps 要追加的步骤
+ * @param {string} [options.task] 追加的任务文本
+ * @param {string} [options.model] 模型名称覆盖值
+ * @param {string} [options.url] 候选 URL
+ * @param {boolean} [options.isDone] 完成标记
+ * @param {boolean} [options.isSuccessful] 成功标记
+ * @param {number} [options.functionId] 功能 id 覆盖值
+ * @param {Record<string|number,string>} [options.phaseDescriptions] 阶段描述
+ * @param {string} [options.logText] 操作日志文本
+ * @returns {Promise<number>} 现有轨迹 id
  */
 async function appendToTrajectory(existing, {
   steps, task, model, url, isDone, isSuccessful, functionId, phaseDescriptions = {}, logText = '',
@@ -382,11 +382,11 @@ async function appendToTrajectory(existing, {
 }
 
 /**
- * Resolve a phase description using numeric, string, then fallback keys.
- * @param {Record<string|number,string>} phaseDescriptions description map
- * @param {number} phaseNumber phase number
- * @param {string} [fallback] description fallback
- * @returns {string} normalized description text
+ * 依次使用数值键、字符串键和回退值解析阶段描述。
+ * @param {Record<string|number,string>} phaseDescriptions 描述映射
+ * @param {number} phaseNumber 阶段编号
+ * @param {string} [fallback] 描述回退值
+ * @returns {string} 规范化的描述文本
  */
 function resolvePhaseDescription(phaseDescriptions, phaseNumber, fallback = '') {
   const desc = phaseDescriptions?.[phaseNumber]

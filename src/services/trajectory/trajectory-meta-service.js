@@ -1,10 +1,9 @@
 /**
- * Trajectory metadata and transaction-shell service.
+ * 轨迹元数据与交易外壳服务。
  *
- * Creates empty or phase-backed trajectory shells, analyzes requirement text
- * into executable phases, persists business-data projections, and applies the
- * human confirmation state machine. Parsing remains tolerant because LLM output
- * may contain malformed JSON or unescaped line breaks.
+ * 创建空轨迹或带阶段的轨迹外壳，将需求文本分析为可执行阶段，
+ * 持久化业务数据投影，并应用人工确认状态机。解析保持容错，原因是 LLM 输出
+ * 可能包含格式错误的 JSON 或未转义的换行符。
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
@@ -36,11 +35,11 @@ export {
  * @returns {string[]} 阶段文本列表
  */
 /**
- * Recover top-level phase string elements from a malformed JSON array body.
- * Tracks quoted strings and nested arrays so commas inside content do not split
- * an element prematurely, then applies minimal string repair to each element.
- * @param {string} arrText text between the phase array brackets
- * @returns {string[]} recovered non-empty phase descriptions
+ * 从格式错误的 JSON 数组内容中恢复顶层阶段字符串元素。
+ * 跟踪带引号的字符串和嵌套数组，避免内容中的逗号过早分割元素，
+ * 然后对每个元素进行最小化字符串修复。
+ * @param {string} arrText 阶段数组方括号之间的文本
+ * @returns {string[]} 恢复出的非空阶段描述
  */
 function extractPhaseElementsLoose(arrText) {
   const elements = [];
@@ -84,9 +83,9 @@ function extractPhaseElementsLoose(arrText) {
 }
 
 /**
- * Parse an LLM analysis response using strict JSON and tolerant fallbacks.
- * @param {string} raw raw model response
- * @returns {{phases: string[]}} extracted phase descriptions, possibly empty
+ * 使用严格 JSON 解析和容错回退解析 LLM 分析响应。
+ * @param {string} raw 原始模型响应
+ * @returns {{phases: string[]}} 提取出的阶段描述，可能为空
  */
 function parseAnalyzePayload(raw) {
   const text = String(raw || '').trim();
@@ -284,8 +283,8 @@ export async function createEmptyTrajectory({
  * @param {string|null} [opts.reqChunkId] `<file-stem>#<h1-slug>` chapter anchor (provenance)
  * @param {string|null} [opts.reqAtomKey] Stable propose atom key (provenance)
  * @param {number} [opts.reqAtomSeq] Force re-commit sequence within (module, atom)
- * @param {string|null} [opts.kbFlowRef] KB flow-card reference
- * @param {string|null} [opts.kbFlowNodeId] KB flow-card node identifier
+ * @param {string|null} [opts.kbFlowRef] KB 流程卡引用
+ * @param {string|null} [opts.kbFlowNodeId] KB 流程卡节点标识符
  * @param {import('knex').Knex|null} [opts.trx] 可选事务
  * @returns {Promise<object>} 创建的轨迹实体（含阶段）
  */

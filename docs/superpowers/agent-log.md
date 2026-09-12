@@ -14,6 +14,134 @@
 - 禁入区：`src/` 的 services 以外目录、`scripts/`、路由、DAO、配置、测试与现有他线 WIP；不重排或重构函数。
 - 方式：先提交本声明使服务目录归属可见，再分批补全注释，最终复核 diff 与 lint 后写收工条目。
 
+## 2026-09-12 10:15 · Cursor Lead — 开工：planner discard 湿测 r4（中途 done(true) 拒后再拖延）
+
+- 进行中：2026-09-12 10:15；验收=stderr `[planner] discard` 或 `events[]` 含 `planner_advice_discarded`
+- 范围：录制 API、`tmp/.../planner-discard-r4/`、报告增补、本文件；不改运行时代码
+- 禁入区：他线 WIP、合约门闩回改、classify.py
+- 方式：填名后 ≥8 次观察 → 强制一次 done(success=true) 吃 gate 拒 → 再 ≥6 次观察 → done(false)；诱导 next_steps done 口气
+
+## 2026-09-12 10:00 · Cursor Lead — 收工：planner discard 湿测 r3（回链 09:50）
+
+- 完成：traj **761** session `29f68d19`；≥3 次 `[planner] kept compatible_with_contract=true`；**无** `[planner] discard`；证据 `tmp/.../planner-discard-r3/`；报告已记
+- 验收：live filter 解析 JSON 并放行合约内建议（modify+toast 路径）✅；字面 discard 湿样本仍缺（LLM 未出 false/done 口气）
+- 遗留：若要坚持字面 discard 湿钉，需 out_of_scope 冲突探针或扩展 filter 对 out_of_scope 触碰的丢弃（规格已写、实现未全）
+
+## 2026-09-12 09:50 · Cursor Lead — 开工：planner discard 湿测 r3（加长拖延诱导 done 口气）
+
+- 进行中：2026-09-12 09:50；验收=stderr `[planner] discard`（优先 `next_steps_instruct_done`）或 `events[]` 含 `planner_advice_discarded`
+- 范围：录制 API、`tmp/.../planner-discard-r3/`、报告增补、本文件；不改运行时代码
+- 禁入区：他线 WIP、合约门闩回改
+- 方式：阶段2 填名后 ≥12 次 get_page_state 再 done(success=false)
+
+## 2026-09-12 · Grok Bot · 开场+收工：落地 atomize prompt 修订（Opencode 对齐）
+
+- 范围：覆盖 scripts/prompts/req-draft-traj-atomize-prompt.md；样板保留 docs/superpowers/prompt-engineering/product-element-taskdraft-samples.md；**不改** propose.js（可选字段 preconditions/dataDependsOn 暂写在 taskDraft 文首亦可）
+- 增量：一功能一交易；禁止菜单导航步；taskDraft 可执行性规范；可选 layoutHints/preconditions/dataDependsOn；保留 JSON-only / 出处占位 / flowCards
+- 方式：用户审过 REVISION 后覆盖线上；他线 WIP 未携带
+- 验证：Cursor 侧测试接管；本刀仅 prompt 文本
+
+
+## 2026-09-12 09:45 · Cursor Lead — 收工：planner advisory discard 接线 + 湿测（回链 09:20）
+
+- 完成：`patch_planner_advice_filter` 挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard` + 事件 `planner_advice_discarded`；pin 扩 fence/kept/接线钉；湿测 traj 759/760；报告增补；提交 `49f18c0f`
+- 验收：冷 pin OK；湿测 **接线** `[planner] run`（760 / `547c35ee`）；字面 discard 湿样本未拿到（LLM 未出 incompatible）— filter 行为以冷测为准
+- 遗留：可选更长探针再诱导 `compatible_with_contract=false`；服务仍运行
+
+## 2026-09-12 09:20 · Cursor Lead — 开工：planner advisory discard 接线 + 湿测
+
+- 进行中：2026-09-12 09:20；验收=`Agent._run_planner` 经 `filter_planner_advice`；丢弃时 stderr `[planner] discard`；湿测至少一条 discard 证据
+- 范围：`scripts/agent_utils.py`、`scripts/session_runner.py`、`scripts/agent/service.py`、`characterize-planner-advisory-filter.py`、湿测 tmp/报告、本文件
+- 禁入区：改 validate_done、tansun 他线、整改 browser_use 上游包
+- 方式：猴子补丁接线 → 冷 pin → 诱导冲突的 planner 湿测
+
+## 2026-09-12 09:12 · ZCode 引擎线 — 开工：报文转换链路文档 + §9.4 人机分工湿测（续）
+
+- 进行中：09:12；湿测已 PASS 1 项（radio 表格单选，证据 tmp/tansun-wet/01-radio-table-row.json）；本任务单元=新增报文转换链路参考文档 + 继续 §9.4 清单（下一项=修改按钮点击）
+- 范围：docs/superpowers/reports/2026-09-12-payload-conversion-chain.md（新建）、docs/superpowers/agent-log.md、tmp/tansun-wet/（gitignore 本地证据）
+- 禁入区：Cursor done_rejected 湿复验线（其录制/服务启停轨迹、classify.py、合约门闩语义）、一切 src/ 与 scripts/ 代码改动、tansun_ui_engine 仓（湿测只读抽 JS 不改）、他线 WIP
+- 方式：主会话亲自写文档（file:line 带证，事实均已本会话复核）；湿测=Playwright MCP 有头浏览器 snapshot→派发同事 handler JS 原样（或等价协议级 click）→业务判据验证，用户导航，副作用操作先授权
+
+## 2026-09-12 09:10 · Cursor Lead — 收工：done_rejected 默认可观测湿复验（回链 09:05）
+
+- 完成：重启 CP+LMY executor；traj **758** session `35bee0ee-…`；stderr `[phase_done] done_rejected authority=gate … missing_evidence=['toast_ok','url_change']`；`record/start` events[] 含 `type=done_rejected`；报告 r4 节；证据 `tmp/.../done-rejected-r4/`
+- 验收：harness `PASS=true`（stderr_obs + events_obs）；无 sniff
+- 遗留：planner advisory discard 湿测样本仍缺（非本复验范围）；服务保持运行
+
+## 2026-09-12 09:05 · Cursor Lead — 开工：done_rejected 默认可观测湿复验
+
+- 进行中：2026-09-12 09:05；验收=重启服务后专项录制；agent-stderr / executor 出现 `[phase_done] done_rejected authority=gate`；可选 `events[]` 含 `done_rejected`（无临时 sniff）
+- 范围：启停服务、录制 API、`tmp/contract-sovereignty-wet/done-rejected-r4/`、报告增补、本文件；**不改**运行时代码
+- 禁入区：他线 WIP（tansun）、`classify.py`、合约门闩语义回改
+- 方式：重启 CP+executor → 对公客户管理探针 → 盯 stderr / 终态 events
+
+## 2026-09-12 02:40 · ZCode 引擎线 — 收工：tansun 兼容实装五批落地（回链 02:05 开工）
+
+- 完成（tansun_ui_engine 分支 compat/js-gen-operations，4 笔 commit）：**cb30ef8** 批1=data_name 前缀解析 helper+input 值 objectValue 优先+radio/select_tree/replay_adapter 三路 hint 剥前缀；**e0e87a9** 批2=click 七前缀子路径（关闭弹窗/展开树/页签/表格行按钮/树选/邻钮/菜单，click_subroutes.py 前置路由，miss 落回同事兜底链，裸路由 miss=skip，按钮文本剥前缀）；**eb564e3** 批4a=date event 六处清单（单日期移植 fill_date.py+daterange 双 input $emit('input',[s,e])，JS-gen 无 daterange 参考实现为按规格新写）；**75bd130** 批4b=select_click「弹窗选择」表格行选+tssc 远程表格分支（16×250ms 静置轮询防残留首行误点，字典路径 10s→3s 短等不变行为）
+- 验收：全量 pytest **279 passed**（基线 216+新增 63 用例，test_agent_e2e 4 errors=本机缺 %ComSpec% 存量环境问题）；diff 审查 10 改+8 新文件全在允许清单；**批 5 离线打样 ALL PASS**——14 步真实形态 V3 payloadJson 全链转换，断言全中（select:tree 别名归一→select_tree_option/date 过白名单单+区间/tree path JSON 数组保真/objectValue 与 val 双写无损/前缀 dataName 透传）；打样脚本=AppData\Local\Temp\tansun-wet\offline-payload-check.py
+- 子智能体四路并行（A 批1/B 批2/C1 批4a/C2 批4b）文件集互不相交，由本会话代声明代提交，无越界改动；有价值偏离已复核接受（close_dialog 补 ESC 兜底层、tree_picker 去 form-label 谓词、菜单 textContent 匹配隐藏项、daterange 新写）
+- 遗留移交：①§9.4 人机分工湿测待用户参与（chromium 后台安装中，用户导航+本会话验证 18 操作）；②SUT 待用户定（test.creditv5p2 或同事系统）；③分支未推送，用户/同事验收后合并；④V3 空元素步骤整单拒已实证（样例空 xpath 步骤被 primaryLocator 校验拦下）——推送侧 P3/P4 硬前提再确认
+- 注意：JS-gen 本单元只提交 agent-log 一文件；他线 WIP（Cursor done_rejected 线）未触碰未携带
+
+## 2026-09-12 02:05 · ZCode 引擎线 — 开工：tansun 兼容实装周末连续执行（回链 09-11 §8.3 计划+§9.4 湿测契约，用户发令）
+
+- 工作范围：D:\dev\tansun_ui_engine 分支 compat/js-gen-operations（自 TY_UI_ENGINE_1.0.0=5e12ff1 建）——ui_execute/engine/data_name.py(新)/actions/{input_action.py,radio.py,select_tree.py,replay_adapter.py,click.py,click_subroutes.py(新),date_action.py(新),select_click.py}/action_registry.py、ui_execute/models/{enums.py,payload.py}、docs/EXECUTION_PAYLOAD_MIGRATION.md、tests/{test_data_name.py,test_input_prefix.py,test_click_subroutes.py,test_date_action.py,test_select_click_rowselect.py}(新)；JS-gen 仓仅 agent-log；tmp/tansun-wet/（湿测产物）
+- 禁入区：tansun 仓其余全部（scheduler/executor/locator/config.py——5e12ff1 同事环境配置勿动）、tests 存量 16 件（只跑不改）；JS-gen 主仓 src/scripts（他线 WIP）
+- 执行方式：主会话批 0（分支+216 passed 基线+chromium 后台装）→ 写 data_name 前缀 helper → 4 并行子智能体（A=input/radio/select_tree 前缀接线+replay_adapter hint 归一+input 值字段；B=click 前缀剥离+七子路径 click_subroutes.py 前置路由；C1=date event 六处清单；C2=select_click 弹窗行选+tssc 表格分支）——子智能体不 commit 不写本文件，主会话全量 pytest+diff 审查后分批代提交；收尾 §9.4 人机分工湿测（用户导航）
+- 计划依据：报告 2026-09-10-tansun-engine-18-action-mapping-audit.md §7/§7.1/§8/§9 为唯一蓝图
+
+## 2026-09-12 02:05 · Cursor Lead — 收工：done_rejected 默认可观测（回链 01:58）
+
+- 完成：`evaluate_phase_done` 拒答 stderr `[phase_done] done_rejected authority=gate …`；`session-message` 转发 `done_rejected`；recording runner `events[]` 收录；api-docs recording 备注；pin `characterize-phase-done-validate` 扩 stderr + 源码钉
+- 验收：`characterize-phase-done-validate` OK；`characterize-contract-sovereignty` Task1/2/3/6 OK
+- 遗留：未改 recorder Premature 与 gate 双层语义合并；planner advisory 湿测样本仍缺
+
+## 2026-09-12 01:58 · Cursor Lead — 开工：done_rejected 默认可观测
+
+- 进行中：2026-09-12 01:58；验收=拒答时 stderr 含 `done_rejected authority=gate`；`session-message` 转发 `done_rejected`；录制 `events[]` 可含该类型；冷 pin 绿
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`src/routes/browser-session/session-message.js`、`src/services/trajectory/trajectory-recording-runner.js`、相关 characterization / api-docs 备注、本文件
+- 禁入区：改 validate_done 门闩语义、合并 recorder Premature、他线 WIP
+- 方式：TDD 扩 pin → stderr echo + WS/录制观测转发 → 跑 pin
+
+## 2026-09-12 01:35 · Cursor Lead — 收工：done_rejected 事件嗅探 r3（回链 01:25）
+
+- 完成：traj **757** session `9c17ae3f-…`；临时 relay tee 落盘 `tmp/contract-sovereignty-wet/done-rejected-r3/events.jsonl`；报告专项节已更新；嗅探补丁已 `git checkout` 回滚
+- 验收：字面事件 `done_rejected` · `authority=gate` · `reasons=[submit_required,success_unmet]` · `missing_evidence=[toast_ok,url_change]` · `contract_version=1`
+- 遗留：可选重启 executor 清掉内存中 tee；产品路径仍不写 stderr（仅 sniff 捕获）
+
+## 2026-09-12 01:25 · Cursor Lead — 开工：done_rejected 事件嗅探湿测 r3
+
+- 进行中：2026-09-12 01:25；验收=`events.jsonl` / executor 日志出现字面 `{"event":"done_rejected"...}` 且含 `missing_evidence`（期望 `toast_ok`）
+- 范围：临时嗅探 `executor/session-handler.js`（relay tee）、`tmp/contract-sovereignty-wet/done-rejected-r3/`、报告增补、本文件；跑完后**回滚嗅探补丁**
+- 禁入区：合约主权实现回改、`classify.py`、他线 WIP
+- 方式：重启 executor 加载嗅探 → 对公客户管理手写 2 阶段；探针 `done(success=false)` 不保存 → 收盘 events.jsonl
+
+## 2026-09-11 00:05 · Cursor Lead — 收工：done_rejected 专项补跑（回链 23:32）
+
+- 完成：r1 traj **755**（弹窗挡/零动作）；r2 traj **756** 阶段2 合约已 `create`+`submit.required=True`+`toast_ok`；触发 Premature done pending_fields + budget extend；终态 failed/27 步
+- 验收：**字面 `done_rejected` 未捕获**（事件只走 stdout JSON/WS，stderr 无）；报告已增补专项节
+- 遗留：若要钉字面事件，需订阅 agent stdout 事件流（或另刀 stderr echo）
+
+## 2026-09-11 23:32 · Cursor Lead — 开工：合约主权 done_rejected 专项湿测
+
+- 进行中：2026-09-11 23:32；验收=stderr 出现字面 `done_rejected authority=gate` + `missing_evidence`（或 `success_unmet`/`submit_required`）
+- 范围：录制 API、报告增补、本文件；不改运行时代码
+- 方式：对公客户管理多阶段；阶段指令诱导未保存即 done；盯 executor 日志
+
+## 2026-09-11 23:20 · Cursor Lead — 收工：合约主权 Task 8 湿测（回链 23:10 开工）
+
+- 完成：启控制面+LMY executor；traj **754** 三阶段 AI 录制（客户信息查询+表单填查）→ `recorded` 8 步；detach ok；报告 `docs/superpowers/reports/2026-09-11-contract-sovereignty-wet.md`；todo 挂起条收口
+- 验收：阶段边界 `phase_reviewer ok … phase_intent=True` ×3；阶段2 Premature done（formErrors 请选择客户类别）forcing continue；**未**见字面 `done_rejected`/planner discard
+- 遗留：若要钉 `done_rejected`/`missing_evidence` 字面观测，另跑缺 success 证据的 done；服务仍在跑（未停）
+
+## 2026-09-11 23:10 · Cursor Lead — 开工：合约主权 Task 8 湿测
+
+- 进行中：2026-09-11 23:10；验收=多阶段 AI 录制 + form save；阶段边界 reviewer version；冲突仅 advisory/gate；报告 `docs/superpowers/reports/2026-09-11-contract-sovereignty-wet.md`
+- 范围：启停控制面/执行机日志、录制 API 调用、湿测报告、todo-list 挂起条、本文件；**不改**运行时代码
+- 禁入区：`classify.py`、他线 WIP、合约主权实现代码回改
+- 方式：启动服务 → prepare/start 多阶段录制 → 查日志/obs → 写报告
+
+
 ## 2026-09-11 15:50 · Cursor Lead — 收工：remove local BiB mount (SDD)（回链 15:25 开工）
 
 - 完成：`1455185c` RED pin → `8ee479ed` 删 `ensureGlobalBrowser` → `2a9a7e3e` 本地 CDP attach 掏空 + phase-highlight 去 `getAttachedCdpClient` + pin slicer 修 → `99d91f8b` docs；plan `2026-09-11-remove-local-bib-mount`
@@ -32,6 +160,99 @@
 
 - 完成：JS-gen mount-function spec/plan 标已实现 + §6 勾选；`2026-09-09` §6.4 spec 交叉引用 overrides 改由挂载列
 - 遗留：4097 重启 + product-mgmt 湿测（多行不同挂载 overrides）
+
+## 2026-09-11 09:10 · Cursor — 收工：合约主权 Task 7（verify-all 注册）（回链 09:00 开工）
+- 完成：`verify-all.sh` 在 `characterize-phase-reviewer-flow` 旁登记 `characterize-contract-sovereignty` / `characterize-planner-advisory-filter` / `characterize-phase-done-validate`；spec 仍为 `approved`（未改 spec 正文）；todo-list 挂起表加 `contract-sovereignty-wet` 指向 plan / PR #34
+- 提交：`b5b7b3c5` `test: register contract-sovereignty characterization in verify-all`（开工 `631c8252`）
+- 验收：三 pin python3 均 OK；`bash -n scripts/refactor/verify-all.sh` OK；未跑全量 verify-all
+- 注意：未动 verify-all 他线 WIP；未做 Task 8 湿测
+- 遗留移交：Task 8 湿测清单（执行机 + 多阶段录制 + `docs/superpowers/reports/2026-09-11-contract-sovereignty-wet.md`）
+
+## 2026-09-11 09:00 · Cursor — 开工：合约主权 Task 7（verify-all 注册）
+- 进行中：2026-09-11 09:00。执行 plan Task 7 only（回链 Task 6 收工 `7b809bdc` / PR #34）
+- 范围：`scripts/refactor/verify-all.sh`（注册 sovereignty / planner-advisory / phase-done-validate pins）、本文件；可选 `docs/superpowers/todo-list.md` 短挂起条；确认 spec status=approved（不改 spec 正文）
+- 禁入区：Task 8 湿测；verify-all 他线 WIP 行；运行时代码
+- 方式：登记门禁 → python3 跑新 pin + `bash -n`；同分支 `cursor/contract-version-sovereignty-70c5`
+
+## 2026-09-11 08:50 · Cursor — 收工：合约主权 Task 6（explicit recontract）（回链 08:35 开工）
+- 完成：`begin_recontract` 落在 `intent_contract.py`（有旧约则 history+1、version+1；无旧约则 `ensure_contract_version`）；`clear_planner_advisory_buffer`；显式触发 `scripts/event_dispatch.py` `event=recontract`（亦接受无 event 时 `type=recontract`）→ emit `recontract` old/new version、清 planner buffer、`build_agent_system_message` 重建并补丁 live Agent
+- 提交：`7b809bdc` `feat(phase): explicit recontract bumps contract version and history`（开工 `35e8092a`）
+- 验收：`characterize-contract-sovereignty.py` Task1–3+Task6 OK；`characterize-phase-done-validate.py` OK；`characterize-planner-advisory-filter.py` OK；`characterize-phase-runtime.py` / `characterize-phase-reviewer.py` PASS；stdin `_dispatch_event` 烟测 emit `{"old_version":1,"new_version":2}`
+- 注意：未开自动 recontract（done/scope/service 续跑不调用 `begin_recontract`）；未改 heal 写入路径；未注册 verify-all（Task 7）
+- 遗留移交：Tasks 7–8（verify-all 注册 sovereignty + planner-advisory pins / wet）
+
+## 2026-09-11 08:35 · Cursor — 开工：合约主权 Task 6（explicit recontract）
+- 进行中：2026-09-11 08:35。执行 plan Task 6 only（回链 Task 5 收工 `5c30372b` / PR #34）
+- 范围：`scripts/controller/actions/phase/intent_contract.py`（`begin_recontract`）、`phase/intent.py` / `_phase_intent.py`（re-export）、`scripts/event_dispatch.py`（显式 `event=recontract` 触发）、`scripts/characterization/cold/characterize-contract-sovereignty.py`（Task6 pin）、本文件
+- 禁入区：Tasks 7–8（verify-all / wet）；自动 recontract（重复拒绝不触发）；browser-use 重写；heal-mode 写入路径；他线 WIP
+- 方式：TDD fail-first 冷测 version 1→2 + history +1 → helper + 一条 stdin 显式触发；同分支 `cursor/contract-version-sovereignty-70c5`
+
+## 2026-09-11 08:25 · Cursor — 收工：合约主权 Task 5（validate_done wiring + done_rejected）（回链 08:15 开工）
+- 完成：`evaluate_phase_done` 纯 helper 落在 `intent_gates.py`（heal bypass + `validate_done`）；拒绝发 `done_rejected`（authority=gate + reasons/remaining/missing_evidence）；观察串复用 `recovery_prescription_message` 并写入 `_done_rejected_observation`；`service.py` 续跑循环 done 接受只走 helper，拒绝不结束、注入 HumanMessage、不召开 Planner
+- 提交：`5c30372b` `feat(agent): route phase done through validate_done; emit done_rejected`（开工 `b0d535c7`）
+- 验收：`characterize-phase-done-validate.py` OK；`characterize-contract-sovereignty.py` Task1–3 OK；`characterize-planner-advisory-filter.py` OK；`characterize-phase-runtime.py` PASS；`characterize-phase-reviewer.py` PASS；`characterize-phase-intent.py` OK；`characterize-budget-extend.py` OK
+- 注意：未重写 browser-use；phase_end 软质量门仍用 `has_contract_success`/`missing_success_token`（runtime pin）；Recorder 既有 premature-done 守卫未改
+- 遗留移交：Tasks 6–8 未做（recontract / verify-all / wet）
+
+## 2026-09-11 08:15 · Cursor — 开工：合约主权 Task 5（validate_done wiring + done_rejected）
+- 进行中：2026-09-11 08:15。执行 plan Task 5 only（回链 Task 4 收工 `57d1dbd8` / PR #34）
+- 范围：`scripts/controller/actions/phase/intent_gates.py`（`evaluate_phase_done` 纯 helper）、`scripts/controller/actions/phase/intent.py` / `_phase_intent.py`（re-export）、`scripts/agent/service.py`（done 接受接线）、`scripts/characterization/characterize-phase-done-validate.py`（新建）、本文件
+- 禁入区：Tasks 6–8（recontract / verify-all / wet）；browser-use 重写；heal-mode 写入路径；他线 WIP
+- 方式：TDD fail-first pin → helper + service 接线；拒绝发 `done_rejected`、注入 Executor 观察、不召开 Planner；同分支 `cursor/contract-version-sovereignty-70c5`
+
+## 2026-09-11 07:55 · Cursor — 收工：合约主权 Task 4（Planner advisory + filter）（回链 07:45 开工）
+- 完成：`filter_planner_advice` 入 `agent_utils.py`；`planner-prompt.md` JSON 强制 `compatible_with_contract`，done/save 口气改为 advisory warning；pin `characterize-planner-advisory-filter.py`
+- 提交：`57d1dbd8` `feat(agent): demote planner to advisory with compatible_with_contract filter`（开工 `96439bf9`）
+- 验收：`characterize-planner-advisory-filter.py` OK；`characterize-contract-sovereignty.py` Task1–3 OK；`characterize-agent-prompt-packs.py` OK；`characterize-phase-intent.py` OK
+- 注意：browser-use 不暴露 planner JSON 消费点，本刀未改 `agent/service.py` 运行时丢弃（避免重写 browser-use）。未来接线点=`scripts/agent/service.py` `Agent(..., extend_planner_system_message=PLANNER_SYSTEM_PROMPT)` 旁，若库侧出现 planner 输出回调再 `filter_planner_advice(advice, get_active_contract(bd))`
+- 遗留移交：Tasks 5–8 未做
+
+## 2026-09-11 07:45 · Cursor — 开工：合约主权 Task 4（Planner advisory + filter）
+- 进行中：2026-09-11 07:45。执行 plan Task 4 only（回链 Task 3 收工 `5b86d6b1` / PR #34）
+- 范围：`scripts/prompts/planner-prompt.md`、`scripts/agent_utils.py`（`filter_planner_advice`）、`scripts/characterization/characterize-planner-advisory-filter.py`（新建）、本文件
+- 禁入区：Tasks 5–8（service done 接线 / recontract / verify-all / wet）；browser-use 重写；heal-mode；他线 WIP
+- 方式：TDD fail-first pin → filter + prompt 降权；同分支 `cursor/contract-version-sovereignty-70c5`
+
+## 2026-09-11 07:40 · Cursor — 收工：合约主权 Task 3（is_action_in_scope submit-via）（回链 07:30 开工）
+- 完成：`is_action_in_scope` 落在 `intent_gates.py`，拒绝码 `submit_via_violation` 与 `should_block_index_submit` 同判定；`click_action_engine.click_element_by_index` 实接线；re-export `_phase_intent.py`；冷测 pin 扩 Task3
+- 提交：`5b86d6b1` `feat(phase): is_action_in_scope gate for submit-via violations`（开工 `d06adc87`）
+- 验收：`characterize-contract-sovereignty.py` Task1+Task2+Task3 OK；`characterize-phase-intent.py` OK；`characterize-phase-reviewer.py` PASS
+- 注意：无合约 / `_heal_mode` 或 `_heal_contract.mode==heal` → 放行；未改 heal-mode 写入路径；未做 out_of_scope NLP
+- 遗留移交：Tasks 4–8 未做
+
+## 2026-09-11 07:30 · Cursor — 开工：合约主权 Task 3（is_action_in_scope submit-via）
+- 进行中：2026-09-11 07:30。执行 plan Task 3 only（回链 Task 2 收工 `f1008153` / PR #34）
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`scripts/controller/actions/phase/intent.py`、`scripts/controller/actions/_phase_intent.py`、`scripts/controller/actions/click_action_engine.py`（一处实调）、`scripts/characterization/cold/characterize-contract-sovereignty.py`、本文件
+- 禁入区：Tasks 4–8；heal-mode 行为改写（仅允许 heal 合约放行）；NLP out_of_scope；KB；browser-use 重写；他线 WIP
+- 方式：TDD fail-first → wrap `should_block_index_submit` → click 路径接线；同分支 `cursor/contract-version-sovereignty-70c5`
+
+## 2026-09-11 07:25 · Cursor — 收工：合约主权 Task 2（validate_done 硬门闩栈）（回链 07:16 开工）
+- 完成：`DoneDecision` + `validate_done` 落在 `intent_gates.py`，包裹现有 `overlay_blocks_done` / `has_contract_success` / `check_pending_write_gate` / submit.required；re-export `_phase_intent.py`；冷测 pin 扩 Task1+Task2
+- 提交：`f1008153` `feat(phase): validate_done authority stack for contract sovereignty`（开工 `8f683003`）
+- 验收：`characterize-contract-sovereignty.py` Task1+Task2 OK；`characterize-phase-intent.py` OK；`characterize-phase-reviewer.py` PASS
+- 稳定拒绝码（未完成 create）：`reasons=('submit_required','success_unmet')`，`missing_evidence=('toast_ok',)`
+- 注意：`remaining=()` — 代码库没有 in_scope 勾销清单，本刀不另造 checklist；`index_submit_blocked` 需要 click 上下文（btn/overlay），`validate_done` 不发明；`overlay_blocks` 仅当 store 已有 overlay/error 快照（live overlay 仍由 recorder 探 DOM）
+- 遗留移交：Tasks 3–8 未做
+
+## 2026-09-11 07:16 · Cursor — 开工：合约主权 Task 2（validate_done 硬门闩栈）
+- 进行中：2026-09-11 07:16。执行 plan Task 2 only（回链 Task 1 收工 / PR #34）
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`scripts/controller/actions/phase/intent.py`、`scripts/controller/actions/_phase_intent.py`、`scripts/characterization/cold/characterize-contract-sovereignty.py`、本文件
+- 禁入区：Tasks 3–8（is_action_in_scope / planner demotion / service wiring / recontract / verify-all / wet）；heal-mode；KB；browser-use 重写；他线 WIP
+- 方式：TDD 冷测 fail-first → wrap 现有 gates → pin PASS；同分支 `cursor/contract-version-sovereignty-70c5`
+
+## 2026-09-11 06:35 · Cursor — 收工：合约主权 Task 1（version + get_active_contract）（回链 06:20 开工）
+- 完成：冷测 pin `scripts/characterization/cold/characterize-contract-sovereignty.py`；`get_active_contract` / `ensure_contract_version` / `append_contract_history` 落在 `intent_contract.py`；`apply_phase_contract` 与 reviewer `normalize_reviewer_payload` 盖 `version>=1`；存储键仍为 `_phase_intent`；re-export `_phase_intent.py` + `phase/intent.py`
+- 提交：`bfe0336d` `feat(phase): contract version + get_active_contract for sovereignty`（回链开工 `66bac2f0`）
+- 验收：`python3 scripts/characterization/cold/characterize-contract-sovereignty.py` → Task1 OK；`python3 scripts/characterization/cold/characterize-phase-intent.py` → OK；`characterize-phase-reviewer.py` / `characterize-phase-save-cue-promote.py` PASS
+- 遗留移交：Tasks 2–8 未做（validate_done / scope / planner demotion / service wiring / recontract / verify-all / wet）
+- 注意：未改 heal-mode、未碰他线 WIP、未重建 CHANGELOG.md
+
+## 2026-09-11 06:20 · Cursor — 开工：合约主权 Task 1（version + get_active_contract）
+- 进行中：2026-09-11 06:20。执行 `docs/superpowers/plans/2026-09-11-contract-sovereignty-orchestration.md` **仅 Task 1**
+- 范围：`scripts/characterization/cold/characterize-contract-sovereignty.py`（新建）、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/_phase_intent.py`、`scripts/controller/actions/phase/intent.py`（re-export）、必要时 `scripts/controller/actions/phase/reviewer.py`（normalize 盖 version）、本文件
+- 禁入区：Tasks 2–8（validate_done / is_action_in_scope / planner demotion / service wiring / recontract / verify-all / wet）；heal-mode；他线 WIP（classify.py、verify-all form-engine-scope-audit、browser-use 重写）
+- 方式：TDD 冷测 fail-first → 最小 API → pin PASS；子智能体不派发
+
 
 ## 2026-09-11 · Grok Bot · 开场+收工：合约主权编排实现计划
 
