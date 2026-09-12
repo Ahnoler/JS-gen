@@ -47,6 +47,17 @@
   - JS-gen 源头 `scripts/controller/actions/js_snippets/close_dialog.py` 同修复，commit **b4b832e0**（用户明确授权解禁；非 raw 字符串故正则写 `\\s`）
 - 实机复验：真机「取 消」命中、无新 updateCard 写入
 
+### WET-2026-0912-DATEPANEL（用户复看截图时追问发现）
+
+- **现象**：daterange 填值后日期面板不关闭，残留的双月日历盖在日志表格上方；用户追问「你的 daterange 不会自动关闭日期选择弹框吗」
+- **根因**（实证链）：① 截图 `20-daterange-filled.png` 面板可见；② 实时探针 `el-picker-panel el-date-range-picker el-popper` 仍 `visuallyVisible=true`，且 `inlineDisplay` 已被抹回空、`is-hidden` 类消失；③ 组件状态探针 `vm.pickerVisible===true`。即 `closePanels()` 只改 DOM 样式，未触碰组件状态，Element 的 popper 按自身状态重绘时把 `display:none` 覆盖回去——样式压制对 Vue 重渲染无效
+- **影响**：面板残留会遮住后续步骤的点击目标（真实用户点的第一下被 Element 的 clickoutside 吃掉），是回放链的跨步风险；单日期路径同病根（第 05 项证据 `knownCosmetic` 已记录同一残留观察）
+- **修复**：加 `closePickerVm()` 状态级关闭（walk 到 ElDatePicker/TsscMultiDatePicker vm → `pickerVisible=false`，回落 `handleClose()`），单日期与 daterange 两分支的 blur 之后调用，原样式压制保留为兜底
+  - 引擎 `ui_execute/engine/actions/date_action.py` + pin test，commit **013a67d**（pytest 281 passed；4 个 error 为 test_agent_e2e.py 缺浏览器可执行文件的环境问题，改动前后一致）
+  - JS-gen 源头 `scripts/controller/actions/js_snippets/fill_date.py`（单日期路径同在），commit **b9694d1b**
+- **真机复验**（修复后集成 JS，值换 `2026-08-01 - 2026-08-31`）：返回 `ok-date-range`；t0/500ms/2000ms 三次采样 `panelVisible=false`、`pickerVisible=false`（2 秒不被重新拉起），三层值一致 `["2026-08-01","2026-08-31"]`；证据 `20b-daterange-panel-closed-fix.png`
+- **验证边界**：JS-gen 单日期路径的独立真机复验待做（本页无单日期控件；逻辑与引擎修复逐行同源，且关闭机制已在同一 SUT/同一 Element 版本上真机证明）——下次落到带单日期的页面（如对公客户修改详情页「成立日期」）顺手复验
+
 ## 四、前端可见性变更（用户指令）
 
 - `src/models/meta-step-actions.js` 移除 `expand_all_el_tree`（commit **4adcf94e**）：展开树从 meta 步骤转为普通业务步骤——前端步骤列表可见+计入 stepCount、录制时 action_persisted 实时推送、回放时作为必做业务步（保树展开保真度）

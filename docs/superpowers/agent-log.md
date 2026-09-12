@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-12 11:00 · ZCode 引擎线 — 补记：WET-2026-0912-DATEPANEL 缺陷双侧修复（回链 09:12 / 10:45）
+
+- 触发：用户复看第 20 项截图追问「daterange 不会自动关闭日期弹框吗」——属实，面板残留盖住表格
+- 根因（实证）：`closePanels()` 只改 DOM 样式，组件 `vm.pickerVisible` 仍 true，Element popper 按自身状态重绘把压制覆盖回去；样式压制对 Vue 重渲染无效。单日期路径同病根（第 05 项 `knownCosmetic` 已记录同一残留）
+- 修复：`closePickerVm()` 状态级关闭（=`pickerVisible=false`，回落 `handleClose()`），两分支 blur 后调用，样式压制留作兜底
+  - 引擎 `ui_execute/engine/actions/date_action.py` + pin test — commit **013a67d**（pytest 281 passed）
+  - JS-gen 源头 `scripts/controller/actions/js_snippets/fill_date.py` — commit **b9694d1b**（**禁入区第二次解禁说明**：用户追问即授权修此缺陷；同目录同病根，已单独 commit 可审计）
+- 真机复验：修复后集成 JS 返回 `ok-date-range`，t0/500ms/2000ms 面板均关闭不被重新拉起，三层值一致；证据 `tmp/tansun-wet/20b-daterange-panel-closed-fix.png`
+- 边界：JS-gen 单日期路径的独立真机复验待做（当页无单日期控件；逻辑与引擎修复同源，关闭机制已同 SUT 真机证明）——下次落到带单日期页面顺手复验
+- 报告已同步：`docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md` §三·补
+
 ## 2026-09-12 10:45 · ZCode 引擎线 — 收工：§9.4 人机分工湿测 20/20 全 PASS（回链 09:12）
 
 - 完成：**20 项全 PASS**（六 type 全覆盖+click 八子路径全命中：radio表格/input×2/date单日期/select:click字典/select:tree/页签/邻钮/弹窗查询/行选/确认回填/关闭弹窗/tssc两形态/表格行按钮/表单radio/展开树/菜单：/daterange）；收官报告 `docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md`；证据 JSON+截图 `tmp/tansun-wet/`（gitignore 本地，Temp 同步副本）
