@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-12 11:35 · ZCode 引擎线 — 开工+收工：同事引擎 mega 菜单不收起修复（他仓 commit 8356af4）
+
+- 触发：用户报告引擎执行实际任务时子菜单无法关闭（截图：产品管理面板残留盖住页面）
+- 根因（真机实证）：本 SUT mega 菜单只认面板外 **trusted mousedown**；引擎 `菜单：` 只发合成 `el.click()`，通用链 mousedown 也是 `dispatchEvent`（isTrusted=false）、Escape 亦无效 → 面板残留。用户失败链的菜单步是 `[click] 菜单切换-1/2`（走通用链，非 `菜单：` 子路由）
+- 修复（**他仓** `D:/dev/tansun_ui_engine` compat/js-gen-operations，commit **8356af4**，3 文件）：移植 JS-gen `page_id.py:190` 选点 + `_replay.py:204` 真实鼠标 down/up → `dismiss_mega_menu()`；`menu_item()` 与「菜单切换」前缀两条成功路径挂钩；5 条 pin（含禁止简化成合成 click 的防再犯断言）
+- 验收：冷测 28 passed；**真机同调用对照** 开面板 8 项 → 合成 mousedown 仍 8 项 → 真实 move/down/up 后 **0** 项，800ms 复查仍 0；证据 `tmp/tansun-wet/22-menu-panel-dismiss.json`
+- 遗留：① 引擎进程级整合复跑待用户执行（运行中实例 PID 30472 早于修复、不热加载；且该链含凭据）；② **合并波及备案**：用户 11:02 合入上游（b67a605）带来 `.gitignore tests/` 并删 20 个测试文件（281→70 用例），`test_select_click_rowselect.py` import 断裂致全量唯一 1 failed，与本修复无关；③ 「菜单切换」父级分支未挂载问题（WET-2026-0912-MENUBRANCH）仍未修
+
 ## 2026-09-12 10:55 · Cursor Lead — 收工：合约主权收口（回链 10:50）
 
 - 完成：① `todo-list` `contract-sovereignty-wet` → **P3 已闭**（754/758/762）；② `_DONE_AS_INSTRUCTION_RE` 收紧 `(?<![A-Za-z_])done\s*\(` + pin（`task_done` 不误伤）；`planner_advice_discarded` 转发已在 `session-message.js` / recording-runner（r4 events=0 系 start 中断非缺接线）；④ CP `339435`/executor `339431` 已停
