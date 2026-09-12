@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 22:40 · ZCode 引擎线 — 收工：tree_picker_click 叶子名直达双模式湿测闭环（回链 21:42 开工）
+
+- 完成：实施 commit **6fd303a9**（7 文件：搜索直达片段×2、签名可选化+叶子分支、_normalize_params 别名、event_dispatch 白名单、prompt 双模式、cold pin 针同步）+ 守卫补丁 **5e6d51fc**（弹层已开不重复开）。
+- 验收（19242 活页面，产品目录字段，全程未保存、零净变更）：①叶子名模式真选「对公流贷」→ `ok, echo=对公流贷, via=search-real-click`，1.5s，弹层自关；②path 模式真点 KB测一级→KB测子类 把值还原 → echo=KB测子类-20260907-1835；③对照实验实证 SUT 树搜索自身剥连字符（`KB测子类-…`→0 结果、`对公流贷`→精确 3 节点），带 `-` 等特殊字符的叶子名搜索直达不可用、path 模式不受影响；④离线=compile+import+单测+6 pin+verify-all（同 4 存量红，无新增）。
+- 遗留移交：①SUT 树搜索剥特殊字符是门户自身行为，如需支持带 `-` 叶子名可在叶模式加「搜索无果→按前缀逐级展开」兜底（未做，待裁决）；②分类目录（新增分类弹窗）字段第一次探测报 popover-not-open，未二查（用户改指产品目录）；③/tmp 湿测脚本 wet-tree-leaf-search*.py 留档。
+
 ## 2026-09-12 21:42 · ZCode 引擎线 — 开工：tree_picker_click 叶子名直达（path 可选化）+ 老参数兼容
 
 - 范围：`scripts/controller/actions/js_snippets/tree_picker.py`（新增搜索直达片段）、`_js_snippets.py`（re-export）、`_tree.py`（签名可选化+叶子分支）、`_replay.py`（_normalize_params 别名）、`scripts/event_dispatch.py`（签名白名单补登）、`scripts/prompts/`（若提及该动作则同步）
