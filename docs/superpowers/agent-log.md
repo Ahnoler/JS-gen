@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 09:10 · Cursor Lead — 收工：done_rejected 默认可观测湿复验（回链 09:05）
+
+- 完成：重启 CP+LMY executor；traj **758** session `35bee0ee-…`；stderr `[phase_done] done_rejected authority=gate … missing_evidence=['toast_ok','url_change']`；`record/start` events[] 含 `type=done_rejected`；报告 r4 节；证据 `tmp/.../done-rejected-r4/`
+- 验收：harness `PASS=true`（stderr_obs + events_obs）；无 sniff
+- 遗留：planner advisory discard 湿测样本仍缺（非本复验范围）；服务保持运行
+
 ## 2026-09-12 09:05 · Cursor Lead — 开工：done_rejected 默认可观测湿复验
 
 - 进行中：2026-09-12 09:05；验收=重启服务后专项录制；agent-stderr / executor 出现 `[phase_done] done_rejected authority=gate`；可选 `events[]` 含 `done_rejected`（无临时 sniff）

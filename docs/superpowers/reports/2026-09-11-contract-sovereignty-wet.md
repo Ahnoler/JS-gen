@@ -70,6 +70,7 @@ Phase 3 done
 | r1 | **755** | ❌ 全局「单元测试配置」弹窗挡住；阶段内零动作 done → `[recorder] done rejected: zero actions`；reviewer `submit.required=False success.kinds=[]`；`steps=0 recorded` |
 | r2 | **756** | ⚠️ 合约形态已对齐，字面事件未捕获（见下） |
 | r3 | **757** | ✅ 临时嗅探钉住字面 `done_rejected`（见下） |
+| r4 | **758** | ✅ 默认可观测湿复验：stderr + `events[]`（无 sniff） |
 
 ### r2 关键证据（session `afa3aa80-…`）
 
@@ -97,16 +98,26 @@ Phase 3 done
 
 5. **终态：** `recordStatus=failed`，`stepCount=3`，detach 200。
 
-证据目录：`tmp/contract-sovereignty-wet/done-rejected/`（r1）、`…/done-rejected-r2/`（r2）、`…/done-rejected-r3/`（r3）。
+### r4 关键证据（session `35bee0ee-…`，2026-09-12 上午）
+
+目标：验证 `7a2315b5` 默认可观测（**无**临时 sniff）。
+
+1. **探针：** 同 r3（新增 → `done(success=false)`）；服务重启后跑 `tmp/.../done-rejected-r4/run.mjs`
+2. **stderr（产品路径）：** executor + `logs/agent-stderr/35bee0ee-….log`  
+   `[phase_done] done_rejected authority=gate phase=2 contract_version=1 reasons=['submit_required', 'success_unmet'] remaining=[] missing_evidence=['toast_ok', 'url_change'].`
+3. **`record/start` events[]：** 含一条 `type=done_rejected`（authority=gate，missing_evidence 含 toast_ok）— 见 `start-done-rejected-events.json`
+4. **终态：** `recordStatus=failed`，`stepCount=2`，detach 200；harness `PASS=true`（stderr_obs + events_obs）
+
+证据目录：`tmp/contract-sovereignty-wet/done-rejected/`（r1）、`…/done-rejected-r2/`（r2）、`…/done-rejected-r3/`（r3）、`…/done-rejected-r4/`（r4）。
 
 ### 专项结论
 
 | 项 | 结果 |
 |---|---|
-| 诱导 create + `toast_ok` 合约 | ✅（r2 / r3） |
-| recorder 过早 done 门闩（pending_write / overlay） | ✅（r2 / r3） |
-| 字面 `done_rejected` / `missing_evidence` 湿测钉死 | ✅（r3，`authority=gate`，`missing_evidence` 含 `toast_ok`） |
+| 诱导 create + `toast_ok` 合约 | ✅（r2 / r3 / r4） |
+| recorder 过早 done 门闩（pending_write / overlay） | ✅（r2 / r3 / r4） |
+| 字面 `done_rejected` / `missing_evidence` 湿测钉死 | ✅（r3 sniff；**r4 默认 stderr + events[]**） |
 
 ## 服务状态
 
-湿测与补跑结束后控制面与 executor **仍保持运行**（未在本报告中停止）。r3 后嗅探补丁已回滚；executor 需重启一次以丢掉内存中的临时 tee（可选）。
+r4 复验时控制面与 executor **已重启并保持运行**。默认可观测代码已在产品路径（`7a2315b5`），无需 sniff。
