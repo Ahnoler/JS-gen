@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-12 10:45 · ZCode 引擎线 — 收工：§9.4 人机分工湿测 20/20 全 PASS（回链 09:12）
+
+- 完成：**20 项全 PASS**（六 type 全覆盖+click 八子路径全命中：radio表格/input×2/date单日期/select:click字典/select:tree/页签/邻钮/弹窗查询/行选/确认回填/关闭弹窗/tssc两形态/表格行按钮/表单radio/展开树/菜单：/daterange）；收官报告 `docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md`；证据 JSON+截图 `tmp/tansun-wet/`（gitignore 本地，Temp 同步副本）
+- 湿测产出修复（均用户授权/指令）：① WET-2026-0912-CLOSEBTN 带空格按钮「取 消」匹配失败落「确 定」变保存——双侧修复 engine `873d534`（含 pin test，280 passed）+ JS-gen 源头 `b4b832e0`；② expand_all_el_tree 移出 META_STEP_ACTIONS 前端可见 `4adcf94e`（三消费点语义核验+verify-all 3 红经 stash 对照=存量红）
+- **禁入区解禁说明**：开工条目声明「不改 src/ 与 scripts/ 代码」，会话中经用户两条明确指令（「JS-gen 源头的缺陷，你也修复吧」「既然是推送步骤的话，请你还是在前端展示吧」）解禁，仅动 `scripts/controller/actions/js_snippets/close_dialog.py` 与 `src/models/meta-step-actions.js` 两文件，均单独 commit 可审计
+- 验收：逐项业务证据回读（含 SUT 业务校验拦截/隐私保护两处用户判读）；pytest 280 passed；eslint pre-commit 全过
+- 遗留移交：expand_all_el_tree 录制步骤 locator=null 推送侧硬校验拒（payload.py:333-334）→推送链元素抓取随引擎联调窗口排期；L2 端到端全链湿测 L1 收官后安排；两分支待用户+同事评审后推送/合并
+
 ## 2026-09-12 10:25 · Cursor Lead — 收工：planner discard 湿测 r4（回链 10:15）
 
 - 完成：traj **762** session `72a4e367`；字面 `[planner] discard reason=next_steps_instruct_done`（stderr）；多次 kept 后命中；证据 `tmp/.../planner-discard-r4/`；报告已记
