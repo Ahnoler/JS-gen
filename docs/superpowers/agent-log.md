@@ -8,6 +8,12 @@
 - 验证：Cursor 侧测试接管；本刀仅 prompt 文本
 
 
+## 2026-09-12 09:45 · Cursor Lead — 收工：planner advisory discard 接线 + 湿测（回链 09:20）
+
+- 完成：`patch_planner_advice_filter` 挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard` + 事件 `planner_advice_discarded`；pin 扩 fence/kept/接线钉；湿测 traj 759/760；报告增补；提交 `49f18c0f`
+- 验收：冷 pin OK；湿测 **接线** `[planner] run`（760 / `547c35ee`）；字面 discard 湿样本未拿到（LLM 未出 incompatible）— filter 行为以冷测为准
+- 遗留：可选更长探针再诱导 `compatible_with_contract=false`；服务仍运行
+
 ## 2026-09-12 09:20 · Cursor Lead — 开工：planner advisory discard 接线 + 湿测
 
 - 进行中：2026-09-12 09:20；验收=`Agent._run_planner` 经 `filter_planner_advice`；丢弃时 stderr `[planner] discard`；湿测至少一条 discard 证据
