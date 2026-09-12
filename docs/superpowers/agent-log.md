@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 21:42 · ZCode 引擎线 — 开工：tree_picker_click 叶子名直达（path 可选化）+ 老参数兼容
+
+- 范围：`scripts/controller/actions/js_snippets/tree_picker.py`（新增搜索直达片段）、`_js_snippets.py`（re-export）、`_tree.py`（签名可选化+叶子分支）、`_replay.py`（_normalize_params 别名）、`scripts/event_dispatch.py`（签名白名单补登）、`scripts/prompts/`（若提及该动作则同步）
+- 禁入区：`config/`、`scripts/session_runner.py` 等他线 WIP；agent-log 他人条目只读不删
+- 方式：主线程实施；验证=py_compile+模块级 import+characterization pin（含更新若钉住签名）+verify-all 对照已知 4 存量红；19242 活页面 replay API 单步湿测（真选叶子「对公流贷」，用户已批准）
+
 ## 2026-09-12 17:40 · ZCode 引擎线 — 收工：回放误触发表单结构自愈修复（回链 17:24 开工）
 
 - 完成：`scripts/controller/actions/js_snippets/misc.py` JS_VERIFY_FORM_STRUCTURE 的 expectedLabels 表达式一处（`f.label || f` → `(f&&typeof f==='object')?(f.label??''):f`），commit **48c99419**。根因=空 label 布尔坑把 tssc 按钮行 form-item（label=''）误判为新增可选字段，恒产 `added_optional:['']` 误入 Phase2 结构自愈。
