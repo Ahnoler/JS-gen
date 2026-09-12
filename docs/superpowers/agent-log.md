@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 · OpenCode — 开工：本地启动 MySQL 连接超时修复
+
+- 进行中：修复 `npm start` 启动期间远程 MySQL 不可达导致的连接池超时与后台维护任务噪声。
+- 范围：`config/database.js`、`server.mjs`、`config/.env.example`、本文件；验证启动行为与相关静态检查。
+- 禁入区：`src/` 业务 DAO/service、其他会话未提交改动及引擎线文件；不修改用户已有配置中的凭据。
+- 方式：按需连接池 + 数据库连接超时 + 启动维护任务数据库可用性门控，随后运行 lint/启动冒烟并提交。
+
 ## 2026-09-12 · OpenCode — 收工：src/services JSDoc 中文化（回链 `41864d19`）
 
 - 完成：将 `5614cd8a` 新增或扩展的 `src/services/**/*.js` 文件级与具名函数级 JSDoc 翻译为中文，JSDoc 标签、类型和实现逻辑均未改；提交：`a19f1cc1`。
