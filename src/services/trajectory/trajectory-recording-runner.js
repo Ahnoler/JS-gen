@@ -651,6 +651,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         type === 'phase_intent_obs'
         || type === 'phase_boundary_obs'
         || type === 'done_rejected'
+        || type === 'planner_advice_discarded'
         || type === 'phase_end'
       ) {
         if (type === 'phase_end' && payload?.quality_failed === true) {

@@ -568,6 +568,11 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
         register_new_step_callback=make_step_callback((get_current_phase() or step_index) * 100),
         register_done_callback=make_done_callback(output_path, business_data_ref),
     )
+    # For planner advisory filter (compatible_with_contract / done-instruction discard).
+    try:
+        agent._jsgen_business_data = business_data_ref
+    except Exception:
+        pass
     _last_agent = agent
     sys.stderr.write(f"Agent created, starting run...\n");
     sys.stderr.flush()

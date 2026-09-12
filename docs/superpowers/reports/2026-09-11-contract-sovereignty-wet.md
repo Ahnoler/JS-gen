@@ -36,8 +36,8 @@
 | 控制面 + executor 在线 | ✅ | CP listening :4097；executor `registered … status: 'online'` |
 | 多阶段 AI 录制 + 表单操作 | ✅ | 3 phases；阶段2 `fill_form_field(客户名称)` + 多次点击查询；阶段3 列表出结果并记录客户号 |
 | 阶段边界 reviewer 立法 | ✅ | 每阶段前 `phase_reviewer ok … phase_intent=True source=llm`（login / query / query） |
-| 阶段中冲突仅 gate / advisory | ⚠️ 部分 | 本跑未观察到 planner `compatible_with_contract=false` 丢弃日志；见下行 early-done |
-| 过早 done → `done_rejected` / `missing_evidence` | ⚠️ 部分 | 阶段2 step 8：`[recorder] ⚠ Premature done() — visible errors … formErrors=['请选择客户类别'], forcing continue`。走 **recorder 可见校验错误门闩** 并强制继续，**未**在 stderr 见到字面 `done_rejected` / `missing_evidence`（与冷测 pin 的 `validate_done` 事件路径不同） |
+| 阶段中冲突仅 gate / advisory | ✅（接线+冷测；湿测见下） | 2026-09-12：`filter_planner_advice` 已挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard`；冷 pin OK；湿测 traj **760** 见 `[planner] run`（接线），字面 discard 仍依赖 LLM 产出 incompatible 建议 |
+| 过早 done → `done_rejected` / `missing_evidence` | ✅（r4） | 见专项 r4：默认 stderr + `events[]` |
 | 无 recontract 时合约不静默改写 | ✅（负向） | 全程无 `recontract` 日志；无显式 version bump 行 |
 
 ## 关键日志摘录（executor）
@@ -57,9 +57,27 @@ Phase 3 done
 ## 结论
 
 - **Acceptance #4 主路径（多阶段 + 阶段边界 reviewer）PASS。**  
-- **early-done 门闩有真机触发**，但主跑落到 recorder「可见表单错误 → forcing continue」，**未能**用湿测钉住字面 `done_rejected` / `missing_evidence` 观测字段。  
-- **Planner advisory discard** 本跑无触发样本。  
-- **done_rejected 专项**见下节（2026-09-11 晚补跑）。
+- **early-done / done_rejected：** 主跑曾落 recorder Premature；字面 gate 事件已由专项 r3/r4 钉死。  
+- **Planner advisory：** 冷测 + 运行时接线已落地；湿测见下节。
+
+## 补跑：planner advisory discard 接线（2026-09-12）
+
+**缺口：** Task 4 交付了 `filter_planner_advice` + prompt 字段，但未挂入 browser-use `Agent._run_planner`，故早期湿测不可能看到丢弃日志。
+
+**产品改动：**
+- `patch_planner_advice_filter()` → 包装 `_run_planner`
+- `apply_planner_advice_filter`：JSON（含 markdown fence）→ filter；stderr `[planner] run|kept|discard`；事件 `planner_advice_discarded`
+- `session_runner` 安装补丁；`service.py` 挂 `agent._jsgen_business_data`
+- recording runner / session-message 转发 `planner_advice_discarded`
+
+**验收：**
+| 项 | 结果 |
+|---|---|
+| `characterize-planner-advisory-filter` | ✅（含 discard/kept/fence/接线源码钉） |
+| 湿测 traj **759** | ⚠️ 14 步；未见 discard（LLM 未产出 incompatible） |
+| 湿测 traj **760** | ✅ 接线：`[planner] run`（session `547c35ee`）；未捕获字面 discard（探针过早 failed/1 步） |
+
+证据：`tmp/contract-sovereignty-wet/planner-discard/`。字面 `compatible_with_contract=false` 丢弃路径以冷测为准；湿测确认 filter 已在 live planner 路径上执行。
 
 ## 补跑：done_rejected 专项（traj 755 / 756 / 757）
 
