@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 · OpenCode — 收工：src/services JSDoc 中文化（回链 `41864d19`）
+
+- 完成：将 `5614cd8a` 新增或扩展的 `src/services/**/*.js` 文件级与具名函数级 JSDoc 翻译为中文，JSDoc 标签、类型和实现逻辑均未改；提交：`a19f1cc1`。
+- 合并：已先解决拉取后的 `agent-log.md` 冲突，采用远端协作日志内容并保留本线追溯；合并提交：`41864d19`。
+- 验收：服务 JSDoc 定向 ESLint 与 `git diff --check` 通过；提交钩子 ESLint 通过。
+- 遗留：`src/services/trajectory/trajectory-recording-runner.js` 保留工作区既有的事件过滤实现改动，未纳入本次注释提交。
+
 ## 2026-09-12 · OpenCode — 开工：src/services JSDoc 中文化
 
 - 进行中：将 `5614cd8a` 新增或扩展的 `src/services/**/*.js` 文件级与具名函数级 JSDoc 翻译为中文；JSDoc 标签、类型、实现代码与导出契约保持不变。
