@@ -50,16 +50,20 @@ JS_CLOSE_VISIBLE_DIALOG = '''async (args) => {
     const title = norm(target.querySelector('.el-dialog__title')?.textContent) || '(unnamed)';
 
     // 2) 找可点按钮：取消 → 确 定/确定（合 norm 空格）→ headerbtn X。
+    //    比对前剔除全部空白：按钮文案带 Element UI 样式空格（「取 消」「确 定」）时
+    //    norm 只压缩不去除，取消匹配失败会落点「确 定」=把关弹窗变成保存动作
+    //    （湿测 WET-2026-0912-CLOSEBTN 实证，引擎侧修复 commit 873d534 同源）。
     //    disabled 判定：真 disabled / disabled attr / is-disabled / aria-disabled。
     const isDisabled = (b) => b.disabled
         || b.hasAttribute('disabled')
         || b.classList.contains('is-disabled')
         || b.getAttribute('aria-disabled') === 'true';
+    const flat = (s) => norm(s).replace(/\\s+/g, '');
     const findBtn = (texts) => {
         for (const btn of target.querySelectorAll('button')) {
             if (!isVisible(btn) || isDisabled(btn)) continue;
-            const t = norm(btn.textContent);
-            if (texts.some((w) => t === norm(w) || t.indexOf(norm(w)) !== -1)) return btn;
+            const t = flat(btn.textContent);
+            if (texts.some((w) => t === flat(w) || t.indexOf(flat(w)) !== -1)) return btn;
         }
         return null;
     };
