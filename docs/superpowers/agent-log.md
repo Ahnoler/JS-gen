@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-12 · Grok Bot · 开场+收工：落地 atomize prompt 修订（Opencode 对齐）
+
+- 范围：覆盖 scripts/prompts/req-draft-traj-atomize-prompt.md；样板保留 docs/superpowers/prompt-engineering/product-element-taskdraft-samples.md；**不改** propose.js（可选字段 preconditions/dataDependsOn 暂写在 taskDraft 文首亦可）
+- 增量：一功能一交易；禁止菜单导航步；taskDraft 可执行性规范；可选 layoutHints/preconditions/dataDependsOn；保留 JSON-only / 出处占位 / flowCards
+- 方式：用户审过 REVISION 后覆盖线上；他线 WIP 未携带
+- 验证：Cursor 侧测试接管；本刀仅 prompt 文本
+
+
 ## 2026-09-12 09:20 · Cursor Lead — 开工：planner advisory discard 接线 + 湿测
 
 - 进行中：2026-09-12 09:20；验收=`Agent._run_planner` 经 `filter_planner_advice`；丢弃时 stderr `[planner] discard`；湿测至少一条 discard 证据
