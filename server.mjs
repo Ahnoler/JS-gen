@@ -27,6 +27,7 @@ import { startPendingScreenshotRetry, stopPendingScreenshotRetry } from './src/s
 import { cleanupPendingFiles } from './src/services/screenshot-pending-store.js';
 import * as screenshotDao from './src/dao/screenshot-dao.js';
 import { purgeMissingLocalScreenshots } from './src/services/screenshot-service.js';
+import { checkDBConnection } from './config/database.js';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -90,6 +91,43 @@ async function main() {
   const httpServer = createServer(app);
   const dashboardWss = initWebSocket();
   const executorWss = initExecutorWs();
+  let databaseReady = false;
+  let databaseProbeRunning = false;
+  let databaseMaintenanceStarted = false;
+  let screenshotRetryStarted = false;
+  const resumeDatabaseTasks = () => {
+    if (!databaseReady || screenshotRetryStarted) return;
+    screenshotRetryStarted = true;
+    startPendingScreenshotRetry();
+  };
+  const initializeDatabaseTasks = async () => {
+    if (databaseMaintenanceStarted || databaseProbeRunning) return;
+    databaseProbeRunning = true;
+    try {
+      databaseReady = await checkDBConnection();
+      if (!databaseReady) {
+        console.warn('[server] MySQL unavailable; database maintenance tasks are paused until it recovers');
+        return;
+      }
+      databaseMaintenanceStarted = true;
+      try {
+        const purged = await purgeMissingLocalScreenshots();
+        if (purged.deleted) {
+          console.warn(`[server] purged ${purged.deleted}/${purged.scanned} local screenshot row(s) with missing pending file`);
+        }
+        const pendingScreenshots = await screenshotDao.listPending();
+        await cleanupPendingFiles(pendingScreenshots.map((p) => p.id));
+      } catch (err) {
+        databaseMaintenanceStarted = false;
+        databaseReady = false;
+        console.warn('[server] screenshot pending cleanup skipped:', err?.message || err);
+        return;
+      }
+      resumeDatabaseTasks();
+    } finally {
+      databaseProbeRunning = false;
+    }
+  };
 
   httpServer.on('upgrade', async (req, socket, head) => {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -125,8 +163,14 @@ async function main() {
   });
 
   const sweepInterval = setInterval(() => {
+    if (!databaseReady) {
+      initializeDatabaseTasks().catch(() => {});
+      return;
+    }
     executorService.sweepStale(EXECUTOR_HEARTBEAT_TIMEOUT_MS).catch((err) => {
       console.error('[server] executor sweep failed:', err);
+      databaseReady = false;
+      databaseMaintenanceStarted = false;
     });
   }, Math.max(15000, Math.floor(EXECUTOR_HEARTBEAT_TIMEOUT_MS / 2)));
   sweepInterval.unref?.();
@@ -134,21 +178,9 @@ async function main() {
   const { startTrajectoryIdleReaper } = await import('./src/services/trajectory/trajectory-idle-reaper.js');
   startTrajectoryIdleReaper();
 
-  // Screenshot local pending upload: drop DB orphans without files, clean orphan
-  // files, then start the retry loop.
-  try {
-    const purged = await purgeMissingLocalScreenshots();
-    if (purged.deleted) {
-      console.warn(
-        `[server] purged ${purged.deleted}/${purged.scanned} local screenshot row(s) with missing pending file`,
-      );
-    }
-    const pendingScreenshots = await screenshotDao.listPending();
-    await cleanupPendingFiles(pendingScreenshots.map((p) => p.id));
-  } catch (err) {
-    console.warn('[server] screenshot pending cleanup skipped:', err?.message || err);
-  }
-  startPendingScreenshotRetry();
+  // Start database maintenance asynchronously so an unavailable remote DB
+  // cannot delay HTTP/WebSocket readiness.
+  initializeDatabaseTasks().catch(() => {});
 
   // Do NOT crash occupied remote_sessions at raw boot — executor nodes look offline
   // until they reconnect. Defer reconcile until after the reconnect window.
@@ -156,6 +188,10 @@ async function main() {
   setTimeout(() => {
     (async () => {
       try {
+        if (!databaseReady) {
+          databaseReady = await checkDBConnection();
+          if (!databaseReady) return;
+        }
         const remoteSessionDao = await import('./src/dao/remote-session-dao.js');
         const n = await remoteSessionDao.crashOccupiedOnOfflineNodes();
         if (n) console.log(`[server] crashed ${n} occupied remote_session(s) on offline nodes`);

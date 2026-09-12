@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 · OpenCode — 收工：本地启动 MySQL 连接超时修复（回链本条开工）
+
+- 完成：`config/database.js` 改为数据库连接按需创建，新增 `DB_CONNECT_TIMEOUT_MS`/`DB_ACQUIRE_TIMEOUT_MS`，健康探测使用一次性 mysql2 连接；`server.mjs` 将数据库维护异步化并增加单线程恢复探测，MySQL 不可达时暂停截图清理、截图重试、executor sweep 与启动 reconcile。
+- 验收：备用端口 `4198` 启动成功，远程 MySQL 不可达时服务仍监听且仅输出一条暂停告警；`npx eslint config/database.js server.mjs`、`node --check server.mjs`、`node --check config/database.js`、`git diff --check` 通过。
+- 提交：待本条记录与实现一并提交。
+- 遗留：当前 `4097` 已被已有进程占用；远程 `47.101.58.49:3306` 仍不可达，恢复数据库网络后后台维护会自动恢复。
+
 ## 2026-09-12 · OpenCode — 开工：本地启动 MySQL 连接超时修复
 
 - 进行中：修复 `npm start` 启动期间远程 MySQL 不可达导致的连接池超时与后台维护任务噪声。
