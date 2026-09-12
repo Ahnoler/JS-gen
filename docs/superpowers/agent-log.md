@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-13 00:40 · ZCode 引擎线 — 收工：叶模式兜底二段湿测 PASS，全链闭环（回链 00:14 开工）
+
+- 完成：兜底实施 commit **c60309e4**（JS_TREE_PICKER_DFS_PATH + 导出 + 叶模式无果分支 + _tree_picker_walk_path + prompt 同步）。
+- 验收（19242 活页面，产品目录字段，未保存零净变更）：带连字符叶子 `KB测子类-20260907-1835` 搜索必败 → 自动兜底 DFS 解析路径 `[KB测一级-20260907-1835, KB测子类-20260907-1835]` → 逐级 CDP 真点 → 回显校验 `ok, via=data-dfs-path`，8.1s，弹层自关，字段值=叶子；DFS 抽检 `对公流贷`→恰好 1 条 `[贷款,对公,对公流贷]`；离线=compile+import+pin+verify-all（同 4 存量红）+DFS Node 逻辑测试（唯一/同父同名去重/跨父歧义/不存在）+Python 去重单测全过。
+- 至此叶模式三级递进全链实测闭环：搜索直达（昨夜 PASS）→ DFS 寻路真点（本次 PASS）→ 歧义交还 path。遗留：SUT 搜索剥特殊字符属门户自身行为（已绕过不必修）；湿测脚本 tmp/wet-tree-dfs-fallback.py、tmp/dfs-path.test.cjs 留档。
+
 ## 2026-09-13 00:14 · ZCode 引擎线 — 开工：tree_picker_click 叶模式兜底二段（搜索无果→数据侧 DFS 寻路真点）
 
 - 范围：`scripts/controller/actions/js_snippets/tree_picker.py`（+JS_TREE_PICKER_DFS_PATH）、`_js_snippets.py`（导出）、`_tree.py`（叶模式无果分支+`_tree_picker_walk_path`）、`scripts/prompts/agent-tools-tree.md`（兜底说明）
