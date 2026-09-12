@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 09:05 · Cursor Lead — 开工：done_rejected 默认可观测湿复验
+
+- 进行中：2026-09-12 09:05；验收=重启服务后专项录制；agent-stderr / executor 出现 `[phase_done] done_rejected authority=gate`；可选 `events[]` 含 `done_rejected`（无临时 sniff）
+- 范围：启停服务、录制 API、`tmp/contract-sovereignty-wet/done-rejected-r4/`、报告增补、本文件；**不改**运行时代码
+- 禁入区：他线 WIP（tansun）、`classify.py`、合约门闩语义回改
+- 方式：重启 CP+executor → 对公客户管理探针 → 盯 stderr / 终态 events
+
 ## 2026-09-12 02:40 · ZCode 引擎线 — 收工：tansun 兼容实装五批落地（回链 02:05 开工）
 
 - 完成（tansun_ui_engine 分支 compat/js-gen-operations，4 笔 commit）：**cb30ef8** 批1=data_name 前缀解析 helper+input 值 objectValue 优先+radio/select_tree/replay_adapter 三路 hint 剥前缀；**e0e87a9** 批2=click 七前缀子路径（关闭弹窗/展开树/页签/表格行按钮/树选/邻钮/菜单，click_subroutes.py 前置路由，miss 落回同事兜底链，裸路由 miss=skip，按钮文本剥前缀）；**eb564e3** 批4a=date event 六处清单（单日期移植 fill_date.py+daterange 双 input $emit('input',[s,e])，JS-gen 无 daterange 参考实现为按规格新写）；**75bd130** 批4b=select_click「弹窗选择」表格行选+tssc 远程表格分支（16×250ms 静置轮询防残留首行误点，字典路径 10s→3s 短等不变行为）
