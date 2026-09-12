@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 17:40 · ZCode 引擎线 — 收工：回放误触发表单结构自愈修复（回链 17:24 开工）
+
+- 完成：`scripts/controller/actions/js_snippets/misc.py` JS_VERIFY_FORM_STRUCTURE 的 expectedLabels 表达式一处（`f.label || f` → `(f&&typeof f==='object')?(f.label??''):f`），commit **48c99419**。根因=空 label 布尔坑把 tssc 按钮行 form-item（label=''）误判为新增可选字段，恒产 `added_optional:['']` 误入 Phase2 结构自愈。
+- 验收：py_compile+模块级真实 import PASS；渲染后片段 Node 行为测试双对照 PASS（修复=零差异；旧式=精确复现线上 `added_optional:['']`，tmp/verify-form-structure-empty-label.test.cjs）；verify-all 4 红经 HEAD 基线复跑比对确认为存量/环境（step-highlight、export-v3=无 VPN 断库取不到真数据；layer-tree=traj33 数据漂移；confirm-notification=读 `_misc.py` 通知 marker 漂移），**与本改动无关，零新增红**。
+- 遗留移交：①录制侧快照口径排除无输入控件的按钮 form-item（动静大，待裁决）；②上述 4 项存量红归各自线（库依赖项 VPN 恢复后自愈、_misc.py marker 漂移归引擎线复核）；③`memory_writer flush timed out`（无 VPN 机器网络层现象，未深查）。
+
 ## 2026-09-12 17:24 · ZCode 引擎线 — 开工：回放误触发表单结构自愈修复（misc.py 一行）
 
 - 范围：仅 `scripts/controller/actions/js_snippets/misc.py`（回放比对 expectedLabels 表达式一处，约 304 行）
