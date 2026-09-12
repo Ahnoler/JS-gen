@@ -65,12 +65,11 @@ export function buildRequestHash({
 }
 
 /**
- * Normalize and validate the requested batch execution mode.
- * Missing input retains the historical record-mode default; unsupported values
- * are rejected before the job is persisted.
- * @param {unknown} raw requested batch mode
- * @returns {string} validated record or draft mode
- * @throws {Error} with statusCode 400 when the mode is unsupported
+ * 归一化并校验请求的批处理执行模式。缺失输入保留历史上的 record 模式默认值；
+ * 不支持的值会在任务持久化前被拒绝。
+ * @param {unknown} raw 请求的批处理模式
+ * @returns {string} 经校验的 record 或 draft 模式
+ * @throws {Error} 模式不受支持时带有 statusCode 400
  */
 function normalizeBatchMode(raw) {
   if (raw == null || raw === '') return 'record';
@@ -155,11 +154,10 @@ export async function emitProgress(batchId, item = null, extra = {}) {
 }
 
 /**
- * Write the user-facing system notification for a terminal batch job.
- * Notification persistence is best effort and does not prevent job completion
- * when the system-message layer is unavailable.
- * @param {object} job terminal batch job row
- * @param {object} summary aggregated batch item counts
+ * 为终态批处理任务写入面向用户的系统通知。通知持久化为尽力而为，系统消息层不可用时
+ * 不会阻止任务完成。
+ * @param {object} job 终态批处理任务行
+ * @param {object} summary 汇总的批处理项计数
  * @returns {Promise<void>}
  */
 async function notifyBatchTerminalMessage(job, summary) {

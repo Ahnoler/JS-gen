@@ -1,17 +1,17 @@
 /**
- * Search and presentation helpers for reusable special-element step groups.
+ * 可复用特殊元素步骤组的搜索和展示辅助函数。
  *
- * Queries use lightweight lexical scoring over persisted names, tags, phase
- * descriptions, remarks, and optional step metadata within one system.
+ * 查询在单个系统内对持久化名称、标签、阶段描述、备注及可选步骤元数据
+ * 使用轻量级词法评分。
  */
 import * as specialElementDao from '../dao/special-element-dao.js';
 import * as specialElementStepDao from '../dao/special-element-step-dao.js';
 import * as sysDictDataDao from '../dao/sys-dict-data-dao.js';
 
 /**
- * Split search text into normalized lexical tokens.
- * @param {string} text source query text
- * @returns {string[]} non-empty lowercase tokens
+ * 将搜索文本拆分为规范化的词法标记。
+ * @param {string} text 源查询文本
+ * @returns {string[]} 非空的小写标记
  */
 function tokenize(text) {
   return String(text || '')
@@ -36,9 +36,9 @@ function normalizeLegalAliases(text) {
 const INTRODUCE_HINT_RE = /引入|选人|放大镜|法定代表人|法定责任人/;
 
 /**
- * Produce a compact summary of the first steps in a special element.
- * @param {Array<object>} [steps] persisted special-element steps
- * @returns {Array<object>} step number and action type pairs
+ * 生成特殊元素前几个步骤的紧凑摘要。
+ * @param {Array<object>} [steps] 持久化的特殊元素步骤
+ * @returns {Array<object>} 步骤编号和操作类型对
  */
 function stepSummary(steps = []) {
   return steps.slice(0, 8).map((s) => ({

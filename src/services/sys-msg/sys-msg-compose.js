@@ -1,9 +1,8 @@
 /**
- * Pure helpers for composing system-message content and shaping message rows.
+ * 用于组装系统消息内容及塑造消息行的纯辅助函数。
  *
- * This module owns the stable message constants re-exported to service and
- * route layers, plus the escaping, formatting, link-building, and API-shape
- * rules for batch-import notifications.
+ * 本模块维护重新导出给服务层和路由层的稳定消息常量，以及批量导入通知的
+ * 转义、格式化、链接构建和 API 结构规则。
  */
 export {
   MSG_TYPE_BATCH_IMPORT,
@@ -59,10 +58,10 @@ export function jobStatusLabel(status) {
 }
 
 /**
- * Read a numeric summary field, normalizing absent or invalid values to zero.
- * @param {object|null|undefined} summary batch job summary object
- * @param {string} key summary property name
- * @returns {number} finite numeric summary value or zero
+ * 读取数值型摘要字段，并将缺失或无效值规范为零。
+ * @param {object|null|undefined} summary 批处理任务摘要对象
+ * @param {string} key 摘要属性名
+ * @returns {number} 有限数值型摘要值；否则为零
  */
 function summaryInt(summary, key) {
   const v = Number(summary?.[key]);
@@ -105,9 +104,9 @@ export function batchImportLinkUrl(batchId) {
 }
 
 /**
- * Left-pad a date or time component to two characters.
- * @param {number|string} n component value
- * @returns {string} two-character component string
+ * 为日期或时间组成部分左侧补零至两位。
+ * @param {number|string} n 组成部分的值
+ * @returns {string} 两位组成部分字符串
  */
 function pad2(n) {
   return String(n).padStart(2, '0');

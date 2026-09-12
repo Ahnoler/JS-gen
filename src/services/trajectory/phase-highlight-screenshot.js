@@ -1,7 +1,7 @@
 /**
- * Phase highlight screenshot capture and metadata persistence.
- * Supports direct CDP capture and executor-mediated BiB capture, preserving
- * element geometry and region-tree metadata for the recording phase.
+ * 阶段高亮截图采集及元数据持久化。
+ * 支持直接 CDP 采集和执行机代理的 BiB 采集，保留录制阶段所需的元素几何信息
+ * 与区域树元数据。
  */
 import { randomUUID } from 'node:crypto';
 import { PNG } from 'pngjs';

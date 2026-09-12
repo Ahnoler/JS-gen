@@ -115,13 +115,12 @@ function applySynonymExpansion(tokens, hay, semanticDict, synonyms, moduleKey) {
 }
 
 /**
- * Build the searchable text for one flow card.
+ * 构建单张流程卡的可搜索文本。
  *
- * The haystack combines flow identity, aliases, keywords, hash markers, node
- * navigation fields, and short rule/state/pending-step labels. Empty fields
- * are omitted and the result is lowercased for deterministic matching.
- * @param {object} card Flow card whose fields should be indexed
- * @returns {string} Lowercased pipe-delimited card haystack
+ * 该搜索语料组合了流程身份、别名、关键词、哈希标记、节点导航字段，以及简短的
+ * 规则/状态/待办步骤标签。空字段会被省略，结果转为小写以保证确定性匹配。
+ * @param {object} card 其字段应被建立索引的流程卡
+ * @returns {string} 转为小写、以竖线分隔的卡片搜索语料
  */
 function buildCardHaystack(card) {
   const parts = [
@@ -149,19 +148,18 @@ function buildCardHaystack(card) {
 }
 
 /**
- * Create the normalized flow-name key used for specificity tie-breaking.
- * Removing whitespace makes equivalent names compare by their actual content.
- * @param {object} card Flow card
- * @returns {string} Flow name with all whitespace removed
+ * 创建用于特异性打破平局的规范化流程名称键。移除空白使等价名称能按实际内容比较。
+ * @param {object} card 流程卡
+ * @returns {string} 移除全部空白的流程名称
  */
 function normFlowName(card) {
   return String(card?.flow || '').replace(/\s+/g, '');
 }
 
 /**
- * Build the searchable text for a single flow-card node.
- * @param {object} node Flow-card node with id, page, and enter fields
- * @returns {string} Lowercased pipe-delimited node haystack
+ * 构建单个流程卡节点的可搜索文本。
+ * @param {object} node 包含 id、page 和 enter 字段的流程卡节点
+ * @returns {string} 转为小写、以竖线分隔的节点搜索语料
  */
 function buildNodeHaystack(node) {
   return [node.id, node.page, node.enter].filter(Boolean).join('|').toLowerCase();
@@ -452,14 +450,12 @@ export function matchFlowForAtom({ title, taskDraft, cards, synonyms, moduleKey 
 }
 
 /**
- * Render a flow card and optional node context as an atomization hint.
+ * 将流程卡及可选节点上下文渲染为原子化提示。
  *
- * The result includes the template sentinel, menu path, up to eight
- * preconditions, the selected node's entry point, and the original atom task.
- * Missing or non-object cards produce null so callers can proceed without
- * guidance.
- * @param {{ card?: object|null, nodeId?: string|null, atomTask?: string }} opts Hint inputs
- * @returns {string|null} Sentinel-delimited template hint or null
+ * 结果包含模板哨兵、菜单路径、至多八个前置条件、所选节点的进入点和原始原子任务。
+ * 缺失或非对象卡片会生成 null，使调用方可在没有引导的情况下继续。
+ * @param {{ card?: object|null, nodeId?: string|null, atomTask?: string }} opts 提示输入
+ * @returns {string|null} 由哨兵分隔的模板提示，或 null
  */
 export function buildFlowTemplateHint({ card, nodeId, atomTask } = {}) {
   if (!card || typeof card !== 'object') return null;
@@ -489,12 +485,10 @@ export function buildFlowTemplateHint({ card, nodeId, atomTask } = {}) {
 }
 
 /**
- * Remove a leading flow-template hint from a trajectory description.
- * Complete sentinel pairs are removed through the closing marker. Legacy hints
- * without that marker use the historical single-line atom-task layout; text
- * without a leading marker is returned unchanged.
- * @param {string} description Existing trajectory description
- * @returns {string} Description with the leading template removed
+ * 从轨迹描述中移除开头的流程模板提示。完整哨兵对会一直移除到结束标记；缺少该
+ * 标记的旧版提示使用历史的单行原子任务布局；没有开头标记的文本原样返回。
+ * @param {string} description 现有轨迹描述
+ * @returns {string} 移除开头模板后的描述
  */
 function stripFlowTemplateHint(description) {
   const text = String(description ?? '');
@@ -522,12 +516,11 @@ function stripFlowTemplateHint(description) {
 }
 
 /**
- * Replace any existing leading flow-template hint with a new one.
- * A missing hint leaves the description unchanged; otherwise the old template
- * is stripped first and the new hint is prepended to any remaining base text.
- * @param {string} description Existing trajectory description
- * @param {string|null} hint New rendered flow-template hint
- * @returns {string} Description containing at most the new leading hint
+ * 使用新的流程模板提示替换现有的任意开头提示。提示缺失时描述保持不变；否则先
+ * 移除旧模板，再将新提示前置到剩余基础文本。
+ * @param {string} description 现有轨迹描述
+ * @param {string|null} hint 新渲染的流程模板提示
+ * @returns {string} 至多包含新开头提示的描述
  */
 export function applyFlowTemplateHintToDescription(description, hint) {
   if (!hint) return String(description ?? '');
@@ -536,9 +529,9 @@ export function applyFlowTemplateHintToDescription(description, hint) {
 }
 
 /**
- * Preview flow-template hint for a trajectory row (no DB write).
- * @param {object|null} traj trajectory row from trajectoryDao.getById
- * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>} Resolved hint preview and its flow-card references
+ * 预览轨迹行的流程模板提示（不写入数据库）。
+ * @param {object|null} traj 来自 trajectoryDao.getById 的轨迹行
+ * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>} 已解析的提示预览及其流程卡引用
  */
 async function flowTemplateHintFromTrajectory(traj) {
   const kbFlowRef = traj?.kbFlowRef ?? null;
@@ -556,10 +549,10 @@ async function flowTemplateHintFromTrajectory(traj) {
 }
 
 /**
- * Load trajectory by id and preview the flow-card template hint (no DB write).
- * @param {number|string} trajectoryId Identifier of the trajectory to inspect
- * @param {{ getById?: (id: number) => Promise<object|null> }} [deps] test hooks
- * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>} Resolved hint preview and its flow-card references
+ * 按 ID 加载轨迹并预览流程卡模板提示（不写入数据库）。
+ * @param {number|string} trajectoryId 要检查的轨迹标识符
+ * @param {{ getById?: (id: number) => Promise<object|null> }} [deps] 测试钩子
+ * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>} 已解析的提示预览及其流程卡引用
  */
 export async function getFlowTemplateHintForTrajectory(trajectoryId, { getById = trajectoryDao.getById } = {}) {
   const tid = Number(trajectoryId);

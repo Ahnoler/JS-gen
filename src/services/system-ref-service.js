@@ -10,10 +10,10 @@ import * as trajectoryDao from '../dao/trajectory-dao.js';
 import { AppError } from '../http/app-error.js';
 
 /**
- * Validate a trajectory identifier and confirm that its row exists.
- * @param {number|string} trajectoryId candidate trajectory id
- * @returns {Promise<number>} normalized, existing trajectory id
- * @throws {AppError} when the id is invalid or the trajectory is missing
+ * 校验轨迹标识符，并确认对应行存在。
+ * @param {number|string} trajectoryId 候选轨迹 ID
+ * @returns {Promise<number>} 规范化且已存在的轨迹 ID
+ * @throws {AppError} ID 无效或轨迹缺失时抛出
  */
 async function assertTrajectory(trajectoryId) {
   const tid = Number(trajectoryId);

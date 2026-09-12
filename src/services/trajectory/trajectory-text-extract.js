@@ -1,10 +1,8 @@
 /**
- * Trajectory requirement-text extraction module.
+ * 轨迹需求文本提取模块。
  *
- * Provides the shared parsing rules for business-data sections, success-gate
- * sections, and phase classification. The helpers are deliberately tolerant
- * of natural-language formatting and keep raw requirement text available when
- * structured key/value parsing cannot recover every entry.
+ * 提供业务数据区块、成功门闩区块和阶段分类的共享解析规则。这些助手有意兼容
+ * 自然语言格式；当结构化键值解析无法恢复全部条目时，仍保留原始需求文本。
  */
 import * as businessDataDao from '../../dao/business-data-dao.js';
 

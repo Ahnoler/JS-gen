@@ -65,10 +65,9 @@ export function startItemLeaseRenewal({
 }
 
 /**
- * Count currently available executor slots across connected, non-draining
- * nodes. Database capacity is authoritative when present, while registry
- * connectivity determines which nodes can accept work now.
- * @returns {Promise<number>} number of free cluster slots
+ * 统计所有已连接且未排空节点当前可用的执行机槽位。存在时以数据库容量为准，
+ * 而注册表连接状态决定当前哪些节点可以接收任务。
+ * @returns {Promise<number>} 集群空闲槽位数
  */
 async function computeClusterFreeSlots() {
   const dbNodes = await executorNodeDao.list().catch(() => []);
@@ -86,10 +85,9 @@ async function computeClusterFreeSlots() {
 }
 
 /**
- * Fill available executor capacity with claimed record-mode batch items.
- * Each claimed item is transitioned through preparation and recording by a
- * detached worker, while the scheduler is kicked again as workers finish.
- * @returns {Promise<void>} resolves after the current claim pass is scheduled
+ * 使用已认领的 record 模式批处理项填满可用执行机容量。每个已认领项均由独立的
+ * worker 经历准备和录制状态流转，worker 结束时会再次唤醒调度器。
+ * @returns {Promise<void>} 当前认领轮次完成调度后兑现
  */
 export async function pumpRecord() {
   // Dynamic: start as many workers as free slots (at least try one if waiting)
@@ -136,12 +134,11 @@ export async function pumpRecord() {
 }
 
 /**
- * Execute one claimed record item through prepare, record, reconciliation, and
- * detach. Cancellation, lease loss, unavailable slots, and quality-gate
- * failures are converted into the corresponding persisted batch item state.
- * @param {object} item claimed batch item with batchId and trajectoryId
- * @param {string} token worker token owning the item lease
- * @returns {Promise<void>} resolves after item state and progress are settled
+ * 执行一个已认领的录制项，依次经过准备、录制、核对和脱离。取消、租约丢失、
+ * 槽位不可用及质量门失败都会转换为相应的持久化批处理项状态。
+ * @param {object} item 含 batchId 和 trajectoryId 的已认领批处理项
+ * @param {string} token 持有该项租约的 worker 令牌
+ * @returns {Promise<void>} 项状态与进度稳定后兑现
  */
 async function runRecord(item, token) {
   const batchId = item.batchId;

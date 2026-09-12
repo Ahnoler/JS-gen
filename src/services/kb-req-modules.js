@@ -30,9 +30,9 @@ export const MODULE_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const DEFAULT_ROOT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'kb', 'req');
 
 /**
- * Select the configured or default requirements workspace root.
- * @param {string} [rootDir] caller-supplied workspace root
- * @returns {string} workspace root path
+ * 选择配置的或默认的需求工作区根目录。
+ * @param {string} [rootDir] 调用方提供的工作区根目录
+ * @returns {string} 工作区根目录路径
  */
 function resolveRootDir(rootDir) {
   return rootDir ?? DEFAULT_ROOT_DIR;
@@ -61,9 +61,9 @@ export function moduleDir(moduleKey, rootDir) {
 }
 
 /**
- * Check whether the registered source document is accessible to the server.
- * @param {string} sourcePath source document path
- * @returns {Promise<boolean>} whether the path exists and is accessible
+ * 检查登记的源文档是否可被服务器访问。
+ * @param {string} sourcePath 源文档路径
+ * @returns {Promise<boolean>} 路径是否存在且可访问
  */
 async function isSourceAccessible(sourcePath) {
   try {
@@ -75,9 +75,9 @@ async function isSourceAccessible(sourcePath) {
 }
 
 /**
- * Read and parse a module manifest, treating a missing file as absent.
- * @param {string} manifestPath manifest JSON path
- * @returns {Promise<object|null>} parsed manifest or null when missing
+ * 读取并解析模块清单文件，将缺失文件视为不存在。
+ * @param {string} manifestPath 清单 JSON 路径
+ * @returns {Promise<object|null>} 解析后的清单，缺失时为 null
  */
 async function readManifestFile(manifestPath) {
   try {
@@ -199,9 +199,9 @@ export async function listReqModules({ rootDir } = {}) {
 }
 
 /**
- * Determine whether a directory exists and contains at least one entry.
- * @param {string} dirPath directory path
- * @returns {Promise<boolean>} whether the directory is non-empty
+ * 判断目录是否存在且至少包含一个条目。
+ * @param {string} dirPath 目录路径
+ * @returns {Promise<boolean>} 目录是否非空
  */
 async function dirHasEntries(dirPath) {
   try {
@@ -214,9 +214,9 @@ async function dirHasEntries(dirPath) {
 }
 
 /**
- * Test filesystem existence without propagating a missing-path error.
- * @param {string} filePath path to test
- * @returns {Promise<boolean>} whether the path exists
+ * 检查文件系统路径是否存在，不向上传播路径缺失错误。
+ * @param {string} filePath 待检查的路径
+ * @returns {Promise<boolean>} 路径是否存在
  */
 async function pathExists(filePath) {
   try {
@@ -228,9 +228,9 @@ async function pathExists(filePath) {
 }
 
 /**
- * Count JSON draft artifacts in a module drafts directory.
- * @param {string} draftsDir drafts directory path
- * @returns {Promise<number>} number of JSON draft files
+ * 统计模块草稿目录中的 JSON 草稿文件。
+ * @param {string} draftsDir 草稿目录路径
+ * @returns {Promise<number>} JSON 草稿文件数量
  */
 async function countDraftFiles(draftsDir) {
   try {

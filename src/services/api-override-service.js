@@ -5,11 +5,11 @@ import * as apiOverrideDao from '../dao/api-override-dao.js';
 import { API_OVERRIDE_MATCH_TYPES, API_OVERRIDE_SCOPES } from '../models/constants.js';
 
 /**
- * Validate an override scope and its logical reference id.
- * @param {string} scope global, trajectory, or function scope
- * @param {number|null} scopeRefId referenced entity id for non-global scopes
+ * 校验覆盖规则的作用域及其逻辑引用 ID。
+ * @param {string} scope 全局、轨迹或功能作用域
+ * @param {number|null} scopeRefId 非全局作用域引用的实体 ID
  * @returns {void}
- * @throws {Error} when the scope or required reference is invalid
+ * @throws {Error} 作用域或必需的引用无效时抛出
  */
 function assertScope(scope, scopeRefId) {
   if (!API_OVERRIDE_SCOPES.includes(scope)) {

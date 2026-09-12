@@ -112,10 +112,10 @@ export function flattenNodesToRows(nodes = []) {
   let rowNumber = 2;
 
   /**
-   * Recursively flatten one level of hierarchy into parent-path rows.
-   * @param {Array<object>} list nodes at the current depth
-   * @param {string[]} parentParts ancestor names
-   * @returns {void} appends normalized rows to the enclosing result
+   * 将一层层级递归展开为带父路径的行。
+   * @param {Array<object>} list 当前深度的节点
+   * @param {string[]} parentParts 祖先名称
+   * @returns {void} 将规范化行追加到外层结果
    */
   function walk(list, parentParts) {
     for (const node of list || []) {
@@ -284,9 +284,9 @@ export async function parseExcelBuffer(buffer) {
 }
 
 /**
- * Map supported worksheet header labels to normalized field names.
- * @param {string} h raw worksheet header
- * @returns {string} normalized field name or the original label
+ * 将支持的工作表表头标签映射为规范化字段名。
+ * @param {string} h 原始工作表表头
+ * @returns {string} 规范化字段名或原始标签
  */
 function normalizeHeader(h) {
   const s = String(h || '').trim();
@@ -312,9 +312,9 @@ function normalizeHeader(h) {
 }
 
 /**
- * Convert an ExcelJS cell value, including rich text and formula results, to text.
- * @param {object|null} cell ExcelJS cell-like value
- * @returns {string} readable cell text
+ * 将 ExcelJS 单元格值转换为文本，包括富文本和公式结果。
+ * @param {object|null} cell 类 ExcelJS 单元格值
+ * @returns {string} 可读的单元格文本
  */
 function cellText(cell) {
   if (!cell || cell.value == null) return '';

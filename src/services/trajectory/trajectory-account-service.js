@@ -143,10 +143,10 @@ export async function getTrajectoryLoginContext(trajectoryId) {
 }
 
 /**
- * Project a system row into the stable system shape returned to callers.
- * Legacy `systemId` is used as the uid fallback when the newer uid column is empty.
- * @param {object} cur resolved system row
- * @returns {{id: number, name: string, uid: string|number, description: string|null, url: string}} public system summary
+ * 将系统行映射为返回给调用方的稳定系统结构。较新的 uid 列为空时，使用旧版 `systemId`
+ * 作为 uid 兜底值。
+ * @param {object} cur 已解析的系统行
+ * @returns {{id: number, name: string, uid: string|number, description: string|null, url: string}} 对外系统摘要
  */
 function _shapeSystem(cur) {
   return {
@@ -159,10 +159,9 @@ function _shapeSystem(cur) {
 }
 
 /**
- * Resolve the owning system through a persisted system-account relationship.
- * Root nodes and missing relationships are treated as unresolved.
- * @param {number} accountId system account id
- * @returns {Promise<object|null>} owning non-root system row, or null
+ * 通过持久化的系统账号关系解析所属系统。根节点和缺失关系均视为未解析。
+ * @param {number} accountId 系统账号 ID
+ * @returns {Promise<object|null>} 所属的非根系统行，或 null
  */
 async function _systemFromAccount(accountId) {
   const account = await systemAccountDao.getById(accountId);
@@ -173,10 +172,9 @@ async function _systemFromAccount(accountId) {
 }
 
 /**
- * Load and normalize all login accounts belonging to a system.
- * The system URL supplies a fallback login URL for legacy account rows.
- * @param {object} cur owning system row
- * @returns {Promise<object[]>} normalized account summaries including credentials
+ * 加载并归一化属于某系统的全部登录账号。系统 URL 为旧版账号行提供登录 URL 兜底值。
+ * @param {object} cur 所属系统行
+ * @returns {Promise<object[]>} 包含凭据的归一化账号摘要
  */
 async function _accountsForSystem(cur) {
   return (await systemAccountDao.listBySystem(cur.id)).map((a) => ({

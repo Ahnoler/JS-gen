@@ -1,9 +1,8 @@
 /**
- * Trajectory step service.
+ * 轨迹步骤服务。
  *
- * Owns step creation, editing, confirmation, deletion, and movement while
- * keeping trajectory metadata counts synchronized. It also centralizes the
- * element payload preparation and recording/busy-state guards used by edits.
+ * 负责步骤的创建、编辑、确认、删除和移动，并保持轨迹元数据计数同步。同时集中
+ * 管理编辑操作使用的元素载荷准备逻辑以及录制/忙碌状态守卫。
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
@@ -80,15 +79,14 @@ export async function markStepReplayOk(stepId) {
 }
 
 /**
- * Normalize and validate an element payload for a trajectory step.
- * Locator-exempt and non-single-target actions accept a missing usable locator
- * but still use the common element serializer when an element is supplied.
- * @param {string} actionType requested action name or alias
- * @param {object|null} params action parameters used by element preparation
- * @param {object|string|null} element raw element payload
- * @param {object} [options] preparation options
- * @param {boolean} [options.requireUsable] require a usable target for single-target actions; defaults to true
- * @returns {object|null} normalized element payload, or null when none is available
+ * 规范化并校验轨迹步骤的元素载荷。
+ * 豁免定位器和非单目标操作可以缺少可用定位器，但提供元素时仍使用通用元素序列化器。
+ * @param {string} actionType 请求的操作名称或别名
+ * @param {object|null} params 元素准备所用的操作参数
+ * @param {object|string|null} element 原始元素载荷
+ * @param {object} [options] 准备选项
+ * @param {boolean} [options.requireUsable] 单目标操作是否必须有可用目标；默认为 true
+ * @returns {object|null} 规范化后的元素载荷；没有可用元素时返回 null
  */
 function prepareStepElement(actionType, params, element, { requireUsable = true } = {}) {
   const action = normalizeActionName(actionType || '');
@@ -307,12 +305,11 @@ export async function removeTrajectoryStep(stepId) {
 }
 
 /**
- * Reject step mutations while AI recording, manual recording, or session work
- * could make the persisted order inconsistent with the live action stream.
- * @param {number} trajectoryId trajectory DB id
- * @param {object} traj current trajectory row
- * @returns {Promise<void>} resolves when the step edit is allowed
- * @throws {Error} with statusCode 409 when a recording or busy session exists
+ * 在 AI 录制、手动录制或会话工作期间拒绝步骤变更，以免持久化顺序与实时操作流不一致。
+ * @param {number} trajectoryId 轨迹数据库 ID
+ * @param {object} traj 当前轨迹行
+ * @returns {Promise<void>} 允许步骤编辑时完成
+ * @throws {Error} 存在录制或忙碌会话时抛出 statusCode 为 409 的错误
  */
 async function assertNotBusyForStepEdit(trajectoryId, traj) {
   const tid = Number(trajectoryId);

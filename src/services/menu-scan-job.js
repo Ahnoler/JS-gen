@@ -94,8 +94,8 @@ export async function startScan(systemNodeId) {
 /**
  * 启动仅补采落地 pageId 任务（默认只处理 source=ai 的空 pd_cmpt_ecd；不扫菜单树）。
  * @param {number|string} systemNodeId 系统节点 id
- * @param {{ sources?: string[] }} [opts] optional source filters
- * @returns {Promise<{ scanId: string }>} newly registered task id
+ * @param {{ sources?: string[] }} [opts] 可选的来源过滤条件
+ * @returns {Promise<{ scanId: string }>} 新登记的任务 ID
  */
 export async function startFillPageIds(systemNodeId, opts = {}) {
   if (currentScan !== null) {

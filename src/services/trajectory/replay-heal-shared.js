@@ -154,8 +154,8 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, heal
   }, HEAL_TIMEOUT_MS);
 
   /**
-   * Release all listeners and the timeout when the heal wait settles.
-   * The guard makes cleanup idempotent across success, error, abort, and timeout.
+   * 修复等待结束时释放全部监听器和超时计时器。
+   * 该保护使清理过程在成功、错误、中止和超时情况下保持幂等。
    * @returns {void}
    */
   function cleanup() {

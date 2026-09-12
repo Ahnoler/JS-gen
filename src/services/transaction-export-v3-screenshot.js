@@ -7,9 +7,9 @@ import { mapStepToTransactionEvent } from './transaction-export.js';
 import { stripVolatileQuery } from './transaction-export-v3-region.js';
 
 /**
- * Parse JSON-like screenshot metadata without propagating malformed input.
- * @param {unknown} raw object or serialized JSON value
- * @returns {object|null} parsed value, or null when invalid
+ * 解析类似 JSON 的截图元数据，不向上传播格式错误的输入。
+ * @param {unknown} raw 对象或序列化的 JSON 值
+ * @returns {object|null} 解析后的值，无效时为 null
  */
 function parseJson(raw) {
   if (raw == null) return null;
@@ -89,9 +89,9 @@ export function buildScreenshotEntries({
   let nextId = 1;
 
   /**
-   * Register exact and normalized page-level keys for later parent lookup.
-   * @param {string} levelKey page or popup level key
-   * @param {number} entryId generated screenshot entry id
+   * 登记精确和规范化的页面级键，供后续查找父级使用。
+   * @param {string} levelKey 页面或弹窗级键
+   * @param {number} entryId 生成的截图条目 ID
    * @returns {void}
    */
   const rememberPageLevelKey = (levelKey, entryId) => {
@@ -107,9 +107,9 @@ export function buildScreenshotEntries({
     // 触发步骤（click 步元素含 anchor 或属性值），而某弹窗的 anchor 匹配不到任何步骤
     // ——匹配不到者为旧录制残留，跳过不导出。全部都匹配不到时保留（无法分辨，不误删）。
     /**
-     * Extract popup title, anchor, and parent page key from screenshot metadata.
-     * @param {object} shot screenshot metadata row
-     * @returns {{title: string, anchor: string, parentKey: string}|null} parsed parts
+     * 从截图元数据中提取弹窗标题、锚点和父页面键。
+     * @param {object} shot 截图元数据行
+     * @returns {{title: string, anchor: string, parentKey: string}|null} 解析后的部分
      */
     const anchorOf = (shot) => {
       const key = String(shot?.levelKey || shot?.metadataJson?.levelKey || '');
@@ -124,9 +124,9 @@ export function buildScreenshotEntries({
       })
       .filter(Boolean);
     /**
-     * Determine whether a recorded click element matches a popup trigger anchor.
-     * @param {string} anchor trigger anchor expression
-     * @returns {boolean} whether any recorded click matches
+     * 判断录制的点击元素是否匹配弹窗触发锚点。
+     * @param {string} anchor 触发锚点表达式
+     * @returns {boolean} 是否有录制点击匹配
      */
     const anchorMatched = (anchor) => {
       const a = String(anchor || '').trim();
@@ -134,9 +134,9 @@ export function buildScreenshotEntries({
       const am = a.match(/='([^']+)'/);
       const label = am ? am[1] : '';
     /**
-     * Check locator/text fields for the complete anchor or its label.
-     * @param {unknown} s candidate locator or text
-     * @returns {boolean} whether the candidate matches
+     * 检查定位器/文本字段是否匹配完整锚点或其标签。
+     * @param {unknown} s 候选定位器或文本
+     * @returns {boolean} 候选值是否匹配
      */
     const inStr = (s) => {
         const str = String(s || '');
@@ -154,9 +154,9 @@ export function buildScreenshotEntries({
       if (anchorMatched(parts.anchor)) groups.set(gk, true);
     }
     /**
-     * Identify an unmatched duplicate popup left by an older recording.
-     * @param {object} shot screenshot metadata row
-     * @returns {boolean} whether the popup should be skipped as stale
+     * 识别旧录制遗留的未匹配重复弹窗。
+     * @param {object} shot 截图元数据行
+     * @returns {boolean} 弹窗是否应作为过期数据跳过
      */
     const stalePopup = (shot) => {
       const parts = anchorOf(shot);

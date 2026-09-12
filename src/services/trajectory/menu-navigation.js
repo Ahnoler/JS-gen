@@ -7,9 +7,8 @@
  * - 导航失败不阻断交易执行（吞异常 + console.warn 后继续）
  * - 导航动作 is_replay 恒为 true（不入步骤表）
  *
- * This module keeps menu lookup, duplicate-navigation suppression, and replay
- * dispatch together so callers can request navigation without handling menu
- * tree details or turning a navigation failure into a transaction failure.
+ * 本模块将菜单查找、重复导航抑制和回放派发集中处理，使调用方无需处理菜单树细节，
+ * 也不会将导航失败变成交易失败。
  */
 import * as execSession from '../../executor-session-client.js';
 import * as systemDao from '../../dao/system-dao.js';

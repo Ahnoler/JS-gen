@@ -81,8 +81,8 @@ export async function buildCoverageReport({ systemId, type = 'function' } = {}) 
   if (sysId != null && Number.isFinite(sysId)) {
     const keep = new Set();
     /**
-     * Recursively collect ids in the selected system subtree.
-     * @param {number} id current node id
+     * 递归收集选定系统子树中的 ID。
+     * @param {number} id 当前节点 ID
      * @returns {void}
      */
     const collect = (id) => {

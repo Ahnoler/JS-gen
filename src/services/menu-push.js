@@ -50,9 +50,9 @@ export function getAutoSyncMs() {
 }
 
 /**
- * Normalize a persisted menu-push status, defaulting missing values to idle.
- * @param {unknown} raw persisted status value
- * @returns {string} trimmed status or `idle`
+ * 规范化持久化的菜单推送状态，缺失值默认为 idle。
+ * @param {unknown} raw 持久化的状态值
+ * @returns {string} 去除首尾空白的状态或 `idle`
  */
 function normalizeStatus(raw) {
   const s = String(raw || '').trim();
@@ -125,9 +125,9 @@ export function buildMenuPushPayload(system, nodes, { menuVersion, partnerSystem
 }
 
 /**
- * Load navigable module and function nodes directly under a system.
- * @param {number} systemId local system node id
- * @returns {Promise<object[]>} ordered source nodes for the push payload
+ * 直接加载系统下可导航的模块和功能节点。
+ * @param {number} systemId 本地系统节点 ID
+ * @returns {Promise<object[]>} 推送载荷所需的有序源节点
  */
 async function listMenuNodesUnderSystem(systemId) {
   const all = await systemDao.listAll();
@@ -143,8 +143,8 @@ async function listMenuNodesUnderSystem(systemId) {
 }
 
 /**
- * Schedule the short-lived pushing-to-synced status transition for a system.
- * @param {number} systemNodeId local system node id
+ * 为系统安排从 pushing 到 synced 的短时状态转换。
+ * @param {number} systemNodeId 本地系统节点 ID
  * @returns {void}
  */
 function scheduleAutoSync(systemNodeId) {
@@ -162,8 +162,8 @@ function scheduleAutoSync(systemNodeId) {
 }
 
 /**
- * Mark a system as synced if it is still in the pushing state.
- * @param {number} systemNodeId local system node id
+ * 如果系统仍处于 pushing 状态，则将其标记为 synced。
+ * @param {number} systemNodeId 本地系统节点 ID
  * @returns {Promise<void>}
  */
 async function markSynced(systemNodeId) {

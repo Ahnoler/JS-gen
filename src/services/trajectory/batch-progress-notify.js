@@ -1,7 +1,6 @@
 /**
- * Batch progress notification helpers for trajectory lifecycle updates. The
- * module resolves a trajectory's owning batch item lazily so the core batch
- * service can remain decoupled from callers that only know a trajectory ID.
+ * 用于交易生命周期更新的批处理进度通知辅助函数。本模块按需解析交易所属的批处理项，
+ * 使核心批处理服务无需耦合仅知晓交易 ID 的调用方。
  */
 import * as batchDao from '../../dao/batch-recording-dao.js';
 

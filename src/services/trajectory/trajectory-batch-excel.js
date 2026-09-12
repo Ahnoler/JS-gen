@@ -68,10 +68,10 @@ export async function buildTemplateBuffer(rows = sampleTemplateRows()) {
 }
 
 /**
- * Convert an ExcelJS cell value, including rich text and formula results, to text.
- * Values that cannot provide a specialized representation fall back to String().
- * @param {unknown} value raw ExcelJS cell value
- * @returns {string} normalized cell text, or an empty string for nullish values
+ * 将 ExcelJS 单元格值（包括富文本和公式结果）转换为文本。无法提供专用表示的值会回退至
+ * String()。
+ * @param {unknown} value 原始 ExcelJS 单元格值
+ * @returns {string} 归一化后的单元格文本，nullish 值时为空字符串
  */
 function cellText(value) {
   if (value == null) return '';

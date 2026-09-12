@@ -293,8 +293,8 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
     let leadingNavSteps = [];
 
     /**
-     * Materialize the current grouped steps as one guided atom or deterministic
-     * fallback, then clear the group buffers for the next persistence boundary.
+     * 将当前分组步骤实例化为一个受引导的原子或确定性回退结果，然后清空分组缓冲，
+     * 以处理下一个持久化边界。
      * @returns {void}
      */
     const flushGroup = () => {
@@ -482,7 +482,7 @@ function buildAtomizeUserPayload(chains, flowCards = []) {
  * @param {string} moduleKey Module key
  * @param {(text: string) => Promise<string>} llmFn Injectable LLM caller
  * @param {object[]} [flowCards] Relevant flow cards for LLM guidance
- * @returns {Promise<Array<Record<string, unknown>>|null>} Raw LLM atom objects, or null for an invalid atoms payload
+ * @returns {Promise<Array<Record<string, unknown>>|null>} 原始 LLM 原子对象；atoms 载荷无效时为 null
  */
 async function callAtomizeLlm(chains, moduleKey, llmFn, flowCards = []) {
   const systemPrompt = loadAtomizePrompt();
@@ -747,10 +747,10 @@ export function computeFunctionIdCandidates(atom, functionNodes) {
   const out = [];
   const seen = new Set();
   /**
-   * Add a candidate once, retaining the first matching reason and score.
-   * @param {object} node System-tree function node
-   * @param {number} score Deterministic candidate score
-   * @param {'page_code'|'name_match'|'menu_path'} reason Candidate reason
+   * 仅添加一次候选项，并保留首次匹配的原因和得分。
+   * @param {object} node 系统树功能节点
+   * @param {number} score 确定性的候选得分
+   * @param {'page_code'|'name_match'|'menu_path'} reason 候选原因
    * @returns {void}
    */
   const push = (node, score, reason) => {

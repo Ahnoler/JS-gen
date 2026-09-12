@@ -1,9 +1,8 @@
 /**
  * Batch job task name formula：文件名(去扩展名) + '_MMDD-HHmm'（服务器本地时区）。
  * 运行时创建与迁移回填共用，保持零依赖纯函数。
- * The exported helpers preserve the server-local timestamp convention and
- * bound only the filename portion so the generated task name stays within its
- * database column limit.
+ * 导出的辅助函数遵循服务器本地时间戳约定，且仅限制文件名部分，以使生成的
+ * 任务名称始终处于数据库列长度限制内。
  */
 
 /**
@@ -18,9 +17,9 @@ export function stripExtension(filename) {
 }
 
 /**
- * Render a numeric date component as a two-character decimal string.
- * @param {number} n date or time component
- * @returns {string} zero-padded component
+ * 将数值日期组件渲染为两个字符的十进制字符串。
+ * @param {number} n 日期或时间组件
+ * @returns {string} 补零后的组件
  */
 function pad2(n) {
   return String(n).padStart(2, '0');

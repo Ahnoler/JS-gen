@@ -128,10 +128,9 @@ async function resolveHardDetachRemoteSessionId(tid, { traj, runtime, sessionId 
 }
 
 /**
- * Close a remote-session row and clear its ownership and live binding.
- * Cleanup failures are logged because a leftover row can reserve a resource,
- * but the helper intentionally does not rethrow during best-effort teardown.
- * @param {number|null|undefined} remoteSessionId remote-session database id
+ * 关闭远程会话行并清除其所有权和实时绑定。清理失败会记录日志，因为残留行可能占用资源，
+ * 但该辅助函数在尽力清理期间有意不再抛出异常。
+ * @param {number|null|undefined} remoteSessionId 远程会话数据库 ID
  * @returns {Promise<void>}
  */
 async function hardCloseRemoteSession(remoteSessionId) {
@@ -147,11 +146,10 @@ async function hardCloseRemoteSession(remoteSessionId) {
 }
 
 /**
- * Close an executor session opened during attach when a later attach step fails.
- * Reused Chrome is left idle for its existing grace owner; newly opened Chrome
- * is fully closed. Slot release is used as a fallback if the executor call fails.
- * @param {string} sessionId executor agent session id
- * @param {object|null|undefined} opened open-session result
+ * 当后续附加步骤失败时，关闭附加过程中打开的执行机会话。复用的 Chrome 会为其现有宽限期
+ * 所有者保留空闲状态；新打开的 Chrome 会被完全关闭。执行机调用失败时，回退释放槽位。
+ * @param {string} sessionId 执行机 agent 会话 ID
+ * @param {object|null|undefined} opened 打开会话的结果
  * @returns {Promise<void>}
  */
 async function releaseOpenedSessionBestEffort(sessionId, opened) {
@@ -168,13 +166,12 @@ async function releaseOpenedSessionBestEffort(sessionId, opened) {
 }
 
 /**
- * Attach the browser-in-browser stream for a trajectory and synchronize its mount.
- * BiB failures are returned as a degraded status except for ownership conflicts,
- * which are rethrown so callers can preserve their HTTP 409 semantics.
- * @param {number} tid trajectory database id
- * @param {string} sessionId executor agent session id
- * @param {object|null} runtime mutable trajectory runtime entry
- * @returns {Promise<{attached: object|null, bibError: string|null, remoteSessionId: number|null, status: object|null}>} attach outcome
+ * 为交易附加 browser-in-browser 流并同步其挂载状态。除所有权冲突外，BiB 失败以降级状态
+ * 返回；所有权冲突会重新抛出，以让调用方保留 HTTP 409 语义。
+ * @param {number} tid 交易数据库 ID
+ * @param {string} sessionId 执行机 agent 会话 ID
+ * @param {object|null} runtime 可变的交易运行时条目
+ * @returns {Promise<{attached: object|null, bibError: string|null, remoteSessionId: number|null, status: object|null}>} 附加结果
  */
 async function attachBibBestEffort(tid, sessionId, runtime) {
   let attached = null;

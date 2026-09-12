@@ -13,10 +13,10 @@
 const MAX_EVIDENCE_LEN = 160;
 
 /**
- * Normalize whitespace and cap evidence text before exposing it in diagnostics.
- * @param {unknown} value arbitrary evidence value
- * @param {number} [max] maximum output length
- * @returns {string} single-line clipped text
+ * 在诊断信息中暴露证据文本前归一化空白并限制长度。
+ * @param {unknown} value 任意证据值
+ * @param {number} [max] 最大输出长度
+ * @returns {string} 截断后的单行文本
  */
 function clipText(value, max = MAX_EVIDENCE_LEN) {
   const s = String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -24,9 +24,9 @@ function clipText(value, max = MAX_EVIDENCE_LEN) {
 }
 
 /**
- * Convert a step error into comparable text while preserving structured errors.
- * @param {unknown} errorResult raw action result or thrown error
- * @returns {string} deterministic error representation
+ * 将步骤错误转换为可比较的文本，同时保留结构化错误。
+ * @param {unknown} errorResult 原始操作结果或抛出的错误
+ * @returns {string} 确定性的错误表示
  */
 function normalizeError(errorResult) {
   if (errorResult == null || errorResult === '') return '';
@@ -40,19 +40,19 @@ function normalizeError(errorResult) {
 }
 
 /**
- * Convert an optional value into a string array and discard empty entries.
- * @param {unknown} value candidate array
- * @returns {string[]} normalized non-empty string values
+ * 将可选值转换为字符串数组并丢弃空条目。
+ * @param {unknown} value 候选数组
+ * @returns {string[]} 归一化后的非空字符串值
  */
 function asStringArray(value) {
   return Array.isArray(value) ? value.map((v) => String(v ?? '')).filter(Boolean) : [];
 }
 
 /**
- * Normalize a form-structure report into the fields used by classification rules.
- * Missing or malformed reports produce an empty report with all change flags false.
- * @param {unknown} report raw form structure report
- * @returns {{hasRequiredChange: boolean, hasOptionalChange: boolean, added_required: string[], added_optional: string[], missing_required: string[], missing_optional: string[]}} normalized report
+ * 将表单结构报告归一化为分类规则使用的字段。缺失或格式错误的报告会生成所有变更标记均为
+ * false 的空报告。
+ * @param {unknown} report 原始表单结构报告
+ * @returns {{hasRequiredChange: boolean, hasOptionalChange: boolean, added_required: string[], added_optional: string[], missing_required: string[], missing_optional: string[]}} 归一化后的报告
  */
 function normalizeReport(report) {
   if (!report || typeof report !== 'object') {

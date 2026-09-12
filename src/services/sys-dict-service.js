@@ -5,10 +5,10 @@ import * as typeDao from '../dao/sys-dict-type-dao.js';
 import * as dataDao from '../dao/sys-dict-data-dao.js';
 
 /**
- * Construct a serializable service error with the HTTP status expected by routes.
- * @param {number} status HTTP response status code
- * @param {string} message human-readable failure message
- * @returns {Error & {statusCode: number}} configured error instance
+ * 构造可序列化的服务错误，并携带路由所需的 HTTP 状态码。
+ * @param {number} status HTTP 响应状态码
+ * @param {string} message 可读的失败消息
+ * @returns {Error & {statusCode: number}} 已配置的错误实例
  */
 function httpError(status, message) {
   const err = new Error(message);

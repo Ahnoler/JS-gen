@@ -10,8 +10,8 @@ import {
 } from '../../config/config.js';
 
 /**
- * Ensure the restricted pending-screenshot directory exists.
- * @returns {Promise<void>} resolves when the directory is available
+ * 确保受限的待处理截图目录存在。
+ * @returns {Promise<void>} 目录可用后完成
  */
 async function ensureDir() {
   await mkdir(SCREENSHOT_PENDING_DIR, { recursive: true, mode: 0o700 });

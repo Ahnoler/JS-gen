@@ -20,10 +20,10 @@ import {
 import { getDB } from '../../config/database.js';
 
 /**
- * Upload image bytes through the configured MinIO backend.
- * @param {Buffer} buffer image bytes
- * @param {string} mimeType image MIME type
- * @returns {Promise<object>} uploaded object metadata
+ * 通过配置的 MinIO 后端上传图像字节。
+ * @param {Buffer} buffer 图像字节
+ * @param {string} mimeType 图像 MIME 类型
+ * @returns {Promise<object>} 已上传对象的元数据
  */
 async function uploadOrThrow(buffer, mimeType) {
   if (!isMinioConfigured()) {
@@ -33,11 +33,11 @@ async function uploadOrThrow(buffer, mimeType) {
 }
 
 /**
- * Remove the object or local pending file represented by a screenshot row.
- * @param {object|null} row persisted screenshot row
- * @param {object} [options] deletion behavior
- * @param {boolean} [options.strict] whether MinIO deletion errors are fatal
- * @returns {Promise<void>} resolves after storage cleanup
+ * 删除截图行所表示的对象或本地待处理文件。
+ * @param {object|null} row 持久化的截图行
+ * @param {object} [options] 删除行为选项
+ * @param {boolean} [options.strict] MinIO 删除错误是否应视为致命错误
+ * @returns {Promise<void>} 存储清理完成后结束
  */
 async function removeStoredObject(row, { strict = false } = {}) {
   if (!row) return;
@@ -55,11 +55,11 @@ async function removeStoredObject(row, { strict = false } = {}) {
 }
 
 /**
- * Persist a local pending screenshot after a MinIO upload failure.
- * @param {object} opts fallback dependencies
- * @param {function(object): Promise<number|null>} opts.daoCall DAO persistence callback
- * @param {object} opts.pendingFile temporary pending-file descriptor
- * @returns {Promise<number>} persisted screenshot row id
+ * MinIO 上传失败后持久化本地待处理截图。
+ * @param {object} opts 回退依赖
+ * @param {function(object): Promise<number|null>} opts.daoCall DAO 持久化回调
+ * @param {object} opts.pendingFile 临时待处理文件描述
+ * @returns {Promise<number>} 持久化后的截图行 ID
  */
 async function fallbackToLocal({ daoCall, pendingFile }) {
   let id = null;

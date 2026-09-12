@@ -261,7 +261,7 @@ export function resolveLiveBinding(opts = {}) {
 }
 
 /**
- * Clear all live BiB bindings during a full executor-state reset.
+ * 在完整执行器状态重置期间清除所有实时 BiB 绑定。
  * @returns {void}
  */
 export function clearExecutorLive() {

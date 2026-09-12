@@ -12,8 +12,8 @@ import {
 } from '../../config/config.js';
 
 /**
- * Release all in-memory leases, runtimes, and session bindings for a node.
- * @param {string} nodeUuid executor node uuid
+ * 释放节点的所有内存租约、运行时和会话绑定。
+ * @param {string} nodeUuid 执行器节点 UUID
  * @returns {void}
  */
 function purgeNodeBindings(nodeUuid) {
@@ -128,9 +128,9 @@ export function onDisconnect(nodeUuid, nodeId) {
 }
 
 /**
- * Add live registry and slot-lease state to a persisted executor node row.
- * @param {object|null} node persisted executor node
- * @returns {object|null} enriched node row or null
+ * 将实时注册表和槽位租约状态添加到持久化的执行器节点行。
+ * @param {object|null} node 持久化的执行器节点
+ * @returns {object|null} 增强后的节点行或 null
  */
 function withLeaseSlots(node) {
   if (!node) return null;

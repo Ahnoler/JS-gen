@@ -11,9 +11,9 @@ import {
 } from './transaction-export-v3-region.js';
 
 /**
- * Parse a JSON value used in persisted trajectory fields.
- * @param {unknown} raw object or serialized JSON value
- * @returns {object|null} parsed value, or null when invalid
+ * 解析持久化轨迹字段中使用的 JSON 值。
+ * @param {unknown} raw 对象或序列化的 JSON 值
+ * @returns {object|null} 解析后的值，无效时为 null
  */
 function parseJson(raw) {
   if (raw == null) return null;
@@ -26,9 +26,9 @@ function parseJson(raw) {
 }
 
 /**
- * Read and validate the element metadata attached to a trajectory step.
- * @param {object} step trajectory step row
- * @returns {object|null} element metadata, or null when unavailable
+ * 读取并校验附加到轨迹步骤的元素元数据。
+ * @param {object} step 轨迹步骤行
+ * @returns {object|null} 元素元数据，不可用时为 null
  */
 function parseStepElement(step) {
   const el = parseJson(step?.elementJson);
@@ -117,9 +117,9 @@ export function buildV3Properties({
 
   // 从 region_id 链提取分区段（跳过 page: 和 overlay: 段）
   /**
-   * Extract partition segments that can become intermediate property nodes.
-   * @param {string} regionId stamped region hierarchy
-   * @returns {string[]} non-page, non-overlay segments
+   * 提取可成为中间属性节点的分区段。
+   * @param {string} regionId 带标记的区域层级
+   * @returns {string[]} 非页面、非覆盖层分段
    */
   function extractPartitionSegments(regionId) {
     const rid = String(regionId || '').trim();
@@ -131,9 +131,9 @@ export function buildV3Properties({
 
   // 从分区段提取 role（"role:label" → "role"；无冒号则整段作 role）
   /**
-   * Extract the role portion of one region segment.
-   * @param {string} seg region segment
-   * @returns {string} segment role
+   * 提取一个区域分段中的角色部分。
+   * @param {string} seg 区域分段
+   * @returns {string} 分段角色
    */
   function segmentRole(seg) {
     const i = seg.indexOf(':');
@@ -141,9 +141,9 @@ export function buildV3Properties({
   }
   // 从分区段提取 label（"role:label" → "label"；无冒号则整段）
   /**
-   * Extract the display label portion of one region segment.
-   * @param {string} seg region segment
-   * @returns {string} segment label
+   * 提取一个区域分段中的展示标签部分。
+   * @param {string} seg 区域分段
+   * @returns {string} 分段标签
    */
   function segmentLabel(seg) {
     const i = seg.indexOf(':');
@@ -153,10 +153,10 @@ export function buildV3Properties({
   // 为 step 的分区段创建/复用中间节点，返回最近节点的 id（无分区段或全被跳过返回 null）
   // role 按 §8 映射 type；SKIP_SECTION_ROLES 的段跳过（不建节点，parentId 不变）
   /**
-   * Create or reuse intermediate nodes for a step's partition path.
-   * @param {string[]} segments partition segments
-   * @param {string} rootPid screenshot/root property id
-   * @returns {string|null} nearest created node id, or null
+   * 为步骤的分区路径创建或复用中间节点。
+   * @param {string[]} segments 分区分段
+   * @param {string} rootPid 截图/根属性 ID
+   * @returns {string|null} 最近创建的节点 ID，无结果时为 null
    */
   function ensureSectionNodes(segments, rootPid) {
     if (!segments.length) return null;
@@ -209,9 +209,9 @@ export function buildV3Properties({
   // 且不晚于当前步骤者；popup 的 propertiesPID 改挂触发图标对象节点（弹窗挂在触发按钮后面）。
   // anchor 形如 "//a[@aria-label='新增一级分类']"，提取第一个属性值与步骤元素匹配。
   /**
-   * Extract the first quoted label from an anchor expression.
-   * @param {string} anchor anchor expression
-   * @returns {string} extracted label, or an empty string
+   * 从锚点表达式中提取第一个带引号的标签。
+   * @param {string} anchor 锚点表达式
+   * @returns {string} 提取的标签，或空字符串
    */
   function anchorMatchLabel(anchor) {
     const m = String(anchor || '').match(/='([^']+)'/);
@@ -219,10 +219,10 @@ export function buildV3Properties({
   }
 
   /**
-   * Check whether element locator/text fields match a popup anchor.
-   * @param {object} el captured element metadata
-   * @param {string} anchor anchor expression
-   * @returns {boolean} whether the element matches
+   * 检查元素定位器/文本字段是否匹配弹窗锚点。
+   * @param {object} el 采集的元素元数据
+   * @param {string} anchor 锚点表达式
+   * @returns {boolean} 元素是否匹配
    */
   function elementMatchesAnchor(el, anchor) {
     const anchorStr = String(anchor || '').trim();
@@ -239,9 +239,9 @@ export function buildV3Properties({
   }
 
   /**
-   * Parse page, dialog title, and optional trigger anchor from a region key.
-   * @param {string} regionId page/dialog region key
-   * @returns {{pageKey: string, title: string, anchor: string}|null} parsed parts
+   * 从区域键中解析页面、弹窗标题和可选的触发锚点。
+   * @param {string} regionId 页面/弹窗区域键
+   * @returns {{pageKey: string, title: string, anchor: string}|null} 解析后的部分
    */
   function popupPartsFromRegionId(regionId) {
     const key = String(regionId || '');
@@ -272,10 +272,10 @@ export function buildV3Properties({
 
   // 触发链归属：返回最晚触发且 ≤ stepIdx 的同页弹窗 entryId；无候选返回 null
   /**
-   * Find the latest eligible popup trigger for a step on a page.
-   * @param {string} pageKey page-level key
-   * @param {number} stepIdx current step index
-   * @returns {string|null} matching popup entry id, or null
+   * 查找页面上某步骤对应的最新可用弹窗触发条目。
+   * @param {string} pageKey 页面级键
+   * @param {number} stepIdx 当前步骤索引
+   * @returns {string|null} 匹配的弹窗条目 ID，或 null
    */
   function popupByTriggerChain(pageKey, stepIdx) {
     if (!pageKey) return null;

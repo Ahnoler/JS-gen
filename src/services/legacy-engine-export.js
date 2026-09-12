@@ -244,10 +244,10 @@ export function pickOperationValue(action, params = {}) {
 }
 
 /**
- * Resolve the legacy engine type, including date-picker specialization for fills.
- * @param {string} action normalized action name
- * @param {object} [element] recorded element metadata
- * @returns {string|null} emitted engine type or null when unsupported
+ * 解析旧版引擎类型，包括填充操作的日期选择器特化类型。
+ * @param {string} action 规范化的操作名称
+ * @param {object} [element] 录制的元素元数据
+ * @returns {string|null} 输出的引擎类型，不支持时为 null
  */
 function resolveEngineType(action, element = {}) {
   const mapped = ACTION_TO_ENGINE_TYPE[action];

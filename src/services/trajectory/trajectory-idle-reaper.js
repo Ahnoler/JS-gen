@@ -25,12 +25,11 @@ let timer = null;
 let running = false;
 
 /**
- * Read the newest persisted step timestamp for a trajectory.
+ * 读取交易最新持久化步骤的时间戳。
  *
- * The runtime normally supplies this value, but the database is the fallback
- * when a process restart or an older runtime entry has no in-memory timestamp.
- * @param {number|string} trajectoryId trajectory database id
- * @returns {Promise<number|null>} newest step creation time in epoch milliseconds
+ * 运行时通常会提供此值，但进程重启或较旧的运行时条目没有内存时间戳时，数据库作为兜底。
+ * @param {number|string} trajectoryId 交易数据库 ID
+ * @returns {Promise<number|null>} 最新步骤创建时间的纪元毫秒数
  */
 async function latestStepCreatedAt(trajectoryId) {
   const db = getDB();
@@ -42,10 +41,9 @@ async function latestStepCreatedAt(trajectoryId) {
 }
 
 /**
- * Convert a date-like value into an epoch timestamp for idle-age comparison.
- * Invalid, empty, or absent values are represented as null.
- * @param {string|number|Date|null|undefined} value date-like input
- * @returns {number|null} finite epoch milliseconds, or null when unparseable
+ * 将类日期值转换为用于空闲时长比较的纪元时间戳。无效、为空或缺失的值表示为 null。
+ * @param {string|number|Date|null|undefined} value 类日期输入
+ * @returns {number|null} 有限的纪元毫秒数，无法解析时为 null
  */
 function parseTs(value) {
   if (!value) return null;
@@ -54,11 +52,10 @@ function parseTs(value) {
 }
 
 /**
- * Determine whether an agent session is still represented by live control-plane state.
- * Both the session registry and trajectory runtime map are checked because either
- * may retain the authoritative association during lifecycle transitions.
- * @param {string|null|undefined} agentSessionId executor agent session id
- * @returns {boolean} true when the session is still live or reusable
+ * 判断 agent 会话是否仍由控制面的实时状态表示。会同时检查会话注册表和交易运行时映射，
+ * 因为在生命周期切换期间任一方都可能保留权威关联。
+ * @param {string|null|undefined} agentSessionId 执行机 agent 会话 ID
+ * @returns {boolean} 会话仍存活或可复用时为 true
  */
 function agentSessionStillLive(agentSessionId) {
   if (!agentSessionId) return false;
@@ -173,9 +170,8 @@ export async function reapIdleTrajectoryRuntimes() {
 }
 
 /**
- * Start the periodic idle-runtime reaper once for the control-plane process.
- * Each tick is serialized so a slow database or executor cleanup cannot overlap
- * with the next tick; the timer is unref'ed so it does not keep Node alive.
+ * 为控制面进程仅启动一次定期空闲运行时回收器。每个 tick 都会串行执行，防止缓慢的数据库或
+ * 执行机清理与下一次 tick 重叠；计时器会 unref，从而不阻止 Node 退出。
  * @returns {void}
  */
 export function startTrajectoryIdleReaper() {

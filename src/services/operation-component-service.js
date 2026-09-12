@@ -20,10 +20,10 @@ import {
 } from './operation-component-signature.js';
 
 /**
- * Create a service error carrying the HTTP status expected by route handlers.
- * @param {string} message human-readable error message
- * @param {number} [statusCode] HTTP status code
- * @returns {Error & {statusCode: number}} configured service error
+ * 创建携带路由处理器所需 HTTP 状态码的服务错误。
+ * @param {string} message 可读的错误消息
+ * @param {number} [statusCode] HTTP 状态码
+ * @returns {Error & {statusCode: number}} 已配置的服务错误
  */
 function svcError(message, statusCode = 400) {
   const err = new Error(message);
@@ -64,9 +64,9 @@ export async function resolveSystemIdForTrajectory(trajectory) {
 }
 
 /**
- * Parse serialized step params and element data into the internal step shape.
- * @param {object} step raw DAO or request step
- * @returns {object} normalized step with parsed params and element fields
+ * 将序列化的步骤参数和元素数据解析为内部步骤结构。
+ * @param {object} step DAO 或请求中的原始步骤
+ * @returns {object} 带有已解析参数和元素字段的规范化步骤
  */
 function parseStepParams(step) {
   let params = step.params ?? step.paramsJson ?? null;

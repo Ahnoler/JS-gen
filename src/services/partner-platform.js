@@ -18,20 +18,19 @@ export const DEFAULT_PARTNER_SYSTEM_ID = '98';
 export const DEFAULT_PARTNER_PROJECT_ID = '31';
 
 /**
- * Read a trimmed configuration value through the repository config resolver.
- * Empty or falsey values are normalized to the supplied fallback so callers
- * can apply their endpoint or credential precedence rules consistently.
- * @param {string} key configuration key
- * @param {string} [fallback] value used when the key is unset
- * @returns {string} trimmed configuration value
+ * 通过仓库配置解析器读取去除首尾空白的配置值。
+ * 空值或假值会规范化为指定回退值，使调用方能够一致地应用端点或凭据优先级规则。
+ * @param {string} key 配置键
+ * @param {string} [fallback] 配置键未设置时使用的值
+ * @returns {string} 去除首尾空白的配置值
  */
 function envOrConfig(key, fallback = '') {
   return String(configResolve(key, fallback) || '').trim();
 }
 
 /**
- * Resolve the base URL used for partner platform API requests.
- * @returns {string} base URL without a trailing slash
+ * 解析伙伴平台 API 请求使用的基础 URL。
+ * @returns {string} 不带末尾斜杠的基础 URL
  */
 function partnerApiBase() {
   const raw = envOrConfig('PARTNER_API_BASE')
@@ -41,16 +40,16 @@ function partnerApiBase() {
 }
 
 /**
- * Resolve the partner system API base URL.
- * @returns {string} configured partner API base URL
+ * 解析伙伴系统 API 基础 URL。
+ * @returns {string} 已配置的伙伴 API 基础 URL
  */
 function systemBaseUrl() {
   return partnerApiBase();
 }
 
 /**
- * Resolve the partner importDemand endpoint, honoring an explicit override.
- * @returns {string} importDemand request URL
+ * 解析伙伴 importDemand 端点，并遵循显式覆盖配置。
+ * @returns {string} importDemand 请求 URL
  */
 function importDemandUrl() {
   const override = envOrConfig('PARTNER_IMPORT_DEMAND_URL');
@@ -114,16 +113,15 @@ export function resolveSystemProject(src = {}) {
 }
 
 /**
- * Execute an authenticated partner request and parse its response best-effort.
- * Network, timeout, and transport failures are converted to service errors;
- * non-JSON responses remain available to callers for diagnostics.
- * @param {string} url request URL
- * @param {object} [options] request options
- * @param {string} options.accessToken partner access token
- * @param {string} [options.method] HTTP method
- * @param {unknown} [options.body] JSON request body
- * @param {number} [options.timeoutMs] abort timeout in milliseconds
- * @returns {Promise<{httpStatus: number, ok: boolean, json: object|null, text: string}>} response envelope
+ * 执行经过认证的伙伴请求，并尽力解析其响应。
+ * 网络、超时和传输失败会转换为服务错误；非 JSON 响应仍会保留，供调用方诊断。
+ * @param {string} url 请求 URL
+ * @param {object} [options] 请求选项
+ * @param {string} options.accessToken 伙伴访问令牌
+ * @param {string} [options.method] HTTP 方法
+ * @param {unknown} [options.body] JSON 请求体
+ * @param {number} [options.timeoutMs] 中止超时时间（毫秒）
+ * @returns {Promise<{httpStatus: number, ok: boolean, json: object|null, text: string}>} 响应封装对象
  */
 async function partnerFetch(url, { method = 'GET', accessToken, body, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   if (!accessToken) {
@@ -222,12 +220,11 @@ export function toPartnerImportPayload(payload) {
 }
 
 /**
- * Validate the partner business response code and raise a gateway error for
- * malformed or explicitly unsuccessful partner responses.
- * @param {unknown} json parsed partner response
- * @param {string} [fallbackMsg] message for malformed responses
- * @returns {object} validated partner response
- * @throws {Error} when the response is malformed or reports failure
+ * 校验伙伴业务响应码，并在响应格式错误或明确表示失败时抛出网关错误。
+ * @param {unknown} json 已解析的伙伴响应
+ * @param {string} [fallbackMsg] 响应格式错误时使用的消息
+ * @returns {object} 已校验的伙伴响应
+ * @throws {Error} 响应格式错误或报告失败时抛出
  */
 function assertPartnerBusinessOk(json, fallbackMsg = PARTNER_NETWORK_ERROR_MSG) {
   if (json == null || typeof json !== 'object') {
@@ -270,9 +267,9 @@ export function preflightCheck(wirePayload) {
 }
 
 /**
- * Normalize one partner project row to the compact project shape used by APIs.
- * @param {unknown} row raw partner row
- * @returns {{id: number|string, name: string}|null} normalized row or null
+ * 将一条伙伴项目行规范化为 API 使用的紧凑项目结构。
+ * @param {unknown} row 原始伙伴行
+ * @returns {{id: number|string, name: string}|null} 规范化后的行或 null
  */
 function normalizeProjectRow(row) {
   if (!row || typeof row !== 'object') return null;
@@ -312,9 +309,9 @@ export async function listPartnerProjects({ accessToken } = {}) {
 }
 
 /**
- * Recursively normalize one partner system-tree node and its child nodes.
- * @param {unknown} node raw partner node
- * @returns {object|null} normalized node or null for an unusable row
+ * 递归规范化一个伙伴系统树节点及其子节点。
+ * @param {unknown} node 原始伙伴节点
+ * @returns {object|null} 规范化后的节点，不可用行返回 null
  */
 function normalizeSystemNode(node) {
   if (!node || typeof node !== 'object') return null;
@@ -500,7 +497,7 @@ export async function pushImportDemand(payload, { accessToken } = {}) {
 /**
  * 把 v1.2 本地 payload 适配成伙伴 importData 契约（剥 schemaVersion，保留 menus 明细）。
  * @param {object} payload buildMenuPushPayload 输出
- * @returns {{ systemNodeId: number, systemName?: string, menuVersion?: number, menus: object[] }} partner importData payload
+ * @returns {{ systemNodeId: number, systemName?: string, menuVersion?: number, menus: object[] }} 伙伴 importData 载荷
  */
 export function toPartnerMenuPushPayload(payload) {
   if (!payload || typeof payload !== 'object') return payload;
@@ -521,8 +518,8 @@ export function toPartnerMenuPushPayload(payload) {
  * POST 伙伴菜单 importData（`/system/umlElementData/importData`）。
  * 基址：`PARTNER_API_BASE`（与交易推送同一伙伴平台）。
  * @param {object} payload v1.2 wire body（schemaVersion/systemNodeId/systemName/menuVersion/menus）
- * @param {{ accessToken?: string }} [opts] partner authentication options
- * @returns {Promise<{ code: number, msg?: string, data?: unknown }>} normalized partner response
+ * @param {{ accessToken?: string }} [opts] 伙伴认证选项
+ * @returns {Promise<{ code: number, msg?: string, data?: unknown }>} 规范化后的伙伴响应
  */
 export async function pushMenusToPartner(payload, { accessToken } = {}) {
   const url = `${partnerApiBase()}/system/umlElementData/importData`;

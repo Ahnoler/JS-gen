@@ -5,8 +5,8 @@
  * transport uses L1C_LLM_MODEL / L1C_LLM_BASE_URL / L1C_LLM_API_KEY (fallback LLM_*).
  */
 /**
- * Classify captured region cards using deterministic rules with optional LLM
- * assistance and a short-lived in-memory cache for repeated feature shapes.
+ * 使用确定性规则对采集的区域卡片分类，可选使用 LLM 辅助，
+ * 并通过短期内存缓存处理重复的特征形态。
  */
 import { createHash } from 'node:crypto';
 import { callLLM } from '../llm-utils.js';
@@ -37,9 +37,9 @@ const L1D_TTL_MS = 3600 * 1000;
 const l1dCache = new Map();
 
 /**
- * Read a non-expired value from the L1d classification cache.
- * @param {string} key cache key
- * @returns {object|null} cached classification or null on miss/expiry
+ * 从 L1d 分类缓存读取未过期的值。
+ * @param {string} key 缓存键
+ * @returns {object|null} 缓存的分类结果，未命中或过期时为 null
  */
 function cacheGet(key) {
   const row = l1dCache.get(key);
@@ -52,9 +52,9 @@ function cacheGet(key) {
 }
 
 /**
- * Store the stable classification fields in the L1d cache.
- * @param {string} key cache key
- * @param {object} value classification result
+ * 将稳定的分类字段存入 L1d 缓存。
+ * @param {string} key 缓存键
+ * @param {object} value 分类结果
  * @returns {void}
  */
 function cacheSet(key, value) {
@@ -98,9 +98,9 @@ export function shouldLlmClassify(card = {}) {
 }
 
 /**
- * Check whether a role is in the supported taxonomy or custom-role format.
- * @param {string} role candidate role
- * @returns {boolean} whether the role is valid
+ * 检查角色是否属于支持的分类体系或自定义角色格式。
+ * @param {string} role 候选角色
+ * @returns {boolean} 角色是否有效
  */
 function isValidRole(role) {
   const r = String(role || '');
@@ -108,9 +108,9 @@ function isValidRole(role) {
 }
 
 /**
- * Parse an LLM response containing a JSON array, tolerating surrounding prose.
- * @param {string} raw raw model response
- * @returns {Array<object>|null} parsed array or null when invalid
+ * 解析包含 JSON 数组的 LLM 响应，并容忍周围的说明性文本。
+ * @param {string} raw 原始模型响应
+ * @returns {Array<object>|null} 解析后的数组，无效时为 null
  */
 function parseLlmJsonArray(raw) {
   const text = String(raw || '').trim();
@@ -134,9 +134,9 @@ function parseLlmJsonArray(raw) {
 }
 
 /**
- * Build the constrained prompt used for batched region classification.
- * @param {Array<object>} cards region cards to classify
- * @returns {string} serialized classification prompt
+ * 构造批量区域分类使用的受限提示词。
+ * @param {Array<object>} cards 待分类的区域卡片
+ * @returns {string} 序列化的分类提示词
  */
 function buildClassifyPrompt(cards) {
   const slim = cards.map((c, i) => ({
@@ -158,10 +158,10 @@ function buildClassifyPrompt(cards) {
 }
 
 /**
- * Call the configured LLM while enforcing the region-classification timeout.
- * @param {string} prompt classification prompt
- * @param {string} model model identifier
- * @returns {Promise<unknown>} raw model response
+ * 调用配置的 LLM，并强制执行区域分类超时限制。
+ * @param {string} prompt 分类提示词
+ * @param {string} model 模型标识
+ * @returns {Promise<unknown>} 原始模型响应
  */
 async function callLLMWithTimeout(prompt, model) {
   let timer;
@@ -183,9 +183,9 @@ async function callLLMWithTimeout(prompt, model) {
 }
 
 /**
- * Classify one batch of cards and normalize each model item.
- * @param {Array<object>} cards region cards
- * @returns {Promise<Array<object|null>>} normalized results aligned to cards
+ * 对一批卡片分类，并规范化每个模型项目。
+ * @param {Array<object>} cards 区域卡片
+ * @returns {Promise<Array<object|null>>} 与卡片对齐的规范化结果
  */
 async function llmClassifyBatch(cards) {
   const raw = await callLLMWithTimeout(buildClassifyPrompt(cards), L1C_LLM_MODEL);
@@ -210,10 +210,10 @@ async function llmClassifyBatch(cards) {
 }
 
 /**
- * Overlay an optional LLM classification onto the rule-based base result.
- * @param {object} base rule-based classification
- * @param {object|null} llmItem normalized LLM result
- * @returns {object} merged classification
+ * 将可选的 LLM 分类结果叠加到基于规则的基础结果上。
+ * @param {object} base 基于规则的分类结果
+ * @param {object|null} llmItem 规范化的 LLM 结果
+ * @returns {object} 合并后的分类结果
  */
 function mergeLlm(base, llmItem) {
   if (!llmItem) return { ...base, source: 'rule' };

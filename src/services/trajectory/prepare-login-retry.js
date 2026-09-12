@@ -4,9 +4,8 @@
  * Replaces the old fixed 8s sleep after first failure (login-retry-heuristic).
  */
 /**
- * Prepare-time login retry policy for executor cold starts.
- * A failed attempt optionally settles page readiness, waits with capped
- * exponential backoff within a wall-clock budget, then retries the login.
+ * 执行机冷启动时 prepare 阶段的登录重试策略。一次尝试失败后，可选地等待页面就绪，
+ * 在墙钟时间预算内按设上限的指数退避等待，再次尝试登录。
  */
 
 /**

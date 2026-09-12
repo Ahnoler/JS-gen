@@ -1,11 +1,9 @@
 /**
- * Public entry point for the requirement-to-draft-trajectory service.
+ * 需求到草稿轨迹服务的公共入口。
  *
- * This barrel exposes parsing, provenance, proposal caching, atom materialization,
- * commit validation, flow-card guidance, and key-data normalization through one
- * service-level import. The underlying modules retain responsibility for their
- * filesystem, database, and LLM interactions; this file only re-exports their
- * public contract.
+ * 此聚合模块通过单个服务级导入公开解析、出处、提议缓存、原子实例化、提交校验、
+ * 流程卡引导和关键数据规范化。底层模块仍各自负责文件系统、数据库和 LLM 交互；
+ * 本文件仅重新导出其公共契约。
  */
 export { parseThroughChainsMarkdown, buildAtomKey, hasProposeableChainSteps } from './parse-through-chains.js';
 export {

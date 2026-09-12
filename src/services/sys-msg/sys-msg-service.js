@@ -1,9 +1,8 @@
 /**
- * System-message service for creating and querying user-facing notifications.
+ * 用于创建和查询面向用户通知的系统消息服务。
  *
- * The service coordinates message persistence with dictionary and hierarchy
- * lookups, translates database rows into the API shape, and exposes the
- * read-state operations used by the control-plane notification UI.
+ * 该服务协调消息持久化、字典和层级查询，将数据库行转换为 API 结构，并暴露
+ * 控制面通知 UI 使用的已读状态操作。
  */
 import * as systemDao from '../../dao/system-dao.js';
 import * as dataDao from '../../dao/sys-dict-data-dao.js';
@@ -20,10 +19,10 @@ import {
 } from './sys-msg-compose.js';
 
 /**
- * Create an error that route handlers can serialize with an HTTP status.
- * @param {number} status HTTP response status code
- * @param {string} message human-readable error message
- * @returns {Error} error instance carrying statusCode
+ * 创建可由路由处理器连同 HTTP 状态一起序列化的错误。
+ * @param {number} status HTTP 响应状态码
+ * @param {string} message 人类可读的错误消息
+ * @returns {Error} 携带 statusCode 的错误实例
  */
 function httpError(status, message) {
   const err = new Error(message);
@@ -32,10 +31,9 @@ function httpError(status, message) {
 }
 
 /**
- * Resolve the configured display title for batch-import messages.
- * Falls back to the built-in title when the dictionary is unavailable or
- * contains no active entry for the batch-import message type.
- * @returns {Promise<string>} configured or fallback message title
+ * 解析批量导入消息配置的展示标题。字典不可用或未包含批量导入消息类型的
+ * 启用条目时，回退到内置标题。
+ * @returns {Promise<string>} 配置的或回退的消息标题
  */
 async function resolveTitle() {
   try {
@@ -48,10 +46,10 @@ async function resolveTitle() {
 }
 
 /**
- * Resolve a hierarchy function id into the name and ownership id used by a
- * system-message row, while degrading cleanly when the id is invalid or gone.
- * @param {number|string|null} functionId hierarchy function node id
- * @returns {Promise<{name: string, id: number|null}>} resolved display name and id
+ * 将层级功能 ID 解析为系统消息行使用的名称和归属 ID；ID 无效或已不存在时
+ * 平稳降级。
+ * @param {number|string|null} functionId 层级功能节点 ID
+ * @returns {Promise<{name: string, id: number|null}>} 已解析的展示名称和 ID
  */
 async function resolveFunctionName(functionId) {
   const id = Number(functionId);
@@ -96,8 +94,8 @@ export async function insertSysMsgFromBatchJob(job, summary = {}) {
 }
 
 /**
- * Build a lookup from active system-message type values to dictionary labels.
- * @returns {Promise<Record<string, string>>} type-to-label map, or an empty map on lookup failure
+ * 构建从启用的系统消息类型值到字典标签的查找映射。
+ * @returns {Promise<Record<string, string>>} 类型到标签的映射；查询失败时为空映射
  */
 async function typeLabelMap() {
   try {

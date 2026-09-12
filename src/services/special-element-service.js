@@ -26,10 +26,10 @@ import { state } from '../state.js';
 const SPECIAL_ELEMENT_TAG = 'special_element_tag';
 
 /**
- * Create an error carrying an HTTP status for service-layer failures.
- * @param {number} status HTTP status code
- * @param {string} message human-readable error message
- * @returns {Error & {statusCode: number}} configured error
+ * 创建携带 HTTP 状态码的服务层失败错误。
+ * @param {number} status HTTP 状态码
+ * @param {string} message 可读的错误消息
+ * @returns {Error & {statusCode: number}} 已配置的错误
  */
 function httpError(status, message) {
   const err = new Error(message);
@@ -38,9 +38,9 @@ function httpError(status, message) {
 }
 
 /**
- * Parse persisted JSON fields while accepting already-parsed values.
- * @param {unknown} val raw JSON value
- * @returns {unknown|null} parsed value, or null when malformed
+ * 解析持久化的 JSON 字段，同时接受已经解析的值。
+ * @param {unknown} val 原始 JSON 值
+ * @returns {unknown|null} 解析后的值，格式错误时为 null
  */
 function parseJsonMaybe(val) {
   if (val == null) return null;
@@ -69,9 +69,9 @@ export function buildSearchText({ name, dictLabel, phaseDescription, remark }) {
 }
 
 /**
- * Load the persisted steps and attach them to a special-element row.
- * @param {object|null} element special-element row
- * @returns {Promise<object|null>} row with steps, or null
+ * 加载持久化步骤并将其附加到特殊元素行。
+ * @param {object|null} element 特殊元素行
+ * @returns {Promise<object|null>} 带步骤的行或 null
  */
 async function withSteps(element) {
   if (!element) return null;

@@ -25,8 +25,8 @@ export function isMinioConfigured() {
 }
 
 /**
- * Lazily construct and cache the MinIO client from repository configuration.
- * @returns {import('minio').Client} configured MinIO client
+ * 根据仓库配置按需构造并缓存 MinIO 客户端。
+ * @returns {import('minio').Client} 已配置的 MinIO 客户端
  */
 function getClient() {
   if (!client) {
@@ -42,10 +42,9 @@ function getClient() {
 }
 
 /**
- * Verify MinIO configuration and create the configured bucket when absent.
- * Concurrent callers share the same initialization promise; failed setup can
- * be retried by clearing that promise in the rejection path.
- * @returns {Promise<void>} resolves when the bucket is ready
+ * 校验 MinIO 配置，并在目标存储桶不存在时创建它。
+ * 并发调用方共享同一个初始化 Promise；失败设置可在拒绝路径清除该 Promise 后重试。
+ * @returns {Promise<void>} 存储桶就绪后完成
  */
 async function ensureBucket() {
   if (!isMinioConfigured()) {

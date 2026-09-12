@@ -38,12 +38,11 @@ const RECORD_TIMEOUT_MS = 10 * 60 * 1000;
 const STALE_JOB_MS = 30 * 60 * 1000;
 
 /**
- * Create an application error carrying the HTTP status expected by route
- * handlers. The helper keeps validation and downstream service failures
- * consistent without changing the native Error message or stack behavior.
- * @param {string} message human-readable error message
- * @param {number} statusCode HTTP status code exposed to the caller; defaults to 400
- * @returns {Error} error instance with an additional statusCode property
+ * 创建携带路由处理器预期 HTTP 状态的应用错误。该辅助函数在不改变原生
+ * Error 消息或堆栈行为的前提下，使校验失败与下游服务失败保持一致。
+ * @param {string} message 人类可读的错误消息
+ * @param {number} statusCode 暴露给调用方的 HTTP 状态码；默认 400
+ * @returns {Error} 带有附加 statusCode 属性的错误实例
  */
 function svcError(message, statusCode = 400) {
   const err = new Error(message);
@@ -52,9 +51,9 @@ function svcError(message, statusCode = 400) {
 }
 
 /**
- * Wait for a fixed interval before continuing a polling loop.
- * @param {number} ms delay duration in milliseconds
- * @returns {Promise<void>} promise resolved after the delay
+ * 在继续轮询循环前等待固定时长。
+ * @param {number} ms 延迟时长，单位毫秒
+ * @returns {Promise<void>} 延迟结束后兑现的 Promise
  */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -306,11 +305,10 @@ async function maskTrajectoryStepSecrets(tid, password) {
     if (!obj || typeof obj !== 'object') continue;
     let changed = false;
     /**
-     * Recursively replace exact password-valued properties in parsed params.
-     * Arrays and nested objects are traversed in place so the enclosing step
-     * can be persisted only when at least one secret was actually replaced.
-     * @param {unknown} node current array, object, or scalar value
-     * @returns {void} mutates node and the enclosing changed flag as needed
+     * 递归替换已解析参数中值与密码完全一致的属性。原地遍历数组和嵌套对象，
+     * 以便仅在实际替换至少一个密钥时持久化其所在步骤。
+     * @param {unknown} node 当前数组、对象或标量值
+     * @returns {void} 按需修改 node 及外围的 changed 标记
      */
     const walk = (node) => {
       if (Array.isArray(node)) {
@@ -748,9 +746,9 @@ export async function getAuthRecordingStatus(systemId) {
   }
   const job = await store.latestJobForSystem(sid);
   /**
-   * Load the compact trajectory status associated with an auth job.
-   * @param {number|null} tid trajectory id, or null when the segment was not created
-   * @returns {Promise<object|null>} status summary or null when unavailable
+   * 加载与认证任务关联的精简轨迹状态。
+   * @param {number|null} tid 轨迹 ID；尚未创建分段时为 null
+   * @returns {Promise<object|null>} 状态摘要；不可用时为 null
    */
   const summarize = async (tid) => {
     if (tid == null) return null;

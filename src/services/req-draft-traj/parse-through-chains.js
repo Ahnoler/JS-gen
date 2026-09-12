@@ -166,7 +166,7 @@ export function parseThroughChainsMarkdown(md) {
   let tableLines = [];
 
   /**
-   * Parse and commit the currently buffered table, if it belongs to a chain.
+   * 若当前缓冲的表格属于某条链路，则解析并提交该表格。
    * @returns {void}
    */
   const flushTable = () => {

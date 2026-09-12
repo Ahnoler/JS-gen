@@ -1,9 +1,8 @@
 /**
- * Trajectory step movement planning module.
+ * 轨迹步骤移动规划模块。
  *
- * This module is intentionally side-effect free: it validates a requested
- * move, rebuilds phase buckets in global phase order, and returns the complete
- * renumbered order for the persistence service to apply.
+ * 本模块有意保持无副作用：校验请求的移动操作，按全局阶段顺序重建阶段分组，
+ * 并返回供持久化服务应用的完整重编号顺序。
  *
  * Pure planner for POST .../steps/move.
  * Builds global order = phases sorted by phaseNumber, each phase's steps in list order

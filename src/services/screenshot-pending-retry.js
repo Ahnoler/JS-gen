@@ -1,6 +1,6 @@
 /**
- * Background retry coordinator for screenshots stored locally after a failed
- * MinIO upload. It serializes scans and exposes manual and scheduled entrypoints.
+ * MinIO 上传失败后对本地截图进行后台重试的协调器。
+ * 它串行执行扫描，并提供手动和定时入口。
  */
 import {
   SCREENSHOT_RETRY_INTERVAL_MS,
@@ -132,7 +132,7 @@ export function startPendingScreenshotRetry() {
 }
 
 /**
- * Stop the background pending-screenshot retry timer, if one is active.
+ * 停止后台待处理截图重试计时器（如果当前存在）。
  * @returns {void}
  */
 export function stopPendingScreenshotRetry() {

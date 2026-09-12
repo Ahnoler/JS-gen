@@ -49,11 +49,10 @@ const FILL_ACTION_TYPES = new Set([
 ]);
 
 /**
- * Parse the executor's form-structure result, accepting the prefixed wire
- * format as well as a plain JSON string or object. Malformed or non-object
- * values are treated as unavailable reports.
- * @param {unknown} raw raw replay result
- * @returns {object|null} parsed form-structure report, or null when invalid
+ * 解析执行机的表单结构结果，接受带前缀的线协议格式、普通 JSON 字符串或对象。
+ * 格式错误或非对象值视为不可用报告。
+ * @param {unknown} raw 原始回放结果
+ * @returns {object|null} 解析出的表单结构报告，无效时为 null
  */
 function parseFormStructureResult(raw) {
   const s = String(raw || '');
@@ -67,11 +66,10 @@ function parseFormStructureResult(raw) {
 }
 
 /**
- * Determine whether a form diff requires Type B healing work.
- * Container lookup failures are excluded because they are unsafe errors rather
- * than structural changes that can be repaired by this handler.
- * @param {object|null|undefined} report form-structure diff report
- * @returns {boolean} true when required or optional fields changed
+ * 判断表单差异是否需要 Type B 修复处理。容器查找失败会被排除，因为它们是不安全的
+ * 错误，而非可由本处理器修复的结构变更。
+ * @param {object|null|undefined} report 表单结构差异报告
+ * @returns {boolean} 必填或选填字段发生变化时为 true
  */
 function needsTypeB(report) {
   if (!report) return false;
@@ -549,11 +547,10 @@ export async function handleFormStructureCheckpoint({
 }
 
 /**
- * Persist the post-scan field set while retaining requiredness for unchanged
- * fields and applying the report's added-field classifications.
- * @param {object|null|undefined} snap stored form snapshot
- * @param {object|null|undefined} report live form-structure diff report
- * @returns {Promise<void>} resolves after the snapshot fields are updated
+ * 持久化扫描后的字段集合，保留未变字段的必填属性，并应用报告中新增字段的分类。
+ * @param {object|null|undefined} snap 已存储的表单快照
+ * @param {object|null|undefined} report 实时表单结构差异报告
+ * @returns {Promise<void>} 快照字段更新后兑现
  */
 async function updateSnapshotFromReport(snap, report) {
   if (!snap?.id || !report) return;
@@ -583,9 +580,9 @@ async function updateSnapshotFromReport(snap, report) {
 }
 
 /**
- * Capture the current action-log entry IDs before an AI heal run.
- * @param {object|null|undefined} runtime trajectory runtime with executor session identity
- * @returns {Promise<Set<string>>} IDs present before healing
+ * 在 AI 修复运行前获取当前操作日志条目 ID。
+ * @param {object|null|undefined} runtime 带执行机会话标识的交易运行时
+ * @returns {Promise<Set<string>>} 修复前存在的 ID
  */
 async function peekActionLogIds(runtime) {
   const entries = await fetchActionLogEntries(runtime);
@@ -593,10 +590,9 @@ async function peekActionLogIds(runtime) {
 }
 
 /**
- * Request the executor's current action log, failing soft when the session is
- * unavailable or the event request cannot be completed.
- * @param {object|null|undefined} runtime trajectory runtime with session identifiers
- * @returns {Promise<Array<object>>} action-log entries, or an empty array
+ * 请求执行机当前操作日志；会话不可用或事件请求无法完成时静默降级。
+ * @param {object|null|undefined} runtime 带会话标识的交易运行时
+ * @returns {Promise<Array<object>>} 操作日志条目，或空数组
  */
 async function fetchActionLogEntries(runtime) {
   if (!runtime?.sessionId || !runtime?.executorNodeUuid) return [];

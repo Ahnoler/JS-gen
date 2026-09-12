@@ -1,10 +1,9 @@
 /**
- * Key-data normalization helpers for proposed draft trajectory atoms.
+ * 用于拟议草稿轨迹原子的关键数据规范化辅助函数。
  *
- * Page/component codes are collected from LLM output, task text, and source
- * table cells in stable first-seen order. ZJJK-only metadata is removed from
- * the human-facing 关键数据 section while its codes remain structured.
- * These helpers are pure and do not write files.
+ * 页面/组件编码按稳定的首次出现顺序，从 LLM 输出、任务文本和来源表格单元格中
+ * 收集。仅含 ZJJK 的元数据会从面向用户的关键数据章节中移除，但其编码仍保留为
+ * 结构化数据。这些辅助函数均为纯函数，不写入文件。
  */
 import { extractZjjkCodes } from './provenance.js';
 
@@ -13,21 +12,20 @@ const KEYDATA_HEADER_RE = /^(关键数据|业务数据|案例数据|测试数据
 const PURE_ZJJK_META_RE = /^(?:大页面|页签|页面|组件|编号)?\s*[:：]?\s*(?:ZJJK\d{5,}(?:\s*[\/|,，]\s*ZJJK\d{5,})*)\s*$/i;
 
 /**
- * Collect unique ZJJK page/component codes from all atom-code sources.
+ * 从全部原子编码来源收集唯一的 ZJJK 页面/组件编码。
  *
- * Values are normalized by the shared provenance extractor and emitted once
- * in source order: LLM pageCodes, taskDraft text, then through-chain cells.
- * Invalid or absent collections contribute no values.
- * @param {{ llmPageCodes?: unknown, taskDraft?: string, zjjkCells?: unknown[] }} opts Code sources
- * @returns {string[]} Ordered, uppercased unique ZJJK codes
+ * 值由共享出处提取器规范化，并按来源顺序仅输出一次：LLM pageCodes、taskDraft
+ * 文本、再到通链单元格。无效或缺失的集合不贡献任何值。
+ * @param {{ llmPageCodes?: unknown, taskDraft?: string, zjjkCells?: unknown[] }} opts 编码来源
+ * @returns {string[]} 按顺序排列且转为大写的唯一 ZJJK 编码
  */
 export function collectPageCodes({ llmPageCodes, taskDraft, zjjkCells } = {}) {
   /** @type {string[]} */
   const out = [];
   const seen = new Set();
   /**
-   * Extract codes from one source value and append only unseen codes.
-   * @param {unknown} raw Source value that may contain ZJJK codes
+   * 从单个来源值提取编码，并仅追加未出现过的编码。
+   * @param {unknown} raw 可能包含 ZJJK 编码的来源值
    * @returns {void}
    */
   const pushAll = (raw) => {
@@ -48,13 +46,12 @@ export function collectPageCodes({ llmPageCodes, taskDraft, zjjkCells } = {}) {
 }
 
 /**
- * Determine whether a line contains only ZJJK metadata and optional labels.
+ * 判断一行是否仅包含 ZJJK 元数据及可选标签。
  *
- * A matching line can use the recognized metadata prefix or consist solely of
- * one or more codes separated by punctuation. Empty lines and lines with
- * business content are preserved by the sanitizer.
- * @param {string} line Candidate key-data line
- * @returns {boolean} True when the line is safe to remove as code metadata
+ * 匹配行可以使用已识别的元数据前缀，或仅由一个或多个以标点分隔的编码构成。
+ * 空行和包含业务内容的行由清理器保留。
+ * @param {string} line 候选关键数据行
+ * @returns {boolean} 该行可作为编码元数据安全移除时为 true
  */
 function isPureZjjkMetaLine(line) {
   const t = String(line || '').trim();
@@ -70,11 +67,10 @@ function isPureZjjkMetaLine(line) {
 /**
  * Remove ZJJK-only lines from 关键数据; drop empty keydata section.
  *
- * The section ends at the next numbered task/source line. Non-code content and
- * meaningful spacing remain; an emptied section is omitted, and non-empty
- * output is normalized to a trailing newline.
- * @param {string} taskDraft Draft task text to sanitize
- * @returns {{ taskDraft: string, extractedCodes: string[] }} Sanitized text and extracted codes
+ * 该章节在下一条编号任务/来源行处结束。保留非编码内容和有意义的空白；清空后的
+ * 章节会被省略，非空输出会规范为以换行结尾。
+ * @param {string} taskDraft 要清理的草稿任务文本
+ * @returns {{ taskDraft: string, extractedCodes: string[] }} 清理后的文本和提取出的编码
  */
 export function sanitizeTaskDraftKeyData(taskDraft) {
   const lines = String(taskDraft || '').split(/\r?\n/);
@@ -87,7 +83,7 @@ export function sanitizeTaskDraftKeyData(taskDraft) {
   const keyBuf = [];
 
   /**
-   * Flush the buffered key-data section, removing code-only metadata lines.
+   * 刷新缓冲的关键数据章节，并移除仅含编码的元数据行。
    * @returns {void}
    */
   const flushKey = () => {
@@ -140,12 +136,11 @@ export function sanitizeTaskDraftKeyData(taskDraft) {
 }
 
 /**
- * Detect the legacy shape whose 关键数据 body contains only ZJJK metadata.
+ * 检测关键数据正文仅包含 ZJJK 元数据的旧版结构。
  *
- * The check stops at the next numbered task line, ignores blank lines, and
- * returns false when the section is absent or has no body.
- * @param {string} taskDraft Draft task text to inspect
- * @returns {boolean} True when the key-data body is code-only legacy content
+ * 检查在下一条编号任务行处停止，忽略空行；章节不存在或没有正文时返回 false。
+ * @param {string} taskDraft 要检查的草稿任务文本
+ * @returns {boolean} 关键数据正文是仅含编码的旧版内容时为 true
  */
 export function isLegacyZjjkOnlyKeyData(taskDraft) {
   const lines = String(taskDraft || '').split(/\r?\n/);

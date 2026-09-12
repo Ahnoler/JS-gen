@@ -201,9 +201,9 @@ export async function listSessions(opts) {
 }
 
 /**
- * Resolve an executor UUID to its database node id.
- * @param {string|null} nodeUuid executor node UUID
- * @returns {Promise<number|null>} node id, or null when unresolved
+ * 将执行器 UUID 解析为其数据库节点 ID。
+ * @param {string|null} nodeUuid 执行器节点 UUID
+ * @returns {Promise<number|null>} 节点 ID，无法解析时为 null
  */
 async function resolveExecutorNodeId(nodeUuid) {
   if (!nodeUuid) return null;
@@ -661,4 +661,4 @@ export async function getLiveStatus(opts = {}) {
   };
 }
 
-/** Rebuild in-memory live map entry from DB row during boot reconciliation. */
+/** 在启动校准期间根据数据库行重建内存实时映射条目。 */

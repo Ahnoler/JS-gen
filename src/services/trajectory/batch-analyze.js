@@ -23,9 +23,9 @@ let analyzeWorkers = 0;
 let draftWorkers = 0;
 
 /**
- * Claim pending or recovering analysis items up to the configured concurrency
- * and schedule one analysis worker for each successful claim.
- * @returns {Promise<void>} resolves after the current claim pass is scheduled
+ * 在配置的并发度内认领待分析或恢复中的分析项，并为每个成功认领的项
+ * 调度一个分析 worker。
+ * @returns {Promise<void>} 当前认领轮次完成调度后兑现
  */
 export async function pumpAnalyze() {
   while (analyzeWorkers < BATCH_ANALYZE_CONCURRENCY) {
@@ -62,12 +62,11 @@ export async function pumpAnalyze() {
 }
 
 /**
- * Analyze one claimed requirement, persist its phases, and hand the resulting
- * item to draft creation. Cancellation and retryable analysis failures update
- * item/job progress without allowing stale results to be committed.
- * @param {object} item claimed batch item containing requirement and batchId
- * @param {string} token worker token associated with the claim
- * @returns {Promise<void>} resolves after analysis outcome handling completes
+ * 分析一个已认领的需求，持久化其阶段，并将结果项交给草稿创建。取消及可重试的
+ * 分析失败会更新项/任务进度，同时避免提交过期结果。
+ * @param {object} item 含 requirement 与 batchId 的已认领批处理项
+ * @param {string} token 与认领关联的 worker 令牌
+ * @returns {Promise<void>} 分析结果处理完成后兑现
  */
 async function runAnalyze(item, token) {
   const batchId = item.batchId;
@@ -164,11 +163,10 @@ async function runAnalyze(item, token) {
  * @returns {Promise<void>} resolves when draft/trajectory is created and item status updated
  */
 /**
- * Create a trajectory and its phases from an analyzed item, then bind the
- * resulting trajectory as a draft or queue it for recording according to the
- * parent job mode. The transaction and CAS checks prevent duplicate binding.
- * @param {object} item analyzed item containing analysisJson and batchId
- * @returns {Promise<void>} resolves after creation, cancellation, or failure handling
+ * 从已分析项创建交易及其阶段，再根据父任务模式将创建出的交易绑定为草稿，或
+ * 排队等待录制。事务和 CAS 校验可防止重复绑定。
+ * @param {object} item 包含 analysisJson 与 batchId 的已分析项
+ * @returns {Promise<void>} 创建、取消或失败处理完成后兑现
  */
 async function createDraftFromAnalyzed(item) {
   const job = await batchDao.getJobById(item.batchId);
@@ -252,9 +250,8 @@ async function createDraftFromAnalyzed(item) {
  * No executor slots; survives restart via kickScheduler / recovery lease clear.
  */
 /**
- * Claim analyzed items that do not yet have trajectories and schedule draft
- * creation workers up to the configured analysis concurrency.
- * @returns {Promise<void>} resolves after the current claim pass is scheduled
+ * 认领尚未有交易的已分析项，并在配置的分析并发度内调度草稿创建 worker。
+ * @returns {Promise<void>} 当前认领轮次完成调度后兑现
  */
 export async function pumpDraft() {
   while (draftWorkers < BATCH_ANALYZE_CONCURRENCY) {

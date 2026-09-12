@@ -13,9 +13,9 @@ import {
 import { clearLiveBinding } from './remote-session-state.js';
 
 /**
- * Emit a compact structured lifecycle event for operational diagnostics.
- * @param {string} event lifecycle event name
- * @param {object} [fields] event fields
+ * 输出紧凑的结构化生命周期事件，用于运维诊断。
+ * @param {string} event 生命周期事件名称
+ * @param {object} [fields] 事件字段
  * @returns {void}
  */
 function logLifecycle(event, fields = {}) {
@@ -23,10 +23,10 @@ function logLifecycle(event, fields = {}) {
 }
 
 /**
- * Clear in-memory trajectory runtime mounts after database unmounting.
- * @param {number[]} cleared trajectory ids whose mounts were removed
- * @param {number} remoteSessionId remote-session id that was detached
- * @returns {Promise<void>} resolves after best-effort runtime cleanup
+ * 数据库卸载后清除内存中的轨迹运行时挂载。
+ * @param {number[]} cleared 已移除挂载的轨迹 ID
+ * @param {number} remoteSessionId 已分离的远程会话 ID
+ * @returns {Promise<void>} 尽力完成运行时清理后结束
  */
 async function clearRuntimeMounts(cleared, remoteSessionId) {
   if (!cleared?.length) return;

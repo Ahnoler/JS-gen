@@ -169,7 +169,7 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
 
 /**
  * 仅补采落地 pageId：登录后对空 pd_cmpt_ecd 的 L2 点读天元写入（不扫菜单树、不改结构）。
- * @param {object} ctx fill-page-id scan context
+ * @param {object} ctx 补采 pageId 的扫描上下文
  * @param {string} ctx.scanId 任务 id（复用 scanJobs）
  * @param {number} ctx.systemNodeId 系统节点 id
  * @param {string} ctx.url 被测系统 URL
@@ -241,9 +241,9 @@ export async function runFillPageIds({ scanId, systemNodeId, url, account, sourc
  * @returns {Promise<Array<object>>} 既有模块数组，每个元素含 id/name/source/unmatchedFlag 与 children（功能）
  */
 /**
- * Load the existing module/function subtree in the shape consumed by the scan planner.
- * @param {number} systemNodeId system node id
- * @returns {Promise<object[]>} existing modules with normalized function children
+ * 以扫描规划器所需的形态加载现有模块/功能子树。
+ * @param {number} systemNodeId 系统节点 ID
+ * @returns {Promise<object[]>} 带规范化功能子节点的现有模块
  */
 async function loadExistingModules(systemNodeId) {
   const modules = await systemDao.listByParent(systemNodeId);
@@ -276,9 +276,9 @@ async function loadExistingModules(systemNodeId) {
  * @returns {Promise<Map<number, object[]>>} 功能节点 id → system_page camelCase 行数组
  */
 /**
- * Batch-load page ids for eligible JSON-import function nodes with no xpath.
- * @param {Array<object>} existing normalized existing module tree
- * @returns {Promise<Map<number, object[]>>} function id to page rows map
+ * 批量加载符合条件且没有 xpath 的 JSON 导入功能节点的页面 ID。
+ * @param {Array<object>} existing 规范化后的现有模块树
+ * @returns {Promise<Map<number, object[]>>} 功能 ID 到页面行的映射
  */
 async function loadGhostPageIdsByNodeIds(existing) {
   const ids = [];

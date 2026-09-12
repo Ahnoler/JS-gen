@@ -1,8 +1,8 @@
 /**
- * Rerun orchestration for recovering from a failed generated action sequence.
+ * 用于从失败的生成操作序列中恢复的重运行编排。
  *
- * The service reconstructs the pre-failure browser state and returns a heal
- * instruction; it is separate from the product replay-actions service.
+ * 该服务重建失败前的浏览器状态并返回修复指令；
+ * 它与产品回放操作服务相互独立。
  */
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';

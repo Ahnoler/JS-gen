@@ -29,11 +29,11 @@ export async function importTree(payload = {}) {
   const stats = { created: 0, updated: 0, skipped: 0 };
 
   /**
-   * Validate and recursively insert or update one imported hierarchy node.
-   * @param {object} node imported node payload
-   * @param {number} parentId resolved database parent id
-   * @param {number} expectedType required node type at this depth
-   * @returns {Promise<object>} persisted node row
+   * 校验并递归插入或更新一个导入的层级节点。
+   * @param {object} node 导入的节点载荷
+   * @param {number} parentId 已解析的数据库父节点 ID
+   * @param {number} expectedType 当前深度要求的节点类型
+   * @returns {Promise<object>} 持久化后的节点行
    */
   async function upsertNode(node, parentId, expectedType) {
     const type = Number(node.type);

@@ -1,7 +1,6 @@
 /**
- * Batch item progress calculations. This module converts pipeline status and
- * available trajectory phases into the compact progress shape consumed by
- * batch status views, without performing database or network work.
+ * 批处理项进度计算。本模块将流水线状态和可用交易阶段转换为批处理状态视图
+ * 所使用的紧凑进度结构，不执行数据库或网络操作。
  */
 import { parseDoneLogs } from '../../models/phase-done-logs.js';
 
@@ -33,9 +32,9 @@ export function summarizePhases(phases = []) {
 }
 
 /**
- * Get the latest completion message for a completed phase.
- * @param {object|null|undefined} phase completed phase row
- * @returns {string} latest parsed done-log text or a phase-number fallback
+ * 获取已完成阶段的最新完成消息。
+ * @param {object|null|undefined} phase 已完成的阶段行
+ * @returns {string} 最新解析出的完成日志文本，或阶段编号兜底文本
  */
 function latestCompletedDoneText(phase) {
   if (!phase) return '';
@@ -47,10 +46,10 @@ function latestCompletedDoneText(phase) {
 }
 
 /**
- * Convert completed-phase progress to the recording range of 40 through 90.
- * @param {number} phaseCompleted number of completed phases
- * @param {number} phaseTotal total number of phases
- * @returns {number} progress percentage for recording state
+ * 将已完成阶段的进度转换为录制状态的 40 到 90 区间。
+ * @param {number} phaseCompleted 已完成阶段数
+ * @param {number} phaseTotal 阶段总数
+ * @returns {number} 录制状态的进度百分比
  */
 function recordingRatioPercent(phaseCompleted, phaseTotal) {
   if (!(Number(phaseTotal) > 0)) return 40;
@@ -58,10 +57,10 @@ function recordingRatioPercent(phaseCompleted, phaseTotal) {
 }
 
 /**
- * Map a non-recording pipeline status to its progress percentage.
- * @param {string} status batch item status
- * @param {string} mode batch mode, either draft or record
- * @returns {number|null} mapped percentage, or null for an unknown status
+ * 将非录制流水线状态映射为对应的进度百分比。
+ * @param {string} status 批处理项状态
+ * @param {string} mode 批处理模式，draft 或 record
+ * @returns {number|null} 映射后的百分比，未知状态时为 null
  */
 function pipelinePercent(status, mode) {
   if (mode === 'draft') {

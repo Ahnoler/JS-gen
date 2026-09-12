@@ -11,9 +11,8 @@
  *            (contract.runtime.retry_count), then fall back to AI heal
  *   heal / repair / unknown -> existing AI heal flow
  *
- * The routing functions are pure and do not execute healing, mutate replay
- * state, or interpret the returned pipeline step. Their only responsibility is
- * to make the feature-flag and suggested-action decision explicit.
+ * 路由函数为纯函数，不执行修复、不修改回放状态，也不解释返回的流水线步骤。
+ * 它们仅负责明确功能开关和建议操作的决策。
  */
 
 const DECISION_FLAG = 'HEAL_LOCATE_DECISION_ENABLED';

@@ -12,13 +12,12 @@ const TARGET_KEYS = ['action', 'label', 'xpath_smart', 'option_text'];
 const RUNTIME_KEYS = ['retry_count', 'max_steps'];
 
 /**
- * Convert a positive numeric-like value to a positive integer.
+ * 将类数值的正数转换为正整数。
  *
- * Invalid, zero, and negative values are replaced with the supplied fallback;
- * decimal values are truncated toward zero before being returned.
- * @param {unknown} value candidate numeric value
- * @param {number} fallback value used when the candidate is not positive
- * @returns {number} normalized positive integer or fallback
+ * 无效、零和负数值会替换为提供的兜底值；返回前小数会向零截断。
+ * @param {unknown} value 候选数值
+ * @param {number} fallback 候选值非正时使用的值
+ * @returns {number} 归一化后的正整数或兜底值
  */
 function normalizeInt(value, fallback) {
   const n = Number(value);
@@ -26,11 +25,10 @@ function normalizeInt(value, fallback) {
 }
 
 /**
- * Select the most useful smart XPath available on a failed replay entry.
- * Candidate metadata is preferred, followed by the entry and element-level
- * XPath fields, with an empty string returned when no locator is available.
- * @param {object|null|undefined} failedEntry failed action entry
- * @returns {string} trimmed smart XPath or empty string
+ * 从失败回放条目中选择最有用的智能 XPath。优先使用候选元数据，其次为条目和元素级
+ * XPath 字段；没有可用定位器时返回空字符串。
+ * @param {object|null|undefined} failedEntry 失败的操作条目
+ * @returns {string} 去除首尾空白的智能 XPath 或空字符串
  */
 function pickXpathSmart(failedEntry) {
   const element = failedEntry?.element && typeof failedEntry.element === 'object'
@@ -51,12 +49,11 @@ function pickXpathSmart(failedEntry) {
 }
 
 /**
- * Extract option text relevant to selection-like actions.
- * Explicit option fields win; supported selection actions then fall back to
- * their value, option, or text parameter, while other actions return empty.
- * @param {string} action action name from the failed entry
- * @param {object|null|undefined} params action parameters
- * @returns {string} trimmed option text or empty string
+ * 提取与选择类操作相关的选项文本。显式选项字段优先；支持的选择操作随后回退至其
+ * value、option 或 text 参数，其他操作返回空字符串。
+ * @param {string} action 失败条目中的操作名称
+ * @param {object|null|undefined} params 操作参数
+ * @returns {string} 去除首尾空白的选项文本或空字符串
  */
 function pickOptionText(action, params) {
   const explicit = String(
@@ -72,9 +69,9 @@ function pickOptionText(action, params) {
 }
 
 /**
- * Verify that a value has the shape produced by missing-reason analysis.
- * @param {unknown} reason candidate reason value
- * @returns {boolean} whether category, suggested action, and evidence are valid
+ * 验证值是否具有缺失原因分析生成的结构。
+ * @param {unknown} reason 候选原因值
+ * @returns {boolean} category、建议操作和证据是否有效
  */
 function isReasonShape(reason) {
   return reason

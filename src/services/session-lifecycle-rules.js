@@ -1,8 +1,8 @@
 /**
- * Pure remote-session ownership and grace-window rules.
+ * 纯远程会话所有权和宽限窗口规则。
  *
- * These helpers intentionally have no database or process-state dependencies,
- * so claim decisions can be tested independently of lifecycle persistence.
+ * 这些辅助函数有意不依赖数据库或进程状态，
+ * 因此可以独立于生命周期持久化测试占用决策。
  */
 
 /**

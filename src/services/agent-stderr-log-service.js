@@ -135,8 +135,8 @@ export function lineMatches(line, { slot, sid } = {}) {
 }
 
 /**
- * List per-session stderr log files in the configured log directory.
- * @returns {string[]} absolute paths to log files
+ * 列出配置日志目录中的会话级 stderr 日志文件。
+ * @returns {string[]} 日志文件的绝对路径
  */
 function listLogFilePaths() {
   const dir = resolveLogDir();
@@ -147,10 +147,10 @@ function listLogFilePaths() {
 }
 
 /**
- * Read one log file and retain lines matching the slot/session filter.
- * @param {string} filePath log file path
- * @param {{ slot?: number, sid?: string }} filter line filter
- * @returns {string[]} matching raw log lines
+ * 读取一个日志文件，仅保留匹配槽位/会话过滤条件的行。
+ * @param {string} filePath 日志文件路径
+ * @param {{ slot?: number, sid?: string }} filter 行过滤条件
+ * @returns {string[]} 匹配的原始日志行
  */
 function readMatchingLines(filePath, filter) {
   if (!existsSync(filePath)) return [];
@@ -219,9 +219,9 @@ export function filterLines(filter = {}) {
  * @returns {Promise<object>} `{ byNodeUuid, bySessionId }` port maps keyed by node uuid / session id
  */
 /**
- * Query connected executors for live slot/CDP-port metadata used by the active log view.
- * Unreachable nodes are omitted so one slow executor does not fail the whole listing.
- * @returns {Promise<{byNodeUuid: Map<string, object[]>, bySessionId: Map<string, number>}>} live port indexes
+ * 查询已连接执行器的实时槽位/CDP 端口元数据，供当前日志视图使用。
+ * 忽略无法访问的节点，避免单个响应缓慢的执行器导致整个列表失败。
+ * @returns {Promise<{byNodeUuid: Map<string, object[]>, bySessionId: Map<string, number>}>} 实时端口索引
  */
 async function fetchLiveSlotPorts() {
   const { listExecutorSessions } = await import('../executor-session-client.js');

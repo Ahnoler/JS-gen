@@ -1,17 +1,16 @@
 /**
- * Service operations for system login-account records.
+ * 系统登录账号记录的服务操作。
  *
- * This module validates system ownership and normalizes account patches before
- * delegating persistence to the system and account DAOs.
+ * 本模块校验系统归属并规范化账号补丁，然后委托系统和账号 DAO 持久化。
  */
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
 import { NODE_TYPE } from '../models/hierarchy-constants.js';
 
 /**
- * Keep only fields supported by the account update contract.
- * @param {object} [input] requested partial account changes
- * @returns {object} patch containing only defined, writable fields
+ * 仅保留账号更新契约支持的字段。
+ * @param {object} [input] 请求的部分账号变更
+ * @returns {object} 仅包含已定义且可写字段的补丁
  */
 function normalizeAccountPatch(input = {}) {
   const data = {};

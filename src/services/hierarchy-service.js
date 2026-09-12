@@ -180,9 +180,9 @@ export function assertAccountNamesAvailable(existing, resolved) {
 }
 
 /**
- * Convert a credential input to a scalar string while rejecting object values.
- * @param {unknown} value raw credential value
- * @returns {string} string credential or empty string
+ * 将凭据输入转换为标量字符串，并拒绝对象值。
+ * @param {unknown} value 原始凭据值
+ * @returns {string} 字符串形式的凭据或空字符串
  */
 function stringifyCredential(value) {
   if (value === undefined || value === null) return '';
@@ -191,11 +191,11 @@ function stringifyCredential(value) {
 }
 
 /**
- * Ensure account payloads are supplied only for system nodes.
- * @param {number|string} nodeType hierarchy node type
- * @param {Array|undefined|null} accounts optional account payload
+ * 确保仅为系统节点提供账号载荷。
+ * @param {number|string} nodeType 层级节点类型
+ * @param {Array|undefined|null} accounts 可选的账号载荷
  * @returns {void}
- * @throws {Error} when accounts are supplied for a non-system node
+ * @throws {Error} 为非系统节点提供账号时抛出
  */
 function assertAccountsForSystem(nodeType, accounts) {
   if (accounts !== undefined && accounts !== null && Number(nodeType) !== NODE_TYPE.SYSTEM) {
@@ -204,11 +204,11 @@ function assertAccountsForSystem(nodeType, accounts) {
 }
 
 /**
- * Reconcile a system's account rows with normalized incoming account data.
- * @param {number} systemId system node id
- * @param {Array<object>} normalized validated account objects
- * @param {object} trx knex transaction
- * @returns {Promise<object[]>} current account rows after synchronization
+ * 使用规范化后的传入账号数据校准系统账号行。
+ * @param {number} systemId 系统节点 ID
+ * @param {Array<object>} normalized 已校验的账号对象
+ * @param {object} trx Knex 事务
+ * @returns {Promise<object[]>} 同步后的当前账号行
  */
 async function syncSystemAccounts(systemId, normalized, trx) {
   const existing = await systemAccountDao.listBySystem(systemId, trx);

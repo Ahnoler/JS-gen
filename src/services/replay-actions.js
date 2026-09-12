@@ -52,8 +52,8 @@ export function waitForOwnedReplayDone(execSession, sessionId, replayId, timeout
     /** @type {(() => void)|null} */
     let unsub = null;
     /**
-     * Settle the event waiter once and release its timer/listener resources.
-     * @param {() => void} fn settlement callback
+     * 完成事件等待器并释放其计时器/监听器资源，且只执行一次。
+     * @param {() => void} fn 完成回调
      * @returns {void}
      */
     function finish(fn) {

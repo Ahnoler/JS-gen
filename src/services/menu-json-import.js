@@ -282,12 +282,12 @@ export async function importMenuJson(systemNodeId, buffer) {
      * @returns {Promise<object>} 落位节点（API 形态）
      */
     /**
-     * Upsert one planned module/function and synchronize its page rows.
-     * @param {object} item planned node payload
-     * @param {number} parentId resolved parent node id
-     * @param {number} type node type, module or function
-     * @param {object[]} pages page rows associated with the node
-     * @returns {Promise<object>} persisted node row
+     * 插入或更新一个规划中的模块/功能，并同步其页面行。
+     * @param {object} item 规划节点载荷
+     * @param {number} parentId 已解析的父节点 ID
+     * @param {number} type 节点类型，模块或功能
+     * @param {object[]} pages 与节点关联的页面行
+     * @returns {Promise<object>} 持久化后的节点行
      */
     async function upsertNode(item, parentId, type, pages) {
       const name = String(item.name || '').trim();

@@ -39,13 +39,12 @@ import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import { navigateToFunctionMenu } from './menu-navigation.js';
 
 /**
- * Emit the terminal replay event for a user-aborted batch.
- * Failed step ids are deduplicated so the event reflects logical failures
- * rather than repeated bookkeeping entries.
- * @param {number} tid trajectory database id
- * @param {object} [options] partial replay counters
- * @param {number} [options.successCount] completed successful step count
- * @param {Array<number>} [options.failedStepIds] failed step ids
+ * 为用户中止的批处理发送终态回放事件。失败步骤 ID 会去重，使事件反映逻辑失败，
+ * 而非重复的记账条目。
+ * @param {number} tid 交易数据库 ID
+ * @param {object} [options] 部分回放计数器
+ * @param {number} [options.successCount] 已完成的成功步骤数
+ * @param {Array<number>} [options.failedStepIds] 失败步骤 ID
  * @returns {void}
  */
 function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
@@ -61,11 +60,11 @@ function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
 }
 
 /**
- * Forward one recorded action to the executor using replay timeout semantics.
- * @param {object} runtime trajectory runtime with executor session identifiers
- * @param {object} entry recorded action entry
- * @param {boolean} doSuppress whether replay persistence should be suppressed
- * @returns {Promise<object>} executor replay result for the single action
+ * 使用回放超时语义将一条已录制操作转发给执行机。
+ * @param {object} runtime 带执行机会话标识的交易运行时
+ * @param {object} entry 已录制的操作条目
+ * @param {boolean} doSuppress 是否应抑制回放持久化
+ * @returns {Promise<object>} 执行机对该单个操作的回放结果
  */
 async function forwardReplayEntry(runtime, entry, doSuppress) {
   return runReplayActions({
@@ -567,16 +566,15 @@ export async function runReplayBatch({
 }
 
 /**
- * Assemble the stable response payload returned after replay completion, failure,
- * or user cancellation, combining raw results with aggregate counters.
- * @param {number} tid trajectory database id
- * @param {boolean} doSuppress whether replay persistence was suppressed
- * @param {Array<object>} rows persisted step rows used for stepIds
- * @param {Array<object>} allResults per-action replay results
- * @param {Array<object>} healed actions handled by AI heal
- * @param {string|null} error terminal error message
- * @param {object} [counts] explicit counters for partial/aborted runs
- * @returns {object} replay API result payload
+ * 组装回放完成、失败或用户取消后返回的稳定响应载荷，将原始结果与汇总计数器结合。
+ * @param {number} tid 交易数据库 ID
+ * @param {boolean} doSuppress 是否抑制了回放持久化
+ * @param {Array<object>} rows 用于 stepIds 的持久化步骤行
+ * @param {Array<object>} allResults 各操作的回放结果
+ * @param {Array<object>} healed 由 AI 修复处理的操作
+ * @param {string|null} error 终态错误消息
+ * @param {object} [counts] 部分或中止运行的显式计数器
+ * @returns {object} 回放 API 结果载荷
  */
 function buildPayload(tid, doSuppress, rows, allResults, healed, error, counts = {}) {
   const okCount = allResults.filter((r) => r.ok && !r.healed).length;

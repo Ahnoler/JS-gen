@@ -46,9 +46,9 @@ export const TRANSACTION_ENVELOPE_FIELDS = Object.freeze([
 ]);
 
 /**
- * Extract and deduplicate selectable options from an action entry.
- * @param {object} entry trajectory action entry
- * @returns {string} compact JSON array of usable options, or an empty string
+ * 从操作条目中提取并去重可选项。
+ * @param {object} entry 轨迹操作条目
+ * @returns {string} 可用选项的紧凑 JSON 数组，或空字符串
  */
 function resolveOptions(entry) {
   const fromEl = entry?.element?.options;

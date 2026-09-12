@@ -6,9 +6,9 @@
  */
 
 /**
- * Convert one layer descriptor into its stable region identifier.
- * @param {object} [l] layer with role and label fields
- * @returns {string} role-label identifier
+ * 将一个层级描述转换为稳定的区域标识符。
+ * @param {object} [l] 带有 role 和 label 字段的层级
+ * @returns {string} role-label 标识符
  */
 function layerIdOf(l) {
   const role = String(l?.role || '').replace(/\s+/g, ' ').trim();
@@ -59,12 +59,12 @@ export function deriveRegionRef(element = {}) {
 }
 
 /**
- * Return or create a child node under a parent region.
- * @param {object|null} parent parent region node
- * @param {string} id stable child identifier
- * @param {string} role region role
- * @param {string} label display label
- * @returns {object|null} existing or newly created child, or null without parent
+ * 返回或创建父区域下的子节点。
+ * @param {object|null} parent 父区域节点
+ * @param {string} id 稳定的子节点标识符
+ * @param {string} role 区域角色
+ * @param {string} label 展示标签
+ * @returns {object|null} 已有或新建的子节点，无父节点时为 null
  */
 function ensureChild(parent, id, role, label) {
   if (parent) {
@@ -89,11 +89,11 @@ export function assembleRegionTree(items = [], { pageLabel = '' } = {}) {
   const roots = [];
 
   /**
-   * Return or create a root region node.
-   * @param {string} id stable root identifier
-   * @param {string} role region role
-   * @param {string} label display label
-   * @returns {object} existing or newly created root node
+   * 返回或创建根区域节点。
+   * @param {string} id 稳定的根节点标识符
+   * @param {string} role 区域角色
+   * @param {string} label 展示标签
+   * @returns {object} 已有或新建的根节点
    */
   function ensureRoot(id, role, label) {
     let n = roots.find((r) => r.id === id && r.role === role);
@@ -140,8 +140,8 @@ export function assembleRegionTree(items = [], { pageLabel = '' } = {}) {
   return { pageLabel: rootPageLabel, roots };
 }
 /**
- * Build hierarchical UI region trees from captured element layer metadata.
+ * 根据采集的元素层级元数据构建分层的 UI 区域树。
  *
- * The exported helpers retain stable region identifiers and attach each
- * control to its nearest region node for downstream recording and replay.
+ * 导出的辅助函数保留稳定的区域标识符，并将每个控件挂载到最近的区域节点，
+ * 供后续录制和回放使用。
  */

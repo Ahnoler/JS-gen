@@ -143,10 +143,10 @@ export async function ensureRootTree(tree = []) {
 }
 
 /**
- * Validate a requested hierarchy node type filter.
- * @param {number} t numeric node type
+ * 校验请求的层级节点类型过滤条件。
+ * @param {number} t 数字节点类型
  * @returns {void}
- * @throws {Error} when the type is not system, module, or function
+ * @throws {Error} 类型不是系统、模块或功能时抛出
  */
 function assertTypeFilter(t) {
   if (![NODE_TYPE.SYSTEM, NODE_TYPE.MODULE, NODE_TYPE.FUNCTION].includes(t)) {
@@ -157,9 +157,9 @@ function assertTypeFilter(t) {
 }
 
 /**
- * Format an ancestor chain for display, adding type labels where needed.
- * @param {object[]} pathNodes root-first ancestor chain
- * @returns {string} display path excluding the sentinel root
+ * 格式化用于展示的祖先链，并在需要时添加类型标签。
+ * @param {object[]} pathNodes 从根开始的祖先链
+ * @returns {string} 排除哨兵根节点后的展示路径
  */
 function formatPath(pathNodes) {
   const display = (n) => {

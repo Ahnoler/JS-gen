@@ -28,10 +28,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = path.resolve(__dirname, '../../scripts/prompts/component-mine-prompt.md');
 
 /**
- * Create a validation-style error for mining scope and input failures.
- * @param {string} message error message
- * @param {number} [statusCode] HTTP status code
- * @returns {Error & {statusCode: number}} configured service error
+ * 创建用于挖掘作用域和输入失败的校验类错误。
+ * @param {string} message 错误消息
+ * @param {number} [statusCode] HTTP 状态码
+ * @returns {Error & {statusCode: number}} 已配置的服务错误
  */
 function svcError(message, statusCode = 400) {
   const err = new Error(message);
@@ -40,8 +40,8 @@ function svcError(message, statusCode = 400) {
 }
 
 /**
- * Load the component naming prompt from disk, with a minimal local fallback.
- * @returns {string} prompt template text
+ * 从磁盘加载组件命名提示词，并提供最小的本地回退内容。
+ * @returns {string} 提示词模板文本
  */
 function loadPromptTemplate() {
   if (existsSync(PROMPT_PATH)) {
@@ -55,9 +55,9 @@ function loadPromptTemplate() {
 }
 
 /**
- * Page through all trajectories bound to a function.
- * @param {number} functionId function node id
- * @returns {Promise<number[]>} trajectory ids discovered across all pages
+ * 分页读取绑定到某个功能的全部轨迹。
+ * @param {number} functionId 功能节点 ID
+ * @returns {Promise<number[]>} 从所有分页中发现的轨迹 ID
  */
 async function listAllTrajectoryIdsByFunction(functionId) {
   const ids = [];
@@ -110,13 +110,13 @@ async function resolveMineScope(body = {}) {
 }
 
 /**
- * Compose the strict JSON naming prompt for one signature cluster.
- * @param {string} template base prompt text
- * @param {object} input cluster description and signature fragments
- * @param {string} [input.phaseDescription] representative phase description
- * @param {object[]} input.fragments deterministic signature fragments
- * @param {number} input.stepCount number of representative steps
- * @returns {string} complete LLM prompt
+ * 为一个签名簇组装严格 JSON 命名提示词。
+ * @param {string} template 基础提示词文本
+ * @param {object} input 簇描述和签名片段
+ * @param {string} [input.phaseDescription] 代表性阶段描述
+ * @param {object[]} input.fragments 确定性的签名片段
+ * @param {number} input.stepCount 代表性步骤数量
+ * @returns {string} 完整的 LLM 提示词
  */
 function buildLlmPrompt(template, { phaseDescription, fragments, stepCount }) {
   const summary = fragments.map((f, i) => {
@@ -139,13 +139,13 @@ function buildLlmPrompt(template, { phaseDescription, fragments, stepCount }) {
 }
 
 /**
- * Ask the configured LLM to name a repeated phase cluster and normalize output.
- * @param {object} input cluster naming input
- * @param {string} [input.phaseDescription] representative phase description
- * @param {object[]} input.fragments signature fragments
- * @param {number} input.stepCount representative step count
- * @param {string} [input.model] optional model override
- * @returns {Promise<object>} normalized naming result, including `llmFailed`
+ * 请求配置的 LLM 为重复阶段簇命名，并规范化输出。
+ * @param {object} input 簇命名输入
+ * @param {string} [input.phaseDescription] 代表性阶段描述
+ * @param {object[]} input.fragments 签名片段
+ * @param {number} input.stepCount 代表性步骤数量
+ * @param {string} [input.model] 可选的模型覆盖值
+ * @returns {Promise<object>} 规范化的命名结果，包括 `llmFailed`
  */
 async function nameClusterWithLlm({ phaseDescription, fragments, stepCount, model }) {
   const template = loadPromptTemplate();
