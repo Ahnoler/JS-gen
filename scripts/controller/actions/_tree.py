@@ -62,10 +62,14 @@ async def _tree_picker_click_leaf_search(page, label_text: str, leaf: str) -> st
     活体依据（2026-09-12 产品目录弹层）：树数据全量在客户端（lazy=false），
     查询后仅渲染祖先链+叶子；选中必须真实点击（$emit 注入对本组件族无效）。
     """
-    rc = await _real_click_via_cdp(page, label_text=label_text)
-    if not (rc == 'skipped-open' or rc.startswith('ok-real-click')):
-        return 'err-tree-trigger-not-found:' + label_text + ' | ' + rc[:80]
-    await page.wait_for_timeout(600)
+    # 弹层已开则不再真点触发器（toggle 会把它关掉）：SEARCH_MATCHES ok 即弹层在开
+    probe = _as_dict(await page.evaluate(
+        JS_TREE_PICKER_SEARCH_MATCHES, [label_text, leaf]))
+    if not (isinstance(probe, dict) and probe.get('ok')):
+        rc = await _real_click_via_cdp(page, label_text=label_text)
+        if not (rc == 'skipped-open' or rc.startswith('ok-real-click')):
+            return 'err-tree-trigger-not-found:' + label_text + ' | ' + rc[:80]
+        await page.wait_for_timeout(600)
 
     filled = _as_dict(await page.evaluate(JS_TREE_PICKER_SEARCH_FILL, [label_text, leaf]))
     if not (isinstance(filled, dict) and filled.get('ok')):
