@@ -38,7 +38,11 @@ from .js_snippets.picker_confirm import JS_PICKER_DIALOG_QUERY, JS_PICKER_DIALOG
 from .js_snippets.workspace_tabs import JS_WORKSPACE_TABS
 from .js_snippets.todo_cards import JS_LIST_TODO_CARDS, JS_WF_SUBMIT_GUARD
 from .js_snippets.tree_check import JS_TREE_CHECK_CONFIRM
-from .js_snippets.tree_picker import JS_TREE_PICKER_CLICK
+from .js_snippets.tree_picker import (
+    JS_TREE_PICKER_CLICK,
+    JS_TREE_PICKER_SEARCH_FILL,
+    JS_TREE_PICKER_SEARCH_MATCHES,
+)
 from .js_snippets.table_cell import JS_FILL_TABLE_CELL
 from .js_snippets.guarantee_intro_snippet import (
     JS_INTRODUCE_GUARANTOR_FILL,

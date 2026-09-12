@@ -163,3 +163,48 @@ JS_TREE_PICKER_CLICK = '''async (args) => {
     }
     return JSON.stringify({ ok: true, echo: echo, clicked: clicked });
 }'''
+
+
+# ── 叶子名搜索直达（2026-09-12 活体实证：产品目录弹层）─────────────────────────
+# 弹层自带「搜索框 + 查询按钮」，树数据全量在客户端（lazy=false + filterNodeMethod）：
+# 填叶子名点查询后，树只渲染 祖先链+叶子（如 贷款/对公/对公流贷 3 节点）——
+# 点一下叶子即选中，无需逐级展开。树节点的「选中」仍必须真实点击（本文件头部
+# KB-I5 结论），所以这里只做两件合成安全的事：填搜索词（v-model 文本框，native
+# setter 通道）、报出 查询按钮/叶子节点 的视口坐标供 Python 走 CDP 真实点击。
+
+JS_TREE_PICKER_SEARCH_FILL = '''async (args) => {
+    const [labelText, leaf] = args || [];
+    const visible = (el) => el && (el.offsetParent !== null || el.getClientRects().length > 0);
+    // 定位「开着且带搜索框+树」的弹层（树选择 popover；页面侧栏树无 search-item，天然排除）
+    const pop = [...document.querySelectorAll('.el-popover, .el-popper')]
+        .filter((p) => visible(p) && p.querySelector('.search-item input') && p.querySelector('.el-tree'))[0];
+    if (!pop) return JSON.stringify({ ok: false, error: 'err-tree-popover-not-open' });
+    const input = pop.querySelector('.search-item input');
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    set.call(input, String(leaf == null ? '' : leaf));
+    input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    const btn = pop.querySelector('.search-item button');
+    if (!btn || !visible(btn)) return JSON.stringify({ ok: false, error: 'err-tree-search-btn-not-found' });
+    const r = btn.getBoundingClientRect();
+    return JSON.stringify({
+        ok: true,
+        btn: { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) },
+    });
+}'''
+
+JS_TREE_PICKER_SEARCH_MATCHES = '''async (args) => {
+    const [labelText, leaf] = args || [];
+    const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
+    const visible = (el) => el && (el.offsetParent !== null || el.getClientRects().length > 0);
+    const pop = [...document.querySelectorAll('.el-popover, .el-popper')]
+        .filter((p) => visible(p) && p.querySelector('.search-item input') && p.querySelector('.el-tree'))[0];
+    if (!pop) return JSON.stringify({ ok: false, error: 'err-tree-popover-not-open' });
+    const want = norm(leaf);
+    const matches = [];
+    for (const c of pop.querySelectorAll('.el-tree-node__content')) {
+        if (!visible(c) || norm(c.textContent) !== want) continue;
+        const r = c.getBoundingClientRect();
+        matches.push({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) });
+    }
+    return JSON.stringify({ ok: true, count: matches.length, matches: matches });
+}'''

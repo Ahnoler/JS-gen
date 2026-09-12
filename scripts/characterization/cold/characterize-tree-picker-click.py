@@ -38,7 +38,7 @@ checks = [
     )),
     ("scripts/controller/actions/_js_snippets.py", ("tree_picker",)),
     ("scripts/prompts/agent-tools-tree.md", (
-        "tree_picker_click(label_text, path_texts)",
+        "tree_picker_click(label_text, path_texts 可选, option_text 可选)",
         "err-tree-no-echo",
         "维护方案品种明细",
     )),

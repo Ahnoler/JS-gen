@@ -236,6 +236,13 @@ def _normalize_params(action_name: str, params: dict | None) -> dict:
     elif action_name in ('select_option', 'select_tree_option', 'click_radio'):
         if not p.get('option_text'):
             p['option_text'] = p.get('value') or p.get('option') or p.get('text') or ''
+    elif action_name == 'tree_picker_click':
+        # 老录制/手写步骤可能只有 option_text（叶子名）→ 走动作的叶子名搜索直达流。
+        # 不映射 text：历史步骤里 text 存的是字段标签（如 '产品目录'）不是叶子。
+        if not p.get('path_texts') and not p.get('option_text'):
+            leaf = p.get('value') or p.get('option') or ''
+            if leaf:
+                p['option_text'] = leaf
     return p
 
 
