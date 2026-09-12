@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 10:50 · Cursor Lead — 开工：合约主权收口（台账 + done 正则 + 停服务）
+
+- 进行中：2026-09-12 10:50；验收=todo-list 闭线、`task_done` 不误 discard、CP/executor 已停
+- 范围：`docs/superpowers/todo-list.md`、`scripts/agent_utils.py`、`characterize-planner-advisory-filter.py`、报告注记、本文件；停 4097/LMY
+- 禁入区：他线 WIP、classify.py、合约门闩语义大改、push/PR（未授权）
+- 方式：收紧 `_DONE_AS_INSTRUCTION_RE` + pin；核对 `planner_advice_discarded` 转发；停服务
+
 ## 2026-09-12 11:00 · ZCode 引擎线 — 补记：WET-2026-0912-DATEPANEL 缺陷双侧修复（回链 09:12 / 10:45）
 
 - 触发：用户复看第 20 项截图追问「daterange 不会自动关闭日期弹框吗」——属实，面板残留盖住表格
