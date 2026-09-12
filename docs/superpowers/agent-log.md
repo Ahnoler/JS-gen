@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 09:12 · ZCode 引擎线 — 开工：报文转换链路文档 + §9.4 人机分工湿测（续）
+
+- 进行中：09:12；湿测已 PASS 1 项（radio 表格单选，证据 tmp/tansun-wet/01-radio-table-row.json）；本任务单元=新增报文转换链路参考文档 + 继续 §9.4 清单（下一项=修改按钮点击）
+- 范围：docs/superpowers/reports/2026-09-12-payload-conversion-chain.md（新建）、docs/superpowers/agent-log.md、tmp/tansun-wet/（gitignore 本地证据）
+- 禁入区：Cursor done_rejected 湿复验线（其录制/服务启停轨迹、classify.py、合约门闩语义）、一切 src/ 与 scripts/ 代码改动、tansun_ui_engine 仓（湿测只读抽 JS 不改）、他线 WIP
+- 方式：主会话亲自写文档（file:line 带证，事实均已本会话复核）；湿测=Playwright MCP 有头浏览器 snapshot→派发同事 handler JS 原样（或等价协议级 click）→业务判据验证，用户导航，副作用操作先授权
+
 ## 2026-09-12 09:10 · Cursor Lead — 收工：done_rejected 默认可观测湿复验（回链 09:05）
 
 - 完成：重启 CP+LMY executor；traj **758** session `35bee0ee-…`；stderr `[phase_done] done_rejected authority=gate … missing_evidence=['toast_ok','url_change']`；`record/start` events[] 含 `type=done_rejected`；报告 r4 节；证据 `tmp/.../done-rejected-r4/`
