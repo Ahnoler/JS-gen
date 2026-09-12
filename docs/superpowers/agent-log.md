@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 · OpenCode — 开工：src/services 模块与方法注释
+
+- 进行中：为 `src/services/**/*.js` 添加或补全文件级多行说明，以及每个具名函数/方法的相对详细多行 JSDoc；只改注释，不改变运行时代码。
+- 范围：`src/services/**`、`docs/superpowers/agent-log.md`；按目录分批审查并执行 `npm run lint` 验收。
+- 禁入区：`src/` 的 services 以外目录、`scripts/`、路由、DAO、配置、测试与现有他线 WIP；不重排或重构函数。
+- 方式：先提交本声明使服务目录归属可见，再分批补全注释，最终复核 diff 与 lint 后写收工条目。
+
 ## 2026-09-11 15:50 · Cursor Lead — 收工：remove local BiB mount (SDD)（回链 15:25 开工）
 
 - 完成：`1455185c` RED pin → `8ee479ed` 删 `ensureGlobalBrowser` → `2a9a7e3e` 本地 CDP attach 掏空 + phase-highlight 去 `getAttachedCdpClient` + pin slicer 修 → `99d91f8b` docs；plan `2026-09-11-remove-local-bib-mount`
