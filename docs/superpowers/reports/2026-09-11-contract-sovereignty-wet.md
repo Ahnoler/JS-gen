@@ -81,7 +81,7 @@ Phase 3 done
 
 证据：`tmp/contract-sovereignty-wet/planner-discard/`、`…/planner-discard-r3/`、`…/planner-discard-r4/`。
 
-**r4 钉要点**：探针在填名+≥8 次观察后强制 `done(success=true)`（gate 拒）再拖延；planner 随后在 `next_steps` 写出含 `task_done(...)` 的补救建议，命中 `_DONE_AS_INSTRUCTION_RE`（`done\s*\(`）→ discard。注：本次触发串是 `task_done(` 而非阶段工具 `done()`——regex 过宽可另收紧，但不影响「live filter 湿路径已通」结论。
+**r4 钉要点**：探针在填名+≥8 次观察后强制 `done(success=true)`（gate 拒）再拖延；planner 随后在 `next_steps` 写出含 `task_done(...)` 的补救建议，当时命中过宽的 `_DONE_AS_INSTRUCTION_RE`（`done\s*\(`）→ discard——仍证明 live filter 湿路径已通。**收口后**：正则已改为 `(?<![A-Za-z_])done\s*\(`，`task_done(...)` 不再误 discard（冷 pin 覆盖）；真 done 口气（`done(` / `调用 done` / `结束阶段`）仍 discard。
 
 ## 补跑：done_rejected 专项（traj 755 / 756 / 757）
 

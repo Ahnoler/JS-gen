@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 10:55 · Cursor Lead — 收工：合约主权收口（回链 10:50）
+
+- 完成：① `todo-list` `contract-sovereignty-wet` → **P3 已闭**（754/758/762）；② `_DONE_AS_INSTRUCTION_RE` 收紧 `(?<![A-Za-z_])done\s*\(` + pin（`task_done` 不误伤）；`planner_advice_discarded` 转发已在 `session-message.js` / recording-runner（r4 events=0 系 start 中断非缺接线）；④ CP `339435`/executor `339431` 已停
+- 验收：`characterize-planner-advisory-filter: OK`；报告注记已更
+- 遗留：Premature vs gate 文档、out_of_scope 触碰丢弃、push/PR 仍待用户授权
+
 ## 2026-09-12 10:50 · Cursor Lead — 开工：合约主权收口（台账 + done 正则 + 停服务）
 
 - 进行中：2026-09-12 10:50；验收=todo-list 闭线、`task_done` 不误 discard、CP/executor 已停
