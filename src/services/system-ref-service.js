@@ -9,6 +9,12 @@ import * as systemRefDao from '../dao/system-ref-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import { AppError } from '../http/app-error.js';
 
+/**
+ * Validate a trajectory identifier and confirm that its row exists.
+ * @param {number|string} trajectoryId candidate trajectory id
+ * @returns {Promise<number>} normalized, existing trajectory id
+ * @throws {AppError} when the id is invalid or the trajectory is missing
+ */
 async function assertTrajectory(trajectoryId) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) {

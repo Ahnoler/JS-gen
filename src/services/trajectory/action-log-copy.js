@@ -7,6 +7,10 @@
  *
  * 【部署架构】执行机→控制面只有出站 WS 一条通道；增量 sync 降低管道字节，
  * 周期性 full（Python 侧）便于控制面重启后重新灌满副本。
+ *
+ * Copies are intentionally process-local and expire after a short idle period;
+ * callers must therefore treat this module as an acceleration and live-state
+ * view rather than the durable source of action history.
  */
 import {
   META_STEP_ACTIONS,

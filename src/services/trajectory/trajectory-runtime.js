@@ -1,5 +1,9 @@
 /**
- * In-memory trajectory ↔ executor session runtime map.
+ * In-memory trajectory runtime registry.
+ *
+ * Maintains the control-plane binding between a trajectory, its executor node,
+ * and its live session. Entries are process-local and are purged when the
+ * session or executor disappears; persistent trajectory data remains in DAOs.
  */
 import * as execSession from '../../executor-session-client.js';
 import * as slotLease from '../../executor-slot-lease.js';

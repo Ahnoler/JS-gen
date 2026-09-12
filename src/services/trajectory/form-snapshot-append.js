@@ -3,6 +3,9 @@
  * CDP/manual/agent action) + appendRecordedFormSnapshot (save_form_snapshot
  * checkpoint dual-write with fingerprint dedupe).
  * Extracted from trajectory-persist-service.js — move-only, no logic changes.
+ * The exported append operations preserve action-log identity, phase
+ * association, trajectory counts, and form snapshot trigger relationships
+ * while keeping duplicate writes idempotent.
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';

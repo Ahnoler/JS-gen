@@ -1,5 +1,10 @@
 /**
- * Layer B/C helpers: pageCodes + sanitize 关键数据 (no ZJJK tables in keydata).
+ * Key-data normalization helpers for proposed draft trajectory atoms.
+ *
+ * Page/component codes are collected from LLM output, task text, and source
+ * table cells in stable first-seen order. ZJJK-only metadata is removed from
+ * the human-facing 关键数据 section while its codes remain structured.
+ * These helpers are pure and do not write files.
  */
 import { extractZjjkCodes } from './provenance.js';
 
@@ -8,13 +13,23 @@ const KEYDATA_HEADER_RE = /^(关键数据|业务数据|案例数据|测试数据
 const PURE_ZJJK_META_RE = /^(?:大页面|页签|页面|组件|编号)?\s*[:：]?\s*(?:ZJJK\d{5,}(?:\s*[\/|,，]\s*ZJJK\d{5,})*)\s*$/i;
 
 /**
- * @param {{ llmPageCodes?: unknown, taskDraft?: string, zjjkCells?: unknown[] }} opts
- * @returns {string[]}
+ * Collect unique ZJJK page/component codes from all atom-code sources.
+ *
+ * Values are normalized by the shared provenance extractor and emitted once
+ * in source order: LLM pageCodes, taskDraft text, then through-chain cells.
+ * Invalid or absent collections contribute no values.
+ * @param {{ llmPageCodes?: unknown, taskDraft?: string, zjjkCells?: unknown[] }} opts Code sources
+ * @returns {string[]} Ordered, uppercased unique ZJJK codes
  */
 export function collectPageCodes({ llmPageCodes, taskDraft, zjjkCells } = {}) {
   /** @type {string[]} */
   const out = [];
   const seen = new Set();
+  /**
+   * Extract codes from one source value and append only unseen codes.
+   * @param {unknown} raw Source value that may contain ZJJK codes
+   * @returns {void}
+   */
   const pushAll = (raw) => {
     for (const code of extractZjjkCodes(String(raw || ''))) {
       if (seen.has(code)) continue;
@@ -33,8 +48,13 @@ export function collectPageCodes({ llmPageCodes, taskDraft, zjjkCells } = {}) {
 }
 
 /**
- * @param {string} line
- * @returns {boolean}
+ * Determine whether a line contains only ZJJK metadata and optional labels.
+ *
+ * A matching line can use the recognized metadata prefix or consist solely of
+ * one or more codes separated by punctuation. Empty lines and lines with
+ * business content are preserved by the sanitizer.
+ * @param {string} line Candidate key-data line
+ * @returns {boolean} True when the line is safe to remove as code metadata
  */
 function isPureZjjkMetaLine(line) {
   const t = String(line || '').trim();
@@ -49,8 +69,12 @@ function isPureZjjkMetaLine(line) {
 
 /**
  * Remove ZJJK-only lines from 关键数据; drop empty keydata section.
- * @param {string} taskDraft
- * @returns {{ taskDraft: string, extractedCodes: string[] }}
+ *
+ * The section ends at the next numbered task/source line. Non-code content and
+ * meaningful spacing remain; an emptied section is omitted, and non-empty
+ * output is normalized to a trailing newline.
+ * @param {string} taskDraft Draft task text to sanitize
+ * @returns {{ taskDraft: string, extractedCodes: string[] }} Sanitized text and extracted codes
  */
 export function sanitizeTaskDraftKeyData(taskDraft) {
   const lines = String(taskDraft || '').split(/\r?\n/);
@@ -62,6 +86,10 @@ export function sanitizeTaskDraftKeyData(taskDraft) {
   /** @type {string[]} */
   const keyBuf = [];
 
+  /**
+   * Flush the buffered key-data section, removing code-only metadata lines.
+   * @returns {void}
+   */
   const flushKey = () => {
     const kept = [];
     for (const raw of keyBuf) {
@@ -112,8 +140,12 @@ export function sanitizeTaskDraftKeyData(taskDraft) {
 }
 
 /**
- * @param {string} taskDraft
- * @returns {boolean}
+ * Detect the legacy shape whose 关键数据 body contains only ZJJK metadata.
+ *
+ * The check stops at the next numbered task line, ignores blank lines, and
+ * returns false when the section is absent or has no body.
+ * @param {string} taskDraft Draft task text to inspect
+ * @returns {boolean} True when the key-data body is code-only legacy content
  */
 export function isLegacyZjjkOnlyKeyData(taskDraft) {
   const lines = String(taskDraft || '').split(/\r?\n/);

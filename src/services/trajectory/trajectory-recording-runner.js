@@ -39,6 +39,12 @@ import { phaseEventOwnership, waitForSessionEventOwned } from './run-event-owner
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
+/**
+ * Notify browser-session observers after the recording lock state changes.
+ * The route dependency is loaded lazily to avoid a static service-route cycle;
+ * notification failures are intentionally non-fatal to the recording runner.
+ * @returns {Promise<void>} resolves after the best-effort notification attempt
+ */
 async function broadcastRecordingLock() {
   try {
     const { broadcastWatcherStatus } = await import('../../routes/browser-session/broadcasts.js');
@@ -46,6 +52,15 @@ async function broadcastRecordingLock() {
   } catch {}
 }
 
+/**
+ * Synchronize the AI-recording and busy flags on the runtime and live session.
+ * Keeping both flags aligned prevents concurrent lifecycle actions from treating
+ * an active executor session as available.
+ * @param {object} runtime mutable trajectory runtime entry
+ * @param {object|null|undefined} session live executor session, when available
+ * @param {boolean} locked whether AI recording is active
+ * @returns {void}
+ */
 function lockAiRecording(runtime, session, locked) {
   runtime.aiRecording = !!locked;
   if (session) {
@@ -64,21 +79,41 @@ async function appendRecordedStep(...args) {
   return mod.appendRecordedStep(...args);
 }
 
+/**
+ * Lazily forward coalesced-step deletion to the persistence module.
+ * @param {...unknown} args arguments forwarded to removeRecordedStepsByDbIds
+ * @returns {Promise<object>} persistence result
+ */
 async function removeRecordedStepsByDbIds(...args) {
   const mod = await import('./trajectory-persist-service.js');
   return mod.removeRecordedStepsByDbIds(...args);
 }
 
+/**
+ * Lazily forward step screenshot handling to the live persistence route.
+ * @param {...unknown} args route helper arguments
+ * @returns {Promise<unknown>} delegated screenshot result
+ */
 async function stashOrApplyStepScreenshot(...args) {
   const mod = await import('../../routes/browser-session/persist-live.js');
   return mod.stashOrApplyStepScreenshot(...args);
 }
 
+/**
+ * Lazily flush a screenshot waiting for its persisted step id.
+ * @param {...unknown} args route helper arguments
+ * @returns {Promise<unknown>} delegated flush result
+ */
 async function flushPendingStepScreenshot(...args) {
   const mod = await import('../../routes/browser-session/persist-live.js');
   return mod.flushPendingStepScreenshot(...args);
 }
 
+/**
+ * Lazily forward page-level screenshot persistence to avoid an import cycle.
+ * @param {...unknown} args route helper arguments
+ * @returns {Promise<unknown>} delegated screenshot result
+ */
 async function applyPageLevelScreenshot(...args) {
   const mod = await import('../../routes/browser-session/persist-live.js');
   return mod.applyPageLevelScreenshot(...args);

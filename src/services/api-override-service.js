@@ -4,6 +4,13 @@
 import * as apiOverrideDao from '../dao/api-override-dao.js';
 import { API_OVERRIDE_MATCH_TYPES, API_OVERRIDE_SCOPES } from '../models/constants.js';
 
+/**
+ * Validate an override scope and its logical reference id.
+ * @param {string} scope global, trajectory, or function scope
+ * @param {number|null} scopeRefId referenced entity id for non-global scopes
+ * @returns {void}
+ * @throws {Error} when the scope or required reference is invalid
+ */
 function assertScope(scope, scopeRefId) {
   if (!API_OVERRIDE_SCOPES.includes(scope)) {
     throw new Error(`Invalid scope: ${scope}`);

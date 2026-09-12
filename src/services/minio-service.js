@@ -24,6 +24,10 @@ export function isMinioConfigured() {
   return Boolean(MINIO_ENDPOINT && MINIO_ACCESS_KEY && MINIO_SECRET_KEY && MINIO_BUCKET);
 }
 
+/**
+ * Lazily construct and cache the MinIO client from repository configuration.
+ * @returns {import('minio').Client} configured MinIO client
+ */
 function getClient() {
   if (!client) {
     client = new Client({
@@ -37,6 +41,12 @@ function getClient() {
   return client;
 }
 
+/**
+ * Verify MinIO configuration and create the configured bucket when absent.
+ * Concurrent callers share the same initialization promise; failed setup can
+ * be retried by clearing that promise in the rejection path.
+ * @returns {Promise<void>} resolves when the bucket is ready
+ */
 async function ensureBucket() {
   if (!isMinioConfigured()) {
     throw new Error('MinIO is not configured');

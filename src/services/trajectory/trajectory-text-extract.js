@@ -1,7 +1,10 @@
 /**
- * Requirement-text extraction helpers for trajectories: business-data block
- * extraction, KV entry parsing, business-data phase gating.
- * Extracted from trajectory-meta-service.js — move-only, no logic changes.
+ * Trajectory requirement-text extraction module.
+ *
+ * Provides the shared parsing rules for business-data sections, success-gate
+ * sections, and phase classification. The helpers are deliberately tolerant
+ * of natural-language formatting and keep raw requirement text available when
+ * structured key/value parsing cannot recover every entry.
  */
 import * as businessDataDao from '../../dao/business-data-dao.js';
 

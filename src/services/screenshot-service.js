@@ -19,6 +19,12 @@ import {
 } from './screenshot-pending-store.js';
 import { getDB } from '../../config/database.js';
 
+/**
+ * Upload image bytes through the configured MinIO backend.
+ * @param {Buffer} buffer image bytes
+ * @param {string} mimeType image MIME type
+ * @returns {Promise<object>} uploaded object metadata
+ */
 async function uploadOrThrow(buffer, mimeType) {
   if (!isMinioConfigured()) {
     throw new Error('MinIO is not configured; cannot store screenshot');
@@ -26,6 +32,13 @@ async function uploadOrThrow(buffer, mimeType) {
   return uploadScreenshot(buffer, { mimeType });
 }
 
+/**
+ * Remove the object or local pending file represented by a screenshot row.
+ * @param {object|null} row persisted screenshot row
+ * @param {object} [options] deletion behavior
+ * @param {boolean} [options.strict] whether MinIO deletion errors are fatal
+ * @returns {Promise<void>} resolves after storage cleanup
+ */
 async function removeStoredObject(row, { strict = false } = {}) {
   if (!row) return;
   if (row.storageType === 'minio' && row.storagePath) {
@@ -41,6 +54,13 @@ async function removeStoredObject(row, { strict = false } = {}) {
   }
 }
 
+/**
+ * Persist a local pending screenshot after a MinIO upload failure.
+ * @param {object} opts fallback dependencies
+ * @param {function(object): Promise<number|null>} opts.daoCall DAO persistence callback
+ * @param {object} opts.pendingFile temporary pending-file descriptor
+ * @returns {Promise<number>} persisted screenshot row id
+ */
 async function fallbackToLocal({ daoCall, pendingFile }) {
   let id = null;
   try {

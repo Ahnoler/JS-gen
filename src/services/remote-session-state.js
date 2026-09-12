@@ -260,7 +260,10 @@ export function resolveLiveBinding(opts = {}) {
   return null;
 }
 
-/** Clear all live BiB bindings (full executor reset). */
+/**
+ * Clear all live BiB bindings during a full executor-state reset.
+ * @returns {void}
+ */
 export function clearExecutorLive() {
   liveByRemoteSessionId.clear();
 }

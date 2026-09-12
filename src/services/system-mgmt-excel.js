@@ -111,6 +111,12 @@ export function flattenNodesToRows(nodes = []) {
   const rows = [];
   let rowNumber = 2;
 
+  /**
+   * Recursively flatten one level of hierarchy into parent-path rows.
+   * @param {Array<object>} list nodes at the current depth
+   * @param {string[]} parentParts ancestor names
+   * @returns {void} appends normalized rows to the enclosing result
+   */
   function walk(list, parentParts) {
     for (const node of list || []) {
       const type = Number(node.type);
@@ -277,6 +283,11 @@ export async function parseExcelBuffer(buffer) {
   return rows;
 }
 
+/**
+ * Map supported worksheet header labels to normalized field names.
+ * @param {string} h raw worksheet header
+ * @returns {string} normalized field name or the original label
+ */
 function normalizeHeader(h) {
   const s = String(h || '').trim();
   const map = {
@@ -300,6 +311,11 @@ function normalizeHeader(h) {
   return map[s] || s;
 }
 
+/**
+ * Convert an ExcelJS cell value, including rich text and formula results, to text.
+ * @param {object|null} cell ExcelJS cell-like value
+ * @returns {string} readable cell text
+ */
 function cellText(cell) {
   if (!cell || cell.value == null) return '';
   const v = cell.value;

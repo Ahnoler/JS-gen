@@ -281,6 +281,14 @@ export async function importMenuJson(systemNodeId, buffer) {
      * @param {object[]} pages 该节点的页面清单
      * @returns {Promise<object>} 落位节点（API 形态）
      */
+    /**
+     * Upsert one planned module/function and synchronize its page rows.
+     * @param {object} item planned node payload
+     * @param {number} parentId resolved parent node id
+     * @param {number} type node type, module or function
+     * @param {object[]} pages page rows associated with the node
+     * @returns {Promise<object>} persisted node row
+     */
     async function upsertNode(item, parentId, type, pages) {
       const name = String(item.name || '').trim();
       const umlEcd = String(item.umlEcd || '').trim();

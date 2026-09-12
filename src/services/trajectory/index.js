@@ -1,6 +1,8 @@
 /**
  * Trajectory service barrel — re-exports every public export of the six
  * moved service modules so consumers can switch to a single import path.
+ * The barrel contains re-exports only, allowing consumers to use one stable
+ * import path while implementation responsibilities remain split across modules.
  */
 export {
   acceptTrajectoryStepsReplay,

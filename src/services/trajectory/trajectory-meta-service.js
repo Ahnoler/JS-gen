@@ -1,5 +1,10 @@
 /**
- * Trajectory shell / transaction meta: create empty, create with phases, LLM analyze, confirm.
+ * Trajectory metadata and transaction-shell service.
+ *
+ * Creates empty or phase-backed trajectory shells, analyzes requirement text
+ * into executable phases, persists business-data projections, and applies the
+ * human confirmation state machine. Parsing remains tolerant because LLM output
+ * may contain malformed JSON or unescaped line breaks.
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
@@ -29,6 +34,13 @@ export {
  * 会失败；这里按引号/深度边界做顶层元素切分，再对每个元素做最小修复。
  * @param {string} arrText "phases":[...] 方括号内的原文
  * @returns {string[]} 阶段文本列表
+ */
+/**
+ * Recover top-level phase string elements from a malformed JSON array body.
+ * Tracks quoted strings and nested arrays so commas inside content do not split
+ * an element prematurely, then applies minimal string repair to each element.
+ * @param {string} arrText text between the phase array brackets
+ * @returns {string[]} recovered non-empty phase descriptions
  */
 function extractPhaseElementsLoose(arrText) {
   const elements = [];
@@ -71,6 +83,11 @@ function extractPhaseElementsLoose(arrText) {
   return phases;
 }
 
+/**
+ * Parse an LLM analysis response using strict JSON and tolerant fallbacks.
+ * @param {string} raw raw model response
+ * @returns {{phases: string[]}} extracted phase descriptions, possibly empty
+ */
 function parseAnalyzePayload(raw) {
   const text = String(raw || '').trim();
   const tryObj = (obj) => {
@@ -267,6 +284,8 @@ export async function createEmptyTrajectory({
  * @param {string|null} [opts.reqChunkId] `<file-stem>#<h1-slug>` chapter anchor (provenance)
  * @param {string|null} [opts.reqAtomKey] Stable propose atom key (provenance)
  * @param {number} [opts.reqAtomSeq] Force re-commit sequence within (module, atom)
+ * @param {string|null} [opts.kbFlowRef] KB flow-card reference
+ * @param {string|null} [opts.kbFlowNodeId] KB flow-card node identifier
  * @param {import('knex').Knex|null} [opts.trx] 可选事务
  * @returns {Promise<object>} 创建的轨迹实体（含阶段）
  */

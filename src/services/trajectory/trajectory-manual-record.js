@@ -1,4 +1,8 @@
 /**
+ * Manual trajectory recording service.
+ *
+ * Toggles live executor manual capture, validates optional phase ownership,
+ * coordinates screenshot capture, and updates the in-memory activity marker.
  * Manual recording toggle for a live trajectory session (manual_record_start/stop
  * + screenshot capture + optimistic ack). Extracted from
  * trajectory-record-lifecycle.js — move-only, no logic changes.

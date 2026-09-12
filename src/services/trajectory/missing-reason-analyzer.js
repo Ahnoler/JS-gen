@@ -12,11 +12,22 @@
 
 const MAX_EVIDENCE_LEN = 160;
 
+/**
+ * Normalize whitespace and cap evidence text before exposing it in diagnostics.
+ * @param {unknown} value arbitrary evidence value
+ * @param {number} [max] maximum output length
+ * @returns {string} single-line clipped text
+ */
 function clipText(value, max = MAX_EVIDENCE_LEN) {
   const s = String(value ?? '').replace(/\s+/g, ' ').trim();
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
+/**
+ * Convert a step error into comparable text while preserving structured errors.
+ * @param {unknown} errorResult raw action result or thrown error
+ * @returns {string} deterministic error representation
+ */
 function normalizeError(errorResult) {
   if (errorResult == null || errorResult === '') return '';
   if (typeof errorResult === 'string') return errorResult;
@@ -28,10 +39,21 @@ function normalizeError(errorResult) {
   }
 }
 
+/**
+ * Convert an optional value into a string array and discard empty entries.
+ * @param {unknown} value candidate array
+ * @returns {string[]} normalized non-empty string values
+ */
 function asStringArray(value) {
   return Array.isArray(value) ? value.map((v) => String(v ?? '')).filter(Boolean) : [];
 }
 
+/**
+ * Normalize a form-structure report into the fields used by classification rules.
+ * Missing or malformed reports produce an empty report with all change flags false.
+ * @param {unknown} report raw form structure report
+ * @returns {{hasRequiredChange: boolean, hasOptionalChange: boolean, added_required: string[], added_optional: string[], missing_required: string[], missing_optional: string[]}} normalized report
+ */
 function normalizeReport(report) {
   if (!report || typeof report !== 'object') {
     return {

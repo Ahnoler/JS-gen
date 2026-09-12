@@ -142,6 +142,12 @@ export async function ensureRootTree(tree = []) {
   return [rootNode];
 }
 
+/**
+ * Validate a requested hierarchy node type filter.
+ * @param {number} t numeric node type
+ * @returns {void}
+ * @throws {Error} when the type is not system, module, or function
+ */
 function assertTypeFilter(t) {
   if (![NODE_TYPE.SYSTEM, NODE_TYPE.MODULE, NODE_TYPE.FUNCTION].includes(t)) {
     const err = new Error('type 须为 1=系统 / 2=模块 / 3=功能');
@@ -150,6 +156,11 @@ function assertTypeFilter(t) {
   }
 }
 
+/**
+ * Format an ancestor chain for display, adding type labels where needed.
+ * @param {object[]} pathNodes root-first ancestor chain
+ * @returns {string} display path excluding the sentinel root
+ */
 function formatPath(pathNodes) {
   const display = (n) => {
     const label = TYPE_LABEL[n.type] || '';

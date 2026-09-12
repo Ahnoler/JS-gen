@@ -179,18 +179,37 @@ export function assertAccountNamesAvailable(existing, resolved) {
   }
 }
 
+/**
+ * Convert a credential input to a scalar string while rejecting object values.
+ * @param {unknown} value raw credential value
+ * @returns {string} string credential or empty string
+ */
 function stringifyCredential(value) {
   if (value === undefined || value === null) return '';
   if (typeof value === 'object') return '';
   return String(value);
 }
 
+/**
+ * Ensure account payloads are supplied only for system nodes.
+ * @param {number|string} nodeType hierarchy node type
+ * @param {Array|undefined|null} accounts optional account payload
+ * @returns {void}
+ * @throws {Error} when accounts are supplied for a non-system node
+ */
 function assertAccountsForSystem(nodeType, accounts) {
   if (accounts !== undefined && accounts !== null && Number(nodeType) !== NODE_TYPE.SYSTEM) {
     throw Object.assign(new Error('accounts 仅支持 type=1（系统）节点'), { code: 'VALIDATION' });
   }
 }
 
+/**
+ * Reconcile a system's account rows with normalized incoming account data.
+ * @param {number} systemId system node id
+ * @param {Array<object>} normalized validated account objects
+ * @param {object} trx knex transaction
+ * @returns {Promise<object[]>} current account rows after synchronization
+ */
 async function syncSystemAccounts(systemId, normalized, trx) {
   const existing = await systemAccountDao.listBySystem(systemId, trx);
   const key = (name) => String(name || '').trim().toLocaleLowerCase();

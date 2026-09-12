@@ -169,7 +169,7 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
 
 /**
  * 仅补采落地 pageId：登录后对空 pd_cmpt_ecd 的 L2 点读天元写入（不扫菜单树、不改结构）。
- * @param {object} ctx
+ * @param {object} ctx fill-page-id scan context
  * @param {string} ctx.scanId 任务 id（复用 scanJobs）
  * @param {number} ctx.systemNodeId 系统节点 id
  * @param {string} ctx.url 被测系统 URL
@@ -240,6 +240,11 @@ export async function runFillPageIds({ scanId, systemNodeId, url, account, sourc
  * @param {number} systemNodeId 系统节点 id
  * @returns {Promise<Array<object>>} 既有模块数组，每个元素含 id/name/source/unmatchedFlag 与 children（功能）
  */
+/**
+ * Load the existing module/function subtree in the shape consumed by the scan planner.
+ * @param {number} systemNodeId system node id
+ * @returns {Promise<object[]>} existing modules with normalized function children
+ */
 async function loadExistingModules(systemNodeId) {
   const modules = await systemDao.listByParent(systemNodeId);
   const out = [];
@@ -269,6 +274,11 @@ async function loadExistingModules(systemNodeId) {
  * 候选条件与 runPhase2Match 幽灵判定保持一致；无候选时返回空 Map。
  * @param {Array<object>} existing loadExistingModules 产物（模块数组，children 为功能节点）
  * @returns {Promise<Map<number, object[]>>} 功能节点 id → system_page camelCase 行数组
+ */
+/**
+ * Batch-load page ids for eligible JSON-import function nodes with no xpath.
+ * @param {Array<object>} existing normalized existing module tree
+ * @returns {Promise<Map<number, object[]>>} function id to page rows map
  */
 async function loadGhostPageIdsByNodeIds(existing) {
   const ids = [];

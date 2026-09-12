@@ -19,6 +19,12 @@ import {
   stepsToSnapshot,
 } from './operation-component-signature.js';
 
+/**
+ * Create a service error carrying the HTTP status expected by route handlers.
+ * @param {string} message human-readable error message
+ * @param {number} [statusCode] HTTP status code
+ * @returns {Error & {statusCode: number}} configured service error
+ */
 function svcError(message, statusCode = 400) {
   const err = new Error(message);
   err.statusCode = statusCode;
@@ -57,6 +63,11 @@ export async function resolveSystemIdForTrajectory(trajectory) {
   return resolveSystemIdFromNode(functionId);
 }
 
+/**
+ * Parse serialized step params and element data into the internal step shape.
+ * @param {object} step raw DAO or request step
+ * @returns {object} normalized step with parsed params and element fields
+ */
 function parseStepParams(step) {
   let params = step.params ?? step.paramsJson ?? null;
   if (typeof params === 'string') {

@@ -200,6 +200,11 @@ export async function listSessions(opts) {
   return remoteSessionDao.list(opts);
 }
 
+/**
+ * Resolve an executor UUID to its database node id.
+ * @param {string|null} nodeUuid executor node UUID
+ * @returns {Promise<number|null>} node id, or null when unresolved
+ */
 async function resolveExecutorNodeId(nodeUuid) {
   if (!nodeUuid) return null;
   const node = await executorNodeDao.getByUuid(nodeUuid).catch(() => null);
@@ -656,4 +661,4 @@ export async function getLiveStatus(opts = {}) {
   };
 }
 
-/** Rebuild in-memory live map entry from DB row (boot reconcile). */
+/** Rebuild in-memory live map entry from DB row during boot reconciliation. */

@@ -25,12 +25,23 @@ import { state } from '../state.js';
 
 const SPECIAL_ELEMENT_TAG = 'special_element_tag';
 
+/**
+ * Create an error carrying an HTTP status for service-layer failures.
+ * @param {number} status HTTP status code
+ * @param {string} message human-readable error message
+ * @returns {Error & {statusCode: number}} configured error
+ */
 function httpError(status, message) {
   const err = new Error(message);
   err.statusCode = status;
   return err;
 }
 
+/**
+ * Parse persisted JSON fields while accepting already-parsed values.
+ * @param {unknown} val raw JSON value
+ * @returns {unknown|null} parsed value, or null when malformed
+ */
 function parseJsonMaybe(val) {
   if (val == null) return null;
   if (typeof val === 'object') return val;
@@ -57,6 +68,11 @@ export function buildSearchText({ name, dictLabel, phaseDescription, remark }) {
     .join(' ');
 }
 
+/**
+ * Load the persisted steps and attach them to a special-element row.
+ * @param {object|null} element special-element row
+ * @returns {Promise<object|null>} row with steps, or null
+ */
 async function withSteps(element) {
   if (!element) return null;
   const steps = await specialElementStepDao.listByElement(element.id);

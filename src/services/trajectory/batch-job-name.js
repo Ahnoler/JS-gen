@@ -1,6 +1,9 @@
 /**
  * Batch job task name formula：文件名(去扩展名) + '_MMDD-HHmm'（服务器本地时区）。
  * 运行时创建与迁移回填共用，保持零依赖纯函数。
+ * The exported helpers preserve the server-local timestamp convention and
+ * bound only the filename portion so the generated task name stays within its
+ * database column limit.
  */
 
 /**
@@ -14,6 +17,11 @@ export function stripExtension(filename) {
   return idx > 0 ? s.slice(0, idx) : s;
 }
 
+/**
+ * Render a numeric date component as a two-character decimal string.
+ * @param {number} n date or time component
+ * @returns {string} zero-padded component
+ */
 function pad2(n) {
   return String(n).padStart(2, '0');
 }

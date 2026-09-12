@@ -80,6 +80,11 @@ export async function buildCoverageReport({ systemId, type = 'function' } = {}) 
   let scoped = flatNodes;
   if (sysId != null && Number.isFinite(sysId)) {
     const keep = new Set();
+    /**
+     * Recursively collect ids in the selected system subtree.
+     * @param {number} id current node id
+     * @returns {void}
+     */
     const collect = (id) => {
       if (keep.has(id)) return;
       keep.add(id);

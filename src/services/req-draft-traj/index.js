@@ -1,5 +1,11 @@
 /**
- * Req→draft-traj service: parse chains, provenance, propose atomic candidates.
+ * Public entry point for the requirement-to-draft-trajectory service.
+ *
+ * This barrel exposes parsing, provenance, proposal caching, atom materialization,
+ * commit validation, flow-card guidance, and key-data normalization through one
+ * service-level import. The underlying modules retain responsibility for their
+ * filesystem, database, and LLM interactions; this file only re-exports their
+ * public contract.
  */
 export { parseThroughChainsMarkdown, buildAtomKey, hasProposeableChainSteps } from './parse-through-chains.js';
 export {

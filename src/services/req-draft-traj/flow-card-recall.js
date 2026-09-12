@@ -115,8 +115,13 @@ function applySynonymExpansion(tokens, hay, semanticDict, synonyms, moduleKey) {
 }
 
 /**
- * @param {object} card
- * @returns {string}
+ * Build the searchable text for one flow card.
+ *
+ * The haystack combines flow identity, aliases, keywords, hash markers, node
+ * navigation fields, and short rule/state/pending-step labels. Empty fields
+ * are omitted and the result is lowercased for deterministic matching.
+ * @param {object} card Flow card whose fields should be indexed
+ * @returns {string} Lowercased pipe-delimited card haystack
  */
 function buildCardHaystack(card) {
   const parts = [
@@ -144,17 +149,19 @@ function buildCardHaystack(card) {
 }
 
 /**
- * Flow name with all whitespace stripped — specificity tie-break key.
+ * Create the normalized flow-name key used for specificity tie-breaking.
+ * Removing whitespace makes equivalent names compare by their actual content.
  * @param {object} card Flow card
- * @returns {string} Whitespace-stripped flow name
+ * @returns {string} Flow name with all whitespace removed
  */
 function normFlowName(card) {
   return String(card?.flow || '').replace(/\s+/g, '');
 }
 
 /**
- * @param {object} node
- * @returns {string}
+ * Build the searchable text for a single flow-card node.
+ * @param {object} node Flow-card node with id, page, and enter fields
+ * @returns {string} Lowercased pipe-delimited node haystack
  */
 function buildNodeHaystack(node) {
   return [node.id, node.page, node.enter].filter(Boolean).join('|').toLowerCase();
@@ -445,8 +452,14 @@ export function matchFlowForAtom({ title, taskDraft, cards, synonyms, moduleKey 
 }
 
 /**
- * @param {{ card?: object|null, nodeId?: string|null, atomTask?: string }} opts
- * @returns {string|null}
+ * Render a flow card and optional node context as an atomization hint.
+ *
+ * The result includes the template sentinel, menu path, up to eight
+ * preconditions, the selected node's entry point, and the original atom task.
+ * Missing or non-object cards produce null so callers can proceed without
+ * guidance.
+ * @param {{ card?: object|null, nodeId?: string|null, atomTask?: string }} opts Hint inputs
+ * @returns {string|null} Sentinel-delimited template hint or null
  */
 export function buildFlowTemplateHint({ card, nodeId, atomTask } = {}) {
   if (!card || typeof card !== 'object') return null;
@@ -476,9 +489,12 @@ export function buildFlowTemplateHint({ card, nodeId, atomTask } = {}) {
 }
 
 /**
- * @param {string} description
- * @param {string|null} hint
- * @returns {string}
+ * Remove a leading flow-template hint from a trajectory description.
+ * Complete sentinel pairs are removed through the closing marker. Legacy hints
+ * without that marker use the historical single-line atom-task layout; text
+ * without a leading marker is returned unchanged.
+ * @param {string} description Existing trajectory description
+ * @returns {string} Description with the leading template removed
  */
 function stripFlowTemplateHint(description) {
   const text = String(description ?? '');
@@ -506,9 +522,12 @@ function stripFlowTemplateHint(description) {
 }
 
 /**
- * @param {string} description
- * @param {string|null} hint
- * @returns {string}
+ * Replace any existing leading flow-template hint with a new one.
+ * A missing hint leaves the description unchanged; otherwise the old template
+ * is stripped first and the new hint is prepended to any remaining base text.
+ * @param {string} description Existing trajectory description
+ * @param {string|null} hint New rendered flow-template hint
+ * @returns {string} Description containing at most the new leading hint
  */
 export function applyFlowTemplateHintToDescription(description, hint) {
   if (!hint) return String(description ?? '');
@@ -519,7 +538,7 @@ export function applyFlowTemplateHintToDescription(description, hint) {
 /**
  * Preview flow-template hint for a trajectory row (no DB write).
  * @param {object|null} traj trajectory row from trajectoryDao.getById
- * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>}
+ * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>} Resolved hint preview and its flow-card references
  */
 async function flowTemplateHintFromTrajectory(traj) {
   const kbFlowRef = traj?.kbFlowRef ?? null;
@@ -538,9 +557,9 @@ async function flowTemplateHintFromTrajectory(traj) {
 
 /**
  * Load trajectory by id and preview the flow-card template hint (no DB write).
- * @param {number|string} trajectoryId
+ * @param {number|string} trajectoryId Identifier of the trajectory to inspect
  * @param {{ getById?: (id: number) => Promise<object|null> }} [deps] test hooks
- * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>}
+ * @returns {Promise<{ hint: string|null, kbFlowRef: string|null, kbFlowNodeId: string|null }>} Resolved hint preview and its flow-card references
  */
 export async function getFlowTemplateHintForTrajectory(trajectoryId, { getById = trajectoryDao.getById } = {}) {
   const tid = Number(trajectoryId);

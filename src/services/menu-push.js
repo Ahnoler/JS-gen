@@ -49,6 +49,11 @@ export function getAutoSyncMs() {
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_AUTO_SYNC_MS;
 }
 
+/**
+ * Normalize a persisted menu-push status, defaulting missing values to idle.
+ * @param {unknown} raw persisted status value
+ * @returns {string} trimmed status or `idle`
+ */
 function normalizeStatus(raw) {
   const s = String(raw || '').trim();
   return s || 'idle';
@@ -62,7 +67,6 @@ function normalizeStatus(raw) {
  *    形如 `UML00005556`（全库唯一，幂等键）。
  * 2. **AI 菜单扫描新建**（`source=ai`）：无建模编码，落库时写 `String(node.id)`（纯数字串）；
  *    若历史行尚未回填，此处再回退一次 id，保证 parentUmlEcd 仍能建树。
- *
  * @param {object|null|undefined} n 系统树节点
  * @returns {string} 非空时可用于建树的编码
  */
@@ -120,6 +124,11 @@ export function buildMenuPushPayload(system, nodes, { menuVersion, partnerSystem
   };
 }
 
+/**
+ * Load navigable module and function nodes directly under a system.
+ * @param {number} systemId local system node id
+ * @returns {Promise<object[]>} ordered source nodes for the push payload
+ */
 async function listMenuNodesUnderSystem(systemId) {
   const all = await systemDao.listAll();
   const modules = all.filter((n) => Number(n.type) === NODE_TYPE.MODULE && Number(n.parentId) === Number(systemId));
@@ -133,6 +142,11 @@ async function listMenuNodesUnderSystem(systemId) {
   return [...modules, ...functions];
 }
 
+/**
+ * Schedule the short-lived pushing-to-synced status transition for a system.
+ * @param {number} systemNodeId local system node id
+ * @returns {void}
+ */
 function scheduleAutoSync(systemNodeId) {
   const ms = getAutoSyncMs();
   if (timers.has(systemNodeId)) clearTimeout(timers.get(systemNodeId));
@@ -147,6 +161,11 @@ function scheduleAutoSync(systemNodeId) {
   timers.set(systemNodeId, t);
 }
 
+/**
+ * Mark a system as synced if it is still in the pushing state.
+ * @param {number} systemNodeId local system node id
+ * @returns {Promise<void>}
+ */
 async function markSynced(systemNodeId) {
   const node = await systemDao.getById(systemNodeId);
   if (!node || normalizeStatus(node.menuPushStatus) !== 'pushing') return;

@@ -280,6 +280,23 @@ export async function persistSessionTrajectory({
  * @param {string} [opts.logText] 日志文本
  * @returns {Promise<number>} 轨迹 ID
  */
+/**
+ * Append normalized steps and phase metadata to an existing trajectory.
+ * New steps are renumbered after the current maximum, unbound steps are linked
+ * to matching phases, and trajectory counts/meta are refreshed before return.
+ * @param {object} existing existing trajectory row
+ * @param {object} options append payload and metadata
+ * @param {Array<object>} options.steps steps to append
+ * @param {string} [options.task] additional task text
+ * @param {string} [options.model] model name override
+ * @param {string} [options.url] URL candidate
+ * @param {boolean} [options.isDone] completion flag
+ * @param {boolean} [options.isSuccessful] success flag
+ * @param {number} [options.functionId] function id override
+ * @param {Record<string|number,string>} [options.phaseDescriptions] phase descriptions
+ * @param {string} [options.logText] operation-log text
+ * @returns {Promise<number>} existing trajectory id
+ */
 async function appendToTrajectory(existing, {
   steps, task, model, url, isDone, isSuccessful, functionId, phaseDescriptions = {}, logText = '',
 }) {
@@ -364,6 +381,13 @@ async function appendToTrajectory(existing, {
   return existing.id;
 }
 
+/**
+ * Resolve a phase description using numeric, string, then fallback keys.
+ * @param {Record<string|number,string>} phaseDescriptions description map
+ * @param {number} phaseNumber phase number
+ * @param {string} [fallback] description fallback
+ * @returns {string} normalized description text
+ */
 function resolvePhaseDescription(phaseDescriptions, phaseNumber, fallback = '') {
   const desc = phaseDescriptions?.[phaseNumber]
     ?? phaseDescriptions?.[String(phaseNumber)]

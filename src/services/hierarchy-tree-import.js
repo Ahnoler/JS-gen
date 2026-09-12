@@ -28,6 +28,13 @@ export async function importTree(payload = {}) {
 
   const stats = { created: 0, updated: 0, skipped: 0 };
 
+  /**
+   * Validate and recursively insert or update one imported hierarchy node.
+   * @param {object} node imported node payload
+   * @param {number} parentId resolved database parent id
+   * @param {number} expectedType required node type at this depth
+   * @returns {Promise<object>} persisted node row
+   */
   async function upsertNode(node, parentId, expectedType) {
     const type = Number(node.type);
     if (type !== expectedType) {

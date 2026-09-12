@@ -1,14 +1,38 @@
 /**
- * Flow-card selection + closed-loop helpers for draft-traj propose (spec 2026-09-09).
+ * Helpers for selecting flow cards and shaping their guidance during draft
+ * trajectory proposal.
+ *
+ * This module identifies persistence boundaries, checks whether a group of
+ * steps can be treated as one closed loop, ranks relevant cards through the
+ * shared recall function, and reduces card data to the compact shape supplied
+ * to the atomization LLM. It does not mutate cards or persist proposal data.
  */
 import { matchFlowForAtom } from './flow-card-recall.js';
 
 const PERSIST_BOUNDARY_RE = /保存|提交|启用|禁用|克隆|删除|作废|撤销(?!查询)/;
 
+/**
+ * Determine whether an action is a persistence boundary for atom grouping.
+ *
+ * Save, submit, state-changing, and destructive operations end a closed-loop
+ * group. The regular expression deliberately excludes query-like revoke text
+ * through its negative lookahead.
+ * @param {unknown} action Candidate action text
+ * @returns {boolean} True when the action ends a persistence group
+ */
 export function isPersistBoundaryAction(action) {
   return PERSIST_BOUNDARY_RE.test(String(action || ''));
 }
 
+/**
+ * Check whether a sequence contains at most one persistence boundary.
+ *
+ * Empty or missing input is rejected. Navigation and preparation actions may
+ * accompany a single write boundary, while multiple boundaries require
+ * separate atoms so one atom does not represent multiple transactions.
+ * @param {{ stepActions?: unknown[] }} opts Step action collection
+ * @returns {boolean} True when the actions form one closed loop
+ */
 export function stepsShareClosedLoop({ stepActions }) {
   const actions = (stepActions || []).map((a) => String(a || '').trim()).filter(Boolean);
   if (actions.length === 0) return false;
@@ -16,6 +40,11 @@ export function stepsShareClosedLoop({ stepActions }) {
   return boundaries.length <= 1;
 }
 
+/**
+ * Flatten chain metadata and step fields into recall text.
+ * @param {Array<{ title?: string, chainId?: string, steps?: Array<{ action?: string, zjjk?: string, page?: string, buttons?: string }> }>} chains Parsed chains
+ * @returns {string} Newline-separated text used as the recall query
+ */
 function chainHaystack(chains) {
   const parts = [];
   for (const c of chains || []) {
@@ -27,6 +56,14 @@ function chainHaystack(chains) {
   return parts.filter(Boolean).join('\n');
 }
 
+/**
+ * Select the highest-scoring distinct flow cards relevant to parsed chains.
+ *
+ * Cards are scored independently through the shared matcher, ordered by score
+ * and then stem, and deduplicated before the requested limit is applied.
+ * @param {{ chains?: object[], cards?: object[], limit?: number }} opts Selection inputs
+ * @returns {object[]} Relevant cards in deterministic score order
+ */
 export function selectRelevantFlowCards({ chains, cards, limit = 6 }) {
   const list = Array.isArray(cards) ? cards : [];
   const hay = chainHaystack(chains);
@@ -50,6 +87,14 @@ export function selectRelevantFlowCards({ chains, cards, limit = 6 }) {
   return out;
 }
 
+/**
+ * Project flow cards into the bounded guidance shape sent to the atomizer.
+ *
+ * The summary retains card identity, menu path, six preconditions, and useful
+ * node fields. Button and field lists are capped to keep prompt size stable.
+ * @param {object[]} cards Flow cards to summarize
+ * @returns {Array<object>} LLM-facing card summaries
+ */
 export function summarizeCardsForLlm(cards) {
   return (cards || []).map((card) => ({
     flowRef: card._stem || null,

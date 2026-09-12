@@ -6,6 +6,10 @@
  * - 空菜单直接返回（不导航）
  * - 导航失败不阻断交易执行（吞异常 + console.warn 后继续）
  * - 导航动作 is_replay 恒为 true（不入步骤表）
+ *
+ * This module keeps menu lookup, duplicate-navigation suppression, and replay
+ * dispatch together so callers can request navigation without handling menu
+ * tree details or turning a navigation failure into a transaction failure.
  */
 import * as execSession from '../../executor-session-client.js';
 import * as systemDao from '../../dao/system-dao.js';

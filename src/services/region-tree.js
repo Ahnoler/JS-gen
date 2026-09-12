@@ -5,6 +5,11 @@
  * 其余按 layers 前缀合并（同一父下同 id 同节点）。
  */
 
+/**
+ * Convert one layer descriptor into its stable region identifier.
+ * @param {object} [l] layer with role and label fields
+ * @returns {string} role-label identifier
+ */
 function layerIdOf(l) {
   const role = String(l?.role || '').replace(/\s+/g, ' ').trim();
   const label = String(l?.label || '').replace(/\s+/g, ' ').trim();
@@ -53,6 +58,14 @@ export function deriveRegionRef(element = {}) {
   return { regionId: '', parentRegionId: '' };
 }
 
+/**
+ * Return or create a child node under a parent region.
+ * @param {object|null} parent parent region node
+ * @param {string} id stable child identifier
+ * @param {string} role region role
+ * @param {string} label display label
+ * @returns {object|null} existing or newly created child, or null without parent
+ */
 function ensureChild(parent, id, role, label) {
   if (parent) {
     let n = parent.children.find((c) => c.id === id && c.role === role);
@@ -75,6 +88,13 @@ export function assembleRegionTree(items = [], { pageLabel = '' } = {}) {
   const rootPageLabel = String(pageLabel || '').trim();
   const roots = [];
 
+  /**
+   * Return or create a root region node.
+   * @param {string} id stable root identifier
+   * @param {string} role region role
+   * @param {string} label display label
+   * @returns {object} existing or newly created root node
+   */
   function ensureRoot(id, role, label) {
     let n = roots.find((r) => r.id === id && r.role === role);
     if (n) return n;
@@ -119,3 +139,9 @@ export function assembleRegionTree(items = [], { pageLabel = '' } = {}) {
 
   return { pageLabel: rootPageLabel, roots };
 }
+/**
+ * Build hierarchical UI region trees from captured element layer metadata.
+ *
+ * The exported helpers retain stable region identifiers and attach each
+ * control to its nearest region node for downstream recording and replay.
+ */

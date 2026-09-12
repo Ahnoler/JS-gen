@@ -64,6 +64,14 @@ export function buildRequestHash({
   return h.digest('hex');
 }
 
+/**
+ * Normalize and validate the requested batch execution mode.
+ * Missing input retains the historical record-mode default; unsupported values
+ * are rejected before the job is persisted.
+ * @param {unknown} raw requested batch mode
+ * @returns {string} validated record or draft mode
+ * @throws {Error} with statusCode 400 when the mode is unsupported
+ */
 function normalizeBatchMode(raw) {
   if (raw == null || raw === '') return 'record';
   const m = String(raw).trim().toLowerCase();
@@ -146,6 +154,14 @@ export async function emitProgress(batchId, item = null, extra = {}) {
   return payload;
 }
 
+/**
+ * Write the user-facing system notification for a terminal batch job.
+ * Notification persistence is best effort and does not prevent job completion
+ * when the system-message layer is unavailable.
+ * @param {object} job terminal batch job row
+ * @param {object} summary aggregated batch item counts
+ * @returns {Promise<void>}
+ */
 async function notifyBatchTerminalMessage(job, summary) {
   try {
     await insertSysMsgFromBatchJob(job, summary);

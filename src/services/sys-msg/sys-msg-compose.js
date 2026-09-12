@@ -1,3 +1,10 @@
+/**
+ * Pure helpers for composing system-message content and shaping message rows.
+ *
+ * This module owns the stable message constants re-exported to service and
+ * route layers, plus the escaping, formatting, link-building, and API-shape
+ * rules for batch-import notifications.
+ */
 export {
   MSG_TYPE_BATCH_IMPORT,
   MSG_TITLE_BATCH_IMPORT,
@@ -51,6 +58,12 @@ export function jobStatusLabel(status) {
     : key;
 }
 
+/**
+ * Read a numeric summary field, normalizing absent or invalid values to zero.
+ * @param {object|null|undefined} summary batch job summary object
+ * @param {string} key summary property name
+ * @returns {number} finite numeric summary value or zero
+ */
 function summaryInt(summary, key) {
   const v = Number(summary?.[key]);
   return Number.isFinite(v) ? v : 0;
@@ -91,6 +104,11 @@ export function batchImportLinkUrl(batchId) {
   return `/ui-recording?batchId=${encodeURIComponent(String(batchId || ''))}`;
 }
 
+/**
+ * Left-pad a date or time component to two characters.
+ * @param {number|string} n component value
+ * @returns {string} two-character component string
+ */
 function pad2(n) {
   return String(n).padStart(2, '0');
 }

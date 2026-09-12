@@ -37,12 +37,25 @@ const RECORD_TIMEOUT_MS = 10 * 60 * 1000;
 /** A pending/running job untouched for this long is considered stale (crashed executor) and superseded. */
 const STALE_JOB_MS = 30 * 60 * 1000;
 
+/**
+ * Create an application error carrying the HTTP status expected by route
+ * handlers. The helper keeps validation and downstream service failures
+ * consistent without changing the native Error message or stack behavior.
+ * @param {string} message human-readable error message
+ * @param {number} statusCode HTTP status code exposed to the caller; defaults to 400
+ * @returns {Error} error instance with an additional statusCode property
+ */
 function svcError(message, statusCode = 400) {
   const err = new Error(message);
   err.statusCode = statusCode;
   return err;
 }
 
+/**
+ * Wait for a fixed interval before continuing a polling loop.
+ * @param {number} ms delay duration in milliseconds
+ * @returns {Promise<void>} promise resolved after the delay
+ */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -269,16 +282,6 @@ async function createAuthTrajectory({ functionNodeId, authKind, name, task, acco
  * Mask the account password inside a trajectory's persisted step params
  * (auth-recording login steps contain the real password in `login` action
  * params; the component snapshot is masked separately at registration).
- * Replaces exact password occurrences with the __AUTH_PASSWORD__ placeholder
- * so a re-registration from the masked trajectory still resolves.
- * @param {number} tid trajectory id
- * @param {string} password real account password to scrub
- * @returns {Promise<void>}
- */
-/**
- * Mask the account password inside a trajectory's persisted step params
- * (auth-recording login steps contain the real password in `login` action
- * params; the component snapshot is masked separately at registration).
  * Walks each step's parsed params object and replaces string values exactly
  * equal to the password with the __AUTH_PASSWORD__ placeholder — exact-value
  * matching keeps short passwords (e.g. "1") from corrupting other content,
@@ -302,6 +305,13 @@ async function maskTrajectoryStepSecrets(tid, password) {
     }
     if (!obj || typeof obj !== 'object') continue;
     let changed = false;
+    /**
+     * Recursively replace exact password-valued properties in parsed params.
+     * Arrays and nested objects are traversed in place so the enclosing step
+     * can be persisted only when at least one secret was actually replaced.
+     * @param {unknown} node current array, object, or scalar value
+     * @returns {void} mutates node and the enclosing changed flag as needed
+     */
     const walk = (node) => {
       if (Array.isArray(node)) {
         node.forEach((v, i) => {
@@ -737,6 +747,11 @@ export async function getAuthRecordingStatus(systemId) {
     throw svcError('systemId is required', 400);
   }
   const job = await store.latestJobForSystem(sid);
+  /**
+   * Load the compact trajectory status associated with an auth job.
+   * @param {number|null} tid trajectory id, or null when the segment was not created
+   * @returns {Promise<object|null>} status summary or null when unavailable
+   */
   const summarize = async (tid) => {
     if (tid == null) return null;
     const row = await getDB()('trajectory')

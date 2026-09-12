@@ -4,6 +4,12 @@
 import * as typeDao from '../dao/sys-dict-type-dao.js';
 import * as dataDao from '../dao/sys-dict-data-dao.js';
 
+/**
+ * Construct a serializable service error with the HTTP status expected by routes.
+ * @param {number} status HTTP response status code
+ * @param {string} message human-readable failure message
+ * @returns {Error & {statusCode: number}} configured error instance
+ */
 function httpError(status, message) {
   const err = new Error(message);
   err.statusCode = status;

@@ -1,6 +1,10 @@
 /**
- * Trajectory recording facade — re-exports focused modules.
- * Prefer importing from the specific module when adding new call sites.
+ * Public trajectory recording facade.
+ *
+ * Re-exports runtime, attachment, lifecycle, manual-recording, and replay
+ * operations from their focused modules. New implementation code should use
+ * the owning module directly; this surface preserves the service API used by
+ * routes and other established callers.
  */
 export {
   getTrajectoryRuntime,

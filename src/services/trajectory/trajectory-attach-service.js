@@ -127,6 +127,13 @@ async function resolveHardDetachRemoteSessionId(tid, { traj, runtime, sessionId 
   return null;
 }
 
+/**
+ * Close a remote-session row and clear its ownership and live binding.
+ * Cleanup failures are logged because a leftover row can reserve a resource,
+ * but the helper intentionally does not rethrow during best-effort teardown.
+ * @param {number|null|undefined} remoteSessionId remote-session database id
+ * @returns {Promise<void>}
+ */
 async function hardCloseRemoteSession(remoteSessionId) {
   if (!remoteSessionId) return;
   try {
@@ -139,6 +146,14 @@ async function hardCloseRemoteSession(remoteSessionId) {
   }
 }
 
+/**
+ * Close an executor session opened during attach when a later attach step fails.
+ * Reused Chrome is left idle for its existing grace owner; newly opened Chrome
+ * is fully closed. Slot release is used as a fallback if the executor call fails.
+ * @param {string} sessionId executor agent session id
+ * @param {object|null|undefined} opened open-session result
+ * @returns {Promise<void>}
+ */
 async function releaseOpenedSessionBestEffort(sessionId, opened) {
   try {
     await execSession.closeSession({
@@ -152,6 +167,15 @@ async function releaseOpenedSessionBestEffort(sessionId, opened) {
   }
 }
 
+/**
+ * Attach the browser-in-browser stream for a trajectory and synchronize its mount.
+ * BiB failures are returned as a degraded status except for ownership conflicts,
+ * which are rethrown so callers can preserve their HTTP 409 semantics.
+ * @param {number} tid trajectory database id
+ * @param {string} sessionId executor agent session id
+ * @param {object|null} runtime mutable trajectory runtime entry
+ * @returns {Promise<{attached: object|null, bibError: string|null, remoteSessionId: number|null, status: object|null}>} attach outcome
+ */
 async function attachBibBestEffort(tid, sessionId, runtime) {
   let attached = null;
   let bibError = null;

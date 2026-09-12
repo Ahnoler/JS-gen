@@ -64,6 +64,12 @@ export function startItemLeaseRenewal({
   return () => clearInterval(timer);
 }
 
+/**
+ * Count currently available executor slots across connected, non-draining
+ * nodes. Database capacity is authoritative when present, while registry
+ * connectivity determines which nodes can accept work now.
+ * @returns {Promise<number>} number of free cluster slots
+ */
 async function computeClusterFreeSlots() {
   const dbNodes = await executorNodeDao.list().catch(() => []);
   const byUuid = new Map(dbNodes.map((n) => [n.nodeUuid, n]));
@@ -79,6 +85,12 @@ async function computeClusterFreeSlots() {
   return free;
 }
 
+/**
+ * Fill available executor capacity with claimed record-mode batch items.
+ * Each claimed item is transitioned through preparation and recording by a
+ * detached worker, while the scheduler is kicked again as workers finish.
+ * @returns {Promise<void>} resolves after the current claim pass is scheduled
+ */
 export async function pumpRecord() {
   // Dynamic: start as many workers as free slots (at least try one if waiting)
   const free = await computeClusterFreeSlots();
@@ -123,6 +135,14 @@ export async function pumpRecord() {
   }
 }
 
+/**
+ * Execute one claimed record item through prepare, record, reconciliation, and
+ * detach. Cancellation, lease loss, unavailable slots, and quality-gate
+ * failures are converted into the corresponding persisted batch item state.
+ * @param {object} item claimed batch item with batchId and trajectoryId
+ * @param {string} token worker token owning the item lease
+ * @returns {Promise<void>} resolves after item state and progress are settled
+ */
 async function runRecord(item, token) {
   const batchId = item.batchId;
   const tid = Number(item.trajectoryId);

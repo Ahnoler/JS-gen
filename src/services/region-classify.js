@@ -4,6 +4,10 @@
  * L1c = classify L1 page-region feature cards (role/label). LLM gated by L1C_LLM;
  * transport uses L1C_LLM_MODEL / L1C_LLM_BASE_URL / L1C_LLM_API_KEY (fallback LLM_*).
  */
+/**
+ * Classify captured region cards using deterministic rules with optional LLM
+ * assistance and a short-lived in-memory cache for repeated feature shapes.
+ */
 import { createHash } from 'node:crypto';
 import { callLLM } from '../llm-utils.js';
 import {
@@ -32,6 +36,11 @@ const L1D_TTL_MS = 3600 * 1000;
 /** In-memory L1d cache: key `${systemId}:${signature}` → { value, exp } */
 const l1dCache = new Map();
 
+/**
+ * Read a non-expired value from the L1d classification cache.
+ * @param {string} key cache key
+ * @returns {object|null} cached classification or null on miss/expiry
+ */
 function cacheGet(key) {
   const row = l1dCache.get(key);
   if (!row) return null;
@@ -42,6 +51,12 @@ function cacheGet(key) {
   return row.value;
 }
 
+/**
+ * Store the stable classification fields in the L1d cache.
+ * @param {string} key cache key
+ * @param {object} value classification result
+ * @returns {void}
+ */
 function cacheSet(key, value) {
   l1dCache.set(key, {
     value: {
@@ -82,11 +97,21 @@ export function shouldLlmClassify(card = {}) {
   return false;
 }
 
+/**
+ * Check whether a role is in the supported taxonomy or custom-role format.
+ * @param {string} role candidate role
+ * @returns {boolean} whether the role is valid
+ */
 function isValidRole(role) {
   const r = String(role || '');
   return SEED.has(r) || CUSTOM_ROLE_RE.test(r);
 }
 
+/**
+ * Parse an LLM response containing a JSON array, tolerating surrounding prose.
+ * @param {string} raw raw model response
+ * @returns {Array<object>|null} parsed array or null when invalid
+ */
 function parseLlmJsonArray(raw) {
   const text = String(raw || '').trim();
   if (!text) return null;
@@ -108,6 +133,11 @@ function parseLlmJsonArray(raw) {
   return null;
 }
 
+/**
+ * Build the constrained prompt used for batched region classification.
+ * @param {Array<object>} cards region cards to classify
+ * @returns {string} serialized classification prompt
+ */
 function buildClassifyPrompt(cards) {
   const slim = cards.map((c, i) => ({
     index: i,
@@ -127,6 +157,12 @@ function buildClassifyPrompt(cards) {
   ].join('\n');
 }
 
+/**
+ * Call the configured LLM while enforcing the region-classification timeout.
+ * @param {string} prompt classification prompt
+ * @param {string} model model identifier
+ * @returns {Promise<unknown>} raw model response
+ */
 async function callLLMWithTimeout(prompt, model) {
   let timer;
   const timeoutPromise = new Promise((_, reject) => {
@@ -146,6 +182,11 @@ async function callLLMWithTimeout(prompt, model) {
   }
 }
 
+/**
+ * Classify one batch of cards and normalize each model item.
+ * @param {Array<object>} cards region cards
+ * @returns {Promise<Array<object|null>>} normalized results aligned to cards
+ */
 async function llmClassifyBatch(cards) {
   const raw = await callLLMWithTimeout(buildClassifyPrompt(cards), L1C_LLM_MODEL);
   const arr = parseLlmJsonArray(raw);
@@ -168,6 +209,12 @@ async function llmClassifyBatch(cards) {
   return out;
 }
 
+/**
+ * Overlay an optional LLM classification onto the rule-based base result.
+ * @param {object} base rule-based classification
+ * @param {object|null} llmItem normalized LLM result
+ * @returns {object} merged classification
+ */
 function mergeLlm(base, llmItem) {
   if (!llmItem) return { ...base, source: 'rule' };
   return {

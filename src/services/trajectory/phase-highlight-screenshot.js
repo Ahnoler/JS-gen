@@ -1,3 +1,8 @@
+/**
+ * Phase highlight screenshot capture and metadata persistence.
+ * Supports direct CDP capture and executor-mediated BiB capture, preserving
+ * element geometry and region-tree metadata for the recording phase.
+ */
 import { randomUUID } from 'node:crypto';
 import { PNG } from 'pngjs';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';

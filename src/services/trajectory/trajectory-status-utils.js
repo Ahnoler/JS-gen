@@ -1,5 +1,9 @@
 /**
- * 轨迹状态判定助手（record_status v2）。零依赖、可被服务与 runner 安全引用。
+ * Trajectory recording-status predicates.
+ *
+ * Exposes the database-backed recording activity check used by trajectory
+ * services and runners. Keeping this rule in one small module prevents callers
+ * from inferring AI activity from transient runtime flags or stale metadata.
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 

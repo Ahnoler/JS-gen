@@ -243,6 +243,12 @@ export function pickOperationValue(action, params = {}) {
   }
 }
 
+/**
+ * Resolve the legacy engine type, including date-picker specialization for fills.
+ * @param {string} action normalized action name
+ * @param {object} [element] recorded element metadata
+ * @returns {string|null} emitted engine type or null when unsupported
+ */
 function resolveEngineType(action, element = {}) {
   const mapped = ACTION_TO_ENGINE_TYPE[action];
   if (!mapped) return null;

@@ -1,3 +1,9 @@
+/**
+ * Rerun orchestration for recovering from a failed generated action sequence.
+ *
+ * The service reconstructs the pre-failure browser state and returns a heal
+ * instruction; it is separate from the product replay-actions service.
+ */
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { PROJECT_DIR } from '#config/config.js';

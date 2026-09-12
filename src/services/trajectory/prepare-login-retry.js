@@ -3,6 +3,11 @@
  *
  * Replaces the old fixed 8s sleep after first failure (login-retry-heuristic).
  */
+/**
+ * Prepare-time login retry policy for executor cold starts.
+ * A failed attempt optionally settles page readiness, waits with capped
+ * exponential backoff within a wall-clock budget, then retries the login.
+ */
 
 /**
  * @param {object} opts options

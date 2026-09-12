@@ -67,6 +67,12 @@ export async function buildTemplateBuffer(rows = sampleTemplateRows()) {
   return Buffer.from(buf);
 }
 
+/**
+ * Convert an ExcelJS cell value, including rich text and formula results, to text.
+ * Values that cannot provide a specialized representation fall back to String().
+ * @param {unknown} value raw ExcelJS cell value
+ * @returns {string} normalized cell text, or an empty string for nullish values
+ */
 function cellText(value) {
   if (value == null) return '';
   if (typeof value === 'object') {

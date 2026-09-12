@@ -1,3 +1,8 @@
+/**
+ * Batch item progress calculations. This module converts pipeline status and
+ * available trajectory phases into the compact progress shape consumed by
+ * batch status views, without performing database or network work.
+ */
 import { parseDoneLogs } from '../../models/phase-done-logs.js';
 
 export const PHASE_LOOKUP_STATUSES = new Set([
@@ -27,6 +32,11 @@ export function summarizePhases(phases = []) {
   };
 }
 
+/**
+ * Get the latest completion message for a completed phase.
+ * @param {object|null|undefined} phase completed phase row
+ * @returns {string} latest parsed done-log text or a phase-number fallback
+ */
 function latestCompletedDoneText(phase) {
   if (!phase) return '';
   const logs = parseDoneLogs(phase.doneLogs ?? phase.done_logs);
@@ -36,11 +46,23 @@ function latestCompletedDoneText(phase) {
   return n > 0 ? `阶段${n}已完成` : '';
 }
 
+/**
+ * Convert completed-phase progress to the recording range of 40 through 90.
+ * @param {number} phaseCompleted number of completed phases
+ * @param {number} phaseTotal total number of phases
+ * @returns {number} progress percentage for recording state
+ */
 function recordingRatioPercent(phaseCompleted, phaseTotal) {
   if (!(Number(phaseTotal) > 0)) return 40;
   return Math.min(90, Math.round(40 + 50 * (Number(phaseCompleted) / Number(phaseTotal))));
 }
 
+/**
+ * Map a non-recording pipeline status to its progress percentage.
+ * @param {string} status batch item status
+ * @param {string} mode batch mode, either draft or record
+ * @returns {number|null} mapped percentage, or null for an unknown status
+ */
 function pipelinePercent(status, mode) {
   if (mode === 'draft') {
     if (status === 'pending') return 0;

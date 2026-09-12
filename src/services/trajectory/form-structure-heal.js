@@ -48,6 +48,13 @@ const FILL_ACTION_TYPES = new Set([
   'tssc_multi_select',
 ]);
 
+/**
+ * Parse the executor's form-structure result, accepting the prefixed wire
+ * format as well as a plain JSON string or object. Malformed or non-object
+ * values are treated as unavailable reports.
+ * @param {unknown} raw raw replay result
+ * @returns {object|null} parsed form-structure report, or null when invalid
+ */
 function parseFormStructureResult(raw) {
   const s = String(raw || '');
   const jsonPart = s.startsWith('form-structure:') ? s.slice('form-structure:'.length) : s;
@@ -59,6 +66,13 @@ function parseFormStructureResult(raw) {
   }
 }
 
+/**
+ * Determine whether a form diff requires Type B healing work.
+ * Container lookup failures are excluded because they are unsafe errors rather
+ * than structural changes that can be repaired by this handler.
+ * @param {object|null|undefined} report form-structure diff report
+ * @returns {boolean} true when required or optional fields changed
+ */
 function needsTypeB(report) {
   if (!report) return false;
   if (report.error === 'container_not_found') return false;
@@ -534,6 +548,13 @@ export async function handleFormStructureCheckpoint({
   return { ok: true, aborted: false, results, healed };
 }
 
+/**
+ * Persist the post-scan field set while retaining requiredness for unchanged
+ * fields and applying the report's added-field classifications.
+ * @param {object|null|undefined} snap stored form snapshot
+ * @param {object|null|undefined} report live form-structure diff report
+ * @returns {Promise<void>} resolves after the snapshot fields are updated
+ */
 async function updateSnapshotFromReport(snap, report) {
   if (!snap?.id || !report) return;
   const actualLabels = Array.isArray(report.fields) ? report.fields : [];
@@ -561,11 +582,22 @@ async function updateSnapshotFromReport(snap, report) {
   });
 }
 
+/**
+ * Capture the current action-log entry IDs before an AI heal run.
+ * @param {object|null|undefined} runtime trajectory runtime with executor session identity
+ * @returns {Promise<Set<string>>} IDs present before healing
+ */
 async function peekActionLogIds(runtime) {
   const entries = await fetchActionLogEntries(runtime);
   return new Set(entries.map((e) => (e?.id != null ? String(e.id) : '')).filter(Boolean));
 }
 
+/**
+ * Request the executor's current action log, failing soft when the session is
+ * unavailable or the event request cannot be completed.
+ * @param {object|null|undefined} runtime trajectory runtime with session identifiers
+ * @returns {Promise<Array<object>>} action-log entries, or an empty array
+ */
 async function fetchActionLogEntries(runtime) {
   if (!runtime?.sessionId || !runtime?.executorNodeUuid) return [];
   try {

@@ -153,6 +153,11 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, heal
     rejectP(new Error('Timeout waiting for heal phase_done'));
   }, HEAL_TIMEOUT_MS);
 
+  /**
+   * Release all listeners and the timeout when the heal wait settles.
+   * The guard makes cleanup idempotent across success, error, abort, and timeout.
+   * @returns {void}
+   */
   function cleanup() {
     if (settled) return;
     settled = true;

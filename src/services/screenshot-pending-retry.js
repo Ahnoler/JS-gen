@@ -1,3 +1,7 @@
+/**
+ * Background retry coordinator for screenshots stored locally after a failed
+ * MinIO upload. It serializes scans and exposes manual and scheduled entrypoints.
+ */
 import {
   SCREENSHOT_RETRY_INTERVAL_MS,
   SCREENSHOT_MAX_RETRY,
@@ -127,6 +131,10 @@ export function startPendingScreenshotRetry() {
   return timer;
 }
 
+/**
+ * Stop the background pending-screenshot retry timer, if one is active.
+ * @returns {void}
+ */
 export function stopPendingScreenshotRetry() {
   if (timer) {
     clearInterval(timer);

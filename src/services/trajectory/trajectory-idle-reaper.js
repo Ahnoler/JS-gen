@@ -24,6 +24,14 @@ const TICK_MS = 45 * 1000;
 let timer = null;
 let running = false;
 
+/**
+ * Read the newest persisted step timestamp for a trajectory.
+ *
+ * The runtime normally supplies this value, but the database is the fallback
+ * when a process restart or an older runtime entry has no in-memory timestamp.
+ * @param {number|string} trajectoryId trajectory database id
+ * @returns {Promise<number|null>} newest step creation time in epoch milliseconds
+ */
 async function latestStepCreatedAt(trajectoryId) {
   const db = getDB();
   const row = await db('trajectory_step')
@@ -33,12 +41,25 @@ async function latestStepCreatedAt(trajectoryId) {
   return row?.created_at ? new Date(row.created_at).getTime() : null;
 }
 
+/**
+ * Convert a date-like value into an epoch timestamp for idle-age comparison.
+ * Invalid, empty, or absent values are represented as null.
+ * @param {string|number|Date|null|undefined} value date-like input
+ * @returns {number|null} finite epoch milliseconds, or null when unparseable
+ */
 function parseTs(value) {
   if (!value) return null;
   const t = new Date(value).getTime();
   return Number.isFinite(t) ? t : null;
 }
 
+/**
+ * Determine whether an agent session is still represented by live control-plane state.
+ * Both the session registry and trajectory runtime map are checked because either
+ * may retain the authoritative association during lifecycle transitions.
+ * @param {string|null|undefined} agentSessionId executor agent session id
+ * @returns {boolean} true when the session is still live or reusable
+ */
 function agentSessionStillLive(agentSessionId) {
   if (!agentSessionId) return false;
   if (state.sessions.has(agentSessionId)) return true;
@@ -151,6 +172,12 @@ export async function reapIdleTrajectoryRuntimes() {
   return { checked: map.size, graceExpired, detached, orphanClosed };
 }
 
+/**
+ * Start the periodic idle-runtime reaper once for the control-plane process.
+ * Each tick is serialized so a slow database or executor cleanup cannot overlap
+ * with the next tick; the timer is unref'ed so it does not keep Node alive.
+ * @returns {void}
+ */
 export function startTrajectoryIdleReaper() {
   if (timer) return;
   timer = setInterval(() => {

@@ -9,6 +9,10 @@ import {
   SCREENSHOT_PENDING_DIR,
 } from '../../config/config.js';
 
+/**
+ * Ensure the restricted pending-screenshot directory exists.
+ * @returns {Promise<void>} resolves when the directory is available
+ */
 async function ensureDir() {
   await mkdir(SCREENSHOT_PENDING_DIR, { recursive: true, mode: 0o700 });
 }

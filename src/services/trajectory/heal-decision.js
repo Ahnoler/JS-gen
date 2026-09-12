@@ -10,6 +10,10 @@
  *   retry -> re-run the failed replay action a bounded number of times
  *            (contract.runtime.retry_count), then fall back to AI heal
  *   heal / repair / unknown -> existing AI heal flow
+ *
+ * The routing functions are pure and do not execute healing, mutate replay
+ * state, or interpret the returned pipeline step. Their only responsibility is
+ * to make the feature-flag and suggested-action decision explicit.
  */
 
 const DECISION_FLAG = 'HEAL_LOCATE_DECISION_ENABLED';

@@ -29,6 +29,11 @@ export const MODULE_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 const DEFAULT_ROOT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'kb', 'req');
 
+/**
+ * Select the configured or default requirements workspace root.
+ * @param {string} [rootDir] caller-supplied workspace root
+ * @returns {string} workspace root path
+ */
 function resolveRootDir(rootDir) {
   return rootDir ?? DEFAULT_ROOT_DIR;
 }
@@ -55,6 +60,11 @@ export function moduleDir(moduleKey, rootDir) {
   return join(resolveRootDir(rootDir), moduleKey);
 }
 
+/**
+ * Check whether the registered source document is accessible to the server.
+ * @param {string} sourcePath source document path
+ * @returns {Promise<boolean>} whether the path exists and is accessible
+ */
 async function isSourceAccessible(sourcePath) {
   try {
     await access(sourcePath, constants.F_OK);
@@ -64,6 +74,11 @@ async function isSourceAccessible(sourcePath) {
   }
 }
 
+/**
+ * Read and parse a module manifest, treating a missing file as absent.
+ * @param {string} manifestPath manifest JSON path
+ * @returns {Promise<object|null>} parsed manifest or null when missing
+ */
 async function readManifestFile(manifestPath) {
   try {
     const raw = await readFile(manifestPath, 'utf-8');
@@ -183,6 +198,11 @@ export async function listReqModules({ rootDir } = {}) {
   return rows.sort((a, b) => a.moduleKey.localeCompare(b.moduleKey));
 }
 
+/**
+ * Determine whether a directory exists and contains at least one entry.
+ * @param {string} dirPath directory path
+ * @returns {Promise<boolean>} whether the directory is non-empty
+ */
 async function dirHasEntries(dirPath) {
   try {
     const names = await readdir(dirPath);
@@ -193,6 +213,11 @@ async function dirHasEntries(dirPath) {
   }
 }
 
+/**
+ * Test filesystem existence without propagating a missing-path error.
+ * @param {string} filePath path to test
+ * @returns {Promise<boolean>} whether the path exists
+ */
 async function pathExists(filePath) {
   try {
     await access(filePath, constants.F_OK);
@@ -202,6 +227,11 @@ async function pathExists(filePath) {
   }
 }
 
+/**
+ * Count JSON draft artifacts in a module drafts directory.
+ * @param {string} draftsDir drafts directory path
+ * @returns {Promise<number>} number of JSON draft files
+ */
 async function countDraftFiles(draftsDir) {
   try {
     const names = await readdir(draftsDir);

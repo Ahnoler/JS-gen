@@ -12,10 +12,22 @@ import {
 } from './session-lifecycle-rules.js';
 import { clearLiveBinding } from './remote-session-state.js';
 
+/**
+ * Emit a compact structured lifecycle event for operational diagnostics.
+ * @param {string} event lifecycle event name
+ * @param {object} [fields] event fields
+ * @returns {void}
+ */
 function logLifecycle(event, fields = {}) {
   console.log(`[lifecycle.${event}]`, JSON.stringify(fields));
 }
 
+/**
+ * Clear in-memory trajectory runtime mounts after database unmounting.
+ * @param {number[]} cleared trajectory ids whose mounts were removed
+ * @param {number} remoteSessionId remote-session id that was detached
+ * @returns {Promise<void>} resolves after best-effort runtime cleanup
+ */
 async function clearRuntimeMounts(cleared, remoteSessionId) {
   if (!cleared?.length) return;
   try {

@@ -1,4 +1,10 @@
 /**
+ * Trajectory step movement planning module.
+ *
+ * This module is intentionally side-effect free: it validates a requested
+ * move, rebuilds phase buckets in global phase order, and returns the complete
+ * renumbered order for the persistence service to apply.
+ *
  * Pure planner for POST .../steps/move.
  * Builds global order = phases sorted by phaseNumber, each phase's steps in list order
  * after removing stepId and inserting before beforeStepId (or phase end).

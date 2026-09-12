@@ -142,6 +142,12 @@ export async function getTrajectoryLoginContext(trajectoryId) {
   };
 }
 
+/**
+ * Project a system row into the stable system shape returned to callers.
+ * Legacy `systemId` is used as the uid fallback when the newer uid column is empty.
+ * @param {object} cur resolved system row
+ * @returns {{id: number, name: string, uid: string|number, description: string|null, url: string}} public system summary
+ */
 function _shapeSystem(cur) {
   return {
     id: cur.id,
@@ -152,6 +158,12 @@ function _shapeSystem(cur) {
   };
 }
 
+/**
+ * Resolve the owning system through a persisted system-account relationship.
+ * Root nodes and missing relationships are treated as unresolved.
+ * @param {number} accountId system account id
+ * @returns {Promise<object|null>} owning non-root system row, or null
+ */
 async function _systemFromAccount(accountId) {
   const account = await systemAccountDao.getById(accountId);
   if (!account?.systemId) return null;
@@ -160,6 +172,12 @@ async function _systemFromAccount(accountId) {
   return sys;
 }
 
+/**
+ * Load and normalize all login accounts belonging to a system.
+ * The system URL supplies a fallback login URL for legacy account rows.
+ * @param {object} cur owning system row
+ * @returns {Promise<object[]>} normalized account summaries including credentials
+ */
 async function _accountsForSystem(cur) {
   return (await systemAccountDao.listBySystem(cur.id)).map((a) => ({
     id: a.id,

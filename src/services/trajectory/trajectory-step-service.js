@@ -1,5 +1,9 @@
 /**
- * Trajectory step CRUD + shared step/phase count refresh.
+ * Trajectory step service.
+ *
+ * Owns step creation, editing, confirmation, deletion, and movement while
+ * keeping trajectory metadata counts synchronized. It also centralizes the
+ * element payload preparation and recording/busy-state guards used by edits.
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
@@ -75,6 +79,17 @@ export async function markStepReplayOk(stepId) {
   return confirmTrajectoryStep(stepId, true);
 }
 
+/**
+ * Normalize and validate an element payload for a trajectory step.
+ * Locator-exempt and non-single-target actions accept a missing usable locator
+ * but still use the common element serializer when an element is supplied.
+ * @param {string} actionType requested action name or alias
+ * @param {object|null} params action parameters used by element preparation
+ * @param {object|string|null} element raw element payload
+ * @param {object} [options] preparation options
+ * @param {boolean} [options.requireUsable] require a usable target for single-target actions; defaults to true
+ * @returns {object|null} normalized element payload, or null when none is available
+ */
 function prepareStepElement(actionType, params, element, { requireUsable = true } = {}) {
   const action = normalizeActionName(actionType || '');
   if (LOCATOR_EXEMPT_ACTIONS.includes(action) || !isSingleTargetAction(action)) {
@@ -291,6 +306,14 @@ export async function removeTrajectoryStep(stepId) {
   return { removed: true, trajectoryId: existing.trajectoryId };
 }
 
+/**
+ * Reject step mutations while AI recording, manual recording, or session work
+ * could make the persisted order inconsistent with the live action stream.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} traj current trajectory row
+ * @returns {Promise<void>} resolves when the step edit is allowed
+ * @throws {Error} with statusCode 409 when a recording or busy session exists
+ */
 async function assertNotBusyForStepEdit(trajectoryId, traj) {
   const tid = Number(trajectoryId);
   if (traj?.recordStatus === 'recording' && (await isAiRecordingActive(tid))) {

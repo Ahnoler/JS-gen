@@ -11,11 +11,27 @@ import { analyzeMissingReason } from './missing-reason-analyzer.js';
 const TARGET_KEYS = ['action', 'label', 'xpath_smart', 'option_text'];
 const RUNTIME_KEYS = ['retry_count', 'max_steps'];
 
+/**
+ * Convert a positive numeric-like value to a positive integer.
+ *
+ * Invalid, zero, and negative values are replaced with the supplied fallback;
+ * decimal values are truncated toward zero before being returned.
+ * @param {unknown} value candidate numeric value
+ * @param {number} fallback value used when the candidate is not positive
+ * @returns {number} normalized positive integer or fallback
+ */
 function normalizeInt(value, fallback) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+/**
+ * Select the most useful smart XPath available on a failed replay entry.
+ * Candidate metadata is preferred, followed by the entry and element-level
+ * XPath fields, with an empty string returned when no locator is available.
+ * @param {object|null|undefined} failedEntry failed action entry
+ * @returns {string} trimmed smart XPath or empty string
+ */
 function pickXpathSmart(failedEntry) {
   const element = failedEntry?.element && typeof failedEntry.element === 'object'
     ? failedEntry.element
@@ -34,6 +50,14 @@ function pickXpathSmart(failedEntry) {
   ).trim();
 }
 
+/**
+ * Extract option text relevant to selection-like actions.
+ * Explicit option fields win; supported selection actions then fall back to
+ * their value, option, or text parameter, while other actions return empty.
+ * @param {string} action action name from the failed entry
+ * @param {object|null|undefined} params action parameters
+ * @returns {string} trimmed option text or empty string
+ */
 function pickOptionText(action, params) {
   const explicit = String(
     params?.option_text
@@ -47,6 +71,11 @@ function pickOptionText(action, params) {
   return '';
 }
 
+/**
+ * Verify that a value has the shape produced by missing-reason analysis.
+ * @param {unknown} reason candidate reason value
+ * @returns {boolean} whether category, suggested action, and evidence are valid
+ */
 function isReasonShape(reason) {
   return reason
     && typeof reason === 'object'

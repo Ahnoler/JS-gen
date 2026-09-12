@@ -134,6 +134,10 @@ export function lineMatches(line, { slot, sid } = {}) {
   return true;
 }
 
+/**
+ * List per-session stderr log files in the configured log directory.
+ * @returns {string[]} absolute paths to log files
+ */
 function listLogFilePaths() {
   const dir = resolveLogDir();
   if (!existsSync(dir)) return [];
@@ -142,6 +146,12 @@ function listLogFilePaths() {
     .map((name) => path.join(dir, name));
 }
 
+/**
+ * Read one log file and retain lines matching the slot/session filter.
+ * @param {string} filePath log file path
+ * @param {{ slot?: number, sid?: string }} filter line filter
+ * @returns {string[]} matching raw log lines
+ */
 function readMatchingLines(filePath, filter) {
   if (!existsSync(filePath)) return [];
   const content = readFileSync(filePath, 'utf-8');
@@ -207,6 +217,11 @@ export function filterLines(filter = {}) {
 /**
  * Ask connected executors for per-slot CDP ports (session.list).
  * @returns {Promise<object>} `{ byNodeUuid, bySessionId }` port maps keyed by node uuid / session id
+ */
+/**
+ * Query connected executors for live slot/CDP-port metadata used by the active log view.
+ * Unreachable nodes are omitted so one slow executor does not fail the whole listing.
+ * @returns {Promise<{byNodeUuid: Map<string, object[]>, bySessionId: Map<string, number>}>} live port indexes
  */
 async function fetchLiveSlotPorts() {
   const { listExecutorSessions } = await import('../executor-session-client.js');

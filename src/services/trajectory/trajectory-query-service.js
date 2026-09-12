@@ -1,5 +1,9 @@
 /**
- * Trajectory read/query helpers: tree, lists, action-flow merge.
+ * Trajectory query service.
+ *
+ * Reads trajectory, phase, step, business-data, and screenshot records and
+ * assembles the tree/action-flow shapes consumed by product APIs. Query output
+ * hides meta steps by default while retaining explicit opt-in support.
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
@@ -9,10 +13,20 @@ import * as screenshotDao from '../../dao/screenshot-dao.js';
 import { filterMetaSteps, isMetaStep } from '../../models/meta-step-actions.js';
 import { countBusinessSteps } from './action-log-copy.js';
 
+/**
+ * Parse a JSON value without allowing malformed persisted data to break reads.
+ * @param {string} str serialized JSON value
+ * @returns {object} parsed object, or an empty object on failure
+ */
 function safeJson(str) {
   try { return JSON.parse(str); } catch { return {}; }
 }
 
+/**
+ * Add query-layer metadata to a step without mutating the DAO result.
+ * @param {object} step persisted step row
+ * @returns {object} copied step with meta and group-shot flags
+ */
 function annotateStep(step) {
   if (!step || typeof step !== 'object') return step;
   // groupShotId: 动作前所属状态组截图（kind=phase_group）；无则 null。

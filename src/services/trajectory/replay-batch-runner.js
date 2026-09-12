@@ -38,6 +38,16 @@ import { handleFormStructureCheckpoint } from './form-structure-heal.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import { navigateToFunctionMenu } from './menu-navigation.js';
 
+/**
+ * Emit the terminal replay event for a user-aborted batch.
+ * Failed step ids are deduplicated so the event reflects logical failures
+ * rather than repeated bookkeeping entries.
+ * @param {number} tid trajectory database id
+ * @param {object} [options] partial replay counters
+ * @param {number} [options.successCount] completed successful step count
+ * @param {Array<number>} [options.failedStepIds] failed step ids
+ * @returns {void}
+ */
 function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
   const uniqueFailed = [...new Set(failedStepIds)];
   emitReplay('replay:finished', tid, {
@@ -50,6 +60,13 @@ function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
   });
 }
 
+/**
+ * Forward one recorded action to the executor using replay timeout semantics.
+ * @param {object} runtime trajectory runtime with executor session identifiers
+ * @param {object} entry recorded action entry
+ * @param {boolean} doSuppress whether replay persistence should be suppressed
+ * @returns {Promise<object>} executor replay result for the single action
+ */
 async function forwardReplayEntry(runtime, entry, doSuppress) {
   return runReplayActions({
     execSession,
@@ -549,6 +566,18 @@ export async function runReplayBatch({
   }
 }
 
+/**
+ * Assemble the stable response payload returned after replay completion, failure,
+ * or user cancellation, combining raw results with aggregate counters.
+ * @param {number} tid trajectory database id
+ * @param {boolean} doSuppress whether replay persistence was suppressed
+ * @param {Array<object>} rows persisted step rows used for stepIds
+ * @param {Array<object>} allResults per-action replay results
+ * @param {Array<object>} healed actions handled by AI heal
+ * @param {string|null} error terminal error message
+ * @param {object} [counts] explicit counters for partial/aborted runs
+ * @returns {object} replay API result payload
+ */
 function buildPayload(tid, doSuppress, rows, allResults, healed, error, counts = {}) {
   const okCount = allResults.filter((r) => r.ok && !r.healed).length;
   const failCount = allResults.filter((r) => !r.ok || r.healed || r.confirmed === false).length;

@@ -47,8 +47,8 @@ export async function listFlowCards({ dir = DEFAULT_FLOWS_DIR } = {}) {
 
 /**
  * Read one flow card by filename stem (full JSON object).
- * @param {{ stem?: string, dir?: string }} [opts]
- * @returns {Promise<object|null>}
+ * @param {{ stem?: string, dir?: string }} [opts] lookup options
+ * @returns {Promise<object|null>} full flow card, or null when unavailable
  */
 export async function getFlowCard({ stem, dir = DEFAULT_FLOWS_DIR } = {}) {
   const name = String(stem || '').trim();
@@ -67,8 +67,8 @@ export async function getFlowCard({ stem, dir = DEFAULT_FLOWS_DIR } = {}) {
 
 /**
  * List full flow cards with `_stem` for matching (sorted by filename).
- * @param {{ dir?: string }} [opts]
- * @returns {Promise<object[]>}
+ * @param {{ dir?: string }} [opts] card directory options
+ * @returns {Promise<object[]>} full flow cards with filename stems
  */
 export async function listFlowCardsDetailed({ dir = DEFAULT_FLOWS_DIR } = {}) {
   let names;

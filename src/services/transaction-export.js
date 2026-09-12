@@ -45,6 +45,11 @@ export const TRANSACTION_ENVELOPE_FIELDS = Object.freeze([
   { key: 'transcationProperties', zh: '步骤/事件数组' },
 ]);
 
+/**
+ * Extract and deduplicate selectable options from an action entry.
+ * @param {object} entry trajectory action entry
+ * @returns {string} compact JSON array of usable options, or an empty string
+ */
 function resolveOptions(entry) {
   const fromEl = entry?.element?.options;
   const fromParams = entry?.params?.options;

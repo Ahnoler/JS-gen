@@ -27,12 +27,22 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = path.resolve(__dirname, '../../scripts/prompts/component-mine-prompt.md');
 
+/**
+ * Create a validation-style error for mining scope and input failures.
+ * @param {string} message error message
+ * @param {number} [statusCode] HTTP status code
+ * @returns {Error & {statusCode: number}} configured service error
+ */
 function svcError(message, statusCode = 400) {
   const err = new Error(message);
   err.statusCode = statusCode;
   return err;
 }
 
+/**
+ * Load the component naming prompt from disk, with a minimal local fallback.
+ * @returns {string} prompt template text
+ */
 function loadPromptTemplate() {
   if (existsSync(PROMPT_PATH)) {
     return readFileSync(PROMPT_PATH, 'utf-8');
@@ -44,6 +54,11 @@ function loadPromptTemplate() {
   ].join('\n');
 }
 
+/**
+ * Page through all trajectories bound to a function.
+ * @param {number} functionId function node id
+ * @returns {Promise<number[]>} trajectory ids discovered across all pages
+ */
 async function listAllTrajectoryIdsByFunction(functionId) {
   const ids = [];
   let page = 1;
@@ -94,6 +109,15 @@ async function resolveMineScope(body = {}) {
   throw svcError('systemId, functionId, or trajectoryIds is required', 400);
 }
 
+/**
+ * Compose the strict JSON naming prompt for one signature cluster.
+ * @param {string} template base prompt text
+ * @param {object} input cluster description and signature fragments
+ * @param {string} [input.phaseDescription] representative phase description
+ * @param {object[]} input.fragments deterministic signature fragments
+ * @param {number} input.stepCount number of representative steps
+ * @returns {string} complete LLM prompt
+ */
 function buildLlmPrompt(template, { phaseDescription, fragments, stepCount }) {
   const summary = fragments.map((f, i) => {
     const sem = f.semantics && Object.keys(f.semantics).length
@@ -114,6 +138,15 @@ function buildLlmPrompt(template, { phaseDescription, fragments, stepCount }) {
   ].join('\n');
 }
 
+/**
+ * Ask the configured LLM to name a repeated phase cluster and normalize output.
+ * @param {object} input cluster naming input
+ * @param {string} [input.phaseDescription] representative phase description
+ * @param {object[]} input.fragments signature fragments
+ * @param {number} input.stepCount representative step count
+ * @param {string} [input.model] optional model override
+ * @returns {Promise<object>} normalized naming result, including `llmFailed`
+ */
 async function nameClusterWithLlm({ phaseDescription, fragments, stepCount, model }) {
   const template = loadPromptTemplate();
   const prompt = buildLlmPrompt(template, { phaseDescription, fragments, stepCount });

@@ -10,6 +10,11 @@ import {
   stripVolatileQuery,
 } from './transaction-export-v3-region.js';
 
+/**
+ * Parse a JSON value used in persisted trajectory fields.
+ * @param {unknown} raw object or serialized JSON value
+ * @returns {object|null} parsed value, or null when invalid
+ */
 function parseJson(raw) {
   if (raw == null) return null;
   if (typeof raw === 'object') return raw;
@@ -20,6 +25,11 @@ function parseJson(raw) {
   }
 }
 
+/**
+ * Read and validate the element metadata attached to a trajectory step.
+ * @param {object} step trajectory step row
+ * @returns {object|null} element metadata, or null when unavailable
+ */
 function parseStepElement(step) {
   const el = parseJson(step?.elementJson);
   return el && typeof el === 'object' ? el : null;
@@ -106,6 +116,11 @@ export function buildV3Properties({
   const SKIP_SECTION_ROLES = new Set(['main', 'shell-header', 'shell-aside', 'other']);
 
   // 从 region_id 链提取分区段（跳过 page: 和 overlay: 段）
+  /**
+   * Extract partition segments that can become intermediate property nodes.
+   * @param {string} regionId stamped region hierarchy
+   * @returns {string[]} non-page, non-overlay segments
+   */
   function extractPartitionSegments(regionId) {
     const rid = String(regionId || '').trim();
     if (!rid) return [];
@@ -115,11 +130,21 @@ export function buildV3Properties({
   }
 
   // 从分区段提取 role（"role:label" → "role"；无冒号则整段作 role）
+  /**
+   * Extract the role portion of one region segment.
+   * @param {string} seg region segment
+   * @returns {string} segment role
+   */
   function segmentRole(seg) {
     const i = seg.indexOf(':');
     return i > 0 ? seg.slice(0, i).trim() : seg;
   }
   // 从分区段提取 label（"role:label" → "label"；无冒号则整段）
+  /**
+   * Extract the display label portion of one region segment.
+   * @param {string} seg region segment
+   * @returns {string} segment label
+   */
   function segmentLabel(seg) {
     const i = seg.indexOf(':');
     return i > 0 ? seg.slice(i + 1).trim() : seg;
@@ -127,6 +152,12 @@ export function buildV3Properties({
 
   // 为 step 的分区段创建/复用中间节点，返回最近节点的 id（无分区段或全被跳过返回 null）
   // role 按 §8 映射 type；SKIP_SECTION_ROLES 的段跳过（不建节点，parentId 不变）
+  /**
+   * Create or reuse intermediate nodes for a step's partition path.
+   * @param {string[]} segments partition segments
+   * @param {string} rootPid screenshot/root property id
+   * @returns {string|null} nearest created node id, or null
+   */
   function ensureSectionNodes(segments, rootPid) {
     if (!segments.length) return null;
     let parentId = rootPid;
@@ -177,11 +208,22 @@ export function buildV3Properties({
   // 规则：弹窗归属 = 同页面同标题弹窗中，触发步骤（点击 anchor 元素的 click 步）最晚
   // 且不晚于当前步骤者；popup 的 propertiesPID 改挂触发图标对象节点（弹窗挂在触发按钮后面）。
   // anchor 形如 "//a[@aria-label='新增一级分类']"，提取第一个属性值与步骤元素匹配。
+  /**
+   * Extract the first quoted label from an anchor expression.
+   * @param {string} anchor anchor expression
+   * @returns {string} extracted label, or an empty string
+   */
   function anchorMatchLabel(anchor) {
     const m = String(anchor || '').match(/='([^']+)'/);
     return m ? m[1] : '';
   }
 
+  /**
+   * Check whether element locator/text fields match a popup anchor.
+   * @param {object} el captured element metadata
+   * @param {string} anchor anchor expression
+   * @returns {boolean} whether the element matches
+   */
   function elementMatchesAnchor(el, anchor) {
     const anchorStr = String(anchor || '').trim();
     if (!anchorStr) return false;
@@ -196,6 +238,11 @@ export function buildV3Properties({
     return candidates.some((x) => x.includes(`='${label}']`) || x.includes(`="${label}"]`));
   }
 
+  /**
+   * Parse page, dialog title, and optional trigger anchor from a region key.
+   * @param {string} regionId page/dialog region key
+   * @returns {{pageKey: string, title: string, anchor: string}|null} parsed parts
+   */
   function popupPartsFromRegionId(regionId) {
     const key = String(regionId || '');
     const m = key.match(/\|dialog:([^@|]*)(?:@@anchor:(.*))?$/);
@@ -224,6 +271,12 @@ export function buildV3Properties({
   }
 
   // 触发链归属：返回最晚触发且 ≤ stepIdx 的同页弹窗 entryId；无候选返回 null
+  /**
+   * Find the latest eligible popup trigger for a step on a page.
+   * @param {string} pageKey page-level key
+   * @param {number} stepIdx current step index
+   * @returns {string|null} matching popup entry id, or null
+   */
   function popupByTriggerChain(pageKey, stepIdx) {
     if (!pageKey) return null;
     let best = null;

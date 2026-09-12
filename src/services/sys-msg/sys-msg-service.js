@@ -1,3 +1,10 @@
+/**
+ * System-message service for creating and querying user-facing notifications.
+ *
+ * The service coordinates message persistence with dictionary and hierarchy
+ * lookups, translates database rows into the API shape, and exposes the
+ * read-state operations used by the control-plane notification UI.
+ */
 import * as systemDao from '../../dao/system-dao.js';
 import * as dataDao from '../../dao/sys-dict-data-dao.js';
 import * as msgDao from '../../dao/sys-msg-dao.js';
@@ -12,12 +19,24 @@ import {
   shapeSysMsgApi,
 } from './sys-msg-compose.js';
 
+/**
+ * Create an error that route handlers can serialize with an HTTP status.
+ * @param {number} status HTTP response status code
+ * @param {string} message human-readable error message
+ * @returns {Error} error instance carrying statusCode
+ */
 function httpError(status, message) {
   const err = new Error(message);
   err.statusCode = status;
   return err;
 }
 
+/**
+ * Resolve the configured display title for batch-import messages.
+ * Falls back to the built-in title when the dictionary is unavailable or
+ * contains no active entry for the batch-import message type.
+ * @returns {Promise<string>} configured or fallback message title
+ */
 async function resolveTitle() {
   try {
     const rows = await dataDao.listByTypeActive(DICT_TYPE_SYS_MSG);
@@ -28,6 +47,12 @@ async function resolveTitle() {
   return MSG_TITLE_BATCH_IMPORT;
 }
 
+/**
+ * Resolve a hierarchy function id into the name and ownership id used by a
+ * system-message row, while degrading cleanly when the id is invalid or gone.
+ * @param {number|string|null} functionId hierarchy function node id
+ * @returns {Promise<{name: string, id: number|null}>} resolved display name and id
+ */
 async function resolveFunctionName(functionId) {
   const id = Number(functionId);
   if (!Number.isFinite(id) || id <= 0) return { name: '', id: null };
@@ -70,6 +95,10 @@ export async function insertSysMsgFromBatchJob(job, summary = {}) {
   });
 }
 
+/**
+ * Build a lookup from active system-message type values to dictionary labels.
+ * @returns {Promise<Record<string, string>>} type-to-label map, or an empty map on lookup failure
+ */
 async function typeLabelMap() {
   try {
     const rows = await dataDao.listByTypeActive(DICT_TYPE_SYS_MSG);

@@ -1,3 +1,8 @@
+/**
+ * Batch progress notification helpers for trajectory lifecycle updates. The
+ * module resolves a trajectory's owning batch item lazily so the core batch
+ * service can remain decoupled from callers that only know a trajectory ID.
+ */
 import * as batchDao from '../../dao/batch-recording-dao.js';
 
 /**

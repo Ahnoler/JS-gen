@@ -17,10 +17,22 @@ export const PARTNER_NETWORK_ERROR_MSG = '网络异常，自动化平台无法�
 export const DEFAULT_PARTNER_SYSTEM_ID = '98';
 export const DEFAULT_PARTNER_PROJECT_ID = '31';
 
+/**
+ * Read a trimmed configuration value through the repository config resolver.
+ * Empty or falsey values are normalized to the supplied fallback so callers
+ * can apply their endpoint or credential precedence rules consistently.
+ * @param {string} key configuration key
+ * @param {string} [fallback] value used when the key is unset
+ * @returns {string} trimmed configuration value
+ */
 function envOrConfig(key, fallback = '') {
   return String(configResolve(key, fallback) || '').trim();
 }
 
+/**
+ * Resolve the base URL used for partner platform API requests.
+ * @returns {string} base URL without a trailing slash
+ */
 function partnerApiBase() {
   const raw = envOrConfig('PARTNER_API_BASE')
     || envOrConfig('PARTNER_SYSTEM_BASE_URL')
@@ -28,10 +40,18 @@ function partnerApiBase() {
   return String(raw).replace(/\/$/, '');
 }
 
+/**
+ * Resolve the partner system API base URL.
+ * @returns {string} configured partner API base URL
+ */
 function systemBaseUrl() {
   return partnerApiBase();
 }
 
+/**
+ * Resolve the partner importDemand endpoint, honoring an explicit override.
+ * @returns {string} importDemand request URL
+ */
 function importDemandUrl() {
   const override = envOrConfig('PARTNER_IMPORT_DEMAND_URL');
   if (override) return override;
@@ -93,6 +113,18 @@ export function resolveSystemProject(src = {}) {
   return { systemId, projectId };
 }
 
+/**
+ * Execute an authenticated partner request and parse its response best-effort.
+ * Network, timeout, and transport failures are converted to service errors;
+ * non-JSON responses remain available to callers for diagnostics.
+ * @param {string} url request URL
+ * @param {object} [options] request options
+ * @param {string} options.accessToken partner access token
+ * @param {string} [options.method] HTTP method
+ * @param {unknown} [options.body] JSON request body
+ * @param {number} [options.timeoutMs] abort timeout in milliseconds
+ * @returns {Promise<{httpStatus: number, ok: boolean, json: object|null, text: string}>} response envelope
+ */
 async function partnerFetch(url, { method = 'GET', accessToken, body, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   if (!accessToken) {
     const err = new Error('access_token is required');
@@ -189,6 +221,14 @@ export function toPartnerImportPayload(payload) {
   return clone;
 }
 
+/**
+ * Validate the partner business response code and raise a gateway error for
+ * malformed or explicitly unsuccessful partner responses.
+ * @param {unknown} json parsed partner response
+ * @param {string} [fallbackMsg] message for malformed responses
+ * @returns {object} validated partner response
+ * @throws {Error} when the response is malformed or reports failure
+ */
 function assertPartnerBusinessOk(json, fallbackMsg = PARTNER_NETWORK_ERROR_MSG) {
   if (json == null || typeof json !== 'object') {
     const err = new Error(fallbackMsg);
@@ -229,6 +269,11 @@ export function preflightCheck(wirePayload) {
   return { ok: issues.length === 0, issues };
 }
 
+/**
+ * Normalize one partner project row to the compact project shape used by APIs.
+ * @param {unknown} row raw partner row
+ * @returns {{id: number|string, name: string}|null} normalized row or null
+ */
 function normalizeProjectRow(row) {
   if (!row || typeof row !== 'object') return null;
   const id = row.id ?? row.projectId ?? row.project_id;
@@ -266,6 +311,11 @@ export async function listPartnerProjects({ accessToken } = {}) {
   return list.map(normalizeProjectRow).filter(Boolean);
 }
 
+/**
+ * Recursively normalize one partner system-tree node and its child nodes.
+ * @param {unknown} node raw partner node
+ * @returns {object|null} normalized node or null for an unusable row
+ */
 function normalizeSystemNode(node) {
   if (!node || typeof node !== 'object') return null;
   const id = node.id ?? node.systemId ?? node.system_id;
@@ -450,7 +500,7 @@ export async function pushImportDemand(payload, { accessToken } = {}) {
 /**
  * 把 v1.2 本地 payload 适配成伙伴 importData 契约（剥 schemaVersion，保留 menus 明细）。
  * @param {object} payload buildMenuPushPayload 输出
- * @returns {{ systemNodeId: number, systemName?: string, menuVersion?: number, menus: object[] }}
+ * @returns {{ systemNodeId: number, systemName?: string, menuVersion?: number, menus: object[] }} partner importData payload
  */
 export function toPartnerMenuPushPayload(payload) {
   if (!payload || typeof payload !== 'object') return payload;
@@ -471,8 +521,8 @@ export function toPartnerMenuPushPayload(payload) {
  * POST 伙伴菜单 importData（`/system/umlElementData/importData`）。
  * 基址：`PARTNER_API_BASE`（与交易推送同一伙伴平台）。
  * @param {object} payload v1.2 wire body（schemaVersion/systemNodeId/systemName/menuVersion/menus）
- * @param {{ accessToken?: string }} [opts]
- * @returns {Promise<{ code: number, msg?: string, data?: unknown }>} partner response
+ * @param {{ accessToken?: string }} [opts] partner authentication options
+ * @returns {Promise<{ code: number, msg?: string, data?: unknown }>} normalized partner response
  */
 export async function pushMenusToPartner(payload, { accessToken } = {}) {
   const url = `${partnerApiBase()}/system/umlElementData/importData`;

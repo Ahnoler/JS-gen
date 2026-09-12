@@ -22,6 +22,11 @@ import {
 let analyzeWorkers = 0;
 let draftWorkers = 0;
 
+/**
+ * Claim pending or recovering analysis items up to the configured concurrency
+ * and schedule one analysis worker for each successful claim.
+ * @returns {Promise<void>} resolves after the current claim pass is scheduled
+ */
 export async function pumpAnalyze() {
   while (analyzeWorkers < BATCH_ANALYZE_CONCURRENCY) {
     const token = randomUUID();
@@ -56,6 +61,14 @@ export async function pumpAnalyze() {
   }
 }
 
+/**
+ * Analyze one claimed requirement, persist its phases, and hand the resulting
+ * item to draft creation. Cancellation and retryable analysis failures update
+ * item/job progress without allowing stale results to be committed.
+ * @param {object} item claimed batch item containing requirement and batchId
+ * @param {string} token worker token associated with the claim
+ * @returns {Promise<void>} resolves after analysis outcome handling completes
+ */
 async function runAnalyze(item, token) {
   const batchId = item.batchId;
   const job = await batchDao.getJobById(batchId);
@@ -150,6 +163,13 @@ async function runAnalyze(item, token) {
  * @param {object} item analyzed batch item with batchId, name, requirement, mode
  * @returns {Promise<void>} resolves when draft/trajectory is created and item status updated
  */
+/**
+ * Create a trajectory and its phases from an analyzed item, then bind the
+ * resulting trajectory as a draft or queue it for recording according to the
+ * parent job mode. The transaction and CAS checks prevent duplicate binding.
+ * @param {object} item analyzed item containing analysisJson and batchId
+ * @returns {Promise<void>} resolves after creation, cancellation, or failure handling
+ */
 async function createDraftFromAnalyzed(item) {
   const job = await batchDao.getJobById(item.batchId);
   if (!job || job.status === 'cancelling' || job.status === 'cancelled') {
@@ -230,6 +250,11 @@ async function createDraftFromAnalyzed(item) {
 /**
  * Claim analyzed items lacking trajectoryId (draft + record) and bind trajectory.
  * No executor slots; survives restart via kickScheduler / recovery lease clear.
+ */
+/**
+ * Claim analyzed items that do not yet have trajectories and schedule draft
+ * creation workers up to the configured analysis concurrency.
+ * @returns {Promise<void>} resolves after the current claim pass is scheduled
  */
 export async function pumpDraft() {
   while (draftWorkers < BATCH_ANALYZE_CONCURRENCY) {

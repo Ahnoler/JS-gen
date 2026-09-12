@@ -165,6 +165,10 @@ export function parseThroughChainsMarkdown(md) {
   /** @type {string[]} */
   let tableLines = [];
 
+  /**
+   * Parse and commit the currently buffered table, if it belongs to a chain.
+   * @returns {void}
+   */
   const flushTable = () => {
     if (!current || tableLines.length === 0) {
       tableLines = [];

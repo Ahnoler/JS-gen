@@ -11,6 +11,11 @@ import {
   EXECUTOR_DISCONNECT_GRACE_MS,
 } from '../../config/config.js';
 
+/**
+ * Release all in-memory leases, runtimes, and session bindings for a node.
+ * @param {string} nodeUuid executor node uuid
+ * @returns {void}
+ */
 function purgeNodeBindings(nodeUuid) {
   slotLease.releaseByNode(nodeUuid);
   clearTrajectoryRuntimesForNode(nodeUuid);
@@ -122,6 +127,11 @@ export function onDisconnect(nodeUuid, nodeId) {
   });
 }
 
+/**
+ * Add live registry and slot-lease state to a persisted executor node row.
+ * @param {object|null} node persisted executor node
+ * @returns {object|null} enriched node row or null
+ */
 function withLeaseSlots(node) {
   if (!node) return null;
   const leases = slotLease.listByNode(node.nodeUuid);

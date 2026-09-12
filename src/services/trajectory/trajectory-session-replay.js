@@ -1,4 +1,10 @@
 /**
+ * Trajectory session replay coordinator.
+ *
+ * Validates selected persisted steps, prepares executor actions, and delegates
+ * execution to the replay batch runner while maintaining runtime busy/abort
+ * state and the product replay event contract.
+ *
  * Re-execute selected DB steps in a live executor session.
  *
  * Product contract (Recording Studio):
@@ -18,6 +24,11 @@ import {
 } from './trajectory-runtime.js';
 import { runReplayBatch } from './replay-batch-runner.js';
 
+/**
+ * Convert snake_case database columns to the camelCase shape used by models.
+ * @param {object|null} row database result row
+ * @returns {object|null} converted row, or null for an absent row
+ */
 function fromDbRowCompat(row) {
   if (!row) return null;
   const obj = {};
@@ -28,14 +39,31 @@ function fromDbRowCompat(row) {
   return obj;
 }
 
+/**
+ * Build the common trajectory identifiers included in replay events.
+ * @param {number} tid trajectory DB id
+ * @returns {{trajectoryId: number, trajectoryDbId: number}} event scope
+ */
 function trajScope(tid) {
   return { trajectoryId: tid, trajectoryDbId: tid };
 }
 
+/**
+ * Broadcast a replay event with both product trajectory identifiers.
+ * @param {string} type event name
+ * @param {number} tid trajectory DB id
+ * @param {object} [extra] event-specific fields
+ * @returns {void}
+ */
 function emitReplay(type, tid, extra = {}) {
   broadcast(type, { ...trajScope(tid), ...extra });
 }
 
+/**
+ * Normalize a possibly string step identifier for executor ordering.
+ * @param {number|string|null} id candidate step id
+ * @returns {number|null} finite numeric id, or null for invalid input
+ */
 function toNumericStepId(id) {
   if (id == null || id === '') return null;
   const n = Number(id);
@@ -169,6 +197,17 @@ export async function stopTrajectoryStepsReplay(trajectoryId) {
   };
 }
 
+/**
+ * Load, validate, enrich, and order a replay batch before execution begins.
+ * Includes hidden meta checkpoints in the selected range, restores bound auth
+ * placeholders, and rejects attached sessions that are already busy.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [options] replay options
+ * @param {Array<number>} [options.stepIds] selected step DB ids
+ * @param {boolean} [options.isReplay] suppress persistence when true; defaults to true
+ * @returns {Promise<object>} prepared runtime, session, actions, rows, and ids
+ * @throws {Error} with statusCode 400, 404, or 409 when preparation fails
+ */
 async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true } = {}) {
   const tid = Number(trajectoryId);
   const runtime = getTrajectoryRuntime(tid);

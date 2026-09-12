@@ -292,6 +292,11 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
     /** @type {import('./parse-through-chains.js').ThroughChainStep[]} */
     let leadingNavSteps = [];
 
+    /**
+     * Materialize the current grouped steps as one guided atom or deterministic
+     * fallback, then clear the group buffers for the next persistence boundary.
+     * @returns {void}
+     */
     const flushGroup = () => {
       const allSteps = [...leadingNavSteps, ...groupSteps];
       if (allSteps.length === 0) return;
@@ -477,7 +482,7 @@ function buildAtomizeUserPayload(chains, flowCards = []) {
  * @param {string} moduleKey Module key
  * @param {(text: string) => Promise<string>} llmFn Injectable LLM caller
  * @param {object[]} [flowCards] Relevant flow cards for LLM guidance
- * @returns {Promise<Array<Record<string, unknown>>>} Raw LLM atom objects
+ * @returns {Promise<Array<Record<string, unknown>>|null>} Raw LLM atom objects, or null for an invalid atoms payload
  */
 async function callAtomizeLlm(chains, moduleKey, llmFn, flowCards = []) {
   const systemPrompt = loadAtomizePrompt();
@@ -741,6 +746,13 @@ export function computeFunctionIdCandidates(atom, functionNodes) {
   /** @type {Array<{ id: number, name: string, score: number, reason: 'page_code'|'name_match'|'menu_path' }>} */
   const out = [];
   const seen = new Set();
+  /**
+   * Add a candidate once, retaining the first matching reason and score.
+   * @param {object} node System-tree function node
+   * @param {number} score Deterministic candidate score
+   * @param {'page_code'|'name_match'|'menu_path'} reason Candidate reason
+   * @returns {void}
+   */
   const push = (node, score, reason) => {
     if (!node || seen.has(node.id)) return;
     seen.add(node.id);

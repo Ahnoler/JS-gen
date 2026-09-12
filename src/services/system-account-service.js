@@ -1,7 +1,18 @@
+/**
+ * Service operations for system login-account records.
+ *
+ * This module validates system ownership and normalizes account patches before
+ * delegating persistence to the system and account DAOs.
+ */
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
 import { NODE_TYPE } from '../models/hierarchy-constants.js';
 
+/**
+ * Keep only fields supported by the account update contract.
+ * @param {object} [input] requested partial account changes
+ * @returns {object} patch containing only defined, writable fields
+ */
 function normalizeAccountPatch(input = {}) {
   const data = {};
   const allowed = ['name', 'loginUrl', 'account', 'password', 'remark', 'sortOrder', 'systemId'];

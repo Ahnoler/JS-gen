@@ -1,5 +1,10 @@
 /**
- * Trajectory phase lifecycle: upsert/status, clear, add, sync descriptions.
+ * Trajectory phase service.
+ *
+ * Manages phase descriptions and statuses, selective or full trajectory
+ * clearing, phase creation, and ordered description synchronization. Phase
+ * changes also maintain step bindings, export-dirty state, and trajectory
+ * counts expected by the product tree API.
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';

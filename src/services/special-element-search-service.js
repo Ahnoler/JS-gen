@@ -1,7 +1,18 @@
+/**
+ * Search and presentation helpers for reusable special-element step groups.
+ *
+ * Queries use lightweight lexical scoring over persisted names, tags, phase
+ * descriptions, remarks, and optional step metadata within one system.
+ */
 import * as specialElementDao from '../dao/special-element-dao.js';
 import * as specialElementStepDao from '../dao/special-element-step-dao.js';
 import * as sysDictDataDao from '../dao/sys-dict-data-dao.js';
 
+/**
+ * Split search text into normalized lexical tokens.
+ * @param {string} text source query text
+ * @returns {string[]} non-empty lowercase tokens
+ */
 function tokenize(text) {
   return String(text || '')
     .toLowerCase()
@@ -10,7 +21,6 @@ function tokenize(text) {
     .filter((t) => t.length >= 1);
 }
 
-/** Normalize common typos / aliases so tag「法定责任人」matches UI「法定代表人». */
 /**
  * Normalize common typos / aliases so tag 法定责任人 matches UI 法定代表人.
  * @param {string} text input text
@@ -25,6 +35,11 @@ function normalizeLegalAliases(text) {
 
 const INTRODUCE_HINT_RE = /引入|选人|放大镜|法定代表人|法定责任人/;
 
+/**
+ * Produce a compact summary of the first steps in a special element.
+ * @param {Array<object>} [steps] persisted special-element steps
+ * @returns {Array<object>} step number and action type pairs
+ */
 function stepSummary(steps = []) {
   return steps.slice(0, 8).map((s) => ({
     stepNumber: s.stepNumber,

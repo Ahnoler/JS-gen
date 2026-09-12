@@ -1,5 +1,10 @@
 /**
- * AI / manual recording lifecycle: start, stop, toggle, resolve, default login.
+ * Trajectory recording lifecycle service.
+ *
+ * Coordinates AI and manual recording state, default authentication replay,
+ * live element resolution, and terminal stop/confirmation transitions. It
+ * owns lifecycle validation and delegates phase execution, persistence, and
+ * runtime binding to the focused trajectory services.
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
@@ -18,6 +23,13 @@ import {
 import { classifyRegions } from '../region-classify.js';
 import { displayGroupOf, isTaxonomyRegionToken, uniquifyDisplayGroups } from '../../cdp/display-group.js';
 
+/**
+ * Resolve the owning system id from a trajectory's function hierarchy.
+ * Lookup failures are fail-soft because system classification is supplemental
+ * to the recording lifecycle.
+ * @param {number} tid trajectory DB id
+ * @returns {Promise<string>} owning system id, or an empty string when unknown
+ */
 async function resolveSystemIdForTrajectory(tid) {
   try {
     const traj = await trajectoryDao.getById(tid);
@@ -31,6 +43,14 @@ async function resolveSystemIdForTrajectory(tid) {
   }
 }
 
+/**
+ * Derive a stable region identifier from a classifier result and prior row.
+ * Overlay and section roles use their cleaned title as a scoped identifier;
+ * other roles use the classifier role directly.
+ * @param {object} classified region classification result
+ * @param {object} [existing] prior region fields used as fallback
+ * @returns {string} normalized region identifier
+ */
 function regionIdFromClassified(classified, existing = {}) {
   const role = String(classified.role || 'other');
   const prevId = String(existing.region_id || '');
@@ -49,6 +69,14 @@ function regionIdFromClassified(classified, existing = {}) {
   return role;
 }
 
+/**
+ * Merge classifier output into an element or preview region in place.
+ * Existing refined labels and collision-safe ids take precedence over coarse
+ * classifier values, while confidence and display-group fields are refreshed.
+ * @param {object|null} target mutable region-bearing payload
+ * @param {object|null} classified classifier result
+ * @returns {void}
+ */
 function patchRegionFields(target, classified) {
   if (!target || !classified) return;
   const prevRole = String(target.region_role || '');
@@ -85,12 +113,26 @@ function patchRegionFields(target, classified) {
   else delete target.display_group;
 }
 
+/**
+ * Remove the transient feature-card payload after region classification.
+ * @param {object|null} target element or preview payload
+ * @returns {void}
+ */
 function stripFeatureCard(target) {
   if (target && typeof target === 'object' && 'feature_card' in target) {
     delete target.feature_card;
   }
 }
 
+/**
+ * Classify feature-card regions in a resolve payload and merge the results.
+ * The operation is best effort: malformed or unavailable classifier data leaves
+ * the original payload intact so element resolution can still proceed.
+ * @param {object|null} payload resolved element or ambiguous match payload
+ * @param {object} [options] classifier options
+ * @param {string} [options.systemId] owning system id
+ * @returns {Promise<object|null>} payload with region fields updated when possible
+ */
 async function applyL1cRegionClassify(payload, { systemId = '' } = {}) {
   if (!payload || typeof payload !== 'object') return payload;
   try {
@@ -247,6 +289,14 @@ const LOGGED_IN_PROBE_SIGS = new Set(['home', 'token', 'left-login']);
  * @param {object} runtime trajectory runtime（sessionId / executorNodeUuid）
  * @param {string} url 系统登录地址
  * @returns {Promise<string|null>} 已登录签名，或 null（未登录 / 无法判定）
+ */
+/**
+ * Probe the attached browser for an existing authenticated page before login.
+ * Unknown probe actions and all executor errors return null so callers retain
+ * the normal login replay fallback.
+ * @param {object} runtime trajectory runtime with executor/session identifiers
+ * @param {string} url system login URL to visit before probing
+ * @returns {Promise<string|null>} recognized login signature, or null
  */
 async function probeLoggedInBeforeLogin(runtime, url) {
   try {

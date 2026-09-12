@@ -1,4 +1,9 @@
-/** Pure remote_session ownership / grace helpers (no DB). */
+/**
+ * Pure remote-session ownership and grace-window rules.
+ *
+ * These helpers intentionally have no database or process-state dependencies,
+ * so claim decisions can be tested independently of lifecycle persistence.
+ */
 
 /**
  * Compute the grace-until timestamp from a base time and grace duration.
