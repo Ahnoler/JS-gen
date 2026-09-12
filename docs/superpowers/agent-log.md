@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-13 00:14 · ZCode 引擎线 — 开工：tree_picker_click 叶模式兜底二段（搜索无果→数据侧 DFS 寻路真点）
+
+- 范围：`scripts/controller/actions/js_snippets/tree_picker.py`（+JS_TREE_PICKER_DFS_PATH）、`_js_snippets.py`（导出）、`_tree.py`（叶模式无果分支+`_tree_picker_walk_path`）、`scripts/prompts/agent-tools-tree.md`（兜底说明）
+- 禁入区：`config/`、`scripts/session_runner.py` 等他线 WIP；agent-log 他人条目只读不删
+- 方式：主线程实施；验证=compile+import+pin+verify-all 对照已知 4 存量红+19242 活页面湿测（带连字符叶子搜索必败→兜底路径真点，字段现值即该叶子=同值重选零风险）
+
 ## 2026-09-12 22:40 · ZCode 引擎线 — 收工：tree_picker_click 叶子名直达双模式湿测闭环（回链 21:42 开工）
 
 - 完成：实施 commit **6fd303a9**（7 文件：搜索直达片段×2、签名可选化+叶子分支、_normalize_params 别名、event_dispatch 白名单、prompt 双模式、cold pin 针同步）+ 守卫补丁 **5e6d51fc**（弹层已开不重复开）。
