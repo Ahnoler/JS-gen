@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-12 10:15 · Cursor Lead — 开工：planner discard 湿测 r4（中途 done(true) 拒后再拖延）
+
+- 进行中：2026-09-12 10:15；验收=stderr `[planner] discard` 或 `events[]` 含 `planner_advice_discarded`
+- 范围：录制 API、`tmp/.../planner-discard-r4/`、报告增补、本文件；不改运行时代码
+- 禁入区：他线 WIP、合约门闩回改、classify.py
+- 方式：填名后 ≥8 次观察 → 强制一次 done(success=true) 吃 gate 拒 → 再 ≥6 次观察 → done(false)；诱导 next_steps done 口气
+
 ## 2026-09-12 10:00 · Cursor Lead — 收工：planner discard 湿测 r3（回链 09:50）
 
 - 完成：traj **761** session `29f68d19`；≥3 次 `[planner] kept compatible_with_contract=true`；**无** `[planner] discard`；证据 `tmp/.../planner-discard-r3/`；报告已记
