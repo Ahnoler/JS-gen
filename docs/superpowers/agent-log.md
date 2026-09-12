@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-12 17:24 · ZCode 引擎线 — 开工：回放误触发表单结构自愈修复（misc.py 一行）
+
+- 范围：仅 `scripts/controller/actions/js_snippets/misc.py`（回放比对 expectedLabels 表达式一处，约 304 行）
+- 禁入区：`scripts/session_runner.py`、`config/`（他线有未提交改动：update-db-whitelist.ps1 / start-tansun-engine.ps1）、agent-log 他人条目只读不删
+- 方式：主线程单点 Edit；验证=py_compile+模块级真实 import+Node 端行为测试（空 label 期望对象复现 added_optional 消失）+verify-all；不派子智能体
+
 ## 2026-09-12 · OpenCode — 收工：本地启动 MySQL 连接超时修复（回链本条开工）
 
 - 完成：`config/database.js` 改为数据库连接按需创建，新增 `DB_CONNECT_TIMEOUT_MS`/`DB_ACQUIRE_TIMEOUT_MS`，健康探测使用一次性 mysql2 连接；`server.mjs` 将数据库维护异步化并增加单线程恢复探测，MySQL 不可达时暂停截图清理、截图重试、executor sweep 与启动 reconcile。
