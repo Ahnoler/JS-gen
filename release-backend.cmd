@@ -72,7 +72,15 @@ if not defined TS (
   echo [error] cannot generate timestamp ^(powershell unavailable^).
   goto fail
 )
-where bash >nul 2>nul && (set BASH=bash) || (set BASH=C:\Program Files\Git\bin\bash.exe)
+where bash >nul 2>nul && (set BASH=bash) || (
+  rem locate Git Bash from git.exe on PATH
+  for /f "delims=" %%G in ('where git 2^>nul') do if not defined GITDIR set "GITDIR=%%~dpG.."
+  if defined GITDIR (
+    set "BASH=!GITDIR!\bin\bash.exe"
+  ) else (
+    set "BASH=C:\Program Files\Git\bin\bash.exe"
+  )
+)
 echo.
 echo [1/4] packing via pack-control-plane.sh (ts=%TS%) ...
 "%BASH%" pack-control-plane.sh
