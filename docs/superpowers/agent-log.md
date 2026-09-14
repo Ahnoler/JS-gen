@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-14 · OpenCode — 收工：trajectory 827/remoteSession 1656 AI 录制重复步骤修复（回链本次开工条目）
+
+- 完成：提交 **1dcb6e39**；`executor-events.js` 在 `session.aiRecording=true` 时不再由通用 `autoPersist` listener 落库 `action_log_sync`，AI 录制仅由 `trajectory-recording-runner.js` 的 run-scoped listener 持久化，避免同一 action 被两条异步链重复追加。
+- 验收：`node --check`（业务文件与冷测试）、`node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs`（OK）、定向 ESLint（0 errors）、`git diff --check` 通过；新增冷 pin 锁定 `autoPersist && !session.aiRecording` 边界。
+- 日志结论：仓库内没有找到 trajectory 827/remoteSession 1656 的原始线上日志或明细文件；现有代码结构已确认双 listener 是重复落库风险/根因。需部署控制面与执行机后用新轨迹复测确认线上数据。
+- 遗留移交：部署后复测请提供 `trajectoryId`、`remoteSessionId`、`sessionId` 及含 `actionId` 的 `action_log_sync`/`action_persisted` 日志；若仍重复，再按相同 `actionId` 是否生成多条 `trajectory_step` 继续定位。
+
 ## 2026-09-14 · OpenCode — 开工：trajectory 827/remoteSession 1656 AI 录制重复步骤修复
 
 - 进行中：根据 trajectoryId=827、remoteSessionId=1656 排查 AI 录制重复步骤，修复 action_log_sync 重复消费/持久化，并补回归验证。
