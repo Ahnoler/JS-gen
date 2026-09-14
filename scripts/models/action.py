@@ -43,6 +43,7 @@ SkippedActionType = Literal[
     "take_screenshot",
     "save_trajectory",
     "save_business_data",
+    "read_business_date",
     "read_business_data",
     "match_form_rule",
     "init_task_list",
