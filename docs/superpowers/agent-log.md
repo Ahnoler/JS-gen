@@ -13,6 +13,14 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-14 21:52 · ZCode 引擎线 — 收工：pull 引入的 2 个 characterization 红项已修（回链 21:44 开工）
+
+- 完成：commit **0f3f2f55**（2 文件 +23/-6，只改判据、不动同事源码）。
+  ① `cold/characterize-search-then-click-prompts.py`：needle「不要为此增删 phase 条数」随 78c89d77 提示词重写被删，纪律由规则 9 承接 → 更新为「不要为了凑数量而拆分」，并存沿革注释；其余 3 针保留。
+  ② `characterize-select-option-stamp.py`：400 字字符窗口判据改为**同一缩进分支块**内断言（3763893d 的纯新增行把距离 365→454 即误红）。
+- 验收：两 pin 单跑 PASS；**变异测试证明强度未降**（删该分支打点行→红、分支内改名→红）；verify-all 回到基线 4 红，零新增。
+- 遗留：无（活页面湿测那条仍属上一条 21:41 条目的待补项，非本条范围）。
+
 ## 2026-09-14 21:44 · ZCode 引擎线 — 开工：修复 pull 引入的 2 个 characterization 红项
 
 - 范围：`scripts/characterization/cold/characterize-search-then-click-prompts.py`（needle 按新提示词更新）、`scripts/characterization/characterize-select-option-stamp.py`（400 字窗口判据改结构化）
