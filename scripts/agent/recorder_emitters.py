@@ -603,6 +603,10 @@ def _guard_done_reject_overlay(agent, business_data_store, contract, open_overla
     返回 True 表示已拒绝。
     """
     from ..controller.actions._phase_intent import overlay_blocks_done
+    # A picker-confirm phase may intentionally leave its parent wizard/drawer
+    # open for the next phase.  `_last_introduce_ok` is the scoped evidence that
+    # the child picker was closed; do not mistake the parent overlay for an
+    # unfinished phase and inject close_dialog().
     if open_overlay and not navigated_ok and not save_ok and not introduce_ok:
         if overlay_blocks_done(contract):
             sys.stderr.write(

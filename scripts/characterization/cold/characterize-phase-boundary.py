@@ -14,6 +14,9 @@ if str(ROOT) not in sys.path:
 # Force boundary on for this smoke
 os.environ['AI_PHASE_BOUNDARY'] = '1'
 
+RECORDER_EMITTERS = (ROOT / 'scripts/agent/recorder_emitters.py').read_text(encoding='utf-8')
+SELECT_ENGINE = (ROOT / 'scripts/controller/actions/select_engine.py').read_text(encoding='utf-8')
+
 from scripts.controller.actions._phase_boundary import (  # noqa: E402
     apply_phase_boundary,
     compile_boundary,
@@ -37,6 +40,16 @@ def assert_true(cond: bool, msg: str) -> None:
 
 
 def main() -> int:
+    assert_true(
+        '_last_introduce_ok' in RECORDER_EMITTERS
+        and 'inject close_dialog' in RECORDER_EMITTERS,
+        'overlay guard documents parent wizard preservation',
+    )
+    assert_true(
+        SELECT_ENGINE.count('_mark_picker_selection_success') >= 6,
+        'all main select success paths mark picker completion',
+    )
+
     b = compile_boundary('进入对公客户管理页面。预期结果：打开对公客户管理列表页面。')
     assert_true(b.get('role') == 'navigate', 'boundary navigate for open-page')
     assert_true(b.get('requires_write_all_editable') is False, 'no write-all on navigate')

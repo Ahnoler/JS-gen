@@ -91,6 +91,16 @@ def _select_failure_next_action(label_text: str, option_text: str, business_data
     return '；'.join(parts)
 
 
+def _mark_picker_selection_success(business_data_store, matched_text: str) -> None:
+    """Mark the child picker complete without closing its parent container."""
+    try:
+        from scripts.controller.actions._phase_intent import record_success_token
+        record_success_token(business_data_store, 'picker_closed', matched_text)
+    except Exception:
+        # Selection already succeeded; evidence is best-effort only.
+        pass
+
+
 JS_SELECT_FILTERABLE_TYPED = r'''async (optionText) => {
     const want = String(optionText == null ? '' : optionText).trim();
     if (!want) return 'filterable-empty-option';
@@ -620,6 +630,7 @@ class SelectEngine(_FormActionEngineBase):
                     _task_done_impl(
                         label_text, self.business_data_store, value=cur_val or stamped, xpath_smart=xp_inv,
                     )
+                    _mark_picker_selection_success(self.business_data_store, cur_val or stamped)
                     streak = int(self.business_data_store.get('_already_matched_streak', 0) or 0) + 1
                     self.business_data_store['_already_matched_streak'] = streak
                     return _ok(_with_submit_cue(
@@ -750,6 +761,8 @@ class SelectEngine(_FormActionEngineBase):
             _task_done_impl(
                 label_text, self.business_data_store, value=stamped or option_text, xpath_smart=xp_inv,
             )
+            # Keep the parent wizard/drawer open for a later phase.
+            _mark_picker_selection_success(self.business_data_store, matched_text)
             return _ok(_with_submit_cue(f'ok | {matched_text}', self.business_data_store))
         elif select_result == 'no-items':
             # Xpath recheck — treat already-set field as success (no labeled JS).
@@ -762,6 +775,7 @@ class SelectEngine(_FormActionEngineBase):
                 params['option_text'] = stamped
                 _task_done_impl(label_text, self.business_data_store, value=cur or stamped, xpath_smart=xp_inv)
                 _record_action('select_option', params, recheck, element=element)
+                _mark_picker_selection_success(self.business_data_store, cur or stamped)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', self.business_data_store))
             failed = await _final_select_failure('no-items', xp)
             if is_replay:
@@ -862,6 +876,7 @@ class SelectEngine(_FormActionEngineBase):
                     _task_done_impl(
                         label_text, self.business_data_store, value=stamped or option_text, xpath_smart=xp_inv,
                     )
+                    _mark_picker_selection_success(self.business_data_store, matched_text)
                     return _ok(_with_submit_cue(f'ok | {matched_text} | mismatch-retry', self.business_data_store))
                 # Alias retry still mismatch (rare race: lazy chunk lag made even
                 # the canonical-label hunt settle on the wrong prefix item) →
@@ -887,6 +902,7 @@ class SelectEngine(_FormActionEngineBase):
                             _task_done_impl(
                                 label_text, self.business_data_store, value=stamped or option_text, xpath_smart=xp_inv,
                             )
+                            _mark_picker_selection_success(self.business_data_store, matched_text)
                             return ok_marked(
                                 self.business_data_store, label=label_text, got=matched_text,
                                 fallback="mismatch-retry-exact",
@@ -944,6 +960,7 @@ class SelectEngine(_FormActionEngineBase):
                     params['option_text'] = matched_text
                     _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(label_text, self.business_data_store, value=matched_text, xpath_smart=xp_inv)
+                    _mark_picker_selection_success(self.business_data_store, matched_text)
                     return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', self.business_data_store))
             # N4 paged-traverse fallback — runs BEFORE the filterable-typed
             # attempt, with filterable-typed demoted to its sub-strategy: a
@@ -971,6 +988,7 @@ class SelectEngine(_FormActionEngineBase):
                 _task_done_impl(
                     label_text, self.business_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
                 )
+                _mark_picker_selection_success(self.business_data_store, matched_text)
                 return _ok(_with_submit_cue(f'ok | {matched_text} | select-paged', self.business_data_store))
             paged_applicable = str(paged_result).startswith('select-paged-no-match')
             sys.stderr.write(
@@ -1012,6 +1030,7 @@ class SelectEngine(_FormActionEngineBase):
                 _task_done_impl(
                     label_text, self.business_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
                 )
+                _mark_picker_selection_success(self.business_data_store, matched_text)
                 return _ok(_with_submit_cue(f'ok | {matched_text} | filterable-typed', self.business_data_store))
             sys.stderr.write(
                 f'[select] filterable-typed attempt failed label={label_text!r} '
@@ -1106,6 +1125,7 @@ class SelectEngine(_FormActionEngineBase):
                 label_text, self.business_data_store,
                 value=stamped or option_text, xpath_smart=xp_inv,
             )
+            _mark_picker_selection_success(self.business_data_store, stamped or option_text)
             return _ok(result)
         res_s = str(result or '')
         if res_s == 'disabled' or res_s.startswith('disabled'):
