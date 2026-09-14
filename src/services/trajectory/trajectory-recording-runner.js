@@ -667,6 +667,21 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     }
     // 落库事件归属过滤（spec 4.1.4）：上一轮 run 的持久化事件不写入本轮步骤表、
     // 不喂空闲看门狗。legacy（旧执行机 payload 无 runId）按 spec 4.4 兼容放行。
+    if (type === 'phase_state_key') {
+      const statePayload = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+      const own = phaseEventOwnership(statePayload, {
+        runId: runtime.currentRunId,
+        phaseNumber: statePayload?.phase ?? statePayload?.phaseNumber ?? null,
+      });
+      if (own.decision === 'ignore') {
+        console.warn(
+          `[record] phase_state_key_ignored_${own.reason} session=${runtime.sessionId}`
+          + ` phase=${statePayload?.phase ?? statePayload?.phaseNumber}`
+          + ` gotRunId=${statePayload?.runId} expect=${runtime.currentRunId}`,
+        );
+        return Promise.resolve();
+      }
+    }
     if (type === 'action_log_sync' || type === 'step_screenshot' || type === 'page_level_screenshot') {
       const own = phaseEventOwnership(payload, { runId: runtime.currentRunId });
       if (own.decision === 'ignore') {

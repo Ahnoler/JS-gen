@@ -40,6 +40,7 @@ export const ENGINEERING_STEP_ACTIONS = Object.freeze([
   'read_error_notify',
   'read_xhr_log',
   'kb_flow',
+  'read_business_date',
 ]);
 
 const ENGINEERING_SET = new Set(ENGINEERING_STEP_ACTIONS);
