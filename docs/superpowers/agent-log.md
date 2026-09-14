@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-14 · OpenCode — 开工：AI 录制画面/步骤错位、阶段内重复及 read_business_date 排查
+
+- 进行中：排查 AI 录制事件、阶段状态组截图、步骤落库/去重及业务日期动作的来源与串线风险；必要时实施最小修复并补充离线验证。
+- 范围：`src/services/trajectory/trajectory-recording-runner.js`、`src/services/trajectory/recording-runner-step-context.js`、`src/services/trajectory/recording-page-bind.js`、相关 trajectory/screenshot DAO 与 routes、`scripts/recorder.py`、`scripts/agent/recorder_emitters.py`、`scripts/controller/actions` 中 `read_business_date` 相关实现/提示词、针对性 characterization。
+- 禁入区：当前工作区已有 `src/services/trajectory/trajectory-meta-service.js` 改动；其他会话在途文件及未明确相关的引擎/KB 线。
+- 方式：先用 git 历史和静态链路确认根因，再按现有事件归属/去重契约做最小改动；验证以 characterization、Python/Node 静态检查及必要的录制接口冒烟为准。
+
 ## 2026-09-13 01:10 · ZCode 引擎线 — 收工：tansun 引擎 select:tree 对齐叶模式策略（他仓 commit 1cd1533，回链 00:40 线）
 
 - 触发：同事（经用户转达）建议引擎仓 select:tree 同步 JS-gen 叶模式三级策略（协议不动，只改内部实现）
