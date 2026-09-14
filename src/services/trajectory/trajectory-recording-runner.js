@@ -127,6 +127,7 @@ async function applyPageLevelScreenshot(...args) {
  *  - _phaseGroups: Map<phaseNum, Map<stateKey, {shotId: number|null, stepIds: number[]}>>
  *  - _pendingStepGroup: Map<entryId, {phase: number, stateKey: string}>（entryId → 动作前状态组）
  *  - _phaseShotChain: Promise（串行采集队列，避免 BiB 采集结果事件互相串线）
+ *  - _phaseShotPersistChain: Promise（独立持久化队列，MinIO 慢不阻塞采集）
  *  - _phaseNumToId: Map<phaseNumber, phaseId>
  */
 /** Per-phase group count cap: beyond it stop capturing, group-only (shotId stays null). */
@@ -145,6 +146,20 @@ function queuePhaseGroupShot(runtime, job) {
     .catch((err) => {
       console.warn('[record] phase group shot job failed:', err?.message || err);
     });
+}
+
+/**
+ * Queue persistence independently from browser capture so a slow MinIO does not
+ * delay the next state capture.
+ * @param {object} runtime trajectory runtime
+ * @param {() => Promise<void>} job persistence job
+ * @returns {void}
+ */
+function queuePhaseGroupPersistence(runtime, job) {
+  runtime._phaseShotPersistChain = Promise.resolve(runtime._phaseShotPersistChain)
+    .catch(() => {})
+    .then(job)
+    .catch((err) => console.warn('[record] phase group shot persistence failed:', err?.message || err));
 }
 
 /**
@@ -196,21 +211,23 @@ function ensurePhaseGroup(runtime, phaseNum, stateKey) {
     );
     return group;
   }
-  queuePhaseGroupShot(runtime, () => captureAndPersistPhaseGroupShot(runtime, Number(phaseNum), key));
+  queuePhaseGroupShot(runtime, async () => {
+    const shot = await capturePhaseGroupShot(runtime, Number(phaseNum), key);
+    if (shot) queuePhaseGroupPersistence(runtime, () => persistPhaseGroupShot(runtime, shot));
+  });
   return group;
 }
 
 /**
- * Capture + persist one phase-group shot (upsert by phase × state_group) and refresh bindings.
- * Never throws: returns false on any failure (group shot missing / degraded).
+ * Capture one phase-group shot without waiting for storage persistence.
  * @param {object} runtime trajectory runtime
  * @param {number} phaseNum phase number
  * @param {string} stateKey state-group key
- * @returns {Promise<boolean>} whether the group shot was persisted
+ * @returns {Promise<object|null>} captured shot or null on failure
  */
-async function captureAndPersistPhaseGroupShot(runtime, phaseNum, stateKey) {
+async function capturePhaseGroupShot(runtime, phaseNum, stateKey) {
   const key = String(stateKey || '').trim();
-  if (!key) return false;
+  if (!key) return null;
   const byKey = phaseGroupMap(runtime, phaseNum);
   let group = byKey.get(key);
   if (!group) {
@@ -221,14 +238,14 @@ async function captureAndPersistPhaseGroupShot(runtime, phaseNum, stateKey) {
     console.warn(
       `[record] phase-group-shot cap reached for phase ${phaseNum} (${byKey.size} groups); skip capture: ${key.slice(0, 80)}`,
     );
-    return false;
+    return null;
   }
   const phaseId = resolvePhaseIdForGroup(runtime, phaseNum);
   if (!phaseId) {
     console.warn(
       `[record] phase group shot skipped: no phase id for phase ${phaseNum} (stateKey=${key.slice(0, 80)})`,
     );
-    return false;
+    return null;
   }
   try {
     const captured = await capturePhaseBuffer({
@@ -237,14 +254,33 @@ async function captureAndPersistPhaseGroupShot(runtime, phaseNum, stateKey) {
     });
     if (!captured?.ok) {
       console.warn('[record] phase group shot skipped:', captured?.skipped || 'capture_failed');
-      return false;
+      return null;
     }
     const metadata = buildMetadata(captured.buffer, captured.meta);
     metadata.stateGroup = key;
+    return { key, phaseNum: Number(phaseNum), phaseId, buffer: captured.buffer, metadata };
+  } catch (err) {
+    console.warn('[record] phase group shot capture failed:', err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * Persist a previously captured phase-group shot and bind waiting steps.
+ * @param {object} runtime trajectory runtime
+ * @param {object} shot captured shot
+ * @returns {Promise<boolean>} whether persistence succeeded
+ */
+async function persistPhaseGroupShot(runtime, shot) {
+  const { key, phaseNum, phaseId, buffer, metadata } = shot || {};
+  if (!key || !phaseId || !buffer) return false;
+  const group = phaseGroupMap(runtime, phaseNum).get(key);
+  if (!group) return false;
+  try {
     const shotId = await replacePhaseGroupScreenshot(phaseId, {
       trajectoryId: runtime.trajectoryId,
       stateGroup: String(key).slice(0, 120),
-      buffer: captured.buffer,
+      buffer,
       mimeType: 'image/png',
       metadataJson: JSON.stringify(metadata),
     });

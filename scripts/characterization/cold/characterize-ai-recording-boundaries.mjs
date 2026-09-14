@@ -17,4 +17,7 @@ assert.match(action, /"read_business_date",/);
 assert.match(runner, /type === 'phase_state_key'/);
 assert.match(runner, /phase_state_key_ignored_/);
 assert.match(runner, /phaseNumber: statePayload\?\.phase \?\? statePayload\?\.phaseNumber \?\? null/);
+assert.match(runner, /function queuePhaseGroupPersistence/);
+assert.match(runner, /const shot = await capturePhaseGroupShot/);
+assert.match(runner, /queuePhaseGroupPersistence\(runtime, \(\) => persistPhaseGroupShot/);
 console.log('characterize-ai-recording-boundaries: OK');
