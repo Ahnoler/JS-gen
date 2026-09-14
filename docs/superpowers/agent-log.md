@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-14 · OpenCode — 开工：trajectory 827/remoteSession 1656 AI 录制重复步骤修复
+
+- 进行中：根据 trajectoryId=827、remoteSessionId=1656 排查 AI 录制重复步骤，修复 action_log_sync 重复消费/持久化，并补回归验证。
+- 范围：`src/routes/browser-session/executor-events.js`、相关 characterization、`docs/superpowers/agent-log.md`；只读检查 `scripts/state.py`、`src/services/trajectory/trajectory-recording-runner.js`。
+- 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户既有改动及其他会话 WIP；不修改线上 trajectory 827/remoteSession 1656 数据。
+- 方式：先确认日志与录制/落库链路，再做最小 listener 边界修复，运行定向 Node 检查/characterization，提交后回报部署与复测要求。
+
 ## 2026-09-14 18:05 · Cursor Automation — 收工：2026-09-13 北京时间工作日报归档
 
 - 完成：`docs/report/2026-09-13.md` + `docs/report/README.md` 索引行；统计窗口 09-13 00:00–24:00，4 条提交（叶模式 DFS 兜底 + 他仓 select:tree 对齐）
