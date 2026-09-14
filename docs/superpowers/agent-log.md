@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-14 · OpenCode — 收工：trajectory 785 日志复核与截图采集时序修复（回链本次开工条目）
+
+- 完成：提交 **577d322a**；状态组截图改为“先捕获浏览器画面，再异步进入上传/落库队列”，MinIO 超时不再阻塞后续状态捕获；保留步骤与截图的 entryId 绑定。
+- 日志结论：785 期间 MinIO `172.19.87.169:9001` 持续 ETIMEDOUT，且日志出现 823/298 与 785 交错 attach，必须在服务器重启后观察实际 `agentSessionId/sessionId → trajectoryId` 映射；现有日志不足以证明同一 Python session 已错误写入 785，但风险真实存在。
+- 验收：Node `--check`、定向 ESLint、新增 AI recording boundary pin 均通过；用户原有 `trajectory-meta-service.js` 未纳入提交。
+- 遗留移交：远程服务器需部署本提交并重启 control plane/executor；复测时提供新的 `trajectoryId`、完整 sessionId/remoteSessionId 关联日志，确认是否仍有跨轨迹复用。
+
 ## 2026-09-14 · OpenCode — 开工：trajectory 785 远程日志复核与截图延迟/会话串线修复
 
 - 进行中：基于用户提供的 trajectory 785 服务器日志，修复 MinIO 超时导致状态组截图晚于动作落地的问题，并核查同一执行机会话被多轨迹复用时的事件归属。
