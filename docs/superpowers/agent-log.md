@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-14 · OpenCode — 收工：trajectory 828/remoteSession 1660 阶段弹窗误关闭修复（回链本次开工条目）
+
+- 完成：提交 **3763893d**；`select_option` 各成功路径记录 `picker_closed` 选择器完成证据，但不关闭父级业务 drawer；阶段 done 守卫据此不再因父 drawer 可见而注入多余 `close_dialog`，下一阶段可继续点击同一 drawer 内的【下一步】。
+- 根因：日志中的 `Premature done() — visible overlay drawer:对公客户评级申请` 后紧跟强制 `close_dialog`，阶段 2 虽已成功但父级向导被关闭；阶段 3 只能重新点击【评级申请】，造成重复操作和后续步骤错乱。
+- 验收：Python `py_compile`、`characterize-phase-boundary.py`、`characterize-introduce-dialog-close.py`、`git diff --check` 全部通过；新增 characterization 检查主 select 成功路径均调用 picker 完成标记。
+- 遗留移交：需部署 control plane/executor 后用新轨迹湿测；预期阶段 2 结束后日志不再出现 `forcing continue`/自动 `close_dialog`，阶段 3 应直接在原 drawer 点击【下一步】。若仍关闭，请提供阶段 2 `action_log_sync` 与 `[recorder]` 完整片段。
+
 ## 2026-09-14 · OpenCode — 开工：trajectory 828/remoteSession 1660 阶段弹窗误关闭与重复步骤修复
 
 - 进行中：依据执行机日志排查阶段 2 `done()` 后误触发 `close_dialog`、导致阶段 3 无法继续并重走阶段 1/2 的问题，修复阶段边界守卫与回归测试。
