@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-14 · OpenCode — 开工：trajectory 828/remoteSession 1660 阶段弹窗误关闭与重复步骤修复
+
+- 进行中：依据执行机日志排查阶段 2 `done()` 后误触发 `close_dialog`、导致阶段 3 无法继续并重走阶段 1/2 的问题，修复阶段边界守卫与回归测试。
+- 范围：`scripts/agent/recorder_emitters.py`、相关 phase contract/characterization、`docs/superpowers/agent-log.md`；只读检查 `scripts/controller/actions/phase/`、录制 runner。
+- 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不修改线上 trajectory 828/remoteSession 1660 数据。
+- 方式：复现日志对应的 done 守卫决策，确认弹窗生命周期契约后做最小修复，运行 Python characterization/编译检查并提交。
+
 ## 2026-09-14 · OpenCode — 收工：trajectory 827/remoteSession 1656 AI 录制重复步骤修复（回链本次开工条目）
 
 - 完成：提交 **1dcb6e39**；`executor-events.js` 在 `session.aiRecording=true` 时不再由通用 `autoPersist` listener 落库 `action_log_sync`，AI 录制仅由 `trajectory-recording-runner.js` 的 run-scoped listener 持久化，避免同一 action 被两条异步链重复追加。
