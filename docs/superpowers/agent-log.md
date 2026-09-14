@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-14 · OpenCode — 收工：AI 录制边界与营业日期观察动作修复（回链本次开工条目）
+
+- 完成：提交 **57a7487b** + **e4c20118**；`phase_state_key` 按嵌套 payload 的 `runId + phase` 做归属过滤，旧 run/旧阶段状态不会再创建或重绑当前阶段组图；`read_business_date` 统一列入 Python 跳过截图/脚本步骤、Node engineering action，保留读取能力但不再落入产品步骤。
+- 验收：`node --check`、新增 `characterize-ai-recording-boundaries.mjs`、`characterize-action-log-sync-delta.py`、Python `py_compile`、定向 ESLint 均通过；新增 pin 已注册 `verify-all`。
+- 结论：阶段内重复的现有明确契约仍是“同一页面元素的连续操作只保留后一次，非连续重复保留”；未做全局去重，避免误删真实业务重复操作。实际 AI 录制仍需用户提供异常轨迹 ID/执行机日志做线上证据核对。
+- 遗留移交：工作区仍保留用户已有未提交改动 `src/services/trajectory/trajectory-meta-service.js`，本线未触碰。
+
 ## 2026-09-14 · OpenCode — 开工：AI 录制画面/步骤错位、阶段内重复及 read_business_date 排查
 
 - 进行中：排查 AI 录制事件、阶段状态组截图、步骤落库/去重及业务日期动作的来源与串线风险；必要时实施最小修复并补充离线验证。
