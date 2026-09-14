@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const runner = fs.readFileSync(path.join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
+const executorEvents = fs.readFileSync(path.join(root, 'src/routes/browser-session/executor-events.js'), 'utf8');
 const meta = fs.readFileSync(path.join(root, 'src/models/meta-step-actions.js'), 'utf8');
 const state = fs.readFileSync(path.join(root, 'scripts/state.py'), 'utf8');
 const action = fs.readFileSync(path.join(root, 'scripts/models/action.py'), 'utf8');
@@ -20,4 +21,9 @@ assert.match(runner, /phaseNumber: statePayload\?\.phase \?\? statePayload\?\.ph
 assert.match(runner, /function queuePhaseGroupPersistence/);
 assert.match(runner, /const shot = await capturePhaseGroupShot/);
 assert.match(runner, /queuePhaseGroupPersistence\(runtime, \(\) => persistPhaseGroupShot/);
+assert.match(
+  executorEvents,
+  /autoPersist && !session\.aiRecording && Number\.isFinite\(Number\(session\.dbTrajectoryId\)\)/,
+  'generic executor persistence is disabled during AI recording',
+);
 console.log('characterize-ai-recording-boundaries: OK');

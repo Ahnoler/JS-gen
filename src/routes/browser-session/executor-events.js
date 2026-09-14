@@ -25,7 +25,11 @@ export function bindExecutorSessionEvents(session) {
       session.lastActionLog = entries;
       broadcast('action_log_sync', { ...(payload || {}), sessionId: session.sessionId });
       const autoPersist = !!(session.autoPersist ?? state.globalBrowser.autoPersist);
-      if (autoPersist && Number.isFinite(Number(session.dbTrajectoryId))) {
+      // AI record/start owns its action_log_sync persistence through the run-scoped
+      // listener in trajectory-recording-runner.js. The generic executor listener
+      // must only maintain the session mirror while that lock is active; otherwise
+      // the same entry can be appended by two independent async consumers.
+      if (autoPersist && !session.aiRecording && Number.isFinite(Number(session.dbTrajectoryId))) {
         const removedIds = Array.isArray(payload?.removedIds) ? payload.removedIds : [];
         const cleanup = removedIds.length
           ? removeLivePersistedActions(session, removedIds).catch(() => {})
