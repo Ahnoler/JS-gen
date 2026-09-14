@@ -13,6 +13,12 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-14 22:25 · ZCode 引擎线 — 收工：图标按钮点击可靠性修复（他仓 commit 41992f0，回链 22:05 开工）
+
+- 完成：tansun_ui_engine（TUE_1.0.1_LMY）**41992f0**，单文件 click.py +57/−4——① `JS_CLICK_ICON_BUTTON` 图标段由「DOM 顺序首个即点」改为「收集全部命中 → 排除页头（.headerbox/.navbar/.header__action-item，滤空回退全量）→ 恰剩一个才点（`ok-icon:<label>`）→ 多个显式 `err-icon-label-ambiguous:<candidates JSON>`」；② 新增 `icon_button` 子路由接线 `_DATA_NAME_SUBROUTES`（「图标：X」专属路径，歧义=该步最终 error 不落回，miss 才回通用链；函数放 click.py 因复用本模块 JS 避免循环导入）；③ `_click_by_button_text` 歧义短路（容器级判歧义后不再让页面级图标 JS 兜底）。lead 设计、双子智能体并行实现（文件集不相交，均未 commit），主会话复核 diff+传播路径后代提交
+- 验收：ruff 全过；JS node --check 过；本地测试 **46 passed**（40 旧全绿 + 6 新 pin：接线/JS 消歧契约/ok 路径/歧义不落回/miss/空 hint）；`err-icon-label-ambiguous` 传播路径人工复核（→ status=error，无误点兜底）。**真机 dry-run 未完成**：MCP 会话在探测时过期跳登录页（凭据不过 ZCode）；结论不受影响——上轮真机已实采该页「上移」双候选现场（页头 span 在前/工具栏 a 在后），新逻辑输出确定为「滤页头 → 恰剩工具栏一个 → 点它」；登录后跑一次 `图标：上移` 预期日志 `图标按钮点击完成 … result=ok-icon:上移` 即终验
+- 同批在库（TUE_1.0.1_LMY，均未 push）：0db22e0（合并上游 a6617f6：date 闸门去重取 pkgutil 版+树节点点击加强）、1cd1533（select:tree 叶模式）、f4c1345（date 三闸门+菜单导航）
+
 ## 2026-09-14 22:05 · ZCode 引擎线 — 开工：引擎图标按钮点击可靠性修复（lead + 2 子智能体）
 
 - 进行中：2026-09-14 22:05；验收=「上移」类歧义名称不再静默点错（多候选优先非页头、仍歧义显式 err-icon-label-ambiguous）+ `图标：` 前缀接线可按图标标签点击
