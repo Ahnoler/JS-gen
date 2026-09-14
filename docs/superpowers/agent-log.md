@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-14 · OpenCode — 开工：trajectory 785 远程日志复核与截图延迟/会话串线修复
+
+- 进行中：基于用户提供的 trajectory 785 服务器日志，修复 MinIO 超时导致状态组截图晚于动作落地的问题，并核查同一执行机会话被多轨迹复用时的事件归属。
+- 范围：`src/services/trajectory/trajectory-recording-runner.js`、`src/services/trajectory/run-event-ownership.js`、`src/routes/browser-session/persist-live.js`、相关 characterization 与协作日志。
+- 禁入区：`src/services/trajectory/trajectory-meta-service.js` 的用户未提交改动；不修改远程服务器数据，不清理用户现有日志/截图。
+- 方式：先做最小事件/截图链路改造，再用 Node 语法、事件归属和截图持久化相关 characterization 验证，最后提交并给出远程部署复测步骤。
+
 ## 2026-09-14 · OpenCode — 收工：AI 录制边界与营业日期观察动作修复（回链本次开工条目）
 
 - 完成：提交 **57a7487b** + **e4c20118**；`phase_state_key` 按嵌套 payload 的 `runId + phase` 做归属过滤，旧 run/旧阶段状态不会再创建或重绑当前阶段组图；`read_business_date` 统一列入 Python 跳过截图/脚本步骤、Node engineering action，保留读取能力但不再落入产品步骤。
