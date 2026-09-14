@@ -13,6 +13,13 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-15 00:55 · ZCode 引擎线 — 收工：tooltip 泡泡框误采修复湿测 PASS 全链闭环（回链 00:23 开工）
+
+- 完成：commit **67cb3286**（`src/cdp/page-locator-helpers.js` normalizeHost 头部 popper→触发器重映射 + 生成链再生成 `_locator_helpers_js.py`）。
+- 验收（MCP 接管浏览器、产品阶段管理活页面、真实悬停触发 tooltip）：把**活的 popper**（`el-tooltip-6393`，注意 id 与昨日 `4652` 不同——动态 id 实锤）喂给 `buildLocatorSnap` → 产出 `//a[contains(@class,'el-icon-folder-add')]`，strategy=xpath_smart、**verified=true**，解析回真实图标 `<a>`（`inTooltipPopper:false`）；图标本体 snap 行为不变；库存按泡泡框文案过滤 0 命中（证明泡泡框从未入库，缺陷入口在事件/文本采集层，normalizeHost 公共入口重映射即全覆盖）；三源 pin PASS；verify-all 基线 4 红零新增。
+- 工程坑（已留痕）：helpers 文本住在模板字面量里——注释中**反引号与插值序列**都会终止模板（本次两次 SyntaxError 来源），已在修复处注释告警。
+- 遗留：无。MCP 浏览器 window.__H 残留 80KB 文本（测试浏览器，无需清理）；`tmp/mcp-chunk-*.js`/`tmp/mcp-wet-tooltip.js` 留档。
+
 ## 2026-09-15 00:23 · ZCode 引擎线 — 开工：AI 录制图标点击采到 tooltip 泡泡框的修复（JS-gen 侧定位链）
 
 - 现场实证（MCP 接管浏览器 + 注入录制侧同款 PAGE_LOCATOR_HELPERS 普查）：产品阶段管理图标（`a.el-tooltip.el-icon-folder-add`）无文本，唯一可见文本是 tooltip popper（`div.el-tooltip__popper.is-dark`，动态 id `el-tooltip-4652`）；文本/事件目标采到 popper 时 `buildLocatorSnap(popper)` 产出 `//div[@id='el-tooltip-4652']`（动态 id 入 xpath）→ 回放即失效。popper **不带 `.el-popper` 类**，现有枚举黑名单拦不住。
