@@ -13,6 +13,13 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-15 00:23 · ZCode 引擎线 — 开工：AI 录制图标点击采到 tooltip 泡泡框的修复（JS-gen 侧定位链）
+
+- 现场实证（MCP 接管浏览器 + 注入录制侧同款 PAGE_LOCATOR_HELPERS 普查）：产品阶段管理图标（`a.el-tooltip.el-icon-folder-add`）无文本，唯一可见文本是 tooltip popper（`div.el-tooltip__popper.is-dark`，动态 id `el-tooltip-4652`）；文本/事件目标采到 popper 时 `buildLocatorSnap(popper)` 产出 `//div[@id='el-tooltip-4652']`（动态 id 入 xpath）→ 回放即失效。popper **不带 `.el-popper` 类**，现有枚举黑名单拦不住。
+- 范围：`src/cdp/page-locator-helpers.js`（normalizeHost 头部加 popper→触发器重映射，经 aria-describedby 反查）+ `node scripts/_gen_locator_helpers_py.mjs` 再生成 `scripts/controller/actions/js_snippets/_locator_helpers_js.py`（禁手改，走生成链）
+- 禁入区：`config/`、他线未提交改动、`scripts/controller/actions/fill_engine.py`（我刚提交的守卫，本次不动）、agent-log 他人条目只读
+- 方式：主线程实施；验证=三源一致 pin（characterize-xpath-three-sources 等）+verify-all 对照基线 4 红+MCP 活页面复测（popper→图标 xpath verified）
+
 ## 2026-09-14 22:25 · ZCode 引擎线 — 收工：图标按钮点击可靠性修复（他仓 commit 41992f0，回链 22:05 开工）
 
 - 完成：tansun_ui_engine（TUE_1.0.1_LMY）**41992f0**，单文件 click.py +57/−4——① `JS_CLICK_ICON_BUTTON` 图标段由「DOM 顺序首个即点」改为「收集全部命中 → 排除页头（.headerbox/.navbar/.header__action-item，滤空回退全量）→ 恰剩一个才点（`ok-icon:<label>`）→ 多个显式 `err-icon-label-ambiguous:<candidates JSON>`」；② 新增 `icon_button` 子路由接线 `_DATA_NAME_SUBROUTES`（「图标：X」专属路径，歧义=该步最终 error 不落回，miss 才回通用链；函数放 click.py 因复用本模块 JS 避免循环导入）；③ `_click_by_button_text` 歧义短路（容器级判歧义后不再让页面级图标 JS 兜底）。lead 设计、双子智能体并行实现（文件集不相交，均未 commit），主会话复核 diff+传播路径后代提交
