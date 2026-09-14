@@ -13,6 +13,15 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-14 21:41 · ZCode 引擎线 — 收工：fill_form_field 同值重填守卫（回链 21:34 开工；活页面湿测待补）
+
+- 完成：commit **63209340**（4 文件 +99/-1）：`fill_engine.py` 录制态同值跳过守卫、`agent-tools-form.md` 终检纪律（先比对再重填）、新增 `characterize-fill-already-filled.py` 入 verify-all。
+- 验收（离线）：py_compile+模块级 import PASS；**行为单测三路径 PASS**（同值→`already-filled` 且不执行真实填充；异值→放行；探测异常→fail-open）；form-engine-scope-audit PASS；verify-all 经逐项比对确认本次改动零新增红。
+- 坑（值得记）：函数体后段一处同名**局部 import** 使 `field_values_equivalent` 在整函数作用域退化为局部名，守卫在其之前引用即 UnboundLocalError —— **AST 未解析名守卫查不出「已解析但晚绑定」，行为测试才抓到**；已固定（局部别名 `_fve`）并入 pin。
+- 遗留移交（**非本次改动引入，属同事入站提交**，已用 8e1403c9 vs HEAD 逐项量化证实，建议转告）：
+  ① `characterize-search-then-click-prompts` 红 —— `src/services/trajectory/trajectory-meta-service.js` 因提示词重写（78c89d77）丢失旧针 `不要为此增删 phase 条数`，需同 commit 更新 pin；
+  ② `characterize-select-option-stamp` 红 —— 3763893d 在 helper 调用与 `no-items-skip` 之间插入 `_mark_picker_selection_success(...)`，把距离从 365 推到 454，越出该 pin 的 400 字窗口（判据本身过脆，建议同时放宽或改为结构化断言）。
+- 待补：19242 活页面双场景湿测（同值→跳过不记录；异值→覆盖并记录）。当前测试浏览器（19242）与控制面（4097）均未运行，无法执行；`tmp/fill-guard-behavior-test.py` 已就绪可复用。
 
 ## 2026-09-14 21:34 · ZCode 引擎线 — 开工：fill_form_field 同值重填守卫（助手填完主 Agent 再填=重复步骤）
 
