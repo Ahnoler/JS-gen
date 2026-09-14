@@ -13,6 +13,13 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-14 22:05 · ZCode 引擎线 — 开工：引擎图标按钮点击可靠性修复（lead + 2 子智能体）
+
+- 进行中：2026-09-14 22:05；验收=「上移」类歧义名称不再静默点错（多候选优先非页头、仍歧义显式 err-icon-label-ambiguous）+ `图标：` 前缀接线可按图标标签点击
+- 范围：tansun_ui_engine（TUE_1.0.1_LMY，已含合并 0db22e0）`ui_execute/engine/actions/click.py`（JS_CLICK_ICON_BUTTON 歧义守卫 + icon_button 子路由 + 路由表接线）与 `tests/test_click_subroutes.py`（**本地件不提交**，pin 更新）；JS-gen 侧仅本文件
+- 禁入区：引擎仓其余文件（含 tests/test_date_action.py、config.py）、JS-gen 源码、push、SUT 真实数据变更（真机只做 dry-run 解析验证不点击）
+- 方式：主会话设计并代子智能体声明；子智能体 A=click.py 实现、B=本地测试 pin（文件集不相交），均不 commit；主会话复核 + node --check + ruff + pytest + 真机 dry-run 后代提交
+
 ## 2026-09-14 21:52 · ZCode 引擎线 — 收工：pull 引入的 2 个 characterization 红项已修（回链 21:44 开工）
 
 - 完成：commit **0f3f2f55**（2 文件 +23/-6，只改判据、不动同事源码）。
