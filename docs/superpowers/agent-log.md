@@ -14,6 +14,12 @@
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
 
+## 2026-09-14 21:34 · ZCode 引擎线 — 开工：fill_form_field 同值重填守卫（助手填完主 Agent 再填=重复步骤）
+
+- 范围：`scripts/controller/actions/fill_engine.py`（录制态同值跳过，约 +25 行）、`scripts/prompts/agent-tools-form.md`（终检纪律改为先比对再重填）、新增 `scripts/characterization/characterize-fill-already-filled.py` + `scripts/refactor/verify-all.sh` 注册一行
+- 禁入区：`config/`（他线未提交 update-db-whitelist.ps1）、`src/services/trajectory/trajectory-recording-runner.js` 与 `src/routes/browser-session/executor-events.js`（同事刚修完的重复落库链，只读不碰）、agent-log 他人条目只读不删
+- 方式：主线程实施；只插入代码不改既有行（AGENTS.md 硬约束）；验证=py_compile+模块级 import+form-engine-scope-audit（AST 未解析名守卫）+新 pin+verify-all 对照已知 4 存量红；19242 活页面双场景湿测（同值→不记录；异值→覆盖并记录）
+
 ## 2026-09-14 · OpenCode — 收工：trajectory 828/remoteSession 1660 阶段弹窗误关闭修复（回链本次开工条目）
 
 - 完成：提交 **3763893d**；`select_option` 各成功路径记录 `picker_closed` 选择器完成证据，但不关闭父级业务 drawer；阶段 done 守卫据此不再因父 drawer 可见而注入多余 `close_dialog`，下一阶段可继续点击同一 drawer 内的【下一步】。
