@@ -1,5 +1,17 @@
 # Agent 协作日志
 
+## 2026-09-14 18:05 · Cursor Automation — 收工：2026-09-13 北京时间工作日报归档
+
+- 完成：`docs/report/2026-09-13.md` + `docs/report/README.md` 索引行；统计窗口 09-13 00:00–24:00，4 条提交（叶模式 DFS 兜底 + 他仓 select:tree 对齐）
+- 验收：git log 四笔与 agent-log 09-13 三条收工/开工条目交叉核对；前日 09-12 无独立日报，遗留对照 09-11 + 09-12 agent-log
+- 遗留移交：09-12 日报仍缺归档；引擎 select:tree 真机复验、主链 R6/R7 等见日报遗留表
+
+## 2026-09-14 18:03 · Cursor Automation — 开工：2026-09-13 北京时间 cron 日报生成
+
+- 范围：仅 `docs/report/2026-09-13.md`、`docs/report/README.md`、`docs/superpowers/agent-log.md`（本条目）
+- 禁入区：`src/`、`scripts/` 业务代码、他线 WIP；不做 Hermes/memory 大扫除
+- 方式：git log + agent-log + 09-12 湿测报告归纳；cron 触发 2026-09-14T10:03Z（北京 18:03）
+
 ## 2026-09-13 01:10 · ZCode 引擎线 — 收工：tansun 引擎 select:tree 对齐叶模式策略（他仓 commit 1cd1533，回链 00:40 线）
 
 - 触发：同事（经用户转达）建议引擎仓 select:tree 同步 JS-gen 叶模式三级策略（协议不动，只改内部实现）
