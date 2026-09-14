@@ -13,6 +13,13 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-14 21:44 · ZCode 引擎线 — 开工：修复 pull 引入的 2 个 characterization 红项
+
+- 范围：`scripts/characterization/cold/characterize-search-then-click-prompts.py`（needle 按新提示词更新）、`scripts/characterization/characterize-select-option-stamp.py`（400 字窗口判据改结构化）
+- 判据前提（已核）：两红均非本次改动引入，且**源码属性仍成立**——① 提示词规则 9「不要为了凑数量而拆分本应合并的操作」承接原「不要为此增删 phase 条数」的数量纪律（措辞变、意图在）；② select_engine no-items 分支仍 `stamped = resolve_recorded_option_text(...)` → `params['option_text'] = stamped`，只是被 3763893d 新增一行把距离从 365 推到 454 越窗。
+- 禁入区：不动 `src/services/trajectory/trajectory-meta-service.js` 与 `select_engine.py` 源码（同事线，只改判据）；agent-log 他人条目只读
+- 方式：主线程；验证=两 pin 单跑 PASS + verify-all 回到基线 4 红
+
 ## 2026-09-14 21:41 · ZCode 引擎线 — 收工：fill_form_field 同值重填守卫（回链 21:34 开工；活页面湿测待补）
 
 - 完成：commit **63209340**（4 文件 +99/-1）：`fill_engine.py` 录制态同值跳过守卫、`agent-tools-form.md` 终检纪律（先比对再重填）、新增 `characterize-fill-already-filled.py` 入 verify-all。
