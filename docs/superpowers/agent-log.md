@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 开工：日期范围字段录制优化
+
+- 进行中：修复日期范围控件录制只读取第一个 input、结束日期丢失的问题；让 CDP/BiB 与手工录制在范围提交后产出完整双日期 `fill_date`。
+- 范围：`src/cdp/inspect.js`、`src/cdp/inspect-payload-script.js`、`src/cdp/remote-bridge/cdp-input.js`、`scripts/manual_recorder/js_parts/a.py`、`scripts/manual_recorder/js_parts/b.py`、相关 characterization、本协作日志；不修改回放动作名及线上轨迹数据。
+- 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动、其他会话 WIP、引擎仓；不处理日期面板关闭之外的基础设施告警。
+- 方式：沿日期点击确认链路扩展 editor 双 input 快照与范围值归并，保留单日期行为，补充离线 pin/语法检查后提交。
+
 ## 2026-09-15 · OpenCode — 收工：AI 录制 picker 阶段完成判定修复（回链本次开工条目）
 
 - 完成：提交 **223c970f**；`picker_dialog_select` 成功完成“选行 + 确认 + 回填”后写入 `picker_closed`、`dialog_confirmed`，并在存在变更字段时写入 `introduced_backfilled`，`done()` 不再因 success token 为空而拒绝。
