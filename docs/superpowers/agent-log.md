@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 收工：AI 录制 picker 阶段完成判定修复（回链本次开工条目）
+
+- 完成：提交 **223c970f**；`picker_dialog_select` 成功完成“选行 + 确认 + 回填”后写入 `picker_closed`、`dialog_confirmed`，并在存在变更字段时写入 `introduced_backfilled`，`done()` 不再因 success token 为空而拒绝。
+- 根因：该组合式 workspace action 只返回/落库 action，未共享通用点击/保存路径的 `record_evidence`；日志中的 step 5 与 step 14 因此出现 `missing_any_of`，模型被错误引导为重新打开弹窗。
+- 验收：`python scripts/characterization/cold/characterize-introduce-dialog-close.py`、`python -m py_compile scripts/controller/actions/_workspace.py scripts/controller/service.py`、`git diff --check` 通过。
+- 遗留移交：需部署 control plane/executor 后用新轨迹湿测，确认阶段 2 后直接进入阶段 3；`network_capture.py` 的 `Response.header_value` 未 await 与 `memory_writer` 超时仍是独立基础设施告警，本次未修改。
+
 ## 2026-09-15 · OpenCode — 开工：AI 录制 picker 阶段完成判定修复
 
 - 进行中：排查阶段 2 `introduce_pick` 已完成后因 success token 缺失而反复重试、影响阶段 3 的问题；为组合式 `picker_dialog_select` 动作补齐阶段完成证据并回归验证。
