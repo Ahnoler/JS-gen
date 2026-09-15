@@ -20,8 +20,8 @@ def main() -> None:
     assert "_record_picker_atomic_actions(payload_dict.get('recorded_actions'))" in WORKSPACE
     assert "if not payload_dict.get('recorded_actions')" in WORKSPACE
     assert "LEGACY specialized picker helper" in WORKSPACE
-    assert "不要调用 `picker_dialog_query` / `picker_dialog_select`" in COMMON_PROMPT
-    assert '`fill_form_field`、`click_button("查询")`、`click_table_row_radio`、`click_button("确认")`' in FORM_PROMPT
+    assert "按当前场景实际发生的有效操作逐步执行并记录" in COMMON_PROMPT
+    assert "不要求固定四步" in FORM_PROMPT
     print("characterize-picker-atomic-recording: OK")
 
 
