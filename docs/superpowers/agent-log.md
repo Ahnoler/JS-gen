@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 13:44 · Cursor Lead — 开工：菜单同 xpath 孪生清理（合同管理 A）
+
+- 进行中：13:44；用户选 A（清同 xpath 孪生 + 堵住 plan 内重复 create）；B 同名不同 RES 另议
+- 范围：`src/services/menu-scan-service.js`（`buildScanApplyPlan`）、`scripts/characterization/characterize-menu-scan.mjs`、`scripts/maintenance/prune-same-xpath-menu-twins.mjs`、本文件；MySQL systemId=1 孪生消重（--apply）
+- 禁入区：同名不同 data-id 合并策略（B）；radio/search-then-click/KB 他线；`.cursor/`
+- 方式：红 pin → 修 plan 去重 → 维护脚本 dry-run/apply；不自动合并异 RES 同名叶
+
 ## 2026-09-15 · OpenCode — 收工：AI 录制 picker 阶段完成判定修复（回链本次开工条目）
 
 - 完成：提交 **223c970f**；`picker_dialog_select` 成功完成“选行 + 确认 + 回填”后写入 `picker_closed`、`dialog_confirmed`，并在存在变更字段时写入 `introduced_backfilled`，`done()` 不再因 success token 为空而拒绝。
