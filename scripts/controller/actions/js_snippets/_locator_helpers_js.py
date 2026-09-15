@@ -196,6 +196,20 @@ PAGE_LOCATOR_HELPERS = r'''
   function normalizeHost(node) {
     if (!node || node.nodeType !== 1) return null;
     if (!node.closest) return node;
+    // Tooltip popper is a transient hover artifact — never a real target.
+    // AI recording reads the tooltip text (an icon button's only visible text)
+    // and text/event capture can land on the popper; its el-tooltip-NNNN id
+    // is minted per render, so a recorded xpath dies on replay. Element UI
+    // links trigger→popper via aria-describedby — remap to the real trigger.
+    // (.el-tooltip__popper carries no .el-popper class, so the generic
+    // popper filters below never catch it — 2026-09-15 产品阶段管理 实证.)
+    // NOTE: this text lives inside a template literal — no backticks and no
+    // dollar-brace sequences allowed in comments here.
+    const tipPop = node.closest('.el-tooltip__popper');
+    if (tipPop && tipPop.id) {
+      const trigger = document.querySelector('[aria-describedby="' + tipPop.id + '"]');
+      if (trigger) return trigger;
+    }
     const close = node.closest(
       '.el-dialog__headerbtn, .el-drawer__close-btn, .el-message-box__headerbtn, .el-notification__closeBtn, .el-dialog__close'
     );

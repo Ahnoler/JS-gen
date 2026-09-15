@@ -29,7 +29,11 @@ NEEDLES: dict[str, tuple[str, ...]] = {
     ),
     "src/services/trajectory/trajectory-meta-service.js": (
         "先搜索/查询再点击",
-        "不要为此增删 phase 条数",
+        # 数量纪律：补写「先搜索/查询再点击」不得改变 phase 条数。
+        # 原 needle「不要为此增删 phase 条数」随 78c89d77 的提示词重写被删，
+        # 该纪律改由规则 9「阶段数量原则：能少则少…不要为了凑数量而拆分本应
+        # 合并的操作」承接（措辞变、意图在）——故按现行文案更新 needle。
+        "不要为了凑数量而拆分",
         # #676: must not strip user-named targets into vague「关键字」
         "必须原样保留",
         "禁止把具体名抹成",

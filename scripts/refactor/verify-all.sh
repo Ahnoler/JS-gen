@@ -76,6 +76,7 @@ run "characterize-container-naming" "$PY" scripts/characterization/characterize-
 run "characterize-result-protocol" "$PY" scripts/characterization/characterize-result-protocol.py
 run "characterize-use-field" "$PY" scripts/characterization/characterize-use-field.py
 run "characterize-field-value-match" "$PY" scripts/characterization/characterize-field-value-match.py
+run "characterize-fill-already-filled" "$PY" scripts/characterization/characterize-fill-already-filled.py
 run "characterize-dual-save-section" "$PY" scripts/characterization/characterize-dual-save-section.py
 run "characterize-form-assistant" "$PY" scripts/characterization/characterize-form-assistant.py
 run "characterize-introduce-query-fill" "$PY" scripts/characterization/characterize-introduce-query-fill.py

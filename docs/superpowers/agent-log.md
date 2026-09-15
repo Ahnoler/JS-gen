@@ -26,6 +26,63 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-15 00:55 · ZCode 引擎线 — 收工：tooltip 泡泡框误采修复湿测 PASS 全链闭环（回链 00:23 开工）
+
+- 完成：commit **67cb3286**（`src/cdp/page-locator-helpers.js` normalizeHost 头部 popper→触发器重映射 + 生成链再生成 `_locator_helpers_js.py`）。
+- 验收（MCP 接管浏览器、产品阶段管理活页面、真实悬停触发 tooltip）：把**活的 popper**（`el-tooltip-6393`，注意 id 与昨日 `4652` 不同——动态 id 实锤）喂给 `buildLocatorSnap` → 产出 `//a[contains(@class,'el-icon-folder-add')]`，strategy=xpath_smart、**verified=true**，解析回真实图标 `<a>`（`inTooltipPopper:false`）；图标本体 snap 行为不变；库存按泡泡框文案过滤 0 命中（证明泡泡框从未入库，缺陷入口在事件/文本采集层，normalizeHost 公共入口重映射即全覆盖）；三源 pin PASS；verify-all 基线 4 红零新增。
+- 工程坑（已留痕）：helpers 文本住在模板字面量里——注释中**反引号与插值序列**都会终止模板（本次两次 SyntaxError 来源），已在修复处注释告警。
+- 遗留：无。MCP 浏览器 window.__H 残留 80KB 文本（测试浏览器，无需清理）；`tmp/mcp-chunk-*.js`/`tmp/mcp-wet-tooltip.js` 留档。
+
+## 2026-09-15 00:23 · ZCode 引擎线 — 开工：AI 录制图标点击采到 tooltip 泡泡框的修复（JS-gen 侧定位链）
+
+- 现场实证（MCP 接管浏览器 + 注入录制侧同款 PAGE_LOCATOR_HELPERS 普查）：产品阶段管理图标（`a.el-tooltip.el-icon-folder-add`）无文本，唯一可见文本是 tooltip popper（`div.el-tooltip__popper.is-dark`，动态 id `el-tooltip-4652`）；文本/事件目标采到 popper 时 `buildLocatorSnap(popper)` 产出 `//div[@id='el-tooltip-4652']`（动态 id 入 xpath）→ 回放即失效。popper **不带 `.el-popper` 类**，现有枚举黑名单拦不住。
+- 范围：`src/cdp/page-locator-helpers.js`（normalizeHost 头部加 popper→触发器重映射，经 aria-describedby 反查）+ `node scripts/_gen_locator_helpers_py.mjs` 再生成 `scripts/controller/actions/js_snippets/_locator_helpers_js.py`（禁手改，走生成链）
+- 禁入区：`config/`、他线未提交改动、`scripts/controller/actions/fill_engine.py`（我刚提交的守卫，本次不动）、agent-log 他人条目只读
+- 方式：主线程实施；验证=三源一致 pin（characterize-xpath-three-sources 等）+verify-all 对照基线 4 红+MCP 活页面复测（popper→图标 xpath verified）
+
+## 2026-09-14 22:25 · ZCode 引擎线 — 收工：图标按钮点击可靠性修复（他仓 commit 41992f0，回链 22:05 开工）
+
+- 完成：tansun_ui_engine（TUE_1.0.1_LMY）**41992f0**，单文件 click.py +57/−4——① `JS_CLICK_ICON_BUTTON` 图标段由「DOM 顺序首个即点」改为「收集全部命中 → 排除页头（.headerbox/.navbar/.header__action-item，滤空回退全量）→ 恰剩一个才点（`ok-icon:<label>`）→ 多个显式 `err-icon-label-ambiguous:<candidates JSON>`」；② 新增 `icon_button` 子路由接线 `_DATA_NAME_SUBROUTES`（「图标：X」专属路径，歧义=该步最终 error 不落回，miss 才回通用链；函数放 click.py 因复用本模块 JS 避免循环导入）；③ `_click_by_button_text` 歧义短路（容器级判歧义后不再让页面级图标 JS 兜底）。lead 设计、双子智能体并行实现（文件集不相交，均未 commit），主会话复核 diff+传播路径后代提交
+- 验收：ruff 全过；JS node --check 过；本地测试 **46 passed**（40 旧全绿 + 6 新 pin：接线/JS 消歧契约/ok 路径/歧义不落回/miss/空 hint）；`err-icon-label-ambiguous` 传播路径人工复核（→ status=error，无误点兜底）。**真机 dry-run 未完成**：MCP 会话在探测时过期跳登录页（凭据不过 ZCode）；结论不受影响——上轮真机已实采该页「上移」双候选现场（页头 span 在前/工具栏 a 在后），新逻辑输出确定为「滤页头 → 恰剩工具栏一个 → 点它」；登录后跑一次 `图标：上移` 预期日志 `图标按钮点击完成 … result=ok-icon:上移` 即终验
+- 同批在库（TUE_1.0.1_LMY，均未 push）：0db22e0（合并上游 a6617f6：date 闸门去重取 pkgutil 版+树节点点击加强）、1cd1533（select:tree 叶模式）、f4c1345（date 三闸门+菜单导航）
+
+## 2026-09-14 22:05 · ZCode 引擎线 — 开工：引擎图标按钮点击可靠性修复（lead + 2 子智能体）
+
+- 进行中：2026-09-14 22:05；验收=「上移」类歧义名称不再静默点错（多候选优先非页头、仍歧义显式 err-icon-label-ambiguous）+ `图标：` 前缀接线可按图标标签点击
+- 范围：tansun_ui_engine（TUE_1.0.1_LMY，已含合并 0db22e0）`ui_execute/engine/actions/click.py`（JS_CLICK_ICON_BUTTON 歧义守卫 + icon_button 子路由 + 路由表接线）与 `tests/test_click_subroutes.py`（**本地件不提交**，pin 更新）；JS-gen 侧仅本文件
+- 禁入区：引擎仓其余文件（含 tests/test_date_action.py、config.py）、JS-gen 源码、push、SUT 真实数据变更（真机只做 dry-run 解析验证不点击）
+- 方式：主会话设计并代子智能体声明；子智能体 A=click.py 实现、B=本地测试 pin（文件集不相交），均不 commit；主会话复核 + node --check + ruff + pytest + 真机 dry-run 后代提交
+
+## 2026-09-14 21:52 · ZCode 引擎线 — 收工：pull 引入的 2 个 characterization 红项已修（回链 21:44 开工）
+
+- 完成：commit **0f3f2f55**（2 文件 +23/-6，只改判据、不动同事源码）。
+  ① `cold/characterize-search-then-click-prompts.py`：needle「不要为此增删 phase 条数」随 78c89d77 提示词重写被删，纪律由规则 9 承接 → 更新为「不要为了凑数量而拆分」，并存沿革注释；其余 3 针保留。
+  ② `characterize-select-option-stamp.py`：400 字字符窗口判据改为**同一缩进分支块**内断言（3763893d 的纯新增行把距离 365→454 即误红）。
+- 验收：两 pin 单跑 PASS；**变异测试证明强度未降**（删该分支打点行→红、分支内改名→红）；verify-all 回到基线 4 红，零新增。
+- 遗留：无（活页面湿测那条仍属上一条 21:41 条目的待补项，非本条范围）。
+
+## 2026-09-14 21:44 · ZCode 引擎线 — 开工：修复 pull 引入的 2 个 characterization 红项
+
+- 范围：`scripts/characterization/cold/characterize-search-then-click-prompts.py`（needle 按新提示词更新）、`scripts/characterization/characterize-select-option-stamp.py`（400 字窗口判据改结构化）
+- 判据前提（已核）：两红均非本次改动引入，且**源码属性仍成立**——① 提示词规则 9「不要为了凑数量而拆分本应合并的操作」承接原「不要为此增删 phase 条数」的数量纪律（措辞变、意图在）；② select_engine no-items 分支仍 `stamped = resolve_recorded_option_text(...)` → `params['option_text'] = stamped`，只是被 3763893d 新增一行把距离从 365 推到 454 越窗。
+- 禁入区：不动 `src/services/trajectory/trajectory-meta-service.js` 与 `select_engine.py` 源码（同事线，只改判据）；agent-log 他人条目只读
+- 方式：主线程；验证=两 pin 单跑 PASS + verify-all 回到基线 4 红
+
+## 2026-09-14 21:41 · ZCode 引擎线 — 收工：fill_form_field 同值重填守卫（回链 21:34 开工；活页面湿测待补）
+
+- 完成：commit **63209340**（4 文件 +99/-1）：`fill_engine.py` 录制态同值跳过守卫、`agent-tools-form.md` 终检纪律（先比对再重填）、新增 `characterize-fill-already-filled.py` 入 verify-all。
+- 验收（离线）：py_compile+模块级 import PASS；**行为单测三路径 PASS**（同值→`already-filled` 且不执行真实填充；异值→放行；探测异常→fail-open）；form-engine-scope-audit PASS；verify-all 经逐项比对确认本次改动零新增红。
+- 坑（值得记）：函数体后段一处同名**局部 import** 使 `field_values_equivalent` 在整函数作用域退化为局部名，守卫在其之前引用即 UnboundLocalError —— **AST 未解析名守卫查不出「已解析但晚绑定」，行为测试才抓到**；已固定（局部别名 `_fve`）并入 pin。
+- 遗留移交（**非本次改动引入，属同事入站提交**，已用 8e1403c9 vs HEAD 逐项量化证实，建议转告）：
+  ① `characterize-search-then-click-prompts` 红 —— `src/services/trajectory/trajectory-meta-service.js` 因提示词重写（78c89d77）丢失旧针 `不要为此增删 phase 条数`，需同 commit 更新 pin；
+  ② `characterize-select-option-stamp` 红 —— 3763893d 在 helper 调用与 `no-items-skip` 之间插入 `_mark_picker_selection_success(...)`，把距离从 365 推到 454，越出该 pin 的 400 字窗口（判据本身过脆，建议同时放宽或改为结构化断言）。
+- 待补：19242 活页面双场景湿测（同值→跳过不记录；异值→覆盖并记录）。当前测试浏览器（19242）与控制面（4097）均未运行，无法执行；`tmp/fill-guard-behavior-test.py` 已就绪可复用。
+
+## 2026-09-14 21:34 · ZCode 引擎线 — 开工：fill_form_field 同值重填守卫（助手填完主 Agent 再填=重复步骤）
+
+- 范围：`scripts/controller/actions/fill_engine.py`（录制态同值跳过，约 +25 行）、`scripts/prompts/agent-tools-form.md`（终检纪律改为先比对再重填）、新增 `scripts/characterization/characterize-fill-already-filled.py` + `scripts/refactor/verify-all.sh` 注册一行
+- 禁入区：`config/`（他线未提交 update-db-whitelist.ps1）、`src/services/trajectory/trajectory-recording-runner.js` 与 `src/routes/browser-session/executor-events.js`（同事刚修完的重复落库链，只读不碰）、agent-log 他人条目只读不删
+- 方式：主线程实施；只插入代码不改既有行（AGENTS.md 硬约束）；验证=py_compile+模块级 import+form-engine-scope-audit（AST 未解析名守卫）+新 pin+verify-all 对照已知 4 存量红；19242 活页面双场景湿测（同值→不记录；异值→覆盖并记录）
 
 ## 2026-09-14 · OpenCode — 收工：trajectory 828/remoteSession 1660 阶段弹窗误关闭修复（回链本次开工条目）
 

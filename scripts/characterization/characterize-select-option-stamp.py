@@ -78,11 +78,24 @@ def test_select_option_already_matched_stamps_concrete() -> None:
         "no-items-skip" in body,
         "no-items already path present",
     )
-    # Stamp call appears near no-items-skip
-    skip_pos = body.find("no-items-skip")
+    # Stamp call must live in the same branch block as the no-items-skip return.
+    # Block-scoped instead of a fixed character window: the branch legitimately
+    # grows (3763893d inserted _mark_picker_selection_success before the return,
+    # pushing the call from 365 to 454 chars and breaking the old 400-char window
+    # on a purely additive change). The property is "this branch stamps the
+    # concrete option_text", not "the call sits within N chars" — a removed stamp
+    # still fails, so the guard keeps its teeth.
+    _lines = body.splitlines()
+    _skip_idx = next(i for i, _ln in enumerate(_lines) if "no-items-skip" in _ln)
+    _indent = len(_lines[_skip_idx]) - len(_lines[_skip_idx].lstrip())
+    _block = [_lines[_skip_idx]]
+    for _ln in reversed(_lines[:_skip_idx]):
+        if _ln.strip() and (len(_ln) - len(_ln.lstrip())) < _indent:
+            break
+        _block.insert(0, _ln)  # keep source order
     assert_true(
-        "resolve_recorded_option_text" in body[max(0, skip_pos - 400) : skip_pos + 80],
-        "no-items-skip stamps concrete option_text",
+        "resolve_recorded_option_text" in "\n".join(_block),
+        "no-items-skip branch stamps concrete option_text",
     )
 
 

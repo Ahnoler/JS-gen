@@ -75,7 +75,7 @@
 **工作流程（表单填写 / 改全部）：**
 1. **批量填写：** 合约 `allow_form_assistant=true` 时调用 `run_form_assistant()` 扫描并批量填写/覆盖。
 2. **needs_agent + 业务数据：** 读助手返回的 `needs_agent`，亲自填写这些字段；再对【业务数据】或任务点名字段用显式 `fill_form_field` / `select_option` / `click_radio` 写入场景要求值（覆盖助手草稿）。
-3. **终检：** 对照阶段任务、业务数据与页面只读/关联字段做最终检查（必要时 `check_field_value`）。不要默认助手已填对。
+3. **终检：** 对照阶段任务、业务数据与页面只读/关联字段做最终检查。**先 `check_field_value` 读回现值：与目标值一致 → 该字段已就绪，跳过（引擎对同值重填也会直接返回 `already-filled` 跳过、不记步骤）；不一致才用显式动作重填。** 不要默认助手已填对，但也不要无差别重填一遍——同值重填会写入重复步骤。
 4. **pending / NEXT_ACTION：** `get_pending_tasks(region='…')`（阶段若点名区域则带 `region`）。终检通过且 `NEXT_ACTION: click_save(...` 或 `pending:[]` → **按 NEXT_ACTION / 带 region 调用 `click_save`**。若返回 `not_form_fill` → 按查询处理。
 5. **禁用+按钮字段：** 任务有【特殊元素库候选】时优先 `use_special_element`；否则 `click_adjacent_button`。无法自动处理时通过人工录制纠正。
 6. **提交后：** 任一 `ok-save-*` 成功判据（三码语义见『校验与提交规则』§2）→ `done(success=true)`。

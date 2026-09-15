@@ -128,6 +128,39 @@ class FillEngine(_FormActionEngineBase):
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
         value = normalize_lat_lng_value(label_text, value)
+        # ── 同值重填守卫（录制态）──────────────────────────────────────────
+        # 助手(run_form_assistant)已按业务数据/规则填好、主 Agent 终检又调一次
+        # fill_form_field 时，旧行为会再写一个步骤：值相同 → 回放冗余覆盖；
+        # 值不同 → 覆盖助手生成的值且回放终值不稳定（用户实证的重复步骤）。
+        # 与 click_adjacent_button 的 already-filled 同款非记录式跳过：
+        # 「已填且等值」才跳过——不等值视为有意纠错，照填并记录。
+        # 查询态不启用：检索框重填用于重新触发查询，不是表单填写语义。
+        # 放在 resolve 之前：xpath 解析失败（如无扫描清单）时守卫仍须生效。
+        if not _is_query_mode(self.business_data_store):
+            _fill_label = (label_text or '').strip()
+            if _fill_label and _fill_label not in ('查询', '搜索', '确定', '提交', '保存'):
+                try:
+                    # 本函数体后段的 false_ok 回读已有一处同名的局部 import，
+                    # 使该名字在整函数作用域退化为局部名——此处必须先局部绑定，
+                    # 否则在它之前引用会 UnboundLocalError（AST 未解析名守卫查不到）。
+                    from scripts.controller.actions.form_scan_utils import (
+                        field_values_equivalent as _fve,
+                    )
+                    _check_raw = await page.evaluate(
+                        JS_CHECK_SINGLE_FIELD, [_fill_label, self._button_keywords()],
+                    )
+                    _check = _check_raw if isinstance(_check_raw, dict) else _as_dict(_check_raw)
+                    _current = str((_check or {}).get('currentValue') or '').strip()
+                    if _current and _fve(_current, value):
+                        sys.stderr.write(
+                            '[fill] already-filled skip label=' + repr(_fill_label)
+                            + ' current=' + repr(_current[:40]) + '\n'
+                        )
+                        sys.stderr.flush()
+                        return _ok('already-filled | ' + _current)
+                except Exception as _af_exc:
+                    sys.stderr.write(f'[fill] already-filled probe skipped: {_af_exc}\n')
+                    sys.stderr.flush()
         resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         from scripts.feature_flags import xpath_smart_fill_only_enabled
 
