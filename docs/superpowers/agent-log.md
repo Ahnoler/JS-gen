@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 开工：修复 AI 录制推流重连风暴
+
+- 进行中：修复前端自动重连计数被每次 `ensureStream` 清零、导致持续高频请求 `live/status` 与 `attach-live`，并完善 BiB 重挂载冷却及新帧状态判断。
+- 范围：前端仓 `src/composables/useRemoteCanvas.ts`、必要的远程状态类型；主仓仅更新本协作日志，参考上一轮 BiB 修复但不改其他后端业务文件。
+- 禁入区：前端仓 `vite.config.ts` 既有未提交改动及无关文件；主仓 `src/services/trajectory/trajectory-meta-service.js` 用户改动、线上轨迹/数据库及其他会话 WIP；不修改部署配置。
+- 方式：以轨迹 835 的请求频率和状态跳转为表征，最小化修复自动重连状态机，运行前端定向类型检查/构建并提交。
+
 ## 2026-09-15 · OpenCode — 收工：AI 录制推流可靠性前四项优化（回链本次开工条目）
 
 - 完成：主仓提交 **73b72e02**；修正 `notifyStreamViewers` DAO 导入并保留错误日志；prepare 对已有 `bibError` 允许重试；已有 runtime 且 BiB 未附着时 `/trajectories/:id/attach` 重新挂载 BiB。前端仓提交 **63d6a53**；RSCF 订阅记录缓存帧基线，仅收到新的帧序号后才将画布判为 streaming，8 秒无新帧则进入现有自动重连，并补充 `cachedFrameId` 类型。
