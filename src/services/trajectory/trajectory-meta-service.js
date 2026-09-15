@@ -502,7 +502,7 @@ export async function setTrajectoryBusinessEntries(trajectoryId, entries) {
 
 /**
  * Human confirmation of a trajectory (transaction-level).
- * confirmed=true  → recordStatus=completed
+ * confirmed=true  → recordStatus=completed（用户触发，不做当前状态闸）
  * confirmed=false → recordStatus=recorded (cancel confirmation)
  * Does NOT touch trajectory_step.confirmed (回放确认 flag, not trajectory confirm).
  * @param {number} trajectoryId 轨迹 id
@@ -523,15 +523,7 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
     throw err;
   }
   const want = !!confirmed;
-  // 状态流转 V3：待确认(recorded) 可人工确认到 已确认(completed)；
-  // 录制中(recording)也允许人工确认——只写持久基线，不打断录制会话，
-  // 会话结束时 finishTransientRecording 以该基线收尾（显式成功不再降级回待确认）。
-  // 只有 已确认(completed) 可取消确认回到 待确认(recorded)。未录制/录制异常不可直接确认。
-  if (want && traj.recordStatus !== 'recorded' && traj.recordStatus !== 'recording') {
-    const err = new Error('Only a recorded (待确认) or recording (录制中) trajectory can be confirmed');
-    err.statusCode = 409;
-    throw err;
-  }
+  // 取消确认仍要求当前为已确认或录制中（录制中只改持久基线）。
   if (!want && traj.recordStatus !== 'completed' && traj.recordStatus !== 'recording') {
     const err = new Error('Only a completed (已确认) trajectory can cancel confirmation');
     err.statusCode = 409;
@@ -539,21 +531,12 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
   }
 
   if (want) {
-    if (traj.recordStatus === 'recording') {
-      // 录制中确认：record_status 保持 recording（前端仍显示录制中），
-      // 持久基线直接置为已确认，录制正常/异常/恢复结束时都不会丢失该确认。
-      await trajectoryDao.updateMeta(tid, {
-        persistentRecordStatus: 'completed',
-        isDone: true,
-        isSuccessful: true,
-      });
-    } else {
-      await trajectoryDao.setPersistentRecordStatus(tid, 'completed');
-      await trajectoryDao.updateMeta(tid, {
-        isDone: true,
-        isSuccessful: true,
-      });
-    }
+    // 用户触发人工确认：不校验当前态，双字段直接写成已确认。
+    await trajectoryDao.setPersistentRecordStatus(tid, 'completed');
+    await trajectoryDao.updateMeta(tid, {
+      isDone: true,
+      isSuccessful: true,
+    });
   } else if (traj.recordStatus === 'recording') {
     // 录制中取消确认：与录制中确认互为逆操作，持久基线回待确认，不打断录制
     await trajectoryDao.updateMeta(tid, {

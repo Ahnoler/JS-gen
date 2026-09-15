@@ -1,5 +1,6 @@
 # Agent 协作日志
 
+
 ## 2026-09-15 · OpenCode — 开工：AI 录制 fill_form_field 作用域异常修复
 
 - 进行中：修复执行机 `fill_form_field` 因函数内条件 import 遮蔽模块级 `err_with`，导致 `UnboundLocalError`、AI 录制中断并将轨迹置为 `failed` 的问题。
@@ -26,6 +27,38 @@
 - 范围：`src/cdp/inspect.js`、`src/cdp/inspect-payload-script.js`、`src/cdp/remote-bridge/cdp-input.js`、`scripts/manual_recorder/js_parts/a.py`、`scripts/manual_recorder/js_parts/b.py`、相关 characterization、本协作日志；不修改回放动作名及线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动、其他会话 WIP、引擎仓；不处理日期面板关闭之外的基础设施告警。
 - 方式：沿日期点击确认链路扩展 editor 双 input 快照与范围值归并，保留单日期行为，补充离线 pin/语法检查后提交。
+
+
+
+## 2026-09-15 15:26 · Cursor Lead — 收工：人工确认去掉状态闸（回链 15:13 / 14:49）
+
+- 完成：`confirmTrajectory` 用户确认路径不再校验状态，`setPersistentRecordStatus(completed)` 双字段直写；取消确认闸保留；pin + api-docs 同步
+- 验收：`node scripts/characterization/characterize-record-status.mjs` OK
+- 遗留：控制面需部署重启后 829 湿测；本提交不含菜单扫描 WIP
+
+## 2026-09-15 15:13 · Cursor Lead — 开工续：人工确认去掉状态闸（用户触发直接 completed）
+
+- 进行中：15:13；用户改要求——confirm 不再校验状态，直接置已确认（已由 15:26 收工闭环）
+- 范围：同 14:49（`trajectory-meta-service.js` / `characterize-record-status.mjs` / api-docs recording.js）
+- 禁入区：菜单扫描未提交改动、`config/`、`.cursor/`、取消确认路径语义不扩
+- 方式：红 pin（无确认闸 + want 无条件 setPersistentRecordStatus completed）→ 最小实现
+
+## 2026-09-15 14:49 · Cursor Lead — 开工：人工确认双字段闸（record_status OR persistent_record_status）
+
+- 进行中：14:49；已被 15:13 续条覆盖（不再做双字段闸，改为去闸直写 completed）
+
+## 2026-09-15 14:00 · Cursor Lead — 收工：菜单同 xpath 孪生清理（回链 13:44 开工）
+
+- 完成：`buildScanApplyPlan` 同 pass 按 parent+data-id / parent+xpath 去重 create；pin 2 条绿；`prune-same-xpath-menu-twins.mjs` 已对 systemId=1 `--apply`（drop 0362/0363/0461）；复跑 dry-run 无孪生
+- 验收：`node scripts/characterization/characterize-menu-scan.mjs` OK；合同管理现余异 RES 同名对（1540↔0360、1541↔0361）属 B，未动
+- 遗留：B 讨论（同名不同 data-id 是否合并/展示）；代码与本条目待用户确认后 commit
+
+## 2026-09-15 13:44 · Cursor Lead — 开工：菜单同 xpath 孪生清理（合同管理 A）
+
+- 进行中：13:44；用户选 A（清同 xpath 孪生 + 堵住 plan 内重复 create）；B 同名不同 RES 另议
+- 范围：`src/services/menu-scan-service.js`（`buildScanApplyPlan`）、`scripts/characterization/characterize-menu-scan.mjs`、`scripts/maintenance/prune-same-xpath-menu-twins.mjs`、本文件；MySQL systemId=1 孪生消重（--apply）
+- 禁入区：同名不同 data-id 合并策略（B）；radio/search-then-click/KB 他线；`.cursor/`
+- 方式：红 pin → 修 plan 去重 → 维护脚本 dry-run/apply；不自动合并异 RES 同名叶
 
 ## 2026-09-15 · OpenCode — 收工：AI 录制 picker 阶段完成判定修复（回链本次开工条目）
 

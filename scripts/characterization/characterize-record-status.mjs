@@ -280,6 +280,26 @@ function testWiringConfirmAndCasUsages() {
     '取消确认后同步持久基线 recorded（CAS recordStatusIn）');
 }
 
+function testWiringConfirmUnconditionalCompleted() {
+  const meta = readFileSync(join(root, 'src/services/trajectory/trajectory-meta-service.js'), 'utf8');
+  const start = meta.indexOf('export async function confirmTrajectory');
+  const next = meta.indexOf('\nexport ', start + 1);
+  const body = next === -1 ? meta.slice(start) : meta.slice(start, next);
+  assert.ok(body.length > 0, 'confirmTrajectory 函数体存在');
+  assert.doesNotMatch(body, /Only a recorded \(待确认\) or recording/,
+    'confirmed=true 不再按状态拒绝');
+  assert.doesNotMatch(body, /isHumanConfirmableRecordStatus/,
+    '确认路径不再走可确认状态 helper');
+  const wantStart = body.indexOf('if (want)');
+  const cancelStart = body.indexOf('} else if');
+  assert.ok(wantStart >= 0 && cancelStart > wantStart, 'confirmed=true 与取消确认分支可切分');
+  const wantBody = body.slice(wantStart, cancelStart);
+  assert.match(wantBody, /setPersistentRecordStatus\(tid, 'completed'\)/,
+    '用户确认无条件把双状态字段写成 completed');
+  assert.doesNotMatch(wantBody, /recordStatus === 'recording'/,
+    '确认写 completed 不再按录制中走仅改 persistent 的旁路');
+}
+
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
@@ -303,6 +323,7 @@ function main() {
     ['wiring: 双状态字段 record_status + persistent_record_status（getRecordStatusRow）', testWiringDualStatusFields],
     ['wiring: 调用链 显式结束→finishTransientRecording，非终结→restorePersistentRecordStatus', testWiringCallChains],
     ['wiring: 确认/取消确认 setPersistentRecordStatus + updateMetaIf CAS', testWiringConfirmAndCasUsages],
+    ['wiring: 人工确认无状态闸，直接 completed', testWiringConfirmUnconditionalCompleted],
   ];
   let failed = 0;
   for (const [name, fn] of tests) {
