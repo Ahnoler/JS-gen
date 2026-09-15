@@ -230,7 +230,10 @@ def _clear_phase_form_state(business_data_store: dict | None, *, mode: str, task
         return
     from ..search_then_click_guard import clear_stc_flags
 
-    for key in ('_query_ui', '_query_ready', '_submit_ready'):
+    for key in (
+        '_query_ui', '_query_ready', '_submit_ready',
+        '_phase_ai_operated_elements', '_phase_ai_operations',
+    ):
         business_data_store.pop(key, None)
     clear_stc_flags(business_data_store)
     clear_form = (

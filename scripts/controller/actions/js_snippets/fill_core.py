@@ -19,6 +19,19 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         t.dispatchEvent(new Event('change', {bubbles:true}));
         t.dispatchEvent(new Event('blur', {bubbles:true}));
     };
+    const fillDate = (target, raw) => {
+        const editor = target.closest('.el-date-editor, .tsscdatepicker');
+        const inputs = editor ? [...editor.querySelectorAll('input:not([type="hidden"])')] : [target];
+        const values = Array.isArray(raw) ? raw : String(raw == null ? '' : raw)
+            .split(/\\s*[,，]\\s*|\\s+-\\s+|\\s+至\\s+/).map(x => x.trim()).filter(Boolean);
+        const isRange = inputs.length > 1 || !!editor?.classList?.contains('el-range-editor');
+        if (isRange && values.length < 2) return 'err-date-range-value-required';
+        target.focus();
+        commitDateVue(target, isRange ? values : (values[0] || raw));
+        inputs.forEach((input, index) => setFn(input, isRange ? values[index] : (values[0] || raw)));
+        target.blur();
+        return 'ok-date';
+    };
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
     // Pass 1: exact label match
@@ -38,12 +51,10 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
             '.el-date-editor, .tsscdatepicker, .el-select, .my-popover, .tree-popover, .el-cascader'
         )) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
-            target.focus();
-            commitDateVue(target, val);
-            setFn(target, val);
-            target.blur();
+            const dateResult = fillDate(target, val);
+            if (!dateResult.startsWith('ok')) return dateResult;
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
-            return 'ok-date';
+            return dateResult;
         }
         setFn(target, val);
         return 'ok';
@@ -63,12 +74,10 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
             '.el-date-editor, .tsscdatepicker, .el-select, .my-popover, .tree-popover, .el-cascader'
         )) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
-            target.focus();
-            commitDateVue(target, val);
-            setFn(target, val);
-            target.blur();
+            const dateResult = fillDate(target, val);
+            if (!dateResult.startsWith('ok')) return dateResult;
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
-            return 'ok-date';
+            return dateResult;
         }
         setFn(target, val);
         return 'ok';
@@ -109,12 +118,10 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         if (!target) return '';
         if (isDisabled(target, item.querySelector('.el-select .el-input__inner'), item)) return '';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
-            target.focus();
-            commitDateVue(target, val);
-            setFn(target, val);
-            target.blur();
+            const dateResult = fillDate(target, val);
+            if (!dateResult.startsWith('ok')) return dateResult;
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
-            return 'ok-date';
+            return dateResult;
         }
         setFn(target, val);
         return 'ok';
@@ -283,11 +290,14 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
       const inp = target.querySelector && target.querySelector('input:not([type="hidden"])');
       if (inp) target = inp;
     }
-    commitDateVue(target, val);
     const dateVal = String(val == null ? '' : val);
     const rangeParts = dateVal.split(/\s*[,，]\s*|\s+-\s+|\s+至\s+/).filter(Boolean);
     const editor = target.closest && target.closest('.el-date-editor, .tsscdatepicker');
     const allDateInputs = editor ? Array.from(editor.querySelectorAll('input')) : [target];
+    const isRange = allDateInputs.length > 1 || !!(editor && editor.classList.contains('el-range-editor'));
+    if (isRange && rangeParts.length < 2) return 'err-date-range-value-required';
+    target.focus();
+    commitDateVue(target, isRange ? rangeParts : dateVal);
     allDateInputs.forEach((inp, idx) => {
       if (rangeParts.length > 1) {
         setFn(inp, rangeParts[idx] || rangeParts[0]);

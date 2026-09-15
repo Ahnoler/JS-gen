@@ -27,6 +27,10 @@ _QUERY_TASK_RE = re.compile(r'查询|搜索|查找')
 _QUERY_EXCLUDE_RE = re.compile(
     r'新增|创建|编辑|修改|保存|提交|删除|录入|校验|导入'
 )
+_QUERY_CONDITION_RE = re.compile(r'(?:查询|筛选)条件')
+_QUERY_CONDITION_HARD_EXCLUDE_RE = re.compile(
+    r'创建|编辑|修改|保存|提交|删除|校验|导入'
+)
 # Wizard / multi-step pages often say「客户名称搜索为…，点击下一步」— that is NOT
 # list-filter query (must not force「点查询 → done」).
 _WIZARD_NAV_RE = re.compile(r'下一步|上一步|进入下一步|点击下一步')
@@ -184,6 +188,12 @@ def is_query_task(task_text: str) -> bool:
     t = classification_task_text(task_text)
     if not _QUERY_TASK_RE.search(t):
         return False
+    if (
+        _QUERY_CONDITION_RE.search(t)
+        and not _QUERY_CONDITION_HARD_EXCLUDE_RE.search(t)
+        and not is_wizard_nav_task(t)
+    ):
+        return True
     if _QUERY_EXCLUDE_RE.search(t):
         return False
     if is_wizard_nav_task(t):

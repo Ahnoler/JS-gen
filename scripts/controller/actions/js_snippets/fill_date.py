@@ -158,7 +158,8 @@ JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
     } catch (e) {}
   };
   if (!xpath) return 'xpath-empty';
-  if (isNaN(new Date(val).getTime())) return 'invalid-date:' + val;
+  const rangeValues = Array.isArray(val) ? val : String(val == null ? '' : val).split(/\s*[,，]\s*|\s+-\s+|\s+至\s+/).map((part) => part.trim()).filter(Boolean);
+  if (!rangeValues.length || rangeValues.some((part) => isNaN(new Date(part).getTime()))) return 'invalid-date:' + val;
   let target = tryXpath(xpath, null);
   if (!target && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
     const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
@@ -173,11 +174,12 @@ JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
     const item = target.closest && target.closest('.el-form-item');
     (item || target).scrollIntoView({ block: 'center', behavior: 'instant' });
   } catch (e) {}
-  target.focus();
-  commitDateVue(target, val);
-  const rangeValues = String(val == null ? '' : val).split(/\s*[,，]\s*|\s+-\s+|\s+至\s+/).map((part) => part.trim()).filter(Boolean);
   const editor = target.closest?.('.el-date-editor, .tsscdatepicker');
   const dateInputs = editor ? Array.from(editor.querySelectorAll('input')) : [target];
+  const isRange = dateInputs.length > 1 || !!editor?.classList?.contains('el-range-editor');
+  if (isRange && rangeValues.length < 2) return 'err-date-range-value-required';
+  target.focus();
+  commitDateVue(target, isRange ? rangeValues : rangeValues[0]);
   dateInputs.forEach((input, index) => setFn(input, rangeValues.length > 1 ? (rangeValues[index] || rangeValues[0]) : val));
   target.blur();
   closePickerVm(target);

@@ -13,6 +13,10 @@ from playwright.async_api import async_playwright
 
 from scripts.manual_recorder.js import JS_MANUAL_RECORDER
 from scripts.manual_recorder.mapper import _map_dom_event_to_action
+from scripts.controller.actions._js_snippets import (  # noqa: E402
+    JS_FILL_BY_XPATH,
+    JS_FILL_FORM_FIELD,
+)
 
 
 HTML = """<!doctype html><html><body>
@@ -28,6 +32,10 @@ HTML = """<!doctype html><html><body>
 
 
 async def main() -> None:
+    assert "err-date-range-value-required" in JS_FILL_FORM_FIELD
+    assert "inputs.forEach" in JS_FILL_FORM_FIELD
+    assert "err-date-range-value-required" in JS_FILL_BY_XPATH
+    assert "rangeParts.length < 2" in JS_FILL_BY_XPATH
     captured: list[dict] = []
 
     async def capture(payload: dict) -> None:

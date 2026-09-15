@@ -179,6 +179,17 @@ def should_block_index_submit(
 
 def check_pending_write_gate(business_data_store: dict | None, section: str = "") -> tuple[bool, list[str]]:
     """Return (ok, pending_labels). Hard gate when refill / boundary requires write."""
+    # DOM truth wins over a failed reviewer/rules fallback. Query toolbars have no
+    # maintain-form "write every editable field then save" contract. Keep picker
+    # evidence gates intact: picker dialogs are also query UIs.
+    contract = get_phase_intent(business_data_store)
+    if (
+        business_data_store
+        and business_data_store.get('_query_ui')
+        and contract
+        and contract.get('mode') in ('create', 'modify')
+    ):
+        return True, []
     try:
         from .._phase_boundary import can_submit_writes, phase_boundary_active
         if phase_boundary_active(business_data_store):
@@ -223,6 +234,14 @@ def record_success_token(business_data_store: dict | None, kind: str, evidence: 
 
 def has_contract_success(business_data_store: dict | None) -> bool:
     """True when required success token for this phase is satisfied."""
+    c = get_phase_intent(business_data_store)
+    if (
+        business_data_store
+        and business_data_store.get('_query_ui')
+        and c
+        and c.get('mode') in ('create', 'modify')
+    ):
+        return True
     try:
         from .._phase_boundary import phase_boundary_active, phase_done_ok
         if phase_boundary_active(business_data_store):
@@ -230,7 +249,6 @@ def has_contract_success(business_data_store: dict | None) -> bool:
             return ok
     except Exception:
         pass
-    c = get_phase_intent(business_data_store)
     if not c:
         if business_data_store:
             return bool(business_data_store.get('_last_save_ok') or business_data_store.get('_last_introduce_ok'))

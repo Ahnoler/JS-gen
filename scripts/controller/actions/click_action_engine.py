@@ -144,6 +144,31 @@ class ClickEngine:
                 or getattr(element_node, 'xpath', None)
                 or ''
             )
+            click_identity = 'click:' + (gate_xp or f'{tag_name}:{elem_text}')
+            date_panel_click = False
+            if gate_xp:
+                try:
+                    date_panel_click = bool(await page.evaluate('''(xpath) => {
+                        try {
+                            const node = document.evaluate(
+                                xpath, document, null,
+                                XPathResult.FIRST_ORDERED_NODE_TYPE, null
+                            ).singleNodeValue;
+                            return !!(node && node.closest && node.closest(
+                                '.el-date-table, .el-month-table, .el-year-table, .el-time-panel'
+                            ));
+                        } catch (e) { return false; }
+                    }''', gate_xp))
+                except Exception:
+                    date_panel_click = False
+            if not date_panel_click:
+                from .phase.element_guard import duplicate_phase_operation
+                duplicate = duplicate_phase_operation(self.business_data_store, click_identity)
+                if duplicate:
+                    return _ok(
+                        f'already-operated-this-phase:index={index} via {duplicate}; '
+                        'do not click the same element again; verify state and call done when complete'
+                    )
             try:
                 dd_gate = await page.evaluate(
                     '''(xpath) => {
@@ -368,6 +393,11 @@ class ClickEngine:
             download_path = await self.browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')
+            if not date_panel_click:
+                from .phase.element_guard import remember_successful_phase_operation
+                remember_successful_phase_operation(
+                    self.business_data_store, click_identity, 'click_element_by_index',
+                )
             # Navigation detection for page-transitioning clicks (e.g. 客户转正 → new page).
             # If URL changed after the click, record a flag that recorder_emitters turns
             # into a [导航] HumanMessage cue — recorded step stays ok-clicked-N.

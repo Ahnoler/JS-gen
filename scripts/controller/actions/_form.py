@@ -15,6 +15,7 @@ from ._workspace import _workspace_result
 from ...models import TaskList
 from .form_rules import get_has_button_keywords
 from .form_scan_utils import _save_form_snapshot, _task_done_impl
+from .phase.element_guard import duplicate_element_action, remember_successful_element_action
 
 # 兼容 re-export（form-actions-split）：外部/characterization 仍从 _form 导入这些
 # form_scan_utils 符号；canonical 位置是 form_scan_utils，勿再新增。
@@ -69,9 +70,19 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
     async def match_form_rule(label_text: str):
         return await _fill_engine.match_form_rule(label_text)
 
-    @controller.action('Fill a form field using Element UI native DOM setter. Works for text inputs AND date pickers (commits Vue v-model, including TsscMultiDatePicker).')
+    @controller.action('Fill a form field using Element UI native DOM setter. Works for text inputs AND date pickers (commits Vue v-model, including TsscMultiDatePicker). For a date-range control, value MUST contain both start and end dates in one call, e.g. "2026-09-05 - 2026-09-30"; never fill only one endpoint.')
     async def fill_form_field(label_text: str, value: str, xpath_smart: str = ""):
-        return await _fill_engine.fill_form_field(label_text, value, xpath_smart)
+        duplicate = duplicate_element_action(business_data_store, label_text)
+        if duplicate:
+            return _ok(
+                f'already-operated-this-phase:{label_text} via {duplicate}; '
+                'do not repeat this field, verify if needed and call done when the phase goal is complete'
+            )
+        result = await _fill_engine.fill_form_field(label_text, value, xpath_smart)
+        remember_successful_element_action(
+            business_data_store, label_text, 'fill_form_field', result,
+        )
+        return result
 
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
@@ -158,7 +169,17 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str, xpath_smart: str = ""):
-        return await _select_engine.select_option(label_text, option_text, xpath_smart)
+        duplicate = duplicate_element_action(business_data_store, label_text)
+        if duplicate:
+            return _ok(
+                f'already-operated-this-phase:{label_text} via {duplicate}; '
+                'do not repeat this field, verify if needed and call done when the phase goal is complete'
+            )
+        result = await _select_engine.select_option(label_text, option_text, xpath_smart)
+        remember_successful_element_action(
+            business_data_store, label_text, 'select_option', result,
+        )
+        return result
 
     @controller.action('Click an adjacent button (选择/引入/上传) to fill a field, but only if the field is empty. Returns "already-filled" (non-ok skip) if field has value.')
     async def click_adjacent_button(label_text: str):
@@ -166,11 +187,31 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
 
     @controller.action('Click a radio option by label text and radio option text.')
     async def click_radio(label_text: str, option_text: str, xpath_smart: str = ""):
-        return await _radio_engine.click_radio(label_text, option_text, xpath_smart)
+        duplicate = duplicate_element_action(business_data_store, label_text)
+        if duplicate:
+            return _ok(
+                f'already-operated-this-phase:{label_text} via {duplicate}; '
+                'do not repeat this field, verify if needed and call done when the phase goal is complete'
+            )
+        result = await _radio_engine.click_radio(label_text, option_text, xpath_smart)
+        remember_successful_element_action(
+            business_data_store, label_text, 'click_radio', result,
+        )
+        return result
 
     @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover. If result starts with no-tree-component, do NOT retry — use fill_form_field with a concrete value (not "first") or select_option.')
     async def select_tree_option(label_text: str, option_text: str, xpath_smart: str = ""):
-        return await _tree_engine.select_tree_option(label_text, option_text, xpath_smart)
+        duplicate = duplicate_element_action(business_data_store, label_text)
+        if duplicate:
+            return _ok(
+                f'already-operated-this-phase:{label_text} via {duplicate}; '
+                'do not repeat this field, verify if needed and call done when the phase goal is complete'
+            )
+        result = await _tree_engine.select_tree_option(label_text, option_text, xpath_smart)
+        remember_successful_element_action(
+            business_data_store, label_text, 'select_tree_option', result,
+        )
+        return result
 
     @controller.action(
         'Directly write a Vue model field (label_text + field_name + value) by walking '
@@ -185,13 +226,23 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
         'with scan/check_field_value and verify the saved request body carries the value.'
     )
     async def set_vue_model(label_text: str, field_name: str, value: str):
+        duplicate = duplicate_element_action(business_data_store, label_text)
+        if duplicate:
+            return _ok(
+                f'already-operated-this-phase:{label_text} via {duplicate}; '
+                'do not rewrite this element through set_vue_model'
+            )
         page = await browser_context.get_current_page()
         result = await page.evaluate(JS_SET_VUE_MODEL, [label_text, field_name, value])
         # Vue re-render settling buffer after $forceUpdate.
         await page.wait_for_timeout(300)
         ok, payload = _workspace_result(result)
         if ok:
-            return _ok(payload)
+            action_result = _ok(payload)
+            remember_successful_element_action(
+                business_data_store, label_text, 'set_vue_model', action_result,
+            )
+            return action_result
         return payload
 
     # save_section 已移除：统一保存入口 click_save（分区保存 region=分区标题）。

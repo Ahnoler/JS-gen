@@ -124,6 +124,7 @@ run "characterize-export-v3-field-completeness" node scripts/characterization/ch
 run "characterize-xpath-three-sources" node scripts/characterization/characterize-xpath-three-sources.mjs
 run "characterize-manual-radio-fill" "$PY" scripts/characterization/cold/characterize-manual-radio-fill.py
 run "characterize-date-range-recording" "$PY" scripts/characterization/cold/characterize-date-range-recording.py
+run "characterize-ai-phase-element-guard" "$PY" scripts/characterization/cold/characterize-ai-phase-element-guard.py
 run "characterize-fill-dispatch" "$PY" scripts/characterization/cold/characterize-fill-dispatch.py
 run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/characterize-search-then-click-guard.py
 run "characterize-search-then-click-prompts" "$PY" scripts/characterization/cold/characterize-search-then-click-prompts.py
