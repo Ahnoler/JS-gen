@@ -1,6 +1,12 @@
 # Agent 协作日志
 
 
+## 2026-09-15 18:05 · Cursor Automation — 收工：2026-09-14 北京时间工作日报归档
+
+- 完成：`docs/report/2026-09-14.md` + `docs/report/README.md` 索引行（**c872530b**）；统计窗口 09-14 00:00–24:00，24 条提交
+- 验收：git log 作者日过滤与 agent-log 09-14 收工/开工条目交叉核对；遗留对照 09-13 日报
+- 遗留移交：785/827/828 部署湿测、fill 活页面湿测、他仓 click 真机终验等见日报遗留表
+
 ## 2026-09-15 18:03 · Cursor Automation — 开工：2026-09-14 北京时间 cron 日报生成
 
 - 范围：仅 `docs/report/2026-09-14.md`、`docs/report/README.md`、`docs/superpowers/agent-log.md`（本条目）
