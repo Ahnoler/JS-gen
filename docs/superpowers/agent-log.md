@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 收工：修复 AI 录制推流重连风暴（回链本次开工条目）
+
+- 完成：前端仓提交 **2d385f2**；修复 `ensureStream` 每次入口重置自动重连计数的问题，重连失败恢复指数退避；当 `live/status` 已返回 `attached:true` 时只重建 WS 订阅/推流，不重复调用 `attach-live`，避免轨迹 835 类型的请求风暴和状态来回跳转。
+- 验收：前端相关文件 `vue-tsc --noEmit` 错误筛选无新增错误，`git diff --check` 通过；前端既有 `vite.config.ts` 未触碰。主仓本任务未修改业务代码。
+- 遗留移交：需部署前端后观察相同轨迹，预期 `live/status` 不再每秒循环、`attach-live` 仅在后端明确未附着时调用；若仍无首帧，需提供 `/ws` 的 `remote:status`、RSCF 帧序号和后端 `[remote-bridge] viewer notification failed` 日志。
+
 ## 2026-09-15 · OpenCode — 开工：修复 AI 录制推流重连风暴
 
 - 进行中：修复前端自动重连计数被每次 `ensureStream` 清零、导致持续高频请求 `live/status` 与 `attach-live`，并完善 BiB 重挂载冷却及新帧状态判断。
