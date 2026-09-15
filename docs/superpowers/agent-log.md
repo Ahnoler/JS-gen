@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 开工续：修正 picker 提示为按实际动作拆分
+
+- 进行中：撤销普通 picker 固定“四步”表述，改为要求按具体场景真实发生的有效操作逐步记录；仅明确需要原子化的日期、下拉、树形搜索等控件继续使用组合动作。
+- 范围：`scripts/prompts/agent-tools-common.md`、`scripts/prompts/agent-tools-form.md`、相关 characterization、本协作日志；不改变已完成的原子步骤采集实现和历史组合动作兼容。
+- 禁入区：`src/services/trajectory/trajectory-meta-service.js`、前端仓、`config/`、线上数据、其他会话 WIP；保留日志中他会话未提交修改。
+- 方式：最小修改提示词和契约断言，运行定向 characterization、编译与 diff 检查后提交。
+
 ## 2026-09-15 · OpenCode — 收工：修复 AI 录制选择客户弹窗步骤缺失（回链本次开工条目）
 
 - 完成：提交待写入；`picker_dialog_query` 返回并落库查询字段 `fill_form_field` 与查询按钮原子步骤，`picker_dialog_select` 返回并落库选行 `click_table_row_radio` 与确认按钮原子步骤；保留旧返回格式下的组合动作兜底，阶段完成证据与回放协议不变。
@@ -21,8 +28,8 @@
 
 ## 2026-09-15 · OpenCode — 收工：修复关闭浏览器后重新准备无法恢复推流（回链本次开工条目）
 
-- 完成：前端仓提交 **57bea6d**；prepare 完成和 `preparing` 收尾均能确定性触发 `ensureStream`，重新 prepare 前清除旧 `userDetached` 门闩；按 `sessionId` 忽略同轨迹旧会话延迟状态，避免旧事件把新会话重置为“浏览器已关闭”。
-- 验收：前端 `npx vue-tsc --noEmit` 通过；`git diff --check` 通过；前端既有 `vite.config.ts`（localhost 配置）未纳入提交；主仓声明提交 **2ff33e30**。
+- 完成：前端仓提交 **57bea6d**、**099f918**；prepare 完成和 `preparing` 收尾均能确定性触发 `ensureStream`，重新 prepare 前清除旧 `userDetached` 门闩；按 `sessionId` 忽略同轨迹旧会话延迟状态和 `recording:detached`，避免旧事件把新会话重置为“浏览器已关闭”。
+- 验收：前端 `npx vue-tsc --noEmit` 通过；`git diff --check` 通过；主仓相关 JS `node --check` 通过；前端既有 `vite.config.ts`（localhost 配置）未纳入提交；主仓声明提交 **2ff33e30**。
 - 遗留移交：需部署前端并重启/部署已提交的主仓 73b72e02 后，用轨迹 834 或新轨迹实测关闭浏览器→重新准备；观察 `/ws`、`attach-live`、RSCF 首帧及请求频率。当前无法连接线上执行机，未完成湿测。
 
 ## 2026-09-15 · OpenCode — 开工：修复录制界面关闭浏览器后重新准备无法恢复推流
