@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 15:00 · OpenCode — 开工：AI 录制阶段续跑与日期查询可靠性优化
+
+- 进行中：修复阶段 `done()` 已接受后仍因后续阶段引入字段触发预算续跑；增强日期范围逗号格式、双端输入与回读；修复网络捕获异步响应头未 await 告警。
+- 范围：`scripts/agent/service.py`、`scripts/controller/actions/network_capture.py`、`scripts/controller/actions/js_snippets/fill_date.py`、`fill_core.py`、日期字段回读相关 snippet、对应 characterization、`scripts/refactor/verify-all.sh`、本协作日志。
+- 禁入区：线上轨迹与 SUT 数据、`src/services/trajectory/trajectory-meta-service.js`、CDP/手工录制日期范围已提交链及其他会话 WIP；不猜测或修改 SUT 接口契约。
+- 方式：以用户执行日志为表征，先锁定 done 后不续跑，再统一范围值解析/双 input 写入及回读，最后异步化 network capture 过滤；运行定向 characterization、编译/语法检查、lint 与综合门禁后分步提交。
+
 ## 2026-09-15 · OpenCode — 收工：日期范围字段录制优化（回链本次开工条目）
 
 - 完成：日期编辑器快照与手工录制 blur/change 均读取全部 input，日期范围最终写成完整 `开始日期 - 结束日期` 的 `fill_date`；CDP 日期点击确认按范围值归属；日期回放解析范围并向 Vue model/两个 input 提交数组与双值。
