@@ -57,10 +57,18 @@ def test_table_row_identity_helper_mentions_dialog() -> None:
     assert_true("function tableRowIdentityText" in src, "tableRowIdentityText present")
 
 
+def test_ai_index_click_preserves_table_radio_action() -> None:
+    src = (ROOT / "scripts/controller/actions/click_action_engine.py").read_text(encoding="utf-8")
+    assert_true("table_radio_info" in src, "AI click path must inspect table radio rows")
+    assert_true("'click_table_row_radio'" in src, "AI click path must record table radio")
+    assert_true("element_info['target_kind'] = 'table_row_radio'" in src, "row kind must be durable")
+
+
 def main() -> int:
     test_mapper_accepts_table_row_radio()
     test_manual_js_does_not_silent_drop_empty_row()
     test_table_row_identity_helper_mentions_dialog()
+    test_ai_index_click_preserves_table_radio_action()
     print("characterize-manual-table-radio: OK")
     return 0
 

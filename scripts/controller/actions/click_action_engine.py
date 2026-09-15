@@ -193,6 +193,42 @@ class ClickEngine:
                     sys.stderr.write("[click] search-then-click tree gate failed index={index!r}" + '\n')
                     sys.stderr.flush()
 
+            # Preserve table-row selection semantics before the click mutates the
+            # Element UI radio model. Generic DOM clicks otherwise lose the
+            # durable row identity and are recorded as click_element_by_index.
+            table_radio_info = {}
+            if gate_xp:
+                try:
+                    table_radio_info = await page.evaluate('''(xpath) => {
+                        let node = null;
+                        try {
+                            node = document.evaluate(
+                                xpath, document, null,
+                                XPathResult.FIRST_ORDERED_NODE_TYPE, null
+                            ).singleNodeValue;
+                        } catch (e) {}
+                        if (!node || !node.closest) return {};
+                        const row = node.closest('tr.el-table__row, .el-table__row, tr');
+                        if (!row || !row.closest('.el-table')) return {};
+                        const radio = row.querySelector(
+                            '.el-radio, .el-radio-button, .el-checkbox, input[type="radio"], input[type="checkbox"]'
+                        );
+                        if (!radio) return {};
+                        const cells = [...row.querySelectorAll('td, .el-table__cell')]
+                            .map((cell) => (cell.innerText || cell.textContent || '')
+                                .replace(/\\s+/g, ' ').trim())
+                            .filter((text) => text && text !== 'radio' && text !== 'checkbox');
+                        return {
+                            isRadio: !!node.closest(
+                                '.el-radio, .el-radio-button, .el-checkbox, input[type="radio"], input[type="checkbox"]'
+                            ),
+                            rowText: cells.find((text) => text.length >= 2) ||
+                                (row.innerText || row.textContent || '').replace(/\\s+/g, ' ').trim(),
+                        };
+                    }''', gate_xp) or {}
+                except Exception:
+                    table_radio_info = {}
+
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
             # select→修改→确认 loops after premature done() rejection.
             # Exception: customer-magnifier / query-toolbar pickers — allow 确认.
@@ -360,6 +396,22 @@ class ClickEngine:
                 )
                 form_label = str((element_info or {}).get('formLabel') or '').strip()
                 tree_opt = (elem_text or '').strip()
+                table_row_text = str(
+                    (element_info or {}).get('row_text')
+                    or (element_info or {}).get('rowText')
+                    or elem_text
+                    or ''
+                ).strip()
+                is_table_row_radio = (
+                    (element_info or {}).get('target_kind') == 'table_row_radio'
+                    or bool(table_radio_info.get('isRadio'))
+                    or 'table_row_radio' in raw_xp
+                    or 'el-radio' in raw_cls
+                    or 'el-checkbox' in raw_cls
+                ) and bool(table_row_text)
+                if isinstance(table_radio_info, dict) and table_radio_info.get('rowText'):
+                    table_row_text = str(table_radio_info['rowText']).strip()[:160]
+                    is_table_row_radio = bool(table_radio_info.get('isRadio'))
                 if (
                     is_tree_node_click
                     and (element_info or {}).get('target_kind') == 'form_tree_select'
@@ -374,6 +426,17 @@ class ClickEngine:
                     _state._record_action(
                         'select_tree_option',
                         {'label_text': form_label, 'option_text': tree_opt},
+                        f'ok-clicked-{index}',
+                        element=element_info,
+                    )
+                elif is_table_row_radio:
+                    if element_info is not None:
+                        element_info = dict(element_info)
+                        element_info['row_text'] = table_row_text[:160]
+                        element_info['target_kind'] = 'table_row_radio'
+                    _state._record_action(
+                        'click_table_row_radio',
+                        {'row_text': table_row_text[:160]},
                         f'ok-clicked-{index}',
                         element=element_info,
                     )

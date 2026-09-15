@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 收工：恢复 picker 表格选行录制语义（回链本次开工条目）
+
+- 完成：AI `click_element_by_index` 在点击前识别位于 el-table 行内的 radio/checkbox，提取行文本并记录为 `click_table_row_radio`，不再退化为普通点击；已完成的搜索输入、查询点击、确认点击原子记录逻辑未修改。
+- 验收：`characterize-manual-table-radio.py`、`characterize-picker-atomic-recording.py`、`characterize-manual-dialog-scope.py`、`characterize-manual-radio-fill.py`、Python 编译和 `git diff --check` 通过。
+- 遗留移交：需真实执行机湿测不同表格（普通 radio、fixed column、checkbox）确认行文本提取和回放语义；未触碰直属 Python 中文注释任务的工作区 WIP。
+
 ## 2026-09-15 · OpenCode — 开工：恢复 picker 表格选行录制语义
 
 - 进行中：修复选择器表格 radio/选行被映射成普通 `click_element_by_index` 的回退问题；保持已完成的搜索输入、查询点击、确认点击原子步骤不变。
