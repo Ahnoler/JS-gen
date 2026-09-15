@@ -7,6 +7,12 @@
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动、前端仓及 `config/`、线上轨迹与 SUT 数据、其他会话已声明工作区；不改变回放动作协议或无关录制基础设施。
 - 方式：先以现有 characterization 和代码路径定位“动作未采集”与“组合动作隐式完成”的边界，再补录制证据/步骤持久化的最小修复，运行定向 characterization、语法检查、`git diff --check` 与必要综合门禁后提交。
 
+## 2026-09-15 · OpenCode — 开工：修复录制界面关闭浏览器后重新准备无法恢复推流
+
+- 进行中：处理轨迹 834 在关闭浏览器后重新准备时，前端持续显示“浏览器已关闭/正在附着”并重复轮询的问题；确保 prepare 完成后必定触发一次附着，并隔离旧会话的异步状态。
+- 范围：前端仓 `src/views/ui-recording/detail/components/RemoteBrowser.vue`、`src/composables/useRemoteCanvas.ts`；主仓仅更新本协作日志；不修改 `vite.config.ts` 既有 WIP、线上数据及其他会话文件。
+- 方式：先补充 prepare 完成触发附着与 session/trajectory 路由校验，再运行前端 TypeScript 检查、diff 检查并提交。
+
 ## 2026-09-15 · OpenCode — 收工：修复 AI 录制推流重连风暴（回链本次开工条目）
 
 - 完成：前端仓提交 **2d385f2**；修复 `ensureStream` 每次入口重置自动重连计数的问题，重连失败恢复指数退避；当 `live/status` 已返回 `attached:true` 时只重建 WS 订阅/推流，不重复调用 `attach-live`，避免轨迹 835 类型的请求风暴和状态来回跳转。
