@@ -204,6 +204,13 @@ ${PAGE_LOCATOR_HELPERS}
     return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
   }
 
+  function dateEditorValue(editor) {
+    if (!editor) return '';
+    const values = Array.from(editor.querySelectorAll('input'))
+      .map((input) => String(input.value || '').trim()).filter(Boolean);
+    return values.length > 1 ? values.join(' - ') : (values[0] || '');
+  }
+
   function elMeta(node, textOverride, kindHint) {
     const t = textOverride != null ? String(textOverride) : shortLabel(node);
     const bu = buXPathOf(node);

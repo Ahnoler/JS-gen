@@ -131,6 +131,13 @@ JS_MANUAL_PART_A = r'''(() => {
     return { label: formItemLabel(editor), editor: editor, input: editor.querySelector('input') };
   }
 
+  function dateEditorValue(editor) {
+    if (!editor) return '';
+    const values = Array.from(editor.querySelectorAll('input'))
+      .map((input) => String(input.value || '').trim()).filter(Boolean);
+    return values.length > 1 ? values.join(' - ') : (values[0] || '');
+  }
+
   function dateValueFromPickerCell(cell) {
     const td = cell.closest ? cell.closest('td') : cell;
     if (!td || !td.closest) return '';

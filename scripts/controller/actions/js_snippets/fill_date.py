@@ -23,6 +23,10 @@ JS_COMMIT_DATE_VUE_BODY = r'''
         return s;
       };
       try {
+        const rawValues = Array.isArray(val) ? val : String(val == null ? '' : val)
+          .split(/\s+-\s+|\s+至\s+/).map((part) => part.trim()).filter(Boolean);
+        const isRange = rawValues.length > 1;
+        const out = isRange ? rawValues.map((part) => emitValOf(null, part)) : emitValOf(null, rawValues[0] || val);
         const w = target.closest && target.closest('.el-date-editor, .tsscdatepicker');
         let vm = (w && w.__vue__) || target.__vue__;
         let guard = 0;
@@ -31,12 +35,13 @@ JS_COMMIT_DATE_VUE_BODY = r'''
           guard += 1;
         }
         if (vm && isDateVm(vm)) {
-          const out = emitValOf(vm, val);
-          vm.value = out;
-          vm.$emit('input', out);
-          vm.$emit('change', out);
-          try { vm.date = new Date(val); } catch (e) {}
-          try { vm.$emit('pick', new Date(val)); } catch (e) {}
+          const committed = isRange ? rawValues.map((part) => emitValOf(vm, part)) : emitValOf(vm, rawValues[0] || val);
+          const emitted = isRange ? committed : out;
+          vm.value = emitted;
+          vm.$emit('input', emitted);
+          vm.$emit('change', emitted);
+          try { vm.date = new Date(rawValues[0] || val); } catch (e) {}
+          try { vm.$emit('pick', new Date(rawValues[isRange ? 1 : 0] || val)); } catch (e) {}
         }
         const item = target.closest && target.closest('.el-form-item');
         let fivm = item && item.__vue__;
@@ -53,11 +58,11 @@ JS_COMMIT_DATE_VUE_BODY = r'''
             cur = cur[parts[i]];
           }
           const key = parts[parts.length - 1];
-          let modelVal = String(val == null ? '' : val).trim();
+          let modelVal = isRange ? (vm && isDateVm(vm) ? (vm.value) : out) : String(val == null ? '' : val).trim();
           const existing = cur[key];
-          if (typeof existing === 'string' && / 00:00:00$/.test(existing) && /^\d{4}-\d{2}-\d{2}$/.test(modelVal)) {
+          if (!isRange && typeof existing === 'string' && / 00:00:00$/.test(existing) && /^\d{4}-\d{2}-\d{2}$/.test(modelVal)) {
             modelVal = modelVal + ' 00:00:00';
-          } else if (vm && isDateVm(vm)) {
+          } else if (!isRange && vm && isDateVm(vm)) {
             modelVal = emitValOf(vm, val);
           }
           cur[key] = modelVal;
@@ -170,7 +175,10 @@ JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
   } catch (e) {}
   target.focus();
   commitDateVue(target, val);
-  setFn(target, val);
+  const rangeValues = String(val == null ? '' : val).split(/\s+-\s+|\s+至\s+/).map((part) => part.trim()).filter(Boolean);
+  const editor = target.closest?.('.el-date-editor, .tsscdatepicker');
+  const dateInputs = editor ? Array.from(editor.querySelectorAll('input')) : [target];
+  dateInputs.forEach((input, index) => setFn(input, rangeValues.length > 1 ? (rangeValues[index] || rangeValues[0]) : val));
   target.blur();
   closePickerVm(target);
   document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x => {

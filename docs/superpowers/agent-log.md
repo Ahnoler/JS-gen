@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 收工：日期范围字段录制优化（回链本次开工条目）
+
+- 完成：日期编辑器快照与手工录制 blur/change 均读取全部 input，日期范围最终写成完整 `开始日期 - 结束日期` 的 `fill_date`；CDP 日期点击确认按范围值归属；日期回放解析范围并向 Vue model/两个 input 提交数组与双值。
+- 验收：`characterize-date-range-recording.py`、`characterize-manual-radio-fill.py`、`characterize-manual-dialog-scope.py`、`characterize-manual-table-radio.py`、`characterize-xpath-fill-select.py`、`characterize-trajectory.mjs`、Node/Python syntax check、定向 ESLint、`git diff --check` 均通过；新日期范围冷测已注册 `verify-all`。
+- 遗留移交：尚未使用远程执行机在真实 SUT 上湿测；需要部署 control plane/executor 后验证 Element UI daterange 与 Tssc 日期组件的实际 DOM/model 回填。
+
 ## 2026-09-15 · OpenCode — 开工：日期范围字段录制优化
 
 - 进行中：修复日期范围控件录制只读取第一个 input、结束日期丢失的问题；让 CDP/BiB 与手工录制在范围提交后产出完整双日期 `fill_date`。

@@ -230,12 +230,14 @@ export async function snapshotDateEditorValues(client) {
         const eds = document.querySelectorAll('.el-date-editor');
         for (const ed of eds) {
           if (ed.offsetParent === null) continue;
-          const input = ed.querySelector('input');
+          const inputs = Array.from(ed.querySelectorAll('input'));
+          const input = inputs[0];
           const label = formItemLabel(ed);
           if (!label && !input) continue;
+          const values = inputs.map((item) => String(item.value || '').trim()).filter(Boolean);
           out.push({
             label: label,
-            value: String((input && input.value) || '').trim(),
+            value: values.length > 1 ? values.join(' - ') : (values[0] || ''),
             xpath: xpathOf(input || ed),
             active: !!(ed.classList.contains('is-active')
               || (input && input.getAttribute('aria-expanded') === 'true')
@@ -345,7 +347,9 @@ export async function resolveCommittedDateFillPayload(client, hint = null, befor
           }
         }
         if (!editor && hintValue) {
-          const matches = pool.filter((ed) => String((ed.querySelector('input') || {}).value || '').trim() === hintValue);
+           const matches = pool.filter((ed) => Array.from(ed.querySelectorAll('input'))
+             .map((item) => String(item.value || '').trim()).filter(Boolean)
+             .join(' - ') === hintValue);
           if (matches.length === 1) editor = matches[0];
           else if (hintLabel) editor = matches.find((ed) => formItemLabel(ed) === hintLabel) || null;
         }
@@ -361,8 +365,10 @@ export async function resolveCommittedDateFillPayload(client, hint = null, befor
         }
         if (!editor) return null;
         try { window.__jsgenActiveDateEditor = editor; } catch (e) {}
-        const input = editor.querySelector('input');
-        const value = String((input && input.value) || hintValue || '').trim();
+        const inputs = Array.from(editor.querySelectorAll('input'));
+        const input = inputs[0];
+        const values = inputs.map((item) => String(item.value || '').trim()).filter(Boolean);
+        const value = values.length > 1 ? values.join(' - ') : (values[0] || hintValue || '').trim();
         const label = formItemLabel(editor) || hintLabel;
         if (!value || !label) return null;
         return {

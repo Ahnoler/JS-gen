@@ -179,14 +179,14 @@ JS_MANUAL_PART_B = r'''
       const built = dateValueFromPickerCell(dateTd);
       const before = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null).map((ed) => {
         const input = ed.querySelector('input');
-        return { label: formItemLabel(ed), value: String((input && input.value) || '').trim() };
+        return { label: formItemLabel(ed), value: dateEditorValue(ed) };
       });
       openDateEditorMeta();
       // Defer: detect which date field changed (multi-date forms); also covers year/month arrow focus loss
       setTimeout(() => {
         const after = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null).map((ed) => {
           const input = ed.querySelector('input');
-          return { label: formItemLabel(ed), value: String((input && input.value) || '').trim(), input: input, ed: ed };
+          return { label: formItemLabel(ed), value: dateEditorValue(ed), input: input, ed: ed };
         });
         const beforeMap = {};
         for (const b of before) beforeMap[b.label] = b.value;
@@ -197,7 +197,7 @@ JS_MANUAL_PART_B = r'''
         if (!pick && changed.length > 1) pick = changed[changed.length - 1];
         if (!pick) {
           const meta = openDateEditorMeta();
-          const value = String((meta.input && meta.input.value) || built || '').trim();
+          const value = dateEditorValue(meta.editor) || built || '';
           const label = (meta.label || '').trim();
           if (value && label) pick = { label: label, value: value, input: meta.input };
         }
@@ -446,9 +446,10 @@ JS_MANUAL_PART_B = r'''
     // Date: prefer calendar pick recording; only emit typed non-empty values.
     // TODO(date-leave-backup): blur/change 到其他字段时，若日期 input 已有非空值则补录
     // fill_date（与 src/cdp/inspect.js resolveFocusedFillPayload 同需求）。选天主路径够用前不实现。
-    const isDate = !!el.closest('.el-date-editor');
+    const dateEditor = el.closest('.el-date-editor');
+    const isDate = !!dateEditor;
     const label = formItemLabel(el);
-    const value = el.value || '';
+    const value = isDate ? dateEditorValue(dateEditor) : (el.value || '');
     if (!String(value).trim()) return;
     const kind = isDate ? 'fill_date' : 'fill';
     // 统一：xpath 抓取复用自动算法（elMeta → buildLocatorSnap → formFieldXpathSmartOf，与
