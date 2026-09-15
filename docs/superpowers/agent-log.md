@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 开工：AI 录制推流可靠性前四项优化
+
+- 进行中：修复 BiB 观看人数通知失败、BiB 首次失败后不重试、已有 runtime 的 attach 不重挂流，以及前端将 HTTP/attached/缓存帧误判为可用推流的问题。
+- 范围：主仓 `src/cdp/remote-bridge/ws-router.js`、`src/services/trajectory/trajectory-attach-runner.js`、`src/services/trajectory/trajectory-attach-service.js`、相关 characterization 与本日志；前端仓 `D:\DevWorkspace\github\ui-auto-recording-agent-vue\vue-project\src\views\ui-recording\detail\components\RemoteBrowser.vue`、`src\composables\useRemoteCanvas.ts` 及相关类型/测试。
+- 禁入区：主仓 `src/services/trajectory/trajectory-meta-service.js` 用户改动、线上轨迹/数据库、其他会话 WIP；前端仓 `vite.config.ts` 既有未提交改动及未明确相关文件；不修改部署配置和线上数据。
+- 方式：先修复确定性路由/生命周期问题，再增加首帧新鲜度门控；运行主仓定向 characterization/语法检查与前端 `npm run build`，分别提交并回报部署复测要求。
+
 
 ## 2026-09-15 · OpenCode — 开工：AI 录制 fill_form_field 作用域异常修复
 
