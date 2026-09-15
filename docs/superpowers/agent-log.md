@@ -13,6 +13,12 @@
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动、前端仓及 `config/`、线上轨迹与 SUT 数据、其他会话已声明工作区；不改变回放动作协议或无关录制基础设施。
 - 方式：先以现有 characterization 和代码路径定位“动作未采集”与“组合动作隐式完成”的边界，再补录制证据/步骤持久化的最小修复，运行定向 characterization、语法检查、`git diff --check` 与必要综合门禁后提交。
 
+## 2026-09-15 · OpenCode — 收工续：普通 picker 改为独立动作链（回链本次开工条目）
+
+- 完成：普通选择器流程提示词改为 `fill_form_field` → `click_button("查询")` → `click_table_row_radio` → `click_button("确认")`；`picker_dialog_query` / `picker_dialog_select` 标记为 legacy specialized，仅供明确特殊组合场景和历史轨迹兼容。前序组合工具原子步骤落库修复一并保留。
+- 验收：`characterize-picker-atomic-recording.py`、`characterize-introduce-dialog-close.py`、`characterize-phase-boundary.py` 均通过；Python 编译和 `git diff --check` 通过。完整 `verify-all.sh` 仍因当前环境没有 `bash` 未执行。
+- 遗留移交：部署重启 control plane/executor 后，用真实“客户名称 → 选择客户”流程确认四个独立步骤均落库并按步骤回放；日期/下拉/树形等专用组合动作保持原路径。
+
 ## 2026-09-15 · OpenCode — 收工：修复关闭浏览器后重新准备无法恢复推流（回链本次开工条目）
 
 - 完成：前端仓提交 **57bea6d**；prepare 完成和 `preparing` 收尾均能确定性触发 `ensureStream`，重新 prepare 前清除旧 `userDetached` 门闩；按 `sessionId` 忽略同轨迹旧会话延迟状态，避免旧事件把新会话重置为“浏览器已关闭”。

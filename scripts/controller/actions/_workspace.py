@@ -59,6 +59,21 @@ def _record_picker_select_evidence(business_data_store, payload_dict):
         )
 
 
+def _record_picker_atomic_actions(recorded_actions):
+    """Persist the concrete DOM operations performed by a picker helper."""
+    if not isinstance(recorded_actions, list):
+        return
+    for item in recorded_actions:
+        if not isinstance(item, dict) or not item.get('action'):
+            continue
+        _record_action(
+            str(item['action']),
+            item.get('params') if isinstance(item.get('params'), dict) else {},
+            'ok-picker-atomic',
+            element=item.get('element') if isinstance(item.get('element'), dict) else None,
+        )
+
+
 def _register_workspace_actions(controller, browser_context, business_data_store=None):
     @controller.action(
         'Read the business date (营业日期) that drives date-field defaults in the '
@@ -77,9 +92,10 @@ def _register_workspace_actions(controller, browser_context, business_data_store
         return payload
 
     @controller.action(
-        'Fill query fields and click 查询 inside an el-dialog picker dialog '
-        '(e.g. 选择对公授信客户). fields_json is a JSON array string like '
-        '[{"label":"客户编号","value":"260831"}]. Returns row_count and the first 5 row texts.'
+        'LEGACY specialized picker helper. Do not use for ordinary customer/table '
+        'searches: record those as separate fill_form_field and click_button actions. '
+        'Only use when a task explicitly requires an atomic custom picker workflow. '
+        'Fills query fields and clicks 查询 inside an el-dialog picker dialog.'
     )
     async def picker_dialog_query(dialog_name: str, fields_json: str):
         try:
@@ -94,14 +110,23 @@ def _register_workspace_actions(controller, browser_context, business_data_store
         await page.wait_for_timeout(WAIT_800_MS)
         ok, payload = _workspace_result(result)
         if ok:
-            _record_action('picker_dialog_query', {'dialog_name': dialog_name, 'fields': fields}, payload)
+            try:
+                payload_dict = json.loads(payload[3:]) if payload.startswith('ok:') else {}
+            except Exception:
+                payload_dict = {}
+            atomic = payload_dict.get('recorded_actions')
+            if atomic:
+                _record_picker_atomic_actions(atomic)
+            else:
+                _record_action('picker_dialog_query', {'dialog_name': dialog_name, 'fields': fields}, payload)
             return _ok(payload)
         return payload
 
     @controller.action(
-        'Select the row whose text contains row_text in an el-dialog picker dialog, '
-        'click its radio, then click the confirm button. Returns the underlying-page '
-        'form fields (label→value) that changed after confirmation.'
+        'LEGACY specialized picker helper. Do not use for ordinary customer/table '
+        'selection: record click_table_row_radio and click_button("确认") separately. '
+        'Only use when a task explicitly requires an atomic custom picker workflow. '
+        'Selects a row, clicks confirm, and verifies underlying form backfill.'
     )
     async def picker_dialog_select(dialog_name: str, row_text: str):
         page = await browser_context.get_current_page()
@@ -128,10 +153,12 @@ def _register_workspace_actions(controller, browser_context, business_data_store
                     except Exception:
                         payload_dict2 = {}
                     if payload_dict2.get('refill_verified') is not False:
+                        _record_picker_atomic_actions(payload_dict2.get('recorded_actions'))
                         _record_picker_select_evidence(
                             business_data_store, payload_dict2
                         )
-                        _record_action('picker_dialog_select', {'dialog_name': dialog_name, 'row_text': row_text}, payload2)
+                        if not payload_dict2.get('recorded_actions'):
+                            _record_action('picker_dialog_select', {'dialog_name': dialog_name, 'row_text': row_text}, payload2)
                         return _ok(payload2)
                 return _err(
                     'err-refill-not-verified: 回填未观察 | dialog=%s row=%s | '
@@ -141,7 +168,9 @@ def _register_workspace_actions(controller, browser_context, business_data_store
             _record_picker_select_evidence(
                 business_data_store, payload_dict
             )
-            _record_action('picker_dialog_select', {'dialog_name': dialog_name, 'row_text': row_text}, payload)
+            _record_picker_atomic_actions(payload_dict.get('recorded_actions'))
+            if not payload_dict.get('recorded_actions'):
+                _record_action('picker_dialog_select', {'dialog_name': dialog_name, 'row_text': row_text}, payload)
             return _ok(payload)
         return payload
 

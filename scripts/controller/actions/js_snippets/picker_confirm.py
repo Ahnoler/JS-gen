@@ -81,10 +81,34 @@ _JS_PICKER_HELPERS = '''    const norm = (s) => String(s == null ? '' : s).repla
         for (const btn of dialog.querySelectorAll('button')) {
             if (btn.offsetParent === null || btn.disabled) continue;
             const t = norm(btn.textContent).replace(/\\s+/g, '');
-            if (t.indexOf(token) !== -1) { btn.click(); return true; }
+            if (t.indexOf(token) !== -1) { btn.click(); return btn; }
         }
-        return false;
-    };'''
+        return null;
+    };
+    const xpathOf = (node) => {
+        if (!node || node.nodeType !== 1) return '';
+        if (node.id) return '//*[@id="' + node.id + '"]';
+        const parts = [];
+        let cur = node;
+        while (cur && cur.nodeType === 1 && cur !== document.body) {
+            let ix = 1;
+            for (let sib = cur.previousElementSibling; sib; sib = sib.previousElementSibling) {
+                if (sib.tagName === cur.tagName) ix++;
+            }
+            parts.unshift(cur.tagName.toLowerCase() + '[' + ix + ']');
+            cur = cur.parentElement;
+        }
+        return '/' + parts.join('/');
+    };
+    const recordMeta = (node, text) => ({
+        xpath: xpathOf(node),
+        xpath_abs: xpathOf(node),
+        xpath_full: xpathOf(node),
+        tag: node && node.tagName ? node.tagName.toLowerCase() : '',
+        text: norm(text || (node && (node.value || node.textContent)) || '').slice(0, 80),
+        attributes: {},
+        locator_strategy: 'xpath_full',
+    });'''
 
 JS_PICKER_DIALOG_QUERY = '''async (args) => {
     const [dialogName, fieldsJson] = args || [];
@@ -98,6 +122,7 @@ JS_PICKER_DIALOG_QUERY = '''async (args) => {
         return JSON.stringify({ ok: false, error: 'invalid-fields-json' });
     }
     if (!Array.isArray(fields)) return JSON.stringify({ ok: false, error: 'invalid-fields-json' });
+    const recorded_actions = [];
     const setNativeValue = (input, value) => {
         const proto = input instanceof HTMLTextAreaElement
             ? window.HTMLTextAreaElement.prototype
@@ -133,10 +158,21 @@ JS_PICKER_DIALOG_QUERY = '''async (args) => {
         }
         if (!input) return JSON.stringify({ ok: false, error: 'field-label-not-found:' + label });
         setNativeValue(input, value);
+        recorded_actions.push({
+            action: 'fill_form_field',
+            params: { label_text: label, value: value },
+            element: Object.assign(recordMeta(input, value), { formLabel: label, target_kind: 'form_input' }),
+        });
     }
-    if (!clickButtonByText(dialog, '查询')) {
+    const queryButton = clickButtonByText(dialog, '查询');
+    if (!queryButton) {
         return JSON.stringify({ ok: false, error: 'query-button-not-found' });
     }
+    recorded_actions.push({
+        action: 'click_element_by_index',
+        params: { index: -1, tag_name: 'button', text: norm(queryButton.textContent) },
+        element: recordMeta(queryButton, queryButton.textContent),
+    });
     // Vue renders query results async — poll until rows appear (≤5s).
     let rows = [];
     for (let i = 0; i < 20; i++) {
@@ -146,7 +182,7 @@ JS_PICKER_DIALOG_QUERY = '''async (args) => {
             .map((r) => norm(r.innerText || r.textContent));
         if (rows.length > 0) break;
     }
-    return JSON.stringify({ ok: true, row_count: rows.length, rows: rows.slice(0, 5) });
+    return JSON.stringify({ ok: true, row_count: rows.length, rows: rows.slice(0, 5), recorded_actions });
 }'''
 
 JS_PICKER_DIALOG_SELECT = '''async (args) => {
@@ -157,6 +193,7 @@ JS_PICKER_DIALOG_SELECT = '''async (args) => {
     const want = norm(rowText);
     if (!want) return JSON.stringify({ ok: false, error: 'row-not-found' });
     const before = readUnderlyingForm();
+    const recorded_actions = [];
     const rows = [...dialog.querySelectorAll('.el-table__body tbody tr, .el-table__body tr')]
         .filter((r) => r.offsetParent !== null);
     const row = rows.find((r) => (norm(r.innerText || r.textContent)).indexOf(want) !== -1);
@@ -165,9 +202,20 @@ JS_PICKER_DIALOG_SELECT = '''async (args) => {
     if (!radio) return JSON.stringify({ ok: false, error: 'row-not-found' });
     radio.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     radio.click();
-    if (!clickButtonByText(dialog, '确')) {
+    recorded_actions.push({
+        action: 'click_table_row_radio',
+        params: { row_text: norm(row.innerText || row.textContent) },
+        element: recordMeta(radio, row.innerText || row.textContent),
+    });
+    const confirmButton = clickButtonByText(dialog, '确');
+    if (!confirmButton) {
         return JSON.stringify({ ok: false, error: 'confirm-button-not-found' });
     }
+    recorded_actions.push({
+        action: 'click_element_by_index',
+        params: { index: -1, tag_name: 'button', text: norm(confirmButton.textContent) },
+        element: recordMeta(confirmButton, confirmButton.textContent),
+    });
     // Vue backfills the underlying form async after the dialog closes — wait for
     // the dialog to disappear (≤5s) before reading the after snapshot.
     for (let i = 0; i < 20; i++) {
@@ -188,7 +236,7 @@ JS_PICKER_DIALOG_SELECT = '''async (args) => {
             if (after2[key] && after2[key] !== before[key]) changed[key] = after2[key];
         }
     }
-    const payload = { ok: true, changed: changed };
+    const payload = { ok: true, changed: changed, recorded_actions: recorded_actions };
     // Still empty after the delayed re-read → flag refill-not-observed while
     // keeping ok:true and the original field set (backward compatible).
     if (Object.keys(changed).length === 0) {
