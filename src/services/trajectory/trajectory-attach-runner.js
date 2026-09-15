@@ -174,8 +174,11 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
     }
   }
 
-  if (!remoteSessionId && !bibError) {
+  if (!remoteSessionId) {
     try {
+      // A prior BiB failure is retryable while the executor session remains alive.
+      runtime.bibError = null;
+      bibError = null;
       const attached = await remoteSessionService.attachLive({
         sessionId: runtime.sessionId,
         trajectoryId: tid,

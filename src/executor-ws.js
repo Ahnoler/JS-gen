@@ -274,6 +274,17 @@ export function getLastRscfPacket(remoteSessionUuid) {
   return lastRscfByUuid.get(String(remoteSessionUuid)) || null;
 }
 
+/**
+ * Return the frame id from the cached RSCF packet for a session uuid.
+ * @param {string} remoteSessionUuid remote session UUID
+ * @returns {number|null} cached frame id
+ */
+export function getLastRscfFrameId(remoteSessionUuid) {
+  const packet = getLastRscfPacket(remoteSessionUuid);
+  if (!packet || packet.length < 8) return null;
+  return packet.readUInt32BE(4);
+}
+
 function bindConnectionHandlers(ws) {
   ws._alive = true;
 

@@ -295,12 +295,24 @@ export async function attachTrajectoryLive(trajectoryId) {
 
   const existing = await clearStaleTrajectoryRuntime(tid);
   if (existing?.sessionId && state.sessions.has(existing.sessionId)) {
-    const liveStatus = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null);
+    let liveStatus = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null);
+    let remoteSessionId = existing.remoteSessionId || liveStatus?.remoteSessionId || null;
+    if (!liveStatus?.attached) {
+      const attached = await remoteSessionService.attachLive({
+        sessionId: existing.sessionId,
+        trajectoryId: tid,
+        viewportW: 1600,
+        viewportH: 900,
+      });
+      remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
+      liveStatus = attached?.status || liveStatus;
+      existing.remoteSessionId = remoteSessionId;
+    }
     return {
       trajectoryId: tid,
       sessionId: existing.sessionId,
       executorNodeUuid: existing.executorNodeUuid,
-      remoteSessionId: existing.remoteSessionId,
+      remoteSessionId,
       status: liveStatus,
       reused: true,
       reusedChrome: false,

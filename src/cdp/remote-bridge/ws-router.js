@@ -10,7 +10,8 @@ import {
 import * as remoteSessionService from '../../services/remote-session-service.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import { sendToExecutor } from '../../executor-session-client.js';
-import { getLastRscfPacket } from '../../executor-ws.js';
+import { getLastRscfPacket, getLastRscfFrameId } from '../../executor-ws.js';
+import * as executorNodeDao from '../../dao/executor-node-dao.js';
 import { getTrajectoryRuntime } from '../../services/trajectory/trajectory-runtime.js';
 import { hideHighlight } from '../inspect.js';
 import {
@@ -32,14 +33,18 @@ async function notifyStreamViewers(remoteSessionUuid) {
     const row = await remoteSessionService.getByUuid(remoteSessionUuid);
     const nodeId = Number(row?.executorNodeId ?? row?.executor_node_id);
     if (!Number.isFinite(nodeId)) return;
-    const { executorNodeDao } = await import('../../dao/executor-node-dao.js');
     const node = await executorNodeDao.getById(nodeId).catch(() => null);
     if (!node?.nodeUuid) return;
     sendToExecutor(node.nodeUuid, 'session.bib_stream_viewers', {
       remoteSessionUuid,
       viewers,
     });
-  } catch {}
+  } catch (err) {
+    console.warn('[remote-bridge] viewer notification failed:', {
+      remoteSessionUuid,
+      error: err?.message || String(err),
+    });
+  }
 }
 
 function pickFromBinding(binding, trajectoryId = null) {
@@ -194,15 +199,22 @@ export function ensureWsHook(attachLive) {
         if (bound && !bound.remoteSessionUuid && live?.remoteSessionUuid) {
           bound.remoteSessionUuid = live.remoteSessionUuid;
         }
+        const subscribedUuid = remoteSessionUuid || live?.remoteSessionUuid || null;
+        // Send the cache marker before the cached binary frame so clients can
+        // distinguish a stale paint from the first fresh frame after subscribe.
+        const cachedFrameId = getLastRscfFrameId(subscribedUuid);
+        ws.send(JSON.stringify({
+          type: 'remote:status',
+          payload: {
+            ...(live || { attached: false, cdpReady: true, trajectoryId }),
+            cachedFrameId,
+          },
+        }));
         // 观众秒开：订阅成功即补发缓存的最后一帧（executor 模式缓存于 executor-ws）
-        const lastPacket = getLastRscfPacket(remoteSessionUuid || live?.remoteSessionUuid || null);
+        const lastPacket = getLastRscfPacket(subscribedUuid);
         if (lastPacket && lastPacket.length) {
           try { ws.send(lastPacket); } catch {}
         }
-        ws.send(JSON.stringify({
-          type: 'remote:status',
-          payload: live || { attached: false, cdpReady: true, trajectoryId },
-        }));
         return;
       }
       if (type === 'remote:unsubscribe') {
