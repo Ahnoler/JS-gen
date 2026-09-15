@@ -44,3 +44,4 @@
 | 2026-09-09 | [2026-09-09.md](./2026-09-09.md) | KB加固13项PASS；select/fill/radio录放统一；tssc v2+湿测修复；search-then-click；菜单umlEcd双轨；召回评测130条Acc@1=0.65；req-draft增强。 |
 | 2026-09-11 | [2026-09-11.md](./2026-09-11.md) | KB覆盖回溯PASS+价值A/B证据不足；合约主权Tasks1-8；executor-only BiB；L1c湿测PASS；口语桥CLOSED；Tansun§9.4计划入库。 |
 | 2026-09-13 | [2026-09-13.md](./2026-09-13.md) | tree_picker叶模式DFS兜底湿测PASS+三级递进闭环；他仓select:tree对齐叶模式(1cd1533离线40 passed)；当日4提交凌晨集中。 |
+| 2026-09-14 | [2026-09-14.md](./2026-09-14.md) | AI录制785/827/828三案修复+截图时序/重复落库/父drawer；fill同值重填守卫离线PASS；pull两红项修复；他仓click图标歧义46 passed；提示词迭代。 |
