@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 开工：恢复 picker 表格选行录制语义
+
+- 进行中：修复选择器表格 radio/选行被映射成普通 `click_element_by_index` 的回退问题；保持已完成的搜索输入、查询点击、确认点击原子步骤不变。
+- 范围：`scripts/manual_recorder/mapper.py`、必要的手工录制 characterization、本协作日志；只读参考 `scripts/manual_recorder/js_parts/` 与 `scripts/controller/actions/js_snippets/picker_confirm.py`。
+- 禁入区：直属 Python 注释任务当前未提交文件、`src/services/trajectory/trajectory-meta-service.js`、前端仓、`config/`、线上数据；不修改搜索/确认拆分实现。
+- 方式：先定位 DOM payload 到 action 的优先级回退，再以最小 mapper 修复恢复 `click_table_row_radio`，补离线 pin，运行定向 characterization、Python 编译和 `git diff --check` 后提交。
+
 ## 2026-09-15 · OpenCode — 开工：scripts 直属 Python 文件添加中文注释
 
 - 进行中：为 `scripts/` 下直属 Python 文件（非子目录）添加中文注释，包括模块级总体注释和每个函数/方法的注释，方便开发人员 review。
