@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 开工：AI 录制 fill_form_field 作用域异常修复
+
+- 进行中：修复执行机 `fill_form_field` 因函数内条件 import 遮蔽模块级 `err_with`，导致 `UnboundLocalError`、AI 录制中断并将轨迹置为 `failed` 的问题。
+- 范围：`scripts/controller/actions/fill_engine.py`、对应 characterization、本协作日志；只读参考远程 trajectory 829 的 control-plane/agent 日志。
+- 禁入区：`src/services/trajectory/trajectory-meta-service.js`、线上轨迹/数据库、其他会话 WIP；不放宽失败轨迹的人工确认状态机。
+- 方式：移除函数体内重复 import，补充静态/行为回归断言，运行定向 Python characterization、编译检查与 diff 检查后提交。
+
 ## 2026-09-15 15:00 · OpenCode — 开工：AI 录制阶段续跑与日期查询可靠性优化
 
 - 进行中：修复阶段 `done()` 已接受后仍因后续阶段引入字段触发预算续跑；增强日期范围逗号格式、双端输入与回读；修复网络捕获异步响应头未 await 告警。
