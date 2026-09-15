@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 开工：scripts 直属 Python 文件添加中文注释
+
+- 进行中：为 `scripts/` 下直属 Python 文件（非子目录）添加中文注释，包括模块级总体注释和每个函数/方法的注释，方便开发人员 review。
+- 范围：`scripts/__init__.py`、`scripts/trajectory_store.py`、`scripts/state.py`、`scripts/session_runner.py`、`scripts/run_traj56_cdp_replay.py`、`scripts/recorder.py`、`scripts/dev-cdp-browser.py`、`scripts/context_compiler.py`、`scripts/main.py`、`scripts/feature_flags.py`、`scripts/event_dispatch.py`、`scripts/cdp_ports.py`、`scripts/browser-use-agent.py`、`scripts/agent_utils.py`。
+- 禁入区：不修改任何代码逻辑，只添加/替换注释；不涉及子目录文件；不涉及其他会话 WIP。
+- 方式：逐文件编辑，替换英文模块 docstring 为中文，为每个函数添加中文 docstring；编辑完成后运行 Python 编译检查语法正确性。
+
 ## 2026-09-15 · OpenCode — 收工续：修正 picker 提示为按实际动作拆分
 
 - 完成：移除普通 picker 固定“四步”要求，改为按具体场景实际发生的有效 DOM 操作逐步执行和记录；允许搜索、查询、选行、确认等动作按场景增减，禁止为凑步骤补操作；日期/下拉/树形搜索等明确专用控件继续允许组合封装。
