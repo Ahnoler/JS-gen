@@ -138,3 +138,16 @@ check('空工作短路==0', compute_budget_extension({
 if failures:
     print('FAIL:', failures); sys.exit(1)
 print('OK: 进度感知缓冲部署 (total_fields/done_fields)')
+
+
+# ── Done gate source-level pin ──────────────────────────────────────
+from pathlib import Path as _Path
+_service_src = (Path(_SCRIPTS_DIR) / 'agent' / 'service.py').read_text(encoding='utf-8')
+# done_fired must break unconditionally (no introduce_count gate)
+check(
+    'done_fired breaks unconditionally',
+    'if done_fired:\n                break' in _service_src,
+)
+if failures:
+    print('FAIL:', failures); sys.exit(1)
+print('OK: done_fired gate pin')

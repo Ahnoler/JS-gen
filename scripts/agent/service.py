@@ -598,8 +598,9 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
             ok_pending, pending_labels = check_pending_write_gate(business_data_ref, section=_sec)
             introduce_count = _count_introduce_fields(business_data_ref)
             needs_agent = business_data_ref.get('_assistant_needs_agent') or []
-            # done 触发且工作完成 → 不续跑
-            if done_fired and ok_pending and introduce_count == 0 and not needs_agent:
+            # done 被 recorder 接受 → 当前阶段终局，不再续跑
+            # （introduce 字段可能属于后续阶段，不应用于推翻已完成的当前阶段）
+            if done_fired:
                 break
             # 工作完成（无论 done）→ 不续跑
             if ok_pending and introduce_count == 0 and not needs_agent:

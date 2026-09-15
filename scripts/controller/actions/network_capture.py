@@ -26,11 +26,11 @@ _EXCLUDE_PATTERN = re.compile(
 _MAX_BODY_CHARS = 4096
 
 
-def _is_form_related(request, response) -> bool:
-    """Decide whether a request/response pair is worth capturing.
+def _is_form_related_sync(request) -> bool:
+    """Sync pre-filter: resource type, URL noise, and write methods.
 
-    Only XHR/fetch. Writes (POST/PUT/DELETE/PATCH) always qualify; GET only
-    when the response is JSON and the URL looks form/business related.
+    GET filtering requires an async ``response.header_value()`` call, which is
+    handled by ``_is_form_related_async`` in the caller.
     """
     try:
         resource_type = getattr(request, 'resource_type', None)
@@ -40,16 +40,29 @@ def _is_form_related(request, response) -> bool:
         if _EXCLUDE_PATTERN.search(url):
             return False
         method = (request.method or '').upper()
+        return method in ('POST', 'PUT', 'DELETE', 'PATCH') or method == 'GET'
+    except Exception:
+        return False
+
+
+async def _is_form_related_async(request, response) -> bool:
+    """Async filter: sync pre-check + awaitable header_value for GET requests.
+
+    Only XHR/fetch. Writes always qualify; GET only when the response is JSON
+    and the URL looks form/business related.
+    """
+    try:
+        if not _is_form_related_sync(request):
+            return False
+        method = (request.method or '').upper()
         if method in ('POST', 'PUT', 'DELETE', 'PATCH'):
             return True
-        if method == 'GET':
-            try:
-                content_type = (response.header_value('content-type') or '').lower()
-            except Exception:
-                content_type = ''
-            if 'json' in content_type and _FORM_KEYWORDS.search(url):
-                return True
-        return False
+        try:
+            content_type = (await response.header_value('content-type') or '').lower()
+        except Exception:
+            content_type = ''
+        url = request.url or ''
+        return 'json' in content_type and bool(_FORM_KEYWORDS.search(url))
     except Exception:
         return False
 
@@ -89,7 +102,7 @@ def attach_network_capture(page, business_data_store=None):
     async def _on_response(response):
         try:
             request = response.request
-            if not _is_form_related(request, response):
+            if not await _is_form_related_async(request, response):
                 return
             try:
                 resp_bytes = await response.body()

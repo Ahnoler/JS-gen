@@ -284,7 +284,17 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
       if (inp) target = inp;
     }
     commitDateVue(target, val);
-    setFn(target, val == null ? '' : String(val));
+    const dateVal = String(val == null ? '' : val);
+    const rangeParts = dateVal.split(/\s*[,，]\s*|\s+-\s+|\s+至\s+/).filter(Boolean);
+    const editor = target.closest && target.closest('.el-date-editor, .tsscdatepicker');
+    const allDateInputs = editor ? Array.from(editor.querySelectorAll('input')) : [target];
+    allDateInputs.forEach((inp, idx) => {
+      if (rangeParts.length > 1) {
+        setFn(inp, rangeParts[idx] || rangeParts[0]);
+      } else {
+        setFn(inp, dateVal);
+      }
+    });
     try { target.blur(); } catch (e) {}
     document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach((x) => {
       x.style.display = 'none';

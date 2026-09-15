@@ -24,7 +24,7 @@ JS_COMMIT_DATE_VUE_BODY = r'''
       };
       try {
         const rawValues = Array.isArray(val) ? val : String(val == null ? '' : val)
-          .split(/\s+-\s+|\s+至\s+/).map((part) => part.trim()).filter(Boolean);
+          .split(/\s*[,，]\s*|\s+-\s+|\s+至\s+/).map((part) => part.trim()).filter(Boolean);
         const isRange = rawValues.length > 1;
         const out = isRange ? rawValues.map((part) => emitValOf(null, part)) : emitValOf(null, rawValues[0] || val);
         const w = target.closest && target.closest('.el-date-editor, .tsscdatepicker');
@@ -175,7 +175,7 @@ JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
   } catch (e) {}
   target.focus();
   commitDateVue(target, val);
-  const rangeValues = String(val == null ? '' : val).split(/\s+-\s+|\s+至\s+/).map((part) => part.trim()).filter(Boolean);
+  const rangeValues = String(val == null ? '' : val).split(/\s*[,，]\s*|\s+-\s+|\s+至\s+/).map((part) => part.trim()).filter(Boolean);
   const editor = target.closest?.('.el-date-editor, .tsscdatepicker');
   const dateInputs = editor ? Array.from(editor.querySelectorAll('input')) : [target];
   dateInputs.forEach((input, index) => setFn(input, rangeValues.length > 1 ? (rangeValues[index] || rangeValues[0]) : val));
