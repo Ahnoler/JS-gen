@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 22:15 · OpenCode — 收工：修复第四阶段重复执行与日期范围异常（回链 21:55 开工）
+
+- 完成：提交 **022f65a2**；“填写查询/筛选条件”规则回退归类为 query，运行时 query toolbar 可纠偏误判的 create/modify pending/success 门禁；AI 同阶段成功字段写入/选择及普通索引点击再次命中时直接返回 `already-operated-this-phase`，失败动作可重试、日期面板日格点击豁免、新阶段自动清空，人工录制不经过该保护。
+- 日期修复：日期范围字段必须一次传入完整起止值；label 与 xpath 填充路径均对两个 input 写值并向 Vue model 提交数组，单日期写入范围控件返回 `err-date-range-value-required`，不再产生字符串 model 后继续查询。
+- 验收：新增 `characterize-ai-phase-element-guard.py` 并注册 verify-all；日期范围、phase intent/boundary/runtime/reviewer、form assistant、xpath fill/select、picker 原子录制、table radio、tree picker、action-log sync 等 13 项定向 characterization、Python 编译、`git diff --check` 全通过；`npm run lint` 0 error（154 warning 均为 `.venv`/既有文件）。完整 `verify-all.sh` 因本机无 `bash` 未能启动。
+- 遗留移交：部署/重启执行机后用同一五阶段场景湿测；第四阶段预期首次 `done(success=true)` 直接结束，不再重填或提前点击第五阶段【查询】；日期步骤应落库完整 `开始日期 - 结束日期`。`memory_writer` timeout 属独立基础设施告警，未修改。
+
 ## 2026-09-15 21:55 · OpenCode — 开工：修复第四阶段重复执行与日期范围异常
 
 - 进行中：修复查询条件填写阶段被误套维护表单完成门禁，导致 `done()` 被 pending fields 拒绝、同阶段字段重复执行并越界点击下一阶段【查询】；同时修复 AI 通过 `fill_form_field` 写日期范围时退化为单日期字符串的问题。
