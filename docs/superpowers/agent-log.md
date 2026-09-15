@@ -1,5 +1,28 @@
 # Agent 协作日志
 
+## 2026-09-15 15:26 · Cursor Lead — 收工：人工确认去掉状态闸（回链 15:13 / 14:49）
+
+- 完成：`confirmTrajectory` 用户确认路径不再校验状态，`setPersistentRecordStatus(completed)` 双字段直写；取消确认闸保留；pin + api-docs 同步
+- 验收：`node scripts/characterization/characterize-record-status.mjs` OK
+- 遗留：控制面需部署重启后 829 湿测；本提交不含菜单扫描 WIP
+
+## 2026-09-15 15:13 · Cursor Lead — 开工续：人工确认去掉状态闸（用户触发直接 completed）
+
+- 进行中：15:13；用户改要求——confirm 不再校验状态，直接置已确认（已由 15:26 收工闭环）
+- 范围：同 14:49（`trajectory-meta-service.js` / `characterize-record-status.mjs` / api-docs recording.js）
+- 禁入区：菜单扫描未提交改动、`config/`、`.cursor/`、取消确认路径语义不扩
+- 方式：红 pin（无确认闸 + want 无条件 setPersistentRecordStatus completed）→ 最小实现
+
+## 2026-09-15 14:49 · Cursor Lead — 开工：人工确认双字段闸（record_status OR persistent_record_status）
+
+- 进行中：14:49；已被 15:13 续条覆盖（不再做双字段闸，改为去闸直写 completed）
+
+## 2026-09-15 14:00 · Cursor Lead — 收工：菜单同 xpath 孪生清理（回链 13:44 开工）
+
+- 完成：`buildScanApplyPlan` 同 pass 按 parent+data-id / parent+xpath 去重 create；pin 2 条绿；`prune-same-xpath-menu-twins.mjs` 已对 systemId=1 `--apply`（drop 0362/0363/0461）；复跑 dry-run 无孪生
+- 验收：`node scripts/characterization/characterize-menu-scan.mjs` OK；合同管理现余异 RES 同名对（1540↔0360、1541↔0361）属 B，未动
+- 遗留：B 讨论（同名不同 data-id 是否合并/展示）；代码与本条目待用户确认后 commit
+
 ## 2026-09-15 13:44 · Cursor Lead — 开工：菜单同 xpath 孪生清理（合同管理 A）
 
 - 进行中：13:44；用户选 A（清同 xpath 孪生 + 堵住 plan 内重复 create）；B 同名不同 RES 另议

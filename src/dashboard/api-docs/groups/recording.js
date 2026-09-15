@@ -91,7 +91,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/confirm',
         summary: '人工确认 / 取消确认（交易级）',
-        desc: 'confirmed=true → recordStatus=completed；false → recorded。不修改 trajectory_step.confirmed。recording/failed 时 409。',
+        desc: 'confirmed=true → 用户触发，不校验当前态，record_status 与 persistent_record_status 均置 completed；false → recorded。不修改 trajectory_step.confirmed。取消确认仍要求当前为 completed/recording，否则 409。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ confirmed: true }),
         respExample: J({
