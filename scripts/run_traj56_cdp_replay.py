@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Replay trajectory 56 on local CDP (9242) using fixed _replay durable clicks.
+轨迹 56 CDP 回放脚本。
 
-Usage (from repo root):
-  set PYTHONPATH=.
-  python scripts/run_traj56_cdp_replay.py
+本脚本在本地 CDP（端口 9242）上回放轨迹 56，使用固定的 _replay 持久化点击。
+
+用法（从仓库根目录）：
+    set PYTHONPATH=.
+    python scripts/run_traj56_cdp_replay.py
 """
 from __future__ import annotations
 
@@ -19,8 +21,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Load DB creds from config/.env lightly
+# 从 config/.env 轻量加载数据库凭证
 def _load_env():
+    """
+    从 config/.env 文件加载环境变量。
+
+    读取配置文件中的键值对，使用 setdefault 设置环境变量，
+    避免覆盖已存在的环境变量。
+    """
     env_path = ROOT / 'config' / '.env'
     if not env_path.exists():
         return
@@ -36,15 +44,41 @@ _load_env()
 
 
 class _PageCtx:
+    """
+    页面上下文封装类。
+
+    封装 Playwright 页面对象，提供 get_current_page() 方法
+    以兼容 controller 的接口要求。
+    """
     def __init__(self, page):
+        """
+        初始化页面上下文。
+
+        参数：
+            page: Playwright 页面对象
+        """
         self._page = page
 
     async def get_current_page(self):
+        """
+        获取当前页面。
+
+        返回：
+            页面对象
+        """
         return self._page
 
 
 async def _pre_nav(page, click_js: str) -> None:
-    """Cold start: home → 产品管理 → 产品阶段管理 (steps 1–14 assume stage page)."""
+    """
+    冷启动导航：首页 → 产品管理 → 产品阶段管理。
+
+    执行步骤 1-14（假设已在阶段页面）。
+
+    参数：
+        page: Playwright 页面对象
+        click_js (str): 点击操作的 JavaScript 代码
+    """
     home = 'http://test.creditv5p2.tansun.com.cn/#/home?part=home'
     await page.goto(home, wait_until='domcontentloaded', timeout=60000)
     await page.wait_for_timeout(1200)
@@ -62,6 +96,15 @@ async def _pre_nav(page, click_js: str) -> None:
 
 
 async def main() -> int:
+    """
+    主函数：从数据库加载轨迹 56 并在 CDP 浏览器上回放。
+
+    连接 MySQL 数据库获取轨迹步骤，然后通过 CDP 连接 Playwright
+    浏览器执行回放，最后将结果保存到 JSON 文件。
+
+    返回：
+        int: 退出码，回放成功返回 0，有失败返回 1
+    """
     import pymysql
     from playwright.async_api import async_playwright
     from scripts.controller.actions._replay import _JS_CLICK_DURABLE, replay_action_entries
@@ -114,6 +157,7 @@ async def main() -> int:
         await _pre_nav(page, _JS_CLICK_DURABLE)
 
         def emit(msg):
+            """回放事件回调函数，输出每步回放结果。"""
             ev = msg.get('event')
             data = msg.get('data') or {}
             if ev == 'replay_step':

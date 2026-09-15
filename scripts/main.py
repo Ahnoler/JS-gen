@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-Browser Use Agent — main entry point.
-Supports --session (interactive multi-turn) mode only.
-One-shot workflow mode has been removed; use Session mode with "Run All Phases".
-Outputs JSON Lines on stdout for progress reporting.
+Browser Use Agent 主入口模块。
+
+本模块是 browser-use-agent 的主入口点，仅支持 --session（交互式多轮）模式。
+单次工作流模式已移除，请使用 Session 模式配合"Run All Phases"功能。
+标准输出使用 JSON Lines 格式进行进度报告。
+
+用法：
+    python -m scripts.main --session --model <model_id> --base-url <url> [选项]
 """
 import sys
 import asyncio
@@ -20,6 +24,12 @@ from .session_runner import run_session
 
 
 def main():
+    """
+    主函数：解析命令行参数并启动会话模式。
+
+    如果未提供 --session 参数，则输出错误信息并退出。
+    否则调用 run_session 函数启动交互式会话。
+    """
     args = parse_args()
     if not args.session:
         print("--session flag is required. Use --help for usage.", file=sys.stderr)

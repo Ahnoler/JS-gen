@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Launch a headed Chromium with CDP on 9242 for manual navigation + later inspect.
+"""
+开发用 CDP 浏览器启动脚本。
 
-Usage:
-  python scripts/dev-cdp-browser.py
-  python scripts/dev-cdp-browser.py --port 9242 --url about:blank
+本脚本启动一个带 CDP（Chrome DevTools Protocol）的有头 Chromium 浏览器，
+用于手动导航和后续检查。默认在端口 9242 上启动。
 
-Prefers %LOCALAPPDATA%\\ms-playwright when project browser/ is empty.
+用法：
+    python scripts/dev-cdp-browser.py
+    python scripts/dev-cdp-browser.py --port 9242 --url about:blank
+
+当项目 browser/ 目录为空时，优先使用 %LOCALAPPDATA%\\ms-playwright 中的浏览器。
 """
 from __future__ import annotations
 
@@ -17,7 +21,13 @@ from pathlib import Path
 
 
 def _ensure_browsers_path() -> None:
-    """Avoid empty project browser/ shadowing a real Playwright install."""
+    """
+    确保 Playwright 浏览器路径正确设置。
+
+    避免空的项目 browser/ 目录遮蔽真实的 Playwright 安装。
+    如果环境变量 PLAYWRIGHT_BROWSERS_PATH 已设置且包含 Chromium，
+    则不做任何操作；否则尝试使用 %LOCALAPPDATA%\\ms-playwright。
+    """
     cur = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '').strip()
     if cur:
         chrome = list(Path(cur).glob('chromium-*/chrome-win*/chrome.exe'))
@@ -29,6 +39,15 @@ def _ensure_browsers_path() -> None:
 
 
 async def main() -> int:
+    """
+    主函数：启动带 CDP 的 Chromium 浏览器。
+
+    解析命令行参数，设置浏览器路径，启动 Chromium 浏览器并保持运行
+    直到用户中断。浏览器关闭后返回 0。
+
+    返回：
+        int: 退出码，正常关闭返回 0
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument('--port', type=int, default=9242)
     ap.add_argument('--url', default='about:blank')

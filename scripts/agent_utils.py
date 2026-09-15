@@ -1,5 +1,8 @@
 """
-Agent utility functions shared across browser-use-agent modules.
+Agent 工具函数模块。
+
+本模块提供 browser-use-agent 各模块共享的工具函数，
+包括参数解析、JSON 输出、LLM 创建、消息管理器修补等功能。
 """
 import argparse
 import json
@@ -9,6 +12,21 @@ import os
 from pathlib import Path
 
 def parse_args():
+    """
+    解析命令行参数。
+
+    返回：
+        argparse.Namespace: 解析后的参数对象，包含：
+            - model: 模型 ID（必需）
+            - base_url: LLM 基础 URL
+            - api_key: LLM API 密钥
+            - output: 输出文件路径
+            - playwright_output: Playwright 脚本输出路径
+            - session: 是否使用会话模式
+            - session_id: 会话 ID
+            - cdp_url: CDP 连接 URL
+            - cdp_port: CDP 端口号
+    """
     parser = argparse.ArgumentParser(description="Browser Use Agent")
     parser.add_argument("--model", required=True, help="Model ID")
     parser.add_argument("--base-url", default=os.getenv("LLM_BASE_URL"), help="LLM base URL (or set LLM_BASE_URL env)")
@@ -27,10 +45,25 @@ def parse_args():
     return parser.parse_args()
 
 def emit_json(data):
+    """
+    将数据以 JSON 格式输出到标准输出。
+
+    参数：
+        data (dict): 要输出的数据字典
+    """
     sys.stdout.write(json.dumps(data, ensure_ascii=False) + "\n")
     sys.stdout.flush()
 
 def extract_first_url(task):
+    """
+    从任务文本中提取第一个 URL。
+
+    参数：
+        task (str): 任务文本
+
+    返回：
+        str | None: 找到的第一个 URL，如果没有找到返回 None
+    """
     urls = re.findall(r'https?://[^\s\n]+', task)
     return urls[0] if urls else None
 
@@ -51,7 +84,8 @@ _DEFAULT_MAX_ACTIONS = 3
 
 
 def resolve_max_actions_per_step(instruction_value, contract_mode=None):
-    """解析单步最大动作数（browser_use max_actions_per_step）。
+    """
+    解析单步最大动作数（browser_use max_actions_per_step）。
 
     规则（与 Node 配置链一致）：
     1. instruction_value 非空（Node 显式传 MAX_ACTIONS_PER_STEP）→ 用之；
@@ -60,7 +94,12 @@ def resolve_max_actions_per_step(instruction_value, contract_mode=None):
        navigate/query/login → 3，其它模式 → 默认 3；
     3. 结果 clamp 到 [1, 10]（框架默认 10 封顶）。
 
-    Returns: (value, source) — source ∈ {'config', 'mode', 'default'}。
+    参数：
+        instruction_value: 指令值（来自 Node 配置）
+        contract_mode (str, optional): 合约模式
+
+    返回：
+        tuple: (value, source) — source ∈ {'config', 'mode', 'default'}
     """
     if instruction_value not in (None, ''):
         try:
@@ -76,6 +115,16 @@ def resolve_max_actions_per_step(instruction_value, contract_mode=None):
 
 
 async def do_navigate(page, url):
+    """
+    执行页面导航。
+
+    导航到指定 URL，处理 HTTPS-First 拦截页面，
+    等待页面加载完成。
+
+    参数：
+        page: Playwright 页面对象
+        url (str): 目标 URL
+    """
     from . import controller as ctrl_mod
     from .controller.actions._helpers import dismiss_https_first_interstitial
     ctrl_mod._TRAJECTORY_URL = url
@@ -87,10 +136,10 @@ async def do_navigate(page, url):
             await page.goto(url, wait_until='load', timeout=30000)
         except Exception:
             await page.goto(url, timeout=30000)
-    # Plain HTTP may land on HTTPS-First interstitial («此网站不支持安全连接»).
+    # 纯 HTTP 可能遇到 HTTPS-First 拦截页面（「此网站不支持安全连接」）
     bypass = await dismiss_https_first_interstitial(page)
     if bypass and bypass.startswith('proceeded'):
-        # After proceed, wait for real page
+        # 继续后等待真实页面
         try:
             await page.wait_for_load_state('domcontentloaded', timeout=15000)
         except Exception:
@@ -99,57 +148,92 @@ async def do_navigate(page, url):
     await page.wait_for_timeout(2000)
     emit_json({"event": "nav_step", "data": {"step": 1, "label": "Page loaded"}})
 
-# ========== Load system prompts from external markdown file ==========
-# Edit pack files under prompts/ or agent-prompt.md shim to change prompts.
+# ========== 从外部 markdown 文件加载系统提示词 ==========
+# 编辑 prompts/ 下的包文件或 agent-prompt.md 垫片来更改提示词
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PACK_DIR = os.path.join(_SCRIPT_DIR, 'prompts')
 _PROMPT_PATH = os.path.join(_PACK_DIR, 'agent-prompt.md')
 
-# Resolve {{include}} directives — replace {{filename.md}} with file content
+# 解析 {{include}} 指令 —— 将 {{filename.md}} 替换为文件内容
 _DIRECTIVE_RE = re.compile(r'\{\{([^}]+\.md)\}\}')
 
 def _resolve_directives(text):
+    """
+    解析文本中的 {{include}} 指令。
+
+    将 {{filename.md}} 替换为对应文件的内容。
+
+    参数：
+        text (str): 包含指令的文本
+
+    返回：
+        str: 解析后的文本
+    """
     def _replacer(m):
         fname = m.group(1)
         fpath = os.path.join(_SCRIPT_DIR, fname)
         if os.path.exists(fpath):
             with open(fpath, 'r', encoding='utf-8') as _f:
                 return _f.read().strip()
-        return m.group(0)  # fallback: leave unchanged
+        return m.group(0)  # 回退：保持不变
     return _DIRECTIVE_RE.sub(_replacer, text)
 
 
 def _read_pack(name: str) -> str:
+    """
+    读取提示词包文件。
+
+    参数：
+        name (str): 包文件名
+
+    返回：
+        str: 文件内容
+    """
     path = os.path.join(_PACK_DIR, name)
     with open(path, 'r', encoding='utf-8') as f:
         return f.read().strip()
 
 
 def build_agent_system_message(contract: dict | None = None) -> str:
-    """Assemble system prompt from packs based on phase intent contract."""
+    """
+    根据阶段意图合约组装系统提示词。
+
+    根据合约模式选择相应的提示词包组合：
+    - heal 模式：仅恢复规则
+    - navigate/query/introduce_pick/login/create/modify 模式：包含表格工具
+    - introduce_pick/create/modify 模式：包含表单工具
+    - create/modify 模式：包含树形工具
+    - 未知模式：回退到完整包组合
+
+    参数：
+        contract (dict, optional): 阶段意图合约
+
+    返回：
+        str: 组装后的系统提示词
+    """
     mode = (contract or {}).get('mode') if contract else None
     allow_assistant = bool((contract or {}).get('allow_form_assistant')) if contract else False
 
     packs = ['agent-core.md', 'agent-tools-common.md']
 
-    # Heal mode: recovery rules only — no form/table/tree recording packs.
+    # 修复模式：仅恢复规则 —— 无表单/表格/树形录制包
     if mode == 'heal':
         packs.append('agent-tools-heal.md')
     else:
-        # Table tools for navigate/query/introduce (row selection, icon buttons)
-        # and create/modify (row edit/delete, toolbar icons)
+        # 表格工具用于 navigate/query/introduce（行选择、图标按钮）
+        # 和 create/modify（行编辑/删除、工具栏图标）
         if mode in ('navigate', 'query', 'introduce_pick', 'login', 'create', 'modify', None):
             packs.append('agent-tools-table.md')
 
-        # Form pack for introduce_pick and create/modify
+        # 表单工具用于 introduce_pick 和 create/modify
         if mode in ('introduce_pick', 'create', 'modify') or allow_assistant:
             packs.append('agent-tools-form.md')
 
-        # Tree pack for create/modify (default)
+        # 树形工具用于 create/modify（默认）
         if mode in ('create', 'modify'):
             packs.append('agent-tools-tree.md')
 
-        # Full fallback: unknown mode or None contract
+        # 完整回退：未知模式或 None 合约
         if mode not in ('login', 'navigate', 'query', 'introduce_pick', 'create', 'modify'):
             packs = [
                 'agent-core.md',
@@ -163,14 +247,14 @@ def build_agent_system_message(contract: dict | None = None) -> str:
     return '\n\n'.join(parts)
 
 
-# Backward-compatible default: full assembly (all packs)
+# 向后兼容的默认值：完整组装（所有包）
 OVERRIDE_SYSTEM_MESSAGE = build_agent_system_message(None)
 
-# Legacy shim file (thin include chain → full assembly via _resolve_directives)
+# 传统垫片文件（薄包含链 → 通过 _resolve_directives 完整组装）
 with open(_PROMPT_PATH, 'r', encoding='utf-8') as _f:
     _prompt_content = _resolve_directives(_f.read()).strip()
 
-# Planner prompt: prefer standalone file, fall back to inline section in agent-prompt.md
+# 规划器提示词：优先使用独立文件，回退到 agent-prompt.md 中的内联部分
 _PLANNER_PATH = os.path.join(_SCRIPT_DIR, 'prompts', 'planner-prompt.md')
 if os.path.exists(_PLANNER_PATH):
     with open(_PLANNER_PATH, 'r', encoding='utf-8') as _f:
@@ -181,13 +265,14 @@ else:
 
 
 def patch_planner_prompt():
-    """Monkey-patch PlannerPrompt.get_system_message() to use extend as override.
+    """
+    猴子补丁 PlannerPrompt.get_system_message() 以使用 extend 作为覆盖。
 
-    Before: built-in (hardcoded) + extended_planner_system_prompt (appended)
-    After:  extended_planner_system_prompt as full replacement (includes built-in part)
+    修改前：内置（硬编码）+ extended_planner_system_prompt（追加）
+    修改后：extended_planner_system_prompt 作为完整替换（包含内置部分）
 
-    This allows editing the full Planner prompt in planner-prompt.md
-    without the library's hardcoded prefix interfering.
+    这允许在 planner-prompt.md 中编辑完整的规划器提示词，
+    而不受库的硬编码前缀干扰。
     """
     from browser_use.agent.prompts import PlannerPrompt
 
@@ -232,10 +317,13 @@ Keep your responses concise and focused on actionable insights.
 
 
 def patch_message_manager():
-    """Monkey-patch MessageManager to limit context size while preserving:
+    """
+    猴子补丁 MessageManager 以限制上下文大小，同时保留：
     - init / memory message_type
     - include_in_memory Action result/error human messages
-    - tool/tool_calls pairing for recent messages
+    - tool/tool_calls 配对（最近消息）
+
+    使用 ContextCompiler 进行裁剪，并上报丢弃明细审计。
     """
     from browser_use.agent.message_manager.service import MessageManager
 
@@ -243,6 +331,15 @@ def patch_message_manager():
     MAX_RECENT = 16
 
     def _msg_content_text(message) -> str:
+        """
+        提取消息文本内容。
+
+        参数：
+            message: 消息对象
+
+        返回：
+            str: 消息文本
+        """
         content = getattr(message, 'content', None)
         if isinstance(content, str):
             return content
@@ -257,6 +354,15 @@ def patch_message_manager():
         return ''
 
     def _is_keepalive(managed) -> bool:
+        """
+        判断消息是否为 keepalive 消息。
+
+        参数：
+            managed: 管理的消息对象
+
+        返回：
+            bool: 如果是 init/memory 类型或 Action result/error 消息返回 True
+        """
         meta = getattr(managed, 'metadata', None)
         mt = getattr(meta, 'message_type', None) if meta is not None else None
         if mt in ('init', 'memory'):
@@ -267,6 +373,12 @@ def patch_message_manager():
         return False
 
     def _patched_get_messages(self):
+        """
+        补丁后的 get_messages 方法。
+
+        使用 ContextCompiler 进行消息窗口裁剪，上报丢弃明细。
+        异常时回退到内联逻辑。
+        """
         history = getattr(getattr(self, 'state', None), 'history', None)
         managed_list = getattr(history, 'messages', None) if history is not None else None
         if not managed_list:
@@ -297,7 +409,7 @@ def patch_message_manager():
                 )
             return kept_messages
         except Exception:
-            pass  # fall through to legacy inline truncation
+            pass  # 回退到传统内联截断
 
         total = len(managed_list)
         if total <= MAX_RECENT + 2:
@@ -308,14 +420,14 @@ def patch_message_manager():
             if _is_keepalive(m):
                 keep.add(i)
 
-        # Always keep the first message (system)
+        # 始终保留首条（system）
         keep.add(0)
 
         recent_start = max(0, total - MAX_RECENT)
         for i in range(recent_start, total):
             keep.add(i)
 
-        # Ensure tool/tool_calls pairing: if an index is a tool message, keep predecessor
+        # 确保 tool/tool_calls 配对：如果索引是 tool 消息，保留前一条
         for i in sorted(keep):
             msg = managed_list[i].message
             role = getattr(msg, 'role', '') or getattr(msg, 'type', '')
@@ -345,11 +457,13 @@ def patch_message_manager():
 
 
 def patch_icon_tooltip_labels():
-    """Before DomService scans, stamp aria-label from el-tooltip aria-describedby.
+    """
+    猴子补丁 BrowserContext.get_state() 在 DomService 扫描前
+    将 el-tooltip aria-describedby 标记为 aria-label。
 
-    Icon-only triggers often have empty text; browser-use already surfaces
-    aria-label in the indexed element list, so resolving tooltips into
-    aria-label lets the agent recognize buttons like 「新增产品」.
+    图标触发器通常文本为空；browser-use 已在索引元素列表中
+    显示 aria-label，因此将工具提示解析为 aria-label
+    让 agent 识别「新增产品」等按钮。
     """
     from browser_use.browser.context import BrowserContext
     from .controller.actions._js_snippets import JS_STAMP_ICON_ARIA_LABELS
@@ -368,6 +482,18 @@ def patch_icon_tooltip_labels():
 
 
 def create_llm(model, base_url, api_key=None, timeout=None):
+    """
+    创建 LLM 客户端。
+
+    参数：
+        model (str): 模型 ID
+        base_url (str): LLM 基础 URL
+        api_key (str, optional): API 密钥，从环境变量获取
+        timeout (float, optional): 超时时间（秒）
+
+    返回：
+        ChatOpenAI: LLM 客户端实例
+    """
     from langchain_openai import ChatOpenAI
     effective_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
     if not base_url:
@@ -383,7 +509,15 @@ def create_llm(model, base_url, api_key=None, timeout=None):
 
 
 def make_step_callback(phase_offset=0):
-    """Create a step callback that emits JSON events."""
+    """
+    创建步骤回调函数。
+
+    参数：
+        phase_offset (int): 阶段偏移量，默认为 0
+
+    返回：
+        callable: 步骤回调函数
+    """
     def on_step_end(browser_state, agent_output, step_num):
         try:
             if agent_output is None: return
@@ -401,10 +535,16 @@ def make_step_callback(phase_offset=0):
 
 
 def make_done_callback(output_path, business_data_store=None):
-    """Create a done callback that saves trajectory and emits JSON event.
+    """
+    创建完成回调函数。
 
-    When business_data_store is provided, sets business_data_store['_done_fired'] = True
-    so the quality gate can detect whether done() was triggered.
+    参数：
+        output_path (Path): 输出文件路径
+        business_data_store (dict, optional): 业务数据存储，
+            提供时设置 business_data_store['_done_fired'] = True
+
+    返回：
+        callable: 完成回调函数
     """
     def on_done(history_list):
         try:

@@ -1,6 +1,16 @@
 """
-Recording hooks for browser-use agent: step callbacks, goal dedup detection, cancel signal,
-and premature done() prevention.
+录制器模块。
+
+本模块提供 browser-use agent 的录制钩子功能，包括：
+- 步骤回调
+- 目标重复检测
+- 取消信号处理
+- 过早 done() 防护
+
+主要功能：
+- 在步骤开始时检查取消信号并注入业务场景摘要
+- 在步骤结束时记录操作日志、检测目标重复、捕获页面 URL
+- 防止 agent 过早调用 done()（当仍有可见的对话框/验证错误时）
 """
 import json
 import re
@@ -20,16 +30,25 @@ from .agent.recorder_emitters import (  # noqa: E402
 )
 
 
-# ========================== Operation Log (plain text, for LLM context) ==========================
-# Each line records one agent step: step#, goal, actions, result.
-# NOT used for script generation — only for LLM reference.
+# ========================== 操作日志（纯文本，用于 LLM 上下文） ==========================
+# 每行记录一个 agent 步骤：步骤号、目标、动作、结果。
+# 不用于脚本生成 —— 仅用于 LLM 参考。
 _ACTION_LOG = []
 
 
 def _compact_last_result(_last_result, max_chars=120):
-    """把 ActionResult（单条或列表）压缩为一行 res=/err= 摘要，避免长 JSON 刷屏。
+    """
+    将 ActionResult（单条或列表）压缩为一行 res=/err= 摘要。
 
-    完整 tool 结果仍在模型上下文里，日志侧只需关键信号与首段预览。
+    避免长 JSON 刷屏，完整 tool 结果仍在模型上下文里，
+    日志侧只需关键信号与首段预览。
+
+    参数：
+        _last_result: 最后的结果对象（单条或列表）
+        max_chars (int): 每个部分的最大字符数，默认为 120
+
+    返回：
+        str: 压缩后的摘要字符串
     """
     results = _last_result if isinstance(_last_result, list) else ([_last_result] if _last_result else [])
     parts = []
@@ -44,12 +63,30 @@ def _compact_last_result(_last_result, max_chars=120):
 
 
 def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_data_store=None):
-    """Build hooks with goal dedup detection and cancel signal."""
+    """
+    构建录制钩子，包含目标重复检测和取消信号处理。
+
+    参数：
+        goal_tracker (dict, optional): 目标追踪器，默认为 {'goals': [], 'stopped': False}
+        cancel_flag_path (Path, optional): 取消信号文件路径
+        business_data_store (dict, optional): 业务数据存储
+
+    返回：
+        tuple: (on_step_start, on_step_end) 钩子函数
+    """
     if goal_tracker is None:
         goal_tracker = {'goals': [], 'stopped': False}
 
     async def on_step_start(agent):
-        # Honor cancel before starting another LLM/action cycle
+        """
+        步骤开始钩子。
+
+        在每个 agent 步骤开始时执行：
+        1. 检查取消信号
+        2. 注入业务场景摘要
+        3. 处理提交就绪提示
+        4. 打断已匹配的重选循环
+        """
         if cancel_flag_path is not None and cancel_flag_path.exists():
             sys.stderr.write("[recorder] Cancel signal on step start — stopping agent\n")
             sys.stderr.flush()
@@ -137,6 +174,18 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
                 sys.stderr.flush()
 
     async def on_step_end(agent):
+        """
+        步骤结束钩子。
+
+        在每个 agent 步骤结束时执行：
+        1. 检查取消信号
+        2. 记录操作日志
+        3. 检测目标重复
+        4. 检测动作循环
+        5. 捕获页面 URL
+        6. 补充缺失的 CSS 选择器
+        7. 防止过早 done()
+        """
         _done = agent.state.history.is_done() if agent.state.history else False
         _stopped = agent.state.stopped
         _last_result = agent.state.last_result

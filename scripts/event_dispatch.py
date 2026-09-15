@@ -1,6 +1,16 @@
-"""Event dispatch for CDP / executor messages in the session runner.
+"""
+事件分发模块。
 
-Extracted verbatim from scripts/session_runner.py.
+本模块处理 CDP / 执行器消息在会话运行器中的分发。
+从 scripts/session_runner.py 中提取。
+
+主要功能：
+- 处理轨迹保存、重置等管理事件
+- 处理 CDP 动作分发
+- 处理手动录制的开始/停止
+- 处理截图捕获控制
+- 处理标签页管理（列表、切换）
+- 处理回放动作执行
 """
 import sys
 
@@ -12,6 +22,8 @@ from .trajectory_store import (
 )
 
 
+# 回放动作签名白名单：定义每个动作允许的参数键
+# 用于过滤回放时传入的参数，只保留必要的键
 _REPLAY_ACTION_SIGNATURES = {
     "fill_form_field": {"label_text", "value"},
     "select_option": {"label_text", "option_text"},
@@ -37,6 +49,18 @@ _REPLAY_ACTION_SIGNATURES = {
 }
 
 def _convert_action_params(action_name, params):
+    """
+    根据动作签名白名单过滤参数。
+
+    对已注册动作，只保留白名单中的参数键；对未注册动作，原样透传。
+
+    参数：
+        action_name (str): 动作名称
+        params (dict): 原始参数字典
+
+    返回：
+        dict: 过滤后的参数字典
+    """
     sig = _REPLAY_ACTION_SIGNATURES.get(action_name)
     if sig is None:
         return dict(params) if params else {}
@@ -44,6 +68,32 @@ def _convert_action_params(action_name, params):
 
 
 async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action_queue=None):
+    """
+    分发接收到的事件消息。
+
+    根据事件类型调用相应的处理函数，支持以下事件：
+    - save_trajectory: 保存轨迹
+    - get_action_log: 获取动作日志
+    - save_business_data: 保存业务数据
+    - reset_trajectory: 重置轨迹
+    - cdp_action: CDP 动作分发
+    - manual_record_start/stop: 手动录制开始/停止
+    - capture_screenshots: 截图捕获控制
+    - list_tabs: 列出标签页
+    - switch_tab: 切换标签页
+    - replay_actions: 回放动作
+    - intervene: 人工干预（已废弃）
+    - step: 步骤执行
+
+    参数：
+        msg (dict): 事件消息
+        session_state (dict): 会话状态
+        agent_running_ref (dict, optional): agent 运行状态引用
+        cdp_action_queue (asyncio.Queue, optional): CDP 动作队列
+
+    返回：
+        str: 'continue' 表示继续处理下一个事件，'step' 表示执行步骤
+    """
     event = msg.get("event")
 
     if event == "save_trajectory":
@@ -184,7 +234,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
                         matched = getattr(t, 'page_id', None)
                         break
                 if matched is None:
-                    # Soft match: same path without trailing slash / query noise
+                    # 软匹配：相同路径（去掉尾部斜杠和查询参数）
                     for t in tabs_info:
                         tu = (getattr(t, 'url', '') or '').rstrip('/')
                         if tu and tu == url.rstrip('/'):
@@ -228,8 +278,8 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             emit_json({"event": "replay_done", "data": early})
             return 'continue'
 
-        # Self-heal / trajectory replay: sequential ops via scripts/controller/actions/_replay.py
-        # (form JS + durable click + controller) — not LLM, not Playwright assemble_partial.
+        # 自修复 / 轨迹回放：通过 scripts/controller/actions/_replay.py 执行顺序操作
+        #（表单 JS + 持久化点击 + 控制器）—— 非 LLM，非 Playwright assemble_partial。
         from .controller.service import build_controller
         from .controller.actions._replay import replay_action_entries
 
@@ -242,7 +292,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         for entry in entries:
             action_name = entry.get("action", "")
             raw_params = entry.get("params", {}) or {}
-            # Prefer signature filter when known, else keep raw for alias normalize.
+            # 优先使用签名过滤（已知动作），否则保留原始参数用于别名规范化
             converted = _convert_action_params(action_name, raw_params)
             merged = converted if converted else dict(raw_params)
             filtered.append({**entry, "action": action_name, "params": merged})
@@ -256,8 +306,8 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             stop_on_fail=stop_on_fail,
         )
 
-        # Heal path: seed ACTION_LOG with the original pre-failure entries so the
-        # subsequent agent recording can be saved as a complete trajectory (prefix + fix).
+        # 修复路径：用原始失败前的条目填充 ACTION_LOG，以便后续 agent 录制
+        # 可以保存为完整轨迹（前缀 + 修复）。
         if seed_action_log:
             try:
                 from . import state as action_state
@@ -295,7 +345,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         return 'continue'
 
     if event == "intervene":
-        # Human intervention via AI session is retired — use manual recording instead.
+        # 通过 AI session 的人工干预已退役 —— 改用手动录制
         emit_json({
             "event": "error",
             "data": {

@@ -1,11 +1,13 @@
-"""ContextCompiler v1 — 上下文窗口预算裁剪 + 丢弃审计明细。
+"""
+上下文窗口预算裁剪与丢弃审计明细模块。
 
-替代 patch_message_manager 的内联截断：保留 keepalive / 最近 N 条 / tool 配对
-逻辑不变，但每次裁剪产出结构化 dropped 明细（index / role / preview），随
-context_drop 事件上报 —— 丢弃可见、可审计（设计文档 §5.5）。
+本模块实现 ContextCompiler v1，替代 patch_message_manager 的内联截断逻辑。
+保留 keepalive / 最近 N 条 / tool 配对逻辑不变，但每次裁剪产出结构化
+dropped 明细（index / role / preview），随 context_drop 事件上报，
+实现丢弃可见、可审计（设计文档 §5.5）。
 
-P1 边界：事实包 / 任务块 / 合约已在 preamble 组装（P1 最小切片），本模块只
-负责消息窗口层；预算上限经 AI_MEMORY_MAX_RECENT 可配（默认 16，与旧行为一致）。
+P1 边界：事实包 / 任务块 / 合约已在 preamble 组装（P1 最小切片），
+本模块只负责消息窗口层；预算上限经 AI_MEMORY_MAX_RECENT 可配（默认 16）。
 """
 
 from __future__ import annotations
@@ -17,7 +19,14 @@ _MAX_DROPPED_ITEMS_REPORT = 20  # 明细上报条数上限（避免事件载荷�
 
 
 def message_window_budget() -> int:
-    """最近消息保留条数（AI_MEMORY_MAX_RECENT，默认 16 保持旧行为）。"""
+    """
+    获取最近消息保留条数。
+
+    环境变量：AI_MEMORY_MAX_RECENT（默认 16，保持旧行为）
+
+    返回：
+        int: 最近消息保留条数，最小为 4
+    """
     try:
         return max(4, int(os.getenv('AI_MEMORY_MAX_RECENT', str(_MAX_RECENT_DEFAULT))))
     except (TypeError, ValueError):
@@ -25,7 +34,16 @@ def message_window_budget() -> int:
 
 
 def msg_preview(message, limit=80) -> str:
-    """取消息文本前 N 字（审计用，不进模型上下文）。"""
+    """
+    取消器文本前 N 字（审计用，不进模型上下文）。
+
+    参数：
+        message: 消息对象
+        limit (int): 截取长度，默认为 80
+
+    返回：
+        str: 消息文本预览
+    """
     content = getattr(message, 'content', None)
     if isinstance(content, str):
         text = content
@@ -43,10 +61,19 @@ def msg_preview(message, limit=80) -> str:
 
 
 def compile_message_window(managed_list, *, max_recent=None, is_keepalive=None):
-    """裁剪消息窗口，返回 (kept_messages, dropped_detail)。
+    """
+    裁剪消息窗口，返回保留的消息和丢弃明细。
 
-    dropped_detail: [{index, role, preview}] —— 每条被裁消息的审计明细。
-    is_keepalive: 可调用对象（msg → bool），None 时只保留首条 system。
+    参数：
+        managed_list: 消息管理列表
+        max_recent (int, optional): 最近消息保留条数，默认使用 message_window_budget()
+        is_keepalive (callable, optional): 判断消息是否为 keepalive 的函数，
+            接受 managed 对象，返回 bool。None 时只保留首条 system 消息。
+
+    返回：
+        tuple: (kept_messages, dropped_detail)
+            - kept_messages: 保留的消息列表
+            - dropped_detail: 丢弃明细列表 [{index, role, preview}]
     """
     if max_recent is None:
         max_recent = message_window_budget()
@@ -90,7 +117,16 @@ def compile_message_window(managed_list, *, max_recent=None, is_keepalive=None):
 
 
 def emit_context_drop(emit, dropped_detail, total, kept_count, max_recent):
-    """上报 context_drop 事件（含明细；emit 为 scripts.memory.writer.emit_memory_event）。"""
+    """
+    上报 context_drop 事件（含明细）。
+
+    参数：
+        emit: 发射函数（scripts.memory.writer.emit_memory_event）
+        dropped_detail (list): 丢弃明细列表
+        total (int): 总消息数
+        kept_count (int): 保留消息数
+        max_recent (int): 最近消息保留条数
+    """
     if not dropped_detail:
         return
     try:

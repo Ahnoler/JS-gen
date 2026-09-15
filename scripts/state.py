@@ -1,9 +1,12 @@
 """
 Shared mutable state for the controller module.
+控制器模块的共享可变状态。
 
 Holds _ACTION_LOG and _TRAJECTORY_URL. All internal reads/writes
 go through this module. The controller facade re-exports these
 for external callers (session_runner, recorder, agent_utils).
+持有 _ACTION_LOG 和 _TRAJECTORY_URL，所有内部读写均通过本模块。
+控制器门面将这些变量重新导出，供外部调用方（session_runner、recorder、agent_utils）使用。
 """
 
 from .models import ActionEntry
@@ -74,36 +77,49 @@ _FIELD_COALESCE_ACTIONS = frozenset({
 
 
 def set_current_run_id(run_id):
-    """Set current recording run id (echoed on phase_done/phase_error events)."""
+    """Set current recording run id (echoed on phase_done/phase_error events).
+    设置当前录制 run id（在 phase_done/phase_error 事件中回传）。
+    """
     global _CURRENT_RUN_ID
     _CURRENT_RUN_ID = run_id
 
 
 def get_current_run_id():
-    """Return current recording run id (None when not set / legacy control plane)."""
+    """Return current recording run id (None when not set / legacy control plane).
+    返回当前录制 run id（未设置或旧版控制平面时为 None）。
+    """
     return _CURRENT_RUN_ID
 
 
 def set_current_phase(n: int):
-    """Set the current phase number. Called by session_runner before each step."""
+    """Set the current phase number. Called by session_runner before each step.
+    设置当前阶段编号，session_runner 在每个步骤前调用。
+    """
     global _CURRENT_PHASE
     _CURRENT_PHASE = n
 
 
 def get_current_phase():
     """Return the current phase number, or None when no phase has been set.
+    返回当前阶段编号，未设置时返回 None。
 
     Symmetric with set_current_phase: _CURRENT_PHASE starts at 0 (= unset),
     which is reported as None so phase-event emitters can fall back to the
     session step index. Phase events must use this (phase-owned number) rather
     than the session-cumulative step_index, or the control plane's owned wait
     (filtered by phaseNumber) drops them as cross-run noise (P1-4).
+    与 set_current_phase 对称：_CURRENT_PHASE 初始值为 0（=未设置），
+    此时返回 None，以便阶段事件发出方可以回退到会话步骤索引。
+    阶段事件必须使用此编号（阶段拥有），而非会话累计的 step_index，
+    否则控制平面的 owned wait（按 phaseNumber 过滤）会将其视为跨运行噪声（P1-4）。
     """
     return _CURRENT_PHASE if _CURRENT_PHASE else None
 
 
 def set_current_page_key(page_key: str):
-    """Set the page-level key for subsequently recorded actions."""
+    """Set the page-level key for subsequently recorded actions.
+    设置后续录制操作的页面级键。
+    """
     global _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY
     if page_key != _CURRENT_PAGE_KEY:
         _CURRENT_POPUP_KEY = ''
@@ -111,19 +127,25 @@ def set_current_page_key(page_key: str):
 
 
 def set_current_source(source: str):
-    """Set recording source for subsequent _record_action calls (agent|manual|cdp)."""
+    """Set recording source for subsequent _record_action calls (agent|manual|cdp).
+    设置后续 _record_action 调用的录制来源（agent|manual|cdp）。
+    """
     global _CURRENT_SOURCE
     _CURRENT_SOURCE = source if source in ('agent', 'manual', 'cdp') else 'agent'
 
 
 def set_capture_screenshots(enabled: bool):
-    """Enable/disable per-step before/after page.screenshot capture."""
+    """Enable/disable per-step before/after page.screenshot capture.
+    启用或禁用每步操作前后的页面截图捕获。
+    """
     global _CAPTURE_SCREENSHOTS
     _CAPTURE_SCREENSHOTS = bool(enabled)
 
 
 def reset_page_level_shots():
-    """Clear the page-level screenshot registry when a recording session (re)starts."""
+    """Clear the page-level screenshot registry when a recording session (re)starts.
+    在录制会话（重新）开始时清空页面级截图注册表。
+    """
     global _PAGE_LEVEL_SHOTS, _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY
     _PAGE_LEVEL_SHOTS = {}
     _CURRENT_PAGE_KEY = ''
@@ -131,10 +153,12 @@ def reset_page_level_shots():
 
 
 def capture_screenshots_enabled() -> bool:
+    """返回截图捕获是否已启用。"""
     return bool(_CAPTURE_SCREENSHOTS)
 
 
 def should_skip_screenshot_action(action_name: str) -> bool:
+    """判断指定操作是否应跳过截图捕获。"""
     return (action_name or '') in _SKIP_SCREENSHOT_ACTIONS
 
 
@@ -146,9 +170,12 @@ _PHASE_SHOT_FUTURES: dict[str, asyncio.Future] = {}
 
 async def request_phase_shot_candidate(state_key: str, phase: int, timeout: float = 5.0) -> bool:
     """Ask the control plane to capture a phase-group shot for one state key (pre-submit).
+    请求控制平面为指定状态键捕获阶段组截图（提交前）。
 
     Emits ``phase_shot_candidate_request`` and awaits ``phase_shot_candidate_result``;
     returns False on timeout/exception — never raises.
+    发出 ``phase_shot_candidate_request`` 并等待 ``phase_shot_candidate_result``；
+    超时或异常时返回 False，永不抛出异常。
     """
     request_id = f'phase-shot-{uuid.uuid4().hex}'
     try:
@@ -169,7 +196,9 @@ async def request_phase_shot_candidate(state_key: str, phase: int, timeout: floa
 
 
 def resolve_phase_shot_result(data: dict) -> None:
-    """Resolve a pending phase-shot request with the control plane's capture ack."""
+    """Resolve a pending phase-shot request with the control plane's capture ack.
+    使用控制平面的捕获确认来解决挂起的阶段截图请求。
+    """
     try:
         rid = str((data or {}).get('requestId') or '')
         if not rid:
@@ -183,7 +212,9 @@ def resolve_phase_shot_result(data: dict) -> None:
 
 
 async def capture_page_png_b64(browser_context, *, full_page: bool = True) -> str | None:
-    """Best-effort Playwright screenshot → base64 PNG string (no data: prefix)."""
+    """Best-effort Playwright screenshot → base64 PNG string (no data: prefix).
+    尽力捕获 Playwright 截图并转为 base64 PNG 字符串（无 data: 前缀）。
+    """
     if not capture_screenshots_enabled():
         return None
     try:
@@ -196,7 +227,9 @@ async def capture_page_png_b64(browser_context, *, full_page: bool = True) -> st
 
 
 async def capture_page_png_b64_from_page(page, *, full_page: bool = True) -> str | None:
-    """Screenshot from an existing page/handle (auto-fill already holds ``page``)."""
+    """Screenshot from an existing page/handle (auto-fill already holds ``page``).
+    从已有页面/句柄截图（auto-fill 已持有 ``page``）。
+    """
     if not capture_screenshots_enabled() or page is None:
         return None
     try:
@@ -211,9 +244,11 @@ async def capture_page_png_b64_from_page(page, *, full_page: bool = True) -> str
 
 async def capture_page_dims_from_page(page) -> dict:
     """Document scroll size (CSS px) — the coordinate space of full-page screenshots.
+    获取文档滚动尺寸（CSS 像素）——全页截图的坐标空间。
 
     Used as the denominator for rect_norm (plugin-format aligned normalized
     0..1 coordinates relative to the page-level screenshot).
+    用作 rect_norm 的分母（插件格式对齐的归一化 0..1 坐标，相对于页面级截图）。
     """
     try:
         target = getattr(page, 'page', page)
@@ -229,12 +264,18 @@ async def capture_page_dims_from_page(page) -> dict:
 
 def page_level_key_from_url(url: str) -> str:
     """Build a stable page key for SPA navigation.
+    为 SPA 导航构建稳定的页面键。
 
     Keeps origin + path + hash route (SPA page identity); drops query params —
     both real search (`?x` before `#`) and query inside the hash fragment
     (`#/route?x=1`) — because they are usually volatile (timestamps, tokens,
     pagination state). In-fragment query also blew past screenshot.level_key
     VARCHAR(512) on long SUT URLs, failing the page_level insert entirely.
+    保留 origin + path + hash 路由（SPA 页面标识）；丢弃查询参数——
+    包括真实搜索（`#` 前的 `?x`）和 hash 片段内的查询（`#/route?x=1`）——
+    因为它们通常是易变的（时间戳、令牌、分页状态）。
+    片段内查询还会导致长 SUT URL 的 screenshot.level_key 超出 VARCHAR(512) 限制，
+    使 page_level 插入完全失败。
     """
     try:
         parts = urlsplit(url or '')
@@ -251,15 +292,23 @@ def page_level_key_from_url(url: str) -> str:
 
 def _stamp_rect_norm(el: dict) -> None:
     """Normalize page_bbox to 0..1 relative to the owning screenshot (plugin-format aligned).
+    将 page_bbox 归一化到 0..1（相对于所属截图，插件格式对齐）。
 
     Page controls: page_bbox / page-level screenshot document size (meta.contentWidth/Height).
     Popup controls: (page_bbox - popup rect on page) / popup rect size — popup meta carries
     its document-coordinate rect; popup screenshot size == rect size (element screenshot).
+    页面控制：page_bbox / 页面级截图文档尺寸（meta.contentWidth/Height）。
+    弹窗控制：(page_bbox - 页面上弹窗矩形) / 弹窗矩形尺寸——
+    弹窗 meta 携带其文档坐标矩形；弹窗截图尺寸 == 矩形尺寸（元素截图）。
 
     Requires page_bbox (document coords). bbox (content/scroll-root coords) is a different
     system and is NOT normalized here — skipping is safer than emitting wrong ratios.
     Registered-shot lookup falls back to a startswith match because stamp keys drop the
     ``@@anchor:`` suffix while registry keys may carry it.
+    需要 page_bbox（文档坐标）。bbox（内容/滚动根坐标）是不同的坐标系，
+    此处不归一化——跳过比发出错误比率更安全。
+    已注册截图查找回退到 startswith 匹配，因为戳记键去掉了 ``@@anchor:`` 后缀，
+    而注册表键可能携带该后缀。
     """
     pb = el.get('page_bbox')
     if not isinstance(pb, dict):
@@ -307,7 +356,9 @@ def _stamp_rect_norm(el: dict) -> None:
 
 
 async def current_page_level(browser_context):
-    """Return (page_key, display_name) for the current page."""
+    """Return (page_key, display_name) for the current page.
+    返回当前页面的 (page_key, display_name)。
+    """
     try:
         page = await browser_context.get_current_page()
         if page is None:
@@ -333,6 +384,7 @@ def _register_page_level_shot(
     png_b64: str,
     meta: dict | None,
 ) -> None:
+    """将页面级截图注册到 _PAGE_LEVEL_SHOTS 注册表。"""
     if not level_key or not png_b64:
         return
     snapshot = {
@@ -347,6 +399,7 @@ def _register_page_level_shot(
 
 
 def _emit_page_level_screenshot(snapshot: dict) -> None:
+    """向控制平面发出页面级截图事件。"""
     try:
         from .agent_utils import emit_json
         # 平铺附加当前录制 runId，供 Node 侧按 run 归属过滤（None 时省略保持 legacy 兼容）
@@ -368,10 +421,13 @@ async def register_current_page_screenshot(
     captured_at: str = 'phase-end',
 ) -> str:
     """Register (or replace) a page-level screenshot for the current page.
+    为当前页面注册（或替换）页面级截图。
 
     ``captured_at`` marks the capture occasion (default ``phase-end`` keeps the
     existing per-phase callers' semantics; ``session-end`` marks the final shot
     taken right before the browser closes).
+    ``captured_at`` 标记捕获时机（默认 ``phase-end`` 保持现有每阶段调用方语义；
+    ``session-end`` 标记浏览器关闭前的最后一张截图）。
     """
     key, name = await current_page_level(browser_context)
     if not key:
@@ -412,12 +468,17 @@ async def register_page_screenshot_if_changed(
     before_dims: dict | None = None,
 ) -> tuple[str, str]:
     """Called after an action: if navigation changed the page, persist the pre-navigation page screenshot.
+    操作后调用：若导航导致页面切换，持久化导航前的页面截图。
 
     ``before_dims`` is the pre-navigation document size ({contentWidth,contentHeight}),
     captured by the caller at the same moment as ``before_b64`` — required for
     rect_norm normalization of the leaving page (post-navigation dims would be wrong).
+    ``before_dims`` 是导航前的文档尺寸（{contentWidth,contentHeight}），
+    由调用方在捕获 ``before_b64`` 的同一时刻获取——用于离开页面的
+    rect_norm 归一化（导航后的尺寸会是错误的）。
 
     Returns the post-action (page_key, page_name).
+    返回操作后的 (page_key, page_name)。
     """
     global _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY
     after_key, after_name = await current_page_level(browser_context)
@@ -461,7 +522,9 @@ async def register_popup_screenshot(
     dialog_b64: str,
     dialog_meta: dict | None = None,
 ) -> str:
-    """Register one popup-level screenshot per popup key."""
+    """Register one popup-level screenshot per popup key.
+    为每个弹窗键注册一张弹窗级截图。
+    """
     if not page_key or not dialog_b64:
         return ''
     title = re.sub(r'\s+', ' ', (dialog_title or 'overlay')).strip()[:40]
@@ -487,7 +550,9 @@ async def register_popup_screenshot(
 
 
 def _last_anchor_xpath_for_overlay() -> str:
-    """Infer the most recent pre-dialog click step as the popup trigger anchor."""
+    """Infer the most recent pre-dialog click step as the popup trigger anchor.
+    推断最近的对话框前点击步骤作为弹窗触发锚点。
+    """
     if len(_ACTION_LOG) < 2:
         return ''
     for entry in reversed(_ACTION_LOG[:-1]):
@@ -504,7 +569,9 @@ def _last_anchor_xpath_for_overlay() -> str:
 
 
 async def capture_dialog_png_b64_from_page(page):
-    """Capture the first visible dialog from an existing page handle."""
+    """Capture the first visible dialog from an existing page handle.
+    从已有页面句柄捕获第一个可见对话框。
+    """
     if not capture_screenshots_enabled() or page is None:
         return None, None
     try:
@@ -562,15 +629,20 @@ async def capture_dialog_png_b64_from_page(page):
 
 
 def _is_overlay_region(region_id) -> bool:
-    """Check whether a region_id chain contains an overlay segment."""
+    """Check whether a region_id chain contains an overlay segment.
+    检查 region_id 链是否包含覆盖层段。
+    """
     return _overlay_label_in_region(region_id) is not None
 
 
 def _overlay_label_in_region(region_id) -> str | None:
     """Return the label of the first overlay segment in a region_id chain, or None.
+    返回 region_id 链中第一个覆盖层段的标签，若无则返回 None。
 
     A region_id chain is ``role:label|role:label|...``; an overlay segment looks
     like ``overlay:新增客户``. The label is the text after the first ``:``.
+    region_id 链格式为 ``role:label|role:label|...``；覆盖层段形如
+    ``overlay:新增客户``。标签是第一个 ``:`` 之后的文本。
     """
     if not region_id:
         return None
@@ -586,8 +658,10 @@ def _overlay_label_in_region(region_id) -> str | None:
 
 async def capture_dialog_png_b64(browser_context):
     """Capture the first visible Element UI dialog/drawer/message-box.
+    捕获第一个可见的 Element UI 对话框/抽屉/消息框。
 
     Returns (base64_png, dialog_meta) or (None, None).
+    返回 (base64_png, dialog_meta) 或 (None, None)。
     """
     if not capture_screenshots_enabled():
         return None, None
@@ -650,7 +724,9 @@ def emit_step_screenshot(
     dialog_b64: str | None = None,
     dialog_meta: dict | None = None,
 ):
-    """One-shot screenshot event — never attach bytes to _ACTION_LOG entries."""
+    """One-shot screenshot event — never attach bytes to _ACTION_LOG entries.
+    一次性截图事件——绝不将字节数据附加到 _ACTION_LOG 条目。
+    """
     if not entry_id:
         return
     if not before_b64 and not after_b64 and not dialog_b64:
@@ -688,8 +764,10 @@ async def record_action_with_screenshots(
     before_b64: str | None = None,
 ):
     """_record_action + after shot + step_screenshot (for paths that bypass controller.action).
+    _record_action + 后置截图 + step_screenshot（用于绕过 controller.action 的路径）。
 
     Pass ``before_b64`` captured before the DOM mutation when possible.
+    尽可能传入在 DOM 变更前捕获的 ``before_b64``。
     """
     after_b64 = None
     if capture_screenshots_enabled():
@@ -710,13 +788,18 @@ async def record_action_with_screenshots(
 
 def _emit_action_log_sync(removed_ids=None, *, full: bool = False):
     """Push action_log_sync to the Dashboard.
+    向仪表板推送 action_log_sync。
 
     Default is *delta*: only entries whose ids were not yet synced, plus optional
     ``removedIds`` for coalesce cleanup. Periodic / forced ``full`` snapshots keep
     the control-plane in-memory copy rebootstrapable after restart.
+    默认为 *增量* 模式：仅包含尚未同步的条目，加上可选的 ``removedIds`` 用于合并清理。
+    周期性/强制 ``full`` 快照确保控制平面内存副本在重启后可重新引导。
 
     Historical O(n²) cost came from sending ``list(_ACTION_LOG)`` on every action
     with a blocking stdout flush; delta shrinks pipe bytes to ~O(1) per step.
+    历史 O(n²) 成本来自每次操作都发送 ``list(_ACTION_LOG)`` 并阻塞 stdout 刷新；
+    增量模式将管道字节数缩减到每步约 O(1)。
     """
     global _ACTION_LOG_SYNC_TICK
     try:
@@ -784,7 +867,9 @@ def _emit_action_log_sync(removed_ids=None, *, full: bool = False):
 
 
 def _element_identity(action_name, params_dict, element=None) -> str | None:
-    """Stable key for 'same page element' coalesce, or None if unknown."""
+    """Stable key for 'same page element' coalesce, or None if unknown.
+    返回"同一页面元素"合并的稳定键，未知时返回 None。
+    """
     params = params_dict or {}
     label = str(params.get('label_text') or '').strip()
     if action_name in _FIELD_COALESCE_ACTIONS and label:
@@ -818,6 +903,7 @@ def _element_identity(action_name, params_dict, element=None) -> str | None:
 
 
 def _entry_element_identity(entry: dict) -> str | None:
+    """从日志条目提取元素身份键。"""
     if not isinstance(entry, dict):
         return None
     return _element_identity(
@@ -828,7 +914,9 @@ def _entry_element_identity(entry: dict) -> str | None:
 
 
 def _record_action(action_name, params, result, element=None, source=None):
-    """Record a controller action call using ActionEntry model."""
+    """Record a controller action call using ActionEntry model.
+    使用 ActionEntry 模型记录控制器操作调用。
+    """
     global _TRAJECTORY_URL
     params_dict = dict(params) if params else {}
     params_dict.pop("xpath_smart", None)

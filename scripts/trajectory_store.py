@@ -1,7 +1,13 @@
-"""Trajectory / case-data persistence for the interactive session runner.
+"""
+轨迹 / 案例数据持久化模块。
 
-Extracted verbatim from scripts/session_runner.py — writes action_*.json,
-log_*.txt, form_*.json, cdata_*.json and emits save_*_result events.
+本模块为交互式会话运行器提供轨迹数据的持久化功能，
+从 scripts/session_runner.py 中提取。
+
+主要功能：
+- 保存 action_*.json、log_*.txt、form_*.json、cdata_*.json 文件
+- 发射 save_*_result 事件
+- 管理轨迹累积和重置
 """
 import json
 import sys
@@ -14,19 +20,27 @@ from .agent_utils import emit_json
 
 
 def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, business_data_store=None):
-    """Save action/log/form files for assemble + MySQL persist.
+    """
+    保存轨迹动作/日志/表单文件用于组装和 MySQL 持久化。
 
-    - action_{ts}.json  — custom action format (for script_assembler.py)
-    - log_{ts}.txt      — operation log (for LLM context)
-    - form_{ts}.json    — form structure snapshots (optional)
+    生成以下文件：
+    - action_{ts}.json — 自定义动作格式（用于 script_assembler.py）
+    - log_{ts}.txt — 操作日志（用于 LLM 上下文）
+    - form_{ts}.json — 表单结构快照（可选）
 
-    Native browser-use AgentHistory (scripts/trajectories/{session_id}.json /
-    traj_*.json) is no longer saved — product truth is MySQL + action JSON.
+    原生 browser-use AgentHistory（scripts/trajectories/{session_id}.json /
+    traj_*.json）不再保存 —— 产品真相是 MySQL + action JSON。
+
+    参数：
+        cumulative_path: 累积轨迹文件路径
+        session_id (str): 会话 ID
+        browser_context: 浏览器上下文（可选）
+        business_data_store (dict, optional): 业务数据存储
     """
     from .controller import _ACTION_LOG, _TRAJECTORY_URL
     from .recorder import _ACTION_LOG as _recorder_log
     from .controller import _ACTION_LOG as _controller_log
-    # Try to extract URL from go_to_url action or _TRAJECTORY_URL
+    # 尝试从 go_to_url 动作或 _TRAJECTORY_URL 提取 URL
     url = _TRAJECTORY_URL or ''
     if not url:
         for entry in (list(_controller_log) if _controller_log else []):
@@ -55,11 +69,11 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, b
         action_path = None
         log_path = None
 
-        # Prepare file paths (write later, after all metadata is ready)
+        # 准备文件路径（在所有元数据就绪后再写入）
         action_path = action_dir / f"action_{ts}.json" if entries else None
         log_path = log_dir / f"log_{ts}.txt" if rec_log_snapshot else None
 
-        # Native AgentHistory dump disabled — discard temp cumulative so it does not grow.
+        # 原生 AgentHistory 转储已禁用 —— 丢弃临时累积文件以防增长
         if cumulative_path and cumulative_path.exists():
             try:
                 cumulative_path.unlink()
@@ -68,7 +82,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, b
         sys.stderr.write(f"[save-trajectory] entries={len(entries)}, rec_log_snapshot={len(rec_log_snapshot)} (native AgentHistory skipped)\n")
         sys.stderr.flush()
 
-        # File 4: form_{ts}.json — form structure snapshots (for replay validation)
+        # 文件 4: form_{ts}.json — 表单结构快照（用于回放验证）
         form_path = None
         snapshots = None
         if business_data_store:
@@ -84,7 +98,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, b
             sys.stderr.write(f"Form snapshots saved: {form_path}\n")
             sys.stderr.flush()
 
-        # File 1: action_{ts}.json
+        # 文件 1: action_{ts}.json
         if action_path and entries:
             action_json = {
                 'id': str(uuid.uuid4()),
@@ -99,7 +113,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, b
             with open(action_path, 'w', encoding='utf-8') as f:
                 json.dump(action_json, f, ensure_ascii=False, indent=2)
 
-        # File 2: log_{ts}.txt
+        # 文件 2: log_{ts}.txt
         if log_path and rec_log_snapshot:
             with open(log_path, 'w', encoding='utf-8') as f:
                 f.write(f"URL: {url}\n")
@@ -108,7 +122,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, b
                 for line in rec_log_snapshot:
                     f.write(line + "\n")
 
-        # Clear all logs so next task starts fresh
+        # 清除所有日志，以便下次任务从头开始
         action_count = len(entries)
         log_count = len(rec_log_snapshot)
         _ACTION_LOG.clear()
@@ -121,8 +135,8 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, b
             "data": {
                 "success": True,
                 "action_file": str(action_path) if action_path else None,
-                # Native AgentHistory path removed; do not fall back to action_file
-                # (would wrongly feed trajectory-store / scripts/trajectories).
+                # 原生 AgentHistory 路径已移除；不要回退到 action_file
+                #（会错误地馈送到 trajectory-store / scripts/trajectories）。
                 "trajectory_file": None,
                 "log_file": str(log_path) if log_path else None,
                 "form_file": str(form_path) if form_path else None,
@@ -142,6 +156,13 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, b
 
 
 def _handle_save_business_data(business_data_store, session_id):
+    """
+    按需保存业务数据到 JSON 文件。
+
+    参数：
+        business_data_store (dict): 业务数据存储
+        session_id (str): 会话 ID
+    """
     try:
         data_dir = Path(__file__).parent / 'case_data'
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -161,6 +182,19 @@ def _handle_save_business_data(business_data_store, session_id):
 
 
 def _handle_reset_trajectory(session_id, business_data_store=None):
+    """
+    重置轨迹数据。
+
+    清空动作日志和记录器日志，清除阶段输出和阶段意图，
+    并准备新的累积文件路径。
+
+    参数：
+        session_id (str): 会话 ID
+        business_data_store (dict, optional): 业务数据存储
+
+    返回：
+        Path: 新的累积文件路径
+    """
     from .controller import _ACTION_LOG
     from .recorder import _ACTION_LOG as _recorder_log
     from .controller.actions._phase_context import clear_phase_outcomes
@@ -181,6 +215,17 @@ def _handle_reset_trajectory(session_id, business_data_store=None):
 
 
 def _accumulate_trajectory(output_path, cumulative_path, phase_number=None):
+    """
+    累积轨迹步骤到累积文件。
+
+    从输出文件读取步骤历史，可选注入阶段号，
+    然后追加到累积文件。
+
+    参数：
+        output_path (Path): 输出文件路径
+        cumulative_path (Path): 累积文件路径
+        phase_number (int, optional): 阶段号，注入到每一步的 state 中
+    """
     if not output_path.exists():
         return
     try:

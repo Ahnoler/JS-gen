@@ -1,6 +1,9 @@
 """
 Interactive session mode for browser-use agent.
+浏览器使用代理的交互式会话模式。
+
 Reads JSON instructions from stdin, runs agent steps with SSE output.
+从 stdin 读取 JSON 指令，运行代理步骤并通过 SSE 输出。
 """
 import os
 import sys
@@ -107,10 +110,13 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=N
 
 async def _run_cdp_watcher(browser_context, action_queue, business_data_store):
     """In-process quick-action executor — uses the same browser_context as the Agent.
+    进程内快速操作执行器——与代理使用相同的 browser_context。
 
     Shares _ACTION_LOG and business_data_store with the main Agent, so all actions
     executed through this watcher are recorded for script assembly.
     No separate CDP connection needed — actions run on the same Playwright context.
+    与主代理共享 _ACTION_LOG 和 business_data_store，因此通过此监视器执行的所有操作
+    都会被记录用于脚本组装。无需单独的 CDP 连接——操作在相同的 Playwright 上下文中运行。
     """
     from .controller.service import build_controller
 
@@ -190,7 +196,9 @@ async def _run_cdp_watcher(browser_context, action_queue, business_data_store):
 
 
 def _env_llm_timeout_sec():
-    """Read LLM_TIMEOUT_MS env → seconds; <=0 → None (no timeout)."""
+    """Read LLM_TIMEOUT_MS env → seconds; <=0 → None (no timeout).
+    读取 LLM_TIMEOUT_MS 环境变量并转为秒；<=0 → None（无超时）。
+    """
     raw = os.getenv('LLM_TIMEOUT_MS', '').strip()
     if not raw:
         return None
@@ -299,6 +307,7 @@ async def _teardown_session(browser, browser_context, reader_task, cdp_task, cdp
 
 
 async def run_session(args):
+    """运行交互式浏览器代理会话。"""
     patch_message_manager()
     patch_planner_prompt()
     patch_icon_tooltip_labels()
@@ -359,7 +368,9 @@ async def run_session(args):
         sys.stderr.flush()
 
     def _on_cdp_task_done(t):
-        """记录 cdp watcher 任务异常退出，避免无人观测的静默死亡。"""
+        """记录 cdp watcher 任务异常退出，避免无人观测的静默死亡。
+        Record CDP watcher task abnormal exit to avoid unobserved silent death.
+        """
         if t.cancelled():
             return
         exc = t.exception()
@@ -414,7 +425,9 @@ async def run_session(args):
     keep_browser = False  # 「释放资源」默认关浏览器；keep_browser=True 才留 CDP
 
     async def _run_step(data, step_idx):
-        """Execute one agent step with the given data."""
+        """Execute one agent step with the given data.
+        使用给定数据执行一个代理步骤。
+        """
         nonlocal cumulative_path
         from .state import register_current_page_screenshot, set_current_phase
         from .state import get_current_run_id, get_current_phase
