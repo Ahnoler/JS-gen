@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 开工：AI 录制 picker 阶段完成判定修复
+
+- 进行中：排查阶段 2 `introduce_pick` 已完成后因 success token 缺失而反复重试、影响阶段 3 的问题；为组合式 `picker_dialog_select` 动作补齐阶段完成证据并回归验证。
+- 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
+- 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
+- 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+
 ## 2026-09-14 · OpenCode — 收工：trajectory 828/remoteSession 1660 阶段弹窗误关闭修复（回链本次开工条目）
 
 - 完成：提交 **3763893d**；`select_option` 各成功路径记录 `picker_closed` 选择器完成证据，但不关闭父级业务 drawer；阶段 done 守卫据此不再因父 drawer 可见而注入多余 `close_dialog`，下一阶段可继续点击同一 drawer 内的【下一步】。

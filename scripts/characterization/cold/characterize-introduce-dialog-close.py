@@ -25,6 +25,9 @@ from scripts.controller.actions._phase_intent import (  # noqa: E402
     apply_phase_contract,
     has_contract_success,
 )
+from scripts.controller.actions._workspace import (  # noqa: E402
+    _record_picker_select_evidence,
+)
 from scripts.controller.actions.phase.reviewer import sanitize_contract_for_mode  # noqa: E402
 
 
@@ -95,10 +98,33 @@ def test_form_save_toast_path_stamps_picker_closed() -> None:
     )
 
 
+def test_picker_select_confirm_stamps_phase_success() -> None:
+    """The combined picker action must satisfy introduce_pick done()."""
+    store: dict = {}
+    apply_phase_contract(
+        store,
+        {
+            "mode": "introduce_pick",
+            "submit": {"required": True},
+            "success": {"kinds": ["picker_closed"]},
+            "source": "llm",
+        },
+    )
+    _record_picker_select_evidence(store, {"changed": {"客户名称": "曾有限责任公司"}})
+    ok, missing = phase_done_ok(store)
+    assert_true(ok, f"picker select/confirm must satisfy phase done; missing={missing}")
+    observed = {item["kind"] for item in store.get("_evidence_observed", [])}
+    assert_true(
+        {"picker_closed", "dialog_confirmed", "introduced_backfilled"} <= observed,
+        f"picker completion evidence incomplete: {observed}",
+    )
+
+
 def main() -> int:
     test_sanitize_introduce_expands_success_kinds()
     test_toast_ok_satisfies_llm_dialog_close_contract()
     test_form_save_toast_path_stamps_picker_closed()
+    test_picker_select_confirm_stamps_phase_success()
     print("characterize-introduce-dialog-close: OK")
     return 0
 

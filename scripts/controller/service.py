@@ -194,7 +194,7 @@ def build_controller(browser_context, business_data_store=None,
     _register_navigation_actions(controller, browser_context)
     _register_table_actions(controller, browser_context, business_data_store)
     _register_misc_actions(controller, browser_context, business_data_store)
-    _register_workspace_actions(controller, browser_context)
+    _register_workspace_actions(controller, browser_context, business_data_store)
     _register_todo_actions(controller, browser_context)
     _register_tree_actions(controller, browser_context)
     _register_observe_actions(controller, browser_context)

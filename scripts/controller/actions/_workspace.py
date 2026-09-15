@@ -42,7 +42,24 @@ def _workspace_result(result):
     return False, str(parsed.get('error') or result)
 
 
-def _register_workspace_actions(controller, browser_context):
+def _record_picker_select_evidence(business_data_store, payload_dict):
+    """Record completion evidence for the atomic picker select/confirm action."""
+    if not business_data_store:
+        return
+    from ._phase_boundary import record_evidence
+
+    changed = payload_dict.get('changed') if isinstance(payload_dict, dict) else None
+    record_evidence(business_data_store, 'picker_closed', 'picker_dialog_select-confirmed')
+    record_evidence(business_data_store, 'dialog_confirmed', 'picker_dialog_select-confirmed')
+    if isinstance(changed, dict) and changed:
+        record_evidence(
+            business_data_store,
+            'introduced_backfilled',
+            ','.join(str(key) for key in changed)[:160],
+        )
+
+
+def _register_workspace_actions(controller, browser_context, business_data_store=None):
     @controller.action(
         'Read the business date (营业日期) that drives date-field defaults in the '
         'target system, from localStorage (keys: businessDate, databaseDate, tenantId). '
@@ -111,6 +128,9 @@ def _register_workspace_actions(controller, browser_context):
                     except Exception:
                         payload_dict2 = {}
                     if payload_dict2.get('refill_verified') is not False:
+                        _record_picker_select_evidence(
+                            business_data_store, payload_dict2
+                        )
                         _record_action('picker_dialog_select', {'dialog_name': dialog_name, 'row_text': row_text}, payload2)
                         return _ok(payload2)
                 return _err(
@@ -118,6 +138,9 @@ def _register_workspace_actions(controller, browser_context):
                     '确认后底层表单回填未发生（重选一次仍未观察到 changed 字段），'
                     '请检查选择是否命中正确行或改用其他选择方式' % (dialog_name, row_text)
                 )
+            _record_picker_select_evidence(
+                business_data_store, payload_dict
+            )
             _record_action('picker_dialog_select', {'dialog_name': dialog_name, 'row_text': row_text}, payload)
             return _ok(payload)
         return payload
