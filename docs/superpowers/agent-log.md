@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 21:55 · OpenCode — 开工：修复第四阶段重复执行与日期范围异常
+
+- 进行中：修复查询条件填写阶段被误套维护表单完成门禁，导致 `done()` 被 pending fields 拒绝、同阶段字段重复执行并越界点击下一阶段【查询】；同时修复 AI 通过 `fill_form_field` 写日期范围时退化为单日期字符串的问题。
+- 范围：`scripts/agent/recorder_emitters.py`、`scripts/controller/actions/phase/intent_gates.py`、AI 控制器动作分发/去重辅助、`scripts/controller/actions/js_snippets/fill_core.py`、`fill_date.py`、对应 characterization、本协作日志；不修改人工录制 mapper/CDP 采集语义和线上轨迹数据。
+- 禁入区：前端仓、`src/services/trajectory/trajectory-meta-service.js`、其他会话 WIP；不改变日期范围录制产物格式，沿用完整起止日期契约。
+- 方式：以 sid `58d8036c` 第四阶段日志为表征，先修运行时 query UI 完成门禁，再补日期范围单值拒绝/区间提交，最后仅在 AI 动作执行入口阻止同阶段同元素成功写操作重复执行；运行定向 characterization、Python 编译和综合门禁后提交。
+
 ## 2026-09-15 · OpenCode — 收工：恢复 picker 表格选行录制语义（回链本次开工条目）
 
 - 完成：AI `click_element_by_index` 在点击前识别位于 el-table 行内的 radio/checkbox，提取行文本并记录为 `click_table_row_radio`，不再退化为普通点击；已完成的搜索输入、查询点击、确认点击原子记录逻辑未修改。
