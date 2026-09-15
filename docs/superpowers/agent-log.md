@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-15 · OpenCode — 收工：AI 录制推流可靠性前四项优化（回链本次开工条目）
+
+- 完成：主仓提交 **73b72e02**；修正 `notifyStreamViewers` DAO 导入并保留错误日志；prepare 对已有 `bibError` 允许重试；已有 runtime 且 BiB 未附着时 `/trajectories/:id/attach` 重新挂载 BiB。前端仓提交 **63d6a53**；RSCF 订阅记录缓存帧基线，仅收到新的帧序号后才将画布判为 streaming，8 秒无新帧则进入现有自动重连，并补充 `cachedFrameId` 类型。
+- 验收：主仓 `node --check` 4 个相关 JS、定向 ESLint、`git diff --check` 通过；前端针对本次文件的 `vue-tsc` 错误筛选无新增错误。前端完整 `npm run build` 仍被仓库既有 `useRecordingStudio.ts`、系统字典、录制列表/草稿向导等类型错误阻断；未发现本次新增代码对应的构建错误。
+- 遗留移交：需部署并重启 control plane/executor 与前端后，用新轨迹核对 `prepare`、`live/status`、`/executors`、`/active` 及 `/ws` 的 `remote:subscribe`/RSCF 首帧；前端仓工作区原有 `vite.config.ts` 未触碰未提交。
+
 ## 2026-09-15 · OpenCode — 开工：AI 录制推流可靠性前四项优化
 
 - 进行中：修复 BiB 观看人数通知失败、BiB 首次失败后不重试、已有 runtime 的 attach 不重挂流，以及前端将 HTTP/attached/缓存帧误判为可用推流的问题。
