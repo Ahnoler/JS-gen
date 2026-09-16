@@ -87,6 +87,7 @@ atoms[] + rejected[] + propose cache
 
 - 校验 `flowRef` 对应卡文件存在；无效 → rejected 或降级该条。
 - **单卡单闭环**：允许多个写操作词步骤进入同一 atom（放宽 `multi_write_atom`），闭环边界以卡 node / 明确落库点（保存/提交且结束本段）为准。
+- 若同一闭环内包含「造 A + 造依赖 A 的 B」，仍须拆成两笔 atom，并用 `dataDependsOn` 串联（依赖规则优先于卡闭环合并）。
 - **跨闭环 / 跨卡**：仍禁止合并。
 - 入口-only（开抽屉无保存）继续并入下一闭环（既有 `foldEntryOnlyLlmAtoms`）。
 - 出处校验不变：缺出处不得进 `atoms`。

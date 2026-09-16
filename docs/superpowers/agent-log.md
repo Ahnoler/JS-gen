@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:32 · Cursor — 收工：Task 4 spec 交叉引用；原子拆分边界计划 T1–T4 完成（回链 12:31 开工）
+
+- 完成：2026-09-07 §3 与 2026-09-09 单卡闭环交叉引用；2026-09-15 状态 → `已审阅；实现按 2026-09-16 plan（PR #37）`
+- 验收：`characterize-atom-depend` **8/8 all passed**；`characterize-atom-keydata` **all passed**
+- 计划：`2026-09-16-atomic-draft-tx-split-boundary.md` Task 1–4 均已落地（helper / propose 接线 / prompt+样例 / spec 交叉引用），PR #37
+- 遗留移交：无本计划内项；不维护 CHANGELOG
+
 ## 2026-09-16 12:31 · Cursor — 开工：Task 4 spec 交叉引用 + 计划收口
 
 - 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 4**（2026-09-07 §3 / 2026-09-09 单卡闭环交叉引用；2026-09-15 状态翻为已审阅/实现中；characterize 复核）
