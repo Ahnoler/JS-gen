@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 14:00 · ZCode — 排查：批量推送坐标非归一化（根因=录制侧 rect_norm 时序缺口，非历史遗留）
+
+- 结论：**不是历史遗留数据**（最新 09-15 的 traj 835/829 同样命中），**也不是导出侧没用归一化算法**（30 条可推轨迹 224 步中 163 步 rect_norm 正常直出）。真因=录制侧 `_stamp_rect_norm`（state.py:293）依赖 `_PAGE_LEVEL_SHOTS` 注册表 meta 作分母，两条时序断点致跳过不写：**A**（主导）`register_page_screenshot_if_changed` 的 after-action 注册 meta 只有 phaseNumber/capturedAt **缺 contentWidth/Height**（state.py:510），页面首动作起整个 phase 内全部跳过，直到 phase-end `register_current_page_screenshot` 才补尺寸——traj 823 phase1 全 5 步 P、phase2 步 8 N 实证；**B**（弹窗）弹窗 shot 在动作后注册（service.py:138-147），弹窗内首动作查不到 → 跳过（traj 823 ph3 st9 / 835 st23131）
+- 证据：`tmp/rect-audit2.mjs`（30 轨迹覆盖审计 163N/61P）、`tmp/rect-seq.mjs`（823 逐步 N/P 序列 vs 页面/弹窗/phase 时序）、offender 全有 page_bbox 排除 bbox 缺失
+- 未修代码（用户未拍板）；修复方向：A=after-action meta 带 before_dims（service.py wrapper 已现成采集）+ 动作前 dims 直通兜底每页首步；B=弹窗首步留缺（导出侧像素回退+弹窗减法仍正确，仅格式非 0-1）
+- 提交本文件顺带携带他线条目：无
+
 ## 2026-09-16 13:50 · Cursor — 收工：表单字段内同族控件 xpath 消歧（回链 12:15 开工）
 
 - 完成：方案 A 落地。`formFieldXpathSmartOf` 改 class-token leaf + 同族 `(item//leaf)[n]`；snap 写 `field_slot`/`display_label`；人工/AI 透传；SPA `pickParamText` 拼 `保证金比例-A`。计划 `docs/superpowers/plans/2026-09-16-form-field-intra-slot-xpath.md`。
