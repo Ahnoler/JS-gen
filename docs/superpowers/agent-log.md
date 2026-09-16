@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 21:05 · Cursor — 收工：能力内聚结构硬闸 Task 1（回链 20:55 开工）
+
+- 完成：helper `src/services/req-draft-traj/capability-cohesion.js`（parse / inspect / classify / sequence-only `assertCapabilityCohesion`）+ pins `scripts/characterization/characterize-capability-cohesion.mjs`。feat **`da1ed8f1`**。开工声明 `ff456d8b`。
+- 验收：`node scripts/characterization/characterize-capability-cohesion.mjs` **all passed**（17 pins：parse×3、C5 classify、classify×4、C1/C5 reject、C2/C6 pass、sequence×4、no scene literals）。RED 先为 `ERR_MODULE_NOT_FOUND`。`npx eslint src/services/req-draft-traj/capability-cohesion.js` 0 warning。reason 仅 `multi_capability_task_draft`；无 `synthesizeFallbackProduceKey`；无场景黑名单字面量。
+- 遗留移交：Task 2+（`produces_eq_title` / fallback `${title}产物` / propose 接线 / cache 4→5 / prompt / verify-all）。湿测 W1–W4 仍只在本地 LMY。不维护 CHANGELOG
+
 ## 2026-09-16 20:55 · Cursor — 开工：能力内聚结构硬闸 Task 1（helper + C1/C5/C2/C6 pins）
 
 - 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 1**（TDD：characterization RED → helper GREEN）。`assertCapabilityCohesion` 本任务只做序列闸；`produces_eq_title` / `synthesizeFallbackProduceKey` 留给 Task 2。
