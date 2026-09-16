@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 20:40 · Cursor — 开工：能力内聚结构硬闸实现计划（writing-plans）
+
+- 进行中：只写实现计划，**不实现**硬闸 / 不 bump cache / 不改 `src/**` 与 prompt。产物=`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` + 本日志短开/收；PR 合入 `uara_V1.2`。规格源=`docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md`（PR #43 仍 OPEN，本分支自 `cursor/capability-cohesion-structural-gate-design-bb60` 起）。
+- 范围（可写集）：`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`、本协作日志
+- 禁入区：`src/**`（含 `req-draft-traj/**` / `propose.js` / `propose-cache.js` / `flow-card-guide.js` / `atom-depend.js`）；`scripts/prompts/**`；characterization；`scripts/refactor/verify-all.sh`；规格正文（不回改 reason 字符串）；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；生成链；SPA；`config/`
+- 方式：主会话 writing-plans；TDD/接线顺序/C1–C6/W1–W4 写进计划，本轮零产品代码
+
 ## 2026-09-16 20:28 · Cursor — 收工：能力内聚结构硬闸设计规格（回链 20:21 开工）
 
 - 完成：**`55138813`** 规格 `docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md`（开工声明 `10849cd9`）。**未实现闸、未 bump cache、未改 prompt/src。**
