@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 20:10 · ZCode 引擎线 — 开工：actions 层改动盘点 → 同事引擎同步清单 → agent team 移植
+
+- 进行中：2026-09-16 20:10；验收=①产出「JS-gen actions 层改动 vs tansun_ui_engine 现状」同步清单（逐项：语义/来源 commit/引擎是否已有/是否需要同步）②清单中确认需同步且引擎侧适用的条目移植完成并提交
+- 范围：只读调研=JS-gen `docs/superpowers/agent-log.md`（991 行）+ engine 仓 `ui_execute/engine/actions/**` 现状盘点；实现=engine 仓 `ui_execute/engine/actions/**`（具体文件集待清单确定后在本条目追加）+ 本地测试件（不提交）+ 本文件
+- 禁入区：JS-gen 源码（只读）、engine 仓 config.py、push、SUT 真实数据变更；他线 WIP（`scripts/refactor/verify-all.sh` 等在途件不碰）
+- 方式：lead 设计；调研双子智能体并行（R1=挖 log、R2=引擎盘点，均只读不 commit）；实现子智能体按清单文件集不相交派发；主会话复核+验证后代提交
+
 ## 2026-09-16 19:27 · OpenCode — 收工：录制两病灶修复（回链 18:59 开工）
 
 - 完成：**`953c4be4`**（4 文件 / +106 -22）——①`click_action_engine.click_element_by_index` 新增 `select_trigger_click`：dd_gate 对 `.el-select` 触发框返回 `kind:'trigger'`（排除 `.el-select-dropdown`/`.el-tree`/`.el-tree-node`/`.tree-popover`/`.el-tree-select__popper`/`.el-cascader__dropdown`/`.el-popover` 内的 popper 内容），并补 `target_kind=='form_select'` 兜底；命中即**点击照做但不录制、不 `remember_phase_operation_aliases`、不 `remember_trigger_button`**，返回 `transient-select-open` 提示；option/table-row/dropdown 仍原样硬拒 `use-select-option`。②索引点击「查询」时按 `re.sub(r'\s+','',btn_label)=='查询'` 调 `mark_query_clicked`（与 `click_button` 及回放侧 `mark_stc_flags_on_replay_ok` 对齐，消除录放不对称）。③`trajectory-meta-service.js` 阶段拆分提示词新增硬规则 `3.1 状态边界原则`（预期结果为「打开确认弹窗」的阶段必须含全部开窗动作；弹窗内按钮只归下一阶段；禁止下一阶段承担上一阶段未完成动作；不确定可达时「触发→确认」合并）。
