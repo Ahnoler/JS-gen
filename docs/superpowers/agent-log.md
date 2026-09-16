@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 22:25 · Cursor — 收工：能力内聚结构硬闸 Task 4（回链 22:10 开工）
+
+- 完成：`characterize-req-draft-traj.mjs` pin 改为 `PROPOSE_CACHE_VERSION === 5`；`propose-cache.js` 4→5（注释 v5 = capability-cohesion + title-as-key reject）；`verify-all.sh` 在 `characterize-persist-boundary` 后注册 `characterize-capability-cohesion`。chore **`433f0b2c`**。开工声明 `3926a134`。
+- 验收：RED=`PROPOSE_CACHE_VERSION is 5` actual `4 !== 5`（未 bump 时）。GREEN：version pin ✓；`characterize-capability-cohesion.mjs` **all passed**（25 pins）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**；eslint 三 src 文件 0 warning。
+- **未全绿**：`characterize-req-draft-traj.mjs` 在 version pin 通过后于 `propose merges same-loop steps when LLM returns flowRef` 失败（`atoms.length` `0 !== 1`）。诊断：`进入编辑页` 因 maintain 族子串 `编辑` 被标 `other`，与 `维护概况` 构成两个 `other` → `multi_capability_task_draft`；fallback 同稿同样被拒。未改 `capability-cohesion.js` / `propose.js`（Task 4 禁入）。未改 prompt / samples / api-docs。
+- 遗留移交：Task 5+（prompt 一句 / samples / api-docs）前需处理该既有 flowRef 闭环节 pin 与 `编辑页` 假阳性；湿测 W1–W4 仍只在本地 LMY。不维护 CHANGELOG
+
 ## 2026-09-16 22:10 · Cursor — 开工：能力内聚结构硬闸 Task 4（cache v5 + verify-all）
 
 - 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 4**（TDD：先改 `characterize-req-draft-traj.mjs` pin `PROPOSE_CACHE_VERSION === 5` RED actual 4 → bump `propose-cache.js` 4→5 GREEN → `verify-all.sh` 注册 `characterize-capability-cohesion`）。不改 prompt / samples / api-docs（Task 5+）。
