@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-16 16:50 · Cursor — 开工：产品树脏后缀 design spec
+
+- 进行中：写入并提交 `docs/superpowers/specs/2026-09-16-tree-node-dirty-suffix-design.md`（用户裁决：剥 `(N)`/拼接 `-`，保留 `[V-…]`；DOM 优先取内层 span）
+- 范围：该 spec + 本协作日志；暂不改代码
+- 禁入区：`src/cdp/**` 实现、`stripVolatileTreeText` 行为变更（待 spec 批准后）、他线 search-then-click、`config/` WIP
+- 方式：主会话 brainstorming → 用户审阅 spec 后再 writing-plans
+
+
 ## 2026-09-16 16:43 · OpenCode — 收工：回放 err-search-first 误拦截（回链 16:37 开工）
 
 - 完成：根因（回放引擎绕过录制态 STC flag 标记 → 守卫误拦 → 语意路径退化）修复 `c820ac76`：新增 `mark_stc_flags_on_replay_ok`（fill→search_filled / 查询点击→query_clicked，候选含 params 与 element/attrs placeholder）；`replay_action_entries` 成功分支接线；`FillEngine`/`ClickEngine` 录制路径行为不变
