@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 16:05 · Cursor — 开工：product-mgmt wet propose 多【确定】误合并（persist boundary + taskDraft 闸）
+
+- 进行中：TDD 修 confirmed 根因——`stepsShareClosedLoop`/`isPersistBoundaryAction` 只看 action 不看 buttons；`启用` 误匹配 `未启用`；flowGuided 下 `boundaries<=1` 放行多写合并；taskDraft 多【确定】无闸
+- 范围：`src/services/req-draft-traj/flow-card-guide.js`、`src/services/req-draft-traj/propose.js`、`scripts/characterization/characterize-persist-boundary.mjs`（新）、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：`product_library.json` / `prod_add_dlg` 拆卡；`missing_depend_fields` 升硬拒；runtime recording scheduler；他线 field_slot xpath；SPA；`tmp/cmds` / `config/` WIP
+- 方式：主会话 Inline TDD（先 RED pin 再最小实现）；分支 `cursor/persist-boundary-confirm-8f78`；PR 合入 `uara_V1.2`
+
 ## 2026-09-16 15:05 · Cursor — 收工：field_slot 终审 Important 修复（回链 14:50 开工）
 
 - 完成：`7ed9b6bd` persist AI/CDP `field_slot`/`display_label`；`ccdb68e1` offline input tight leaf；湿测 JSON `.superpowers/sdd/task-4-wet-result.json`；SPA `19130bf`/`041a1ef`（独立仓）
