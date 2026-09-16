@@ -113,6 +113,7 @@ run "characterize-phase-group-shot" "$PY" scripts/characterization/characterize-
 
 run "characterize-form-engine-wiring" "$PY" scripts/characterization/characterize-form-engine-wiring.py
 run "characterize-ghost-pending-prune" "$PY" scripts/characterization/characterize-ghost-pending-prune.py
+run "characterize-phase-end-pending-refresh" "$PY" scripts/characterization/characterize-phase-end-pending-refresh.py
 run "characterize-done-accept-reason" "$PY" scripts/characterization/characterize-done-accept-reason.py
 run "characterize-save-retry-scope" "$PY" scripts/characterization/characterize-save-retry-scope.py
 run "characterize-picker-close-clears-section" "$PY" scripts/characterization/characterize-picker-close-clears-section.py
