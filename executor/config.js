@@ -4,6 +4,7 @@
 import path from 'path';
 import os from 'os';
 import { readFileSync, existsSync, writeFileSync, writeSync, openSync, closeSync, unlinkSync, mkdirSync } from 'fs';
+import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 
@@ -131,13 +132,44 @@ function isPidAlive(pid) {
 }
 
 /**
+ * 核对 pid 对应进程是否"长得像"本执行机（命令行同时含 node 与 agent.mjs）。
+ * Windows 激进复用 PID：强杀/崩溃留下的陈旧锁，其 pid 常被无关进程占用
+ * （2026-09-12 实锤：被回收给 Cursor.exe），仅探活会误判双开、启动永久死锁。
+ * 查询失败返回 null，调用方保守处理（沿用旧行为拒绝接管）。
+ * @param {number} pid 进程 id
+ * @returns {boolean|null} true=像执行机（真双开）；false=不像（陈旧锁）；
+ *   null=无法判断（进程查询失败/不可用平台命令）
+ */function pidLooksLikeExecutor(pid) {
+  try {
+    let cmd = '';
+    if (process.platform === 'win32') {
+      cmd = execFileSync(
+        'powershell.exe',
+        ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`],
+        { timeout: 5000, encoding: 'utf-8' },
+      );
+    } else if (process.platform === 'darwin') {
+      cmd = execFileSync('ps', ['-p', String(pid), '-o', 'command='], { timeout: 5000, encoding: 'utf-8' });
+    } else {
+      cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf-8').replace(/\0/g, ' ');
+    }
+    const lower = String(cmd || '').toLowerCase();
+    return lower.includes('node') && lower.includes('agent.mjs');
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 获取执行器启动互斥锁：同一 node-uuid 只允许一个 executor 进程运行。
  * （双进程会以相同 nodeUuid 互相顶替 WS 连接，导致指令路由黑洞与误清租约。）
  *
  * 锁文件为 .node-uuid 同目录的 .node-uuid.lock，内容为持锁进程的 pid：
  * - `fs.openSync(lockPath, 'wx')` 独占创建成功 → 写入当前 pid，返回 true；
  * - 锁已存在（EEXIST）→ 读取旧 pid 探活：进程已死（或锁内容损坏）→
- *   覆盖写自己的 pid 返回 true；进程存活（含 Windows EPERM）→ 返回 false。
+ *   覆盖写自己的 pid 返回 true；进程存活 → 核对身份（pidLooksLikeExecutor）：
+ *   命令行含 node+agent.mjs = 真双开，返回 false；不像 = pid 已被无关进程
+ *   复用（Windows 常见），视为陈旧锁，警告后覆盖接管；查询失败(null)保守拒绝。
  * @returns {boolean} true 表示成功持锁；false 表示已有存活的同 node-uuid 执行器进程
  */
 export function acquireExecutorLock() {
@@ -159,9 +191,16 @@ export function acquireExecutorLock() {
     oldPid = parseInt(readFileSync(EXECUTOR_LOCK_FILE, 'utf-8').trim(), 10);
   } catch {}
   if (Number.isInteger(oldPid) && oldPid > 0 && isPidAlive(oldPid)) {
-    return false;
+    const looksLikeExecutor = pidLooksLikeExecutor(oldPid);
+    if (looksLikeExecutor !== false) {
+      return false;
+    }
+    console.warn(
+      `[executor] stale lock: pid ${oldPid} is alive but NOT an executor process`
+      + ' (Windows recycled the pid) — taking over the lock',
+    );
   }
-  // 锁为残留（持有进程已死 / 内容损坏）：覆盖写入当前 pid 接管
+  // 锁为残留（持有进程已死 / 内容损坏 / pid 已被无关进程复用）：覆盖写入当前 pid 接管
   writeFileSync(EXECUTOR_LOCK_FILE, String(process.pid), 'utf-8');
   return true;
 }

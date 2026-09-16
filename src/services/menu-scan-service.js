@@ -25,7 +25,8 @@ export function extractMenuDataId(xpath) {
  * L2 优先按 `parentName` 下子节点 `menuXpath` 的 data-id 命中（命中则 updates，名称不同时带 `name` 改为 SUT 文案），
  * 其次按同名命中——但仅当该子节点 xpath 为空或 data-id 与扫描一致（避免把叶子 xpath 写到错名幽灵上）；
  * 再其次按同名 `intermediateFlag===1` 子节点升格（`promote: true`）；
- * 否则 creates。
+ * 否则 creates——但同 pass 内已排队的同 parent+data-id / 同 parent+xpath 不再二次 create
+ * （堵住扫描列表重复条目导致的同 xpath 孪生）。
  * 命中 → `updates`（带 menuXpath）；若该节点 `unmatchedFlag===1` → 同时记入 `clearedUnmatched`。
  * 未命中 → `creates`（L1 带 `parentName:''`，L2 带 parentName）。
  * @param {Array<{ level: 1|2, name: string, parentName?: string, xpath: string }>} scannedMenus 扫描到的菜单项
@@ -49,6 +50,10 @@ export function buildScanApplyPlan(scannedMenus, existingModules) {
 
   let matched = 0;
   const l1CreatedNames = new Set();
+  /** @type {Set<string>} 本 pass 已排队 create 的 L2：`${parentName}\\0${dataId}` */
+  const pendingL2DataIds = new Set();
+  /** @type {Set<string>} 本 pass 已排队 create 的 L2：`${parentName}\\0${xpath}` */
+  const pendingL2Xpaths = new Set();
 
   // sortOrder 计数器：L1 全局下标（0-based，按 level===1 出现序）；
   // L2 按 parentName 分组下标（每个 parentName 独立从 0 计数）。
@@ -85,6 +90,8 @@ export function buildScanApplyPlan(scannedMenus, existingModules) {
       const kids = parentMod && Array.isArray(parentMod.children) ? parentMod.children : [];
       const navKids = kids.filter((c) => Number(c.intermediateFlag) !== 1);
       const scanDataId = extractMenuDataId(xpath);
+      const dataIdKey = scanDataId ? `${parentName}\0${scanDataId}` : '';
+      const xpathKey = xpath ? `${parentName}\0${xpath}` : '';
 
       let fnNode = null;
       let renameTo = '';
@@ -121,7 +128,15 @@ export function buildScanApplyPlan(scannedMenus, existingModules) {
           matched += 1;
           continue;
         }
+        // 同 pass 已排队同 data-id / 同 xpath → 视为命中 pending，不再 create
+        if ((dataIdKey && pendingL2DataIds.has(dataIdKey))
+          || (xpathKey && pendingL2Xpaths.has(xpathKey))) {
+          matched += 1;
+          continue;
+        }
         creates.push({ level: 2, name, parentName, xpath, sortOrder });
+        if (dataIdKey) pendingL2DataIds.add(dataIdKey);
+        if (xpathKey) pendingL2Xpaths.add(xpathKey);
       }
       continue;
     }

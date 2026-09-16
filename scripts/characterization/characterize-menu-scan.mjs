@@ -329,6 +329,67 @@ function testL2DifferentNameDoesNotPromoteIntermediate() {
   );
 }
 
+/** 同一次扫描里重复出现同一 parent+data-id → 只 create 一次（堵住同 xpath 孪生） */
+function testL2SamePassDuplicateDataIdCreatesOnce() {
+  if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const existingModules = [
+    {
+      id: 11,
+      name: '合同管理',
+      source: 'json_import',
+      unmatchedFlag: 0,
+      children: [],
+    },
+  ];
+  const scanned = [
+    { level: 1, name: '合同管理', parentName: '', xpath: '//li[@data-id="RES_M"]' },
+    {
+      level: 2,
+      name: '待签订',
+      parentName: '合同管理',
+      xpath: '//*[@data-id="RES234"]',
+      dataId: 'RES234',
+    },
+    {
+      level: 2,
+      name: '待签订',
+      parentName: '合同管理',
+      xpath: '//*[@data-id="RES234"]',
+      dataId: 'RES234',
+    },
+  ];
+  const plan = buildScanApplyPlan(scanned, existingModules);
+  const creates = plan.creates.filter((c) => c.level === 2 && c.name === '待签订');
+  assert.equal(creates.length, 1, 'same-pass duplicate data-id → one L2 create');
+  assert.equal(creates[0].xpath, '//*[@data-id="RES234"]');
+  assert.equal(plan.stats.created, 1, 'stats.created counts one L2 (L1 matched)');
+  assert.equal(plan.stats.matched, 2, 'L1 update + second L2 treated as matched pending');
+}
+
+/** 同一次扫描里同 parent+同 xpath、不同 data-id 文本亦只 create 一次 */
+function testL2SamePassDuplicateXpathCreatesOnce() {
+  if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const existingModules = [
+    {
+      id: 11,
+      name: '合同管理',
+      source: 'json_import',
+      unmatchedFlag: 0,
+      children: [],
+    },
+  ];
+  const xpath = '//div[@id="x"]//*[@data-id="RES234"]';
+  const scanned = [
+    { level: 1, name: '合同管理', parentName: '', xpath: '//li[@data-id="RES_M"]' },
+    { level: 2, name: '待签订', parentName: '合同管理', xpath },
+    { level: 2, name: '待签订 ghost', parentName: '合同管理', xpath },
+  ];
+  const plan = buildScanApplyPlan(scanned, existingModules);
+  const creates = plan.creates.filter((c) => Number(c.level) === 2);
+  assert.equal(creates.length, 1, 'same-pass duplicate xpath → one L2 create');
+  assert.equal(creates[0].name, '待签订');
+}
+
 /** 已有可导航同名叶 → 仍更新可导航 id，不升格 sibling intermediate */
 function testL2NavigableWinsOverIntermediateSibling() {
   if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
@@ -539,6 +600,8 @@ function main() {
     ['buildScanApplyPlan L2 same-name intermediate → promote, no create', testL2PromoteSameNameIntermediate],
     ['buildScanApplyPlan L2 异名叶 does not promote intermediate → create', testL2DifferentNameDoesNotPromoteIntermediate],
     ['buildScanApplyPlan L2 navigable same-name wins over intermediate sibling', testL2NavigableWinsOverIntermediateSibling],
+    ['buildScanApplyPlan L2 same-pass duplicate data-id → one create', testL2SamePassDuplicateDataIdCreatesOnce],
+    ['buildScanApplyPlan L2 same-pass duplicate xpath → one create', testL2SamePassDuplicateXpathCreatesOnce],
     ['buildScanApplyPlan stats: totalScanned + unmatchedScanned', testStatsCorrect],
     ['wiring: service uses openSession + runReplayActions + buildScanApplyPlan', testWiringService],
     ['wiring: runScan calls fillEmptyPageIdsForSystem after apply', testWiringSessionPageIdFill],
