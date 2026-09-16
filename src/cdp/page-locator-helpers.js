@@ -1716,10 +1716,19 @@ export const PAGE_LOCATOR_HELPERS = `
         occurrence = pinned.occurrence;
         verified = pinned.verified;
         // Do not export global [n] when section/titlebox anchor exists but uniqueness failed.
+        // Keep field-internal (itemPred//leaf)[n] pins and unique form_* smart xpaths.
         if (occurrence >= 1 && (regionAnchorOf(host) || (region && (region.title || region.region_block)))) {
-          smart = '';
-          verified = false;
-          occurrence = 0;
+          const isFormKind = String(kind).indexOf('form_') === 0;
+          const uniqueFormSmart = isFormKind && smart && evalXpathAll(smart).length === 1;
+          const smartStr = String(smart || '');
+          const fieldInternalPin = isFormKind && smartStr
+            && smartStr.indexOf("div[contains(@class,'el-form-item')]") >= 0
+            && /\\)\\[(\\d+)\\]\\s*$/.test(smartStr);
+          if (!uniqueFormSmart && !fieldInternalPin) {
+            smart = '';
+            verified = false;
+            occurrence = 0;
+          }
         }
       }
     }

@@ -56,6 +56,8 @@ ${PAGE_LOCATOR_HELPERS}
       field_slot: loc.field_slot || '',
       display_label: loc.display_label || '',
       locator_occurrence: loc.locator_occurrence || 0,
+      locator_verified: loc.locator_verified,
+      locator_strategy: loc.locator_strategy || '',
       hitCount: hits.length,
       hitId: hits[0] && hits[0].id,
       hostId: host && host.id,
@@ -85,6 +87,12 @@ async function main() {
   assert.equal(selB.field_slot, 'B');
   assert.equal(selA.display_label, '保证金比例-A');
   assert.equal(selB.display_label, '保证金比例-B');
+  assert.equal(selA.locator_verified, true, 'select A verified with titlebox');
+  assert.equal(selB.locator_verified, true, 'select B verified with titlebox');
+  assert.equal(selA.locator_strategy, 'xpath_smart');
+  assert.equal(selB.locator_strategy, 'xpath_smart');
+  assert.ok(selA.xpath_smart.includes("el-form-item"), 'select A keeps field-internal pin');
+  assert.ok(selB.xpath_smart.includes("el-form-item"), 'select B keeps field-internal pin');
   console.log('ok: dual select slots');
 
   const inA = await page.evaluate(snapExpr('#in-a', '保证金比例', 'form_input'));
@@ -96,6 +104,10 @@ async function main() {
   assert.equal(inA.field_slot, 'A');
   assert.equal(inB.field_slot, 'B');
   assert.equal(inA.formLabel, '保证金比例');
+  assert.equal(inA.locator_verified, true, 'input A verified with titlebox');
+  assert.equal(inB.locator_verified, true, 'input B verified with titlebox');
+  assert.equal(inA.locator_strategy, 'xpath_smart');
+  assert.equal(inB.locator_strategy, 'xpath_smart');
   console.log('ok: dual input slots');
 
   const single = await page.evaluate(snapExpr('#biz-no', '业务产品编号', 'form_input'));
