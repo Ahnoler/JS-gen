@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-16 · OpenCode — 收工：排查控制面异常关闭导致录制画面推流中断（回链本次开工）
+
+- 完成：只读梳理 `trajectory.remote_session_id` → `remote_session` → `agent_session_id`/`executor_node_id` → 执行机 `BibBridge` → RSCF 推流链路；未修改业务代码、数据库或线上运行态。
+- 结论：控制面重启会丢失 `state.sessions`、trajectory runtime、`liveByRemoteSessionId` 和控制面 WS 的帧缓存；执行机/Python/Chrome 可继续存活。注册重连时仅按 `remote_session.status=active` 恢复 BiB 绑定，未恢复控制面 session/runtime，也未主动重新发送 `session.attach_bib`；因此交易若仍为 `recording`，前端按 DB 的 `remote_session_id` 订阅却可能收不到新帧。更严重的是 `server.mjs` 延迟 15s 执行 `crashOccupiedOnOfflineNodes()`，执行机若超过窗口才重连会把仍存活的 active/idle row 标记 `crashed` 并清 `trajectory_id`，永久切断原交易身份。
+- 关键证据：`schemas/init.sql:67-73,103-120` 定义状态与交易 FK；`server.mjs:185-227` 先等待重连窗口后批量 crash；`src/executor-ws.js:81-147` 仅恢复 active row 的 live binding并随后处理孤儿；`src/services/remote-session-state.js:304-318` 恢复还依赖 `row.status=active`；`src/services/executor-node-service.js:119-127,182-189` 断连 grace 到期会 crash 全节点会话；`executor/session-manager.js:346-391` 的 `bib_ready` 只在收到新的 `session.attach_bib` 时产生；`executor/ws-client.js:129-137` 重连只 flush 事件，不触发已存活会话的 BiB 重附。
+- 次要风险：控制面收到执行机重连后，`handleRegister` 的恢复查询和 `reconcileOrphanSessions` 不是事务；`remote_session` 的多行/状态变化可能在两步之间漂移。`remoteSessionId` 与 `remoteSessionUuid` 是两层身份，单靠交易表数字 ID 无法在控制面内存清空后恢复执行机端 BiB 对象。
+- 建议移交：①重连恢复应以 `remote_session` 为真源，保留 `active` 行并按 node+agent session 发起幂等 `session.attach_bib`，由 `bib_ready` 重建控制面 binding/runtime 或显式要求前端走 reattach；②将启动批量 crash 改为带执行机 `session.list` 的逐会话对账，确认 executor 不存在后再 crash，避免固定 15s 时间窗误杀；③控制面启动后为 `record_status=recording` 且 remote_session 仍 active 的交易补建 runtime/录制事件订阅，或将其明确标为 `degraded` 并提供按 `remote_session_id` 的恢复接口；④补充“控制面 kill → 执行机保持在线 → 重连在 15s 内/外 → 前端重新订阅”的真机验收。
+- 验收：完成静态代码与历史提交审计；`git status` 仅保留既有 `config/.db-whitelist-seen` 未跟踪文件及本次日志提交；未执行线上连接。`git pull`/`git push` 均因 GitHub 连接被重置失败。
+- 遗留移交：本轮没有实现修复；根因与修复边界已明确，下一任务应先确定“保留原 remote_session 并重附 BiB”还是“将 recording 置 degraded 后人工恢复”的产品语义。
+
 ## 2026-09-16 · OpenCode — 开工：排查控制面异常关闭导致录制画面推流中断
 
 - 进行中：从交易关联的 `remote_session_id` 出发，排查数据库记录、控制面恢复/清理逻辑、执行机 WebSocket 与 BiB/画面推流生命周期；本轮先做只读根因分析，不直接修改业务代码。
