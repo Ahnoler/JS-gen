@@ -341,6 +341,73 @@ async function testAbortMidBatchDropsExecutedStep() {
   }
 }
 
+/**
+ * Auto-injected meta checkpoints must not inflate user-facing step counts:
+ * their success is silent (business step count only); failures still count.
+ */
+async function testMetaStepSuccessNotCounted() {
+  if (!sutAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const node = fakeExecutorNode();
+  node.attach('rb-char-node-meta');
+  const runtime = makeRuntime({
+    sessionId: 'rb-char-meta',
+    executorNodeUuid: 'rb-char-node-meta',
+    suppressStepPersist: true, isReplay: true,
+  });
+  const session = { busy: true };
+  const actions = [
+    { id: 'm', action: 'task_done', params: { label_text: 'x' } },
+    { id: 'a', action: 'click', params: {} },
+  ];
+  try {
+    const p = runReplayBatch({
+      tid: TID, orderedStepIds: [1, 2], doSuppress: true, runtime, session,
+      actions, rows: [{ id: 1 }, { id: 2 }], snapshotsByTrigger: new Map(),
+    });
+    for (let step = 0; step < 2; step += 1) {
+      await waitSubscribeAndEmit('rb-char-meta', 'replay_done',
+        { ok: 1, failed: 0, results: [{ ok: true, result: 'ok' }] }, `meta step ${step}`);
+      await waitSubscribeAndEmit('rb-char-meta', 'get_action_log_result',
+        { entries: [] }, `meta mark ${step}`);
+    }
+    const out = await withTimeout(p, 30000, 'meta-not-counted');
+
+    assert.equal(out.results.length, 2, 'both entries produced a result row');
+    assert.equal(out.successCount, 1, 'meta step success excluded from successCount');
+    assert.equal(out.ok, 1, 'ok mirrors business successCount');
+    assert.equal(out.count, 1, 'count counts business steps only');
+    assert.equal(out.failedCount, 0, 'no failures');
+    assert.equal(out.failed, 0, 'failed 0');
+    assert.equal(out.results[0].action, 'task_done', 'meta result row kept for diagnostics');
+    assert.equal(out.results[0].ok, true, 'meta result row ok');
+    assert.equal(out.results[1].action, 'click', 'business result row present');
+  } finally {
+    hub.removeSessionHub('rb-char-meta');
+    node.detach('rb-char-node-meta');
+  }
+}
+
+/** Type B checkpoint with no bound snapshot (skip-success) must not be counted. */
+async function testFormSnapshotSkipNotCounted() {
+  if (!sutAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const runtime = makeRuntime({
+    sessionId: 'rb-char-fsnap', suppressStepPersist: true, isReplay: true,
+  });
+  const session = { busy: true };
+  const out = await withTimeout(runReplayBatch({
+    tid: TID, orderedStepIds: [3], doSuppress: true, runtime, session,
+    actions: [{ id: 's', action: 'save_form_snapshot', params: {} }],
+    rows: [{ id: 3 }], snapshotsByTrigger: new Map(),
+  }), 60000, 'form-snapshot-skip');
+
+  assert.equal(out.results.length, 1, 'checkpoint result row present');
+  assert.equal(out.results[0].action, 'save_form_snapshot', 'checkpoint row action');
+  assert.equal(out.results[0].ok, true, 'skip-success checkpoint ok');
+  assert.equal(out.successCount, 0, 'checkpoint success not counted');
+  assert.equal(out.count, 0, 'count excludes the checkpoint');
+  assert.equal(out.failedCount, 0, 'checkpoint skip is not a failure');
+}
+
 async function testTransportFailureAggregatesFailedStepIds() {
   if (!sutAvailable) { console.log('    (skipped: SUT not importable)'); return; }
   const runtime = makeRuntime({
@@ -426,6 +493,8 @@ function testStructureTypeBBeforeTypeA() {
   assert.match(src, /skippedIds,/, 'skippedIds handed to handleFormStructureCheckpoint');
   assert.match(src, /healType: 'form_structure'/, 'Type B finished payload tagged form_structure');
   assert.match(src, /FORM_STRUCTURE_SOFT_FAIL_CONTINUE/, 'Type B soft-fail continue marker');
+  assert.match(src, /if \(!typeB\.ok && !typeB\.aborted\)[\s\S]{0,220}?failedStepIds\.push\(stepId\)/,
+    'meta checkpoint failure still aggregated into failedStepIds (surfaced)');
 }
 
 function testStructureHealBranches() {
@@ -507,6 +576,8 @@ async function main() {
     ['runReplayBatch: empty actions completes (count 0, runtime reset)', testEmptyActionsCompletes],
     ['runReplayBatch: abort at start → aborted/user_stop, nothing executed', testAbortAtStart],
     ['runReplayBatch: two ok steps → successCount 2 + replay_actions forwards', testStepSuccessAggregation],
+    ['runReplayBatch: meta checkpoint success not counted (business count only)', testMetaStepSuccessNotCounted],
+    ['runReplayBatch: save_form_snapshot skip-success not counted', testFormSnapshotSkipNotCounted],
     ['runReplayBatch: abort mid-batch drops the executed step', testAbortMidBatchDropsExecutedStep],
     ['runReplayBatch: transport failure → failedStepIds aggregated', testTransportFailureAggregatesFailedStepIds],
     ['structure: abort semantics (user_stop sites + abortReplay checks)', testStructureAbortSemantics],
