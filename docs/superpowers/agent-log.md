@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-16 · OpenCode — 收工：修复控制面重启后的录制推流会话恢复（回链本次开工）
+
+- 完成：commit **5fd439fb**。控制面不再在启动后按 executor 节点暂时 offline 状态批量 crash `remote_session`；执行机注册后以 `session.list` 的 `agent_session_id` 为会话存活真源，只有权威查询缺失才 crash 并清交易所有权。
+- 恢复：命中的 active/idle 行恢复 `liveByRemoteSessionId`；有交易归属的行恢复 control-plane session、trajectory runtime、手工录制持久化订阅和 slot lease；active 行幂等下发 `session.attach_bib`，由执行机重建 BiB 并回传 `session.bib_ready` 以恢复画面推流。
+- 验收：`node --check`（`executor-node-service.js` / `executor-ws.js` / `server.mjs`）PASS；`characterize-executor-orphan-reconcile.mjs` PASS（新增 session.list/仅缺失才 crash/runtime+lease/BiB attach/禁启动批量 crash 断言）；`characterize-session-lifecycle.mjs` 与 `characterize-trajectory.mjs` PASS；`git diff --check` PASS；commit hook eslint 0 error。完整 `bash scripts/refactor/verify-all.sh` 未运行：本机没有 `bash`。独立 `npm run lint -- --no-warn-ignored` 0 error、154 条既有 `.venv`/存量 warning。
+- 遗留移交：控制面重启期间正在运行的 AI run 仍无法安全续接其未持久化的 phase/run 上下文；本修复保留会话、恢复画面和手工录制持久化，不伪造 AI run 终局。需另立 AI run checkpoint/recovery 协议后才可支持 AI 录制无缝继续。
+- 协作：本轮开工前 `git pull` 及两次 `git push` 均因 GitHub 连接重置/443 连接失败未成功；本地分支含声明 commit **0b0d0823** 与代码 commit **5fd439fb**，待网络恢复后推送。既有未跟踪 `config/.db-whitelist-seen` 未触碰。
+
 ## 2026-09-16 · OpenCode — 开工：修复控制面重启后的录制推流会话恢复
 
 - 进行中：以执行机 `session.list` 为会话存活真源，修复控制面异常重启后 `remote_session` 的误 crash、BiB 绑定/推流重附、交易 runtime 和槽位租约恢复。
