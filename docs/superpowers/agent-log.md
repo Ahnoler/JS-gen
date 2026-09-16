@@ -1,6 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-16 16:58 · Cursor — 收工：atomize 能力内聚（回链 16:50 开工）
+
+- 完成：通用「能力内聚」写入线上 atomize prompt（一笔一项能力 / 准备步骤从属 / 禁止夹带另一项可独立验证能力）；样例正例定位→填→一次落库 + 反例「同页多能力合写」；spec §3.7 记为 prompt 层、无关键词硬闸
+- 提交：`1aa133bf`（prompt + samples + spec）；开工声明 `82cfa41b`
+- 验收：prompt 三条为通用中文，无上移/下移/维护基本信息/产品树层硬禁；未改 `src/services/req-draft-traj/**`，未 bump `PROPOSE_CACHE_VERSION`（仍为 3）；prompt/docs only，未跑 JS characterization / verify-all
+- 遗留移交：湿测须**重新 propose**（缓存仍 v3 合法，新 prompt 只在下次 LLM propose 生效）；PR #39 场景硬拆路线放弃，由本 PR 取代
+- 注意：不维护 CHANGELOG
+
 ## 2026-09-16 16:50 · Cursor — 开工：atomize 能力内聚（通用规则，非场景禁令）
+
 
 - 进行中：在拆分边界下增加通用「能力内聚」；样例补正例（定位→填→一次落库）与反例「同页多能力合写」。不写上移/下移/产品树层/维护基本信息硬禁，不复活 PR #39
 - 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`（轻量补记）、本协作日志
