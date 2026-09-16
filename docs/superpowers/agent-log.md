@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 20:55 · Cursor — 开工：能力内聚结构硬闸 Task 1（helper + C1/C5/C2/C6 pins）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 1**（TDD：characterization RED → helper GREEN）。`assertCapabilityCohesion` 本任务只做序列闸；`produces_eq_title` / `synthesizeFallbackProduceKey` 留给 Task 2。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（新建）、`src/services/req-draft-traj/capability-cohesion.js`（新建）、本协作日志
+- 禁入区：`propose.js` / `propose-cache.js` / `atom-depend.js` / `flow-card-guide.js`（只 import `isPersistBoundaryAction`）；`scripts/prompts/**`；`verify-all.sh`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 2+ 接线与 cache bump
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
 ## 2026-09-16 20:48 · Cursor — 收工：能力内聚结构硬闸实现计划（回链 20:40 开工）
 
 - 完成：计划 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（T1 helper+C1/C5/C2/C6 → T2 C4+fallback `${title}产物` → T3 `materializeLlmAtom` 顺序+C3 → T4 cache 4→5 + verify-all → T5 prompt 一句/samples/api-docs → T6 自检+C1 证伪+湿测 W1–W4 清单）。**未实现闸、未 bump cache、未改 src/prompt。**
