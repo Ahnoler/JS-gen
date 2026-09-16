@@ -933,10 +933,13 @@ async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> b
                 bool((contract.get('submit') or {}).get('required'))
                 or _boundary_requires_evidence(business_data_store)
             )
+            # 拒绝分支必须 `return True`：返回值由 recorder.py 按 truthy 判定
+            # （`if await _guard_done_on_step_end(...): return`），裸 return 会返回
+            # None → 被当成"未拒绝"而放行 done，零业务步守卫形同虚设。
             if _guard_done_reject_zero_business_actions(
                 agent, business_data_store, done_success,
             ):
-                return
+                return True
             if _guard_done_reject_missing_token(
                 agent, business_data_store, contract, done_success, introduce_ok, needs_token,
             ):
