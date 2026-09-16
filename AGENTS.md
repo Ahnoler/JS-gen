@@ -19,6 +19,7 @@ Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. Th
 
 **收工回报（任务单元结束时）：**
 - 在顶部插入**收工条目**回链开工条目：完成（含 commit hash）/ 验收证据 / 遗留移交——开工条目中的"进行中"至此闭环，状态以收工条目为准；写完立即 **commit + push**（2026-09-16 起 push 为硬约定）
+- **push 冲突处理**（2026-09-16 起）：push 被拒（non-fast-forward）时先 `git pull`，逐处解决冲突（agent-log 条目冲突=保留双方条目并排，不删他线内容）后合并提交，再重新 push；**禁止 force push、禁止以丢弃他线条目换取合并**
 - 提交 agent-log 时若顺带携带了其他会话的未提交条目，在 commit message 注明
 - 任务单元的代码改动结束即 commit；agent-log 条目（开工/收工）写完一律 commit + push——未提交/未推送的工作对其他 Agent 不可见
 - **不维护 CHANGELOG.md**（2026-09-04 已移除）：变更史以翔实的 git commit message 为准，不要重建该文件
