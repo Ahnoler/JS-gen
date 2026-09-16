@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 17:52 · OpenCode — 开工：回放汇总步数把自动注入的 meta 检查点也计入
+
+- 进行中：只勾选 4 步却提示「回放完成 5 步」——根因=`prepareReplayBatch` 自动补入选中区间内的 meta 检查点（`save_form_snapshot`）进 `actions`/`orderedStepIds`，`runReplayBatch` 的 `if (typeB.ok) successCount += 1` 与 `buildPayload` 的 `count/ok/failed` 把它算作业务步；FE 用 WS `replay:finished.successCount` 显示「回放完成 N 步」（`useRecordingStudio.ts:726-741`）。修向=汇总只计业务步（与 `trajectory.js` 文档「stepCount 亦只计业务步骤」一致），meta 检查点的成功/失败不计入用户面计数
+- 范围：`src/services/trajectory/replay-batch-runner.js`、`src/services/trajectory/trajectory-session-replay.js`（如 202 步清单需对齐）、characterization pin、本协作日志
+- 禁入区：SPA 仓（`ui-auto-recording-agent-vue`）；他线 atom-depend/propose、cdp locator text、tree-node-dirty-suffix；`config/` WIP；不改 Type B 安全性策略与 `assessFormStructureDiffSafety`
+- 方式：主会话 Inline（先 RED pin 再最小实现）；跑 verify-all；分支 `uara_V1.2`
+
 ## 2026-09-16 18:20 · Cursor — 收工：产品树脏后缀 SDD Task 1–5（回链 17:12 开工）
 
 - 完成：`55f3a622` 清洗函数保留 `[V-…]`、剥 `(N)`/尾部装饰 `-` + DOM 内层 span；`550a643b` 录制 snap/manual/AI/CDP 落库净文本；`7c13b820` 回放 `stripVolatile` + select_tree/tree_picker 双侧 strip；`a1e00c22`+`1ced5870` 推送 `buildBusinessObjectName` 门控清洗 + JSDoc
