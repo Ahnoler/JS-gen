@@ -89,7 +89,7 @@
 2. 准备步骤仅当服务于该项能力时允许并入：定位 `dataDependsOn`、打开表单、填写该项能力的字段。  
 3. 禁止把另一项可独立验证的能力写进同一草稿，即使同页、同一对象、同一需求段落。
 
-不把具体按钮文案或树层级写入硬闸；既有闸仍是 `self_produce_depend` / `dangling_data_depend` / `multi_persist_task_draft`。场景特化关键词拒已放弃，改由本条通用规则约束。
+不把具体按钮文案或树层级写入硬闸；既有闸是 `missing_depend_fields` / `self_produce_depend` / `dangling_data_depend` / `multi_persist_task_draft`。场景特化关键词拒已放弃，改由本条通用规则约束。
 
 直觉对照（非场景法）：维护已有对象 = 定位 + 编辑该项能力字段 + 一次保存为一项能力；列表上另一次可独立验收的操作与详情保存是不同能力。互相依赖的新建仍由 §3.3 依赖图拆分。
 
@@ -97,7 +97,7 @@
 
 `scripts/prompts/req-draft-traj-atomize-prompt.md`：
 
-1. 要求每笔输出 `produces`、`dataDependsOn`、`taskDraft`（及既有字段）。  
+1. 要求每笔输出非空 `produces`、连贯 `dataDependsOn`、`taskDraft`（及既有字段）；prompt 以 XML 分区（`<role>` / `<output_contract>` / `<split_rules>` / `<examples>` / `<anti_patterns>` / `<checklist>`）承载合同与 few-shot。  
 2. 用 §3 主规则指导切分；允许「进页 → 对依赖键先搜索/定位再选中 → 一次落库」。  
 3. 禁止场景特例清单与 #504 式本笔造上游。  
 4. 文末「关键数据」KV 键名与 `produces` / `dataDependsOn` 一致。  
@@ -110,14 +110,15 @@
 
 | 级别 | 条件 | 行为 |
 |------|------|------|
+| 硬闸 | 物化后 `produces` 为空（字段缺失、`[]`、或仅空白键） | 该 atom `rejected`，原因：`missing_depend_fields` |
 | 硬闸 | 同一 atom：`produces` ∩ `dataDependsOn`（按 key）非空 | 该 atom `rejected`，原因：自产自依赖 |
 | 硬闸 | `dataDependsOn` 项 `source` 为 atom/缺省，且同批无任何 atom 的 `produces` 含该 key | `rejected`，原因：依赖悬空 |
 | 通过 | `source: "preset"` | 不要求同批 `produces` |
-| 软 | 未输出新字段 | `warning`；本版可降级旧行为，落地后可改强制 |
-| 软 | 疑似同笔多个落库新建意图 | `warning` only；不自动拆、不拒收 |
+| 通过 | 根 atom `dataDependsOn: []` 且 `produces` 非空 | 合法 |
+| 硬闸 | `taskDraft` 内多次落库确认 | `multi_persist_task_draft`（既有） |
 | 不做 | 产品树层级 / 关键词强制拆 | — |
 
-**兼容**：旧客户端可忽略新字段；新 prompt 仍要求模型输出。缺字段时降级路径须打 `warning`，不得静默当合法依赖链。
+**兼容**：旧客户端可忽略新字段；新 prompt 仍要求模型输出。物化后 `produces` 为空硬拒 `missing_depend_fields`，不得静默当合法依赖链。
 
 **与 flowCards**：有卡时仍可参考卡上可录闭环；**冲突时以 §3 依赖规则为准**。卡若将「造 A + 造依赖 A 的 B」画在同一闭环，仍须拆成两笔并用 `dataDependsOn` 串联。`flowRef` / `nodeId` 能挂则挂，不能挂不伪造。
 

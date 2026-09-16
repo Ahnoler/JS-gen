@@ -236,6 +236,8 @@ async function main() {
           taskDraft: '1、进入产品库。\n2、点击新增一级分类，名称填「KB测一级」，序号填「1」，确定。\n\n来源：<sourceDoc> / <sourceChapter>\n\n关键数据\n分类名称：KB测一级\n序号：1\n',
           phaseHints: ['进入产品库', '新增一级分类并确定'],
           suggestedFunctionId: 9000000740,
+          produces: ['一级分类'],
+          dataDependsOn: [],
         },
       ],
     });
@@ -278,6 +280,8 @@ async function main() {
           title: '新增一级分类',
           taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n\n关键数据\nZJJK00107304\n',
           phaseHints: ['新增一级分类'],
+          produces: ['一级分类'],
+          dataDependsOn: [],
         },
       ],
     });
@@ -375,6 +379,8 @@ async function main() {
           title: '新增对公客户并保存',
           taskDraft: '1、选类型→录证件→【保存】\n\n来源：demo.docx\n',
           phaseHints: ['保存'],
+          produces: ['对公客户'],
+          dataDependsOn: [],
         },
       ],
     });
@@ -404,6 +410,8 @@ async function main() {
           taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n',
           phaseHints: ['新增一级分类'],
           suggestedFunctionId: 90000107304,
+          produces: ['一级分类'],
+          dataDependsOn: [],
         },
       ],
     });
@@ -458,6 +466,8 @@ async function main() {
           title: '新增一级分类',
           taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n',
           phaseHints: ['新增一级分类'],
+          produces: ['一级分类'],
+          dataDependsOn: [],
         },
         {
           chainId: 'chain-a',
@@ -465,6 +475,8 @@ async function main() {
           title: '选中分类下新增子分类',
           taskDraft: '1、选中分类下新增子分类。\n\n来源：demo.docx\n',
           phaseHints: ['新增子分类'],
+          produces: ['子分类'],
+          dataDependsOn: ['一级分类'],
         },
       ],
     });
@@ -548,8 +560,8 @@ async function main() {
   });
 
   const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
-  run('PROPOSE_CACHE_VERSION is 3 (persist-boundary confirm)', () => {
-    assert.equal(PROPOSE_CACHE_VERSION, 3);
+  run('PROPOSE_CACHE_VERSION is 4 (missing_depend_fields hard reject)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 4);
   });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
@@ -598,7 +610,7 @@ async function main() {
 
     const fakeLLM = async () => JSON.stringify({
       atoms: [
-        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'], produces: ['一级分类'], dataDependsOn: [] },
       ],
     });
     await proposeDraftTrajectories({ moduleKey: 'demo-mod', rootDir: tmp, callLLM: fakeLLM, listSystemsFn: async () => [] });
@@ -1076,7 +1088,7 @@ async function main() {
     cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
     const fakeLLM = async () => JSON.stringify({
       atoms: [
-        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'], produces: ['一级分类'], dataDependsOn: [] },
       ],
     });
     let before = 0;
@@ -1123,7 +1135,7 @@ async function main() {
 
     const fakeLLM = async () => JSON.stringify({
       atoms: [
-        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'], produces: ['一级分类'], dataDependsOn: [] },
       ],
     });
     const out = await proposeDraftTrajectories({
@@ -1173,9 +1185,9 @@ async function main() {
 
     const fakeLLM = async () => JSON.stringify({
       atoms: [
-        { chainId: 'chain-a', stepIndexes: [1], title: '进入产品库，加载产品树', taskDraft: '1、进入产品库。\n\n来源：demo.docx\n', phaseHints: ['x'] },
-        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
-        { chainId: 'chain-a', stepIndexes: [3], title: '选中分类下新增子分类', taskDraft: '1、选中分类下新增子分类。\n\n来源：demo.docx\n', phaseHints: ['x'] },
+        { chainId: 'chain-a', stepIndexes: [1], title: '进入产品库，加载产品树', taskDraft: '1、进入产品库。\n\n来源：demo.docx\n', phaseHints: ['x'], produces: ['一级分类'], dataDependsOn: [] },
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'], produces: ['一级分类'], dataDependsOn: [] },
+        { chainId: 'chain-a', stepIndexes: [3], title: '选中分类下新增子分类', taskDraft: '1、选中分类下新增子分类。\n\n来源：demo.docx\n', phaseHints: ['x'], produces: ['子分类'], dataDependsOn: ['一级分类'] },
       ],
     });
     const out = await proposeDraftTrajectories({
@@ -1201,7 +1213,7 @@ async function main() {
 
     const fakeLLM = async () => JSON.stringify({
       atoms: [
-        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'], suggestedFunctionId: 9000000740 },
+        { chainId: 'chain-a', stepIndexes: [2], title: '新增一级分类', taskDraft: '1、新增一级分类。\n\n来源：demo.docx\n', phaseHints: ['x'], suggestedFunctionId: 9000000740, produces: ['一级分类'], dataDependsOn: [] },
       ],
     });
     const out = await proposeDraftTrajectories({
@@ -1268,6 +1280,8 @@ async function main() {
           phaseHints: ['进页', '保存'],
           pageCodes: [],
           suggestedFunctionId: null,
+          produces: ['信贷潜在客户'],
+          dataDependsOn: [],
         }],
       });
     };

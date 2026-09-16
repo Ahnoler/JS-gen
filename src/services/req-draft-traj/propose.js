@@ -98,6 +98,19 @@ const NAV_ACTION_RE = /进入|加载|刷树|打开|导航|切换|刷新/;
  */
 const ENTRY_ONLY_RE = /打开\s*.{0,16}(抽屉|向导)|点[击]?\s*【新增】\s*.*打开/;
 const PERSIST_WRITE_RE = /保存|提交/;
+
+/**
+ * Deterministic fallback has no LLM depend graph. Use the write title as the
+ * sole produce key so the hard `missing_depend_fields` gate does not drop
+ * fallback atoms; `dataDependsOn` stays empty (no inferred upstream).
+ * @param {string} title Atom title
+ * @returns {{ produces: string[], dataDependsOn: [] }} Depend fields
+ */
+function fallbackDependFields(title) {
+  const key = String(title || '').trim();
+  return { produces: key ? [key] : ['atom_output'], dataDependsOn: [] };
+}
+
 /**
  * Reference-style steps defer to another chain's steps and are not
  * independently recordable atoms (spec F-10; e.g. `回主链 A 第 6-9 步…`).
@@ -216,10 +229,10 @@ function buildGroupedTaskDraft(navPreamble, groupSteps, sourceDoc) {
  * navigation-only steps merge into the next write atom's taskDraft preamble.
  * @param {import('./parse-through-chains.js').ThroughChain[]} chains Parsed chains
  * @param {string} sourceDoc Source document path for template
- * @returns {Array<{ chainId: string, stepIndexes: number[], title: string, taskDraft: string, phaseHints: string[], suggestedFunctionId: null }>} Fallback LLM-shaped atom list
+ * @returns {Array<{ chainId: string, stepIndexes: number[], title: string, taskDraft: string, phaseHints: string[], suggestedFunctionId: null, produces: string[], dataDependsOn: unknown[] }>} Fallback LLM-shaped atom list
  */
 function buildFallbackLlmAtoms(chains, sourceDoc) {
-  /** @type {Array<{ chainId: string, stepIndexes: number[], title: string, taskDraft: string, phaseHints: string[], suggestedFunctionId: null }>} */
+  /** @type {Array<{ chainId: string, stepIndexes: number[], title: string, taskDraft: string, phaseHints: string[], suggestedFunctionId: null, produces: string[], dataDependsOn: unknown[] }>} */
   const atoms = [];
 
   for (const chain of chains) {
@@ -245,6 +258,7 @@ function buildFallbackLlmAtoms(chains, sourceDoc) {
             taskDraft: buildTemplateTaskDraft([], action, step, sourceDoc),
             phaseHints: [action],
             suggestedFunctionId: null,
+            ...fallbackDependFields(action),
           });
           navPreamble = [];
         }
@@ -261,6 +275,7 @@ function buildFallbackLlmAtoms(chains, sourceDoc) {
           taskDraft: buildTemplateTaskDraft(preamble, action, step, sourceDoc),
           phaseHints: preamble.length > 0 ? [...preamble, action] : [action],
           suggestedFunctionId: null,
+          ...fallbackDependFields(action),
         });
         continue;
       }
@@ -273,6 +288,7 @@ function buildFallbackLlmAtoms(chains, sourceDoc) {
         taskDraft: buildTemplateTaskDraft([], action, step, sourceDoc),
         phaseHints: [action],
         suggestedFunctionId: null,
+        ...fallbackDependFields(action),
       });
     }
   }
@@ -331,6 +347,7 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
         taskDraft: buildGroupedTaskDraft(navPreamble, groupSteps, sourceDoc),
         phaseHints: actions.slice(0, 4),
         suggestedFunctionId: null,
+        ...fallbackDependFields(title),
       };
       if (flowRef) atom.flowRef = flowRef;
       if (hit.nodeId) atom.nodeId = hit.nodeId;
@@ -690,10 +707,6 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   };
   atom.produces = normalizeProduces(llmAtom.produces);
   atom.dataDependsOn = normalizeDataDependsOn(llmAtom.dataDependsOn);
-  atom.dependFieldsPresent = (
-    Object.prototype.hasOwnProperty.call(llmAtom, 'produces')
-    || Object.prototype.hasOwnProperty.call(llmAtom, 'dataDependsOn')
-  );
 
   if (llmAtom.wetTestHint != null && String(llmAtom.wetTestHint).trim()) {
     atom.wetTestHint = String(llmAtom.wetTestHint).trim();
@@ -711,6 +724,9 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   const prov = assertAtomProvenance(atom);
   if (!prov.ok) {
     return { rejected: { atomKey, reason: prov.reason } };
+  }
+  if (atom.produces.length === 0) {
+    return { rejected: { atomKey, reason: 'missing_depend_fields' } };
   }
 
   return { atom };
@@ -913,9 +929,8 @@ export async function proposeDraftTrajectories({
 
   const graphInput = atoms.map((a) => ({
     atomKey: a.atomKey,
-    ...(a.dependFieldsPresent
-      ? { produces: a.produces, dataDependsOn: a.dataDependsOn }
-      : {}),
+    produces: a.produces,
+    dataDependsOn: a.dataDependsOn,
   }));
   const dependResult = validateAtomDependGraph(graphInput);
   const rejectKeys = new Set(
@@ -927,10 +942,8 @@ export async function proposeDraftTrajectories({
       const reason = dependResult.rejected.find((r) => r.atomKey === a.atomKey)?.reason
         || 'dangling_data_depend';
       rejected.push({ atomKey: a.atomKey, reason });
-      delete a.dependFieldsPresent;
       continue;
     }
-    delete a.dependFieldsPresent;
     kept.push(a);
   }
   atoms.length = 0;

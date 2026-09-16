@@ -61,11 +61,13 @@ export function normalizeDataDependsOn(raw) {
 /**
  * 校验一批 atom 的 produces / dataDependsOn 图。
  *
- * 两字段均缺失时记软警告 `missing_depend_fields`；自产自依赖硬拒
- * `self_produce_depend`；`source==='atom'` 且键不在未拒收 atom 的 produced
- * 集合中则硬拒 `dangling_data_depend`。被拒 atom 不向 produced 集合贡献键。
+ * 物化后 `produces` 为空（字段缺失、空数组、或仅空白键）硬拒
+ * `missing_depend_fields`；自产自依赖硬拒 `self_produce_depend`；
+ * `source==='atom'` 且键不在未拒收 atom 的 produced 集合中则硬拒
+ * `dangling_data_depend`。被拒 atom 不向 produced 集合贡献键。
+ * 根 atom 允许 `dataDependsOn` 为空数组。
  * @param {Array<{ atomKey?: string, produces?: unknown, dataDependsOn?: unknown }>} atoms atom 列表
- * @returns {{ rejected: Array<{ atomKey?: string, reason: string }>, warnings: Array<{ atomKey?: string, reason: string }> }} 拒收与警告
+ * @returns {{ rejected: Array<{ atomKey?: string, reason: string }>, warnings: Array<{ atomKey?: string, reason: string }> }} 拒收与（现为空，保留字段兼容）警告
  */
 export function validateAtomDependGraph(atoms) {
   const list = Array.isArray(atoms) ? atoms : [];
@@ -79,13 +81,13 @@ export function validateAtomDependGraph(atoms) {
 
   for (const atom of list) {
     const atomKey = atom?.atomKey != null ? String(atom.atomKey) : undefined;
-    const hasProduces = Object.prototype.hasOwnProperty.call(atom || {}, 'produces');
-    const hasDepends = Object.prototype.hasOwnProperty.call(atom || {}, 'dataDependsOn');
-    if (!hasProduces && !hasDepends) {
-      warnings.push({ atomKey, reason: 'missing_depend_fields' });
-    }
     const produces = normalizeProduces(atom?.produces);
     const depends = normalizeDataDependsOn(atom?.dataDependsOn);
+    if (produces.length === 0) {
+      rejected.push({ atomKey, reason: 'missing_depend_fields' });
+      normalized.push({ atomKey, produces, depends, selfRejected: true });
+      continue;
+    }
     const produceSet = new Set(produces);
     let selfRejected = false;
     for (const d of depends) {
