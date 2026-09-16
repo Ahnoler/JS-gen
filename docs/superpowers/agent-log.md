@@ -9,6 +9,15 @@
 - 部署：原执行机 PID 33548 / 控制面 PID 12924 已停止，新进程执行机 **25860**、控制面 **32668**（日志 `logs/executor.*.log`、`logs/server.*.log`）。启动对账日志 `[executor-ws] reconciled … { kept: 0, crashed: 2, bibReattached: 0 }`——执行机重启令 834 的 1893 与 839 的 1897 Python 进程消失，按新对账逻辑正确判 crashed（符合预期，二者需重新 prepare）。
 - 遗留移交：①SPA 仍以「frameId 变化」判定 streaming（既有契约），本次令后端满足之，未改 SPA 仓；②执行机进程内序号在进程重启后从 0 重来，已由 `session.bib_ready` 清缓存兜住基线倒挂；③控制面本地 `src/cdp/remote-bridge/screencast.js` 的同名写 `sessionId` 路径为已移除的本地 BiB 挂载（dead code），未改；④不维护 CHANGELOG。
 
+## 2026-09-16 20:49 · ZCode 引擎线 — 开工：本地合入 PR #45（G3 phase_done 证据门闩）
+
+- 进行中：把 `origin/cursor/g3-phase-done-evidence-gate-3b92`（7 提交 `539c8e76`→`9391f09c`，作者 Cursor Cloud，12:22–12:41）合入**本地主线 `uara_V1.2`**（该 PR 原提 master，用户明确不动 master）。内容=query/navigate `success_when` 证据 + click 证据埋点 + recorder `needs_token` 双条件 + 控制面 0 步 `phase_done` 拒收 + verify-all 接入 2 pin + prompts 对齐
+- 冲突面（分叉点=`origin/master` HEAD `5dddf2ea`，落后 uara_V1.2 **1034 提交**）：17 文件中 12 个双方都改过——`agent-log.md`(我方 483 次)、`refactor/verify-all.sh`(54)、`trajectory-recording-runner.js`(24)、`agent/recorder_emitters.py`(6)、`phase/intent_contract.py`(6)、`actions/_misc.py`(4)、`phase/reviewer.py`(4)、`phase/prompts.py`(3)、`phase/boundary_gates.py`(2)、`prompts/agent-core.md`(1)；3 个是 PR 新增（`characterize-phase-boundary.py`、`characterize-phase-done-evidence-gate.mjs`、`src/services/trajectory/phase-done-evidence-gate.js`）
+- 范围（可写集）：仅合并产物——上述 12 个冲突文件的解冲突、`uara_V1.2` 上的合并提交、本协作日志
+- 禁入区：`origin/master`（用户明示不动）；不 rebase/改写 PR 分支既成提交；冲突解法定为**保留双方**（他线条目/配置/常量一律不删，语义冲突逐处按"两边都要"合并）；不改 PR 意图（如把 0 步拒收改软）
+- 方式：主会话 Inline；`git merge --no-ff` + 逐处解冲突 + 复跑 PR 自带 3 个 pin 与 verify-all 基线比对；子智能体仅用于只读定位（如需）
+- 声明修正：本条为**新工作单元**（前序「字段 label 解析同族收敛」已于 19:20 收工，见下方条目）
+
 ## 2026-09-16 20:45 · OpenCode — 开工：修复 RSCF frameId 恒定导致的画面反复附着/自动重连死循环
 
 - 现场实证：CDP `Page.screencastFrame.sessionId` **在单个 screencast 会话内恒定**（自建 headless Chrome 实测 298 帧全为 `sessionId=1`，`b64len` 各异＝确为不同帧），而 `executor/bib-bridge.js` 直接把它写进 RSCF 头 `frameId`（`_onScreencastFrame`）。前端（SPA 仓 63d6a53）以「收到**新**帧序号」判定 streaming、8s 无新帧即自动重连 → 序号永不变 → 无限「正在附着画面… / 画面已断开，系统正在自动重连…」，并每轮 `detach`+重新 prepare 生成新 remote_session（实测 1894→1895→1896→1897 链，839 被反复重置为 draft）。
