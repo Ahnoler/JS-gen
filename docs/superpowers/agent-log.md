@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 2（回链 21:15 开工）
+
+- 完成：`synthesizeFallbackProduceKey`（空/`'  '`→`atom_output`，否则 `` `${trim}产物` ``）+ `assertCapabilityCohesion` 序列通过后 title-as-key（`length===1` 且 `produces[0]===trim(title)` → `produces_eq_title`；空 produces / title+另一 key 仍 ok）+ `propose.js` `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`（未豁免 fallback、未保留 `produces:[title]`）。feat **`d2c6bfbb`**。开工声明 `2dce38a0`。
+- 验收：RED=`C4 helper: produces exact title` `true !== false` + `synthesizeFallbackProduceKey` `undefined`≠`function`；C1/C2/C5/C6 仍 ok。GREEN：`characterize-capability-cohesion.mjs` **all passed**（21 pins）；`characterize-persist-boundary.mjs` **all passed**（含 fallback 三分写 + `multi_persist_task_draft`）；`characterize-atom-depend.mjs` **all passed**。`npx eslint` 两 src 文件 0 warning。未接线 `materializeLlmAtom`、未 bump cache、未改 prompt。
+- 遗留移交：Task 3+（`materializeLlmAtom` 顺序+C3 / cache 4→5 / prompt 一句 / verify-all / 湿测 W1–W4）。不维护 CHANGELOG
+
 ## 2026-09-16 21:15 · Cursor — 开工：能力内聚结构硬闸 Task 2（C4 produces_eq_title + fallback synthesizer）
 
 - 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 2**（TDD：C4/synthesizer pins RED → `synthesizeFallbackProduceKey` + title-as-key 闸 GREEN → `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`）。不接线 `materializeLlmAtom` 硬闸、不 bump cache、不改 prompt。
