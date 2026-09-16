@@ -22,6 +22,14 @@ from .replay_timing import WAIT_800_MS
 _SELECT_OPTION_PLACEHOLDERS = frozenset({'请选择', '请选择…', '请选择...', ''})
 
 
+def _strip_volatile_tree_text(text: str) -> str:
+    """Mirror stripVolatileTreeText: drop trailing (N) and decorative dash; keep [V-…]."""
+    s = re.sub(r'\s+', ' ', (text or '')).strip()
+    s = re.sub(r'\(\d+\)\s*$', '', s)
+    s = re.sub(r'\s*-\s*$', '', s)
+    return s.strip()[:40]
+
+
 def _as_dict(raw):
     """Parse a page.evaluate result that may arrive as a JSON string.
 
@@ -374,11 +382,14 @@ async def _enrich_click_element(
 
     Mirrors manual/CDP locator enrichment via PAGE_LOCATOR_HELPERS / buildLocatorSnap.
     """
+    cleaned_text = (text or '').strip()[:80]
+    if (target_kind or '') == 'tree_node':
+        cleaned_text = _strip_volatile_tree_text(cleaned_text)
     base = {
         'tag_name': tag_name or '',
         'xpath': xpath or '',
         'attributes': attributes if isinstance(attributes, dict) else {},
-        'text': (text or '').strip()[:80],
+        'text': cleaned_text,
         'target_kind': target_kind or '',
         'formLabel': form_label or '',
         'row_text': '',
@@ -396,6 +407,10 @@ async def _enrich_click_element(
         attrs = info.get('attributes') if isinstance(info.get('attributes'), dict) else {}
         if not attrs and isinstance(attributes, dict):
             attrs = attributes
+        out_text = (info.get('text') or text or '').strip()[:80]
+        out_kind = info.get('target_kind') or target_kind or ''
+        if out_kind == 'tree_node':
+            out_text = _strip_volatile_tree_text(out_text)
         out = {
             'tag_name': info.get('tag_name') or tag_name or '',
             'xpath': info.get('xpath') or info.get('xpath_smart') or xpath or '',
@@ -404,7 +419,7 @@ async def _enrich_click_element(
             'xpath_abs': info.get('xpath_abs') or info.get('xpath_full') or '',
             'css_selector': info.get('css_selector') or info.get('cssSelector') or '',
             'attributes': attrs,
-            'text': (info.get('text') or text or '').strip()[:80],
+            'text': out_text,
             'candidates': info.get('candidates') if isinstance(info.get('candidates'), list) else [],
             'formLabel': info.get('formLabel') or form_label or '',
             'target_kind': info.get('target_kind') or target_kind or '',

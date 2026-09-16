@@ -4,7 +4,10 @@ import re
 import sys
 
 from scripts import state as _state
-from ._helpers import _ok, _err, _enrich_click_element, _is_ok_result, _wait_if_loading
+from ._helpers import (
+    _ok, _err, _enrich_click_element, _is_ok_result, _wait_if_loading,
+    _strip_volatile_tree_text,
+)
 from .result_protocol import err_with
 from ._js_snippets import (
     JS_CLICK_ICON_BUTTON,
@@ -473,7 +476,7 @@ class ClickEngine:
                     or 'el-tree-node__label' in raw_cls
                 )
                 form_label = str((element_info or {}).get('formLabel') or '').strip()
-                tree_opt = (elem_text or '').strip()
+                tree_opt = _strip_volatile_tree_text((elem_text or '').strip())
                 table_row_text = str(
                     (element_info or {}).get('row_text')
                     or (element_info or {}).get('rowText')
@@ -519,16 +522,24 @@ class ClickEngine:
                         element=element_info,
                     )
                 else:
+                    record_text = (element_info or {}).get('text') or elem_text or ''
+                    if is_tree_node_click:
+                        record_text = _strip_volatile_tree_text(record_text)
+                        if element_info is not None:
+                            element_info = dict(element_info)
+                            element_info['text'] = record_text[:80]
                     _state._record_action('click_element_by_index', {
                         'index': index,
                         'tag_name': element_info.get('tag_name') if element_info else tag_name,
-                        'text': (element_info or {}).get('text') or elem_text or '',
+                        'text': record_text,
                     }, f'ok-clicked-{index}', element=element_info)
                 if self.business_data_store is not None:
                     from scripts.controller.actions.container_naming import remember_trigger_button
                     remember_trigger_button(
                         self.business_data_store,
-                        (element_info or {}).get('text') or elem_text or '',
+                        (element_info or {}).get('text') or (
+                            _strip_volatile_tree_text(elem_text) if is_tree_node_click else elem_text
+                        ) or '',
                     )
                 try:
                     from scripts.controller.actions._phase_intent import record_success_token

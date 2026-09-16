@@ -386,7 +386,8 @@ JS_MANUAL_PART_B = r'''
         ? resolveFormTreeSelectHostFromPopoverTree(tree)
         : null;
       if (formHost) {
-        const optionText = stripVolatileTreeText(shortLabel(tree) || cleanVisibleText(tree));
+        const optionText = treeSemanticTextFromNode(tree)
+          || stripVolatileTreeText(shortLabel(tree) || cleanVisibleText(tree));
         const item = formHost.closest && formHost.closest('.el-form-item');
         const lblEl = item && item.querySelector('.el-form-item__label, label');
         const labelText = normalizeFormLabel(lblEl && lblEl.textContent);
@@ -399,7 +400,9 @@ JS_MANUAL_PART_B = r'''
           return;
         }
       }
-      emit(Object.assign({ kind: 'click' }, elMeta(tree)));
+      const treeText = treeSemanticTextFromNode(tree)
+        || stripVolatileTreeText(shortLabel(tree) || cleanVisibleText(tree));
+      emit(Object.assign({ kind: 'click' }, elMeta(tree, treeText, 'tree_node')));
       return;
     }
 

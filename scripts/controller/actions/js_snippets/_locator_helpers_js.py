@@ -1627,7 +1627,10 @@ PAGE_LOCATOR_HELPERS = r'''
       ? opts.region
       : assignRegion(host);
     const kind = opts.targetKind || detectTargetKind(host);
-    const t = normalizeControlText(text) || cleanVisibleText(host);
+    let t = normalizeControlText(text) || cleanVisibleText(host);
+    if (kind === 'tree_node') {
+      t = treeSemanticTextFromNode(host) || stripVolatileTreeText(t);
+    }
     const abs = String(xpathFull || absXPath(host) || '');
     let formLbl = normalizeFormLabel(formLabel || '');
     // For adjacent_button the formLabel hint is the recorded label_text, which

@@ -66,6 +66,39 @@ export function stripVolatileTreeText(text) {
 }
 
 /**
+ * Node-safe visible text (mirrors browser cleanVisibleText when possible).
+ * @param {Element|null} node DOM element.
+ * @returns {string} Whitespace-collapsed visible text without badge/icon noise.
+ */
+export function cleanVisibleTextNodeSafe(node) {
+  if (!node || node.nodeType !== 1) return '';
+  const fromAttr = (node.getAttribute && (
+    node.getAttribute('aria-label') ||
+    node.getAttribute('title') ||
+    node.getAttribute('data-name') ||
+    node.getAttribute('data-menu') ||
+    ''
+  )) || '';
+  if (fromAttr.trim()) return normalizeControlText(fromAttr);
+  if (typeof node.cloneNode === 'function') {
+    try {
+      const clone = node.cloneNode(true);
+      if (clone.querySelectorAll) {
+        const kill = clone.querySelectorAll(
+          '.el-badge, .el-badge__content, [class*="badge"], .el-icon, i[class*="icon"],'
+          + ' .el-submenu__icon-arrow, .popper__arrow, sup, sub'
+        );
+        for (let i = 0; i < kill.length; i++) {
+          if (kill[i] && kill[i].parentNode) kill[i].parentNode.removeChild(kill[i]);
+        }
+      }
+      return normalizeControlText(clone.innerText || clone.textContent || '');
+    } catch (e) { /* fall through */ }
+  }
+  return normalizeControlText(node.innerText || node.textContent || '');
+}
+
+/**
  * Prefer inner semantic span under .custom-tree-node; then stripVolatileTreeText.
  * @param {Element|null} node Tree node element (or host under custom-tree-node).
  * @returns {string} Cleaned semantic tree label, capped at 40 chars.
@@ -85,8 +118,7 @@ export function treeSemanticTextFromNode(node) {
       if (raw) return stripVolatileTreeText(raw);
     }
   }
-  const fallback = String(node.innerText || node.textContent || '');
-  return stripVolatileTreeText(fallback);
+  return stripVolatileTreeText(cleanVisibleTextNodeSafe(node));
 }
 
 /**

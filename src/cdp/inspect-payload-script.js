@@ -501,6 +501,34 @@ ${PAGE_LOCATOR_HELPERS}
     return Object.assign({ kind: 'close_dialog', source_channel: 'cdp_bib' }, elMeta(closeBtn, 'close', 'dialog_close'));
   }
 
+  const tree = el.closest && el.closest('.el-tree-node__content');
+  if (tree) {
+    const formHost = (typeof resolveFormTreeSelectHostFromPopoverTree === 'function')
+      ? resolveFormTreeSelectHostFromPopoverTree(tree)
+      : null;
+    if (formHost) {
+      const optionText = treeSemanticTextFromNode(tree)
+        || stripVolatileTreeText(shortLabel(tree) || cleanVisibleText(tree));
+      const item = formHost.closest && formHost.closest('.el-form-item');
+      const lblEl = item && item.querySelector('.el-form-item__label, label');
+      const labelText = normalizeFormLabel(lblEl && lblEl.textContent);
+      if (labelText && optionText) {
+        return Object.assign({
+          kind: 'select_tree_option',
+          label_text: labelText,
+          option_text: optionText,
+          source_channel: 'cdp_bib',
+        }, elMeta(formHost, optionText, 'form_tree_select'));
+      }
+    }
+    const treeText = treeSemanticTextFromNode(tree)
+      || stripVolatileTreeText(shortLabel(tree) || cleanVisibleText(tree));
+    return Object.assign({
+      kind: 'click',
+      source_channel: 'cdp_bib',
+    }, elMeta(tree, treeText, 'tree_node'));
+  }
+
   const btn = el.closest && el.closest('button, .el-button, a, [role="button"]');
   if (btn && btn.closest && (
     btn.closest('.el-select') || btn.closest('.el-cascader') || btn.closest('.el-date-editor')
