@@ -1,5 +1,18 @@
 # Agent 协作日志
 
+## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 6 unit/falsify（回链 21:19 开工）
+
+- 完成：Task 6 冷测自检 + C1 证伪 + `src/` 无 `missing_locate_prep` + 计划 Tasks 1–5 勾选 + PR #46 ready-for-review。**未跑** product-mgmt 湿测 propose。开工声明 `274188c8`。
+- 验收：
+  - `characterize-capability-cohesion.mjs` **31 passed**（C1–C6 + 编辑页 pins + prompt pin）
+  - `characterize-persist-boundary.mjs` **11 passed**
+  - `characterize-atom-depend.mjs` **16 passed**
+  - `characterize-req-draft-traj.mjs` **OK 63**（含 `PROPOSE_CACHE_VERSION is 5`）
+  - `npx eslint` 四文件 **0 warning**
+  - C1 证伪：clean tree 上 `git stash push` 对已提交 helper 无效果；等价隐藏 `git rm capability-cohesion.js` → `ERR_MODULE_NOT_FOUND` exit 1（C1 无法绿）；`git checkout HEAD --` 恢复 → **31 passed**
+  - grep `missing_locate_prep`：`src/` **0 hits**（仅 spec/plan/agent-log 文档出现）
+- 遗留移交：湿测 W1–W4 只在本地 LMY（控制面须 cache v5 + 重新 propose，勿复用 v4 缓存）。不 merge。不维护 CHANGELOG
+
 ## 2026-09-16 21:19 · Cursor — 开工：能力内聚结构硬闸 Task 6（unit/falsify，不跑湿测）
 
 - 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 6** 的 unit/falsify（表征全绿、stash C1 证伪、grep `missing_locate_prep` 不得出现在 `src/`、PR #46 ready-for-review + W1–W4 未勾清单）。**不跑** product-mgmt 湿测 propose。
