@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 21:19 · Cursor — 开工：能力内聚结构硬闸 Task 6（unit/falsify，不跑湿测）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 6** 的 unit/falsify（表征全绿、stash C1 证伪、grep `missing_locate_prep` 不得出现在 `src/`、PR #46 ready-for-review + W1–W4 未勾清单）。**不跑** product-mgmt 湿测 propose。
+- 范围（可写集）：`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（Tasks 1–5 勾选；Task 6 仅勾 unit/falsify 步，W1–W4 保持未勾）、本协作日志、PR #46 描述
+- 禁入区：`src/services/req-draft-traj/**` 产品逻辑；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；湿测 W1–W4 / product-mgmt wet propose
+- 方式：主会话 Inline 自检+证伪；不 merge
+
 ## 2026-09-16 21:50 · Cursor — 收工：能力内聚结构硬闸 Task 5（回链 21:35 开工）
 
 - 完成：atomize prompt item-9 准备步骤改为「仅限定位类（查询/搜索/过滤/选中/点行或节点/打开或进入目标/展开/切换页签）」；`atom-depend-split-samples.md` B1 交叉引用结构闸 `multi_capability_task_draft`（多次【确定】仍 `multi_persist_task_draft`）；`kb.js` propose `notes[]` 一行列出两新 reason。pin `atomize prompt locates prep to locate-class only`。开工声明 `15e5422d`。本提交即 Task 5 产品提交。
