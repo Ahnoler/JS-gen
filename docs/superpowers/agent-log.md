@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 20:21 · Cursor — 开工：能力内聚结构硬闸设计规格（propose 同页多能力）
+
+- 进行中：只写已批准设计规格，**不实现**硬闸。产物=`docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md` + 本日志短开/收；PR 合入 `uara_V1.2`。依赖 PR #41（空 produces 硬拒 + cache v4 + XML prompt）**已合入**本线。
+- 范围（可写集）：`docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md`、本协作日志
+- 禁入区：`src/**`（含 `req-draft-traj/**` / `flow-card-guide.js` / `propose.js` / `atom-depend.js` / `propose-cache.js`）；`scripts/prompts/**`；characterization；`scripts/refactor/verify-all.sh`；他线 OpenCode 20:03 在途（`trajectory-meta-service.js` / `trajectory-text-extract.js` / analyze-case-data pin）；生成链；SPA；`config/`
+- 方式：主会话 Inline；分支 `cursor/capability-cohesion-structural-gate-design-bb60` 从 `uara_V1.2` 起；不 bump cache、不改代码
+
 ## 2026-09-16 20:03 · OpenCode — 开工：阶段拆分提示词加固 + JS 侧业务数据判定对齐（承接 18:59/19:27 线）
 
 - 进行中：用户手动调整的提示词示例经核查**已丢失**（工作区 hash 与 HEAD 一致，VS Code 本地历史仅 `undoRedo` 条目）→ 由本次统一补做。六项：
