@@ -7,17 +7,36 @@
  */
 import { matchFlowForAtom } from './flow-card-recall.js';
 
-const PERSIST_BOUNDARY_RE = /保存|提交|启用|禁用|克隆|删除|作废|撤销(?!查询)/;
+const PERSIST_VERB_RE = /保存|提交|(?<![未已])启用|禁用|克隆|删除|作废|撤销(?!查询)/;
+const PERSIST_BOUNDARY_RE = /保存|提交|(?<![未已])启用|禁用|克隆|删除|作废|撤销(?!查询)|确定/;
+const CONFIRM_MARK_RE = /【确定】|确定】/;
+
+/**
+ * True when a step-shaped value has any action/buttons text.
+ * @param {unknown} item Action string or `{ action, buttons }`
+ * @returns {boolean} True when the step contributes persist haystack
+ */
+function hasStepText(item) {
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    return Boolean(String(item.action || '').trim() || String(item.buttons || '').trim());
+  }
+  return Boolean(String(item || '').trim());
+}
 
 /**
  * 判断操作是否为原子分组的持久化边界。
  *
- * 保存、提交、状态变更和破坏性操作都会结束一个闭环分组。正则表达式通过负向
- * 前瞻有意排除查询类撤销文本。
- * @param {unknown} action 候选操作文本
+ * 保存、提交、确认、状态变更和破坏性操作都会结束一个闭环分组。正则通过负向
+ * 回顾排除「未启用/已启用」对「启用」的误匹配，并通过负向前瞻排除查询类撤销。
+ * 步骤对象的 buttons 只把【确定】/确定计为边界，避免【保存概况】把填单步误当成二次保存。
+ * @param {unknown} action 候选操作文本，或 `{ action?: unknown, buttons?: unknown }`
  * @returns {boolean} 操作结束持久化分组时为 true
  */
 export function isPersistBoundaryAction(action) {
+  if (action && typeof action === 'object' && !Array.isArray(action)) {
+    if (PERSIST_BOUNDARY_RE.test(String(action.action || ''))) return true;
+    return /确定/.test(String(action.buttons || ''));
+  }
   return PERSIST_BOUNDARY_RE.test(String(action || ''));
 }
 
@@ -25,15 +44,40 @@ export function isPersistBoundaryAction(action) {
  * 检查一个序列是否至多包含一个持久化边界。
  *
  * 空或缺失输入会被拒绝。导航和准备操作可以伴随单个写入边界；多个边界则需要
- * 拆分为独立原子，以免一个原子代表多笔交易。
- * @param {{ stepActions?: unknown[] }} opts 步骤操作集合
+ * 拆分为独立原子，以免一个原子代表多笔交易。步骤可带 buttons，以便【确定】
+ * 计入边界。
+ * @param {{ stepActions?: unknown[] }} opts 步骤操作集合（字符串或 `{ action, buttons }`）
  * @returns {boolean} 操作构成一个闭环时为 true
  */
 export function stepsShareClosedLoop({ stepActions }) {
-  const actions = (stepActions || []).map((a) => String(a || '').trim()).filter(Boolean);
+  const actions = (stepActions || []).filter((a) => hasStepText(a));
   if (actions.length === 0) return false;
   const boundaries = actions.filter((a) => isPersistBoundaryAction(a));
   return boundaries.length <= 1;
+}
+
+/**
+ * Count persist confirms in taskDraft text (separate saves).
+ *
+ * Each `【确定】` / `确定】` counts once. Lines that are persist verbs
+ * without a confirm mark (保存/提交/启用/…) count as additional confirms so
+ * a draft that lists two saves is rejected even if it never wrote 确定.
+ * Bare 「确定」 in confirm-dialog copy is not counted here (only the mark
+ * regex), so 「启用」 + 「确定执行此操作？」 stays one persist.
+ * 「保存概况」 in a line is stripped first so a fill-step button does not
+ * inflate the count next to a later 【保存】.
+ * @param {unknown} text Task draft or other haystack
+ * @returns {number} Number of persist confirms
+ */
+export function countPersistConfirms(text) {
+  const src = String(text || '');
+  const confirmHits = src.match(new RegExp(CONFIRM_MARK_RE.source, 'g')) || [];
+  const otherLines = src.split(/\r?\n/).filter((line) => {
+    if (CONFIRM_MARK_RE.test(line)) return false;
+    const stripped = line.replaceAll('保存概况', '');
+    return PERSIST_VERB_RE.test(stripped);
+  });
+  return confirmHits.length + otherLines.length;
 }
 
 /**

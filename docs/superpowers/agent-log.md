@@ -1,5 +1,18 @@
 # Agent 协作日志
 
+## 2026-09-16 16:25 · Cursor — 收工：product-mgmt wet propose 多【确定】误合并（回链 16:05 开工）
+
+- 完成：`b8416216` RED pin；`bc9c1d82` persist 边界 + `multi_persist_task_draft` 闸；review follow-up：fallback 亦看 buttons、`countPersistConfirms` 不把裸「确定」当二次保存、`PROPOSE_CACHE_VERSION` 2→3
+- 验收：`characterize-persist-boundary` all passed（11 pins）；`characterize-req-draft-traj` **OK 63**；`characterize-atom-depend` **8/8**；eslint 改动文件 0 error
+- 遗留移交：不拆 `prod_add_dlg` 流程卡；`missing_depend_fields` 仍为警告；湿缓存须重新 propose（v3）；不维护 CHANGELOG
+
+## 2026-09-16 16:05 · Cursor — 开工：product-mgmt wet propose 多【确定】误合并（persist boundary + taskDraft 闸）
+
+- 进行中：TDD 修 confirmed 根因——`stepsShareClosedLoop`/`isPersistBoundaryAction` 只看 action 不看 buttons；`启用` 误匹配 `未启用`；flowGuided 下 `boundaries<=1` 放行多写合并；taskDraft 多【确定】无闸
+- 范围：`src/services/req-draft-traj/flow-card-guide.js`、`src/services/req-draft-traj/propose.js`、`scripts/characterization/characterize-persist-boundary.mjs`（新）、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：`product_library.json` / `prod_add_dlg` 拆卡；`missing_depend_fields` 升硬拒；runtime recording scheduler；他线 field_slot xpath；SPA；`tmp/cmds` / `config/` WIP
+- 方式：主会话 Inline TDD（先 RED pin 再最小实现）；分支 `cursor/persist-boundary-confirm-8f78`；PR 合入 `uara_V1.2`
+
 ## 2026-09-16 15:05 · Cursor — 收工：field_slot 终审 Important 修复（回链 14:50 开工）
 
 - 完成：`7ed9b6bd` persist AI/CDP `field_slot`/`display_label`；`ccdb68e1` offline input tight leaf；湿测 JSON `.superpowers/sdd/task-4-wet-result.json`；SPA `19130bf`/`041a1ef`（独立仓）

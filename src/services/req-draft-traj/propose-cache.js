@@ -10,10 +10,12 @@ import { join } from 'node:path';
 export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
 
 /**
- * Cache format version — bump on breaking cache shape changes; commit
- * rejects caches whose version differs (STALE_PROPOSE_CACHE).
+ * Cache format version — bump on breaking cache shape **or** persist-boundary
+ * semantics that invalidate previously proposed atoms; commit rejects caches
+ * whose version differs (STALE_PROPOSE_CACHE). v3: buttons/确定 persist +
+ * multi_persist_task_draft.
  */
-export const PROPOSE_CACHE_VERSION = 2;
+export const PROPOSE_CACHE_VERSION = 3;
 
 /**
  * Read cached propose result from a module directory.
