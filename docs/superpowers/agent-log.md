@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-16 17:12 · Cursor — 开工：产品树脏后缀 SDD Task 1–5
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-tree-node-dirty-suffix.md`（清洗函数 → 录制 → 回放 → 推送 → 湿测）
+- 范围：`src/cdp/locator-builders/text.js`、`src/cdp/page-locator-helpers.js`（+ gen）、`scripts/manual_recorder/js_parts/b.py`、AI click/enrich、`src/services/transaction-export.js`、characterization cold pins、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：SPA 仓；历史 DB migrate；他线 atomize/req-draft-traj；不手改 `_locator_helpers_js.py`（走 gen）；`config/` WIP
+- 方式：subagent-driven-development；子智能体不 commit，主会话验收后代提交 + push
+
+
 <<<<<<< HEAD
 ## 2026-09-16 17:05 · ZCode 引擎线 — 补记：select_option 字段解析错位修复**真机复验通过**（回链 10:28 开工 / 10:52 收工）
 
