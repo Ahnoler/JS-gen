@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 20:45 · OpenCode — 开工：修复 RSCF frameId 恒定导致的画面反复附着/自动重连死循环
+
+- 现场实证：CDP `Page.screencastFrame.sessionId` **在单个 screencast 会话内恒定**（自建 headless Chrome 实测 298 帧全为 `sessionId=1`，`b64len` 各异＝确为不同帧），而 `executor/bib-bridge.js` 直接把它写进 RSCF 头 `frameId`（`_onScreencastFrame`）。前端（SPA 仓 63d6a53）以「收到**新**帧序号」判定 streaming、8s 无新帧即自动重连 → 序号永不变 → 无限「正在附着画面… / 画面已断开，系统正在自动重连…」，并每轮 `detach`+重新 prepare 生成新 remote_session（实测 1894→1895→1896→1897 链，839 被反复重置为 draft）。
+- 范围（可写集）：`executor/bib-bridge.js`（RSCF 序号改进程内单调递增；`ack` 仍回真实 CDP sessionId）、`src/executor-ws.js`（`session.bib_ready` 时清该 uuid 的 RSCF 帧缓存，避免重挂后基线倒挂）、`scripts/characterization/cold/characterize-bib-navigate-input.mjs`（追加已注册的行为 pin）、本协作日志；`tmp/` 下诊断脚本。
+- 禁入区：`scripts/refactor/verify-all.sh`（他线在途 WIP，不新增注册项）、`scripts/controller/actions/**`、`scripts/prompts/**`、生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`、SPA 仓、`config/`、线上数据库/执行机运行态、`config/.db-whitelist-seen`。
+- 方式：先落 pin（复用已注册的 bib navigate 冷 pin 文件）再最小实现；`node --check` + 定向 characterization + 真机 WS 订阅探针（`tmp/ws-frame-probe.mjs`）复验序号递增；不改 SPA 契约（令后端满足既有「递增 frameId」契约）。
+
 ## 2026-09-16 20:03 · OpenCode — 开工：阶段拆分提示词加固 + JS 侧业务数据判定对齐（承接 18:59/19:27 线）
 
 - 进行中：用户手动调整的提示词示例经核查**已丢失**（工作区 hash 与 HEAD 一致，VS Code 本地历史仅 `undoRedo` 条目）→ 由本次统一补做。六项：
