@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-16 12:22 · Cursor Cloud — 开工声明：G3 phase_done 证据门闩
+- 开工：12:22 UTC。执行 Project store `docs/g3-phase-done-plan.md` Tasks 0–7
+- 范围：`scripts/controller/actions/phase/boundary_contract.py`、`boundary_gates.py`、`intent_contract.py`、`intent_gates.py`、`prompts.py`、`scripts/agent/recorder_emitters.py`、点击/导航证据埋点相关（`_misc` / form click 路径按需）、`scripts/characterization/characterize-phase-boundary.py`、`characterize-phase-runtime.py`（若触 needs_token）、`scripts/refactor/verify-all.sh`、`src/services/trajectory/trajectory-recording-runner.js`（及本阶段业务步数小 helper）、本文件
+- 禁入：G1 报文捞取、G2 运维、G4 真上传 / KB 湿测主责、文件上传·SUT、`save_section.py`（禁止恢复）、他线 WIP（`scripts/agent/service.py` 未声明改动、`data/kb/flows/**` 湿测主链、req-upload）
+- 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
+- 分支：`cursor/g3-phase-done-evidence-gate-3b92`
+
 ## 2026-09-05 19:35 · Cursor Lead — 收工：需求导入 KB 实现 T1–T4（回链 19:16 开工）
 - 完成：Skill `req-doc-to-kb`；服务+pin OK 11；`/api/v2/kb/req-modules*` + 501 上传 stub；`product-mgmt` registered；`verify-all` 接入 pin
 - 提交链：`9681934` → `dc4f84d` → `25a75c2` → `9e345e8` → `c05e99f`
