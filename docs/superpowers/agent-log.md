@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:30 · Cursor — 收工：Task 2 propose.js 接线 produces/dataDependsOn（回链 12:26 开工）
+
+- 完成：commit **`fd18fc6a`** `feat(propose): attach produces/dataDependsOn and hard-gate depend graph`
+- 范围：`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`（cache 写入 `warnings`）、`scripts/characterization/characterize-atom-depend.mjs` 源码 pin
+- 验收：characterize-atom-depend **8/8 ok / all passed**（pin 先 RED 缺 import，后 GREEN）；characterize-atom-keydata all passed；characterize-req-draft-traj **OK 63**（含 `multi_write_atom`）；eslint 三文件 0
+- 遗留移交：Task 3–4（atomize prompt、samples、spec 交叉引用）未做
+
 ## 2026-09-16 12:26 · Cursor — 开工：Task 2 propose.js 接线 produces/dataDependsOn
 
 - 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 2 only**（TDD：characterize 源码 pin → `propose.js` 接线 → cache/return `warnings`）
