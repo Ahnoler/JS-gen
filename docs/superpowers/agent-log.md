@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 10:52 · ZCode — 开工：协作协议再升级固化（开工前 pull / log 条目 commit+push）
+
+- 用户指令：开工声明之前先 `git pull`；写完 agent log 后一律 commit 并 push（原约定只 commit）。今日将其固化进 AGENTS.md「跨 Agent 协作」区段
+- 范围：仅 `AGENTS.md`（协作区段）+ 本日志条目；仓库外记忆文件同步
+- 禁入区：其余文件不动；agent-log 他人条目只读
+- 方式：主线程；纯文档改动，pull 已先行完成
+
 ## 2026-09-16 10:52 · ZCode 引擎线 — 收工：select_option 字段解析错位修复湿测 PASS（回链 10:28 开工）
 
 - 完成：commit **b3339e2a**（4 文件 +105/-8）：tssc_multi_select 字段查找改 findFieldItem（精确优先→包含唯一兜底→多命中 ambiguous-label）、prompts 同步歧义错误码、新增 characterize-tssc-field-resolution.py 入 verify-all。
