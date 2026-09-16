@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:15 · Cursor — 开工：表单字段内同族控件 xpath 消歧（field_slot）
+
+- 进行中：真机调研「保证金比例」复合字段 → 方案 A 已定；写 design spec，待用户审阅后写 plan 再改代码。
+- 范围：`src/cdp/page-locator-helpers.js`（及 `_gen_locator_helpers_py` 生成物）、`src/models/element.js`、`src/cdp/locator-builders/controls.js`（若需对齐）、`scripts/manual_recorder/**`、characterization、本仓 `docs/superpowers/specs|plans`、本协作日志；前端仓 `D:\dev\ui-auto-recording-agent-vue-master\vue-project`（`trajectory-tree.ts` / step 标题路径）。
+- 禁入区：他线 WIP（白名单/发版 tmp/cmds、atomic-draft 计划线）；不改 `label_text` 语义；不回填历史轨迹；agent-log 他人条目只读。
+- 方式：主线程；先 spec→plan→实现；验证=characterization + 本页湿测。
+
 ## 2026-09-16 · Zcode Lead — AI 录制管线讲解材料产出（培训交接用）
 - 完成：`docs/superpowers/research/2026-09-16-ai-recording-pipeline-handover.md`——三路并行调研（Node 生命周期 / Python 引擎 / 数据落库）汇总成文，与回放材料（2026-09-01）配套；含 prepare 四阶段、phase 循环+假成功门闩、四 LLM 角色、cue 纠偏体系、一个点击的落库旅程、9 条易混淆点；全部带 file:line
 - 声明：本轮只新增该 research 文档 + 本条目，未动任何代码
@@ -9,6 +16,41 @@
 - 计划：`docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md`
 - Spec：`2026-09-15-atomic-draft-tx-split-boundary-design.md` 已审阅；待选执行方式
 
+## 2026-09-16 11:xx · OpenCode — 收工：迁移本机数据库白名单同步工具至 tmp/cmds（回链本次开工）
+
+- 完成：删除仓库共享 `config/update-db-whitelist.cmd` 与 `config/update-db-whitelist.ps1`；本机工具已迁至 gitignore 的 `tmp/cmds/`，两文件保持同目录调用关系。
+- 兼容：PowerShell 引擎按自身新位置回溯仓库根目录，继续读取/写入 `config/.db-whitelist-seen` 和 `config/.db-whitelist-sync.log`；CMD 的双击循环和 `once` 单次同步参数不变。
+- 验收：CMD、PS1、新位置回溯的仓库根目录及 `config/` 状态目录均存在；PowerShell AST 语法解析通过；同目录 PS1 引用和 `StateDir=config` 断言通过；`git diff --check` 通过。未执行 SSH、TCP 探测或服务器白名单变更。
+- 遗留移交：从 `tmp/cmds/update-db-whitelist.cmd` 启动即可；未触碰既有 `config/.db-whitelist-seen` 运行状态。
+
+## 2026-09-16 11:xx · OpenCode — 开工：迁移本机数据库白名单同步工具至 tmp/cmds
+
+- 进行中：迁移 `config/update-db-whitelist.cmd` 及其同目录本机 PowerShell 引擎 `update-db-whitelist.ps1` 至 `tmp/cmds/`，保持双击循环同步与 `once` 单次同步用法。
+- 范围：`config/update-db-whitelist.cmd`→`tmp/cmds/update-db-whitelist.cmd`、`config/update-db-whitelist.ps1`→`tmp/cmds/update-db-whitelist.ps1`、本协作日志；运行时状态/日志仍留在忽略的 `config/.db-whitelist-*`。
+- 禁入区：`src/`、`migrations/`、其余 `config/` 文件、线上 iptables/数据库、既有 `config/.db-whitelist-seen` 运行状态和其他会话 WIP。
+- 方式：CMD 保持与 PS1 同目录；PS1 从自身位置回溯仓库根目录，再将 state/log 写入 `config/`；仅做本地路径与 PowerShell 语法验证，不连接服务器或更改白名单。
+
+## 2026-09-16 11:xx · OpenCode — 收工：迁移本机后端发版 CMD 至 tmp/cmds（回链本次开工）
+
+- 完成：删除仓库根目录 `release-backend.cmd`；本机发版命令迁至被 gitignore 的 `tmp/cmds/release-backend.cmd`，不保留根目录兼容入口。
+- 保留：`pack-control-plane.sh`（README 公开的 Git Bash 打包入口）和 `release-backend-remote.sh`（上传后在服务器运行的部署逻辑）继续置于仓库根目录，供共用发布流程调用。
+- 兼容：新 CMD 由自身位置回溯到仓库根目录，并以绝对路径调用上述共享脚本；远端上传名固定为 `release-backend-remote.sh`，与服务器清理和 SSH 执行路径一致。
+- 验收：新 CMD 路径解析为仓库根目录且两个共享脚本均存在；实际运行到 Git Bash 前置检测（本机未安装 Git Bash，按原有保护逻辑在上传前退出，未连接服务器）；`git diff --check` 通过。
+- 遗留移交：本机安装 Git Bash 后可从 `tmp/cmds/release-backend.cmd` 双击直接发版；未触碰 `config/.db-whitelist-seen` 和其他忽略的本地运行文件。
+
+## 2026-09-16 11:xx · OpenCode — 开工：迁移本机后端发版 CMD 至 tmp/cmds
+
+- 进行中：将仅供本机 Windows 双击发版的 `release-backend.cmd` 移到 `tmp/cmds/`，并使其按自身位置回溯仓库根目录后继续调用共用的打包与远端部署脚本。
+- 范围：`release-backend.cmd`→`tmp/cmds/release-backend.cmd`、本协作日志；`pack-control-plane.sh` 与 `release-backend-remote.sh` 保留根目录，因 README/非 Windows 发版流程可直接共用。
+- 禁入区：`src/`、`config/`、`migrations/`、`scripts/`、线上服务器、`config/.db-whitelist-seen` 未跟踪运行文件及其他会话 WIP。
+- 方式：移动后由 CMD 先解析仓库根目录，再以绝对路径定位 Bash 打包脚本和远端 shell 脚本；验证路径解析、打包命令和 Shell 语法，不执行上传或服务器重启。
+
+## 2026-09-16 11:xx · OpenCode — 收工：修复后端一键发布脚本跨秒误拒绝（回链本次开工）
+
+- 完成：commit **ebd26411**；`release-backend.cmd` 将启动时生成的发布时间戳传给 `pack-control-plane.sh`，从而使压缩包名与上传前的同一时间戳校验一致，跨秒打包不再误报 stale pack。
+- 兼容：`pack-control-plane.sh` 保留无参行为，供同事直接执行时仍自行按当前时间命名；发布远端协议、包内容、SSH/SCP 和重启逻辑均未修改。
+- 验收：Git Bash `bash -n pack-control-plane.sh` 通过；固定时间戳 `20991231-235959` 打包、产物存在和 `tar -tzf` 校验通过；无参打包与产物完整性校验通过；`git diff --check` 通过。
+- 遗留移交：无；本次未连接或变更线上服务器，首次点击发布可直接按现有流程执行。
 
 ## 2026-09-16 10:55 · ZCode — 开工：协作协议补条（push 冲突处理规则）
 
