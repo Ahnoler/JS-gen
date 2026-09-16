@@ -1,5 +1,8 @@
 # Agent 协作日志
 
+
+> **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
+
 ## 2026-09-16 14:xx · OpenCode — 收工：修复 tmp/cmds 后端发版 CMD 闪退（回链本次开工）
 
 - 根因：CMD 的 Git Bash 缺失提示放在括号块内，文本中的未转义 `1)`/`2)` 会被 CMD 预解析为语法错误；即使当前 `D:\Software\Git\bin\bash.exe` 存在且路径已解析，脚本仍在上传前闪退。
@@ -14,7 +17,6 @@
 - 禁入区：共享发布 shell 脚本、`src/`、`config/`、`migrations/`、线上发布目录和其他会话 WIP；不执行真实上传、迁移、重启或回滚。
 - 方式：以 CMD 包装运行捕获错误，验证根目录与 Git Bash 发现逻辑；修复后运行到安全的打包前确认边界，确保失败窗口保留并输出可诊断错误。
 
-> **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
 
 ## 2026-09-16 14:22 · ZCode — 收工：agent-log 归档完成（回链 14:15 开工）
 
