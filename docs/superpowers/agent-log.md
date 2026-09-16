@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-16 21:03 · ZCode 引擎线 — 收工：本地合入 PR #45（G3 phase_done 证据门闩，回链 20:49 开工）
+
+- 完成：`c0cfa03e`（合并提交，17 文件）+ `abea7695`（集成修复）。PR 原提 master（分叉点 `5dddf2ea` 落后 uara_V1.2 **1034 提交**），按用户要求合到本地主线 `uara_V1.2`，未动 master。PR 作者分支 `cursor/g3-phase-done-evidence-gate-3b92`（7 提交 `539c8e76`→`9391f09c`，Cursor Cloud，12:22–12:41）
+- 五处冲突处置：①`agent-log.md`——两侧无公共顶部区（我方已裁成近期窗口、协议在 `AGENTS.md`、旧档在 `archive/logs/`），**取我方 + 只插入 PR 作者两条新条目（12:22 开工 / 13:10 收工），未回灌 master 陈旧历史**；②`_misc.py` 取我方委派版（PR 对该文件是纯增量 70+/0-），其三段 G3 增量**手工移植进抽离后的 `click_action_engine.py`**（`overlay_title_before`/`url_changed`/`maybe_record_click_completion_evidence`，grep 计数 4/3/2 校验）；③`trajectory-recording-runner.js` 三块——imports 只取本文件尚未有的符号（PR 的 `countBusinessSteps`/`META_STEP_ACTIONS` 与本文件 31/32 行重名，照抄即 SyntaxError）；phase outcome 取我方（见下"未采纳"）；整轨收尾取我方并接线 PR 的 `aggregateTrajectorySuccessful` 作整轨判定单一来源、per-run 零步过滤改用 `applyZeroStepFakeSuccessGate(...).rejectedZeroStep`（两处均在 drain 之后调用，计数可信）；④`verify-all.sh` 双方新增并存，**并修正 PR 的注册路径**——`scripts/characterization/characterize-phase-boundary.py` 在我方已归档，git 改名检测把 PR 那份折进 `cold/`，故改注册 `cold/` 路径（否则门禁"文件不存在"假红）；⑤`reviewer.py` 冲突仅 docstring（`_MAINTAIN_ONLY`/`_NAV_OK` 代码 hunk 干净落地），两段文案合并保留
+- **集成修复（PR 自身缺陷，我方门禁抓到）**：PR 新增的 `_guard_done_reject_zero_business_actions` 拒绝分支写成裸 `return` → 返回 None → 而唯一调用方 `recorder.py:271` 按 truthy 判定 → **被当成"未拒绝"而放行 done，零步守卫形同虚设**。改 `return True`（`abea7695`）；注释放 `if` 之前而非 `):` 与 `return True` 之间，因 `characterize-recorder-phase-reset` 钉的就是那个形状（我第一版把注释插中间，门禁如实报红）
+- 未采纳（**须用户知悉**）：PR 的 phase 级同步判定是在**累积 DB 计数**（`trajectoryStepDao.listByPhase`）上算出 `success:false`；我方 v2/v3 刻意返回 `null` 交给 drain 后异步门闩，理由是录制同步延迟实测可达分钟级（588-593）会**误杀**，且累积口径在重录时被旧 run 步骤掩护（#612/#614）——这正是 per-run `phaseStepCounts` 存在的原因。故保留我方时序，**PR 的"0 步成功不得成立"意图仍端到端成立**（终态必为 failed），但判定时机是异步而非同步
+- 验收：PR 自带三门禁全绿（`characterize-phase-done-evidence-gate` OK / `cold/characterize-phase-boundary` OK / `characterize-phase-runtime` PASS）；受守卫影响的 7 个门禁全绿（done-accept-reason / click-navigation-cue / kb-staging / phase-runtime / recorder-phase-reset 39 checks / cold phase-boundary / cold step-notice-scan）；合并产物 11 个 Python 模块 import 通过 + 两个 JS `node --check`；**verify-all 3 红 = step-highlight / layer-tree / confirm-notification（既有基线，与合入前逐项同）→ 无新增红**（首次合并后跑出 4 红，多出的 `characterize-recorder-phase-reset` 即上述 PR 缺陷，已修并复跑归零）
+- 提示词一致性已核：`phase/prompts.py` 与 `prompts/agent-core.md` 的查询/导航收口改为"先取得证据再 done、禁 0 步假完成"，与新门闩口径一致（提示词与门闩不对齐会导致录制反复被拒）
+- 遗留移交：①**湿测未跑**（PR 作者云环境无 MySQL，其条目自述"湿测未跑"）——建议对公建档/查询多阶段真机跑一遍，确认 0 步假成功确被拒且正常查询/导航不被误拒；②生产须重启控制面 + 执行机进程生效；③`release` 前若发现查询/导航阶段被过度拒绝，回退点是 `abea7695`（仅一行）与 `c0cfa03e`（整体）；④el-select 下拉栅栏等 PR 未涉及的能力未动
+- 注：不维护 CHANGELOG
+
 ## 2026-09-16 20:49 · ZCode 引擎线 — 开工：本地合入 PR #45（G3 phase_done 证据门闩）
 
 - 进行中：把 `origin/cursor/g3-phase-done-evidence-gate-3b92`（7 提交 `539c8e76`→`9391f09c`，作者 Cursor Cloud，12:22–12:41）合入**本地主线 `uara_V1.2`**（该 PR 原提 master，用户明确不动 master）。内容=query/navigate `success_when` 证据 + click 证据埋点 + recorder `needs_token` 双条件 + 控制面 0 步 `phase_done` 拒收 + verify-all 接入 2 pin + prompts 对齐
