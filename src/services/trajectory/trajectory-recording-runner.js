@@ -31,6 +31,12 @@ import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { capturePhaseBuffer, buildMetadata } from './phase-highlight-screenshot.js';
 import { replacePhaseGroupScreenshot } from '../screenshot-service.js';
+import {
+  aggregateTrajectorySuccessful,
+  applyZeroStepFakeSuccessGate,
+  countBusinessSteps,
+} from './phase-done-evidence-gate.js';
+import { META_STEP_ACTIONS } from '../../models/meta-step-actions.js';
 
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -647,28 +653,42 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   /**
    * 阶段收尾：解析 phase_done 结果写入 phaseOutcomes、appendPhaseDoneLog、
    * 置阶段 completed、通知批量进度，排空持久化与组图队列后采集阶段高亮截图。
+   * G3：0 业务步 + success=true → 覆盖为 success=false（zero_step_rejected）。
    * @param {object} phase 当前阶段
    * @param {object|null} donePayload phase_done 事件负载
    * @returns {Promise<void>}
    */
   const recordPhaseResult = async (phase, donePayload) => {
-    const explicitSuccess = donePayload?.success === true
-      || donePayload?.success === false
-      ? donePayload.success
-      : null;
-    const textFromDone = String(donePayload?.text || donePayload?.summary || '').trim();
+    let businessStepCount = 0;
+    try {
+      const steps = await trajectoryStepDao.listByPhase(phase.id);
+      businessStepCount = countBusinessSteps(steps, META_STEP_ACTIONS);
+    } catch (err) {
+      console.warn('[record] phase business step count failed:', err?.message || err);
+    }
+    const gated = applyZeroStepFakeSuccessGate({
+      stepCount: businessStepCount,
+      donePayload,
+    });
     const phaseOutcome = {
-      // Only explicit true/false; missing success on phase_done → unknown (null).
-      success: explicitSuccess,
-      text: textFromDone
-        || (explicitSuccess == null ? '见页面当前状态' : String(donePayload?.name || '').trim())
-        || '见页面当前状态',
+      success: gated.success,
+      text: gated.text,
     };
     runtime.phaseOutcomes[phase.id] = phaseOutcome;
     runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;
-    const rawDoneText = String(donePayload?.text || '').trim();
-    if (rawDoneText) {
-      await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
+    if (gated.rejectedZeroStep) {
+      await appendPhaseDoneLog(phase.id, {
+        text: gated.text,
+        source: 'fail',
+      });
+      console.warn(
+        `[record] G3 zero_step_rejected phase=${phase.phaseNumber} id=${phase.id}`,
+      );
+    } else {
+      const rawDoneText = String(donePayload?.text || '').trim();
+      if (rawDoneText) {
+        await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
+      }
     }
     await trajectoryPhaseDao.updateStatus(phase.id, 'completed');
     await notifyBatchProgressForTrajectory(tid);
@@ -779,11 +799,12 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       await recordPhaseResult(phase, donePayload);
     }
 
-    // 录制成功（V3）：无论持久基线为何，显式结束成功 → 待确认(recorded)。
+    // 录制收尾（V3）：按 phaseOutcomes 聚合 isSuccessful（G3：任一 false → false）。
     finalStatus = await trajectoryDao.finishTransientRecording(tid, 'success');
+    const trajSuccess = aggregateTrajectorySuccessful(runtime.phaseOutcomes);
     await trajectoryDao.updateMeta(tid, {
       isDone: true,
-      isSuccessful: true,
+      isSuccessful: trajSuccess,
     });
     await trajectoryPhaseDao.updateRunningStatus(tid, 'completed').catch((err) => {
       console.warn(`[record] updateRunningStatus(completed) failed for #${tid}:`, err?.message || err);

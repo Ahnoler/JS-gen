@@ -19,8 +19,10 @@ def query_task_hint() -> str:
         '本阶段是查询/筛选，不是表单填写、也不是表单修改。\n'
         '1. 禁止自动填写：不要等 auto-fill、不要 scan_form_fields / get_pending_tasks 当进度。\n'
         '2. 由你根据任务描述设置筛选条件（fill_form_field / select_option / select_tree_option）。\n'
-        '3. 设完后用 click_element_by_index 点击「查询」（或「搜索」），然后 done(success=true)。\n'
-        '4. 本页没有「保存/提交」语义；click_save 不适用。\n'
+        '3. 设完后用 click_element_by_index 点击「查询」（或「搜索」）。\n'
+        '4. 仅当已实际点过「查询/搜索」后才允许 done(success=true)；'
+        '禁止 0 步或未点查询就声称成功。\n'
+        '5. 本页没有「保存/提交」语义；click_save 不适用。\n'
     )
 
 
@@ -35,8 +37,10 @@ def wizard_nav_task_hint() -> str:
         '禁止 click_element_by_index 点下拉行（会假成功且录不到可回放步骤）。\n'
         '2. 设完后用 click_element_by_index 点击「下一步」；不要把点「查询」当成阶段结束'
         '（除非任务明确要求先点查询再点下一步）。\n'
-        '3. 若弹出确认/风险提示，点「确定/确认」后继续；进入下一步后 done(success=true)。\n'
+        '3. 若弹出确认/风险提示，点「确定/确认」后继续；进入下一步并取得证据后才 '
+        'done(success=true)。\n'
         '4. 禁止 click_save(保存/提交)；本页无表单保存语义。\n'
+        '5. 禁止无点击证据的 done(success=true)。\n'
     )
 
 
@@ -46,11 +50,12 @@ def open_page_task_hint() -> str:
         '\n\n【任务类型：打开页面/导航】\n'
         '本阶段只是把目标页面/弹窗打开，不办理页面内的业务流程。\n'
         '1. 按任务描述完成前置点击（菜单 / 选中行 / 点「评级申请」类按钮）。\n'
-        '2. 目标页面/弹窗出现后，立刻 done(success=true)。\n'
+        '2. 目标页面/弹窗出现（URL 变化或新弹窗标题）后，立刻 done(success=true)。\n'
         '3. 本阶段目标是让目标页面/弹窗出现；出现即结束。'
         '🚨 禁止在新页面/弹窗内继续操作：不要填字段、不要点「下一步/查询/确定/保存」'
         '——那是后续阶段的任务。\n'
         '4. 本阶段无表单保存语义，不需要 click_save。\n'
+        '5. 禁止 0 步 done(success=true)；必须先完成至少一次有效点击/导航。\n'
     )
 
 
