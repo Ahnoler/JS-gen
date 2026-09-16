@@ -254,6 +254,66 @@ def _boundary_requires_evidence(business_data_store) -> bool:
         return False
 
 
+def _guard_done_record_open_page_evidence(business_data_store, open_overlay) -> None:
+    """Stamp ``page_opened`` for an open-page navigate phase whose target overlay is visible.
+
+    The click-time capture (click_action_engine) measures the overlay title
+    immediately after the click; a drawer/dialog that renders asynchronously
+    (or has no readable title) is missed there, so the G3 token gate would reject
+    every ``done()`` (sid 3718d161 phase 1: 评级申请 → 对公客户评级申请 drawer).
+    By done() time the overlay is visible, which *is* the open-page success
+    condition — record it so the evidence gate can pass. The zero-business-action
+    guard still requires a real click for this phase.
+    """
+    try:
+        from scripts.controller.actions._phase_boundary import (
+            get_phase_boundary,
+            phase_boundary_active,
+            record_evidence,
+        )
+        if not open_overlay or not phase_boundary_active(business_data_store):
+            return
+        b = get_phase_boundary(business_data_store) or {}
+        if b.get('role') != 'navigate' or 'open_page' not in (b.get('goals') or []):
+            return
+        needed = set(b.get('success_when') or [])
+        if not (needed & {'page_opened', 'url_change', 'dialog_confirmed'}):
+            return
+        record_evidence(business_data_store, 'page_opened', str(open_overlay)[:80])
+        sys.stderr.write(
+            f'[recorder] open-page evidence recorded from visible overlay '
+            f'{str(open_overlay)[:60]!r}\n'
+        )
+        sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f'[recorder] open-page evidence record skipped: {e}\n')
+        sys.stderr.flush()
+
+
+def _guard_done_nav_evidence_ok(business_data_store) -> bool:
+    """True when a navigate-phase boundary's success_when evidence is satisfied.
+
+    For navigate (open-page / wizard 下一步) a visible overlay is the target page
+    or the next step, not unfinished work — the overlay gate must not reject
+    ``done()`` once the phase's own evidence is present.
+    """
+    try:
+        from scripts.controller.actions._phase_boundary import (
+            get_phase_boundary,
+            phase_boundary_active,
+            phase_done_ok,
+        )
+        if not phase_boundary_active(business_data_store):
+            return False
+        b = get_phase_boundary(business_data_store) or {}
+        if b.get('role') != 'navigate':
+            return False
+        ok, _ = phase_done_ok(business_data_store)
+        return bool(ok)
+    except Exception:
+        return False
+
+
 # Align with product META_STEP_ACTIONS / skip-screenshot observation ops.
 _ZERO_STEP_META_ACTIONS = frozenset({
     'save_form_snapshot', 'scan_form_fields', 'scan_visible_fields',
@@ -689,13 +749,22 @@ def _guard_done_reject_legacy_claim(agent, business_data_store, save_ok, navigat
         return True
     return False
 
-def _guard_done_reject_overlay(agent, business_data_store, contract, open_overlay, navigated_ok, save_ok, introduce_ok) -> bool:
+def _guard_done_reject_overlay(agent, business_data_store, contract, open_overlay, navigated_ok, save_ok, introduce_ok, nav_evidence_ok: bool = False) -> bool:
     """done 拦截-可见 overlay 门禁（原 445-475 段逐字搬移）。
 
     契约不允许 overlay 时拒绝（改写历史结果）；契约允许时仅记录放行日志。
+    ``nav_evidence_ok``（navigate 阶段 success_when 已满足）时，可见 overlay 就是
+    目标页面/下一步本身，放行不拒（sid 3718d161 阶段1：打开抽屉式向导）。
     返回 True 表示已拒绝。
     """
     from ..controller.actions._phase_intent import overlay_blocks_done
+    if open_overlay and not navigated_ok and not save_ok and not introduce_ok and nav_evidence_ok:
+        sys.stderr.write(
+            f"[recorder] overlay {open_overlay} present but navigate evidence satisfied "
+            f"at step {agent.state.n_steps} — allow done (target page/next step)\n"
+        )
+        sys.stderr.flush()
+        return False
     # A picker-confirm phase may intentionally leave its parent wizard/drawer
     # open for the next phase.  `_last_introduce_ok` is the scoped evidence that
     # the child picker was closed; do not mistake the parent overlay for an
@@ -923,6 +992,10 @@ async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> b
             save_ok, introduce_ok, navigated_ok, contract = _guard_done_derive_flags(
                 business_data_store, done_success, cur_url,
             )
+            # Open-page navigate: a visible target overlay at done() time is the
+            # page_opened evidence when the click-time capture missed an async
+            # drawer/dialog render (sid 3718d161 phase 1).
+            _guard_done_record_open_page_evidence(business_data_store, open_overlay)
             if _guard_done_reject_zero_actions(agent, business_data_store):
                 return True
             if _guard_done_reject_pending_write(agent, business_data_store, contract):
@@ -949,9 +1022,11 @@ async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> b
                 needs_token, claims_save_ok,
             ):
                 return True
+            nav_evidence_ok = _guard_done_nav_evidence_ok(business_data_store)
             if _guard_done_reject_overlay(
                 agent, business_data_store, contract, open_overlay,
                 navigated_ok, save_ok, introduce_ok,
+                nav_evidence_ok=nav_evidence_ok,
             ):
                 return True
             if _guard_done_reject_errors(

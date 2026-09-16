@@ -333,6 +333,71 @@ def test_create_submit_budget_includes_recovery_buffer() -> None:
     assert_true(create <= 30, "still capped by ceiling")
 
 
+def test_open_page_overlay_evidence_and_overlay_gate() -> None:
+    """sid 3718d161 phase 1: an open-page navigate drawer must satisfy the G3 gate.
+
+    The click-time capture misses a drawer/dialog that renders asynchronously; by
+    done() time the visible overlay IS the open-page success condition, so
+    recorder_emitters stamps page_opened and the overlay gate must not reject it.
+    """
+    from scripts.agent.recorder_emitters import (
+        _guard_done_nav_evidence_ok,
+        _guard_done_record_open_page_evidence,
+        _guard_done_reject_overlay,
+    )
+    from scripts.controller.actions._phase_boundary import (
+        apply_phase_boundary,
+        observed_kinds,
+        phase_done_ok,
+    )
+
+    class _State:
+        n_steps = 3
+
+        class history:
+            history = []
+
+    class _Agent:
+        state = _State()
+
+    agent = _Agent()
+    # A navigate contract like boundary_to_legacy_intent derives (kinds non-empty
+    # → overlay_blocks_done True, so the exemption is what avoids the false reject).
+    contract = {
+        'mode': 'navigate',
+        'submit': {'required': False, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': ['url_change', 'page_opened'], 'evidence': []},
+    }
+
+    store: dict = {}
+    apply_phase_boundary(store, '点击【评级申请】按钮。预期结果：打开“对公客户评级申请”向导页面。')
+    b = store['_phase_boundary']
+    assert_true(b['role'] == 'navigate' and 'open_page' in b['goals'], f'open_page navigate: {b}')
+    assert_true(not phase_done_ok(store)[0], 'gate closed before any evidence')
+    assert_true(
+        _guard_done_reject_overlay(agent, store, contract, 'drawer:对公客户评级申请',
+                                   False, False, False,
+                                   nav_evidence_ok=_guard_done_nav_evidence_ok(store)) is True,
+        'open overlay + no nav evidence → overlay gate rejects',
+    )
+    _guard_done_record_open_page_evidence(store, 'drawer:对公客户评级申请')
+    assert_true('page_opened' in observed_kinds(store), 'visible overlay stamps page_opened')
+    assert_true(phase_done_ok(store)[0], 'page_opened satisfies open_page gate')
+    assert_true(_guard_done_nav_evidence_ok(store), 'nav evidence satisfied')
+    assert_true(
+        _guard_done_reject_overlay(agent, store, contract, 'drawer:对公客户评级申请',
+                                   False, False, False,
+                                   nav_evidence_ok=_guard_done_nav_evidence_ok(store)) is False,
+        'target overlay with nav evidence → overlay gate allows done',
+    )
+
+    # wizard click_next (no open_page goal) must NOT stamp from a stray overlay
+    store2: dict = {}
+    apply_phase_boundary(store2, '客户名称搜索为贯通验证企业，点击下一步。预期结果：进入风险阻断。')
+    _guard_done_record_open_page_evidence(store2, 'dialog:unrelated')
+    assert_true(not observed_kinds(store2), 'non-open-page navigate does not stamp page_opened')
+
+
 def test_resolve_infer_unique_and_longest() -> None:
     store = {
         "_phase_intent": {
@@ -371,6 +436,7 @@ def main() -> None:
     test_session_runner_logs_empty_buffer()
     test_quality_fail_logging_in_session_runner()
     test_create_submit_budget_includes_recovery_buffer()
+    test_open_page_overlay_evidence_and_overlay_gate()
     test_resolve_infer_unique_and_longest()
     print("PASS characterize-phase-runtime")
 
