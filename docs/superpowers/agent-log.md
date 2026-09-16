@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 11:xx · OpenCode — 开工：迁移本机数据库白名单同步工具至 tmp/cmds
+
+- 进行中：迁移 `config/update-db-whitelist.cmd` 及其同目录本机 PowerShell 引擎 `update-db-whitelist.ps1` 至 `tmp/cmds/`，保持双击循环同步与 `once` 单次同步用法。
+- 范围：`config/update-db-whitelist.cmd`→`tmp/cmds/update-db-whitelist.cmd`、`config/update-db-whitelist.ps1`→`tmp/cmds/update-db-whitelist.ps1`、本协作日志；运行时状态/日志仍留在忽略的 `config/.db-whitelist-*`。
+- 禁入区：`src/`、`migrations/`、其余 `config/` 文件、线上 iptables/数据库、既有 `config/.db-whitelist-seen` 运行状态和其他会话 WIP。
+- 方式：CMD 保持与 PS1 同目录；PS1 从自身位置回溯仓库根目录，再将 state/log 写入 `config/`；仅做本地路径与 PowerShell 语法验证，不连接服务器或更改白名单。
+
 ## 2026-09-16 11:xx · OpenCode — 收工：迁移本机后端发版 CMD 至 tmp/cmds（回链本次开工）
 
 - 完成：删除仓库根目录 `release-backend.cmd`；本机发版命令迁至被 gitignore 的 `tmp/cmds/release-backend.cmd`，不保留根目录兼容入口。
