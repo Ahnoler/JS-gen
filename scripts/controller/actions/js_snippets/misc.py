@@ -73,7 +73,18 @@ JS_VERIFY_FORM_STRUCTURE = '''(arg) => {
         if (!el) return false;
         const aria = (el.getAttribute('aria-label') || '').trim();
         const header = (el.querySelector('.el-drawer__title, .el-drawer__header, .el-dialog__title')?.textContent || '').trim();
-        if (!w || w === 'unnamed') return !aria && !header;
+        if (!w || w === 'unnamed') {
+            // Recorder marks dialogs "unnamed" from an EMPTY .el-dialog__title
+            // (JS_IDENTIFY_CONTAINER) — it never looks at aria-label. Element UI
+            // always renders a generic aria-label="dialog" (`title || 'dialog'`),
+            // and a custom title slot leaves aria-label as the real title with no
+            // .el-dialog__title node. Use the same title-text signal the recorder
+            // used so a recorded `<kind>:<trigger>|unnamed` container still
+            // resolves at replay (previously it always failed container_not_found).
+            const isElDialog = el.classList.contains('el-dialog');
+            if (isElDialog) return !header;
+            return !aria && !header;
+        }
         return aria === w || header === w
             || (aria && (aria.includes(w) || w.includes(aria)))
             || (header && (header.includes(w) || w.includes(header)));

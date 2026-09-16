@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-16 17:19 · OpenCode — 收工：Type B 容器解析失败致回放误报失败（回链 17:11 开工）
+
+- 根因：多步回放中 `save_form_snapshot`（Type B 检查点）按 `dialog:<trigger>|unnamed` 找根，`JS_VERIFY_FORM_STRUCTURE.matchTitle` 的 unnamed 分支要求 `aria-label` 为空；但 Element UI 的 `.el-dialog` 恒有 `aria-label="dialog"`（`:aria-label="title || 'dialog'"`），而录制侧 `JS_IDENTIFY_CONTAINER` 判定 unnamed 只看 `.el-dialog__title` 文本为空 → 两侧语义不对称 → unnamed 容器永远 `container_not_found` → Node 按 unsafe 把该检查点计入 `failedStepIds`，用户看到「步骤都执行了却失败 1 条」
+- 完成：`96869ade` 修 `matchTitle`——`.el-dialog` 的 unnamed 分支改用录制侧同源信号（`.el-dialog__title` 文本为空，覆盖默认无标题与 custom title slot 两种）；drawer 维持 `aria+header` 不变；新烟 `characterize-form-structure-container.mjs`（Playwright 8 例：untitled/titled/custom-slot/legacy/缺容器/drawer/main 作用域），入 verify-all
+- 验收：新烟先 RED（`container_not_found`）后 GREEN 8/8；verify-all 复跑=既有 4 红（step-highlight/layer-tree/confirm-notification/network-capture，均他线数据/环境）不变，本线新烟绿；`characterize-container-naming` / `characterize-dialog-screenshot` / `characterize-form-snapshot-trigger` 等相邻烟全绿
+- 遗留移交：生产须重启执行机进程生效；本次仅修容器解析（回放时容器确实存在却匹配失败），未改 Type B `container_not_found`→fail 的策略（设计定调 unsafe 不 mutate）；顺带清除 agent-log 他线遗留的合并冲突标记（保留双方条目）
+- 注意：push 时遇 GitHub 不可达（TCP 443 连接失败），本条与代码提交待网络恢复后 pull+push；不维护 CHANGELOG
+
 ## 2026-09-16 17:12 · Cursor — 开工：产品树脏后缀 SDD Task 1–5
 
 - 进行中：执行 `docs/superpowers/plans/2026-09-16-tree-node-dirty-suffix.md`（清洗函数 → 录制 → 回放 → 推送 → 湿测）
