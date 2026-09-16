@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 21:06 · Cursor — 开工：BLOCKER 编辑页误判 maintain
+
+- 进行中：`capability-cohesion.js` `detectOtherFamilies` / maintain 匹配不把导航复合「编辑页 / 编辑页面 / 编辑界面」计为 maintain（真维护如「编辑字段」仍计）；`characterize-capability-cohesion.mjs` 加 pin；`propose merges same-loop steps when LLM returns flowRef` 转绿。不 bump cache，不做 Task 5 prompt。
+- 范围：`src/services/req-draft-traj/capability-cohesion.js`、`scripts/characterization/characterize-capability-cohesion.mjs`、本协作日志
+- 禁入：`propose-cache.js`；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 5+
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
 ## 2026-09-16 22:25 · Cursor — 收工：能力内聚结构硬闸 Task 4（回链 22:10 开工）
 
 - 完成：`characterize-req-draft-traj.mjs` pin 改为 `PROPOSE_CACHE_VERSION === 5`；`propose-cache.js` 4→5（注释 v5 = capability-cohesion + title-as-key reject）；`verify-all.sh` 在 `characterize-persist-boundary` 后注册 `characterize-capability-cohesion`。chore **`433f0b2c`**。开工声明 `3926a134`。
