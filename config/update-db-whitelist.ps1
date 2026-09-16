@@ -1,20 +1,25 @@
-﻿# JS-gen MySQL whitelist auto-sync.
-# The office network is multi-WAN NAT: the egress IP used for MySQL traffic to the
-# server differs from HTTP egress (ifconfig.me) and drifts over time. So instead of
-# trusting an IP-echo service, the server itself observes the real source IP:
-#   1. install a temporary LOG rule before the 3306 DROP rule in DOCKER-USER
-#   2. open a TCP probe to 47.101.58.49:3306 (SYN is dropped, but logged with SRC=)
-#   3. read the observed SRC from dmesg and whitelist that IP (keep 127.0.0.1)
-#   4. remove the LOG rule
-# Invoked by a Windows scheduled task every 10 minutes; can also be run manually:
+﻿# JS-gen MySQL whitelist auto-sync (cumulative mode).
+# The office network is multi-WAN NAT: MySQL egress drifts between two+ provider
+# IPs (observed: 113.240.250.166 <-> 116.128.254.227 within minutes). A
+# replace-style whitelist kills the previous IP's rule on every sync — and with
+# it every ESTABLISHED connection from that egress (knex pool dies, ETIMEDOUT
+# storm). So this script ACCUMULATES: every newly observed egress IP is added,
+# existing rules are kept, and only IPs unseen for RETIRE_HOURS are removed.
+#   1. install a temporary LOG rule at the top of DOCKER-USER
+#   2. open a TCP probe to 47.101.58.49:3306 (SYN logged with SRC= even when ACCEPTed)
+#   3. add the observed SRC to the whitelist if missing (keep 127.0.0.1)
+#   4. retire whitelist IPs not observed for RETIRE_HOURS (comment file = last-seen)
+#   5. remove the LOG rule
+# Invoked by update-db-whitelist.cmd (keep window open); can also be run manually:
 #   powershell -ExecutionPolicy Bypass -File update-db-whitelist.ps1
 # Requires SSH key auth (~/.ssh/id_ed25519 installed in server authorized_keys).
 
 $ErrorActionPreference = 'Stop'
 $Server = '47.101.58.49'
 $User = 'root'
-$StateFile = Join-Path $PSScriptRoot '.db-whitelist-lastip'
+$SeenFile = Join-Path $PSScriptRoot '.db-whitelist-seen'   # lines: <unix-ts> <ip>
 $LogFile = Join-Path $PSScriptRoot '.db-whitelist-sync.log'
+$RetireHours = 48                                          # retire IPs unseen this long
 
 function Write-Log([string]$msg) {
     "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg" | Add-Content -Path $LogFile
@@ -85,6 +90,7 @@ echo "SRC=$SRC"
 
 try {
     $ip = Probe-SourceIp
+    $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
     $remoteList = (Invoke-RemoteSsh "iptables -S DOCKER-USER | sed -n 's/.*-s \([0-9.]*\)\/32 .*--dport 3306 .*/\1/p' | grep -v '^127.0.0.1$'")
     # ssh output carries CRLF; strip \r so '127.0.0.1' is filtered correctly
@@ -92,27 +98,30 @@ try {
         ForEach-Object { $_.TrimEnd("`r") } |
         Where-Object { $_ -match '^\d{1,3}(\.\d{1,3}){3}$' -and $_ -ne '127.0.0.1' }
 
-    if ($remote -contains $ip) {
-        Set-Content -Path $StateFile -Value $ip
-        exit 0
+    # load last-seen timestamps
+    $seen = @{}
+    if (Test-Path $SeenFile) {
+        foreach ($line in Get-Content $SeenFile) {
+            $p = $line.Trim() -split '\s+'
+            if ($p.Count -eq 2 -and $p[0] -match '^\d+$' -and $p[1] -match '^\d{1,3}(\.\d{1,3}){3}$') {
+                $seen[$p[1]] = [long]$p[0]
+            }
+        }
     }
+    $seen[$ip] = $now
 
-    $oldList = $remote -join ' '
-    Write-Log "observed source IP: $ip; server whitelist: [$($remote -join ', ')] -> updating"
-
-    # single-quoted here-string: nothing is evaluated locally; tokens replaced below
-    $script = @'
+    if ($remote -contains $ip) {
+        Write-Log "observed source IP: $ip (already whitelisted: [$($remote -join ', ')])"
+    } else {
+        Write-Log "observed source IP: $ip (NEW; current whitelist: [$($remote -join ', ')]) -> adding"
+        # cumulative: add NEW only; never drop existing accept rules — a rule the
+        # current egress doesn't use may be serving ESTABLISHED connections from
+        # the other NAT path. Insert before the 3306 DROP in both chains.
+        $script = @'
 set -e
 NEW=__NEWIP__
-# drop stale /32 accept rules (keep 127.0.0.1); DOCKER-USER is the chain that
-# actually applies to docker-published ports, INPUT is a redundant copy
-for OLD in __OLDIPS__ ; do
-    [ -n "$OLD" ] || continue
-    iptables -D DOCKER-USER -s "$OLD/32" -p tcp -m tcp --dport 3306 -j ACCEPT 2>/dev/null || true
-    iptables -D INPUT -s "$OLD/32" -p tcp -m tcp --dport 3306 -j ACCEPT 2>/dev/null || true
-done
-# insert the new accept rule right before the 3306 DROP rule in both chains
 for CHAIN in DOCKER-USER INPUT; do
+    iptables -C $CHAIN -s "$NEW/32" -p tcp -m tcp --dport 3306 -j ACCEPT 2>/dev/null && continue
     DROPLINE=$(iptables -L $CHAIN --line-numbers -n | awk '/dpt:3306/ && /DROP/ {print $1; exit}')
     if [ -n "$DROPLINE" ]; then
         iptables -I $CHAIN "$DROPLINE" -s "$NEW/32" -p tcp -m tcp --dport 3306 -j ACCEPT
@@ -123,12 +132,40 @@ done
 echo "DOCKER-USER now:"
 iptables -L DOCKER-USER -n | grep 3306
 '@
-    $script = $script.Replace('__NEWIP__', $ip).Replace('__OLDIPS__', $oldList)
-    $res = Invoke-RemoteSsh $script
-    Write-Log ("remote output: " + ($res.Trim() -replace "\r?\n", ' | '))
+        $script = $script.Replace('__NEWIP__', $ip)
+        $res = Invoke-RemoteSsh $script
+        Write-Log ("remote output: " + ($res.Trim() -replace "\r?\n", ' | '))
+        Write-Log "whitelist accumulated $ip"
+    }
 
-    Set-Content -Path $StateFile -Value $ip
-    Write-Log "whitelist updated to $ip"
+    # retire: server rules + seen entries for IPs unseen for RETIRE_HOURS
+    # (never touch the IP observed this cycle or anything seen recently)
+    $stale = @($seen.Keys | Where-Object { ($now - [long]$seen[$_]) -gt ($RetireHours * 3600) })
+    $retired = @()
+    foreach ($old in $stale) {
+        $null = $seen.Remove($old)
+        if ($old -eq $ip) { continue }
+        if ($remote -contains $old) {
+            $script = @'
+set -e
+for OLD in __OLDIPS__ ; do
+    [ -n "$OLD" ] || continue
+    iptables -D DOCKER-USER -s "$OLD/32" -p tcp -m tcp --dport 3306 -j ACCEPT 2>/dev/null || true
+    iptables -D INPUT -s "$OLD/32" -p tcp -m tcp --dport 3306 -j ACCEPT 2>/dev/null || true
+done
+echo "retired: __OLDIPS__"
+'@
+            $script = $script.Replace('__OLDIPS__', $old)
+            $res = Invoke-RemoteSsh $script
+            Write-Log ("retire output: " + ($res.Trim() -replace "\r?\n", ' | '))
+            $retired += $old
+        }
+    }
+    if ($retired.Count) { Write-Log ("retired unseen-for-${RetireHours}h IPs: " + ($retired -join ', ')) }
+
+    # persist last-seen (sorted by ts for readability)
+    ($seen.GetEnumerator() | Sort-Object Value | ForEach-Object { "$($_.Value) $($_.Key)" }) |
+        Set-Content -Path $SeenFile
 } catch {
     Write-Log "ERROR: $($_.Exception.Message)"
     exit 1

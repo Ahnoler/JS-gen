@@ -72,20 +72,40 @@ if not defined TS (
   echo [error] cannot generate timestamp ^(powershell unavailable^).
   goto fail
 )
-where bash >nul 2>nul && (set BASH=bash) || (
-  rem locate Git Bash from git.exe on PATH
-  for /f "delims=" %%G in ('where git 2^>nul') do if not defined GITDIR set "GITDIR=%%~dpG.."
-  if defined GITDIR (
-    set "BASH=!GITDIR!\bin\bash.exe"
-  ) else (
-    set "BASH=C:\Program Files\Git\bin\bash.exe"
+rem locate a real bash: PATH first (never the WSL stub in System32), then derive
+rem from git.exe — Git for Windows has git.exe under cmd\ OR mingw64\bin\ while
+rem bash lives one to three levels up in bin\ or usr\bin\; then common install
+rem dirs. Plain `C:\Program Files\Git` is NOT universal.
+set BASH=
+for /f "delims=" %%B in ('where bash 2^>nul') do (
+  if not defined BASH (
+    echo %%B | find /i "System32" >nul || set "BASH=%%B"
   )
 )
+if not defined BASH (
+  for /f "delims=" %%G in ('where git 2^>nul') do (
+    if not defined BASH (
+      for %%L in ("%%~dpG..\bin\bash.exe" "%%~dpG..\..\bin\bash.exe" "%%~dpG..\..\..\bin\bash.exe" "%%~dpG..\usr\bin\bash.exe" "%%~dpG..\..\usr\bin\bash.exe" "%%~dpG..\..\..\usr\bin\bash.exe") do (
+        if not defined BASH if exist %%L set "BASH=%%~fL"
+      )
+    )
+  )
+)
+if not defined BASH if exist "%ProgramFiles%\Git\bin\bash.exe" set "BASH=%ProgramFiles%\Git\bin\bash.exe"
+if not defined BASH if exist "%ProgramFiles(x86)%\Git\bin\bash.exe" set "BASH=%ProgramFiles(x86)%\Git\bin\bash.exe"
+if not defined BASH if exist "%LocalAppData%\Programs\Git\bin\bash.exe" set "BASH=%LocalAppData%\Programs\Git\bin\bash.exe"
+if not defined BASH (
+  echo [error] Git Bash ^(bash.exe^) not found - the pack step needs bash to run
+  echo        pack-control-plane.sh. Fix either way:
+  echo          1) install Git for Windows: https://git-scm.com/download/win
+  echo          2) or add your Git install's bin dir ^(e.g. ^<git^>\bin^) to PATH
+  goto fail
+)
 echo.
-echo [1/4] packing via pack-control-plane.sh (ts=%TS%) ...
+echo [1/4] packing via pack-control-plane.sh (ts=%TS%, bash=%BASH%) ...
 "%BASH%" pack-control-plane.sh
 if errorlevel 1 (
-  echo [error] pack failed - stopped, server untouched.
+  echo [error] pack failed - stopped, server untouched. ^(bash: %BASH%^)
   goto fail
 )
 set TGZ=
