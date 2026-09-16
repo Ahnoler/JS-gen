@@ -294,6 +294,37 @@ def done_accept_reason(
         return 'save-ok'
     return 'navigation'
 
+def _default_recovery_next_action(contract: dict[str, Any] | None) -> str:
+    """Mode-aware recovery default when the contract carries no explicit
+    ``recovery.next_action`` (LLM reviewer contracts have none).
+
+    A hardcoded ``click_save()`` fallback made non-submit phases (navigate /
+    query / other / login) instruct the agent to click a 确定/保存 that the phase
+    must not touch — sid 4460cf2a phase 3 clicked 确定 after 下一步 and hit a
+    server-side business error. Only create/modify may be told to click_save.
+    """
+    mode = ((contract or {}).get('mode') or '').strip()
+    submit = (contract or {}).get('submit') if isinstance((contract or {}).get('submit'), dict) else {}
+    if mode in ('create', 'modify'):
+        btn = str((submit or {}).get('button_text') or '保存') or '保存'
+        return f'click_save(button_text="{btn}")'
+    if mode == 'introduce_pick':
+        return 'click_element_by_index on 确认 after selecting the target row'
+    if mode == 'query':
+        return 'click_element_by_index on 查询/搜索 to record the query-click evidence'
+    if mode == 'navigate':
+        return (
+            'complete the task clicks (e.g. click_element_by_index on 下一步 / the '
+            'target menu) and wait for the URL / page / dialog to change'
+        )
+    if mode == 'login':
+        return 'finish the login clicks and done(success=true) once the target page appears'
+    return (
+        'done(success=true) once the phase goal is visibly complete '
+        '(this phase requires no save/confirm step)'
+    )
+
+
 def recovery_prescription_message(contract: dict[str, Any] | None, *, reason: str = '') -> str:
     if not contract:
         return (
@@ -301,12 +332,23 @@ def recovery_prescription_message(contract: dict[str, Any] | None, *, reason: st
             'Do not re-select the same row / re-open 修改.'
         )
     rec = contract.get('recovery') or {}
-    nxt = rec.get('next_action') or 'click_save()'
+    nxt = rec.get('next_action') or _default_recovery_next_action(contract)
+    mode = ((contract or {}).get('mode') or '').strip()
+    # Only maintain / introduce phases get nudged toward 确认; a non-submit phase is
+    # not told 确认 is allowed (that is how sid 4460cf2a drifted into an out-of-scope
+    # 确定 click). This withholds a nudge, it does not forbid the agent trying.
+    if mode in ('create', 'modify', 'introduce_pick'):
+        allowed = 'wait / get_page_state / list query + row select + 确认 are allowed.'
+    else:
+        allowed = (
+            'wait / get_page_state / click_element_by_index are allowed '
+            '(this phase requires no save/confirm step).'
+        )
     base = (
         f'[RECORDER] {reason} '.strip()
         + f'Recovery prescription: {nxt}. '
         'Do NOT re-select table row or re-click 修改. '
-        'wait / get_page_state / list query + row select + 确认 are allowed.'
+        + allowed
     )
     return base.strip()
 

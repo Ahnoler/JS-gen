@@ -188,12 +188,24 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
     if mode in ('create', 'modify') and explicit_all:
         refill = 'all_editable'
 
+    # Mode-aware recovery: only maintain phases may be told to click_save. A
+    # non-submit phase (login/query/other) prescribed click_save made the agent
+    # fabricate a 确定/保存 click on pages/regions that have none (sid 4460cf2a).
+    if mode == 'modify':
+        next_action = 'click_save(button_text="确认")'
+    elif mode == 'create':
+        next_action = 'click_save(button_text="保存")'
+    elif mode == 'query':
+        next_action = 'click_element_by_index on 查询/搜索, then done(success=true)'
+    elif mode == 'login':
+        next_action = 'finish the login clicks, then done(success=true)'
+    else:
+        next_action = (
+            'done(success=true) once the phase goal is visibly complete '
+            '(no save/confirm step in this phase)'
+        )
     recovery = {
-        'next_action': (
-            'click_save(button_text="确认")'
-            if mode == 'modify'
-            else 'click_save(button_text="保存")'
-        ),
+        'next_action': next_action,
         'forbid_reopen_modify_cycle': True,
         'on_cycle': 'prescribe_once_then_stop_if_deviate',
         'deviate_actions': ['reselect_row', 'reopen_modify', 'reopen_maintain_dialog'],

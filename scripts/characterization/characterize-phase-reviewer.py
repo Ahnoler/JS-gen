@@ -197,6 +197,47 @@ def main() -> None:
     )
     assert c2 and c2['brief_plan'] == ['打开新增抽屉']
 
+    # other = reviewer catch-all: an invented success kind (e.g. "step_change") must
+    # be cleared so the G3 evidence gate never demands an unrecordable token.
+    # sid 4460cf2a phase 3: after 下一步 the done() looped and the recovery
+    # prescription forced an out-of-scope click_save/确定 (server-side error).
+    other_clean = sanitize_contract_for_mode({
+        'mode': 'other',
+        'submit': {'required': False, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': ['step_change'], 'evidence': []},
+        'refill': 'none',
+    })
+    assert other_clean['success']['kinds'] == [], 'other must not keep invented kinds'
+    assert other_clean['submit']['required'] is False
+    other_store: dict = {}
+    apply_phase_contract(other_store, other_clean)
+    assert other_store['_phase_boundary']['success_when'] == [], 'other boundary has no evidence gate'
+    assert has_contract_success(other_store) is True, 'other accepts done without token'
+
+    # recovery prescription must not prescribe click_save on non-submit phases
+    from scripts.controller.actions._phase_intent import recovery_prescription_message
+    other_rec = recovery_prescription_message(other_store['_phase_intent'], reason='x')
+    assert 'Recovery prescription: click_save' not in other_rec, f'other recovery must not click_save: {other_rec}'
+    assert 'row select + 确认 are allowed' not in other_rec, f'other recovery must not nudge 确认: {other_rec}'
+    nav_rec = recovery_prescription_message({'mode': 'navigate', 'submit': {'required': False}}, reason='x')
+    assert 'Recovery prescription: click_save' not in nav_rec, f'navigate recovery must not click_save: {nav_rec}'
+    create_rec = recovery_prescription_message(
+        {'mode': 'create', 'submit': {'required': True, 'button_text': '确定'}}, reason='x'
+    )
+    assert 'Recovery prescription: click_save' in create_rec, f'create recovery keeps click_save: {create_rec}'
+
+    # legacy rule compiler (AI_PHASE_BOUNDARY=off fallback) recovery is mode-aware too
+    from scripts.controller.actions._phase_intent import compile_phase_intent
+    q_c = compile_phase_intent('按客户名称查询。预期结果：列表展示匹配客户。')
+    assert q_c['mode'] == 'query'
+    assert 'click_save' not in (q_c['recovery']['next_action'] or ''), q_c['recovery']['next_action']
+    o_c = compile_phase_intent('点击【下一步】按钮。预期结果：进入风险阻断步骤。')
+    assert o_c['mode'] == 'other'
+    assert 'click_save' not in (o_c['recovery']['next_action'] or ''), o_c['recovery']['next_action']
+    m_c = compile_phase_intent('修改客户名称。预期结果：保存成功。')
+    assert m_c['mode'] == 'modify'
+    assert 'click_save' in (m_c['recovery']['next_action'] or ''), m_c['recovery']['next_action']
+
     print('PASS characterize-phase-reviewer')
 
 

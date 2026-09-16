@@ -15,7 +15,11 @@ _VALID_MODES = frozenset({
 _VALID_REFILL = frozenset({'none', 'touched', 'all_editable'})
 
 # Modes that must not require form-submit success tokens (done() after login/nav/query).
-_NO_SUBMIT_TOKEN_MODES = frozenset({'login', 'navigate', 'query'})
+# `other` is the reviewer's catch-all (deterministic compile gives it success_when=[]);
+# LLM reviewers occasionally invent non-recordable kinds there (e.g. "step_change"),
+# which the PR#45 G3 evidence gate would then require forever → done() loop → the
+# recovery prescription forced an out-of-scope click_save/确定 (sid 4460cf2a phase 3).
+_NO_SUBMIT_TOKEN_MODES = frozenset({'login', 'navigate', 'query', 'other'})
 
 # introduce_pick: LLM often invents only dialog_close; toast / picker close must also count
 # (sid 0975ed13 Premature done loop after ok-save-success).
@@ -112,6 +116,10 @@ def sanitize_contract_for_mode(contract: dict[str, Any]) -> dict[str, Any]:
     LLM reviewers often invent submit.required=true + toast_ok for login/navigate;
     those maintain tokens are never recorded on query/nav paths. G3 still requires
     role-appropriate evidence kinds (query_clicked / url_change|page_opened|…).
+
+    `other` (catch-all) is cleared to no submit/kinds as well: deterministic
+    compile already gives it empty success_when, and an LLM-only invented kind
+    (e.g. "step_change") is never recordable — requiring it makes done() loop.
 
     Maintain-side contradiction guard (#614 移交，2026-09-07)：reviewer 偶发把
     create/修改弹窗判成「部分点名」语义（allow_form_assistant=False +

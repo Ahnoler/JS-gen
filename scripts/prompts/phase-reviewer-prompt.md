@@ -44,7 +44,8 @@
 5. **查询/检索**：`mode=query`，`allow_form_assistant=false`，`refill=none`。
 6. **引入/选人/客户选择弹窗**：`mode=introduce_pick`，`allow_form_assistant=false`，`refill=none`。
 7. **登录**：`mode=login`，`allow_form_assistant=false`，`refill=none`，**必须** `submit.required=false`，`success.kinds=[]`（登录不走表单保存 token）。
-8. **navigate / query**：同样 **必须** `submit.required=false`，`success.kinds=[]`（完成条件用 `done_when` 自然语言即可，不要填 toast_ok/url_change）；阶段文本含「点击保存/保存成功/点击提交/提交成功」时禁止 navigate/query——「预期结果：页面跳转至…或提示保存成功」中的页面跳转是保存成功的形态（saved_navigation），属于 create/modify 的成功证据而非导航。
+8. **navigate / query / other**：同样 **必须** `submit.required=false`，`success.kinds=[]`（完成条件用 `done_when` 自然语言即可，不要填 toast_ok/url_change，也不要自造 `step_change` 之类 token——它们无法被录制证据满足，会让 `done()` 反复被拒）；阶段文本含「点击保存/保存成功/点击提交/提交成功」时禁止 navigate/query——「预期结果：页面跳转至…或提示保存成功」中的页面跳转是保存成功的形态（saved_navigation），属于 create/modify 的成功证据而非导航。
+   - 向导「点击【下一步】」且预期只是切换步骤（非打开新页面/弹窗）时用 `navigate`（可留空 kinds，运行时会默认按 `nav_next_clicked`/`url_change`/`page_opened` 收口）；确无保存/确认/查询/导航语义才用 `other`。
 
 9. **泛指 vs 点名判定基准**（规则 3 与规则 4 的分界）：
    - 阶段文案对填写范围是**泛指**（如「填写…信息」「完善…资料」「维护表单」），且未列出具体字段清单时，即使提到「修改」，也按整表维护处理：新增类走规则 2、修改类走规则 3——即 `refill=all_editable`、`allow_form_assistant=true`。
@@ -55,7 +56,7 @@
 ## submit / success 约束
 
 - 仅 `create` / `modify`（需保存）或 `introduce_pick`（需确认）才应设置 `submit.required=true` 与非空 `success.kinds`。
-- `login` / `navigate` / `query`：**禁止** `submit.required=true`，**禁止** `success.kinds` 含 `toast_ok` / `url_change` / `saved_navigation`。
+- `login` / `navigate` / `query` / `other`：**禁止** `submit.required=true`，**禁止** `success.kinds` 非空（`toast_ok` / `url_change` / `saved_navigation` 尤其禁止，自造 token 同样禁止）。
 
 ## 跨阶段边界
 
