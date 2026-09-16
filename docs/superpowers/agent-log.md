@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 14:11 · ZCode — 开工：推送坐标归一化修复（录制侧直通尺寸 + 导出侧双兜底）
+
+- 进行中：14:11；承接 14:00 排查条目，用户批准三处修复。修复 1（录制侧）：state.py 加 `_CURRENT_PAGE_DIMS` 直通 + service.py wrapper 每动作前注入已采 before_dims + `_stamp_rect_norm` 页面路径先读直通再回落注册表 + after-action 注册 meta 补 contentWidth/Height；修复 2（导出侧）：弹窗像素回退减法后再除弹窗 rect 宽高（15 步存量立即转正）；修复 3（导出侧）：页面级像素回退从截图 metadataJson 收集 contentWidth/Height 作分母（46 步存量）
+- 范围：`scripts/state.py`、`scripts/controller/service.py`、`src/services/transaction-export-v3-properties.js`、`src/services/transaction-export-v3.js`（如需传截图 meta）、`scripts/characterization/characterize-export-v3.mjs`（pin 期望同 commit 更新）、verify-all 注册行（如加门禁）、本文件、tmp/rect-*.mjs（审计脚本）
+- 禁入区：Cursor 线热区（locator-candidates/parity/form-field-intra-slot 及其 fixture、`formFieldXpathSmartOf` 相关）、click 族（click_action_engine/_misc/replay_form_action）、`.cursor/`、`data/kb/**` 只读、他线 5 红（step-highlight/layer-tree/export-v3/confirm-notification/network-capture）不修——**但 characterize-export-v3 的 pin 期望更新属本修复必要配套，触碰时只在 rect 相关断言内动**
+- 方式：三修复分 commit（录制侧一个、导出侧一个、pin/门禁一个）→ 每步 verify-all 比对基线红 → 重录小轨迹湿测 → 30 轨迹审计脚本复跑确认像素回退清零
+
 ## 2026-09-16 14:00 · ZCode — 排查：批量推送坐标非归一化（根因=录制侧 rect_norm 时序缺口，非历史遗留）
 
 - 结论：**不是历史遗留数据**（最新 09-15 的 traj 835/829 同样命中），**也不是导出侧没用归一化算法**（30 条可推轨迹 224 步中 163 步 rect_norm 正常直出）。真因=录制侧 `_stamp_rect_norm`（state.py:293）依赖 `_PAGE_LEVEL_SHOTS` 注册表 meta 作分母，两条时序断点致跳过不写：**A**（主导）`register_page_screenshot_if_changed` 的 after-action 注册 meta 只有 phaseNumber/capturedAt **缺 contentWidth/Height**（state.py:510），页面首动作起整个 phase 内全部跳过，直到 phase-end `register_current_page_screenshot` 才补尺寸——traj 823 phase1 全 5 步 P、phase2 步 8 N 实证；**B**（弹窗）弹窗 shot 在动作后注册（service.py:138-147），弹窗内首动作查不到 → 跳过（traj 823 ph3 st9 / 835 st23131）
