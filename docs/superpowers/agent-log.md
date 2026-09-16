@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 18:20 · Cursor — 收工：产品树脏后缀 SDD Task 1–5（回链 17:12 开工）
+
+- 完成：`55f3a622` 清洗函数保留 `[V-…]`、剥 `(N)`/尾部装饰 `-` + DOM 内层 span；`550a643b` 录制 snap/manual/AI/CDP 落库净文本；`7c13b820` 回放 `stripVolatile` + select_tree/tree_picker 双侧 strip；`a1e00c22`+`1ced5870` 推送 `buildBusinessObjectName` 门控清洗 + JSDoc
+- 验收：`characterize-tree-node-text` / `characterize-tree-text-export` / `characterize-replay-click-fuzzy-nav` OK；Tasks 1–4 子审均 Approved；Task 5 真机湿测 deferred（Playwright 仅 about:blank），冷 fixture 覆盖 Spec §5
+- 遗留移交：有登录态产品树页时做一次最小 evaluate 湿测（勿整包注入 helpers）；不 migrate 历史 DB；不维护 CHANGELOG
+
 ## 2026-09-16 17:45 · Cursor — 收工：atomize XML 合同 + missing_depend_fields 硬拒（回链 17:29 开工）
 
 - 完成：`d390a3ad` 线上 atomize prompt 改为 XML 分区（`<role>` / `<output_contract>` / `<split_rules>` / `<examples>` 含 3 good + 4 bad / `<anti_patterns>` / `<checklist>`）；样例对齐；物化后空 `produces` 硬拒 `missing_depend_fields`；fallback 用标题合成 produce 键；`PROPOSE_CACHE_VERSION` 3→4
