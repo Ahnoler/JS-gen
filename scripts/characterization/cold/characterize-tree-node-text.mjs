@@ -31,6 +31,17 @@ const COUNT_FIXTURE = `<!doctype html>
 </div>
 </body></html>`;
 
+const REPLAY_TREE_FIXTURE = `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>replay tree</title></head><body>
+<div class="el-tree">
+  <div class="el-tree-node">
+    <div class="el-tree-node__content" id="replay-tree-node">
+      <span class="custom-tree-node"><span>金融新产品</span>(3)</span>
+    </div>
+  </div>
+</div>
+</body></html>`;
+
 const BADGE_FIXTURE = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>tree badge</title></head><body>
 <div class="el-tree-node__content" id="badge-leaf">
@@ -50,6 +61,17 @@ ${PAGE_LOCATOR_HELPERS}
 
 function ok(name) {
   console.log(`ok: ${name}`);
+}
+
+function extractDurableBlob() {
+  const src = readFileSync('scripts/controller/actions/replay_js.py', 'utf8');
+  const m = src.match(/_JS_CLICK_DURABLE = r'''([\s\S]*?)'''/);
+  assert.ok(m, '_JS_CLICK_DURABLE present in replay_js.py');
+  return m[1];
+}
+
+function stripVolatileBlock(blob) {
+  return blob.split('const stripVolatile')[1].split('const wantRaw')[0];
 }
 
 async function main() {
@@ -141,6 +163,84 @@ ${PAGE_LOCATOR_HELPERS}
     assert.equal(text, '节点名', `badge fallback: got ${JSON.stringify(text)}`);
     await browser.close();
     ok('treeSemanticTextFromNode strips badge on fallback');
+  }
+
+  {
+    const blob = extractDurableBlob();
+    const stripBlock = stripVolatileBlock(blob);
+    assert.ok(
+      !/\[\s*V[-\d.]+\s*\]\$/i.test(stripBlock),
+      'replay stripVolatile must not strip [V-…]',
+    );
+    assert.ok(
+      stripBlock.includes('\\(\\d+\\)$'),
+      'stripVolatile must strip trailing (N)',
+    );
+    assert.ok(
+      stripBlock.includes('replace(/-$/'),
+      'stripVolatile must strip trailing decorative dash',
+    );
+    ok('replay_js stripVolatile semantics pinned');
+  }
+
+  {
+    const selectTree = readFileSync(
+      'scripts/controller/actions/js_snippets/select_tree.py',
+      'utf8',
+    );
+    assert.ok(
+      selectTree.includes('stripTreeText') && selectTree.includes('nodeMatches'),
+      'select_tree must strip both sides for nodeMatches',
+    );
+    ok('select_tree bilateral strip pinned');
+  }
+
+  {
+    const treePicker = readFileSync(
+      'scripts/controller/actions/js_snippets/tree_picker.py',
+      'utf8',
+    );
+    const dfs = treePicker.split('JS_TREE_PICKER_DFS_PATH')[1] || '';
+    assert.ok(
+      dfs.includes('stripTreeText') && dfs.includes('label === want'),
+      'tree_picker DFS must strip both sides before label === want',
+    );
+    ok('tree_picker DFS bilateral strip pinned');
+  }
+
+  {
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.setContent(REPLAY_TREE_FIXTURE);
+    const matched = await page.evaluate(() => {
+      const norm = (s) => (s || '').replace(/\s+/g, '').trim();
+      const stripVolatile = (s) => norm(s)
+        .replace(/\(\d+\)$/, '')
+        .replace(/-$/, '')
+        .slice(0, 40);
+      const isVisible = (el) => {
+        if (!el) return false;
+        const st = getComputedStyle(el);
+        const box = el.getBoundingClientRect();
+        if (st.display === 'none' || st.visibility === 'hidden' || box.width < 1 || box.height < 1) return false;
+        return true;
+      };
+      const pickTreeNode = (rawWant) => {
+        const base = stripVolatile(rawWant);
+        if (!base) return null;
+        const roots = [...document.querySelectorAll('.el-tree-node__content, .el-tree-node__label')].filter(isVisible);
+        for (const el of roots) {
+          const t = stripVolatile(el.innerText || el.textContent);
+          if (t === base) return el;
+        }
+        return null;
+      };
+      const node = pickTreeNode('金融新产品(7)');
+      return node ? stripVolatile(node.innerText || node.textContent) : null;
+    });
+    assert.equal(matched, '金融新产品', `pickTreeNode drift: got ${matched}`);
+    await browser.close();
+    ok('replay pickTreeNode matches (7) recorded vs (3) live');
   }
 
   console.log('characterize-tree-node-text: OK');

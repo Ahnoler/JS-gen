@@ -71,8 +71,9 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
   opts = opts || {};
   const norm = (s) => (s || '').replace(/\s+/g, '').trim();
   const stripVolatile = (s) => norm(s)
-    .replace(/\[\s*V[-\d.]+\s*\]$/i, '')
-    .replace(/\(\d+\)$/, '');
+    .replace(/\(\d+\)$/, '')
+    .replace(/-$/, '')
+    .slice(0, 40);
   const wantRaw = String(text || '');
   const want = norm(wantRaw);
   const wantBase = stripVolatile(wantRaw);

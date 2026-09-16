@@ -219,8 +219,15 @@ JS_TREE_PICKER_SEARCH_MATCHES = '''async (args) => {
 JS_TREE_PICKER_DFS_PATH = '''async (args) => {
     const [leaf] = args || [];
     const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
+    const stripTreeText = (s) => String(s == null ? '' : s)
+        .replace(/\\s+/g, ' ')
+        .trim()
+        .replace(/\\(\\d+\\)\\s*$/, '')
+        .replace(/\\s*-\\s*$/, '')
+        .trim()
+        .slice(0, 40);
     const visible = (el) => el && (el.offsetParent !== null || el.getClientRects().length > 0);
-    const want = norm(leaf);
+    const want = stripTreeText(leaf);
     if (!want) return JSON.stringify({ ok: false, error: 'err-tree-args-empty' });
     const pop = [...document.querySelectorAll('.el-popover, .el-popper')]
         .filter((p) => visible(p) && p.querySelector('.search-item input') && p.querySelector('.el-tree'))[0];
@@ -235,7 +242,7 @@ JS_TREE_PICKER_DFS_PATH = '''async (args) => {
     const dfs = (nodes, path) => {
         for (const n of nodes || []) {
             if (!n) continue;
-            const label = norm(n.label || n.name || '');
+            const label = stripTreeText(n.label || n.name || '');
             const next = path.concat([label]);
             if (label === want) candidates.push(next);
             if (n.children && n.children.length) dfs(n.children, next);

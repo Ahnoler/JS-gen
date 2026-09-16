@@ -40,6 +40,24 @@ def test_text_candidates_include_plugin_nav() -> None:
     )
 
 
+def test_strip_volatile_tree_text_aligned() -> None:
+    """Replay stripVolatile must mirror stripVolatileTreeText (Task 3)."""
+    blob = _durable_blob()
+    strip_block = blob.split("const stripVolatile")[1].split("const wantRaw")[0]
+    assert_true(
+        r"\[\s*V[-\d.]+\s*\]" not in strip_block,
+        "stripVolatile must not strip [V-…] version badges",
+    )
+    assert_true(
+        r"\(\d+\)$" in strip_block,
+        "stripVolatile must strip trailing (N) count suffix",
+    )
+    assert_true(
+        "replace(/-$/" in strip_block,
+        "stripVolatile must strip trailing decorative dash after norm",
+    )
+
+
 def test_fuzzy_rejects_short_substring_of_want() -> None:
     """
     Regression: want='3.评级等级测算' must not click button text='测算'
@@ -75,6 +93,7 @@ def test_fuzzy_rejects_short_substring_of_want() -> None:
 def main() -> int:
     test_xpath_tries_html_body_prefix()
     test_text_candidates_include_plugin_nav()
+    test_strip_volatile_tree_text_aligned()
     test_fuzzy_rejects_short_substring_of_want()
     print("characterize-replay-click-fuzzy-nav: OK")
     return 0

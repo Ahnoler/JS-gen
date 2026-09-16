@@ -147,6 +147,13 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
     // ═══════════════════════════════════════════════════════════════════
     // P0: Exact match — resolve to a leaf node code.
     //
+    const stripTreeText = (s) => String(s == null ? '' : s)
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\(\d+\)\s*$/, '')
+        .replace(/\s*-\s*$/, '')
+        .trim()
+        .slice(0, 40);
     // data[] is hierarchical: { label, id, children? }.  Leaf = no children.
     // treeData[] is flat:     { name, id, pId } (no children, no label).
     //
@@ -188,7 +195,7 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
         }
         return 'no-leaf-for-first';
     }
-    const nodeMatches = (n) => (n.label || n.name || '') === option || n.id === option;
+    const nodeMatches = (n) => stripTreeText(n.label || n.name || '') === stripTreeText(option) || n.id === option;
     const walkForLeaf = (nodes) => {
         for (const n of nodes) {
             if (nodeMatches(n)) {
@@ -206,7 +213,7 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
     if (!code) {
         const flat = vm.treeData || [];
         for (const n of flat) {
-            if ((n.name || '') === option || n.id === option) { code = n.id; break; }
+            if (stripTreeText(n.name || '') === stripTreeText(option) || n.id === option) { code = n.id; break; }
         }
     }
     if (code) {
