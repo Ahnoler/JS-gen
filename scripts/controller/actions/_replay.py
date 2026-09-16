@@ -73,6 +73,7 @@ from .replay_click import _post_click_settle, _replay_click_by_index
 from .replay_form_action import _replay_form_action
 from .replay_table import _replay_table_row_radio
 from .replay_timing import WAIT_400_MS, WAIT_600_MS
+from .search_then_click_guard import mark_stc_flags_on_replay_ok
 _CLICK_BY_INDEX = 'click_element_by_index'
 
 
@@ -704,6 +705,11 @@ async def replay_action_entries(
 
             ok = _result_ok(action_name, result)
             if ok:
+                # Mark search-then-click flags on the shared store so the
+                # guard hint stays truthful (replay bypasses record-mode
+                # engines, otherwise the row/tree guard falsely blocks
+                # post-query clicks with err-search-first).
+                mark_stc_flags_on_replay_ok(action_name, params, entry, store)
                 ok_count += 1
             else:
                 fail_count += 1

@@ -54,6 +54,62 @@ def clear_stc_flags(store: dict | None) -> None:
     store.pop(STC_SEARCH_FILLED, None)
     store.pop(STC_QUERY_CLICKED, None)
 
+
+def mark_stc_flags_on_replay_ok(
+    action_name: str,
+    params: dict,
+    entry: dict | None,
+    store: dict | None,
+) -> None:
+    """Replay-side STC marking so the guard hint stays truthful.
+
+    Deterministic replay (`replay_actions`) bypasses the record-mode engines
+    (`FillEngine.fill_form_field_for_replay` uses a throwaway store;
+    `ClickEngine.click_button_for_replay` has no store), so the STC flags on
+    the shared business_data_store were never set. The guard then falsely
+    blocked post-query row/tree clicks with err-search-first. Call this after
+    a successful replay step to keep the same marking as record mode:
+
+    - fill_form_field hits a search-like label/placeholder → search_filled
+    - click_button / click_element_by_index / click_adjacent_button on
+      「查询」 → query_clicked
+    """
+    if store is None or not isinstance(params, dict):
+        return
+    el = (
+        entry.get('element')
+        if isinstance(entry, dict) and isinstance(entry.get('element'), dict)
+        else {}
+    )
+    if action_name == 'fill_form_field':
+        attrs = el.get('attributes') if isinstance(el, dict) else {}
+        attrs = attrs if isinstance(attrs, dict) else {}
+        candidates = (
+            str(params.get('label_text') or ''),
+            str(params.get('placeholder') or ''),
+            str(el.get('placeholder') or '') if isinstance(el, dict) else '',
+            str(attrs.get('placeholder') or ''),
+        )
+        for cand in candidates:
+            if is_search_field_label(cand):
+                mark_search_filled(store)
+                return
+        return
+    if action_name in (
+        'click_button',
+        'click_element_by_index',
+        'click_adjacent_button',
+    ):
+        text = str(
+            params.get('button_text')
+            or params.get('text')
+            or params.get('label_text')
+            or (el.get('text') if isinstance(el, dict) else '')
+            or ''
+        )
+        if re.sub(r'\s+', '', text) == '查询':
+            mark_query_clicked(store)
+
 _JS_DETECT_SEARCH_UI = '''() => {
   const inputs = [...document.querySelectorAll('input')].filter(el => {
     if (!el.offsetParent && getComputedStyle(el).visibility === 'hidden') return false;

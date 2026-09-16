@@ -21,6 +21,7 @@ def main() -> int:
         detect_search_ui,
         xpath_is_tree_node,
         guard_locate_or_err,
+        mark_stc_flags_on_replay_ok,
         STC_SEARCH_FILLED,
         STC_QUERY_CLICKED,
     )
@@ -87,6 +88,45 @@ def main() -> int:
     if store.get(STC_SEARCH_FILLED) or store.get(STC_QUERY_CLICKED):
         print("FAIL: clear_stc_flags")
         return 1
+    # Replay-side STC marking: deterministic replay must mark the same flags on the
+    # shared store, otherwise the guard falsely blocks post-query row/tree clicks.
+    rstore = {}
+    mark_stc_flags_on_replay_ok(
+        'fill_form_field', {'label_text': '搜索关键字'}, None, rstore)
+    if not rstore.get(STC_SEARCH_FILLED):
+        print("FAIL: replay fill on search label must mark search_filled")
+        return 1
+    mark_stc_flags_on_replay_ok(
+        'click_button', {'button_text': '查询'}, None, rstore)
+    if not rstore.get(STC_QUERY_CLICKED):
+        print("FAIL: replay click 查询 must mark query_clicked")
+        return 1
+    block5, _ = should_block_locate(
+        snapshot=SearchUiSnapshot(has_search_input=True, has_query_button=True),
+        search_filled=bool(rstore.get(STC_SEARCH_FILLED)),
+        query_clicked=bool(rstore.get(STC_QUERY_CLICKED)),
+    )
+    if block5:
+        print("FAIL: replay fill+query marks must unblock the guard")
+        return 1
+    # Non-search labels/clicks must NOT mark (guard hint stays truthful).
+    nstore = {}
+    mark_stc_flags_on_replay_ok(
+        'fill_form_field', {'label_text': '客户名称'}, None, nstore)
+    mark_stc_flags_on_replay_ok(
+        'click_button', {'button_text': '保存'}, None, nstore)
+    mark_stc_flags_on_replay_ok('click_menu_item', {'menu_text': '查询'}, None, nstore)
+    if nstore.get(STC_SEARCH_FILLED) or nstore.get(STC_QUERY_CLICKED):
+        print("FAIL: non-search/unrelated actions must not mark STC flags")
+        return 1
+    # Element-dict placeholder fallback (search boxes often lack label_text).
+    pstore = {}
+    mark_stc_flags_on_replay_ok(
+        'fill_form_field', {'label_text': '', 'value': 'x'},
+        {'element': {'attributes': {'placeholder': '搜索关键字'}}}, pstore)
+    if not pstore.get(STC_SEARCH_FILLED):
+        print("FAIL: element placeholder fallback must mark search_filled")
+        return 1
     intent_path = ROOT / "scripts/controller/actions/phase/intent_contract.py"
     intent_src = intent_path.read_text(encoding="utf-8")
     if "_stc_search_filled" not in intent_src and "clear_stc_flags" not in intent_src:
@@ -109,6 +149,10 @@ def main() -> int:
         return 1
     if "guard_locate_or_err" not in engine_src or "xpath_is_tree_node" not in engine_src:
         print("FAIL: click_action_engine.py missing tree search-then-click gate wiring")
+        return 1
+    replay_src = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    if "mark_stc_flags_on_replay_ok" not in replay_src:
+        print("FAIL: _replay.py missing replay-side STC marking wiring")
         return 1
     print("OK search-then-click-guard")
     return 0
