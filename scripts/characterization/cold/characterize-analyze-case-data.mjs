@@ -92,4 +92,51 @@ assert(
   'analyze rule forbids prior-phase actions landing in the next phase',
 );
 
+// State-boundary rule hardening (same flow): rule 3 must defer to 3.1 for confirm
+// dialogs; 3.1(c) merge is the exception only; 6.1 must keep filter field/values;
+// rule 8 must make the record identity / filter condition explicit.
+assert(
+  analyzeSrc.includes('确认/提示弹窗」按 3.1 处理'),
+  'rule 3 defers confirm-dialog boundaries to 3.1',
+);
+assert(
+  analyzeSrc.includes('例外（仅在必要时）') && analyzeSrc.includes('不得为省事而合并'),
+  '3.1(c) merge stays a narrow exception',
+);
+assert(
+  analyzeSrc.includes('若所列的字段名/取值是后续本阶段或下一阶段要操作的筛选条件'),
+  '6.1 keeps filter field names/values (no clash with rules 7/8)',
+);
+assert(
+  analyzeSrc.includes('若原文未给出唯一标识') && analyzeSrc.includes('选中首条匹配记录'),
+  'rule 8 requires record identity or explicit filter condition',
+);
+// A worked few-shot for the boundary rule (nothing pinned it before).
+assert(
+  analyzeSrc.includes('示例6：确认弹窗的状态边界') && analyzeSrc.includes('弹窗内【确定】只归下一阶段'),
+  'analyze prompt ships a confirm-dialog boundary example',
+);
+
+// 业务数据 classification: the real delete+confirm phase text must opt in (this JS
+// classifier disagreed with Python needs_business_data_context, which said true),
+// while a pure confirm-click phase and pure open-page stay out.
+const realDeletePhase =
+  '在业务记录列表中先搜索/查询"审批状态"为"待发起"的记录，再单选选中该记录，点击【删除】按钮。'
+  + '预期结果：打开"您确定删除这条记录吗?"确认弹窗。';
+assert(
+  phaseNeedsBusinessData(realDeletePhase) === true,
+  'delete phase ending on a confirm dialog needs biz data',
+);
+assert(
+  phaseNeedsBusinessData(
+    '在弹出的确认提示"您确定删除这条记录吗?"中，点击【确定】按钮。'
+    + '预期结果：删除完成并刷新列表，该记录从列表中消失。',
+  ) === false,
+  'pure confirm-click phase (删除 only in the dialog copy) must not need biz data',
+);
+assert(
+  phaseNeedsBusinessData('选中业务编号为 PJ20260907016008 的记录并点击【删除】。预期结果：打开确认弹窗。') === true,
+  'row-select + delete needs biz data',
+);
+
 console.log('characterize-analyze-case-data: OK');
