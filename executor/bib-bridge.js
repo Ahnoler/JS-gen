@@ -24,6 +24,30 @@ const DEFAULT_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
 /** If no CDP frame for this long while attached, restart screencast. */
 const STALL_RESTART_MS = 2500;
 
+/**
+ * Process-wide monotonic RSCF frame sequence.
+ *
+ * CDP `Page.screencastFrame.sessionId` is the *screencast session* id — it stays
+ * constant for every frame of one `Page.startScreencast` session (measured:
+ * hundreds of distinct JPEGs all report the same id). Dashboard clients use the
+ * RSCF `frameId` as a progress marker (a strictly new id proves the stream is
+ * live, not a replayed cached paint), so writing Chrome's session id there makes
+ * the stream look permanently stalled and drives the client into an endless
+ * attach/detach loop. Emit our own sequence instead; keeping it monotonic across
+ * BibBridge instances and screencast restarts means a re-attached session is
+ * never mistaken for a stale cache.
+ */
+let rscfFrameSeq = 0;
+
+/**
+ * Allocate the next monotonic RSCF frame id.
+ * @returns {number} next frame id (wraps at 2^32)
+ */
+function nextRscfFrameId() {
+  rscfFrameSeq = (rscfFrameSeq + 1) >>> 0;
+  return rscfFrameSeq;
+}
+
 function isUsablePage(p) {
   const url = p?.url || '';
   return !url.startsWith('devtools://') && !url.startsWith('chrome-extension://');
@@ -69,6 +93,8 @@ export class BibBridge {
     this._ackPacer = null;
     this._stallTimer = null;
     this._restarting = false;
+    /** Last CDP screencast session id seen (constant per screencast session; used for acks). */
+    this._cdpSessionId = null;
     /** @type {string|null} */
     this.activeTargetId = null;
     this._switching = false;
@@ -303,7 +329,11 @@ async switchToTarget(targetId) {
  */
 async ack({ frameId, sessionId } = {}) {
     if (!this.client || !this.screencastOn) return;
-    const fid = frameId ?? sessionId;
+    // The RSCF frameId is a control-plane progress sequence, not a CDP id.
+    // Always ack Chrome with the real screencast session id captured from the frame event.
+    const fid = Number.isFinite(this._cdpSessionId)
+      ? this._cdpSessionId
+      : (frameId ?? sessionId);
     if (fid == null) return;
     try {
       await this.client.send('Page.screencastFrameAck', { sessionId: Number(fid) });
@@ -498,6 +528,7 @@ async ack({ frameId, sessionId } = {}) {
   _onScreencastFrame(params = {}) {
     if (!this.screencastOn || !this.remoteSessionUuid) return;
     const cdpSessionId = params.sessionId;
+    if (Number.isFinite(Number(cdpSessionId))) this._cdpSessionId = Number(cdpSessionId);
     // Pace acks to the forward cadence — Chrome skips capture/encode while in-flight is full.
     this._ackPacer?.schedule(Number(cdpSessionId));
     this._lastFrameAt = Date.now();
@@ -518,7 +549,8 @@ async ack({ frameId, sessionId } = {}) {
     try {
       const jpeg = Buffer.from(dataB64, 'base64');
       const uuidBuf = Buffer.from(String(this.remoteSessionUuid), 'utf8');
-      const frameId = cdpSessionId ?? 0;
+      // Monotonic RSCF sequence — never Chrome's constant screencast session id.
+      const frameId = nextRscfFrameId();
       const header = Buffer.alloc(4 + 4 + 2 + uuidBuf.length);
       MAGIC.copy(header, 0);
       header.writeUInt32BE(Number(frameId) >>> 0, 4);
