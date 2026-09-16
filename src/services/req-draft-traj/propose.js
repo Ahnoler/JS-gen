@@ -21,6 +21,7 @@ import {
 import { getFlowCard, listFlowCardsDetailed } from '../kb-flow-cards.js';
 import { matchFlowForAtom } from './flow-card-recall.js';
 import {
+  countPersistConfirms,
   isPersistBoundaryAction,
   selectRelevantFlowCards,
   stepsShareClosedLoop,
@@ -616,7 +617,10 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
     ? countWriteStepsInIndexes(chain, stepIndexes)
     : (primaryStep && isWriteStep(primaryStep.action) ? 1 : 0);
   if (writeStepCount > 1) {
-    const actions = stepIndexes.map((idx) => findStepByIndex(chain, idx)?.action || title);
+    const actions = stepIndexes.map((idx) => {
+      const st = findStepByIndex(chain, idx);
+      return st ? { action: st.action, buttons: st.buttons } : title;
+    });
     const allow = flowRef && stepsShareClosedLoop({ stepActions: actions });
     if (!allow) {
       const atomKey = buildAtomKey({
@@ -649,6 +653,9 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   const rawTaskDraft = String(llmAtom.taskDraft || '').trim();
   const filled = fillTaskDraftProvenancePlaceholders(rawTaskDraft, sourceDoc, resolvedChapter);
   const { taskDraft: cleanedDraft, extractedCodes } = sanitizeTaskDraftKeyData(filled);
+  if (countPersistConfirms(cleanedDraft) > 1) {
+    return { rejected: { atomKey, reason: 'multi_persist_task_draft' } };
+  }
 
   const zjjkCells = [];
   for (const idx of (stepIndexes.length ? stepIndexes : [atomKeyStepIndex])) {

@@ -88,6 +88,19 @@ await run('未启用 alone is not persist via 启用', () => {
   assert.equal(guide.isPersistBoundaryAction('【启用】'), true);
 });
 
+await run('保存概况 as action is persist; as fill-step button is not', () => {
+  assert.equal(guide.isPersistBoundaryAction('保存概况'), true);
+  assert.equal(guide.isPersistBoundaryAction('保存'), true);
+  assert.equal(
+    guide.isPersistBoundaryAction({ action: '维护概况', buttons: '【保存概况】' }),
+    false,
+  );
+  assert.equal(
+    guide.isPersistBoundaryAction({ action: '新增一级分类', buttons: '【新增一级分类】→【确定】' }),
+    true,
+  );
+});
+
 await run('stepsShareClosedLoop false for three product-library writes with 【确定】 buttons', () => {
   assert.equal(
     guide.stepsShareClosedLoop({ stepActions: PRODUCT_LIBRARY_WRITES }),
