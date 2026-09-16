@@ -154,6 +154,40 @@ def main() -> int:
     if "mark_stc_flags_on_replay_ok" not in replay_src:
         print("FAIL: _replay.py missing replay-side STC marking wiring")
         return 1
+    # Record/replay symmetry: index-click on「查询」must mark query_clicked exactly
+    # like click_button. Without it the guard deadlocks for the whole phase
+    # (err-search-first:need-fill-and-query) → the phase fails → its leftover
+    # actions get re-done and recorded under the NEXT phase.
+    if "mark_query_clicked" not in engine_src:
+        print("FAIL: click_action_engine.py must mark query_clicked on index-click 查询")
+        return 1
+    if "re.sub(r'\\s+', '', btn_label) == '查询'" not in engine_src:
+        print("FAIL: index-click 查询 marking must be keyed on the normalized label")
+        return 1
+    # el-select trigger (closed dropdown) = transient open click: it must NOT be
+    # recorded (junk 点击元素 whose text is the hidden option labels), must not be
+    # remembered as a phase operation, and must not become the picker trigger button.
+    if "kind: 'trigger'" not in engine_src:
+        print("FAIL: click_action_engine.py missing el-select trigger surface classification")
+        return 1
+    if "'table-row' : (inItem ? 'option' : 'dropdown')" not in engine_src:
+        print("FAIL: dropdown-surface kinds (table-row/option/dropdown) must stay blocked")
+        return 1
+    if "elif not select_trigger_click:" not in engine_src:
+        print("FAIL: plain click_element_by_index record must be skipped for select triggers")
+        return 1
+    if "if not date_panel_click and not select_trigger_click:" not in engine_src:
+        print("FAIL: select trigger click must not be remembered as a phase operation")
+        return 1
+    if engine_src.count("if not select_trigger_click:") < 2:
+        print("FAIL: select trigger click must also be skipped for remember_trigger_button")
+        return 1
+    if "transient-select-open" not in engine_src:
+        print("FAIL: suppressed trigger click must surface a transient-select-open hint")
+        return 1
+    if ".el-tree-node, .tree-popover" not in engine_src:
+        print("FAIL: trigger classification must exclude nested tree/popover popper contents")
+        return 1
     print("OK search-then-click-guard")
     return 0
 

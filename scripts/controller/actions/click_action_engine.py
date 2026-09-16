@@ -173,6 +173,11 @@ class ClickEngine:
             )
             click_identity = 'click:' + (gate_xp or f'{tag_name}:{elem_text}')
             date_panel_click = False
+            # el-select 触发框（下拉未展开）的点击只是开框瞬态动作：业务步是随后的
+            # select_option。它的 text 会被隐藏下拉的全部选项文案污染（见下方
+            # dd_gate），录制下来就是「点击元素 - 待发起审批中已撤销退回通过投决」
+            # 这类垃圾步。点击照做，但不录制、不记忆、不当弹窗触发按钮。
+            select_trigger_click = False
             if gate_xp:
                 try:
                     date_panel_click = bool(await page.evaluate('''(xpath) => {
@@ -231,29 +236,49 @@ class ClickEngine:
                         }
                         if (!node || node.nodeType !== 1) return { hit: false };
                         const dd = node.closest && node.closest('.el-select-dropdown');
-                        if (!dd) return { hit: false };
-                        const inItem = !!(node.closest('.el-select-dropdown__item'));
-                        const inRow = !!(node.closest('tr.el-table__row, .el-table__row'));
-                        return {
-                            hit: true,
-                            kind: inRow ? 'table-row' : (inItem ? 'option' : 'dropdown'),
-                        };
+                        if (dd) {
+                            const inItem = !!(node.closest('.el-select-dropdown__item'));
+                            const inRow = !!(node.closest('tr.el-table__row, .el-table__row'));
+                            return {
+                                hit: true,
+                                kind: inRow ? 'table-row' : (inItem ? 'option' : 'dropdown'),
+                            };
+                        }
+                        const sel = node.closest && node.closest('.el-select');
+                        // Exclude popper contents (tree-select / cascader / popover
+                        // dropdowns nested inside .el-select) — only the closed
+                        // trigger itself is the transient open-click surface.
+                        if (sel && !node.closest(
+                            '.el-select-dropdown, .el-tree, .el-tree-node, .tree-popover, '
+                            + '.el-tree-select__popper, .el-cascader__dropdown, .el-popover'
+                        )) {
+                            return { hit: true, kind: 'trigger' };
+                        }
+                        return { hit: false };
                     }''',
                     gate_xp,
                 )
                 if isinstance(dd_gate, dict) and dd_gate.get('hit'):
                     kind = str(dd_gate.get('kind') or 'dropdown')
-                    return _err(
-                        f'use-select-option | Index click on el-select dropdown ({kind}) '
-                        f'is forbidden — do not record 点击元素. '
-                        f'Call select_option(label_text=..., option_text=...) only '
-                        f'(table-in-select / 客户名称 remote rows included).',
-                        include_in_memory=True,
-                    )
+                    if kind == 'trigger':
+                        select_trigger_click = True
+                    else:
+                        return _err(
+                            f'use-select-option | Index click on el-select dropdown ({kind}) '
+                            f'is forbidden — do not record 点击元素. '
+                            f'Call select_option(label_text=..., option_text=...) only '
+                            f'(table-in-select / 客户名称 remote rows included).',
+                            include_in_memory=True,
+                        )
             except Exception:
                 sys.stderr.write("[click] el-select dropdown gate check failed index={index!r}" + '\n')
                 sys.stderr.flush()
                 pass
+            # Fallback signal: locator enrichment already classifies any node whose
+            # canonical host is `.el-select` (normalizeHost) as form_select. Use it
+            # when the xpath gate above could not run (empty/failed gate_xp).
+            if str((element_info or {}).get('target_kind') or '').lower() == 'form_select':
+                select_trigger_click = True
 
             if gate_xp:
                 try:
@@ -441,7 +466,7 @@ class ClickEngine:
             download_path = await self.browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')
-            if not date_panel_click:
+            if not date_panel_click and not select_trigger_click:
                 from .phase.element_guard import remember_phase_operation_aliases
                 identities = [click_identity]
                 if button_text_identity:
@@ -521,7 +546,7 @@ class ClickEngine:
                         f'ok-clicked-{index}',
                         element=element_info,
                     )
-                else:
+                elif not select_trigger_click:
                     record_text = (element_info or {}).get('text') or elem_text or ''
                     if is_tree_node_click:
                         record_text = _strip_volatile_tree_text(record_text)
@@ -535,12 +560,20 @@ class ClickEngine:
                     }, f'ok-clicked-{index}', element=element_info)
                 if self.business_data_store is not None:
                     from scripts.controller.actions.container_naming import remember_trigger_button
-                    remember_trigger_button(
-                        self.business_data_store,
-                        (element_info or {}).get('text') or (
-                            _strip_volatile_tree_text(elem_text) if is_tree_node_click else elem_text
-                        ) or '',
-                    )
+                    if not select_trigger_click:
+                        remember_trigger_button(
+                            self.business_data_store,
+                            (element_info or {}).get('text') or (
+                                _strip_volatile_tree_text(elem_text) if is_tree_node_click else elem_text
+                            ) or '',
+                        )
+                    # 索引点击「查询」必须像 click_button 一样标记 STC query_clicked，
+                    # 否则守卫整阶段拦 row/tree 定位（录放不对称，回放侧
+                    # mark_stc_flags_on_replay_ok 早已对 index 点击标记）→ 阶段失败 →
+                    # 前阶段动作被下一阶段补做并记到下一阶段。
+                    if re.sub(r'\s+', '', btn_label) == '查询':
+                        from scripts.controller.actions.search_then_click_guard import mark_query_clicked
+                        mark_query_clicked(self.business_data_store)
                 try:
                     from scripts.controller.actions._phase_intent import record_success_token
                     from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
@@ -622,6 +655,12 @@ class ClickEngine:
                     sys.stderr.write("[click] picker confirm record/close helper failed" + '\n')
                     sys.stderr.flush()
                     pass
+            if select_trigger_click:
+                return _ok(
+                    f'ok-clicked-{index} | transient-select-open — the dropdown-open click '
+                    f'is NOT recorded; call select_option(label_text=..., option_text=...) '
+                    f'to record the business step'
+                )
             return _ok(f'ok-clicked-{index}')
         except Exception as e:
             import traceback as _tb

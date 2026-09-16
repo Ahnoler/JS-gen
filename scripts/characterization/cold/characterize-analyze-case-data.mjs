@@ -82,4 +82,14 @@ assert(analyzeSrc.includes('必须原样保留'), 'analyze rule keeps user targe
 assert(analyzeSrc.includes('禁止把具体名抹成'), 'analyze rule forbids vague rewrite');
 assert(!/不要在 phases 字符串里复制任何业务数据/.test(analyzeSrc), 'old wipe-all rule 7 gone');
 
+// Phase state-boundary rule: a phase whose expected result is「打开确认弹窗」must
+// carry every action that opens it (选中行 + 点击删除); the modal button click
+// belongs ONLY to the next phase. Prevents a phase's actions being split across
+// the boundary (observed: 选中表格行/点击删除 recorded under the 点【确定】phase).
+assert(analyzeSrc.includes('状态边界原则'), 'analyze rule pins phase state boundaries');
+assert(
+  analyzeSrc.includes('禁止让下一阶段承担上一阶段未完成的动作'),
+  'analyze rule forbids prior-phase actions landing in the next phase',
+);
+
 console.log('characterize-analyze-case-data: OK');
