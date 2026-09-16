@@ -7,13 +7,51 @@
  *   node scripts/characterization/characterize-capability-cohesion.mjs
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const HELPER_PATH = join(ROOT, 'src/services/req-draft-traj/capability-cohesion.js');
 const mod = await import(pathToFileURL(HELPER_PATH).href);
+process.env.KB_STAGING_DIR = mkdtempSync(join(tmpdir(), 'kb-observe-cohesion-'));
+const { proposeDraftTrajectories } = await import(
+  pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href
+);
+const demoRoot = join(ROOT, 'scripts/characterization/fixtures/req-draft-traj/demo-mod');
+const PRODUCT_LIBRARY_CARD = {
+  _stem: 'product_library',
+  flow: '产品库管理',
+  keywords: ['新增一级分类', '新增产品'],
+  menu_path: '产品管理→产品信息管理→产品库管理',
+  preconditions: [],
+  nodes: [{
+    id: 'prod_add_dlg',
+    page: '新增产品弹窗',
+    enter: '从产品树新增',
+    buttons: ['确定'],
+    fields: ['名称'],
+  }],
+};
+
+/**
+ * @param {object} llmAtom One fake LLM atom (chainId/stepIndexes/title/taskDraft/…)
+ * @returns {Promise<{ atoms: object[], rejected: object[] }>} Propose result
+ */
+async function proposeOne(llmAtom) {
+  const tmp = mkdtempSync(join(tmpdir(), 'req-draft-cohesion-'));
+  cpSync(demoRoot, join(tmp, 'demo-mod'), { recursive: true });
+  const out = await proposeDraftTrajectories({
+    moduleKey: 'demo-mod',
+    rootDir: tmp,
+    callLLM: async () => JSON.stringify({ atoms: [llmAtom] }),
+    listSystemsFn: async () => [],
+    listFlowCardsFn: async () => [PRODUCT_LIBRARY_CARD],
+  });
+  rmSync(tmp, { recursive: true, force: true });
+  return out;
+}
 
 let failed = 0;
 async function run(name, fn) {
@@ -232,6 +270,84 @@ await run('synthesizeFallbackProduceKey never equals trimmed title', () => {
   assert.notEqual(mod.synthesizeFallbackProduceKey('维护基本信息'), '维护基本信息');
   assert.equal(mod.synthesizeFallbackProduceKey(''), 'atom_output');
   assert.equal(mod.synthesizeFallbackProduceKey('  '), 'atom_output');
+});
+
+await run('C1 propose: merged maintain+reorder rejected and not in atoms', async () => {
+  const out = await proposeOne({
+    chainId: 'chain-a',
+    stepIndexes: [2],
+    title: '维护并排序',
+    flowRef: 'product_library',
+    nodeId: 'prod_add_dlg',
+    taskDraft: `${C1_MERGED_MAINTAIN_REORDER}\n\n来源：demo.docx / chapters/01-product-library.md\n`,
+    produces: ['已维护对象'],
+    dataDependsOn: [],
+    phaseHints: ['维护'],
+    suggestedFunctionId: null,
+  });
+  assert.equal(out.atoms.length, 0, `expected no atoms, got ${JSON.stringify(out.atoms)}`);
+  assert.ok(
+    out.rejected.some((r) => r.reason === 'multi_capability_task_draft'),
+    `expected multi_capability_task_draft, got ${JSON.stringify(out.rejected)}`,
+  );
+});
+
+await run('C3 propose: THREE_CONFIRM_DRAFT stays multi_persist_task_draft (not multi_capability)', async () => {
+  const out = await proposeOne({
+    chainId: 'chain-a',
+    stepIndexes: [2],
+    title: '新增一级分类',
+    flowRef: 'product_library',
+    nodeId: 'prod_add_dlg',
+    taskDraft: FALLBACK_THREE_GROUPS,
+    produces: ['一级分类'],
+    dataDependsOn: [],
+    phaseHints: ['新增一级分类'],
+    suggestedFunctionId: null,
+  });
+  assert.ok(
+    out.rejected.some((r) => r.reason === 'multi_persist_task_draft'),
+    `expected multi_persist_task_draft, got ${JSON.stringify(out.rejected)}`,
+  );
+  assert.equal(
+    out.rejected.filter((r) => r.reason === 'multi_capability_task_draft').length,
+    0,
+    'must not rebrand multi-confirm as multi_capability',
+  );
+});
+
+await run('C4 propose: title-as-key cohesive draft → produces_eq_title, not in atoms', async () => {
+  const out = await proposeOne({
+    chainId: 'chain-a',
+    stepIndexes: [2],
+    title: '维护基本信息',
+    flowRef: 'product_library',
+    nodeId: 'prod_add_dlg',
+    taskDraft: `${PROMPT_GOOD_MAINTAIN}`,
+    produces: ['维护基本信息'],
+    dataDependsOn: [],
+    phaseHints: ['维护'],
+    suggestedFunctionId: null,
+  });
+  assert.equal(out.atoms.length, 0);
+  assert.ok(out.rejected.some((r) => r.reason === 'produces_eq_title'));
+});
+
+await run('C2 propose: cohesive maintain with business produce key is accepted', async () => {
+  const out = await proposeOne({
+    chainId: 'chain-a',
+    stepIndexes: [2],
+    title: '维护基本信息',
+    flowRef: 'product_library',
+    nodeId: 'prod_add_dlg',
+    taskDraft: `${PROMPT_GOOD_MAINTAIN}`,
+    produces: ['已维护对象'],
+    dataDependsOn: [{ key: '已有对象', source: 'preset' }],
+    phaseHints: ['维护'],
+    suggestedFunctionId: null,
+  });
+  assert.ok(out.atoms.length >= 1, `expected atoms, rejected=${JSON.stringify(out.rejected)}`);
+  assert.equal(out.rejected.filter((r) => r.reason === 'multi_capability_task_draft').length, 0);
 });
 
 if (failed) process.exit(1);

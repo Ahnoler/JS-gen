@@ -34,7 +34,7 @@ import {
   normalizeDataDependsOn,
   validateAtomDependGraph,
 } from './atom-depend.js';
-import { synthesizeFallbackProduceKey } from './capability-cohesion.js';
+import { assertCapabilityCohesion, synthesizeFallbackProduceKey } from './capability-cohesion.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
@@ -707,6 +707,15 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   };
   atom.produces = normalizeProduces(llmAtom.produces);
   atom.dataDependsOn = normalizeDataDependsOn(llmAtom.dataDependsOn);
+
+  const cohesion = assertCapabilityCohesion({
+    title,
+    taskDraft: cleanedDraft,
+    produces: atom.produces,
+  });
+  if (!cohesion.ok) {
+    return { rejected: { atomKey, reason: cohesion.reason } };
+  }
 
   if (llmAtom.wetTestHint != null && String(llmAtom.wetTestHint).trim()) {
     atom.wetTestHint = String(llmAtom.wetTestHint).trim();
