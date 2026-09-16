@@ -34,6 +34,7 @@ import {
   normalizeDataDependsOn,
   validateAtomDependGraph,
 } from './atom-depend.js';
+import { synthesizeFallbackProduceKey } from './capability-cohesion.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
@@ -100,15 +101,14 @@ const ENTRY_ONLY_RE = /打开\s*.{0,16}(抽屉|向导)|点[击]?\s*【新增】\
 const PERSIST_WRITE_RE = /保存|提交/;
 
 /**
- * Deterministic fallback has no LLM depend graph. Use the write title as the
- * sole produce key so the hard `missing_depend_fields` gate does not drop
- * fallback atoms; `dataDependsOn` stays empty (no inferred upstream).
+ * Deterministic fallback has no LLM depend graph. Synthesize a produce key
+ * that is not the raw title so `produces_eq_title` does not drop fallback
+ * atoms; `dataDependsOn` stays empty (no inferred upstream).
  * @param {string} title Atom title
  * @returns {{ produces: string[], dataDependsOn: [] }} Depend fields
  */
 function fallbackDependFields(title) {
-  const key = String(title || '').trim();
-  return { produces: key ? [key] : ['atom_output'], dataDependsOn: [] };
+  return { produces: [synthesizeFallbackProduceKey(title)], dataDependsOn: [] };
 }
 
 /**

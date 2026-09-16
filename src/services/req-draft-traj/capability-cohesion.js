@@ -245,6 +245,18 @@ function assertSequence(groups) {
 }
 
 /**
+ * Deterministic fallback produce key that is never the raw title (spec §4.4).
+ * @param {unknown} title Atom title
+ * @returns {string} Non-empty key, !== trimmed title when title is non-empty
+ */
+export function synthesizeFallbackProduceKey(title) {
+  const key = String(title || '').trim();
+  if (!key) return 'atom_output';
+  const synthesized = `${key}产物`;
+  return synthesized === key ? `${key}_output` : synthesized;
+}
+
+/**
  * Hard-gate one materialized atom (spec §4). Does not rewrite taskDraft.
  * @param {{ title?: unknown, taskDraft?: unknown, produces?: unknown }} atom Title, draft, normalized produces
  * @returns {{ ok: true }|{ ok: false, reason: 'multi_capability_task_draft'|'produces_eq_title' }} Gate pass or locked reject reason
@@ -253,5 +265,10 @@ export function assertCapabilityCohesion(atom) {
   const groups = parseTaskDraftStepGroups(atom?.taskDraft);
   const seq = assertSequence(groups);
   if (!seq.ok) return seq;
+  const produces = Array.isArray(atom?.produces) ? atom.produces : [];
+  const title = String(atom?.title ?? '').trim();
+  if (produces.length === 1 && produces[0] === title) {
+    return { ok: false, reason: 'produces_eq_title' };
+  }
   return { ok: true };
 }

@@ -198,5 +198,41 @@ await run('helper source has no scene blacklist literals', () => {
   assert.equal(src.includes('一级分类'), false);
 });
 
+await run('C4 helper: produces exact title → produces_eq_title even when draft is cohesive', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '维护基本信息',
+    taskDraft: PROMPT_GOOD_MAINTAIN,
+    produces: ['维护基本信息'],
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, 'produces_eq_title');
+});
+
+await run('C4 helper: produces title plus another key is not produces_eq_title', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '维护基本信息',
+    taskDraft: PROMPT_GOOD_MAINTAIN,
+    produces: ['维护基本信息', '已维护对象'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('C4 helper: empty produces is not produces_eq_title', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '维护基本信息',
+    taskDraft: PROMPT_GOOD_MAINTAIN,
+    produces: [],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('synthesizeFallbackProduceKey never equals trimmed title', () => {
+  assert.equal(typeof mod.synthesizeFallbackProduceKey, 'function');
+  assert.equal(mod.synthesizeFallbackProduceKey('维护基本信息'), '维护基本信息产物');
+  assert.notEqual(mod.synthesizeFallbackProduceKey('维护基本信息'), '维护基本信息');
+  assert.equal(mod.synthesizeFallbackProduceKey(''), 'atom_output');
+  assert.equal(mod.synthesizeFallbackProduceKey('  '), 'atom_output');
+});
+
 if (failed) process.exit(1);
 console.log('all passed');
