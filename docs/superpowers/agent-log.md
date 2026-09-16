@@ -2,6 +2,13 @@
 
 > **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
 
+## 2026-09-16 14:30 · ZCode — 开工：移除 agent-log 同目录旧归档（09-05/09-06 → 收口进 archive/logs/）
+
+- 进行中：2026-09-16 14:30；用户指令：移除与 agent-log.md 同目录（`docs/superpowers/`）的归档文件。现状=并行会话已复制 09-05/09-06 两份进 `archive/logs/`（blob 哈希与已提交原件一致，已核验），但原件仍在——本单元删除原件 git rm + 追踪 archive/logs/ 副本，完成整体搬迁
+- 范围：`docs/superpowers/agent-log-archive-2026-09-05.md`（删）、`agent-log-archive-2026-09-06.md`（删）、`archive/logs/` 下两份副本（add 入库）、本文件
+- 禁入区：他线 WIP（plans/2026-09-09-flow-card-guided-propose.md、reports/2026-09-10-benchmark-leaderboard-scan.md、src/ 等）；本文件他线在途条目原样保留
+- 方式：开工/收工各一 commit + push；移动 commit 注明系收口并行会话在途搬迁
+
 ## 2026-09-16 14:22 · ZCode — 收工：agent-log 归档完成（回链 14:15 开工）
 
 - 完成：归档 `archive/logs/agent-log-archive-2026-09-11.md`（09-11 及更早 272 条目，头部含批次指引）+ 主文件截留 09-12 起 103 条目 + 顶部归档指引行；commit **`caaa8346`** 已推送（开工 `28535be4`）
