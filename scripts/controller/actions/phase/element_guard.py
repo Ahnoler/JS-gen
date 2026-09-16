@@ -41,6 +41,18 @@ def duplicate_phase_operation(
     return str(touched.get(_operation_key(identity)) or "")
 
 
+def duplicate_phase_operation_any(
+    business_data_store: dict | None,
+    identities: list[str],
+) -> str:
+    """Return the first duplicate result across equivalent element identities."""
+    for identity in identities:
+        duplicate = duplicate_phase_operation(business_data_store, identity)
+        if duplicate:
+            return duplicate
+    return ""
+
+
 def remember_successful_element_action(
     business_data_store: dict | None,
     label_text: str,
@@ -73,3 +85,13 @@ def remember_successful_phase_operation(
         touched = {}
         business_data_store["_phase_ai_operations"] = touched
     touched.setdefault(_operation_key(identity), action_name)
+
+
+def remember_phase_operation_aliases(
+    business_data_store: dict | None,
+    identities: list[str],
+    action_name: str,
+) -> None:
+    """Remember multiple identities for one successful browser operation."""
+    for identity in identities:
+        remember_successful_phase_operation(business_data_store, identity, action_name)
