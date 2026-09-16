@@ -37,6 +37,9 @@ export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   picker_dialog_select: 'select:click',
   workspace_tabs: 'click',
   tree_picker_click: 'click',
+  // CDP trusted click (2026-09-16 起落库带 locator 快照；历史行 element 为空仅
+  // target 缺失不丢步骤). Synthetic-event-resistant components only.
+  real_click: 'click',
 });
 
 /** Types we emit today (derived from ACTION_TO_ENGINE_TYPE). */

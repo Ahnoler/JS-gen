@@ -1,4 +1,4 @@
-"""JS snippet constant: JS_REAL_CLICK_RECT.
+"""JS snippet constants: JS_REAL_CLICK_RECT (+ECHO, +TREE_POPOVER_OPEN).
 
 CDP 真实点击通道的定位半边（KB-I5 run7）：trusted 事件通道
 （TsscMultiTree tree-popover / el-cascader 等合成事件链不响应的组件）需要
@@ -7,10 +7,17 @@ CSS selector（可选）+ 元素文本（可选）+ 字段 label_text（可选�
 感知的 fieldItem 触发器定位），返回可见目标元素 getBoundingClientRect 中心
 （viewport 坐标）；找不到或不可见 → {ok:false}。
 
+成功时同一次 evaluate 顺带产出 **locator 快照**（locator 字段，shape 与
+JS_ENRICH_CLICK_LOCATOR 一致：absXPath/buildLocatorSnap/assignRegion 来自
+PAGE_LOCATOR_HELPERS）。必须在点击当场抓——popover 类目标点击后可能立即
+关闭，事后 _enrich_click_element 会扑空。
+
 配套动作 real_click 在 _workspace.py（new_cdp_session + Input.dispatchMouseEvent）；
 tree_picker_click 打开失败时回退调用（_tree.py）。与 select_tree_option /
 tree_picker_click（合成事件）分工见 agent-tools-common.md。
 """
+
+from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
 JS_REAL_CLICK_RECT = '''async (args) => {
     const [selector, text, labelText] = args || [];
@@ -96,6 +103,16 @@ JS_REAL_CLICK_RECT = '''async (args) => {
     if (!(r.width > 0 && r.height > 0)) {
         return JSON.stringify({ ok: false, error: 'err-real-click-invisible', tag: el.tagName });
     }
+''' + PAGE_LOCATOR_HELPERS + '''
+    // Locator snapshot at click time — same shape as JS_ENRICH_CLICK_LOCATOR's
+    // return, so _element_info_from_locate normalizes both identically. Popover
+    // targets usually close on trusted click; a post-hoc enrich would find nothing.
+    const snapRawText = normalizeControlText(txt) || cleanVisibleText(el);
+    const snapKind = detectTargetKind(el);
+    const snapText = snapKind === 'tree_node' ? stripVolatileTreeText(snapRawText) : snapRawText;
+    const snapAbs = absXPath(el);
+    const snapLoc = buildLocatorSnap(el, snapText, snapAbs, lbl, { targetKind: snapKind });
+    const snapReg = assignRegion(el);
     return JSON.stringify({
         ok: true,
         x: Math.round(r.left + r.width / 2),
@@ -103,6 +120,33 @@ JS_REAL_CLICK_RECT = '''async (args) => {
         w: Math.round(r.width),
         h: Math.round(r.height),
         tag: el.tagName + '.' + String(el.className || '').slice(0, 60),
+        locator: {
+            tag_name: snapLoc.tag || (el.tagName || '').toLowerCase(),
+            xpath: snapLoc.xpath || snapAbs,
+            xpath_smart: snapLoc.xpath_smart || '',
+            xpath_full: snapLoc.xpath_full || snapAbs,
+            xpath_abs: snapAbs,
+            css_selector: snapLoc.cssSelector || '',
+            text: snapText,
+            formLabel: snapLoc.formLabel || lbl,
+            attributes: snapLoc.attributes || {},
+            attr: snapLoc.attr || undefined,
+            candidates: snapLoc.candidates || [],
+            target_kind: snapKind,
+            row_text: '',
+            region_id: snapReg.region_id || '',
+            region_label: snapReg.region_label || '',
+            layers: Array.isArray(snapReg.layers) ? snapReg.layers : [],
+            bbox: stepBBoxOf(el),
+            page_bbox: documentBBoxOf(el),
+            locator_scope: snapLoc.locator_scope,
+            locator_occurrence: snapLoc.locator_occurrence,
+            field_slot: snapLoc.field_slot,
+            display_label: snapLoc.display_label,
+            locator_verified: snapLoc.locator_verified,
+            locator_strategy: snapLoc.locator_strategy,
+            locator_fallback_reason: snapLoc.locator_fallback_reason,
+        },
     });
 }'''
 
