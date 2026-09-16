@@ -20,7 +20,7 @@ from ._js_snippets import (
 )
 from .js_snippets.container import JS_VISIBLE_OVERLAY_OF
 from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
-from .js_snippets.base import JS_FIELD_ITEM_CANDIDATES
+from .js_snippets.base import JS_FIELD_ITEM_PICK
 from .form_rules import match_rule, match_cert_number, normalize_lat_lng_value
 from .form_scan_utils import (
     _is_query_mode, _with_submit_cue,
@@ -180,9 +180,29 @@ class FillEngine(_FormActionEngineBase):
             try:
                 live = await page.evaluate(
                     '''(label) => {
-                        const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
-                        const fi = candidatesOf(document, label)[0] || null;
-                        if (!fi) return '';
+                        const container = ''' + JS_GET_CONTAINER + ''';
+                        const pick = ''' + JS_FIELD_ITEM_PICK + ''';
+                        // 与动作体 findFieldItem 同源解析（JS_FIELD_ITEM_PICK）：
+                        // 可见精确 → 隐藏精确 → 唯一包含兜底，多命中=歧义。
+                        // 作用域对齐动作体：JS_GET_CONTAINER 优先，未中补扫可见
+                        // dialog/drawer（替换旧的 document 全域 [0] 盲取——隐藏
+                        // 同名 tssc 节点曾致 err-use-tssc-multi-select 假阳性）。
+                        // 歧义/未解析 → ''（未知，走正常 fill 流程）。
+                        const resolveField = () => {
+                            const hit = pick(container, label);
+                            if (hit && hit.ambiguous) return { ambiguous: true };
+                            if (hit && hit.item) return { item: hit.item };
+                            for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+                                if (dlg.offsetParent === null) continue;
+                                const h2 = pick(dlg, label);
+                                if (h2 && h2.ambiguous) return { ambiguous: true };
+                                if (h2 && h2.item) return { item: h2.item };
+                            }
+                            return null;
+                        };
+                        const field = resolveField();
+                        if (!field || field.ambiguous || !field.item) return '';
+                        const fi = field.item;
                         if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
                         if (fi.querySelector(
                             '.tree-popover, .tsscTree, .el-tree-select,'
@@ -490,9 +510,29 @@ class FillEngine(_FormActionEngineBase):
             try:
                 live = await page.evaluate(
                     '''(label) => {
-                        const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
-                        const fi = candidatesOf(document, label)[0] || null;
-                        if (!fi) return '';
+                        const container = ''' + JS_GET_CONTAINER + ''';
+                        const pick = ''' + JS_FIELD_ITEM_PICK + ''';
+                        // 与动作体 findFieldItem 同源解析（JS_FIELD_ITEM_PICK）：
+                        // 可见精确 → 隐藏精确 → 唯一包含兜底，多命中=歧义。
+                        // 作用域对齐动作体：JS_GET_CONTAINER 优先，未中补扫可见
+                        // dialog/drawer（替换旧的 document 全域 [0] 盲取——隐藏
+                        // 同名 tssc 节点曾致 err-use-tssc-multi-select 假阳性）。
+                        // 歧义/未解析 → ''（未知，走正常 fill 流程）。
+                        const resolveField = () => {
+                            const hit = pick(container, label);
+                            if (hit && hit.ambiguous) return { ambiguous: true };
+                            if (hit && hit.item) return { item: hit.item };
+                            for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+                                if (dlg.offsetParent === null) continue;
+                                const h2 = pick(dlg, label);
+                                if (h2 && h2.ambiguous) return { ambiguous: true };
+                                if (h2 && h2.item) return { item: h2.item };
+                            }
+                            return null;
+                        };
+                        const field = resolveField();
+                        if (!field || field.ambiguous || !field.item) return '';
+                        const fi = field.item;
                         if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
                         if (fi.querySelector(
                             '.tree-popover, .tsscTree, .el-tree-select,'
