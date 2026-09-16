@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 10:28 · ZCode 引擎线 — 开工：select_option 字段解析错位修复（要素名称→组件要素名称，includes 包含匹配错位）
+
+- 现场实证（19242 活页面 + 引擎原版匹配逻辑）：选择要素弹窗 DOM 序含「组件要素编码(6)/组件要素名称(7)」前缀查询字段，`l === label || l.includes(label)` 首个命中被它们抢占——找「要素名称」命中「组件要素名称」、找「要素编码」命中「组件要素编码」（均为错字段）。回放 err-no-options 是对错字段弹层（所属列表要素编码，暂无数据）做出的误判。
+- 范围：仅 `scripts/controller/actions/js_snippets/tssc_multi_select.py` 字段查找两处（L27-29 主循环、L35-37 dialog 兜底）改「精确优先 → 包含唯一才用 → 多命中报 ambiguous-label」；同族 finder（select_tree.py、_resolve_control 等）本次不动、只列清单
+- 禁入区：`config/`、他线 WIP、agent-log 他人条目只读
+- 方式：主线程；验证=py_compile+模块级 import+新行为 pin（source 钉精确优先/唯一/歧义）+相关旧 pin+verify-all 对照基线 4 红+19242 活页面用更新后 snippet 实测解析落点
+
 ## 2026-09-16 · Grok Bot · 原子草稿拆分边界设计 spec
 
 - 方案 B：`produces` / `dataDependsOn`；对照 #675/#676/#678/#504
