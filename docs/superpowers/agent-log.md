@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 16:40 · Cursor — 开工：product-mgmt atomize 「维护基本信息」与树排序误合并
+
+- 进行中：TDD 修 wet propose 后 `product-mgmt:chain-a:6` 把同层排序（上移/下移）并进维护基本信息【保存】；对照金轨迹 #708（搜索/定位选中未启用产品 → 右栏基本信息 → 保存）
+- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/` 金样例、纯 helper + characterization pin、必要时 `src/services/req-draft-traj/propose.js` materialize 接线、本协作日志
+- 禁入区：手改 `through-chains.md` 全量；改 traj #708；拆 `prod_add_dlg`；产品树分层特例；`produces`/`dataDependsOn` 通则可动、不另立树层规则；他线 field_slot / SPA；`config/` WIP
+- 方式：主会话 Inline TDD（先 RED pin 再最小实现）；分支 `cursor/atomize-basic-info-quality-aae4`；PR 合入 `uara_V1.2`
+
 ## 2026-09-16 16:25 · Cursor — 收工：product-mgmt wet propose 多【确定】误合并（回链 16:05 开工）
 
 - 完成：`b8416216` RED pin；`bc9c1d82` persist 边界 + `multi_persist_task_draft` 闸；review follow-up：fallback 亦看 buttons、`countPersistConfirms` 不把裸「确定」当二次保存、`PROPOSE_CACHE_VERSION` 2→3
