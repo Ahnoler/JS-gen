@@ -12,14 +12,15 @@ Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. Th
 3. 读 `docs/superpowers/agent-log.md` 最近几条 — 其他 Agent 最近做了什么、有什么在途声明、有什么遗留
 
 **开工声明（动第一行代码之前，2026-09-05 起为硬约定）：**
-- 在 `docs/superpowers/agent-log.md` 顶部（紧随文件头协议块之下）插入**开工条目**：时刻 + 工作范围（文件/目录清单）+ 禁入区（他线热区/工作区 WIP）+ 执行方式，然后**立即 commit**——未提交的声明对其他 Agent 不可见
+- **先 `git pull` 再写声明**（2026-09-16 起）：拉到远端最新，才看得到他线在途声明，push 也不易冲突
+- 在 `docs/superpowers/agent-log.md` 顶部（紧随文件头协议块之下）插入**开工条目**：时刻 + 工作范围（文件/目录清单）+ 禁入区（他线热区/工作区 WIP）+ 执行方式，然后**立即 commit + push**——未提交/未推送的声明对其他 Agent 不可见
 - 自己的文件集必须与所有在途声明及工作区未提交改动不相交；有交集先协调或换文件集
 - 主会话派发子智能体时**代为声明**（子智能体不直接写 agent-log，避免并行编辑冲突）；子智能体一律不 commit，由主会话验收后代提交
 
 **收工回报（任务单元结束时）：**
-- 在顶部插入**收工条目**回链开工条目：完成（含 commit hash）/ 验收证据 / 遗留移交——开工条目中的"进行中"至此闭环，状态以收工条目为准
+- 在顶部插入**收工条目**回链开工条目：完成（含 commit hash）/ 验收证据 / 遗留移交——开工条目中的"进行中"至此闭环，状态以收工条目为准；写完立即 **commit + push**（2026-09-16 起 push 为硬约定）
 - 提交 agent-log 时若顺带携带了其他会话的未提交条目，在 commit message 注明
-- 一个任务单元结束尽量 commit——未提交的工作对其他 Agent 不可见
+- 任务单元的代码改动结束即 commit；agent-log 条目（开工/收工）写完一律 commit + push——未提交/未推送的工作对其他 Agent 不可见
 - **不维护 CHANGELOG.md**（2026-09-04 已移除）：变更史以翔实的 git commit message 为准，不要重建该文件
 
 ## Working with subagents
