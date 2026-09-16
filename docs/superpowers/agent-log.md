@@ -1,5 +1,21 @@
 # Agent 协作日志
 
+## 2026-09-16 21:59 · OpenCode — 收工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（回链 21:35 开工）
+
+- 完成：**`6367f55`**（5 文件 / +114 -10）。根因：对公客户评级申请阶段3（任务=点击【下一步】→进入风险阻断）的 LLM 评审合约 `mode=other` 自造了**不可录制**的成功 token `success.kinds=['step_change']`；PR #45 的 G3 证据门闩要求边界 `success_when` 被观测，`step_change` 永不满足 → `done(success=true)` 反复被拒 → 恢复处方兜底写死 `click_save()` → agent 去点「确定」，点到整个向导的提交确定并触发服务端业务异常「该客户已发起评级流程…」——即用户反馈的「阶段3 页面没有确定按钮却跑出一个点击确定步骤」。
+- 四处修复：①`phase/reviewer.py` `_NO_SUBMIT_TOKEN_MODES` 加入 `other`——兜底态强制 `submit.required=false` / `success.kinds=[]`，与规则编译 `compile_boundary` 的 `role=other → success_when=[]` 对齐；②`phase/intent_gates.py` 恢复处方改 **mode-aware**：仅 `create/modify` 才 `click_save`，`introduce_pick`→「选行后点确认」，`navigate/query/login/other` 各给正确动作；非提交阶段同时撤下「确认 allowed」的暗示。口径遵循用户裁决「**不强行加，不是不能试**」——只撤下注入的处方，不加硬闸阻止 agent 自行尝试（`click_save` 引擎不再新增拦截，避免误伤 picker 确认 / introduce）；③`phase/intent_contract.py` 规则编译路径 `recovery.next_action` 同样改 mode-aware（此前 `other/login/query` 也写死 `click_save(保存)`）；④`scripts/prompts/phase-reviewer-prompt.md` 明确 `navigate/query/other` **必须** `submit.required=false` / `success.kinds=[]`、禁自造 token，并推荐向导「下一步」用 `navigate`（「下一步」本身就是该阶段的提交式收口）。
+- 关键判据（离线复现修复前/后）：`boundary success_when ['step_change']→[]`；`phase_done_ok after nav_next_clicked False→True`；恢复处方 `click_save() → done(success=true) ... (this phase requires no save/confirm step)`。即点完【下一步】`done()` 直接通过，不再产生恢复处方与额外确定步。
+- 验收证据：回归 pin 落在**已注册**的 `characterize-phase-reviewer`（`other` 无证据门 + 恢复处方不点 click_save + `create` 仍点 + 规则编译器 mode-aware）→ PASS；定向门禁全绿（phase-reviewer / reviewer-flow / runtime / boundary / introduce-dialog-close / save-cue-promote / done-accept-reason / ai-phase-element-guard / refill-contract / form-assistant / assistant-mission-context / phase-intent / phase-done-evidence-gate）；**verify-all 全跑 = 与既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红；三模块 `ast.parse` + import 通过。
+- 未改（防误伤）：`click_save` 引擎不加「非提交阶段一律拒点」硬闸——无匹配按钮时引擎本就 `save-button-not-found` 且不落步，故**消除「被指示去点确定」的处方即消除虚拟步**。
+- 遗留移交：①生产须重启执行机侧 Python agent 进程生效（LLM 评审器下次会话生效）；②若后续发现导航/查询阶段因 `other` 无证据门而过度宽松（过早 done），回退点=本提交；③不维护 CHANGELOG。
+
+## 2026-09-16 21:35 · OpenCode — 开工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（sid 4460cf2a 阶段3）
+
+- 进行中：真机日志显示阶段3 点击【下一步】后 `done(success=true)` 被反复拒绝（`success_when=['step_change'] observed=['nav_next_clicked']`），随后 agent 被引去 `click_save(button_text='确定')` 并触发服务端业务异常；用户要求查清并修好「当前页面区域没有确定按钮时不应强行加入点击确定步骤」。已离线定位：唯一注入源是 done 被拒后的 `recovery_prescription_message`（LLM 合约无 `recovery` 键 → 兜底 `'click_save()'`）。
+- 范围（可写集）：`scripts/controller/actions/phase/reviewer.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/phase/intent_gates.py`、`scripts/prompts/phase-reviewer-prompt.md`、`scripts/characterization/characterize-phase-reviewer.py`、本协作日志
+- 禁入区：`scripts/refactor/verify-all.sh`（他线在途 WIP，不新增注册项）、生成链 `_locator_helpers_js.py` / `src/cdp/page-locator-helpers.js`、SPA 仓、`config/`（含会话前既有 `config/.db-whitelist-seen` 运行态改动，未纳入本次提交）、线上数据库/执行机运行态
+- 方式：主会话 Inline；先离线复现（构造 `mode=other + success.kinds=['step_change']` 合约）确认 `phase_done_ok=False` 且恢复处方为 `click_save()`，再最小实现；pin 落已注册文件、不新增 verify-all 注册项；跑 verify-all 与既有基线比对；不维护 CHANGELOG
+
 ## 2026-09-16 21:03 · ZCode 引擎线 — 收工：本地合入 PR #45（G3 phase_done 证据门闩，回链 20:49 开工）
 
 - 完成：`c0cfa03e`（合并提交，17 文件）+ `abea7695`（集成修复）。PR 原提 master（分叉点 `5dddf2ea` 落后 uara_V1.2 **1034 提交**），按用户要求合到本地主线 `uara_V1.2`，未动 master。PR 作者分支 `cursor/g3-phase-done-evidence-gate-3b92`（7 提交 `539c8e76`→`9391f09c`，Cursor Cloud，12:22–12:41）
