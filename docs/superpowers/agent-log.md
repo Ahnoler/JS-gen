@@ -1,6 +1,12 @@
 # Agent 协作日志
 
-<<<<<<< HEAD
+## 2026-09-16 17:11 · OpenCode — 开工：Type B 表单结构检查点容器解析失败致回放误报失败
+
+- 进行中：多步回放（含选中行）浏览器全执行，但汇总报「失败 1 条」——根因=回放的 `save_form_snapshot`（Type B）按 `dialog:<trigger>|unnamed` 找容器，`JS_VERIFY_FORM_STRUCTURE.matchTitle` 对 unnamed 哨兵要求 `aria-label` 为空，而 Element UI 的 `.el-dialog` 恒有 `aria-label="dialog"`（`title || 'dialog'`）→ 永远匹配不上 → `container_not_found` → Node 按 unsafe 记该步失败。修复=unnamed 分支把 Element UI 通用回退值 `dialog` 视为「无标签」（与录制侧只看 `.el-dialog__title` 文本对齐）
+- 范围：`scripts/controller/actions/js_snippets/misc.py`（matchTitle）、新 characterization、`scripts/refactor/verify-all.sh`、本协作日志（顺带清除他线遗留的合并冲突标记）
+- 禁入区：SPA 仓、`tmp/cmds`、`config/` WIP；他线 req-draft-traj / tree-node-dirty-suffix / select_option 字段解析；`page-locator-helpers.js` 及生成物
+- 方式：主会话 Inline（先 RED pin 再最小实现）；Playwright 固定 fixture 验 `JS_VERIFY_FORM_STRUCTURE`；完成后跑 verify-all；分支 `uara_V1.2`
+
 ## 2026-09-16 17:05 · ZCode 引擎线 — 补记：select_option 字段解析错位修复**真机复验通过**（回链 10:28 开工 / 10:52 收工）
 
 - 用户复验：重放原失败轨迹 **回放成功，无问题**——BUG 闭环。
@@ -12,7 +18,7 @@
 - 完成：spec `2026-09-16-tree-node-dirty-suffix-design.md`（用户批准）；plan `2026-09-16-tree-node-dirty-suffix.md`（Tasks 1–5）
 - 验收：用户确认「可以」；裁决写入 Global Constraints（保留 `[V-…]`，剥 `(N)`/拼接 `-`）
 - 遗留移交：待选执行方式（subagent-driven-development / executing-plans）
-=======
+
 ## 2026-09-16 16:58 · Cursor — 收工：atomize 能力内聚（回链 16:50 开工）
 
 - 完成：通用「能力内聚」写入线上 atomize prompt（一笔一项能力 / 准备步骤从属 / 禁止夹带另一项可独立验证能力）；样例正例定位→填→一次落库 + 反例「同页多能力合写」；spec §3.7 记为 prompt 层、无关键词硬闸
@@ -28,7 +34,6 @@
 - 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`（轻量补记）、本协作日志
 - 禁入区：`src/services/req-draft-traj/**`（不新增关键词硬闸、不拆 flow-card JSON）；`product_library.json` / `prod_add_dlg`；他线 replay/field_slot；`config/` WIP；分支 `cursor/atomize-basic-info-quality-aae4`
 - 方式：主会话 Inline；新分支 `cursor/atomize-capability-cohesion-4c8c` 从 `uara_V1.2` 起；PR 合入 `uara_V1.2`；PR #39 标为已被能力内聚取代
->>>>>>> be9184ecafc31d770a2705b72bf96aea00d71ee3
 
 ## 2026-09-16 16:50 · Cursor — 开工：产品树脏后缀 design spec
 
