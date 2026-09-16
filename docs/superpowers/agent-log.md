@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 · OpenCode — 开工：修复控制面重启后的录制推流会话恢复
+
+- 进行中：以执行机 `session.list` 为会话存活真源，修复控制面异常重启后 `remote_session` 的误 crash、BiB 绑定/推流重附、交易 runtime 和槽位租约恢复。
+- 范围：`server.mjs`、`src/executor-ws.js`、`src/services/executor-node-service.js`、相关 characterization 与本协作日志；只读参考 remote-session/trajectory/executor 生命周期代码。
+- 禁入区：前端仓、线上数据库/执行机运行态、既有未跟踪 `config/.db-whitelist-seen`、Cursor 的 field_slot 热区和其他会话 WIP；不回填历史交易数据。
+- 方式：已先尝试 `git pull`（GitHub 连接重置失败）；执行机注册后先对账再决定 crash，命中会话重建控制面 routing/runtime/lease 并幂等发送 BiB attach；以离线 characterization、语法检查和核心门禁验证。
+
 ## 2026-09-16 · OpenCode — 收工：排查控制面异常关闭导致录制画面推流中断（回链本次开工）
 
 - 完成：只读梳理 `trajectory.remote_session_id` → `remote_session` → `agent_session_id`/`executor_node_id` → 执行机 `BibBridge` → RSCF 推流链路；未修改业务代码、数据库或线上运行态。
