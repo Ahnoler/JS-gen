@@ -1,5 +1,17 @@
 # Agent 协作日志
 
+## 2026-09-16 18:05 · Cursor Automation — 收工：2026-09-15 北京时间工作日报归档
+
+- 完成：`docs/report/2026-09-15.md` + `docs/report/README.md` 索引行；统计窗口 09-15 00:00–24:00，31 条提交（AI 录制 tooltip/picker/BiB/日期/阶段去重 + 人工确认去闸）
+- 验收：git log author date 过滤 + agent-log 09-15 收工条目交叉核对；前日 09-14 日报未归档，遗留对照 09-13
+- 遗留移交：09-14 日报缺口仍待补；多数 AI 录制修复部署湿测 pending
+
+## 2026-09-16 18:03 · Cursor Automation — 开工：2026-09-15 北京时间 cron 日报生成
+
+- 范围：仅 `docs/report/2026-09-15.md`、`docs/report/README.md`、`docs/superpowers/agent-log.md`（本条目）
+- 禁入区：`src/**`、`scripts/**` 代码；他线 WIP
+- 方式：git log + agent-log + 09-13 遗留对照；cron 触发 2026-09-16T10:01Z（北京 18:01）
+
 ## 2026-09-16 17:52 · OpenCode — 开工：回放汇总步数把自动注入的 meta 检查点也计入
 
 - 进行中：只勾选 4 步却提示「回放完成 5 步」——根因=`prepareReplayBatch` 自动补入选中区间内的 meta 检查点（`save_form_snapshot`）进 `actions`/`orderedStepIds`，`runReplayBatch` 的 `if (typeB.ok) successCount += 1` 与 `buildPayload` 的 `count/ok/failed` 把它算作业务步；FE 用 WS `replay:finished.successCount` 显示「回放完成 N 步」（`useRecordingStudio.ts:726-741`）。修向=汇总只计业务步（与 `trajectory.js` 文档「stepCount 亦只计业务步骤」一致），meta 检查点的成功/失败不计入用户面计数
