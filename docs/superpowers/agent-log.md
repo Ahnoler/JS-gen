@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 16:25 · Cursor — 收工：product-mgmt wet propose 多【确定】误合并（回链 16:05 开工）
+
+- 完成：`b8416216` RED pin；`bc9c1d82` persist 边界 + `multi_persist_task_draft` 闸
+- 验收：`characterize-persist-boundary` all passed（8 pins）；`characterize-req-draft-traj` **OK 63**；`characterize-atom-depend` **8/8**；eslint 改动文件 0 error
+- 遗留移交：不拆 `prod_add_dlg` 流程卡；`missing_depend_fields` 仍为警告；fallback 分组仍只看 action（本 PR 只改 `stepsShareClosedLoop` 入参 + taskDraft 闸）；不维护 CHANGELOG
+
 ## 2026-09-16 16:05 · Cursor — 开工：product-mgmt wet propose 多【确定】误合并（persist boundary + taskDraft 闸）
 
 - 进行中：TDD 修 confirmed 根因——`stepsShareClosedLoop`/`isPersistBoundaryAction` 只看 action 不看 buttons；`启用` 误匹配 `未启用`；flowGuided 下 `boundaries<=1` 放行多写合并；taskDraft 多【确定】无闸
