@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 21:15 · Cursor — 开工：能力内聚结构硬闸 Task 2（C4 produces_eq_title + fallback synthesizer）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 2**（TDD：C4/synthesizer pins RED → `synthesizeFallbackProduceKey` + title-as-key 闸 GREEN → `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`）。不接线 `materializeLlmAtom` 硬闸、不 bump cache、不改 prompt。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 C4+synthesizer pins）、`src/services/req-draft-traj/capability-cohesion.js`（synthesizer + `assertCapabilityCohesion` title-as-key）、`src/services/req-draft-traj/propose.js`（import + `fallbackDependFields` 仅改 produce key）、本协作日志
+- 禁入区：`propose-cache.js`；`atom-depend.js`；`flow-card-guide.js`；`materializeLlmAtom` 闸接线（Task 3）；`scripts/prompts/**`；`verify-all.sh`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 3+ cache bump / prompt / api-docs
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
 ## 2026-09-16 21:05 · Cursor — 收工：能力内聚结构硬闸 Task 1（回链 20:55 开工）
 
 - 完成：helper `src/services/req-draft-traj/capability-cohesion.js`（parse / inspect / classify / sequence-only `assertCapabilityCohesion`）+ pins `scripts/characterization/characterize-capability-cohesion.mjs`。feat **`da1ed8f1`**。开工声明 `ff456d8b`。
