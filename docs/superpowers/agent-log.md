@@ -7,6 +7,13 @@
 - 禁入区：`scripts/refactor/verify-all.sh`（他线在途 WIP，不新增注册项）、`scripts/controller/actions/**`、`scripts/prompts/**`、生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`、SPA 仓、`config/`、线上数据库/执行机运行态、`config/.db-whitelist-seen`。
 - 方式：先落 pin（复用已注册的 bib navigate 冷 pin 文件）再最小实现；`node --check` + 定向 characterization + 真机 WS 订阅探针（`tmp/ws-frame-probe.mjs`）复验序号递增；不改 SPA 契约（令后端满足既有「递增 frameId」契约）。
 
+## 2026-09-16 20:10 · ZCode 引擎线 — 开工：actions 层改动盘点 → 同事引擎同步清单 → agent team 移植
+
+- 进行中：2026-09-16 20:10；验收=①产出「JS-gen actions 层改动 vs tansun_ui_engine 现状」同步清单（逐项：语义/来源 commit/引擎是否已有/是否需要同步）②清单中确认需同步且引擎侧适用的条目移植完成并提交
+- 范围：只读调研=JS-gen `docs/superpowers/agent-log.md`（991 行）+ engine 仓 `ui_execute/engine/actions/**` 现状盘点；实现=engine 仓 `ui_execute/engine/actions/**`（具体文件集待清单确定后在本条目追加）+ 本地测试件（不提交）+ 本文件
+- 禁入区：JS-gen 源码（只读）、engine 仓 config.py、push、SUT 真实数据变更；他线 WIP（`scripts/refactor/verify-all.sh` 等在途件不碰）
+- 方式：lead 设计；调研双子智能体并行（R1=挖 log、R2=引擎盘点，均只读不 commit）；实现子智能体按清单文件集不相交派发；主会话复核+验证后代提交
+
 ## 2026-09-16 20:03 · OpenCode — 开工：阶段拆分提示词加固 + JS 侧业务数据判定对齐（承接 18:59/19:27 线）
 
 - 进行中：用户手动调整的提示词示例经核查**已丢失**（工作区 hash 与 HEAD 一致，VS Code 本地历史仅 `undoRedo` 条目）→ 由本次统一补做。六项：
@@ -19,6 +26,8 @@
 - 范围（可写集）：`src/services/trajectory/trajectory-meta-service.js`、`src/services/trajectory/trajectory-text-extract.js`、`scripts/characterization/cold/characterize-analyze-case-data.mjs`、本协作日志
 - 禁入区：`scripts/controller/actions/**`（含他线已收工的 `phase/classify.py`，本轮只读不改）、生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`、`scripts/prompts/**`、`scripts/refactor/verify-all.sh`（本轮不新增注册项，pin 落已有 cold 文件）、SPA 仓、`config/`
 - 方式：主会话 Inline；先补 RED pin 再最小实现；pin 覆盖必须保留的既有子串（`先搜索/查询再点击`、`不要为了凑数量而拆分`、`必须原样保留`、`禁止把具体名抹成`、`状态边界原则`、`禁止让下一阶段承担上一阶段未完成的动作`）；跑 verify-all 比对基线；不维护 CHANGELOG
+
+
 
 ## 2026-09-16 19:27 · OpenCode — 收工：录制两病灶修复（回链 18:59 开工）
 
