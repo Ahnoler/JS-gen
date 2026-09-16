@@ -23,20 +23,52 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
 
+    // 字段解析：精确匹配优先，包含匹配仅在全局唯一时兜底。
+    // 包含匹配会错位：找「要素名称」命中「组件要素名称」（includes 为真且 DOM
+    // 序在前），打开别的字段的弹层（2026-09-16 选择要素弹窗活体实证）。
+    const findFieldItem = (root, label) => {
+        const items = root.querySelectorAll('.el-form-item');
+        const exactVisible = [];
+        const exactAny = [];
+        const fuzzy = [];
+        for (const item of items) {
+            const l = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+            if (!l) continue;
+            if (l === label) {
+                (item.offsetParent !== null || item.getClientRects().length > 0
+                    ? exactVisible : exactAny).push(item);
+            } else if (l.includes(label)) {
+                fuzzy.push({ item, l });
+            }
+        }
+        if (exactVisible.length) return { item: exactVisible[0], via: 'exact' };
+        if (exactAny.length) return { item: exactAny[0], via: 'exact-hidden' };
+        if (fuzzy.length === 1) return { item: fuzzy[0].item, via: 'includes-unique' };
+        if (fuzzy.length > 1) {
+            return { ambiguous: fuzzy.map((f) => f.l) };
+        }
+        return null;
+    };
+
     let fieldItem = null;
-    for (const item of container.querySelectorAll('.el-form-item')) {
-        const l = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (l === label || l.includes(label)) { fieldItem = item; break; }
+    {
+        const hit = findFieldItem(container, label);
+        if (hit && hit.ambiguous) {
+            return 'ambiguous-label:' + label + ' | 候选: ' + hit.ambiguous.join(' / ')
+                + ' — 请提供完整字段名以消歧';
+        }
+        fieldItem = hit ? hit.item : null;
     }
     if (!fieldItem) {
         // KB-I5: 弹窗/抽屉的 form-item 在页面容器之外——补扫可见 dialog/drawer
         for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
             if (dlg.offsetParent === null) continue;
-            for (const item of dlg.querySelectorAll('.el-form-item')) {
-                const l = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                if (l === label || l.includes(label)) { fieldItem = item; break; }
+            const hit = findFieldItem(dlg, label);
+            if (hit && hit.ambiguous) {
+                return 'ambiguous-label:' + label + ' | 候选: ' + hit.ambiguous.join(' / ')
+                    + ' — 请提供完整字段名以消歧';
             }
-            if (fieldItem) break;
+            if (hit && hit.item) { fieldItem = hit.item; break; }
         }
     }
     if (!fieldItem) return 'label-not-found';
