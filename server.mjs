@@ -182,8 +182,8 @@ async function main() {
   // cannot delay HTTP/WebSocket readiness.
   initializeDatabaseTasks().catch(() => {});
 
-  // Do NOT crash occupied remote_sessions at raw boot — executor nodes look offline
-  // until they reconnect. Defer reconcile until after the reconnect window.
+  // Do not crash occupied remote_sessions from node status alone. Reconciliation is
+  // performed by executor-ws after session.list provides authoritative session truth.
   const BOOT_RECONCILE_DELAY_MS = Number(process.env.BOOT_REMOTE_RECONCILE_MS) || 15000;
   setTimeout(() => {
     (async () => {
@@ -192,9 +192,8 @@ async function main() {
           databaseReady = await checkDBConnection();
           if (!databaseReady) return;
         }
-        const remoteSessionDao = await import('./src/dao/remote-session-dao.js');
-        const n = await remoteSessionDao.crashOccupiedOnOfflineNodes();
-        if (n) console.log(`[server] crashed ${n} occupied remote_session(s) on offline nodes`);
+        // Keep this delayed hook for startup ordering, but only repair stale
+        // trajectory pointers. Active rows need executor session.list evidence.
       } catch (err) {
         console.warn('[server] deferred remote_session reconcile skipped:', err.message);
       }

@@ -179,6 +179,8 @@ JS_SMART_LOCATOR = '''([label]) => {
       target_kind: loc.target_kind,
       locator_scope: loc.locator_scope,
       locator_occurrence: loc.locator_occurrence,
+      field_slot: loc.field_slot,
+      display_label: loc.display_label,
       locator_verified: loc.locator_verified,
       locator_strategy: loc.locator_strategy,
       locator_fallback_reason: loc.locator_fallback_reason,

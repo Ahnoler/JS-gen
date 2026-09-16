@@ -29,6 +29,8 @@ JS_MANUAL_PART_B = r'''
       placeholder: loc.placeholder || '',
       locator_scope: loc.locator_scope || '',
       locator_occurrence: loc.locator_occurrence || 0,
+      field_slot: loc.field_slot || '',
+      display_label: loc.display_label || '',
       locator_verified: loc.locator_verified === true,
       locator_strategy: loc.locator_strategy || '',
       region_role: loc.region_role || '',

@@ -107,33 +107,33 @@ export function buildFormFieldXPathSmart({
     || /el-select/i.test(full)
     || (tagL === 'div' && /el-select/i.test(cls))
   ) {
-    leaf = "div[contains(@class,'el-select')]";
+    leaf = `div[${classTokenPred('el-select')}]`;
   } else if (
     tk === 'form_date'
     || /el-date-editor|tsscdatepicker/i.test(cls)
     || /el-date-editor/i.test(full)
   ) {
-    leaf = "div[contains(@class,'el-date-editor')]";
+    leaf = `div[${classTokenPred('el-date-editor')}]`;
   } else if (
     tk === 'form_radio'
     || /el-radio-group/i.test(cls)
     || /el-radio-group/i.test(full)
   ) {
-    leaf = "div[contains(@class,'el-radio-group')]";
+    leaf = `div[${classTokenPred('el-radio-group')}]`;
   } else if (
     tk === 'form_checkbox'
     || /el-checkbox-group/i.test(cls)
     || /el-checkbox-group/i.test(full)
   ) {
-    leaf = "div[contains(@class,'el-checkbox-group')]";
+    leaf = `div[${classTokenPred('el-checkbox-group')}]`;
   } else if (/el-cascader/i.test(cls) || /el-cascader/i.test(full)) {
-    leaf = "div[contains(@class,'el-cascader')]";
+    leaf = `div[${classTokenPred('el-cascader')}]`;
   } else if (
     tk === 'form_tree_select'
     || /el-tree-select|tsscmultitree/i.test(cls)
     || /el-tree-select|tsscmultitree/i.test(full)
   ) {
-    leaf = "div[contains(@class,'el-tree-select') or contains(@class,'tsscmultitree')]";
+    leaf = `div[${classTokenPred('el-tree-select')} or ${classTokenPred('tsscmultitree')}]`;
   } else if (
     /el-tree-select|tsscmultitree|tsscTree|tree-popover|my-popover/i.test(cls)
     || /el-tree-select|tsscmultitree|tsscTree|tree-popover|my-popover/i.test(full)

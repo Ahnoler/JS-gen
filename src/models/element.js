@@ -114,6 +114,8 @@ function copyLocatorMeta(target, source) {
     'target_kind',
     'locator_scope',
     'locator_occurrence',
+    'field_slot',
+    'display_label',
     'locator_verified',
     'locator_strategy',
     'locator_fallback_reason',

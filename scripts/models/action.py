@@ -124,6 +124,8 @@ class ElementInfo(BaseModel):
     target_kind: str = Field(default="", description="Normalized host kind (menu/form_input/...)")
     locator_scope: str = Field(default="", description="dialog|drawer|nav|table|form_item|page")
     locator_occurrence: int = Field(default=0, description="1-based occurrence among xpath matches")
+    field_slot: str = Field(default="", description="In-field same-family slot letter (A/B/…) when xpath needs [n]")
+    display_label: str = Field(default="", description="formLabel-field_slot for UI titles; not a semantic label")
     locator_verified: bool = Field(default=False, description="True only when DOM-evaluated unique")
     locator_strategy: str = Field(default="", description="xpath_smart | xpath_full")
     locator_fallback_reason: str = Field(default="", description="Why absolute was primary")
@@ -162,6 +164,10 @@ class ElementInfo(BaseModel):
             data['locator_scope'] = self.locator_scope
         if self.locator_occurrence:
             data['locator_occurrence'] = self.locator_occurrence
+        if self.field_slot:
+            data['field_slot'] = self.field_slot
+        if self.display_label:
+            data['display_label'] = self.display_label
         if self.locator_verified:
             data['locator_verified'] = True
         if self.locator_strategy:
@@ -395,6 +401,7 @@ class ActionEntry(BaseModel):
                 ]
             for meta_key in (
                 'target_kind', 'locator_scope', 'locator_occurrence',
+                'field_slot', 'display_label',
                 'locator_verified', 'locator_strategy', 'locator_fallback_reason',
                 'formLabel',
             ):

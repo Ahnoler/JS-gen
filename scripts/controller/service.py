@@ -30,6 +30,7 @@ from ..state import (
     register_page_screenshot_if_changed,
     register_popup_screenshot,
     request_phase_shot_candidate,
+    set_current_page_dims,
     set_current_page_key,
     should_skip_screenshot_action,
 )
@@ -80,6 +81,9 @@ def _wrap_action_with_screenshots(controller, browser_context):
                         before_dims = await capture_page_dims_from_page(_page)
                 except Exception:
                     before_b64 = None
+                # rect_norm 分母直通：与动作落库同一瞬间的文档尺寸。
+                # 采不到时清空，防止上一动作的陈旧尺寸跨页面误用。
+                set_current_page_dims(before_dims)
 
                 pre_dialog_b64, pre_dialog_meta = None, None
                 if action_name == 'close_dialog':
