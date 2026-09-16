@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 · Grok Bot · 原子草稿拆分边界设计 spec
+
+- 方案 B：`produces` / `dataDependsOn`；对照 #675/#676/#678/#504
+- 路径：`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`
+- 待用户审阅 spec 后再写实现计划
+
+
 ## 2026-09-15 22:15 · OpenCode — 收工：修复第四阶段重复执行与日期范围异常（回链 21:55 开工）
 
 - 完成：提交 **022f65a2**；“填写查询/筛选条件”规则回退归类为 query，运行时 query toolbar 可纠偏误判的 create/modify pending/success 门禁；AI 同阶段成功字段写入/选择及普通索引点击再次命中时直接返回 `already-operated-this-phase`，失败动作可重试、日期面板日格点击豁免、新阶段自动清空，人工录制不经过该保护。
