@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:26 · Cursor — 开工：Task 2 propose.js 接线 produces/dataDependsOn
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 2 only**（TDD：characterize 源码 pin → `propose.js` 接线 → cache/return `warnings`）
+- 范围：`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`（warnings 写入 cache 所需）、`scripts/characterization/characterize-atom-depend.mjs`、本协作日志
+- 禁入区：atomize prompt / Task 3–4 / spec 交叉引用；产品树关键词强制拆；one-confirm-per-atom 硬闸；不改 `multi_write_atom` / flow-card 闭环；他线 field_slot xpath；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话 Inline TDD；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37
+
 ## 2026-09-16 12:25 · Cursor — 收工：Task 1 atom-depend 图校验（回链 12:20 开工）
 
 - 完成：commit **`4b782ff6`** `feat(req-draft-traj): validate atom produces/dataDependsOn graph`
