@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 14:50 · Cursor — 开工：field_slot 终审 Important 修复（AI/CDP persist + offline leaf）
+
+- 进行中：终审 Important#1（inspect / resolve-by-label / JS_CAPTURE_FROM_XPATH / `_capture_element` 透传 `field_slot`/`display_label`）+ Important#2（`controls.js` input 紧 leaf 对齐 live）
+- 范围：`src/cdp/inspect-payload-script.js`、`src/cdp/resolve-by-label.js`、`src/cdp/locator-builders/controls.js`、`scripts/controller/actions/js_snippets/fill_core.py`、`scripts/controller/actions/_helpers.py`、characterization pin（若需）、本协作日志
+- 禁入区：SPA 仓；他线 atom-depend / rect_norm；不手改 `_locator_helpers_js.py`（若改 helpers 源则走 gen）；`config/` WIP
+- 方式：SDD 终审 fix 子代理；主会话验收后 commit + push
+
 ## 2026-09-16 12:32 · Cursor — 收工：Task 4 spec 交叉引用；原子拆分边界计划 T1–T4 完成（回链 12:31 开工）
 
 - 完成：2026-09-07 §3 与 2026-09-09 单卡闭环交叉引用；2026-09-15 状态 → `已审阅；实现按 2026-09-16 plan（PR #37）`
