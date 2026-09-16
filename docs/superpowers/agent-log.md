@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 14:xx · OpenCode — 收工：修复 tmp/cmds 后端发版 CMD 闪退（回链本次开工）
+
+- 根因：CMD 的 Git Bash 缺失提示放在括号块内，文本中的未转义 `1)`/`2)` 会被 CMD 预解析为语法错误；即使当前 `D:\Software\Git\bin\bash.exe` 存在且路径已解析，脚本仍在上传前闪退。
+- 完成：本机 `tmp/cmds/release-backend.cmd` 改为从 `git --exec-path` 推导非标准 Git for Windows 安装根目录，并用跳转式错误提示规避括号块预解析；启动时显示仓库根目录与实际 Bash 路径。
+- 验收：真实 `release-backend.cmd check` 已通过 Git Bash 探测，打印 `D:\Software\Git\bin\bash.exe`，以 `20260916-140054` 成功完成打包并生成 `dist/JS-gen-control-plane-20260916-140054.tar.gz`（370 项）；`check` 模式按设计跳过 SCP/SSH，未改服务器。
+- 使用：双击 `tmp/cmds/release-backend.cmd` 即执行完整发版；仅需本地验证时从 CMD 运行 `tmp\cmds\release-backend.cmd check`。本机忽略工具不入库；既有 `config/.db-whitelist-seen` 未触碰。
+
 ## 2026-09-16 11:xx · OpenCode — 开工：修复 tmp/cmds 后端发版 CMD 闪退
 
 - 进行中：排查 `tmp/cmds/release-backend.cmd` 双击后窗口闪退且未上传部署的问题，复现 CMD 执行并修复新位置的启动/路径/依赖检测。
