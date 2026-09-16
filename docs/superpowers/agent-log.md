@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 21:40 · Cursor — 开工：能力内聚结构硬闸 Task 3（materializeLlmAtom 接线 + C3）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 3**（TDD：propose-level C1/C3/C4/C2 pins RED → `materializeLlmAtom` 在 `normalizeProduces` 之后、`assertAtomProvenance` 之前调用 `assertCapabilityCohesion` GREEN）。`countPersistConfirms > 1` 保持 sanitize 后第一拒绝；不把 cohesion 放进 `validateAtomDependGraph`。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 propose-level pins）、`src/services/req-draft-traj/propose.js`（import `assertCapabilityCohesion` + `materializeLlmAtom` 接线）、本协作日志
+- 禁入区：`propose-cache.js`（Task 4 cache 4→5）；`atom-depend.js`；`flow-card-guide.js`；`scripts/prompts/**`；`verify-all.sh`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 4+ prompt / api-docs / samples
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
 ## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 2（回链 21:15 开工）
 
 - 完成：`synthesizeFallbackProduceKey`（空/`'  '`→`atom_output`，否则 `` `${trim}产物` ``）+ `assertCapabilityCohesion` 序列通过后 title-as-key（`length===1` 且 `produces[0]===trim(title)` → `produces_eq_title`；空 produces / title+另一 key 仍 ok）+ `propose.js` `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`（未豁免 fallback、未保留 `produces:[title]`）。feat **`d2c6bfbb`**。开工声明 `2dce38a0`。
