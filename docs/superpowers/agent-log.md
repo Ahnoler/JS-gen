@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 11:xx · OpenCode — 开工：迁移本机后端发版 CMD 至 tmp/cmds
+
+- 进行中：将仅供本机 Windows 双击发版的 `release-backend.cmd` 移到 `tmp/cmds/`，并使其按自身位置回溯仓库根目录后继续调用共用的打包与远端部署脚本。
+- 范围：`release-backend.cmd`→`tmp/cmds/release-backend.cmd`、本协作日志；`pack-control-plane.sh` 与 `release-backend-remote.sh` 保留根目录，因 README/非 Windows 发版流程可直接共用。
+- 禁入区：`src/`、`config/`、`migrations/`、`scripts/`、线上服务器、`config/.db-whitelist-seen` 未跟踪运行文件及其他会话 WIP。
+- 方式：移动后由 CMD 先解析仓库根目录，再以绝对路径定位 Bash 打包脚本和远端 shell 脚本；验证路径解析、打包命令和 Shell 语法，不执行上传或服务器重启。
+
 ## 2026-09-16 11:xx · OpenCode — 收工：修复后端一键发布脚本跨秒误拒绝（回链本次开工）
 
 - 完成：commit **ebd26411**；`release-backend.cmd` 将启动时生成的发布时间戳传给 `pack-control-plane.sh`，从而使压缩包名与上传前的同一时间戳校验一致，跨秒打包不再误报 stale pack。
