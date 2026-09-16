@@ -1,7 +1,7 @@
 # Design: 表单字段内同族控件 xpath 消歧（field_slot）
 
 **日期**：2026-09-16  
-**状态**：草案（待用户审阅后写 plan）  
+**状态**：已批准；计划 [`../plans/2026-09-16-form-field-intra-slot-xpath.md`](../plans/2026-09-16-form-field-intra-slot-xpath.md)  
 **触发**：产品库「产品公共要素配置 → 保证金比例」单字段内多 input/select，相对 xpath 多命中  
 **相关**：xpath 栈 skill / `src/cdp/page-locator-helpers.js`（`formFieldXpathSmartOf`、`buildLocatorSnap`、`pinOccurrence`）；前端 `ui-auto-recording-agent-vue-master/vue-project`（`pickParamText` / `getStepTitle`）  
 **用户裁决**：① 消歧方案 **A**（字段内序号 + class-token）；② 展示用独立字段 **`field_slot`**，不改写 `label_text`；③ **JS-gen + SPA 同任务交付**

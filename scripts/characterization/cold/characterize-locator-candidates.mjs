@@ -96,8 +96,21 @@ function ok(name) {
     tag: 'div',
     className: 'el-select',
   });
-  assert.ok(xp.includes("div[contains(@class,'el-select')]"));
+  assert.ok(xp.includes('div[' + classTokenPred('el-select') + ']'));
   ok('form field select');
+}
+
+{
+  const xp = buildFormFieldXPathSmart({
+    label: '保证金比例',
+    tag: 'div',
+    className: 'el-select',
+    occurrence: 2,
+  });
+  assert.ok(xp.startsWith('('));
+  assert.ok(xp.endsWith(')[2]'));
+  assert.ok(xp.includes(classTokenPred('el-select')));
+  ok('form field select intra-item occurrence');
 }
 
 {
@@ -105,7 +118,7 @@ function ok(name) {
     label: '日期',
     className: 'el-date-editor',
   });
-  assert.ok(xp.includes("div[contains(@class,'el-date-editor')]"));
+  assert.ok(xp.includes('div[' + classTokenPred('el-date-editor') + ']'));
   ok('form field date');
 }
 

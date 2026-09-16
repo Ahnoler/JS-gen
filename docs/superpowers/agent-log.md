@@ -14,6 +14,40 @@
 - 禁入区：共享发布 shell 脚本、`src/`、`config/`、`migrations/`、线上发布目录和其他会话 WIP；不执行真实上传、迁移、重启或回滚。
 - 方式：以 CMD 包装运行捕获错误，验证根目录与 Git Bash 发现逻辑；修复后运行到安全的打包前确认边界，确保失败窗口保留并输出可诊断错误。
 
+## 2026-09-16 14:15 · ZCode — 开工：agent-log 归档（09-11 及更早 → archive/logs/）
+
+- 进行中：2026-09-16 14:15；用户指令：5 天前（2026-09-11 及更早）条目归档至 `docs/superpowers/archive/logs/`
+- 范围：本文件（顶部插入本条目 + 截留 09-12 起条目 + 归档指引行）、`docs/superpowers/archive/logs/agent-log-archive-2026-09-11.md`（新建）
+- 禁入区：他线工作区 WIP（`src/services/partner-platform.js`、`transaction-export-v3-*.js`、`plans/2026-09-09-flow-card-guided-propose.md`、`reports/2026-09-10-benchmark-leaderboard-scan.md`、`scripts/maintenance/prune-same-xpath-menu-twins.mjs`、`.cursor/`、`config/`）；本文件他线在途条目原样保留不删
+- 方式：按既有归档规范（archive-09-06 头部格式）原样分流不改写；开工/收工各一 commit + push
+
+## 2026-09-16 14:11 · ZCode — 开工：推送坐标归一化修复（录制侧直通尺寸 + 导出侧双兜底）
+
+- 进行中：14:11；承接 14:00 排查条目，用户批准三处修复。修复 1（录制侧）：state.py 加 `_CURRENT_PAGE_DIMS` 直通 + service.py wrapper 每动作前注入已采 before_dims + `_stamp_rect_norm` 页面路径先读直通再回落注册表 + after-action 注册 meta 补 contentWidth/Height；修复 2（导出侧）：弹窗像素回退减法后再除弹窗 rect 宽高（15 步存量立即转正）；修复 3（导出侧）：页面级像素回退从截图 metadataJson 收集 contentWidth/Height 作分母（46 步存量）
+- 范围：`scripts/state.py`、`scripts/controller/service.py`、`src/services/transaction-export-v3-properties.js`、`src/services/transaction-export-v3.js`（如需传截图 meta）、`scripts/characterization/characterize-export-v3.mjs`（pin 期望同 commit 更新）、verify-all 注册行（如加门禁）、本文件、tmp/rect-*.mjs（审计脚本）
+- 禁入区：Cursor 线热区（locator-candidates/parity/form-field-intra-slot 及其 fixture、`formFieldXpathSmartOf` 相关）、click 族（click_action_engine/_misc/replay_form_action）、`.cursor/`、`data/kb/**` 只读、他线 5 红（step-highlight/layer-tree/export-v3/confirm-notification/network-capture）不修——**但 characterize-export-v3 的 pin 期望更新属本修复必要配套，触碰时只在 rect 相关断言内动**
+- 方式：三修复分 commit（录制侧一个、导出侧一个、pin/门禁一个）→ 每步 verify-all 比对基线红 → 重录小轨迹湿测 → 30 轨迹审计脚本复跑确认像素回退清零
+
+## 2026-09-16 14:00 · ZCode — 排查：批量推送坐标非归一化（根因=录制侧 rect_norm 时序缺口，非历史遗留）
+
+- 结论：**不是历史遗留数据**（最新 09-15 的 traj 835/829 同样命中），**也不是导出侧没用归一化算法**（30 条可推轨迹 224 步中 163 步 rect_norm 正常直出）。真因=录制侧 `_stamp_rect_norm`（state.py:293）依赖 `_PAGE_LEVEL_SHOTS` 注册表 meta 作分母，两条时序断点致跳过不写：**A**（主导）`register_page_screenshot_if_changed` 的 after-action 注册 meta 只有 phaseNumber/capturedAt **缺 contentWidth/Height**（state.py:510），页面首动作起整个 phase 内全部跳过，直到 phase-end `register_current_page_screenshot` 才补尺寸——traj 823 phase1 全 5 步 P、phase2 步 8 N 实证；**B**（弹窗）弹窗 shot 在动作后注册（service.py:138-147），弹窗内首动作查不到 → 跳过（traj 823 ph3 st9 / 835 st23131）
+- 证据：`tmp/rect-audit2.mjs`（30 轨迹覆盖审计 163N/61P）、`tmp/rect-seq.mjs`（823 逐步 N/P 序列 vs 页面/弹窗/phase 时序）、offender 全有 page_bbox 排除 bbox 缺失
+- 未修代码（用户未拍板）；修复方向：A=after-action meta 带 before_dims（service.py wrapper 已现成采集）+ 动作前 dims 直通兜底每页首步；B=弹窗首步留缺（导出侧像素回退+弹窗减法仍正确，仅格式非 0-1）
+- 提交本文件顺带携带他线条目：无
+
+## 2026-09-16 13:50 · Cursor — 收工：表单字段内同族控件 xpath 消歧（回链 12:15 开工）
+
+- 完成：方案 A 落地。`formFieldXpathSmartOf` 改 class-token leaf + 同族 `(item//leaf)[n]`；snap 写 `field_slot`/`display_label`；人工/AI 透传；SPA `pickParamText` 拼 `保证金比例-A`。计划 `docs/superpowers/plans/2026-09-16-form-field-intra-slot-xpath.md`。
+- 验收：`characterize-locator-candidates` / `characterize-locator-parity` / **`characterize-form-field-intra-slot` OK**（双 select/双 input 唯一 + 单字段无 slot）。SUT 浏览器会话已关，保证金比例真机湿测未复跑（离线 fixture 复现同构）。
+- 遗留移交：前端仓 `ui-auto-recording-agent-vue-master/vue-project` 同步改了 trajectory-tree / step-detail / ElementJson（勿提交该仓 `vite.config.ts` WIP）；产品库页人工/AI 录一笔「保证金比例」确认列表标题与回放。
+
+## 2026-09-16 11:xx · OpenCode — 开工：修复 tmp/cmds 后端发版 CMD 闪退
+
+- 进行中：排查 `tmp/cmds/release-backend.cmd` 双击后窗口闪退且未上传部署的问题，复现 CMD 执行并修复新位置的启动/路径/依赖检测。
+- 范围：仅本机忽略文件 `tmp/cmds/release-backend.cmd`、本协作日志；只读参考仓库根目录共享 `pack-control-plane.sh` 与 `release-backend-remote.sh`。
+- 禁入区：共享发布 shell 脚本、`src/`、`config/`、`migrations/`、线上发布目录和其他会话 WIP；不执行真实上传、迁移、重启或回滚。
+- 方式：以 CMD 包装运行捕获错误，验证根目录与 Git Bash 发现逻辑；修复后运行到安全的打包前确认边界，确保失败窗口保留并输出可诊断错误。
+
 ## 2026-09-16 · OpenCode — 收工：修复控制面重启后的录制推流会话恢复（回链本次开工）
 
 - 完成：commit **5fd439fb**。控制面不再在启动后按 executor 节点暂时 offline 状态批量 crash `remote_session`；执行机注册后以 `session.list` 的 `agent_session_id` 为会话存活真源，只有权威查询缺失才 crash 并清交易所有权。

@@ -41,6 +41,19 @@ _CURRENT_PAGE_KEY: str = ''
 # 同标题多实例弹窗（如连开三次「产品」弹窗）仅靠标题无法区分，缺 anchor 会让
 # 导出侧标题兜底全部落到最后一个弹窗（traj 499 实证）。
 _CURRENT_POPUP_KEY: str = ''
+# 动作执行瞬间的文档滚动尺寸（{contentWidth, contentHeight}），由 wrapper 在采集
+# before_b64 的同一时刻注入。rect_norm 页面路径优先用它作分母——注册表里的
+# 页面 shot 可能尚未注册（phase 首动作）或 meta 缺尺寸（after-action 注册），
+# 直通值与 page_bbox 同一瞬间，永远可用。
+_CURRENT_PAGE_DIMS: dict = {}
+
+
+def set_current_page_dims(dims: dict | None):
+    """Set the document dims captured at the same instant as page_bbox.
+    注入与 page_bbox 同一时刻采集的文档尺寸（rect_norm 分母直通）。
+    """
+    global _CURRENT_PAGE_DIMS
+    _CURRENT_PAGE_DIMS = dims if isinstance(dims, dict) else {}
 
 # Actions that never become replay steps — skip before/after capture.
 # Shared with scripts/script_assembler.py (imported there).
@@ -146,10 +159,11 @@ def reset_page_level_shots():
     """Clear the page-level screenshot registry when a recording session (re)starts.
     在录制会话（重新）开始时清空页面级截图注册表。
     """
-    global _PAGE_LEVEL_SHOTS, _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY
+    global _PAGE_LEVEL_SHOTS, _CURRENT_PAGE_KEY, _CURRENT_POPUP_KEY, _CURRENT_PAGE_DIMS
     _PAGE_LEVEL_SHOTS = {}
     _CURRENT_PAGE_KEY = ''
     _CURRENT_POPUP_KEY = ''
+    _CURRENT_PAGE_DIMS = {}
 
 
 def capture_screenshots_enabled() -> bool:
@@ -337,11 +351,16 @@ def _stamp_rect_norm(el: dict) -> None:
         except (KeyError, TypeError, ValueError):
             return
     else:
+        # 直通分母优先（与 page_bbox 同一瞬间采集）；注册表 shot 可能未注册
+        # （phase 首动作）或 meta 缺尺寸（after-action 注册只写 phaseNumber）。
+        dims = _CURRENT_PAGE_DIMS or {}
         shot = _PAGE_LEVEL_SHOTS.get(_CURRENT_PAGE_KEY)
         meta = (shot or {}).get('meta') or {}
+        if not (dims.get('contentWidth') and dims.get('contentHeight')):
+            dims = meta
         try:
-            w = float(meta['contentWidth'])
-            h = float(meta['contentHeight'])
+            w = float(dims['contentWidth'])
+            h = float(dims['contentHeight'])
         except (KeyError, TypeError, ValueError):
             return
         ox, oy = 0.0, 0.0
@@ -501,13 +520,18 @@ async def register_page_screenshot_if_changed(
     if after_key:
         _CURRENT_PAGE_KEY = after_key
         if after_key not in _PAGE_LEVEL_SHOTS and before_key == after_key and before_b64:
+            after_meta = {'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'after-action'}
+            # 补文档尺寸：缺尺寸的注册 shot 无法作 rect_norm 分母（页面路径直接跳过）。
+            if isinstance(before_dims, dict) and before_dims.get('contentWidth') and before_dims.get('contentHeight'):
+                after_meta['contentWidth'] = int(before_dims['contentWidth'])
+                after_meta['contentHeight'] = int(before_dims['contentHeight'])
             _register_page_level_shot(
                 level_type='page',
                 level_key=after_key,
                 parent_level_key=None,
                 display_name=after_name,
                 png_b64=before_b64,
-                meta={'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'after-action'},
+                meta=after_meta,
             )
             _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS[after_key])
     return after_key, after_name
