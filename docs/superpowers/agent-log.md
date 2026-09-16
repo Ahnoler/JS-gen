@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 16:37 · OpenCode — 开工：回放 err-search-first 误拦截（STC flags 回写共享 store）
+
+- 进行中：多步一起回放时 `click_table_row_radio` 失败根因——回放循环成功分支从不把 search_then_click 的 STC flags 写入共享 `business_data_store`（`fill` 走新 `{}` store、`click_button('查询')` 走 classmethod 无 store）→ 语意路径被守卫误拦 `err-search-first`，回退 durable 又找不到行；修复=回放循环成功后标记 fill/查询 标记位
+- 范围：`scripts/controller/actions/search_then_click_guard.py`（新 helper）、`scripts/controller/actions/_replay.py`(接线）、`scripts/characterization/cold/characterize-search-then-click-guard.py`（pin）、本协作日志
+- 禁入区：SPA 仓、`tmp/cmds`、`config/` WIP；`scripts/cdp/page-locator-helpers.js` 及生成物；其他会话 field_slot/req-draft-traj/persist-boundary 热区
+- 方式：主会话 Inline（先 RED pin 再最小实现）；完成后跑 verify-all 门禁；本分支 `uara_V1.2`
+
 ## 2026-09-16 16:25 · Cursor — 收工：product-mgmt wet propose 多【确定】误合并（回链 16:05 开工）
 
 - 完成：`b8416216` RED pin；`bc9c1d82` persist 边界 + `multi_persist_task_draft` 闸；review follow-up：fallback 亦看 buttons、`countPersistConfirms` 不把裸「确定」当二次保存、`PROPOSE_CACHE_VERSION` 2→3
