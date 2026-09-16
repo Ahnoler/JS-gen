@@ -5,6 +5,9 @@
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import * as registry from '../executor-registry.js';
 import * as slotLease from '../executor-slot-lease.js';
+import * as remoteSessionDao from '../dao/remote-session-dao.js';
+import { listExecutorSessions, sendToExecutor } from '../executor-session-client.js';
+import { restoreLiveBindingFromRow } from './remote-session-state.js';
 import { clearTrajectoryRuntimesForNode } from './trajectory-service.js';
 import { state } from '../state.js';
 import {
@@ -187,4 +190,97 @@ export async function sweepStale(timeoutMs) {
     registry.detach(nodeUuid, { immediate: true });
   }
   return stale;
+}
+
+/**
+ * Reconcile persisted remote sessions with the sessions actually held by an executor.
+ * A control-plane restart must not infer session death from the node heartbeat alone.
+ * @param {{ id: number, nodeUuid: string }} node executor node record
+ * @returns {Promise<{ kept: number, crashed: number, bibReattached: number, skipped?: string }>} reconcile result
+ */
+export async function reconcileRemoteSessions(node) {
+  if (!node?.id || !node.nodeUuid) return { kept: 0, crashed: 0, bibReattached: 0 };
+
+  let liveSessions;
+  try {
+    liveSessions = await listExecutorSessions(node.nodeUuid, 8000);
+  } catch (err) {
+    // An unreachable executor is not proof that its sessions are gone.
+    return { kept: 0, crashed: 0, bibReattached: 0, skipped: err.message };
+  }
+
+  const liveByAgent = new Map(
+    liveSessions
+      .filter((session) => session?.sessionId)
+      .map((session) => [String(session.sessionId), session]),
+  );
+  const rows = await remoteSessionDao.listByNode(node.id, ['active', 'idle']);
+  let kept = 0;
+  let crashed = 0;
+  let bibReattached = 0;
+
+  for (const row of rows) {
+    const agentId = row.agentSessionId ? String(row.agentSessionId) : '';
+    const live = agentId ? liveByAgent.get(agentId) : null;
+    if (!live) {
+      // Only an authoritative session.list miss permits crash cleanup.
+      await remoteSessionDao.close(row.id, { crashed: true });
+      const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
+      await clearOwnershipOnClose(row.id).catch(() => {});
+      crashed += 1;
+      continue;
+    }
+
+    kept += 1;
+    restoreLiveBindingFromRow(row, { nodeUuid: node.nodeUuid, attached: row.status === 'active' });
+    if (row.trajectoryId != null && agentId) {
+      await restoreTrajectoryRuntime(row, live, node.nodeUuid);
+    }
+    if (row.status !== 'active' || !agentId) continue;
+
+    try {
+      sendToExecutor(node.nodeUuid, 'session.attach_bib', {
+        sessionId: agentId,
+        remoteSessionUuid: row.sessionUuid,
+        viewportW: row.viewportW || 1600,
+        viewportH: row.viewportH || 900,
+        deviceScaleFactor: row.deviceScaleFactor || 1,
+      });
+      bibReattached += 1;
+    } catch (err) {
+      console.warn(`[executor] BiB reattach failed for remote_session #${row.id}:`, err.message);
+    }
+  }
+
+  return { kept, crashed, bibReattached };
+}
+
+/**
+ * Rebuild the minimal control-plane session/runtime identity lost during restart.
+ * @param {object} row remote_session row
+ * @param {object} live executor session descriptor
+ * @param {string} nodeUuid executor node UUID
+ * @returns {Promise<void>}
+ */
+async function restoreTrajectoryRuntime(row, live, nodeUuid) {
+  const [{ registerTrajectorySession }, { bindTrajectoryManualPersist }] = await Promise.all([
+    import('./trajectory/trajectory-runtime.js'),
+    import('./trajectory/trajectory-attach-service.js'),
+  ]);
+  const tid = Number(row.trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) return;
+  const runtime = registerTrajectorySession(tid, String(row.agentSessionId), {
+    nodeUuid,
+    slotIndex: row.slotIndex,
+    model: live.model || null,
+    cdpPort: live.cdpPort ?? null,
+    cdpReady: true,
+  }, { remoteSessionId: row.id });
+  slotLease.confirmLease({
+    sessionId: String(row.agentSessionId),
+    nodeUuid,
+    slotIndex: row.slotIndex ?? live.slotIndex ?? 0,
+    trajectoryId: tid,
+  });
+  bindTrajectoryManualPersist(tid, String(row.agentSessionId), runtime);
 }

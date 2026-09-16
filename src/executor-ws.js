@@ -78,58 +78,15 @@ async function handleRegister(ws, payload) {
     status: node.status,
   });
 
-  // Rebuild in-memory BiB bindings for active remote_sessions on this node
-  // (control-plane restart otherwise leaves DB rows orphaned from liveByRemoteSessionId).
+  // Reconcile DB rows against executor truth before rebuilding bindings. The executor
+  // can keep Python/Chrome alive while the control plane is restarting.
   try {
-    const remoteSessionDao = await import('./dao/remote-session-dao.js');
-    const remoteSessionService = await import('./services/remote-session-service.js');
-    const rows = await remoteSessionDao.listByNode(node.id, ['active']);
-    /** Per trajectory keep only the newest active row — close older duplicates in DB. */
-    const pickRows = [];
-    const byTraj = new Map();
-    for (const row of rows) {
-      const tid = row.trajectoryId != null ? Number(row.trajectoryId) : null;
-      if (Number.isFinite(tid) && tid > 0) {
-        const prev = byTraj.get(tid);
-        if (!prev || row.id > prev.id) byTraj.set(tid, row);
-      } else {
-        pickRows.push(row);
-      }
-    }
-    pickRows.push(...byTraj.values());
-    const keepIds = new Set(pickRows.map((r) => r.id));
-
-    let closedStale = 0;
-    for (const row of rows) {
-      if (keepIds.has(row.id)) continue;
-      const tid = row.trajectoryId != null ? Number(row.trajectoryId) : null;
-      if (!(Number.isFinite(tid) && tid > 0)) continue;
-      try {
-        await remoteSessionDao.close(row.id, { crashed: false });
-        remoteSessionService.clearLiveBinding(row.id);
-        await remoteSessionService.unmountTrajectoriesFromRemoteSession(row.id).catch(() => {});
-        closedStale += 1;
-      } catch (err) {
-        console.warn(`[executor-ws] close stale remote_session #${row.id} failed:`, err.message);
-      }
-    }
-
-    let restored = 0;
-    for (const row of pickRows) {
-      const binding = remoteSessionService.restoreLiveBindingFromRow(row, {
-        nodeUuid: node.nodeUuid,
-        attached: true,
-      });
-      if (binding?.attached) restored += 1;
-    }
-    if (restored || closedStale) {
-      console.log(
-        `[executor-ws] restored ${restored} live BiB binding(s) for ${nodeUuid}`
-        + (closedStale ? ` (closed ${closedStale} stale duplicate(s))` : ''),
-      );
+    const result = await executorService.reconcileRemoteSessions(node);
+    if (result.kept || result.crashed || result.bibReattached) {
+      console.log(`[executor-ws] reconciled ${nodeUuid}:`, result);
     }
   } catch (err) {
-    console.warn('[executor-ws] live binding restore skipped:', err.message);
+    console.warn('[executor-ws] remote session reconcile skipped:', err.message);
   }
 
   // Orphan reconcile: after a control-plane restart, live executor sessions

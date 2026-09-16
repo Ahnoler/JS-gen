@@ -20,6 +20,14 @@ check(selectOrphanSessions('not-an-array', []).length === 0, 'non-array input to
 // source pins
 const wsSrc = readFileSync(join(ROOT, 'src', 'executor-ws.js'), 'utf-8');
 check(wsSrc.includes("reconcileOrphanSessions(") && wsSrc.includes("orphan executor session(s)"), 'executor-ws.js calls reconcileOrphanSessions in handleRegister');
+const nodeSvcSrc = readFileSync(join(ROOT, 'src', 'services', 'executor-node-service.js'), 'utf8');
+check(nodeSvcSrc.includes('reconcileRemoteSessions') && nodeSvcSrc.includes('listExecutorSessions'), 'executor node reconciliation uses executor session.list truth');
+check(nodeSvcSrc.includes('remoteSessionDao.close(row.id, { crashed: true })'), 'only missing executor sessions are crashed');
+check(nodeSvcSrc.includes('slotLease.confirmLease') && nodeSvcSrc.includes('registerTrajectorySession'), 'matched sessions restore runtime and slot lease');
+check(nodeSvcSrc.includes("sendToExecutor(node.nodeUuid, 'session.attach_bib'"), 'active matched sessions request idempotent BiB reattach');
+check(wsSrc.includes('reconcileRemoteSessions(node)'), 'executor registration performs remote session reconciliation');
+const serverSrc = readFileSync(join(ROOT, 'server.mjs'), 'utf8');
+check(!serverSrc.includes('crashOccupiedOnOfflineNodes()'), 'server boot does not bulk-crash sessions from offline node status');
 const svcSrc = readFileSync(join(ROOT, 'src', 'services', 'executor-orphan-session-service.js'), 'utf-8');
 check(svcSrc.includes('keepBrowser: true'), 'orphan close keeps browser (keepBrowser: true)');
 check(svcSrc.includes('s.ready === true'), 'ready guard protects in-flight session.open');
