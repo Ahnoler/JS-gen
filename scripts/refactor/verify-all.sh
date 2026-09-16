@@ -174,6 +174,7 @@ run "characterize-kb-recall-eval" node scripts/characterization/characterize-kb-
 run "characterize-atom-keydata" node scripts/characterization/characterize-atom-keydata.mjs
 run "characterize-atom-depend" node scripts/characterization/characterize-atom-depend.mjs
 run "characterize-persist-boundary" node scripts/characterization/characterize-persist-boundary.mjs
+run "characterize-capability-cohesion" node scripts/characterization/characterize-capability-cohesion.mjs
 run "characterize-network-capture" node scripts/characterization/characterize-network-capture.mjs
 run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-staging.py
 run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py

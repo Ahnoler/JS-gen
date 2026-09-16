@@ -12,10 +12,11 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
 /**
  * Cache format version — bump on breaking cache shape **or** persist-boundary
  * semantics that invalidate previously proposed atoms; commit rejects caches
- * whose version differs (STALE_PROPOSE_CACHE). v4: `missing_depend_fields` is a
- * hard reject (empty produces after materialize); atomize prompt XML contract.
+ * whose version differs (STALE_PROPOSE_CACHE). v5: capability-cohesion
+ * structural gate (`multi_capability_task_draft`) + title-as-key reject
+ * (`produces_eq_title`).
  */
-export const PROPOSE_CACHE_VERSION = 4;
+export const PROPOSE_CACHE_VERSION = 5;
 
 /**
  * Read cached propose result from a module directory.

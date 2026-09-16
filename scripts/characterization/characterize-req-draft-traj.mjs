@@ -560,8 +560,8 @@ async function main() {
   });
 
   const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
-  run('PROPOSE_CACHE_VERSION is 4 (missing_depend_fields hard reject)', () => {
-    assert.equal(PROPOSE_CACHE_VERSION, 4);
+  run('PROPOSE_CACHE_VERSION is 5 (capability-cohesion + title-as-key reject)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 5);
   });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
