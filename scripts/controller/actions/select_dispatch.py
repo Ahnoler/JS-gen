@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .js_snippets.base import JS_FIELD_ITEM_CANDIDATES
+from .js_snippets.base import JS_FIELD_ITEM_PICK
+from .js_snippets.container import JS_GET_CONTAINER
 
 _TSSC_TARGET = frozenset({
     "form_tssc_multi_select",
@@ -21,19 +22,27 @@ _TREE_KIND = frozenset({"tree-select", "tree", "tree_select"})
 _JS_LIVE_TSSC = '''([lab]) => {
   const want = String(lab || '').replace(/\\s+/g, ' ').trim();
   if (!want) return false;
-  const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
-  // 精确匹配优先：前缀兄弟（如「组件要素名称」）DOM 序在前时不得以兄弟的
-  // 无 tssc 控件短路判定——先解析到真正会被操作的字段，再验其控件。
-  const hit = (root) => {
-    const item = candidatesOf(root, want)[0];
-    return item ? !!(item.querySelector('.tssc-multi-select')) : false;
+  const container = ''' + JS_GET_CONTAINER + ''';
+  const pick = ''' + JS_FIELD_ITEM_PICK + ''';
+  // 与动作体 findFieldItem 同源解析（JS_FIELD_ITEM_PICK）：可见精确 → 隐藏精确
+  // → 唯一包含兜底，多命中=歧义。作用域对齐动作体：JS_GET_CONTAINER 优先，
+  // 未中补扫可见 dialog/drawer（替换旧的 document 全域 [0] 盲取——隐藏同名
+  // tssc 节点曾致 live 判定假阳性，与 fill 侧 err-use-tssc-multi-select 互相矛盾）。
+  // 解析失败或歧义 → false（非 tssc 路径）。
+  const resolveField = () => {
+    const hit = pick(container, want);
+    if (hit && hit.ambiguous) return { ambiguous: true };
+    if (hit && hit.item) return { item: hit.item };
+    for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+      if (dlg.offsetParent === null) continue;
+      const h2 = pick(dlg, want);
+      if (h2 && h2.ambiguous) return { ambiguous: true };
+      if (h2 && h2.item) return { item: h2.item };
+    }
+    return null;
   };
-  if (hit(document)) return true;
-  for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
-    if (dlg.offsetParent === null) continue;
-    if (hit(dlg)) return true;
-  }
-  return false;
+  const field = resolveField();
+  return (field && field.item) ? !!(field.item.querySelector('.tssc-multi-select')) : false;
 }'''
 
 

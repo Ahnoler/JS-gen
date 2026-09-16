@@ -191,6 +191,12 @@ def maybe_record_picker_closed(
     record_evidence(business_data_store, 'picker_closed', 'dialog-closed')
     record_evidence(business_data_store, 'dialog_confirmed', 'picker-closed')
     mark_parent_form_stale(business_data_store, parent_container)
+    # A popup region remembered in _phase_section (e.g. via save_retry_scope
+    # inside the picker) is by definition stale once the popup closes — clear
+    # it so the next save re-resolves against the live DOM.
+    from scripts.controller.actions.section_scope import clear_phase_section
+
+    clear_phase_section(business_data_store)
     return True
 
 def next_action_hint(business_data_store: dict | None) -> str:

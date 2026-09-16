@@ -125,6 +125,40 @@ JS_FIELD_ITEM_CANDIDATES = '''(root, label, allowReverse) => {
 }'''
 
 
+# Shared live-probe field resolver (fill_engine kind-probe x2, select_dispatch
+# _JS_LIVE_TSSC): visibility-bucketed pick on top of JS_FIELD_ITEM_CANDIDATES,
+# semantically aligned with the action body tssc_multi_select.findFieldItem —
+# visible-exact -> hidden-exact -> unique includes() fallback; multi-hit
+# includes() returns an ``ambiguous`` marker instead of silently taking the
+# first DOM hit. Scope is the caller's job (JS_GET_CONTAINER first + visible
+# dialog/drawer rescan), same as the action body.
+# Why: the old probes took candidatesOf(...)[0] — first DOM node, document-wide,
+# hidden nodes included — so a hidden same-name node carrying .tssc-multi-select
+# made fill_form_field report err-use-tssc-multi-select while select_option's
+# findFieldItem resolved the real plain input and said no-tssc-multi-select
+# (真机日志 2026-09-16：同字段两探针互相矛盾，agent 反复试错).
+JS_FIELD_ITEM_PICK = '''(root, label, allowReverse) => {
+    const norm = ''' + JS_FIELD_LABEL_NORM + ''';
+    const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+    const want = norm(label);
+    if (!want) return null;
+    const visOf = (el) => el.offsetParent !== null || el.getClientRects().length > 0;
+    const exactVisible = [];
+    const exactAny = [];
+    const fuzzy = [];
+    for (const item of candidatesOf(root, label, allowReverse)) {
+        const lab = norm(item.querySelector('.el-form-item__label')?.textContent);
+        if (lab === want) (visOf(item) ? exactVisible : exactAny).push(item);
+        else fuzzy.push({ item, lab });
+    }
+    if (exactVisible.length) return { item: exactVisible[0], via: 'exact' };
+    if (exactAny.length) return { item: exactAny[0], via: 'exact-hidden' };
+    if (fuzzy.length === 1) return { item: fuzzy[0].item, via: 'includes-unique' };
+    if (fuzzy.length > 1) return { ambiguous: fuzzy.map((f) => f.lab) };
+    return null;
+}'''
+
+
 JS_LOCATOR = '''(label) => {
     const xpath = (el) => {
         if (!el || el === document || el.nodeType !== 1) return '';

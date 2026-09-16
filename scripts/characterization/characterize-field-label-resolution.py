@@ -23,6 +23,19 @@ Single source: ``js_snippets/base.py`` ``JS_FIELD_LABEL_NORM`` +
 ``JS_FIELD_ITEM_CANDIDATES``. This file pins (a) the shared resolvers' structure,
 (b) that every consumer actually interpolates them, (c) that the old
 first-includes-hit literals are gone, and (d) live behaviour on a real browser.
+
+2026-09-16 probe alignment: the live tssc/tree kind-probes (fill_engine record +
+replay, select_dispatch._JS_LIVE_TSSC) took ``candidatesOf(...)[0]`` — first DOM
+node, document-wide, hidden nodes included — so a hidden same-name node carrying
+``.tssc-multi-select`` made fill_form_field report err-use-tssc-multi-select
+while select_option's action body (``tssc_multi_select.findFieldItem``: visible
+exact → hidden exact → unique-includes fallback, multi-hit = ambiguous) resolved
+the real plain input and said no-tssc-multi-select. Same field, two probes,
+contradicting verdicts → agent trial-and-error loop. This file also pins (e)
+that those probes resolve through the shared ``JS_FIELD_ITEM_PICK``
+(visibility buckets + ambiguous marker, same bucket markers/order as
+``findFieldItem``) with action-body scope: ``JS_GET_CONTAINER`` first + visible
+dialog/drawer rescan.
 """
 from __future__ import annotations
 
@@ -47,6 +60,8 @@ FILL_CORE = (JS / "fill_core.py").read_text(encoding="utf-8")
 SCAN_FORM = (JS / "scan_form.py").read_text(encoding="utf-8")
 SELECT_DISPATCH = (ROOT / "scripts/controller/actions/select_dispatch.py").read_text(encoding="utf-8")
 FILL_ENGINE = (ROOT / "scripts/controller/actions/fill_engine.py").read_text(encoding="utf-8")
+# 语义基准（只读参照，本线不改）：动作体字段解析 findFieldItem。
+TSSC_ACTION = (JS / "tssc_multi_select.py").read_text(encoding="utf-8")
 MISC = (JS / "misc.py").read_text(encoding="utf-8")
 
 failures: list[str] = []
@@ -73,6 +88,51 @@ need(BASE, "else if (lab.includes(want)) fwd.push(item);", "包含命中桶")
 need(BASE, "else if (allowReverse && want.includes(lab)) rev.push(item);", "反向包含桶（opt-in）")
 need(BASE, "return exact.concat(fwd, rev);", "候选按 精确→包含→反向 排序返回")
 
+# ── 单一来源：共享 pick（可见性分桶 + 歧义标记，探针专用）──────────────────
+# 与动作体 tssc_multi_select.findFieldItem 同源语义：
+# 可见精确 → 隐藏精确 → 包含匹配仅唯一时兜底，多命中=歧义标记（绝不静默取首中）。
+need(BASE, "JS_FIELD_ITEM_PICK = '''(root, label, allowReverse) => {", "共享 pick 定义")
+need(BASE, "if (exactVisible.length) return { item: exactVisible[0], via: 'exact' };",
+     "pick 可见精确优先")
+need(BASE, "if (exactAny.length) return { item: exactAny[0], via: 'exact-hidden' };",
+     "pick 隐藏精确兜底")
+need(BASE, "if (fuzzy.length === 1) return { item: fuzzy[0].item, via: 'includes-unique' };",
+     "pick 包含匹配仅唯一时兜底")
+need(BASE, "if (fuzzy.length > 1) return { ambiguous: fuzzy.map((f) => f.lab) };",
+     "pick 多命中=歧义标记")
+
+# ── 探针与动作体同源：pick 与 findFieldItem 共享同一分桶语义（标记 + 顺序）──
+need(TSSC_ACTION, "const findFieldItem = (root, label) => {", "动作体 findFieldItem（语义基准）在位")
+_PICK_MARKERS = ("exactVisible", "exactAny", "via: 'exact'", "via: 'exact-hidden'",
+                 "via: 'includes-unique'", "ambiguous")
+for _m in _PICK_MARKERS:
+    need(BASE, _m, f"探针 pick 分桶标记 {_m}")
+    need(TSSC_ACTION, _m, f"动作体 findFieldItem 分桶标记 {_m}")
+# 顺序锚点用已钉死的代码行（对注释措辞鲁棒）：
+_PICK_ORDER = {
+    "base.JS_FIELD_ITEM_PICK": (
+        "JS_FIELD_ITEM_PICK = '''(root, label, allowReverse) => {",
+        "if (exactVisible.length) return { item: exactVisible[0], via: 'exact' };",
+        "if (exactAny.length) return { item: exactAny[0], via: 'exact-hidden' };",
+        "if (fuzzy.length === 1) return { item: fuzzy[0].item, via: 'includes-unique' };",
+        "if (fuzzy.length > 1) return { ambiguous: fuzzy.map((f) => f.lab) };",
+    ),
+    "tssc_multi_select.findFieldItem": (
+        "const findFieldItem = (root, label) => {",
+        "if (exactVisible.length) return { item: exactVisible[0], via: 'exact' };",
+        "if (exactAny.length) return { item: exactAny[0], via: 'exact-hidden' };",
+        "if (fuzzy.length === 1) return { item: fuzzy[0].item, via: 'includes-unique' };",
+        "if (fuzzy.length > 1) {",
+    ),
+}
+for _where, _anchors in _PICK_ORDER.items():
+    _src = BASE if _where.startswith("base.") else TSSC_ACTION
+    if all(_a in _src for _a in _anchors):
+        _pos = [_src.index(_a) for _a in _anchors]
+        if _pos != sorted(_pos):
+            failures.append(
+                f"{_where}: 分桶顺序应为 定义→可见精确→隐藏精确→唯一包含→歧义, got {_pos}")
+
 # ── 各消费方必须真的走共享解析器 ─────────────────────────────────────────────
 need(BASE, "const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';", "base 自身接线")
 need(BASE, "for (const item of candidatesOf(container, label)) {", "JS_LOCATOR 精确优先并用候选序")
@@ -98,19 +158,33 @@ need(SCAN_FORM, "const wantN = normLab(label);", "scan 归一化定义")
 need(SCAN_FORM, "if (exact) { if (labN !== wantN) continue; }", "scan pass1 归一化精确匹配")
 ban(SCAN_FORM, "if (exact) { if (lbl !== label) continue; }", "scan 旧式裸等值")
 
-need(SELECT_DISPATCH, "from .js_snippets.base import JS_FIELD_ITEM_CANDIDATES", "select_dispatch 接线")
-need(SELECT_DISPATCH, "const item = candidatesOf(root, want)[0];", "tssc 判定按精确优先解析字段")
+need(SELECT_DISPATCH, "from .js_snippets.base import JS_FIELD_ITEM_PICK", "select_dispatch 接线共享 pick")
+need(SELECT_DISPATCH, "from .js_snippets.container import JS_GET_CONTAINER", "select_dispatch 作用域接线（动作体同款）")
+need(SELECT_DISPATCH, "const pick = ''' + JS_FIELD_ITEM_PICK + ''';", "tssc 探针用共享 pick（可见性分桶）")
+need(SELECT_DISPATCH, "const container = ''' + JS_GET_CONTAINER + ''';", "tssc 探针 JS_GET_CONTAINER 优先（document 全域盲取不得回潮）")
+need(SELECT_DISPATCH, "if (hit && hit.ambiguous) return { ambiguous: true };", "tssc 探针歧义短路（主作用域）")
+need(SELECT_DISPATCH, "field.item.querySelector('.tssc-multi-select')",
+     "tssc 判定=解析到的那一个字段子树含 .tssc-multi-select")
+ban(SELECT_DISPATCH, "JS_FIELD_ITEM_CANDIDATES", "select_dispatch 应走共享 pick，不直接用候选列表")
+ban(SELECT_DISPATCH, "candidatesOf(root, want)[0]", "tssc 判定旧式 [0] 盲取（假阳性根源）")
 ban(SELECT_DISPATCH, "if (l === want || l.includes(want)) {", "tssc 判定旧式首中即返（假阴性）")
 
 need(MISC, "from .base import JS_FIELD_ITEM_CANDIDATES", "misc 接线")
 need(MISC, "for (const item of candidatesOf(container, lbl)) {", "验证按钮按精确优先解析字段")
 ban(MISC, "if (!t.includes(lbl)) continue;", "JS_CLICK_VERIFY_BUTTON 旧式包含匹配")
 
-need(FILL_ENGINE, "from .js_snippets.base import JS_FIELD_ITEM_CANDIDATES", "fill_engine 接线")
-need(FILL_ENGINE, "const fi = candidatesOf(document, label)[0] || null;", "kind probe 精确优先")
+need(FILL_ENGINE, "from .js_snippets.base import JS_FIELD_ITEM_PICK", "fill_engine 接线共享 pick")
+need(FILL_ENGINE, "const container = ''' + JS_GET_CONTAINER + ''';", "kind probe 作用域对齐动作体（JS_GET_CONTAINER 优先）")
+need(FILL_ENGINE, "const fi = field.item;", "kind probe 判定=解析到的那一个字段")
+ban(FILL_ENGINE, "JS_FIELD_ITEM_CANDIDATES", "fill_engine kind probe 应走共享 pick，不直接用候选列表")
+ban(FILL_ENGINE, "candidatesOf(document, label)[0] || null", "kind probe 旧式 [0] 盲取（假阳性根源）")
 ban(FILL_ENGINE, "if (t && (t === want || t.includes(want))) { fi = it; break; }", "kind probe 旧式首中即返")
-if FILL_ENGINE.count("candidatesOf(document, label)[0] || null") != 2:
-    failures.append("fill_engine: 两处 kind probe 都应接线（录制 + 回放）")
+if FILL_ENGINE.count("const pick = ''' + JS_FIELD_ITEM_PICK + ''';") != 2:
+    failures.append("fill_engine: 两处 kind probe（录制 + 回放）都应接线共享 pick")
+if FILL_ENGINE.count("for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {") < 2:
+    failures.append("fill_engine: 两处 kind probe 都应有可见 dialog/drawer 补扫")
+if FILL_ENGINE.count("hit.ambiguous") < 2:
+    failures.append("fill_engine: 两处 kind probe 都应歧义短路（→ '' 走正常 fill 流程）")
 
 # 未参与本轮的按文案匹配路径必须保持原样（选项/按钮/菜单/单元格不是字段定位）
 need((JS.parent / "replay_js.py").read_text(encoding="utf-8"),
@@ -142,6 +216,26 @@ FIXTURE = """<!doctype html>
 <div class="el-form-item" id="fi-verify">
   <label class="el-form-item__label">纳税人识别号</label>
   <button id="btn-exact">验证</button></div>
+</body></html>
+"""
+
+# 探针 pick 的可见性分桶 fixture：隐藏同名 tssc 节点在 DOM 序在前（旧探针
+# candidatesOf(...)[0] 恰好取到它 → 假阳性 err-use-tssc-multi-select），
+# 真实纯输入框在后；另有两个包含命中（多命中应报歧义）。
+PROBE_FIXTURE = """<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>probe pick</title></head><body>
+<div class="el-form-item" id="fi-hidden-tssc" style="display:none">
+  <label class="el-form-item__label">要素名称</label>
+  <div class="tssc-multi-select"><input id="in-hidden-tssc" /></div></div>
+<div class="el-form-item" id="fi-visible-plain">
+  <label class="el-form-item__label">要素名称</label>
+  <input id="in-visible-plain" class="el-input__inner" /></div>
+<div class="el-form-item" id="fi-fuzzy-a">
+  <label class="el-form-item__label">组件要素类型</label>
+  <input class="el-input__inner" /></div>
+<div class="el-form-item" id="fi-fuzzy-b">
+  <label class="el-form-item__label">系统要素类型</label>
+  <input class="el-input__inner" /></div>
 </body></html>
 """
 
@@ -220,6 +314,30 @@ async def _run_live() -> None:
         check(v == "ok-verify-clicked", f"JS_CLICK_VERIFY_BUTTON got {v!r}")
         v_hit = await page.evaluate("() => window.__hit")
         check(v_hit == "fi-verify", f"验证按钮点到 {v_hit!r}, want 'fi-verify'")
+
+        # 6. 探针 pick（JS_FIELD_ITEM_PICK）：可见性分桶 + 歧义标记。
+        #    旧探针 candidatesOf(...)[0] 盲取 DOM 序首个——本 fixture 里恰是
+        #    隐藏的 tssc 节点（假阳性 err-use-tssc-multi-select 的形状）。
+        from scripts.controller.actions.js_snippets.base import JS_FIELD_ITEM_PICK
+        await page.set_content(PROBE_FIXTURE)
+        picked = await page.evaluate(
+            "([js, label]) => { const pick = eval(js); const h = pick(document, label);"
+            " if (!h) return null;"
+            " return { id: h.item ? h.item.id : null, via: h.via || null,"
+            "   ambiguous: h.ambiguous || null,"
+            "   tssc: h.item ? !!h.item.querySelector('.tssc-multi-select') : null }; }",
+            [JS_FIELD_ITEM_PICK, "要素名称"])
+        check(picked is not None, f"pick 未解析到字段: {picked!r}")
+        check(picked["id"] == "fi-visible-plain" and picked["via"] == "exact",
+              f"pick 应取可见精确字段（旧 [0] 会取隐藏 tssc 节点）, got {picked!r}")
+        check(picked["tssc"] is False,
+              f"探针 tssc 判定应为 false（假阳性回归）, got {picked!r}")
+        amb = await page.evaluate(
+            "([js]) => { const pick = eval(js); const h = pick(document, '要素类型');"
+            " return h ? (h.ambiguous || null) : null; }",
+            [JS_FIELD_ITEM_PICK])
+        check(isinstance(amb, list) and len(amb) == 2,
+              f"双包含命中应报歧义标记, got {amb!r}")
 
         await browser.close()
 

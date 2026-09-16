@@ -664,11 +664,15 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
 
 
 async def _run_agent_step_post(step_index, task_text, business_data_ref,
-                               max_actions_per_step, budget_extensions):
+                               max_actions_per_step, budget_extensions,
+                               browser_context=None):
     """结果后处理段：相位结束观测 + 软质量门禁 + phase_end 上报。
 
     对应拆分前 _run_agent_step 的 541-586 段（原 local 数据流不变）：空写/缺失成功
     令牌/语义疑点质量标记与 phase_end payload 组装；异常仅记日志不阻断。
+    pending 门禁首次不过时按 ghost-prune 范式用 DOM 实读纠正过期 task_list
+    （弹窗/引入回填只记 evidence 不写 task_list）后重跑 gate；粘滞的
+    pending_fields:* reason 在收尾失败输出前按刷新后的 pending 集合重生成。
     """
     # Phase-end observability + soft quality gate（循环结束后最终评估）
     try:
@@ -683,7 +687,26 @@ async def _run_agent_step_post(step_index, task_text, business_data_ref,
             ok_pending, labels = check_pending_write_gate(business_data_ref, section=_sec)
             contract = get_phase_intent(business_data_ref)
             if contract and contract.get('refill') == 'all_editable' and not ok_pending:
-                mark_quality_failed(business_data_ref, f'pending_fields:{",".join(labels[:8])}')
+                # Stale-snapshot refresh（先例 form_save.py ghost-prune）：picker/
+                # dialog 回填只记 evidence，task_list 仍是扫描时空快照 — 实读 DOM
+                # 一次，非空即已填者写回，然后重跑 gate，过了按过处理。
+                try:
+                    from ..controller.actions.phase.pending_refresh import (
+                        refresh_pending_from_dom,
+                    )
+                    if browser_context is not None:
+                        _page = await browser_context.get_current_page()
+                        await refresh_pending_from_dom(
+                            business_data_ref, _page, section=_sec,
+                        )
+                        ok_pending, labels = check_pending_write_gate(business_data_ref, section=_sec)
+                except Exception as _refresh_err:
+                    sys.stderr.write(
+                        f"[phase-end] pending DOM refresh skipped: {_refresh_err}\n"
+                    )
+                    sys.stderr.flush()
+                if not ok_pending:
+                    mark_quality_failed(business_data_ref, f'pending_fields:{",".join(labels[:8])}')
             submit = (contract or {}).get('submit') or {}
             if submit.get('required') and not has_contract_success(business_data_ref):
                 # has_contract_success already respects success.kinds — do not waive
@@ -696,6 +719,20 @@ async def _run_agent_step_post(step_index, task_text, business_data_ref,
                     business_data_ref,
                     f"semantic_doubt_fields:{','.join(list(doubts)[:8])}",
                 )
+            # 粘滞 reason 重生成（在收尾失败判定与任何输出之前）：premature done
+            # 警告会在弹窗刚打开时写入 pending_fields:*，标签已被 DOM 证据
+            # 移出 pending 的从 reason 剔除，全部移出则整条删除；其余 reason
+            # （missing_success_token 等）不动。
+            try:
+                from ..controller.actions.phase.pending_refresh import (
+                    regenerate_pending_field_reasons,
+                )
+                regenerate_pending_field_reasons(business_data_ref, labels)
+            except Exception as _regen_err:
+                sys.stderr.write(
+                    f"[phase-end] pending reason regen skipped: {_regen_err}\n"
+                )
+                sys.stderr.flush()
             emit_phase_observability(business_data_ref, emit_json)
             phase_payload = {"phase": get_current_phase() or step_index, "name": task_text[:60]}
             phase_payload["maxActionsPerStep"] = max_actions_per_step
@@ -705,6 +742,8 @@ async def _run_agent_step_post(step_index, task_text, business_data_ref,
             if c:
                 phase_payload["phase_intent"] = c
             if business_data_ref.get('_quality_failed'):
+                # regen 已在上面完成（任何输出之前）：若 pending_fields:* 全部
+                # 被澄清，_quality_failed 已撤下，不会进入本分支。
                 reasons = list(business_data_ref.get('_quality_failed_reasons') or [])
                 sys.stderr.write(
                     f"QUALITY FAIL phase={step_index} reasons={reasons}\n"
@@ -743,5 +782,6 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     )
     await _run_agent_step_post(
         step_index, task_text, business_data_ref, max_actions_per_step, budget_extensions,
+        browser_context=browser_context,
     )
     return output_path, task_text
