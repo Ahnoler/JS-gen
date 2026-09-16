@@ -1,5 +1,74 @@
 # Agent 协作日志
 
+## 2026-09-16 15:05 · Cursor — 收工：field_slot 终审 Important 修复（回链 14:50 开工）
+
+- 完成：`7ed9b6bd` persist AI/CDP `field_slot`/`display_label`；`ccdb68e1` offline input tight leaf；湿测 JSON `.superpowers/sdd/task-4-wet-result.json`；SPA `19130bf`/`041a1ef`（独立仓）
+- 验收：characterize-form-field-intra-slot / capture-element-xpath / locator-candidates / locator-parity OK；终审 Ready to merge
+- 遗留移交：Minors 不挡合并（occurrence=0 混排 leaf 近似、`_element_identity` 同 label coalesce、SPA 未 push）；不维护 CHANGELOG
+
+## 2026-09-16 14:50 · Cursor — 开工：field_slot 终审 Important 修复（AI/CDP persist + offline leaf）
+
+- 进行中：终审 Important#1（inspect / resolve-by-label / JS_CAPTURE_FROM_XPATH / `_capture_element` 透传 `field_slot`/`display_label`）+ Important#2（`controls.js` input 紧 leaf 对齐 live）
+- 范围：`src/cdp/inspect-payload-script.js`、`src/cdp/resolve-by-label.js`、`src/cdp/locator-builders/controls.js`、`scripts/controller/actions/js_snippets/fill_core.py`、`scripts/controller/actions/_helpers.py`、characterization pin（若需）、本协作日志
+- 禁入区：SPA 仓；他线 atom-depend / rect_norm；不手改 `_locator_helpers_js.py`（若改 helpers 源则走 gen）；`config/` WIP
+- 方式：SDD 终审 fix 子代理；主会话验收后 commit + push
+
+## 2026-09-16 12:32 · Cursor — 收工：Task 4 spec 交叉引用；原子拆分边界计划 T1–T4 完成（回链 12:31 开工）
+
+- 完成：2026-09-07 §3 与 2026-09-09 单卡闭环交叉引用；2026-09-15 状态 → `已审阅；实现按 2026-09-16 plan（PR #37）`
+- 验收：`characterize-atom-depend` **8/8 all passed**；`characterize-atom-keydata` **all passed**
+- 计划：`2026-09-16-atomic-draft-tx-split-boundary.md` Task 1–4 均已落地（helper / propose 接线 / prompt+样例 / spec 交叉引用），PR #37
+- 遗留移交：无本计划内项；不维护 CHANGELOG
+
+## 2026-09-16 12:31 · Cursor — 开工：Task 4 spec 交叉引用 + 计划收口
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 4**（2026-09-07 §3 / 2026-09-09 单卡闭环交叉引用；2026-09-15 状态翻为已审阅/实现中；characterize 复核）
+- 范围：`docs/superpowers/specs/2026-09-07-req-to-draft-traj-design.md`、`docs/superpowers/specs/2026-09-09-flow-card-guided-propose-design.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`、本协作日志
+- 禁入区：`src/**`、atomize prompt、产品树强制拆、one-confirm-per-atom 硬闸、他线 field_slot xpath、`config/` WIP
+- 方式：主会话；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37；本任务为计划末项
+
+## 2026-09-16 12:29 · Cursor — 收工：Task 3 atomize prompt 拆分边界 + 样例（回链 12:28 开工）
+
+- 完成：commit **`a334499a`** `docs(prompt): atomize split by produces/dataDependsOn bounds`
+- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`
+- 验收：JSON 例含 `produces`/`dataDependsOn`；「拆分边界」十条入 prompt；flowCards 改为参考且依赖规则优先；禁止 #504 造上游与场景清单；样例写明依赖图≠树层教条。原 prompt 无「产品树每层必拆」专项，无需删除。
+- 遗留移交：Task 4 spec 交叉引用未做
+
+## 2026-09-16 12:28 · Cursor — 开工：Task 3 atomize prompt 拆分边界 + 样例
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 3 only**（prompt 加 `produces`/`dataDependsOn` +「拆分边界」十条；样例抽象 #675/#676/#678 与 #504 反例）
+- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、本协作日志
+- 禁入区：Task 4 spec 交叉引用；`propose.js` / `atom-depend.js`；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37
+
+## 2026-09-16 12:30 · Cursor — 收工：Task 2 propose.js 接线 produces/dataDependsOn（回链 12:26 开工）
+
+- 完成：commit **`fd18fc6a`** `feat(propose): attach produces/dataDependsOn and hard-gate depend graph`
+- 范围：`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`（cache 写入 `warnings`）、`scripts/characterization/characterize-atom-depend.mjs` 源码 pin
+- 验收：characterize-atom-depend **8/8 ok / all passed**（pin 先 RED 缺 import，后 GREEN）；characterize-atom-keydata all passed；characterize-req-draft-traj **OK 63**（含 `multi_write_atom`）；eslint 三文件 0
+- 遗留移交：Task 3–4（atomize prompt、samples、spec 交叉引用）未做
+
+## 2026-09-16 12:26 · Cursor — 开工：Task 2 propose.js 接线 produces/dataDependsOn
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 2 only**（TDD：characterize 源码 pin → `propose.js` 接线 → cache/return `warnings`）
+- 范围：`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`（warnings 写入 cache 所需）、`scripts/characterization/characterize-atom-depend.mjs`、本协作日志
+- 禁入区：atomize prompt / Task 3–4 / spec 交叉引用；产品树关键词强制拆；one-confirm-per-atom 硬闸；不改 `multi_write_atom` / flow-card 闭环；他线 field_slot xpath；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话 Inline TDD；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37
+
+## 2026-09-16 12:25 · Cursor — 收工：Task 1 atom-depend 图校验（回链 12:20 开工）
+
+- 完成：commit **`4b782ff6`** `feat(req-draft-traj): validate atom produces/dataDependsOn graph`
+- 范围：`src/services/req-draft-traj/atom-depend.js`、`scripts/characterization/characterize-atom-depend.mjs`、`scripts/refactor/verify-all.sh`（紧随 `characterize-atom-keydata`）
+- 验收：characterize-atom-depend **7/7 ok / all passed**（先 RED `ERR_MODULE_NOT_FOUND`，后 GREEN）；硬拒 `self_produce_depend` / `dangling_data_depend`；警告 `missing_depend_fields`；被拒 atom 不贡献 produces
+- 遗留移交：Task 2–4（`propose.js` 接线、atomize prompt、spec 交叉引用）未做，按计划下一切
+
+## 2026-09-16 12:20 · Cursor — 开工：Task 1 atom-depend 图校验（纯 helper）
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 1 only**（TDD：characterize → `atom-depend.js` → 接入 verify-all）
+- 范围：`scripts/characterization/characterize-atom-depend.mjs`、`src/services/req-draft-traj/atom-depend.js`、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：`propose.js` / atomize prompt / Task 2–4；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath（`src/cdp/page-locator-helpers.js` / locator-builders / `scripts/manual_recorder/**`）；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话 Inline TDD；子智能体不 commit
+
 > **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
 
 
@@ -111,7 +180,6 @@
 - 范围：`src/` 控制面路由与 session/recording/stream 服务、`scripts/` 执行机生命周期与推流相关代码、数据库迁移/查询定义、相关文档与 characterization；本协作日志。
 - 禁入区：前端仓、线上数据库/执行机运行态、既有未提交 `config/.db-whitelist-seen`、其他会话工作区 WIP；不改变任何线上交易或会话状态。
 - 方式：先完成 `git pull` 尝试（因 GitHub 连接重置未成功），再以静态代码、迁移和测试证据追踪异常关闭后的 orphan session、重连和推流恢复路径，最后给出带文件/行号的根因与修复建议。
-
 ## 2026-09-16 12:15 · Cursor — 开工：表单字段内同族控件 xpath 消歧（field_slot）
 
 - 进行中：真机调研「保证金比例」复合字段 → 方案 A 已定；写 design spec，待用户审阅后写 plan 再改代码。

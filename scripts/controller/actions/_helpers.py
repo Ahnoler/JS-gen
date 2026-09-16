@@ -350,6 +350,11 @@ async def _capture_element(page, label_text, *, xpath_smart: str = "", target_ki
             "bbox": info.get("bbox") if isinstance(info.get("bbox"), dict) else None,
             "page_bbox": info.get("page_bbox") if isinstance(info.get("page_bbox"), dict) else None,
             "attr": info.get("attr") if isinstance(info.get("attr"), dict) else None,
+            "locator_occurrence": info.get("locator_occurrence") or 0,
+            "field_slot": info.get("field_slot") or "",
+            "display_label": info.get("display_label") or "",
+            "locator_verified": bool(info.get("locator_verified")),
+            "locator_strategy": info.get("locator_strategy") or "",
         }
     except Exception:
         return None

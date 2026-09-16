@@ -30,15 +30,56 @@ def test_capture_snippet_rebuilds_not_echo() -> None:
     from scripts.controller.actions import _js_snippets as sn
 
     js = sn.JS_CAPTURE_FROM_XPATH
-    assert_true("PAGE_LOCATOR_HELPERS" in js or "formFieldXpathSmartOf" in js, "helpers embedded for rebuild")
-    assert_true("formFieldXpathSmartOf" in js, "rebuild via formFieldXpathSmartOf")
+    assert_true("buildLocatorSnap" in js, "rebuild via buildLocatorSnap (helpers embedded)")
     assert_true(
         "xpath_smart: smart" in js.replace(" ", "")
         or "xpath_smart:smart" in js.replace(" ", "")
-        or "xpath_smart: rebuilt" in js.replace(" ", "")
-        or "xpath_smart:rebuilt" in js.replace(" ", ""),
-        "return rebuilt smart, not echo xp alone",
+        or "loc.xpath_smart" in js.replace(" ", ""),
+        "return rebuilt smart from snap, not echo xp alone",
     )
+
+
+def test_capture_snippet_returns_field_slot() -> None:
+    from scripts.controller.actions import _js_snippets as sn
+
+    js = sn.JS_CAPTURE_FROM_XPATH
+    norm = _norm(js)
+    for key in (
+        "field_slot",
+        "display_label",
+        "locator_occurrence",
+        "locator_verified",
+        "locator_strategy",
+    ):
+        assert_true(f"{key}:" in norm, f"capture snippet returns {key}")
+
+
+def test_capture_helpers_passthrough_field_slot() -> None:
+    src = (ROOT / "scripts/controller/actions/_helpers.py").read_text(encoding="utf-8")
+    cap = src.split("async def _capture_element")[1].split("\nasync def ")[0]
+    for key in (
+        "field_slot",
+        "display_label",
+        "locator_occurrence",
+        "locator_strategy",
+    ):
+        assert_true(f'"{key}": info.get("{key}")' in cap, f"_capture_element passes {key}")
+    assert_true('"locator_verified":' in cap, "_capture_element passes locator_verified")
+
+
+def test_cdp_persist_paths_copy_field_slot() -> None:
+    for rel in (
+        "src/cdp/inspect-payload-script.js",
+        "src/cdp/resolve-by-label.js",
+    ):
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        assert_true("field_slot:" in src, f"{rel} copies field_slot")
+        assert_true("display_label:" in src, f"{rel} copies display_label")
+        idx = src.find("locator_occurrence:")
+        assert_true(idx >= 0, f"{rel} has locator_occurrence")
+        tail = src[idx:idx + 400]
+        assert_true("field_slot:" in tail, f"{rel} field_slot near locator_occurrence")
+        assert_true("display_label:" in tail, f"{rel} display_label near locator_occurrence")
 
 
 def test_capture_snippet_drills_form_input() -> None:
@@ -366,6 +407,9 @@ def main() -> int:
     test_execute_round_passes_xpath_to_capture()
     test_tree_fallback_xpath_captures_pass_xpath()
     test_capture_snippet_rebuilds_not_echo()
+    test_capture_snippet_returns_field_slot()
+    test_capture_helpers_passthrough_field_slot()
+    test_cdp_persist_paths_copy_field_slot()
     test_capture_snippet_drills_form_input()
     test_stamp_rejects_weak_fallback()
     test_form_record_params_omit_xpath_smart()

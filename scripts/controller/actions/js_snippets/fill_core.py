@@ -422,20 +422,27 @@ JS_CAPTURE_FROM_XPATH = (
     return normalizeFormLabel(lbl && lbl.textContent);
   })();
   const host = (typeof normalizeTargetRoot === 'function' ? (normalizeTargetRoot(node) || node) : node);
-  const smart = (typeof formFieldXpathSmartOf === 'function'
-    ? (formFieldXpathSmartOf(host, formLbl) || '')
-    : '');
   const abs = absXPath(host);
-  const primary = smart || abs;
+  const loc = (typeof buildLocatorSnap === 'function'
+    ? buildLocatorSnap(host, '', abs, formLbl, { targetKind: kind || undefined })
+    : null);
+  const smart = loc ? (loc.xpath_smart || '') : (
+    (typeof formFieldXpathSmartOf === 'function' ? (formFieldXpathSmartOf(host, formLbl) || '') : '')
+  );
+  const primary = (loc && loc.xpath) ? loc.xpath : (smart || abs);
   const tag = (host.tagName || '').toLowerCase();
   const attrs = {};
   for (const a of host.attributes || []) attrs[a.name] = a.value;
   const text = (host.innerText || host.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
   const reg = assignRegion(host);
+  const candidates = Array.isArray(loc && loc.candidates) ? loc.candidates : [
+    ...(smart ? [{ type: 'xpath_smart', value: smart }] : []),
+    ...(abs ? [{ type: 'xpath_full', value: abs }] : []),
+  ];
   return {
     xpath: primary,
     xpath_smart: smart,
-    xpath_full: abs,
+    xpath_full: (loc && loc.xpath_full) || abs,
     css_sel: '',
     tag,
     attrs,
@@ -448,10 +455,12 @@ JS_CAPTURE_FROM_XPATH = (
     layers: Array.isArray(reg.layers) ? reg.layers : [],
     bbox: stepBBoxOf(host),
     page_bbox: documentBBoxOf(host),
-    candidates: [
-      ...(smart ? [{ type: 'xpath_smart', value: smart }] : []),
-      ...(abs ? [{ type: 'xpath_full', value: abs }] : []),
-    ],
+    candidates,
+    locator_occurrence: loc ? (loc.locator_occurrence || 0) : 0,
+    field_slot: loc ? (loc.field_slot || '') : '',
+    display_label: loc ? (loc.display_label || '') : '',
+    locator_verified: loc ? (loc.locator_verified === true) : false,
+    locator_strategy: loc ? (loc.locator_strategy || '') : '',
   };
 }'''
 )
