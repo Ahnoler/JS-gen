@@ -1,6 +1,5 @@
 # Agent 协作日志
 
-<<<<<<< HEAD
 ## 2026-09-16 12:32 · Cursor — 收工：Task 4 spec 交叉引用；原子拆分边界计划 T1–T4 完成（回链 12:31 开工）
 
 - 完成：2026-09-07 §3 与 2026-09-09 单卡闭环交叉引用；2026-09-15 状态 → `已审阅；实现按 2026-09-16 plan（PR #37）`
@@ -56,7 +55,7 @@
 - 范围：`scripts/characterization/characterize-atom-depend.mjs`、`src/services/req-draft-traj/atom-depend.js`、`scripts/refactor/verify-all.sh`、本协作日志
 - 禁入区：`propose.js` / atomize prompt / Task 2–4；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath（`src/cdp/page-locator-helpers.js` / locator-builders / `scripts/manual_recorder/**`）；白名单/发版 `tmp/cmds`；`config/` WIP
 - 方式：主会话 Inline TDD；子智能体不 commit
-=======
+
 > **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
 
 
@@ -168,8 +167,6 @@
 - 范围：`src/` 控制面路由与 session/recording/stream 服务、`scripts/` 执行机生命周期与推流相关代码、数据库迁移/查询定义、相关文档与 characterization；本协作日志。
 - 禁入区：前端仓、线上数据库/执行机运行态、既有未提交 `config/.db-whitelist-seen`、其他会话工作区 WIP；不改变任何线上交易或会话状态。
 - 方式：先完成 `git pull` 尝试（因 GitHub 连接重置未成功），再以静态代码、迁移和测试证据追踪异常关闭后的 orphan session、重连和推流恢复路径，最后给出带文件/行号的根因与修复建议。
->>>>>>> origin/uara_V1.2
-
 ## 2026-09-16 12:15 · Cursor — 开工：表单字段内同族控件 xpath 消歧（field_slot）
 
 - 进行中：真机调研「保证金比例」复合字段 → 方案 A 已定；写 design spec，待用户审阅后写 plan 再改代码。
