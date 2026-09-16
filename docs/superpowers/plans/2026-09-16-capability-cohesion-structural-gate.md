@@ -60,7 +60,7 @@ Do not put this gate inside `validateAtomDependGraph`.
 - `synthesizeFallbackProduceKey` is **Task 2**. Do not add it yet.
 - `assertCapabilityCohesion` in this task only needs to run parse → classify → sequence. Title-as-key (`produces_eq_title`) is Task 2; if you already have the produces check stub, keep it spec-accurate (length === 1 and exact `=== String(title).trim()`) but do **not** write the C4 pin until Task 2.
 
-- [ ] **Step 1: Write the failing characterization (helper only; no propose.js yet)**
+- [x] **Step 1: Write the failing characterization (helper only; no propose.js yet)**
 
 Create `scripts/characterization/characterize-capability-cohesion.mjs`:
 
@@ -269,13 +269,13 @@ if (failed) process.exit(1);
 console.log('all passed');
 ```
 
-- [ ] **Step 2: Run the characterization and confirm it fails (missing module)**
+- [x] **Step 2: Run the characterization and confirm it fails (missing module)**
 
 Run: `node scripts/characterization/characterize-capability-cohesion.mjs`
 
 Expected: FAIL (ERR_MODULE_NOT_FOUND for `capability-cohesion.js`, or first pin `parseTaskDraftStepGroups is not a function`). Do not implement yet.
 
-- [ ] **Step 3: Implement the helper (minimal, spec-faithful)**
+- [x] **Step 3: Implement the helper (minimal, spec-faithful)**
 
 Create `src/services/req-draft-traj/capability-cohesion.js` with this body (JSDoc required on every export; do not add product button names):
 
@@ -541,13 +541,13 @@ export function assertCapabilityCohesion(atom) {
 
 Leave `produces_eq_title` out of this function until Task 2 (C2 fixtures already pass a business key ≠ title). Do not add a `维护基本信息` string anywhere in this file — C1/C5 fixtures live only in the characterization file.
 
-- [ ] **Step 4: Re-run helper pins**
+- [x] **Step 4: Re-run helper pins**
 
 Run: `node scripts/characterization/characterize-capability-cohesion.mjs`
 
 Expected: `all passed` (every pin `ok - …`). If C6 fails because closer-only was implemented as “haystack equals 保存 three characters”, switch to the locked reading in Global Constraints (prose around closer allowed; no other family; no persist-as-capability).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/characterization/characterize-capability-cohesion.mjs src/services/req-draft-traj/capability-cohesion.js
@@ -569,7 +569,7 @@ git commit -m "feat(req-draft-traj): add capability-cohesion helper with C1/C2/C
   - `synthesizeFallbackProduceKey(title: unknown): string` — trim; empty → `'atom_output'`; else `` `${trimmed}产物` ``; must be `!== String(title).trim()` whenever title is non-empty; never return the raw title
   - `assertCapabilityCohesion` additional rule (after sequence pass): if `produces` is an array with `length === 1` and `produces[0] === String(title).trim()` → `{ ok: false, reason: 'produces_eq_title' }`. Empty `produces` does **not** use this reason (leave `missing_depend_fields` for later). Compare after caller has `normalizeProduces`; do not case-fold; do not substring-match; extra keys besides title → pass this rule
 
-- [ ] **Step 1: Write failing C4 + synthesizer pins**
+- [x] **Step 1: Write failing C4 + synthesizer pins**
 
 Append to `scripts/characterization/characterize-capability-cohesion.mjs` (before `if (failed)`):
 
@@ -611,13 +611,13 @@ await run('synthesizeFallbackProduceKey never equals trimmed title', () => {
 });
 ```
 
-- [ ] **Step 2: Run pins and confirm C4 / synthesizer fail**
+- [x] **Step 2: Run pins and confirm C4 / synthesizer fail**
 
 Run: `node scripts/characterization/characterize-capability-cohesion.mjs`
 
 Expected: FAIL on `C4 helper: produces exact title` (`ok: true` vs `false`) and/or `synthesizeFallbackProduceKey is not a function`. Earlier C1/C2/C5/C6 must still be `ok`.
 
-- [ ] **Step 3: Implement title-as-key + synthesizer; retarget fallback**
+- [x] **Step 3: Implement title-as-key + synthesizer; retarget fallback**
 
 In `capability-cohesion.js`, add:
 
@@ -676,7 +676,7 @@ function fallbackDependFields(title) {
 
 Do **not** exempt fallback from the gate. Do **not** keep `produces: [title]`.
 
-- [ ] **Step 4: Re-run helper pins**
+- [x] **Step 4: Re-run helper pins**
 
 Run: `node scripts/characterization/characterize-capability-cohesion.mjs`
 
@@ -691,7 +691,7 @@ node scripts/characterization/characterize-atom-depend.mjs
 
 Expected: both print `all passed` / existing ok lines; `multi_persist_task_draft` pin unchanged.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/req-draft-traj/capability-cohesion.js src/services/req-draft-traj/propose.js scripts/characterization/characterize-capability-cohesion.mjs
@@ -716,7 +716,7 @@ git commit -m "feat(req-draft-traj): reject produces_eq_title; synthesize fallba
 - Rejected atoms from step 2 never push onto the `atoms` array, so they **must not** contribute `produces` to the batch graph (spec §4.5). Do not change `validateAtomDependGraph`.
 - Payload stays `{ atomKey, reason }` on `rejected`. HTTP remains 200 + partial rejected. No new status codes.
 
-- [ ] **Step 1: Write failing propose-level pins**
+- [x] **Step 1: Write failing propose-level pins**
 
 Append to `scripts/characterization/characterize-capability-cohesion.mjs`. Add these imports at the top of the file (with the other imports):
 
@@ -849,13 +849,13 @@ await run('C2 propose: cohesive maintain with business produce key is accepted',
 });
 ```
 
-- [ ] **Step 2: Run and confirm propose pins fail (helper not wired)**
+- [x] **Step 2: Run and confirm propose pins fail (helper not wired)**
 
 Run: `node scripts/characterization/characterize-capability-cohesion.mjs`
 
 Expected: helper pins still `ok`; `C1 propose` FAIL because the merged draft is still accepted (atoms length 1) — cohesion is not called yet. `C3 propose` should already `ok` (persist gate already first). `C4 propose` FAIL (title-as-key still accepted until wired).
 
-- [ ] **Step 3: Wire `materializeLlmAtom`**
+- [x] **Step 3: Wire `materializeLlmAtom`**
 
 In `propose.js`:
 
@@ -882,7 +882,7 @@ Do **not** move or duplicate the `countPersistConfirms(cleanedDraft) > 1` block;
 
 Do **not** call `assertCapabilityCohesion` inside `validateAtomDependGraph`.
 
-- [ ] **Step 4: Re-run cohesion + persist-boundary + atom-depend**
+- [x] **Step 4: Re-run cohesion + persist-boundary + atom-depend**
 
 ```bash
 node scripts/characterization/characterize-capability-cohesion.mjs
@@ -892,7 +892,7 @@ node scripts/characterization/characterize-atom-depend.mjs
 
 Expected: all three `all passed`. C3 reason remains `multi_persist_task_draft`. C1/C4 atoms length 0. Existing `未启用` persist-boundary pin untouched.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/req-draft-traj/propose.js scripts/characterization/characterize-capability-cohesion.mjs
@@ -912,7 +912,7 @@ git commit -m "feat(req-draft-traj): wire capability-cohesion after multi_persis
 - Consumes: existing `writeProposeCache` / `readProposeCache` / `commit.js` stale check (`cache.cacheVersion !== PROPOSE_CACHE_VERSION` → `STALE_PROPOSE_CACHE`)
 - Produces: `PROPOSE_CACHE_VERSION === 5`. Comment must say v5 = capability-cohesion structural gate + title-as-key reject. Wet machines that skip the bump would keep committing v4 merged drafts.
 
-- [ ] **Step 1: Write the failing version pin (edit only the characterization assertion first)**
+- [x] **Step 1: Write the failing version pin (edit only the characterization assertion first)**
 
 In `scripts/characterization/characterize-req-draft-traj.mjs` replace the existing version pin with:
 
@@ -924,13 +924,13 @@ In `scripts/characterization/characterize-req-draft-traj.mjs` replace the existi
 
 Do not change `propose-cache.js` yet.
 
-- [ ] **Step 2: Run and confirm it fails**
+- [x] **Step 2: Run and confirm it fails**
 
 Run: `node scripts/characterization/characterize-req-draft-traj.mjs`
 
 Expected: FAIL `PROPOSE_CACHE_VERSION is 5` with actual `4`. Stop; then bump the constant.
 
-- [ ] **Step 3: Bump cache version and register verify-all**
+- [x] **Step 3: Bump cache version and register verify-all**
 
 `src/services/req-draft-traj/propose-cache.js`:
 
@@ -957,7 +957,7 @@ insert:
 run "characterize-capability-cohesion" node scripts/characterization/characterize-capability-cohesion.mjs
 ```
 
-- [ ] **Step 4: Re-run version pin + new pin + core related smokes**
+- [x] **Step 4: Re-run version pin + new pin + core related smokes**
 
 ```bash
 node scripts/characterization/characterize-req-draft-traj.mjs
@@ -976,7 +976,7 @@ Expected: exit 0, no new warnings.
 
 Optional full gate (if time): `bash scripts/refactor/verify-all.sh` — `characterize-capability-cohesion` must appear and pass. Known unrelated reds on some clouds (step-highlight / layer-tree / confirm-notification / network-capture) are not this task; do not “fix” them here.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/req-draft-traj/propose-cache.js scripts/characterization/characterize-req-draft-traj.mjs scripts/refactor/verify-all.sh
@@ -997,7 +997,7 @@ git commit -m "chore(req-draft-traj): bump propose cache to v5 and gate cohesion
 - Consumes: spec §5 exact sentence; existing `<bad reason="same-page multi-capability">` and `<bad reason="maintain missing locate/search/select prep">`
 - Produces: prompt + samples + one docs line. Code gate remains the source of truth. Do **not** paste the other-family table into the prompt. Do **not** add `<bad>` entries that name product-tree layers or button proper names.
 
-- [ ] **Step 1: Add a characterization pin that the prompt contains the locate-prep sentence**
+- [x] **Step 1: Add a characterization pin that the prompt contains the locate-prep sentence**
 
 Append to `scripts/characterization/characterize-capability-cohesion.mjs`:
 
@@ -1015,13 +1015,13 @@ await run('atomize prompt locates prep to locate-class only', () => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm the new pin fails**
+- [x] **Step 2: Run and confirm the new pin fails**
 
 Run: `node scripts/characterization/characterize-capability-cohesion.mjs`
 
 Expected: FAIL `atomize prompt locates prep to locate-class only` (`仅限定位类` missing). Do not weaken the pin.
 
-- [ ] **Step 3: Edit prompt, samples, api-docs**
+- [x] **Step 3: Edit prompt, samples, api-docs**
 
 In `scripts/prompts/req-draft-traj-atomize-prompt.md`, replace the item-9 bullet that currently reads `准备步骤从属于该能力：仅当服务于本笔能力时允许并入。` with:
 
@@ -1043,7 +1043,7 @@ In `src/dashboard/api-docs/groups/kb.js`, append one string to the propose endpo
         'taskDraft 同笔多项能力 → rejected multi_capability_task_draft；produces 规范化后精确等于 title → rejected produces_eq_title；多次落库确认仍为 multi_persist_task_draft（先于新闸）',
 ```
 
-- [ ] **Step 4: Re-run cohesion pins + eslint on kb.js**
+- [x] **Step 4: Re-run cohesion pins + eslint on kb.js**
 
 ```bash
 node scripts/characterization/characterize-capability-cohesion.mjs
@@ -1052,7 +1052,7 @@ npx eslint src/dashboard/api-docs/groups/kb.js
 
 Expected: `all passed`; eslint exit 0.
 
-- [ ] **Step 5: Agent-log 收工 + commit**
+- [x] **Step 5: Agent-log 收工 + commit**
 
 Insert at the top of `docs/superpowers/agent-log.md` (below the protocol/header) a 收工 entry that links the implementer’s 开工: helper+pins commit hashes, cache v5, prompt sentence, C1–C6 evidence (`node scripts/characterization/characterize-capability-cohesion.mjs` all passed), leftover = wet W1–W4 on local LMY.
 
@@ -1074,7 +1074,7 @@ git commit -m "docs(req-draft-traj): echo cohesion gate in atomize prompt, sampl
 - Consumes: Tasks 1–5 outputs; spec §6 / §8
 - Produces: a green unit report + a wet checklist for the human on LMY. Wet failures do not block merging the characterization PR; they block calling the feature “wet-accepted”.
 
-- [ ] **Step 1: Spec coverage checklist (implementer walks this, no extra code)**
+- [x] **Step 1: Spec coverage checklist (implementer walks this, no extra code)**
 
 Confirm each spec row has a pin or an explicit non-goal:
 
@@ -1094,7 +1094,7 @@ Confirm each spec row has a pin or an explicit non-goal:
 | §8 do not regress atom-depend empty produces / persist-boundary `未启用` / req-draft-traj cache pin | Task 4 commands |
 | W1–W4 | this task, local LMY |
 
-- [ ] **Step 2: Falsify C1 (required by spec §8)**
+- [x] **Step 2: Falsify C1 (required by spec §8)**
 
 ```bash
 node scripts/characterization/characterize-capability-cohesion.mjs
@@ -1105,7 +1105,7 @@ git stash pop
 
 Expected: first run `all passed`; stashed run FAIL (module missing or C1 red); after pop, `all passed` again. If C1 stays green with the helper stashed, the pin is not actually testing the helper — fix the pin, do not skip.
 
-- [ ] **Step 3: Final local commands (cloud)**
+- [x] **Step 3: Final local commands (cloud)**
 
 ```bash
 node scripts/characterization/characterize-capability-cohesion.mjs
@@ -1129,7 +1129,7 @@ Control plane must load **cache v5**. Must **re-propose** (do not reuse v4 cache
 | W4 | Multiple persist confirms | Still `multi_persist_task_draft`, **not** `multi_capability_task_draft` as the primary reason |
 | title-as-key | Any atom with `produces: [title]` | `produces_eq_title`; must not enter `atoms` by renaming around the empty-field gate |
 
-- [ ] **Step 5: PR description (implementer fills hashes)**
+- [x] **Step 5: PR description (implementer fills hashes)**
 
 Use this body (replace hashes after commits exist):
 
