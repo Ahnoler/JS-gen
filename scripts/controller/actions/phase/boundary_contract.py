@@ -28,6 +28,9 @@ CompletionEvidence = Literal[
     'dialog_confirmed',
     'introduced_backfilled',
     'saved_navigation',
+    'query_clicked',
+    'page_opened',
+    'nav_next_clicked',
 ]
 
 _INTRODUCE_RE = re.compile(
@@ -110,6 +113,8 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
     needs_intro_then_save = _requires_introduce_then_save(t)
 
     if is_login_task(t):
+        # login keeps empty success_when — prepare already uses replay_done, not
+        # the recording phase_done evidence gate (G3 plan §7 default).
         role: Role = 'other'
         requires_write = False
         goals: list[str] = ['login']
@@ -127,7 +132,8 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         role = 'query'
         requires_write = False
         goals = ['query_filter']
-        success_when = []
+        # G3: forbid empty success_when — must click 查询/搜索 (any-of list).
+        success_when = ['query_clicked']
         forbid_index = False
         picker_allowed = False
     elif is_open_page_task(t):
@@ -135,7 +141,8 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         role = 'navigate'
         requires_write = False
         goals = ['open_page']
-        success_when = []
+        # G3: URL change OR dialog/drawer page_opened (any-of).
+        success_when = ['url_change', 'page_opened']
         forbid_index = False
         picker_allowed = False
     elif task_mode in ('form_fill', 'form_modify'):
@@ -163,7 +170,8 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         role = 'navigate'
         requires_write = False
         goals = ['set_conditions', 'click_next']
-        success_when = []
+        # G3: at least one successful「下一步」click (any-of with url/page as OR).
+        success_when = ['nav_next_clicked', 'url_change', 'page_opened']
         forbid_index = False
         picker_allowed = False
     else:
@@ -265,14 +273,18 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
             '_from_boundary': True,
         }
     if role == 'query':
+        q_kinds = list(boundary.get('success_when') or ['query_clicked'])
         return {
             'mode': 'query',
             'refill': 'none',
             'submit': {'required': False, 'via': 'any', 'button_text': '查询'},
-            'success': {'kinds': [], 'evidence': []},
-            'forbid': [],
+            'success': {
+                'kinds': q_kinds,
+                'evidence': ['ok-query-clicked'],
+            },
+            'forbid': ['done_without_token'],
             'recovery': {
-                'next_action': 'click 查询',
+                'next_action': 'click 查询 via click_element_by_index, then done(success=true)',
                 'forbid_reopen_modify_cycle': False,
                 'on_cycle': 'prescribe_once_then_stop_if_deviate',
                 'deviate_actions': [],
@@ -284,12 +296,16 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
         }
     if role == 'navigate':
         nav_goals = boundary.get('goals') or []
+        nav_kinds = list(boundary.get('success_when') or ['url_change', 'page_opened'])
         return {
             'mode': 'navigate',
             'refill': 'none',
             'submit': {'required': False, 'via': 'any', 'button_text': '下一步'},
-            'success': {'kinds': [], 'evidence': []},
-            'forbid': [],
+            'success': {
+                'kinds': nav_kinds,
+                'evidence': ['ok-nav-evidence'],
+            },
+            'forbid': ['done_without_token'],
             'recovery': {
                 'next_action': (
                     'set fields from task then click_element_by_index on 下一步'
@@ -340,9 +356,16 @@ def contract_summary_hint_boundary(boundary: dict[str, Any] | None) -> str:
         lines.append('- 收口：保存成功 = 操作成功提示 或 保存后页面跳转。')
     elif role == 'introduce':
         lines.append('- 收口：选人确认 / 弹窗关闭即可，不要求操作成功 toast。')
+    elif role == 'query':
+        lines.append('- 收口：必须先点「查询/搜索」取得证据后才允许 done(success=true)。')
     elif role == 'navigate':
         if 'open_page' in goals:
-            lines.append('- 收口：目标页面/弹窗出现即 done；禁止在新页面内继续操作（填字段/下一步/确定）。')
+            lines.append(
+                '- 收口：目标页面/弹窗出现（url_change 或 page_opened 证据）后 done；'
+                '禁止在新页面内继续操作（填字段/下一步/确定）。'
+            )
+        elif 'click_next' in goals:
+            lines.append('- 收口：按任务设条件后点「下一步」并取得证据；勿把点「查询」当阶段结束。')
         else:
             lines.append('- 收口：按任务设条件后点「下一步」；勿把点「查询」当阶段结束。')
     if boundary.get('picker_allowed'):

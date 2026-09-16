@@ -55,7 +55,10 @@ def observed_kinds(business_data_store: dict | None) -> set[str]:
     return out
 
 def phase_done_ok(business_data_store: dict | None) -> tuple[bool, list[str]]:
-    """Return (ok, missing_hints). Empty success_when → always ok (non-maintain)."""
+    """Return (ok, missing_hints). Empty success_when → always ok (login / other).
+
+    Non-empty success_when uses any-of matching (maintain intro+save is AND of groups).
+    """
     b = get_phase_boundary(business_data_store)
     if not b:
         return True, []
@@ -228,12 +231,31 @@ def next_action_hint(business_data_store: dict | None) -> str:
         )
     if b.get('role') == 'introduce':
         return 'NEXT_ACTION: select row then confirm (index click on 确认 OK).'
+    if b.get('role') == 'query':
+        if 'query_clicked' not in have:
+            return (
+                'NEXT_ACTION: click_element_by_index on 「查询/搜索」 first; '
+                'only then done(success=true).'
+            )
+        return 'NEXT_ACTION: evidence ok — done(success=true).'
     if b.get('role') == 'navigate':
         if 'open_page' in (b.get('goals') or []):
+            if not (have & {'url_change', 'page_opened'}):
+                return (
+                    'NEXT_ACTION: finish the clicks described in the task until the target '
+                    'page/dialog appears (need url_change or page_opened evidence), then '
+                    'done(success=true) — do NOT operate inside the new page '
+                    '(no fill / no 下一步 / no 确定).'
+                )
             return (
                 'NEXT_ACTION: finish the clicks described in the task; once the target '
                 'page/dialog appears, done(success=true) — do NOT operate inside the new page '
                 '(no fill / no 下一步 / no 确定).'
+            )
+        if 'nav_next_clicked' not in have and not (have & {'url_change', 'page_opened'}):
+            return (
+                'NEXT_ACTION: set task fields then click_element_by_index on 下一步 '
+                '(not 查询-as-done); after risk confirm if any, done(success=true).'
             )
         return (
             'NEXT_ACTION: set task fields then click_element_by_index on 下一步 '
