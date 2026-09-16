@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:28 · Cursor — 开工：Task 3 atomize prompt 拆分边界 + 样例
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 3 only**（prompt 加 `produces`/`dataDependsOn` +「拆分边界」十条；样例抽象 #675/#676/#678 与 #504 反例）
+- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、本协作日志
+- 禁入区：Task 4 spec 交叉引用；`propose.js` / `atom-depend.js`；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37
+
 ## 2026-09-16 12:30 · Cursor — 收工：Task 2 propose.js 接线 produces/dataDependsOn（回链 12:26 开工）
 
 - 完成：commit **`fd18fc6a`** `feat(propose): attach produces/dataDependsOn and hard-gate depend graph`
