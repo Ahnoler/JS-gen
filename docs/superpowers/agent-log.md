@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-16 17:59 · OpenCode — 收工：回放汇总步数把自动注入的 meta 检查点也计入（回链 17:52 开工）
+
+- 根因：`prepareReplayBatch` 会把选中步区间内的 `META_STEP_ACTIONS`（本次= `save_form_snapshot`）补进 `actions`/`orderedStepIds`；`runReplayBatch` 的 `if (typeB.ok) successCount += 1` 与 `buildPayload` 的 `count: allResults.length` 把它当业务步，FE 用 WS `replay:finished.successCount` 显示「回放完成 N 步」（`useRecordingStudio.ts:726-741`）→ 勾选 4 步却提示 5 步
+- 完成：`4a812814`——`replay-batch-runner.js` 引入 `isMetaStepAction`，Type B 成功分支/普通成功分支/retry-ok 三处 successCount 均跳过 meta；`buildPayload` 的 `okCount`/`count` 只算业务步，`failCount` 保留 meta 失败（按用户拍板「成功不计；失败仍计入失败数」）；`/api/docs` 补 note（stepIds 含补入 meta；count/successCount 只计业务步）
+- 验收：`characterize-replay-batch` 新增 2 pin（meta 成功不计 / save_form_snapshot 无快照跳过不计）+ 1 结构 pin（meta 失败仍入 failedStepIds）——**先 RED**（还原旧实现跑出 2 处断言失败）**后 GREEN**；verify-all 复跑=既有 4 红不变（step-highlight/layer-tree/confirm-notification/network-capture 均他线数据/环境），本烟绿；eslint 改动文件 0
+- 用户口径确认：前端「失败步保持勾选 / 成功步取消勾选」为预期形态——本改纯后端计数，不动 `replay:step`，勾选逻辑不受影响；meta 检查点成功后不再让提示多 1 步，失败时仍会「成功4，失败1」提示（用户已确认接受）
+- 遗留移交：本地后端（交易 830 所属）重启后生效；未改 SPA 仓；未改 Type B 安全性策略；不维护 CHANGELOG
+
 ## 2026-09-16 17:52 · OpenCode — 开工：回放汇总步数把自动注入的 meta 检查点也计入
 
 - 进行中：只勾选 4 步却提示「回放完成 5 步」——根因=`prepareReplayBatch` 自动补入选中区间内的 meta 检查点（`save_form_snapshot`）进 `actions`/`orderedStepIds`，`runReplayBatch` 的 `if (typeB.ok) successCount += 1` 与 `buildPayload` 的 `count/ok/failed` 把它算作业务步；FE 用 WS `replay:finished.successCount` 显示「回放完成 N 步」（`useRecordingStudio.ts:726-741`）。修向=汇总只计业务步（与 `trajectory.js` 文档「stepCount 亦只计业务步骤」一致），meta 检查点的成功/失败不计入用户面计数
