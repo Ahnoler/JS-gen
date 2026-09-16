@@ -1,5 +1,9 @@
 # Agent 协作日志
 
+## 2026-09-16 · Zcode Lead — AI 录制管线讲解材料产出（培训交接用）
+- 完成：`docs/superpowers/research/2026-09-16-ai-recording-pipeline-handover.md`——三路并行调研（Node 生命周期 / Python 引擎 / 数据落库）汇总成文，与回放材料（2026-09-01）配套；含 prepare 四阶段、phase 循环+假成功门闩、四 LLM 角色、cue 纠偏体系、一个点击的落库旅程、9 条易混淆点；全部带 file:line
+- 声明：本轮只新增该 research 文档 + 本条目，未动任何代码
+
 ## 2026-09-16 · Grok Bot · 原子草稿拆分边界实现计划
 
 - 计划：`docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md`
