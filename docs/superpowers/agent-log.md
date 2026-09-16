@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-15 22:25 · OpenCode — 开工：统一 AI click_element/click_button 同按钮去重
+
+- 进行中：修复同一 AI 阶段内同一按钮先后被 `click_element_by_index` 与 `click_button` 各录制一条的问题；共享稳定元素身份，第二次调用不再执行/落库。
+- 范围：`scripts/controller/actions/click_action_engine.py`、`scripts/controller/actions/phase/element_guard.py`、相关 characterization、本协作日志；只读参考 `scripts/state.py` 的动作落库 coalesce 与现有 picker/date 点击例外。
+- 禁入区：人工录制 mapper/CDP 采集、前端仓、`src/services/trajectory/trajectory-meta-service.js`、线上数据及其他会话 WIP；不改变 `click_save`、表格 radio、日期面板重复选日语义。
+- 方式：先在当前无未提交改动状态写入并提交声明，再补 click_button 与 click_element 的跨动作 identity 共享，验证 picker/按钮/日期相关 characterization、编译与 diff 后提交。
+
 ## 2026-09-15 22:15 · OpenCode — 收工：修复第四阶段重复执行与日期范围异常（回链 21:55 开工）
 
 - 完成：提交 **022f65a2**；“填写查询/筛选条件”规则回退归类为 query，运行时 query toolbar 可纠偏误判的 create/modify pending/success 门禁；AI 同阶段成功字段写入/选择及普通索引点击再次命中时直接返回 `already-operated-this-phase`，失败动作可重试、日期面板日格点击豁免、新阶段自动清空，人工录制不经过该保护。
