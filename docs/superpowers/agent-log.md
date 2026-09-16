@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 · Grok Bot · 原子草稿拆分边界实现计划
+
+- 计划：`docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md`
+- Spec：`2026-09-15-atomic-draft-tx-split-boundary-design.md` 已审阅；待选执行方式
+
+
 ## 2026-09-16 10:55 · ZCode — 开工：协作协议补条（push 冲突处理规则）
 
 - 用户指令：push 遇到冲突时须处理冲突、合并后再 push。补进 AGENTS.md「跨 Agent 协作」区段
