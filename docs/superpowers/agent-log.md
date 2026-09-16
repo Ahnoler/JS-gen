@@ -7,6 +7,13 @@
 - 禁入区：其余文件不动；agent-log 他人条目只读
 - 方式：主线程；纯文档改动。现场注记：pull 时 SSH 22 端口间歇被 reset，改走 ssh.github.com:443 通道完成（认证正常）
 
+## 2026-09-16 11:xx · OpenCode — 开工：修复后端一键发布脚本跨秒误拒绝
+
+- 进行中：修复 `release-backend.cmd` 先生成秒级时间戳、`pack-control-plane.sh` 稍后重新取时间导致跨秒时成功打包仍被拒绝上传的问题。
+- 范围：`release-backend.cmd`、`pack-control-plane.sh`、本协作日志；保持双击发布、无参独立打包及远端部署协议兼容。
+- 禁入区：`src/`、`config/`、`migrations/`、`scripts/`、线上服务器及其他会话工作区 WIP。
+- 方式：CMD 将已生成时间戳显式传给打包脚本；Bash 脚本可选接收该时间戳，无参调用仍自行生成；本地验证产物命名、Shell/批处理语法与差异。
+
 ## 2026-09-16 10:52 · ZCode — 开工：协作协议再升级固化（开工前 pull / log 条目 commit+push）
 
 - 用户指令：开工声明之前先 `git pull`；写完 agent log 后一律 commit 并 push（原约定只 commit）。今日将其固化进 AGENTS.md「跨 Agent 协作」区段
