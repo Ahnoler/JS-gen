@@ -106,6 +106,7 @@ export function parseTaskDraftStepGroups(taskDraft) {
 
 /**
  * Other-family ids whose substrings hit haystack.
+ * Maintain `编辑` matches only when not immediately followed by `页`/`界面`/`页面`.
  * @param {string} haystack Group action text
  * @returns {Set<string>} Family ids
  */
@@ -115,6 +116,12 @@ function detectOtherFamilies(haystack) {
   for (const [id, words] of Object.entries(OTHER_FAMILIES)) {
     if (id === 'status') {
       if (/(?<![未已])启用/.test(haystack) || haystack.includes('禁用')) found.add('status');
+      continue;
+    }
+    if (id === 'maintain') {
+      if (words.some((w) => (w === '编辑' ? /编辑(?!页|界面|页面)/.test(haystack) : haystack.includes(w)))) {
+        found.add(id);
+      }
       continue;
     }
     if (words.some((w) => haystack.includes(w))) found.add(id);
@@ -232,6 +239,7 @@ function assertSequence(groups) {
   const mainHay = groups[mainIdx].haystack;
   const mainIsPersistCap = hasPersistAsCapability(mainHay);
   let i = mainIdx + 1;
+  while (i < roles.length && (roles[i] === 'locate' || roles[i] === 'neutral')) i += 1;
   if (i < roles.length && roles[i] === 'persist' && isCloserOnlyPersistHaystack(groups[i].haystack)) {
     const mainRole = roles[mainIdx];
     if (mainRole === 'other' || mainIsPersistCap) i += 1;

@@ -143,6 +143,44 @@ await run('classify: unknown prose is neutral', () => {
   assert.equal(mod.classifyCapabilityGroup('本笔只改名称字段的说明文字'), 'neutral');
 });
 
+await run('classify: 进入编辑页，等待加载 is locate (or neutral), not other/multi', () => {
+  const info = mod.inspectCapabilityGroup('进入编辑页，等待加载');
+  assert.ok(
+    info.role === 'locate' || info.role === 'neutral',
+    `expected locate|neutral, got ${info.role} families=${JSON.stringify(info.families)}`,
+  );
+  assert.notEqual(info.role, 'other');
+  assert.notEqual(info.role, 'multi');
+  assert.equal(info.families.includes('maintain'), false);
+});
+
+await run('classify: 编辑字段 / 编辑基本信息 stay maintain other', () => {
+  const fields = mod.inspectCapabilityGroup('编辑字段');
+  assert.equal(fields.role, 'other');
+  assert.ok(fields.families.includes('maintain'));
+  const basic = mod.inspectCapabilityGroup('编辑基本信息');
+  assert.equal(basic.role, 'other');
+  assert.ok(basic.families.includes('maintain'));
+});
+
+await run('helper: locate 进入编辑页 + other 维护概况并【保存】 with business produce key passes', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '维护概况',
+    taskDraft: '1、进入编辑页\n2、维护概况并【保存】',
+    produces: ['信贷潜在客户'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('helper: locate 进入编辑页 + maintain + verify + closer-only 保存 passes', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '草稿客户转为信贷潜在客户',
+    taskDraft: '1、进入编辑页\n2、维护概况\n3、联网核查\n4、保存',
+    produces: ['信贷潜在客户'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
 await run('C1 helper: locate + maintain/save + reorder → multi_capability_task_draft', () => {
   const out = mod.assertCapabilityCohesion({
     title: '维护并排序',
