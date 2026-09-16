@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-16 19:20 · ZCode 引擎线 — 收工：字段 label 解析同族收敛（回链 18:03 开工）
+
+- 完成：`13cc5404`（10 文件，+95/-71 级）。**单一来源** `js_snippets/base.py` 新增 `JS_FIELD_LABEL_NORM`（折叠空白/剥尾 `：:*`/剥首 `*`）与 `JS_FIELD_ITEM_CANDIDATES`（`(root,label,allowReverse) => el[]`，按 精确→包含→反向包含 排序返回）。**接线 7 个消费方**：`base.JS_LOCATOR`/`JS_SMART_LOCATOR`（录制 xpath 与 locator snap；可见性退化为对有序候选的过滤）、`select_tree.JS_CLICK_RADIO` 与 `JS_SELECT_TREE_OPTION`（两处循环）、`fill_core` Pass1/Pass2/scope 归一化 + `JS_CLEAR_FIELD_VALUE`（Pass2 仍跳精确项，只放宽不重试）、`scan_form.JS_CHECK_SINGLE_FIELD` 两遍、`misc.JS_CLICK_VERIFY_BUTTON`、`select_dispatch._JS_LIVE_TSSC` 与 `fill_engine` 两处 kind probe（精确优先使判定描述"真正会被操作的字段"，消除前缀兄弟无控件即短路的假阴性→select 走错分发）。**刻意不动**：按文案匹配选项/按钮/菜单/单元格（`replay_js` 菜单项、`fill_date` 面板项、`table_cell`、`icons`、`_misc`）；`scripts/prompts/**` 未改（本轮为行为对齐，非新语义）
+- 验收（四层）：①**生成物真机**——7 个 snippet `node --check` 全过；Playwright 活页面证 5 层级（候选序、`JS_LOCATOR`/`JS_SMART_LOCATOR` 落在 `*要素名称` 而非前缀兄弟、正向包含兜底、反向包含仅 opt-in、radio 点中精确组、验证按钮点中精确项）②**新门禁** `characterize-field-label-resolution.py`（源码 pin 全消费方 + 禁旧式字面量 + 活页面 5 断言），**双向证伪**：还原旧 `includes` 首中文面量→红、只变异标签取值来源（源码 pin 不覆盖）→活页面断言红，还原即绿 ③**verify-all**：3 红 = step-highlight / layer-tree / confirm-notification，**已用"源码还原到 HEAD + md5 守卫还原"对跑复现同形**（`FAILED (3)` / `1 FAILURE(S)` / `all markers present`）→ 非回归；network-capture 本轮由红转绿（环境）④同时把此前**未注册**的两个 cold 门禁 `characterize-prefix-label-{select,xpath}` 拉回门禁（verify-all 141 项）
+- 偏差声明（超出 18:03 开工声明文件集，事后自报）：①`_js_snippets.py` 仅补 barrel re-export（该模块自述"re-exports every constant"）②`js_snippets/misc.py` 的 `JS_CLICK_VERIFY_BUTTON` 亦属同族（按 label 定位字段→点按钮），在回收阶段发现并一并收敛
+- 遗留移交：①`characterization/cold/characterize-live-xpath-e2e.mjs` 内嵌 **JS_SMART_LOCATOR 手抄镜像**（未注册门禁，且其 pickControl 清单早已与实现漂移）——本轮未动，若复活该 fixture 须同步镜像 ②`scripts/smoke/result-protocol-live.py:89` 自带内联 kind 探测副本（smoke 豁免区）同样未同步 ③`base.py:157` placeholder 兜底仍为 `ph.includes(label) || normalizeFormLabel(ph) === want` 单次判断（末级兜底，未纳入本轮）④eslint 存量 25 warning 全在 .js（本次零 .js 改动，非本线引入）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-16 18:03 · ZCode 引擎线 — 开工：字段 label 解析同族收敛（归一化 + 精确优先）
 
 - 进行中：接 10:52 收工的 tssc 病灶（`b3339e2a`），把**同族**的「按 label 定位字段」一并对齐到仓库既有规范——`select_trigger._tryItems` 与 `characterize-prefix-label-select`/`characterize-prefix-label-xpath` 已确立的「归一化（折叠空白/剥尾 `：:*`/剥首 `*`）→ 精确优先 → 首个 `includes` 兜底」。现存不合规点：`select_tree.py`（radio 与 tree select 仍用 `l === label || l.includes(label)` 首中即返）、`base.py`（`JS_LOCATOR` 首个 includes 且未归一化；`JS_SMART_LOCATOR` 部分匹配 last-wins）、`fill_core.py`（Pass1/Pass2/scope/clear 未归一化）、`scan_form.py`（pass1 裸等值）、`select_dispatch.py`（`_JS_LIVE_TSSC` 首中即返 → 同族字段非 tssc 时假阴性）、`fill_engine.py`（两处重复 kind probe 同形，假阴性致 select 走错分发）。**只治「按 label 定位字段」；不动按文案匹配选项/按钮/菜单/单元格的路径**
