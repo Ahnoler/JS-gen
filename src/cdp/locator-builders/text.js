@@ -50,7 +50,8 @@ export function normalizeFormLabel(text) {
 }
 
 /**
- * Strip volatile tree suffixes: trailing (count) and [V-x.x.x] version badges.
+ * Strip volatile tree suffixes: trailing (count) and decorative trailing dash.
+ * Does not strip [V-x.x.x] version badges.
  * @param {string} text Raw tree text.
  * @returns {string} Stable text with volatile suffixes removed, capped at 40 chars.
  */
@@ -58,10 +59,34 @@ export function stripVolatileTreeText(text) {
   return String(text || '')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/\[\s*V[-\d.]+\s*\]$/i, '')
     .replace(/\(\d+\)\s*$/, '')
+    .replace(/\s*-\s*$/, '')
     .trim()
     .slice(0, 40);
+}
+
+/**
+ * Prefer inner semantic span under .custom-tree-node; then stripVolatileTreeText.
+ * @param {Element|null} node Tree node element (or host under custom-tree-node).
+ * @returns {string} Cleaned semantic tree label, capped at 40 chars.
+ */
+export function treeSemanticTextFromNode(node) {
+  if (!node || node.nodeType !== 1) return '';
+  const custom = node.closest && node.closest('.custom-tree-node');
+  if (custom) {
+    const spans = custom.querySelectorAll('span');
+    for (let i = 0; i < spans.length; i++) {
+      const span = spans[i];
+      if (span === custom) continue;
+      const cls = String(span.className || '');
+      if (/\bel-icon\b|icon|expand|caret|arrow/i.test(cls)) continue;
+      if (span.querySelector && span.querySelector('i[class*="icon"], .el-icon')) continue;
+      const raw = String(span.textContent || '').replace(/\s+/g, ' ').trim();
+      if (raw) return stripVolatileTreeText(raw);
+    }
+  }
+  const fallback = String(node.innerText || node.textContent || '');
+  return stripVolatileTreeText(fallback);
 }
 
 /**

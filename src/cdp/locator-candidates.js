@@ -16,6 +16,7 @@ export {
   normalizeControlText,
   normalizeFormLabel,
   stripVolatileTreeText,
+  treeSemanticTextFromNode,
   extractElIconClass,
   classTokenPred,
   hasClassToken,

@@ -172,6 +172,7 @@ run "characterize-network-capture" node scripts/characterization/characterize-ne
 run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-staging.py
 run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py
 run "characterize-form-field-intra-slot" node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
+run "characterize-tree-node-text" node scripts/characterization/cold/characterize-tree-node-text.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

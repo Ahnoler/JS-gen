@@ -229,6 +229,12 @@ function ok(name) {
 }
 
 {
+  const xp = buildTreeNodeXPathSmart({ text: '测试111[V-0.0.1]' });
+  assert.ok(xp.includes('[V-0.0.1]') || xp.includes('V-0.0.1'), xp);
+  ok('tree keeps version badge');
+}
+
+{
   const xp = buildTreeNodeXPathSmart({ text: '票据', parentText: '提货担保' });
   assert.ok(xp.includes('提货担保'));
   assert.ok(xp.includes('el-tree-node__children'));
