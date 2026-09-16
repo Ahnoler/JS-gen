@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 · OpenCode — 开工：排查控制面异常关闭导致录制画面推流中断
+
+- 进行中：从交易关联的 `remote_session_id` 出发，排查数据库记录、控制面恢复/清理逻辑、执行机 WebSocket 与 BiB/画面推流生命周期；本轮先做只读根因分析，不直接修改业务代码。
+- 范围：`src/` 控制面路由与 session/recording/stream 服务、`scripts/` 执行机生命周期与推流相关代码、数据库迁移/查询定义、相关文档与 characterization；本协作日志。
+- 禁入区：前端仓、线上数据库/执行机运行态、既有未提交 `config/.db-whitelist-seen`、其他会话工作区 WIP；不改变任何线上交易或会话状态。
+- 方式：先完成 `git pull` 尝试（因 GitHub 连接重置未成功），再以静态代码、迁移和测试证据追踪异常关闭后的 orphan session、重连和推流恢复路径，最后给出带文件/行号的根因与修复建议。
+
 ## 2026-09-16 11:xx · OpenCode — 收工：迁移本机数据库白名单同步工具至 tmp/cmds（回链本次开工）
 
 - 完成：删除仓库共享 `config/update-db-whitelist.cmd` 与 `config/update-db-whitelist.ps1`；本机工具已迁至 gitignore 的 `tmp/cmds/`，两文件保持同目录调用关系。
