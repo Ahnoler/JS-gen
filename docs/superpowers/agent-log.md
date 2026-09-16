@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 16:43 · OpenCode — 收工：回放 err-search-first 误拦截（回链 16:37 开工）
+
+- 完成：根因（回放引擎绕过录制态 STC flag 标记 → 守卫误拦 → 语意路径退化）修复 `c820ac76`：新增 `mark_stc_flags_on_replay_ok`（fill→search_filled / 查询点击→query_clicked，候选含 params 与 element/attrs placeholder）；`replay_action_entries` 成功分支接线；`FillEngine`/`ClickEngine` 录制路径行为不变
+- 验收：`characterize-search-then-click-guard` OK（先 RED import 失败、后 GREEN）；`characterize-search-then-click-prompts` OK；verify-all 其余烟均为已登记他线红（step-highlight/layer-tree/confirm-notification/network-capture 环境）——本线两烟绿；replay/heal 相关烟（heal-locate 39 / heal-decision 9 / replay-batch）复验全绿
+- 遗留移交：本修复仅保证守卫提示真实，若查询后表格确实无该行，语义路径将报 `err-no-row-match`（比误报的 `err-search-first` 更可诊断）；生产须重启执行机进程生效；不维护 CHANGELOG
+
 ## 2026-09-16 16:37 · OpenCode — 开工：回放 err-search-first 误拦截（STC flags 回写共享 store）
 
 - 进行中：多步一起回放时 `click_table_row_radio` 失败根因——回放循环成功分支从不把 search_then_click 的 STC flags 写入共享 `business_data_store`（`fill` 走新 `{}` store、`click_button('查询')` 走 classmethod 无 store）→ 语意路径被守卫误拦 `err-search-first`，回退 durable 又找不到行；修复=回放循环成功后标记 fill/查询 标记位
