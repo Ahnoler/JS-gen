@@ -28,6 +28,11 @@ import {
 } from './flow-card-guide.js';
 import { writeProposeCache, PROPOSE_CACHE_VERSION } from './propose-cache.js';
 import { collectPageCodes, sanitizeTaskDraftKeyData } from './atom-keydata.js';
+import {
+  normalizeProduces,
+  normalizeDataDependsOn,
+  validateAtomDependGraph,
+} from './atom-depend.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
@@ -77,6 +82,8 @@ async function appendObservation(file, line) {
  * @property {string[]} phaseHints Short phase titles
  * @property {string} [wetTestHint] Optional wet-test hint
  * @property {string[]} [pageCodes] Ordered unique ZJJK page/component codes (not in 关键数据)
+ * @property {string[]} [produces] Keys this atom newly establishes
+ * @property {Array<{ key: string, source: 'atom' | 'preset' }>} [dataDependsOn] Required related-data keys
  * @property {string} [suggestedFlowRef] Matched kb flow card stem
  * @property {string} [suggestedNodeId] Matched flow card node id
  * @property {boolean} [flowGuided] True when LLM supplied flowRef (card-guided atom)
@@ -671,6 +678,12 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
       : [],
     pageCodes,
   };
+  atom.produces = normalizeProduces(llmAtom.produces);
+  atom.dataDependsOn = normalizeDataDependsOn(llmAtom.dataDependsOn);
+  atom.dependFieldsPresent = (
+    Object.prototype.hasOwnProperty.call(llmAtom, 'produces')
+    || Object.prototype.hasOwnProperty.call(llmAtom, 'dataDependsOn')
+  );
 
   if (llmAtom.wetTestHint != null && String(llmAtom.wetTestHint).trim()) {
     atom.wetTestHint = String(llmAtom.wetTestHint).trim();
@@ -802,7 +815,7 @@ export function computeFunctionIdCandidates(atom, functionNodes) {
  * @param {() => Promise<Array<object>>} [opts.listFlowCardsFn] Injectable flow-card loader
  *   (offline characterization stubs; defaults to listFlowCardsDetailed)
  * @param {string} [opts.flowsDir] Override flows directory for listFlowCardsDetailed
- * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }>, truncated: { dropped: number, requestedMax: number|null } }>} Accepted and rejected atoms with truncation facts
+ * @returns {Promise<{ atoms: DraftAtom[], rejected: Array<{ atomKey?: string, reason: string }>, truncated: { dropped: number, requestedMax: number|null }, warnings: Array<{ atomKey?: string, reason: string }> }>} Accepted and rejected atoms with truncation facts and depend-graph warnings
  */
 export async function proposeDraftTrajectories({
   moduleKey,
@@ -888,6 +901,32 @@ export async function proposeDraftTrajectories({
     }
   }
 
+  const graphInput = atoms.map((a) => ({
+    atomKey: a.atomKey,
+    ...(a.dependFieldsPresent
+      ? { produces: a.produces, dataDependsOn: a.dataDependsOn }
+      : {}),
+  }));
+  const dependResult = validateAtomDependGraph(graphInput);
+  const rejectKeys = new Set(
+    dependResult.rejected.map((r) => r.atomKey).filter(Boolean),
+  );
+  const kept = [];
+  for (const a of atoms) {
+    if (rejectKeys.has(a.atomKey)) {
+      const reason = dependResult.rejected.find((r) => r.atomKey === a.atomKey)?.reason
+        || 'dangling_data_depend';
+      rejected.push({ atomKey: a.atomKey, reason });
+      delete a.dependFieldsPresent;
+      continue;
+    }
+    delete a.dependFieldsPresent;
+    kept.push(a);
+  }
+  atoms.length = 0;
+  atoms.push(...kept);
+  const warnings = Array.isArray(dependResult.warnings) ? dependResult.warnings : [];
+
   const requestedMax = Number.isFinite(maxAtoms) && maxAtoms > 0 ? maxAtoms : null;
   let capped = atoms;
   if (requestedMax != null && atoms.length > requestedMax) {
@@ -945,6 +984,7 @@ export async function proposeDraftTrajectories({
     sourceHash,
     inputHash,
     truncated,
+    warnings,
   });
 
   const flowRefHits = capped.filter((a) => a.suggestedFlowRef).length;
@@ -976,5 +1016,5 @@ export async function proposeDraftTrajectories({
     });
   }
 
-  return { atoms: capped, rejected, truncated };
+  return { atoms: capped, rejected, truncated, warnings };
 }

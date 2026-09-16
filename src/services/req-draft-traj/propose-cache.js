@@ -42,9 +42,10 @@ export async function readProposeCache(moduleDir) {
  * @param {string} [payload.sourceHash] sha256 of through-chains.md at propose time
  * @param {string} [payload.inputHash] sha256 of the propose input shape ({chainIds, maxAtoms})
  * @param {{ dropped: number, requestedMax: number|null }} [payload.truncated] maxAtoms truncation facts
+ * @param {Array<{ atomKey?: string, reason: string }>} [payload.warnings] Soft depend-graph issues
  * @returns {Promise<object>} Written payload (cacheVersion stamped)
  */
-export async function writeProposeCache(moduleDir, { atoms, rejected, sourceHash, inputHash, truncated }) {
+export async function writeProposeCache(moduleDir, { atoms, rejected, sourceHash, inputHash, truncated, warnings }) {
   const body = {
     cacheVersion: PROPOSE_CACHE_VERSION,
     updatedAt: new Date().toISOString(),
@@ -53,6 +54,7 @@ export async function writeProposeCache(moduleDir, { atoms, rejected, sourceHash
     atoms,
     rejected,
     truncated: truncated ?? { dropped: 0, requestedMax: null },
+    warnings: Array.isArray(warnings) ? warnings : [],
   };
   const target = join(moduleDir, PROPOSE_CACHE_FILENAME);
   const tmp = `${target}.tmp`;

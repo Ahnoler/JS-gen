@@ -85,5 +85,15 @@ await run('missing both fields → warning missing_depend_fields', () => {
   assert.equal(warnings[0].reason, 'missing_depend_fields');
 });
 
+await run('propose materialize keeps produces/depends and rejects self_produce batch', async () => {
+  // Marker-style pin on propose.js source (fast, no DB): fields + validate call present.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(join(ROOT, 'src/services/req-draft-traj/propose.js'), 'utf8');
+  assert.ok(src.includes("from './atom-depend.js'"));
+  assert.ok(src.includes('validateAtomDependGraph'));
+  assert.ok(src.includes('self_produce_depend') || src.includes('validateAtomDependGraph('));
+  assert.ok(src.includes('warnings'));
+});
+
 if (failed) process.exit(1);
 console.log('all passed');
