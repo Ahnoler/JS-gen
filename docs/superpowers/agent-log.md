@@ -11,6 +11,15 @@
 - 遗留移交：①**湿测未跑**（PR 作者云环境无 MySQL，其条目自述"湿测未跑"）——建议对公建档/查询多阶段真机跑一遍，确认 0 步假成功确被拒且正常查询/导航不被误拒；②生产须重启控制面 + 执行机进程生效；③`release` 前若发现查询/导航阶段被过度拒绝，回退点是 `abea7695`（仅一行）与 `c0cfa03e`（整体）；④el-select 下拉栅栏等 PR 未涉及的能力未动
 - 注：不维护 CHANGELOG
 
+## 2026-09-16 21:00 · OpenCode — 收工：修复 RSCF frameId 恒定导致的画面反复附着/自动重连死循环（回链 20:45 开工）
+
+- 完成：**`5b7c751b`**（3 文件 / +103 -2）。①`executor/bib-bridge.js` 新增进程级单调序号 `nextRscfFrameId()`：RSCF 头 `frameId` 不再写 Chrome 的 `screencastFrame.sessionId`（该值在**单个 screencast 会话内恒定**），改写入递增序号；`ack()` 改为始终回真实 CDP sessionId（避免把进度序号当 CDP id 回 ack）。②`src/executor-ws.js` 新增 `clearLastRscfPacket(uuid)`，在 `session.bib_ready`（执行机重建 BiB）时清该 uuid 的缓存帧，防止重挂后缓存基线序号高于新推流序号、新帧被误判为陈旧重绘。
+- 根因链（实证）：前端 `useRemoteCanvas.ts` 以「收到**新** frameId」判定 streaming（`isFresh = parsed.frameId !== lastFrameId` → `streaming.value = true`，行 1004/1012），并在 `waitForFreshFrame`（行 453，baseline=subscribe 时的 `cachedFrameId`）超时后走自动重连，`recording:stream_detached` → `resetStreamOnly('画面已断开，正在自动重连…')`（行 1030）。而旧后端把 CDP `sessionId` 当 frameId（**恒定**），`isFresh` 永假 → 8s 超时 → detach+重新 prepare → 每轮生成新 remote_session（DB 实测 1894→1895→1896→1897 链，839 被反复重置回 draft），即用户看到的「正在附着画面… / 画面已断开，系统正在自动重连…」死循环；用户手动调 `detach` 也无法恢复（同一契约缺口）。
+- 关键实证：自建 headless Chrome + 原始 CDP 直连实测 298 帧 `Page.screencastFrame.sessionId` **全为 1**（`b64len` 各异 ＝ 确为不同帧）→ 证明该字段是推流会话 id 而非逐帧序号；活网控制面 WS 订阅探针（`tmp/ws-frame-probe.mjs`）修复前 frameId 恒定（12 / 35），修复后为 108…135 严格递增且 `unique` 全不同。
+- 验收证据：①pin 追加到**已注册**的 `scripts/characterization/cold/characterize-bib-navigate-input.mjs`（未碰他线 WIP `scripts/refactor/verify-all.sh`）——断言逐帧唯一/严格递增、跨 BibBridge 实例仍单调、ack 用 CDP id 而非 RSCF 序号；**RED→GREEN 已留档**（`git stash push -- executor/bib-bridge.js` 跑红 `1 !== 5`，pop 后 OK）。②`characterize-bib-navigate-input` / `characterize-executor-orphan-reconcile` / `characterize-session-lifecycle` / `characterize-screencast-timing` / `characterize-executor-only-bib` / `characterize-trajectory` 全绿；`node --check` + `npx eslint executor/bib-bridge.js src/executor-ws.js` = 0。③真机复验（经用户批准重启执行机 + 控制面加载新代码）：`POST /trajectories/839/record/prepare` → 新 session **1898**，WS 探针 frameId **108→135 严格递增**、`cachedFrameId=108`；DB 连续监控 60s **无新 remote_session**、1898 保持 `active`、`record_status=recording`（修复前每 2–4 分钟新建一个 session）。
+- 部署：原执行机 PID 33548 / 控制面 PID 12924 已停止，新进程执行机 **25860**、控制面 **32668**（日志 `logs/executor.*.log`、`logs/server.*.log`）。启动对账日志 `[executor-ws] reconciled … { kept: 0, crashed: 2, bibReattached: 0 }`——执行机重启令 834 的 1893 与 839 的 1897 Python 进程消失，按新对账逻辑正确判 crashed（符合预期，二者需重新 prepare）。
+- 遗留移交：①SPA 仍以「frameId 变化」判定 streaming（既有契约），本次令后端满足之，未改 SPA 仓；②执行机进程内序号在进程重启后从 0 重来，已由 `session.bib_ready` 清缓存兜住基线倒挂；③控制面本地 `src/cdp/remote-bridge/screencast.js` 的同名写 `sessionId` 路径为已移除的本地 BiB 挂载（dead code），未改；④不维护 CHANGELOG。
+
 ## 2026-09-16 20:49 · ZCode 引擎线 — 开工：本地合入 PR #45（G3 phase_done 证据门闩）
 
 - 进行中：把 `origin/cursor/g3-phase-done-evidence-gate-3b92`（7 提交 `539c8e76`→`9391f09c`，作者 Cursor Cloud，12:22–12:41）合入**本地主线 `uara_V1.2`**（该 PR 原提 master，用户明确不动 master）。内容=query/navigate `success_when` 证据 + click 证据埋点 + recorder `needs_token` 双条件 + 控制面 0 步 `phase_done` 拒收 + verify-all 接入 2 pin + prompts 对齐

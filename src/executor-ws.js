@@ -198,6 +198,9 @@ async function handleMessage(ws, msg) {
       if (!delivered) broadcast('remote:tabs', tabsPayload);
     }
     if (type === 'session.bib_ready' && payload.remoteSessionUuid) {
+      // 执行机重建了 BiB screencast → 旧缓存帧来自已终止的推流会话，其序号基线
+      // 对新推流不再成立（序号可能更小，会让客户端把新帧误判为陈旧重绘而反复重连）。
+      clearLastRscfPacket(payload.remoteSessionUuid);
       // attach 完成后立即对齐观众数（观众先于 attach 订阅的场景；0 观众 → 执行机暂停推流）
       sendJson(ws, 'session.bib_stream_viewers', {
         sessionId: payload.sessionId,
@@ -240,6 +243,17 @@ export function getLastRscfFrameId(remoteSessionUuid) {
   const packet = getLastRscfPacket(remoteSessionUuid);
   if (!packet || packet.length < 8) return null;
   return packet.readUInt32BE(4);
+}
+
+/**
+ * Drop the cached RSCF packet for a session uuid (fresh BiB attach / screencast restart).
+ * Prevents a stale cached baseline from making a new stream look like a stale repaint.
+ * @param {string} remoteSessionUuid remote session UUID
+ * @returns {void}
+ */
+export function clearLastRscfPacket(remoteSessionUuid) {
+  if (!remoteSessionUuid) return;
+  lastRscfByUuid.delete(String(remoteSessionUuid));
 }
 
 function bindConnectionHandlers(ws) {

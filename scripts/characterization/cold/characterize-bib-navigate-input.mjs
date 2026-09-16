@@ -79,4 +79,59 @@ function makeBridge(calls) {
   assert.deepEqual(res, { ok: false, reason: 'unknown_navigate_action' });
 }
 
+// RSCF frameId contract: CDP `Page.screencastFrame.sessionId` is constant for a whole
+// screencast session (measured: hundreds of distinct frames share one id), so BibBridge
+// must emit its OWN strictly increasing sequence. Dashboard clients treat a non-advancing
+// frameId as "stream stalled" and loop attach/detach, so a regression here is a P0.
+function makeStreamBridge(forwarded, acks) {
+  const bib = new BibBridge({
+    sessionId: 's1',
+    remoteSessionUuid: 'u1',
+    sendBinary: (packet) => forwarded.push(packet),
+  });
+  bib.screencastOn = true;
+  bib._minForwardMs = 0;
+  bib._ackPacer = { schedule: (id) => acks.push(id) };
+  return bib;
+}
+
+const jpegB64 = Buffer.from([1, 2, 3, 4, 5, 6]).toString('base64');
+{
+  const forwarded = [];
+  const acks = [];
+  const bib = makeStreamBridge(forwarded, acks);
+  for (let i = 0; i < 5; i += 1) {
+    bib._onScreencastFrame({ sessionId: 7, data: jpegB64, metadata: { deviceWidth: 800, deviceHeight: 600 } });
+  }
+  assert.equal(forwarded.length, 5, 'every frame is forwarded when not throttled');
+  const ids = forwarded.map((p) => p.readUInt32BE(4));
+  assert.deepEqual([...ids].sort((a, b) => a - b), ids, 'RSCF frameId must be strictly increasing');
+  assert.equal(new Set(ids).size, ids.length, 'each frame carries a distinct RSCF frameId');
+  assert.ok(acks.length >= 5 && acks.every((a) => a === 7), 'acks must use the CDP screencast sessionId');
+  assert.equal(bib._cdpSessionId, 7, 'CDP session id captured for acks');
+}
+
+// A later BibBridge instance (re-attach) must NOT restart the sequence at 1 —
+// otherwise a cached baseline from the previous stream outranks new frames.
+{
+  const forwarded = [];
+  const bib2 = makeStreamBridge(forwarded, []);
+  bib2._onScreencastFrame({ sessionId: 99, data: jpegB64, metadata: {} });
+  assert.ok(forwarded[0].readUInt32BE(4) > 5, 'frame sequence stays monotonic across bridge instances');
+  assert.equal(bib2._cdpSessionId, 99, 'new CDP session id tracked');
+}
+
+// Client ack forwarding must target the real CDP id, never the RSCF progress sequence.
+{
+  const calls = [];
+  const bib = makeStreamBridge([], []);
+  bib._cdpSessionId = 7;
+  bib.client = { send: async (method, params) => { calls.push({ method, params }); return {}; } };
+  await bib.ack({ frameId: 999999 });
+  assert.ok(
+    calls.some((c) => c.method === 'Page.screencastFrameAck' && c.params.sessionId === 7),
+    'ack must use the CDP screencast sessionId, not the RSCF frameId',
+  );
+}
+
 console.log('characterize-bib-navigate-input: OK');
