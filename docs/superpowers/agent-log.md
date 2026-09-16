@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:20 · Cursor — 开工：Task 1 atom-depend 图校验（纯 helper）
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 1 only**（TDD：characterize → `atom-depend.js` → 接入 verify-all）
+- 范围：`scripts/characterization/characterize-atom-depend.mjs`、`src/services/req-draft-traj/atom-depend.js`、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：`propose.js` / atomize prompt / Task 2–4；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath（`src/cdp/page-locator-helpers.js` / locator-builders / `scripts/manual_recorder/**`）；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话 Inline TDD；子智能体不 commit
+
 ## 2026-09-16 12:15 · Cursor — 开工：表单字段内同族控件 xpath 消歧（field_slot）
 
 - 进行中：真机调研「保证金比例」复合字段 → 方案 A 已定；写 design spec，待用户审阅后写 plan 再改代码。
