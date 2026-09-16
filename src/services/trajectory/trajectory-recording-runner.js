@@ -35,6 +35,13 @@ import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { capturePhaseBuffer, buildMetadata } from './phase-highlight-screenshot.js';
 import { replacePhaseGroupScreenshot } from '../screenshot-service.js';
 import { phaseEventOwnership, waitForSessionEventOwned } from './run-event-ownership.js';
+// G3（PR #45）：countBusinessSteps / META_STEP_ACTIONS 已在本文件上方从
+// ./action-log-copy.js 与 ../../models/meta-step-actions.js 导入——两个模块的
+// 同名导出只取其一，故此处只引入本文件尚未有的两个 helper。
+import {
+  aggregateTrajectorySuccessful,
+  applyZeroStepFakeSuccessGate,
+} from './phase-done-evidence-gate.js';
 
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -846,6 +853,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   /**
    * 阶段收尾：解析 phase_done 结果写入 phaseOutcomes、appendPhaseDoneLog、
    * 置阶段 completed、通知批量进度，排空持久化与组图队列后采集阶段高亮截图。
+   * G3：0 业务步 + success=true → 覆盖为 success=false（zero_step_rejected）。
    * @param {object} phase 当前阶段
    * @param {object|null} donePayload phase_done 事件负载
    * @returns {Promise<void>}
@@ -890,9 +898,19 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     };
     runtime.phaseOutcomes[phase.id] = phaseOutcome;
     runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;
-    const rawDoneText = String(donePayload?.text || '').trim();
-    if (rawDoneText) {
-      await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
+    if (gated.rejectedZeroStep) {
+      await appendPhaseDoneLog(phase.id, {
+        text: gated.text,
+        source: 'fail',
+      });
+      console.warn(
+        `[record] G3 zero_step_rejected phase=${phase.phaseNumber} id=${phase.id}`,
+      );
+    } else {
+      const rawDoneText = String(donePayload?.text || '').trim();
+      if (rawDoneText) {
+        await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
+      }
     }
     if (zeroStepPhase) {
       await appendPhaseDoneLog(phase.id, {
@@ -1203,8 +1221,13 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       // 假成功防线 v3（per-run 真源）：本轮 0 落库步却自报 success=true 的阶段。
       // 重录场景下上面两条累积口径（副本/DB）均被旧 run 步骤掩护，唯有
       // phaseStepCounts 只计本轮；drain 后复读防迟到步误杀。
+      // G3：0 步却自报成功的阶段。计数取本轮真源 phaseStepCounts，且此时已
+      // await drain（v3 前提：迟到步不会再进来），故此处可安全地同步判定。
       const perRunZeroPhases = (runtime.perRunZeroSuccessPhases || [])
-        .filter((p) => (runtime.phaseStepCounts?.get(p.id) || 0) === 0)
+        .filter((p) => applyZeroStepFakeSuccessGate({
+          stepCount: runtime.phaseStepCounts?.get(p.id) || 0,
+          donePayload: { success: true },
+        }).rejectedZeroStep)
         .map((p) => p.phaseNumber);
       if (perRunZeroPhases.length) {
         try {
@@ -1246,7 +1269,10 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       }
     }
     const qualityFails = runtime.phaseQualityFails || [];
-    if (failedOutcomeKeys.length || qualityFails.length) {
+    // G3（PR #45）：整轨成败 = phaseOutcomes 聚合（任一显式 false → false）。
+    // phaseOutcomes 以 phase.id / phaseNumber 双键同写同一对象，按引用去重判定。
+    const trajSuccess = aggregateTrajectorySuccessful(runtime.phaseOutcomes);
+    if (failedOutcomeKeys.length || qualityFails.length || !trajSuccess) {
       finalStatus = await trajectoryDao.finishTransientRecording(tid, 'failure');
       await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
       broadcast('fake_success_detected', {

@@ -37,7 +37,6 @@
 - 方式：主会话 Inline；先补 RED pin 再最小实现；pin 覆盖必须保留的既有子串（`先搜索/查询再点击`、`不要为了凑数量而拆分`、`必须原样保留`、`禁止把具体名抹成`、`状态边界原则`、`禁止让下一阶段承担上一阶段未完成的动作`）；跑 verify-all 比对基线；不维护 CHANGELOG
 
 
-
 ## 2026-09-16 19:27 · OpenCode — 收工：录制两病灶修复（回链 18:59 开工）
 
 - 完成：**`953c4be4`**（4 文件 / +106 -22）——①`click_action_engine.click_element_by_index` 新增 `select_trigger_click`：dd_gate 对 `.el-select` 触发框返回 `kind:'trigger'`（排除 `.el-select-dropdown`/`.el-tree`/`.el-tree-node`/`.tree-popover`/`.el-tree-select__popper`/`.el-cascader__dropdown`/`.el-popover` 内的 popper 内容），并补 `target_kind=='form_select'` 兜底；命中即**点击照做但不录制、不 `remember_phase_operation_aliases`、不 `remember_trigger_button`**，返回 `transient-select-open` 提示；option/table-row/dropdown 仍原样硬拒 `use-select-option`。②索引点击「查询」时按 `re.sub(r'\s+','',btn_label)=='查询'` 调 `mark_query_clicked`（与 `click_button` 及回放侧 `mark_stc_flags_on_replay_ok` 对齐，消除录放不对称）。③`trajectory-meta-service.js` 阶段拆分提示词新增硬规则 `3.1 状态边界原则`（预期结果为「打开确认弹窗」的阶段必须含全部开窗动作；弹窗内按钮只归下一阶段；禁止下一阶段承担上一阶段未完成动作；不确定可达时「触发→确认」合并）。
@@ -638,7 +637,6 @@
 - 方式：沿日期点击确认链路扩展 editor 双 input 快照与范围值归并，保留单日期行为，补充离线 pin/语法检查后提交。
 
 
-
 ## 2026-09-15 15:26 · Cursor Lead — 收工：人工确认去掉状态闸（回链 15:13 / 14:49）
 
 - 完成：`confirmTrajectory` 用户确认路径不再校验状态，`setPersistentRecordStatus(completed)` 双字段直写；取消确认闸保留；pin + api-docs 同步
@@ -1026,4 +1024,20 @@
 - 范围：临时嗅探 `executor/session-handler.js`（relay tee）、`tmp/contract-sovereignty-wet/done-rejected-r3/`、报告增补、本文件；跑完后**回滚嗅探补丁**
 - 禁入区：合约主权实现回改、`classify.py`、他线 WIP
 - 方式：重启 executor 加载嗅探 → 对公客户管理手写 2 阶段；探针 `done(success=false)` 不保存 → 收盘 events.jsonl
+
+## 2026-09-16 13:10 · Cursor Cloud — 收工：G3 phase_done 证据门闩（回链 12:22 开工）
+- 完成：Tasks 0–7 — query/navigate `success_when` + click 证据埋点 + recorder `needs_token` 双条件 + 控制面 0 步拒收 + verify-all 接入 pin + prompts 对齐
+- 提交链：`539c8e76` → `1d1afc3f` → `bb16b5e7` → `dd8d2f58` → `8c07eff9` → `0b65742a`（+本收工）
+- PR：https://github.com/Ahnoler/JS-gen/pull/45 （draft → master）
+- 验收：`characterize-phase-boundary` OK；`characterize-phase-runtime` PASS；`characterize-phase-done-evidence-gate` OK；eslint 触及 JS 0 warning；`verify-all` 中 G3 相关全绿
+- 注意：本云环境无 MySQL（3306 ECONNREFUSED）→ `characterize-step-highlight` / `layer-tree` / `export-v3` 仍红（与本刀无关）；湿测未跑
+- 遗留移交：对公建档/查询多阶段湿测确认 P3/P4 不再 0 步假成功；有 DB 的环境再跑全量 `verify-all`
+
+## 2026-09-16 12:22 · Cursor Cloud — 开工声明：G3 phase_done 证据门闩
+- 开工：12:22 UTC。执行 Project store `docs/g3-phase-done-plan.md` Tasks 0–7
+- 范围：`scripts/controller/actions/phase/boundary_contract.py`、`boundary_gates.py`、`intent_contract.py`、`intent_gates.py`、`prompts.py`、`scripts/agent/recorder_emitters.py`、点击/导航证据埋点相关（`_misc` / form click 路径按需）、`scripts/characterization/characterize-phase-boundary.py`、`characterize-phase-runtime.py`（若触 needs_token）、`scripts/refactor/verify-all.sh`、`src/services/trajectory/trajectory-recording-runner.js`（及本阶段业务步数小 helper）、本文件
+- 禁入：G1 报文捞取、G2 运维、G4 真上传 / KB 湿测主责、文件上传·SUT、`save_section.py`（禁止恢复）、他线 WIP（`scripts/agent/service.py` 未声明改动、`data/kb/flows/**` 湿测主链、req-upload）
+- 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
+- 分支：`cursor/g3-phase-done-evidence-gate-3b92`
+
 

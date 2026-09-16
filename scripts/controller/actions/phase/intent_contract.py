@@ -161,7 +161,7 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
         mode = 'query'
         refill = 'none'
         submit = {'required': False, 'via': 'any', 'button_text': '查询'}
-        success = {'kinds': [], 'evidence': []}
+        success = {'kinds': ['query_clicked'], 'evidence': ['ok-query-clicked']}
     elif task_mode == 'form_fill':
         mode = 'create'
         refill = 'all_editable'
@@ -287,9 +287,13 @@ def apply_phase_contract(
         boundary['source'] = source
     else:
         success_when = list((c.get('success') or {}).get('kinds') or [])
-        # Keep boundary in sync with sanitized intent (login/nav/query → []).
-        if mode in ('login', 'navigate', 'query'):
+        # G3: login keeps empty success_when; query/navigate keep compile/sanitized kinds.
+        if mode == 'login':
             success_when = []
+        elif mode == 'query' and not success_when:
+            success_when = ['query_clicked']
+        elif mode == 'navigate' and not success_when:
+            success_when = ['url_change', 'page_opened']
         boundary = {
             'role': role,
             'requires_write_all_editable': requires_write,
@@ -301,10 +305,21 @@ def apply_phase_contract(
             'forbid_index_submit': mode in ('create', 'modify'),
             'picker_allowed': mode in ('create', 'modify', 'introduce_pick'),
         }
-    if boundary_override is not None and mode in ('login', 'navigate', 'query'):
-        # Even with override, never require maintain tokens on non-maintain modes.
+    if boundary_override is not None and mode == 'login':
+        # login: never require evidence tokens (prepare/replay_done path).
         boundary['success_when'] = []
         boundary['requires_write_all_editable'] = False
+    elif boundary_override is not None and mode in ('navigate', 'query'):
+        # Keep compile_boundary success_when; only clear write-all.
+        boundary['requires_write_all_editable'] = False
+        if mode == 'query' and not (boundary.get('success_when') or []):
+            boundary['success_when'] = ['query_clicked']
+        if mode == 'navigate' and not (boundary.get('success_when') or []):
+            goals = boundary.get('goals') or []
+            if 'click_next' in goals:
+                boundary['success_when'] = ['nav_next_clicked', 'url_change', 'page_opened']
+            else:
+                boundary['success_when'] = ['url_change', 'page_opened']
     business_data_store['_phase_boundary'] = boundary
     business_data_store['_phase_boundary_flag_locked'] = True
     business_data_store['_phase_intent'] = c

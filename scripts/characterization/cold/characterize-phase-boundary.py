@@ -266,6 +266,86 @@ def main() -> int:
     b_save_open = compile_boundary('确认信息无误，点击保存。预期结果：保存成功并进入列表页面。')
     assert_true(b_save_open['role'] == 'other', 'save-to-open → other not open_page')
 
+    # --- G3 evidence gate: query / navigate must not have empty success_when ---
+    q_task = '按客户名称查询。预期结果：列表展示匹配客户。'
+    b_q = compile_boundary(q_task)
+    assert_true(b_q['role'] == 'query', 'G3 query role')
+    assert_true(
+        bool(b_q.get('success_when')),
+        'G3 forbid empty success_when on query',
+    )
+    assert_true(
+        'query_clicked' in (b_q.get('success_when') or []),
+        'G3 query success_when includes query_clicked',
+    )
+    store_q: dict = {}
+    apply_phase_boundary(store_q, q_task)
+    ok_q0, miss_q0 = phase_done_ok(store_q)
+    assert_true(not ok_q0, f'G3 query done blocked without evidence: {miss_q0}')
+    record_evidence(store_q, 'query_clicked', '查询')
+    ok_q1, miss_q1 = phase_done_ok(store_q)
+    assert_true(ok_q1 and not miss_q1, 'G3 query done ok after query_clicked')
+
+    store_open: dict = {}
+    apply_phase_boundary(store_open, open_t)
+    b_open_sw = (store_open.get('_phase_boundary') or {}).get('success_when') or []
+    assert_true(bool(b_open_sw), 'G3 open_page success_when non-empty')
+    assert_true(
+        {'url_change', 'page_opened'} & set(b_open_sw),
+        f'G3 open_page needs url_change|page_opened: {b_open_sw}',
+    )
+    ok_o0, miss_o0 = phase_done_ok(store_open)
+    assert_true(not ok_o0, f'G3 open_page done blocked without evidence: {miss_o0}')
+    record_evidence(store_open, 'page_opened', 'dialog')
+    ok_o1, miss_o1 = phase_done_ok(store_open)
+    assert_true(ok_o1 and not miss_o1, 'G3 open_page done ok after page_opened')
+
+    store_wiz: dict = {}
+    apply_phase_boundary(store_wiz, wizard)
+    b_wiz_sw = (store_wiz.get('_phase_boundary') or {}).get('success_when') or []
+    assert_true(
+        'nav_next_clicked' in b_wiz_sw,
+        f'G3 wizard success_when includes nav_next_clicked: {b_wiz_sw}',
+    )
+    ok_w0, _ = phase_done_ok(store_wiz)
+    assert_true(not ok_w0, 'G3 wizard done blocked without evidence')
+    record_evidence(store_wiz, 'nav_next_clicked', '下一步')
+    ok_w1, miss_w1 = phase_done_ok(store_wiz)
+    assert_true(ok_w1 and not miss_w1, 'G3 wizard done ok after nav_next_clicked')
+
+    # login may keep empty success_when (prepare / replay_done path)
+    b_login = compile_boundary('登录系统。预期结果：进入首页。')
+    assert_true(
+        list(b_login.get('success_when') or []) == [],
+        'G3 login keeps empty success_when',
+    )
+
+    # Click-completion evidence helper (pure; no browser)
+    from scripts.controller.actions._phase_boundary import (
+        maybe_record_click_completion_evidence,
+    )
+    store_ev: dict = {}
+    apply_phase_boundary(store_ev, q_task)
+    kinds_ev = maybe_record_click_completion_evidence(
+        store_ev, btn_label='查询', url_changed=False,
+    )
+    assert_true('query_clicked' in kinds_ev, f'helper records query_clicked: {kinds_ev}')
+    ok_ev, _ = phase_done_ok(store_ev)
+    assert_true(ok_ev, 'helper evidence satisfies phase_done_ok')
+
+    store_nav_ev: dict = {}
+    apply_phase_boundary(store_nav_ev, open_t)
+    kinds_nav = maybe_record_click_completion_evidence(
+        store_nav_ev,
+        btn_label='评级申请',
+        url_changed=False,
+        overlay_title_before='',
+        overlay_title_after='评级申请',
+    )
+    assert_true('page_opened' in kinds_nav, f'helper records page_opened: {kinds_nav}')
+    ok_nav_ev, _ = phase_done_ok(store_nav_ev)
+    assert_true(ok_nav_ev, 'page_opened satisfies open_page done')
+
     print('characterize-phase-boundary: OK')
     return 0
 

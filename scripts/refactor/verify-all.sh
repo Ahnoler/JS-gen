@@ -64,6 +64,10 @@ run "characterize-real-click" "$PY" scripts/characterization/characterize-real-c
 run "characterize-tree-check-confirm" "$PY" scripts/characterization/characterize-tree-check-confirm.py
 run "characterize-session-lifecycle" node scripts/characterization/characterize-session-lifecycle.mjs
 run "characterize-phase-done-runid" "$PY" scripts/characterization/characterize-phase-done-runid.py
+# PR #45（G3 phase_done 证据门闩）。phase-boundary 在我方已归档到 cold/——保留 PR
+# 的注册意图，路径随归档同步（master 期路径 scripts/characterization/ 下已不存在）。
+run "characterize-phase-boundary" "$PY" scripts/characterization/cold/characterize-phase-boundary.py
+run "characterize-phase-done-evidence-gate" node scripts/characterization/characterize-phase-done-evidence-gate.mjs
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
 run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py

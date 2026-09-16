@@ -55,7 +55,10 @@ def observed_kinds(business_data_store: dict | None) -> set[str]:
     return out
 
 def phase_done_ok(business_data_store: dict | None) -> tuple[bool, list[str]]:
-    """Return (ok, missing_hints). Empty success_when → always ok (non-maintain)."""
+    """Return (ok, missing_hints). Empty success_when → always ok (login / other).
+
+    Non-empty success_when uses any-of matching (maintain intro+save is AND of groups).
+    """
     b = get_phase_boundary(business_data_store)
     if not b:
         return True, []
@@ -199,6 +202,50 @@ def maybe_record_picker_closed(
     clear_phase_section(business_data_store)
     return True
 
+
+_QUERY_BTN_RE = re.compile(r'^(查询|搜索|查找)')
+_NEXT_BTN_RE = re.compile(r'^(下一步|继续|下一步骤)')
+
+
+def maybe_record_click_completion_evidence(
+    business_data_store: dict | None,
+    *,
+    btn_label: str = '',
+    url_changed: bool = False,
+    overlay_title_before: str = '',
+    overlay_title_after: str = '',
+) -> list[str]:
+    """Record G3 query/nav evidence kinds after a successful index click.
+
+    Returns list of kinds newly recorded (empty if none / no boundary).
+    """
+    if not business_data_store or not phase_boundary_active(business_data_store):
+        return []
+    recorded: list[str] = []
+    compact = re.sub(r'\s+', '', (btn_label or '').strip())
+    before = (overlay_title_before or '').strip()
+    after = (overlay_title_after or '').strip()
+
+    if url_changed:
+        record_evidence(business_data_store, 'url_change', 'post-click-url')
+        recorded.append('url_change')
+
+    # New or retitled visible overlay → page_opened (OR evidence for navigate).
+    if after and after != before:
+        record_evidence(business_data_store, 'page_opened', after[:80])
+        recorded.append('page_opened')
+
+    if compact and _QUERY_BTN_RE.match(compact):
+        record_evidence(business_data_store, 'query_clicked', compact[:40])
+        recorded.append('query_clicked')
+
+    if compact and _NEXT_BTN_RE.match(compact):
+        record_evidence(business_data_store, 'nav_next_clicked', compact[:40])
+        recorded.append('nav_next_clicked')
+
+    return recorded
+
+
 def next_action_hint(business_data_store: dict | None) -> str:
     """NEXT_ACTION cue from boundary goals + current pending."""
     b = get_phase_boundary(business_data_store)
@@ -240,12 +287,31 @@ def next_action_hint(business_data_store: dict | None) -> str:
         )
     if b.get('role') == 'introduce':
         return 'NEXT_ACTION: select row then confirm (index click on 确认 OK).'
+    if b.get('role') == 'query':
+        if 'query_clicked' not in have:
+            return (
+                'NEXT_ACTION: click_element_by_index on 「查询/搜索」 first; '
+                'only then done(success=true).'
+            )
+        return 'NEXT_ACTION: evidence ok — done(success=true).'
     if b.get('role') == 'navigate':
         if 'open_page' in (b.get('goals') or []):
+            if not (have & {'url_change', 'page_opened'}):
+                return (
+                    'NEXT_ACTION: finish the clicks described in the task until the target '
+                    'page/dialog appears (need url_change or page_opened evidence), then '
+                    'done(success=true) — do NOT operate inside the new page '
+                    '(no fill / no 下一步 / no 确定).'
+                )
             return (
                 'NEXT_ACTION: finish the clicks described in the task; once the target '
                 'page/dialog appears, done(success=true) — do NOT operate inside the new page '
                 '(no fill / no 下一步 / no 确定).'
+            )
+        if 'nav_next_clicked' not in have and not (have & {'url_change', 'page_opened'}):
+            return (
+                'NEXT_ACTION: set task fields then click_element_by_index on 下一步 '
+                '(not 查询-as-done); after risk confirm if any, done(success=true).'
             )
         return (
             'NEXT_ACTION: set task fields then click_element_by_index on 下一步 '

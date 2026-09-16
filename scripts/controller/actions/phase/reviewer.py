@@ -107,10 +107,11 @@ def coerce_bool(value: Any) -> bool:
 
 
 def sanitize_contract_for_mode(contract: dict[str, Any]) -> dict[str, Any]:
-    """Force non-maintain modes to not require submit success tokens.
+    """Force non-maintain modes to not require *submit* success tokens.
 
-    LLM reviewers often invent submit.required=true + toast_ok/url_change for
-    login/navigate; recorder then rejects every done() (no token is ever recorded).
+    LLM reviewers often invent submit.required=true + toast_ok for login/navigate;
+    those maintain tokens are never recorded on query/nav paths. G3 still requires
+    role-appropriate evidence kinds (query_clicked / url_change|page_opened|…).
 
     Maintain-side contradiction guard (#614 移交，2026-09-07)：reviewer 偶发把
     create/修改弹窗判成「部分点名」语义（allow_form_assistant=False +
@@ -159,7 +160,21 @@ def sanitize_contract_for_mode(contract: dict[str, Any]) -> dict[str, Any]:
         submit['button_text'] = ''
     c['submit'] = submit
     success = dict(c.get('success') or {})
-    success['kinds'] = []
+    # Strip maintain-only tokens; keep / default G3 evidence kinds.
+    _MAINTAIN_ONLY = frozenset({'toast_ok', 'saved_navigation'})
+    _NAV_OK = frozenset({'url_change', 'page_opened', 'nav_next_clicked', 'dialog_confirmed'})
+    raw_kinds = [k for k in (success.get('kinds') or []) if k not in _MAINTAIN_ONLY]
+    if mode == 'login':
+        success['kinds'] = []
+    elif mode == 'query':
+        kept = [k for k in raw_kinds if k in ({'query_clicked'} | _NAV_OK)]
+        success['kinds'] = kept or ['query_clicked']
+    elif mode == 'navigate':
+        kept = [k for k in raw_kinds if k in (_NAV_OK | {'query_clicked'})]
+        # url_change alone from LLM is OK as nav evidence; else default open-page set.
+        success['kinds'] = kept or ['url_change', 'page_opened']
+    else:
+        success['kinds'] = []
     success['evidence'] = list(success.get('evidence') or [])[:8]
     c['success'] = success
     c['allow_form_assistant'] = False
