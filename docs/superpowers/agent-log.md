@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 21:25 · Cursor — 收工：BLOCKER 编辑页误判 maintain（回链 21:06 开工）
+
+- 完成：maintain `编辑` 不匹配导航复合 `编辑页/编辑页面/编辑界面`；真维护（`编辑字段`/`编辑基本信息`）仍计。闭环尾允许 other 后夹 locate/neutral。fill-step `保存概况` 不当 closer（对齐 `countPersistConfirms`）。未 bump cache，未改 Task 5 prompt。
+- 提交：`8a599873` 编辑页 maintain 假阳性 + pins；`8588f04d` 曾改 haystack（回退）；`a6d5e02e` 恢复 spec haystack + `保存(?!概况)` closer。开工 `8e203550`。
+- 验收：`characterize-capability-cohesion.mjs` **all passed**；`characterize-req-draft-traj.mjs` **OK 63**（含 `propose merges same-loop steps when LLM returns flowRef` 与 card-guided fallback）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**；eslint `capability-cohesion.js` 0 warning。
+- 遗留移交：Task 5+ prompt 一句 / samples / api-docs / 湿测 W1–W4。不维护 CHANGELOG
+
 ## 2026-09-16 21:06 · Cursor — 开工：BLOCKER 编辑页误判 maintain
 
 - 进行中：`capability-cohesion.js` `detectOtherFamilies` / maintain 匹配不把导航复合「编辑页 / 编辑页面 / 编辑界面」计为 maintain（真维护如「编辑字段」仍计）；`characterize-capability-cohesion.mjs` 加 pin；`propose merges same-loop steps when LLM returns flowRef` 转绿。不 bump cache，不做 Task 5 prompt。
