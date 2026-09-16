@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
-# Start control plane (4097), executor agent, and frontend dev server (3000).
+# Start control plane (4097), executor agent, and (opt-in) a frontend dev server.
+#
+# Architecture note (2026-09-02+): on the test server, :3000 is a STATIC NGINX
+# site serving /data/app/front-dist/current — start-all does NOT touch it by
+# default. Only set START_FRONTEND=1 on a machine where vite dev should own
+# 3000 (local dev); NEVER on the test server (it would kill nginx).
+# The executor normally runs on a Windows PC; only start it here if you really
+# run an all-in-one server setup (SKIP_EXECUTOR=1 avoids it).
 #
 # Usage:
-#   ./start-all.sh
-#   SKIP_EXECUTOR=1 ./start-all.sh      # backend + frontend only
-#   SKIP_FRONTEND=1 ./start-all.sh      # backend + executor only
+#   ./start-all.sh                      # control plane + executor (no frontend)
+#   SKIP_EXECUTOR=1 ./start-all.sh      # control plane only
+#   SKIP_FRONTEND=1 ./start-all.sh      # same as default (kept for old habit)
+#   START_FRONTEND=1 ./start-all.sh     # also start vite dev on :3000 (local only)
 #
 # Env overrides:
 #   JS_GEN_DIR=/data/app/JS-gen
@@ -51,11 +59,23 @@ chrome_headless_enabled() {
 kill_port() {
   local port="$1"
   local pids
-  pids="$(lsof -t -i ":${port}" 2>/dev/null || true)"
+  if command -v lsof >/dev/null 2>&1; then
+    pids="$(lsof -t -i ":${port}" 2>/dev/null || true)"
+  else
+    pids="$(ss -ltnp 2>/dev/null | grep ":${port} " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u || true)"
+  fi
   if [[ -n "$pids" ]]; then
     log "Stopping process(es) on port ${port}: ${pids}"
     kill -9 $pids 2>/dev/null || true
     sleep 1
+  fi
+}
+
+port_listening() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -i ":${1}" >/dev/null 2>&1
+  else
+    ss -ltn 2>/dev/null | grep -q ":${1} "
   fi
 }
 
@@ -103,7 +123,7 @@ start_backend() {
   log "Starting control plane on :${CONTROL_PORT}"
   nohup npm start > logs/server.log 2>&1 &
   sleep 2
-  if lsof -i ":${CONTROL_PORT}" >/dev/null 2>&1; then
+  if port_listening "${CONTROL_PORT}"; then
     log "Control plane is up (:${CONTROL_PORT})"
     tail -5 logs/server.log || true
   else
@@ -153,7 +173,7 @@ start_frontend() {
   log "Starting frontend dev server on :${FRONTEND_PORT} (vite --host)"
   nohup npm run dev > logs/dev.log 2>&1 &
   sleep 3
-  if lsof -i ":${FRONTEND_PORT}" >/dev/null 2>&1; then
+  if port_listening "${FRONTEND_PORT}"; then
     log "Frontend is up (:${FRONTEND_PORT})"
     tail -8 logs/dev.log || true
   else
@@ -163,10 +183,34 @@ start_frontend() {
   fi
 }
 
+frontend_mode() {
+  # default: leave :3000 alone (nginx static site on the test server).
+  # START_FRONTEND=1 opts in to a local vite dev server.
+  if [[ "${START_FRONTEND:-0}" == "1" ]]; then
+    log "START_FRONTEND=1 — starting vite dev on :${FRONTEND_PORT} (local dev only)"
+    start_frontend
+  else
+    log "Frontend :${FRONTEND_PORT} untouched — it is an nginx static site on the test server (set START_FRONTEND=1 to run vite dev locally)"
+  fi
+}
+
 print_status() {
   log "---- status ----"
-  lsof -i ":${CONTROL_PORT}" 2>/dev/null || log "control plane: not listening"
-  lsof -i ":${FRONTEND_PORT}" 2>/dev/null || log "frontend: not listening"
+  if port_listening "${CONTROL_PORT}"; then
+    log "control plane: listening on :${CONTROL_PORT}"
+  else
+    log "control plane: not listening"
+  fi
+  if [[ "${START_FRONTEND:-0}" == "1" ]]; then
+    if port_listening "${FRONTEND_PORT}"; then
+      log "frontend dev: listening on :${FRONTEND_PORT}"
+    else
+      log "frontend dev: not listening"
+    fi
+  else
+    # :3000 belongs to the nginx static site on the test server; report it without judging
+    log "frontend :${FRONTEND_PORT}: untouched by this script (nginx static site / START_FRONTEND=1 to run vite dev)"
+  fi
   pgrep -af "node executor/agent.mjs" 2>/dev/null || log "executor: not running"
   if chrome_headless_enabled; then
     log "CHROME_HEADLESS=true (Xvfb not required)"
@@ -176,11 +220,15 @@ print_status() {
   log "logs:"
   log "  tail -f ${JS_GEN_DIR}/logs/server.log"
   log "  tail -f ${JS_GEN_DIR}/logs/executor.log"
-  log "  tail -f ${FRONTEND_DIR}/logs/dev.log"
+  [[ "${START_FRONTEND:-0}" == "1" ]] && log "  tail -f ${FRONTEND_DIR}/logs/dev.log"
 }
 
 main() {
-  resolve_frontend_dir
+  # only require the frontend source dir when a vite dev server was requested;
+  # on the test server there is no frontend source at all (static nginx site)
+  if [[ "${START_FRONTEND:-0}" == "1" ]]; then
+    resolve_frontend_dir
+  fi
   log "JS_GEN_DIR=${JS_GEN_DIR}"
   log "FRONTEND_DIR=${FRONTEND_DIR}"
 
@@ -192,11 +240,7 @@ main() {
     log "SKIP_EXECUTOR=1 — executor not started"
   fi
 
-  if [[ "${SKIP_FRONTEND:-0}" != "1" ]]; then
-    start_frontend
-  else
-    log "SKIP_FRONTEND=1 — frontend not started"
-  fi
+  frontend_mode
 
   print_status
   log "Done. SSH disconnect will not stop these processes."
