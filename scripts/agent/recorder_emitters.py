@@ -239,6 +239,99 @@ def _capture_step_url(agent):
 
 
 
+def _boundary_requires_evidence(business_data_store) -> bool:
+    """True when phase boundary is active and success_when is non-empty (G3)."""
+    try:
+        from scripts.controller.actions._phase_boundary import (
+            get_phase_boundary,
+            phase_boundary_active,
+        )
+        if not phase_boundary_active(business_data_store):
+            return False
+        b = get_phase_boundary(business_data_store) or {}
+        return bool(b.get('success_when'))
+    except Exception:
+        return False
+
+
+# Align with product META_STEP_ACTIONS / skip-screenshot observation ops.
+_ZERO_STEP_META_ACTIONS = frozenset({
+    'save_form_snapshot', 'scan_form_fields', 'scan_visible_fields',
+    'get_page_state', 'get_pending_tasks', 'init_task_list',
+    'sync_tasks_from_errors', 'task_done', 'task_retry', 'mark_field_done',
+    'rebuild_task_list', 'match_form_rule', 'check_field_value',
+    'verify_field_value', 'wait_for_loading', 'expand_all_el_tree',
+    'take_screenshot', 'save_trajectory', 'save_business_data',
+    'read_business_data', 'close_notification', 'done', 'wait',
+    'scroll_down', 'scroll_up',
+})
+
+
+def _count_phase_business_actions(business_data_store=None) -> int:
+    """Count non-meta recorded actions for the current phase (engine 0-step floor)."""
+    try:
+        from scripts import state as _state
+        phase = int(getattr(_state, '_CURRENT_PHASE', 0) or 0)
+        n = 0
+        for entry in list(getattr(_state, '_ACTION_LOG', None) or []):
+            if not isinstance(entry, dict):
+                continue
+            meta = entry.get('meta') if isinstance(entry.get('meta'), dict) else {}
+            pn = meta.get('phaseNumber')
+            if phase and pn is not None and int(pn) != phase:
+                continue
+            action = str(entry.get('action') or entry.get('action_type') or '').strip()
+            if not action or action in _ZERO_STEP_META_ACTIONS:
+                continue
+            n += 1
+        return n
+    except Exception:
+        return 0
+
+
+def _guard_done_reject_zero_business_actions(agent, business_data_store, done_success) -> bool:
+    """Reject done(success=true) when this phase has zero non-meta recorded actions."""
+    if not done_success:
+        return False
+    if not _boundary_requires_evidence(business_data_store):
+        return False
+    if _count_phase_business_actions(business_data_store) > 0:
+        return False
+    try:
+        from ..controller.actions._phase_intent import recovery_prescription_message
+        from ..controller.actions._phase_intent import get_phase_intent
+        contract = get_phase_intent(business_data_store)
+        recovery = recovery_prescription_message(
+            contract,
+            reason='Premature done() rejected: zero business actions this phase (zero_step_fake_success).',
+        )
+    except Exception:
+        recovery = (
+            'Premature done() rejected: zero business actions this phase. '
+            'Perform the required click/fill first, then done(success=true).'
+        )
+    sys.stderr.write(
+        f'[recorder] ⚠ Premature done() — zero business actions at step '
+        f'{getattr(getattr(agent, "state", None), "n_steps", "?")}\n'
+    )
+    sys.stderr.flush()
+    try:
+        for h in agent.state.history.history:
+            if h.result:
+                for r in h.result:
+                    r.is_done = False
+                    r.error = recovery
+                    try:
+                        from scripts.feature_flags import memory_whitelist_enabled
+                        if memory_whitelist_enabled():
+                            r.include_in_memory = True
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return True
+
+
 def _guard_done_extract_success(_last_result) -> bool:
     """done 拦截-成功标志提取（原 _guard_done_on_step_end 顶段 176-188 段）。
 
@@ -785,11 +878,15 @@ async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> b
             if _guard_done_reject_pending_write(agent, business_data_store, contract):
                 return
             done_text, claims_save_ok = _guard_done_claims(_last_result, done_success)
-            # Claiming save success without token when contract requires submit
-            needs_token = bool(
-                contract
-                and (contract.get('submit') or {}).get('required')
+            # G3: need evidence token when submit.required OR boundary success_when non-empty
+            needs_token = bool(contract) and (
+                bool((contract.get('submit') or {}).get('required'))
+                or _boundary_requires_evidence(business_data_store)
             )
+            if _guard_done_reject_zero_business_actions(
+                agent, business_data_store, done_success,
+            ):
+                return
             if _guard_done_reject_missing_token(
                 agent, business_data_store, contract, done_success, introduce_ok, needs_token,
             ):

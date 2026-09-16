@@ -291,6 +291,34 @@ def test_quality_fail_logging_in_session_runner() -> None:
     )
 
 
+def test_recorder_g3_evidence_needs_token() -> None:
+    """G3: needs_token must consider boundary success_when, not only submit.required."""
+    rec = (ROOT / "scripts/agent/recorder_emitters.py").read_text(encoding="utf-8")
+    assert_true(
+        "def _boundary_requires_evidence" in rec,
+        "_boundary_requires_evidence helper present",
+    )
+    assert_true(
+        "_boundary_requires_evidence(business_data_store)" in rec,
+        "needs_token ORs boundary evidence requirement",
+    )
+    assert_true(
+        "def _guard_done_reject_zero_business_actions" in rec,
+        "zero-step engine floor present",
+    )
+    from scripts.agent.recorder_emitters import _boundary_requires_evidence
+    from scripts.controller.actions._phase_boundary import apply_phase_boundary
+
+    empty: dict = {}
+    assert_true(not _boundary_requires_evidence(empty), "no boundary → no evidence req")
+    store: dict = {}
+    apply_phase_boundary(store, '按客户名称查询。预期结果：列表展示匹配客户。')
+    assert_true(_boundary_requires_evidence(store), "query boundary requires evidence")
+    login: dict = {}
+    apply_phase_boundary(login, '登录系统。预期结果：进入首页。')
+    assert_true(not _boundary_requires_evidence(login), "login empty success_when")
+
+
 def test_create_submit_budget_includes_recovery_buffer() -> None:
     """create+submit needs headroom for validation → introduce → final save."""
     base = resolve_phase_max_steps(
