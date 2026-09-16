@@ -1,7 +1,7 @@
 # Design: 产品树节点录制文本去脏后缀
 
 **日期**：2026-09-16  
-**状态**：草案（待用户审阅）  
+**状态**：已批准；计划 [`../plans/2026-09-16-tree-node-dirty-suffix.md`](../plans/2026-09-16-tree-node-dirty-suffix.md)  
 **触发**：AI/人工录制产品树点击后，步骤文本与批量推送携带脏后缀（如 `年龄限制 -`、`金融新产品(7)`），伙伴平台无法使用；回放侧已部分容忍但推送仍脏。  
 **相关**：`stripVolatileTreeText`（`src/cdp/locator-builders/text.js` + `page-locator-helpers.js`）；`buildLocatorSnap` tree_node；manual `js_parts/b.py` 树点击；AI capture / click 落库 `text`；推送 `buildBusinessObjectName` / transaction export。  
 **用户裁决**：

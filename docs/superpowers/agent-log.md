@@ -6,6 +6,12 @@
 - 结论：`b3339e2a`（tssc_multi_select findFieldItem 精确优先+唯一兜底+歧义报错）为有效修复；此前 10:52 收工条目登记的「19242 活页面单点验证」至此升级为**整链真机复验通过**。
 - 本条为状态收口，无新代码改动。
 
+## 2026-09-16 16:58 · Cursor — 收工：产品树脏后缀 design + plan（回链 16:50 开工）
+
+- 完成：spec `2026-09-16-tree-node-dirty-suffix-design.md`（用户批准）；plan `2026-09-16-tree-node-dirty-suffix.md`（Tasks 1–5）
+- 验收：用户确认「可以」；裁决写入 Global Constraints（保留 `[V-…]`，剥 `(N)`/拼接 `-`）
+- 遗留移交：待选执行方式（subagent-driven-development / executing-plans）
+
 ## 2026-09-16 16:50 · Cursor — 开工：产品树脏后缀 design spec
 
 - 进行中：写入并提交 `docs/superpowers/specs/2026-09-16-tree-node-dirty-suffix-design.md`（用户裁决：剥 `(N)`/拼接 `-`，保留 `[V-…]`；DOM 优先取内层 span）
