@@ -8,6 +8,13 @@
 - 遗留移交：生产须重启执行机进程生效；本次仅修容器解析（回放时容器确实存在却匹配失败），未改 Type B `container_not_found`→fail 的策略（设计定调 unsafe 不 mutate）；顺带清除 agent-log 他线遗留的合并冲突标记（保留双方条目）
 - 注意：push 时遇 GitHub 不可达（TCP 443 连接失败），本条与代码提交待网络恢复后 pull+push；不维护 CHANGELOG
 
+## 2026-09-16 17:12 · Cursor — 开工：产品树脏后缀 SDD Task 1–5
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-tree-node-dirty-suffix.md`（清洗函数 → 录制 → 回放 → 推送 → 湿测）
+- 范围：`src/cdp/locator-builders/text.js`、`src/cdp/page-locator-helpers.js`（+ gen）、`scripts/manual_recorder/js_parts/b.py`、AI click/enrich、`src/services/transaction-export.js`、characterization cold pins、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：SPA 仓；历史 DB migrate；他线 atomize/req-draft-traj / Type B form snapshot；不手改 `_locator_helpers_js.py`（走 gen）；`config/` WIP
+- 方式：subagent-driven-development；子智能体不 commit，主会话验收后代提交 + push
+
 ## 2026-09-16 17:11 · OpenCode — 开工：Type B 表单结构检查点容器解析失败致回放误报失败
 
 - 进行中：多步回放（含选中行）浏览器全执行，但汇总报「失败 1 条」——根因=回放的 `save_form_snapshot`（Type B）按 `dialog:<trigger>|unnamed` 找容器，`JS_VERIFY_FORM_STRUCTURE.matchTitle` 对 unnamed 哨兵要求 `aria-label` 为空，而 Element UI 的 `.el-dialog` 恒有 `aria-label="dialog"`（`title || 'dialog'`）→ 永远匹配不上 → `container_not_found` → Node 按 unsafe 记该步失败。修复=unnamed 分支把 Element UI 通用回退值 `dialog` 视为「无标签」（与录制侧只看 `.el-dialog__title` 文本对齐）

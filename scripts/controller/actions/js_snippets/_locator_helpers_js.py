@@ -18,9 +18,26 @@ PAGE_LOCATOR_HELPERS = r'''
   }
   function stripVolatileTreeText(text) {
     return String(text || '').replace(/\s+/g, ' ').trim()
-      .replace(/\[\s*V[-\d.]+\s*\]$/i, '')
       .replace(/\(\d+\)\s*$/, '')
+      .replace(/\s*-\s*$/, '')
       .trim().slice(0, 40);
+  }
+  function treeSemanticTextFromNode(node) {
+    if (!node || node.nodeType !== 1) return '';
+    var custom = node.closest && node.closest('.custom-tree-node');
+    if (custom) {
+      var spans = custom.querySelectorAll('span');
+      for (var i = 0; i < spans.length; i++) {
+        var span = spans[i];
+        if (span === custom) continue;
+        var cls = String(span.className || '');
+        if (/\bel-icon\b|icon|expand|caret|arrow/i.test(cls)) continue;
+        if (span.querySelector && span.querySelector('i[class*="icon"], .el-icon')) continue;
+        var raw = String(span.textContent || '').replace(/\s+/g, ' ').trim();
+        if (raw) return stripVolatileTreeText(raw);
+      }
+    }
+    return stripVolatileTreeText(cleanVisibleText(node));
   }
   function extractElIconClass(className) {
     const m = String(className || '').match(/el-icon-[a-z0-9-]+/i);

@@ -173,6 +173,7 @@ run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-sta
 run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py
 run "characterize-form-field-intra-slot" node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
 run "characterize-form-structure-container" node scripts/characterization/cold/characterize-form-structure-container.mjs
+run "characterize-tree-node-text" node scripts/characterization/cold/characterize-tree-node-text.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
