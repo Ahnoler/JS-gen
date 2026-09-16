@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 20:28 · Cursor — 收工：能力内聚结构硬闸设计规格（回链 20:21 开工）
+
+- 完成：**`55138813`** 规格 `docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md`（开工声明 `10849cd9`）。**未实现闸、未 bump cache、未改 prompt/src。**
+- 验收证据：文档钉死算法（步骤组解析 → locate/persist/other 族分类 → 序列规则）、新 reason `multi_capability_task_draft` / `produces_eq_title`、与既有 `multi_persist_task_draft` 分工、PR #41 已合入依赖、实现时 cache 4→5、湿测 W1–W4、characterization C1–C6。本轮交付=规格 + 本日志；实现另开任务。
+- 遗留移交：实现 plan 按 spec §7–§8 接线 `capability-cohesion.js`（或 flow-card-guide 旁）+ `propose.js` + fallback 去 title 化 + prompt 一句；勿与 OpenCode 20:03 轨迹提示词线文件集相交。不维护 CHANGELOG
+
 ## 2026-09-16 20:21 · Cursor — 开工：能力内聚结构硬闸设计规格（propose 同页多能力）
 
 - 进行中：只写已批准设计规格，**不实现**硬闸。产物=`docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md` + 本日志短开/收；PR 合入 `uara_V1.2`。依赖 PR #41（空 produces 硬拒 + cache v4 + XML prompt）**已合入**本线。
