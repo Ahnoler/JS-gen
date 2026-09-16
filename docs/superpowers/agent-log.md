@@ -1,5 +1,18 @@
 # Agent 协作日志
 
+## 2026-09-16 20:03 · OpenCode — 开工：阶段拆分提示词加固 + JS 侧业务数据判定对齐（承接 18:59/19:27 线）
+
+- 进行中：用户手动调整的提示词示例经核查**已丢失**（工作区 hash 与 HEAD 一致，VS Code 本地历史仅 `undoRedo` 条目）→ 由本次统一补做。六项：
+  ① `trajectory-meta-service.js` 加 **示例6**（删除→确认弹窗的 3.1 few-shot：开窗动作全留本阶段、【确定】归下一阶段）；
+  ② 规则 3 补「确认/提示弹窗按 3.1 处理」优先级指针（消除规则 3「不同弹窗分阶段」与 3.1(a) 打架）；
+  ③ 3.1(c) 收窄为**仅在触发依赖不稳定中间态时**才合并「触发→确认」，并强制合并阶段预期结果写最终态；
+  ④ 6.1(b) 补例外：后续要操作的**筛选字段名/字段值**（如「审批状态=待发起」）不得当无关说明删除（消除 6.1 与 7/8 冲突）；
+  ⑤ 规则 8 补「唯一标识必须原样写入；未给出标识则必须写明筛选条件 + 选中首条匹配记录」；
+  ⑥ `trajectory-text-extract.js` `phaseNeedsBusinessData`：`openPage` early-return 纳入 locate 判定并把 `删除|移除|作废|撤销|停用|启用|重置` 补进 `actionHasWrite`——该函数把本次真机那条「筛选审批状态=待发起→选中→删除。预期结果：打开确认弹窗」判成 false，而 Python `needs_business_data_context`（`phase/classify.py`，mode=form_modify/query）判 true，两个分类器结论相反。附 JSDoc 清理（死注释块 + 过期 `@returns`）。
+- 范围（可写集）：`src/services/trajectory/trajectory-meta-service.js`、`src/services/trajectory/trajectory-text-extract.js`、`scripts/characterization/cold/characterize-analyze-case-data.mjs`、本协作日志
+- 禁入区：`scripts/controller/actions/**`（含他线已收工的 `phase/classify.py`，本轮只读不改）、生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`、`scripts/prompts/**`、`scripts/refactor/verify-all.sh`（本轮不新增注册项，pin 落已有 cold 文件）、SPA 仓、`config/`
+- 方式：主会话 Inline；先补 RED pin 再最小实现；pin 覆盖必须保留的既有子串（`先搜索/查询再点击`、`不要为了凑数量而拆分`、`必须原样保留`、`禁止把具体名抹成`、`状态边界原则`、`禁止让下一阶段承担上一阶段未完成的动作`）；跑 verify-all 比对基线；不维护 CHANGELOG
+
 ## 2026-09-16 19:27 · OpenCode — 收工：录制两病灶修复（回链 18:59 开工）
 
 - 完成：**`953c4be4`**（4 文件 / +106 -22）——①`click_action_engine.click_element_by_index` 新增 `select_trigger_click`：dd_gate 对 `.el-select` 触发框返回 `kind:'trigger'`（排除 `.el-select-dropdown`/`.el-tree`/`.el-tree-node`/`.tree-popover`/`.el-tree-select__popper`/`.el-cascader__dropdown`/`.el-popover` 内的 popper 内容），并补 `target_kind=='form_select'` 兜底；命中即**点击照做但不录制、不 `remember_phase_operation_aliases`、不 `remember_trigger_button`**，返回 `transient-select-open` 提示；option/table-row/dropdown 仍原样硬拒 `use-select-option`。②索引点击「查询」时按 `re.sub(r'\s+','',btn_label)=='查询'` 调 `mark_query_clicked`（与 `click_button` 及回放侧 `mark_stc_flags_on_replay_ok` 对齐，消除录放不对称）。③`trajectory-meta-service.js` 阶段拆分提示词新增硬规则 `3.1 状态边界原则`（预期结果为「打开确认弹窗」的阶段必须含全部开窗动作；弹窗内按钮只归下一阶段；禁止下一阶段承担上一阶段未完成动作；不确定可达时「触发→确认」合并）。

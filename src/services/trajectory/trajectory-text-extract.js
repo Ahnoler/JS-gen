@@ -46,11 +46,32 @@ export function phaseNeedsBusinessData(phaseText) {
 
   const openPage = /预期结果[:：]?[^。；\n]{0,12}(?:打开|进入|抵达|到达)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框)/.test(t);
   const beforeExpect = (t.split(/预期结果/)[0] || t);
-  const actionHasWrite = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交/.test(beforeExpect);
-  if (openPage && !actionHasWrite) return false;
+  // Quoted spans in the action part are usually dialog copy, not actions
+  // (「在弹出的确认提示"您确定删除这条记录吗?"中…」) — drop them before verb matching
+  // so the word 删除 inside a confirm prompt cannot make a pure confirm phase look
+  // destructive.
+  const actionCore = beforeExpect
+    .replace(/"[^"]*"/g, ' ')
+    .replace(/[“”][^“”]*[“”]/g, ' ')
+    .replace(/「[^」]*」/g, ' ');
+  const actionHasWrite = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交|删除|移除|作废|撤销|停用|启用|重置/.test(actionCore);
+  // Locate / search intent also needs 业务数据 (target names & filter values) even
+  // when the phase ends by opening a dialog — e.g.「筛选审批状态为"待发起"的记录，
+  // 单选选中该行，点击【删除】。预期结果：打开确认弹窗。」. Without this the
+  // openPage early-return dropped 业务数据 for such delete/confirm phases (this JS
+  // classifier said false while Python needs_business_data_context said true for
+  // the exact same phase text).
+  const actionHasLocate = /查询|搜索|查找|选中|定位|单选|多选|筛选|过滤/.test(actionCore);
+  if (openPage && !actionHasWrite && !actionHasLocate) return false;
 
   // #676: query/search/locate phases need 业务数据 (keywords / target names)
-  if (/查询|搜索|查找|选中|定位/.test(t)) return true;
+  if (/查询|搜索|查找|选中|定位|筛选|过滤/.test(t)) return true;
+
+  // Destructive phases need it too (target identity + filter values), mirroring the
+  // Python classifier (scripts/controller/actions/phase/classify.py 查询|搜索|删除…).
+  // Keyed on the ACTION part only, so an expected-result clause such as
+  //「删除完成并刷新列表」cannot flip a pure confirm phase back on.
+  if (/删除|移除|作废|撤销|停用|启用|重置/.test(actionCore)) return true;
 
   if (/新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|变更|维护/.test(t)) return true;
   if (/引入|选人|客户选择|选择客户|选择.*客户/.test(t)) return true;
