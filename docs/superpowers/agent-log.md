@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 22:10 · Cursor — 开工：能力内聚结构硬闸 Task 4（cache v5 + verify-all）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 4**（TDD：先改 `characterize-req-draft-traj.mjs` pin `PROPOSE_CACHE_VERSION === 5` RED actual 4 → bump `propose-cache.js` 4→5 GREEN → `verify-all.sh` 注册 `characterize-capability-cohesion`）。不改 prompt / samples / api-docs（Task 5+）。
+- 范围（可写集）：`scripts/characterization/characterize-req-draft-traj.mjs`（version pin 4→5）、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` + 注释）、`scripts/refactor/verify-all.sh`（persist-boundary 后注册 cohesion pin）、本协作日志
+- 禁入区：`capability-cohesion.js` / `propose.js` 逻辑；`atom-depend.js`；`flow-card-guide.js`；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 5+ prompt / samples / api-docs / 湿测 W1–W4
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
 ## 2026-09-16 21:55 · Cursor — 收工：能力内聚结构硬闸 Task 3（回链 21:40 开工）
 
 - 完成：`materializeLlmAtom` 在 `normalizeProduces`/`normalizeDataDependsOn` 之后、`assertAtomProvenance` 之前调用 `assertCapabilityCohesion`；`!ok` → `rejected: { atomKey, reason: cohesion.reason }`。`countPersistConfirms(cleanedDraft) > 1` 仍为 sanitize 后第一拒绝。未改 `validateAtomDependGraph`。feat **`2f223e6b`**。开工声明 `cdd5b8ce`。
