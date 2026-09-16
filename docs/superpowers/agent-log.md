@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:31 · Cursor — 开工：Task 4 spec 交叉引用 + 计划收口
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 4**（2026-09-07 §3 / 2026-09-09 单卡闭环交叉引用；2026-09-15 状态翻为已审阅/实现中；characterize 复核）
+- 范围：`docs/superpowers/specs/2026-09-07-req-to-draft-traj-design.md`、`docs/superpowers/specs/2026-09-09-flow-card-guided-propose-design.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`、本协作日志
+- 禁入区：`src/**`、atomize prompt、产品树强制拆、one-confirm-per-atom 硬闸、他线 field_slot xpath、`config/` WIP
+- 方式：主会话；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37；本任务为计划末项
+
 ## 2026-09-16 12:29 · Cursor — 收工：Task 3 atomize prompt 拆分边界 + 样例（回链 12:28 开工）
 
 - 完成：commit **`a334499a`** `docs(prompt): atomize split by produces/dataDependsOn bounds`
