@@ -9,8 +9,10 @@ sys.path.insert(0, str(ROOT))
 from scripts.controller.actions.phase.element_guard import (  # noqa: E402
     duplicate_element_action,
     duplicate_phase_operation,
+    duplicate_phase_operation_any,
     remember_successful_element_action,
     remember_successful_phase_operation,
+    remember_phase_operation_aliases,
 )
 from scripts.controller.actions.phase.intent_contract import _clear_phase_form_state  # noqa: E402
 from scripts.controller.actions.phase.classify import classify_task_mode  # noqa: E402
@@ -43,6 +45,8 @@ def main() -> None:
     assert duplicate_element_action(store, '审批状态') == 'select_option'
     remember_successful_phase_operation(store, 'click://button[42]', 'click_element_by_index')
     assert duplicate_phase_operation(store, ' click://button[42] ') == 'click_element_by_index'
+    remember_phase_operation_aliases(store, ['click://button[15]', 'button:查询'], 'click_element_by_index')
+    assert duplicate_phase_operation_any(store, ['click://button[42]', 'button:查询']) == 'click_element_by_index'
 
     _clear_phase_form_state(store, mode='create', task_mode='form_fill')
     assert duplicate_element_action(store, '审批状态') == ''

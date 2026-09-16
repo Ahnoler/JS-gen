@@ -53,6 +53,27 @@ class ClickEngine:
         element = await _enrich_click_element(
             page, text=button_text, target_kind='icon',
         )
+        from .phase.element_guard import (
+            duplicate_phase_operation_any,
+            remember_phase_operation_aliases,
+        )
+        button_xpath = str(
+            (element or {}).get('xpath')
+            or (element or {}).get('xpath_smart')
+            or (element or {}).get('bu_xpath')
+            or ''
+        ).strip()
+        button_identities = [f'button:{button_text.strip()}']
+        if button_xpath:
+            button_identities = [f'click:{button_xpath}']
+        duplicate = duplicate_phase_operation_any(
+            self.business_data_store, button_identities,
+        )
+        if duplicate:
+            return _ok(
+                f'already-operated-this-phase:button={button_text} via {duplicate}; '
+                'do not click the same button again; verify state and continue the phase'
+            )
         # G1 container-scope-first: if a visible drawer/dialog is open and a
         # matching button exists inside it, click the in-overlay one; only fall
         # back to the page-level JS_CLICK_ICON_BUTTON on miss (original
@@ -77,6 +98,9 @@ class ClickEngine:
             result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
         await page.wait_for_timeout(WAIT_400_MS)
         if _is_ok_result(result):
+            remember_phase_operation_aliases(
+                self.business_data_store, button_identities, 'click_button',
+            )
             _state._record_action(
                 'click_button',
                 {'button_text': button_text},
@@ -164,6 +188,27 @@ class ClickEngine:
             if not date_panel_click:
                 from .phase.element_guard import duplicate_phase_operation
                 duplicate = duplicate_phase_operation(self.business_data_store, click_identity)
+                button_text_identity = ''
+                if element_info:
+                    candidate_text = str(
+                        element_info.get('text') or elem_text or ''
+                    ).strip()
+                    target_kind = str(element_info.get('target_kind') or '').lower()
+                    raw_tag = str(element_info.get('tag_name') or tag_name).lower()
+                    raw_class = str(
+                        (element_info.get('attributes') or {}).get('class') or ''
+                    ).lower()
+                    if candidate_text and not gate_xp and (
+                        raw_tag in ('button', 'a')
+                        or 'button' in target_kind
+                        or 'el-button' in raw_class
+                    ):
+                        button_text_identity = f'button:{candidate_text}'
+                        if not duplicate:
+                            from .phase.element_guard import duplicate_phase_operation
+                            duplicate = duplicate_phase_operation(
+                                self.business_data_store, button_text_identity,
+                            )
                 if duplicate:
                     return _ok(
                         f'already-operated-this-phase:index={index} via {duplicate}; '
@@ -394,9 +439,12 @@ class ClickEngine:
             if download_path:
                 return _ok(f'downloaded:{download_path}')
             if not date_panel_click:
-                from .phase.element_guard import remember_successful_phase_operation
-                remember_successful_phase_operation(
-                    self.business_data_store, click_identity, 'click_element_by_index',
+                from .phase.element_guard import remember_phase_operation_aliases
+                identities = [click_identity]
+                if button_text_identity:
+                    identities.append(button_text_identity)
+                remember_phase_operation_aliases(
+                    self.business_data_store, identities, 'click_element_by_index',
                 )
             # Navigation detection for page-transitioning clicks (e.g. 客户转正 → new page).
             # If URL changed after the click, record a flag that recorder_emitters turns

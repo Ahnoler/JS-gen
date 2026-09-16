@@ -19,6 +19,20 @@
 - 路径：`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`
 - 待用户审阅 spec 后再写实现计划
 
+## 2026-09-15 22:40 · OpenCode — 收工：统一 AI click_element/click_button 同按钮去重（回链 22:25 开工）
+
+- 完成：提交 **23f58d0d**；`click_element_by_index` 与 `click_button` 共用阶段级按钮 identity，优先使用点击前解析出的稳定 xpath，缺少 xpath 时才使用按钮文本兜底；同阶段第二次命中返回 `already-operated-this-phase`，不再执行浏览器点击或写入第二条步骤。
+- 保留：人工录制 mapper/CDP 行为未修改；`click_save` 未改；表格 radio 仍走 `click_table_row_radio`；日期面板日格点击仍允许重复（同日区间需要两次点击）。
+- 验收：`characterize-ai-phase-element-guard.py`、picker 原子录制、manual table radio、tree picker、date range、click replay engine、Python 编译、`git diff --check` 全通过。
+- 遗留移交：部署/重启执行机后复测“客户名称引入”阶段，确认先后调用 `click_element_by_index(40)` 与 `click_button("选择客户")` 时只保留一条按钮步骤；`memory_writer` timeout 仍为独立基础设施告警。
+
+## 2026-09-15 22:25 · OpenCode — 开工：统一 AI click_element/click_button 同按钮去重
+
+- 进行中：修复同一 AI 阶段内同一按钮先后被 `click_element_by_index` 与 `click_button` 各录制一条的问题；共享稳定元素身份，第二次调用不再执行/落库。
+- 范围：`scripts/controller/actions/click_action_engine.py`、`scripts/controller/actions/phase/element_guard.py`、相关 characterization、本协作日志；只读参考 `scripts/state.py` 的动作落库 coalesce 与现有 picker/date 点击例外。
+- 禁入区：人工录制 mapper/CDP 采集、前端仓、`src/services/trajectory/trajectory-meta-service.js`、线上数据及其他会话 WIP；不改变 `click_save`、表格 radio、日期面板重复选日语义。
+- 方式：先在当前无未提交改动状态写入并提交声明，再补 click_button 与 click_element 的跨动作 identity 共享，验证 picker/按钮/日期相关 characterization、编译与 diff 后提交。
+
 
 ## 2026-09-15 22:15 · OpenCode — 收工：修复第四阶段重复执行与日期范围异常（回链 21:55 开工）
 
