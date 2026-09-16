@@ -1,31 +1,41 @@
-# Final resolve-element fix report
+# Form-field intra-slot xpath — final fix report
 
-## 2026-08-10 — I2 / I1 / M1 / M2 / M3
+## Important #1 — AI/CDP persist drops field_slot / display_label
 
-**Status:** Done
+**Changes**
+- `src/cdp/inspect-payload-script.js` — `elMeta` copies `field_slot` / `display_label` from `loc`.
+- `src/cdp/resolve-by-label.js` — `snap` return + `buildResolveResult` copy same fields.
+- `scripts/controller/actions/js_snippets/fill_core.py` — `JS_CAPTURE_FROM_XPATH` rebuilds via `buildLocatorSnap` and returns slot/locator fields.
+- `scripts/controller/actions/_helpers.py` — `_capture_element` passthrough for `field_slot`, `display_label`, `locator_occurrence`, `locator_verified`, `locator_strategy`.
+- `scripts/characterization/characterize-capture-element-xpath.py` — persist-layer substring pins.
 
-### Commits
+## Important #2 — Offline input leaf drift
 
-| Repo | Branch | SHA | Message |
-|------|--------|-----|---------|
-| JS-gen | V2.1_dev | `e762dfc` | fix: gate resolveTrajectoryElement actionType to supported set |
-| Vue | dev | `086f620` | fix: clarify auto-grab disabled reason copy |
+**Changes**
+- `src/cdp/locator-builders/controls.js` — when `occurrence >= 1`, input leaf uses `input[not(ancestor::div[class-token el-select])]` (matches live tight leaf before `[n]`).
+- `scripts/characterization/cold/characterize-locator-candidates.mjs` — pin for intra-item input tight leaf.
 
-### Changes
+## Verification
 
-- **I2:** `resolveTrajectoryElement` now imports `SUPPORTED_RESOLVE_ACTIONS` from `src/cdp/resolve-by-label.js`, normalizes via `normalizeActionName`, returns 400 if actionType missing/unsupported, and requires needle (`labelText` or `params.text|label_text|menu_text|button_text`) before attach/CDP dispatch.
-- **I1/M1:** `recording.js` `respExample` aligned with click `reqExample` (对公客户管理 / `click_element_by_index` / menu_item).
-- **M2:** `catalog.js` `RECORDING_FLOW` resolve-element step mentions `actionType+params`.
-- **M3:** Vue `OperationDialog.vue` disabled-reason copy includes `button_text`.
+```bash
+node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
+# ok: dual select slots / dual input slots / unique field has no slot
+# characterize-form-field-intra-slot: OK
 
-### Tests
+D:/anaconda3/envs/browser_use/python.exe scripts/characterization/characterize-capture-element-xpath.py
+# characterize-capture-element-xpath: OK
 
+node scripts/characterization/cold/characterize-locator-candidates.mjs
+# ok: form field input intra-item tight leaf (+ existing cases)
+# characterize-locator-candidates: OK
+
+node scripts/characterization/cold/characterize-locator-parity.mjs
+# characterize-locator-parity: OK
 ```
-node scripts/characterization/characterize-resolve-element-auto-grab.mjs  # PASS
-node scripts/characterization/characterize-locator-candidates.mjs           # OK
-```
 
-### Concerns
+## Self-review
 
-- Executor path (`session.bib_resolve_element`) relies on executor-side validation; service layer now gates before send but executor should mirror the same supported-action set.
-- No wet BiB / live attach verification in this pass (characterization only).
+- Single-control fields (`occurrence=0`) still emit bare `//input` offline; live parity test passes for bare-page fixture.
+- `label_text` / `formLabel` not rewritten with `-A`; `display_label` is separate.
+- `_locator_helpers_js.py` untouched (no `page-locator-helpers.js` change).
+- `_capture_element` now mirrors `_enrich_click_element` slot-field passthrough.

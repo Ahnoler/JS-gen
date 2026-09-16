@@ -141,7 +141,9 @@ export function buildFormFieldXPathSmart({
     // Custom bank tree (tsscTree in popover) uses span.my-popover as click trigger
     leaf = "span[contains(@class,'my-popover')]";
   } else if (tagL === 'input' || /el-input__inner/i.test(cls) || !tagL) {
-    leaf = 'input';
+    leaf = occurrence >= 1
+      ? `input[not(ancestor::div[${classTokenPred('el-select')}])]`
+      : 'input';
   } else if (tagL === 'button' || /el-button/i.test(cls)) {
     leaf = 'button';
   } else {

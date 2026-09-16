@@ -115,6 +115,19 @@ function ok(name) {
 
 {
   const xp = buildFormFieldXPathSmart({
+    label: '保证金比例',
+    tag: 'input',
+    className: 'el-input__inner',
+    occurrence: 2,
+  });
+  assert.ok(xp.startsWith('('));
+  assert.ok(xp.endsWith(')[2]'));
+  assert.ok(xp.includes('input[not(ancestor::div[' + classTokenPred('el-select') + '])]'));
+  ok('form field input intra-item tight leaf');
+}
+
+{
+  const xp = buildFormFieldXPathSmart({
     label: '日期',
     className: 'el-date-editor',
   });
