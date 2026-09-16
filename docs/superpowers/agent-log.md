@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-16 22:16 · ZCode 引擎线 — 开工：G3 证据门闩湿测取证 + 护栏固化
+
+- 进行中：对 PR #45 合并产物（`c0cfa03e`+`abea7695`）做湿测，并把可复用的活体验证固化为门禁。已跑：①引擎侧真机守卫（真 Chromium + 真 boundary 状态 + 真 `_guard_done_on_step_end`，含证伪）12/12 过；②runner 接缝（逐字抽取合并后源码里我改写的那两处表达式）9/9 过
+- 范围（可写集）：新 `scripts/characterization/characterize-g3-done-gate-live.py`、新 `scripts/characterization/characterize-g3-runner-seam.mjs`、`scripts/refactor/verify-all.sh`、本协作日志。**不改产品代码**
+- 禁入区：**此刻有他线活跃录制**（remote-session 1908 / traj 832 `recording`，22:14:48 创建）——故**不重启 4097、不动该会话、不抢执行机槽位**；`origin/master` 不动；他线 `replay-*`/`req-draft-traj`/`form-structure-heal` WIP
+- 方式：主会话 Inline；临时脚本在 `tmp/wet-g3/`（gitignore），只把可确定复现、不依赖 SUT/MySQL 的两支固化为门禁（证伪用的"临时改写源码再还原"不入门禁——硬杀可能留下已改文件；该形状已由 `characterize-recorder-phase-reset` 的"每个拒绝分支必须 return True"钉住）
+- 遗留：全链 `record/prepare → record/start` 湿测**待具备条件**（需 4097 重启加载合并 JS + 他线录制结束 + SUT 登录授权）
+
 ## 2026-09-16 21:03 · ZCode 引擎线 — 收工：本地合入 PR #45（G3 phase_done 证据门闩，回链 20:49 开工）
 
 - 完成：`c0cfa03e`（合并提交，17 文件）+ `abea7695`（集成修复）。PR 原提 master（分叉点 `5dddf2ea` 落后 uara_V1.2 **1034 提交**），按用户要求合到本地主线 `uara_V1.2`，未动 master。PR 作者分支 `cursor/g3-phase-done-evidence-gate-3b92`（7 提交 `539c8e76`→`9391f09c`，Cursor Cloud，12:22–12:41）
