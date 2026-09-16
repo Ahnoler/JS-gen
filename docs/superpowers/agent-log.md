@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:29 · Cursor — 收工：Task 3 atomize prompt 拆分边界 + 样例（回链 12:28 开工）
+
+- 完成：commit **`a334499a`** `docs(prompt): atomize split by produces/dataDependsOn bounds`
+- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`
+- 验收：JSON 例含 `produces`/`dataDependsOn`；「拆分边界」十条入 prompt；flowCards 改为参考且依赖规则优先；禁止 #504 造上游与场景清单；样例写明依赖图≠树层教条。原 prompt 无「产品树每层必拆」专项，无需删除。
+- 遗留移交：Task 4 spec 交叉引用未做
+
 ## 2026-09-16 12:28 · Cursor — 开工：Task 3 atomize prompt 拆分边界 + 样例
 
 - 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 3 only**（prompt 加 `produces`/`dataDependsOn` +「拆分边界」十条；样例抽象 #675/#676/#678 与 #504 反例）
