@@ -169,6 +169,7 @@ run "characterize-atom-keydata" node scripts/characterization/characterize-atom-
 run "characterize-network-capture" node scripts/characterization/characterize-network-capture.mjs
 run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-staging.py
 run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py
+run "characterize-form-field-intra-slot" node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

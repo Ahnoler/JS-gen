@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 13:50 · Cursor — 收工：表单字段内同族控件 xpath 消歧（回链 12:15 开工）
+
+- 完成：方案 A 落地。`formFieldXpathSmartOf` 改 class-token leaf + 同族 `(item//leaf)[n]`；snap 写 `field_slot`/`display_label`；人工/AI 透传；SPA `pickParamText` 拼 `保证金比例-A`。计划 `docs/superpowers/plans/2026-09-16-form-field-intra-slot-xpath.md`。
+- 验收：`characterize-locator-candidates` / `characterize-locator-parity` / **`characterize-form-field-intra-slot` OK**（双 select/双 input 唯一 + 单字段无 slot）。SUT 浏览器会话已关，保证金比例真机湿测未复跑（离线 fixture 复现同构）。
+- 遗留移交：前端仓 `ui-auto-recording-agent-vue-master/vue-project` 同步改了 trajectory-tree / step-detail / ElementJson（勿提交该仓 `vite.config.ts` WIP）；产品库页人工/AI 录一笔「保证金比例」确认列表标题与回放。
+
 ## 2026-09-16 11:xx · OpenCode — 开工：修复 tmp/cmds 后端发版 CMD 闪退
 
 - 进行中：排查 `tmp/cmds/release-backend.cmd` 双击后窗口闪退且未上传部署的问题，复现 CMD 执行并修复新位置的启动/路径/依赖检测。

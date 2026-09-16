@@ -249,6 +249,12 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         element['locator_scope'] = locator_scope
     if payload.get('locator_occurrence'):
         element['locator_occurrence'] = payload['locator_occurrence']
+    field_slot = str(payload.get('field_slot') or '').strip()
+    if field_slot:
+        element['field_slot'] = field_slot
+    display_label = str(payload.get('display_label') or '').strip()
+    if display_label:
+        element['display_label'] = display_label
     if payload.get('locator_fallback_reason'):
         element['locator_fallback_reason'] = payload['locator_fallback_reason']
     parent_text = re.sub(r'\s+', ' ', str(payload.get('parent_text') or '')).strip()
@@ -274,6 +280,12 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
 
     def _stamp_params(params: dict) -> dict:
         """Params must not carry xpath_smart; element snap holds the locator."""
+        slot = str(payload.get('field_slot') or '').strip()
+        disp = str(payload.get('display_label') or '').strip()
+        if slot:
+            params['field_slot'] = slot
+        if disp:
+            params['display_label'] = disp
         return params
 
     if kind == 'fill':

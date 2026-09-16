@@ -329,6 +329,32 @@ PAGE_LOCATOR_HELPERS = r'''
     if (tagL === 'a') return 'link';
     return 'generic';
   }
+  function fieldSlotLetter(n) {
+    const i = Number(n) || 0;
+    if (i < 1 || i > 26) return '';
+    return String.fromCharCode(64 + i);
+  }
+  function pinFormFieldFamily(expr, host) {
+    const base = String(expr || '');
+    if (!base || !host) return { xpath: base, occurrence: 0 };
+    const nodes = evalXpathAll(base);
+    if (nodes.length <= 1) return { xpath: base, occurrence: 0 };
+    let idx = -1;
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i] === host) { idx = i; break; }
+    }
+    if (idx < 0) {
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (n && ((n.contains && n.contains(host)) || (host.contains && host.contains(n)))) {
+          idx = i;
+          break;
+        }
+      }
+    }
+    if (idx < 0) return { xpath: base, occurrence: 0 };
+    return { xpath: withOccurrence(base, idx + 1), occurrence: idx + 1 };
+  }
   function formFieldXpathSmartOf(node, formLabel) {
     const lbl0 = normalizeFormLabel(formLabel);
     // Corrupt formLabel that is actually an XPath fragment must be ignored.
@@ -373,12 +399,14 @@ PAGE_LOCATOR_HELPERS = r'''
     const cls = String(node.className || '');
     let leaf = 'input';
     if (tagL === 'textarea' || /(^| )el-textarea( |$)/.test(cls)) leaf = 'textarea';
-    else if (node.closest && node.closest('.el-select')) leaf = "div[contains(@class,'el-select')]";
-    else if (node.closest && node.closest('.el-date-editor, .tsscdatepicker')) leaf = "div[contains(@class,'el-date-editor')]";
-    else if (node.closest && node.closest('.el-radio-group')) leaf = "div[contains(@class,'el-radio-group')]";
-    else if (node.closest && node.closest('.el-checkbox-group')) leaf = "div[contains(@class,'el-checkbox-group')]";
-    else if (node.closest && node.closest('.el-cascader')) leaf = "div[contains(@class,'el-cascader')]";
-    else if (node.closest && node.closest('.el-tree-select')) leaf = "div[contains(@class,'el-tree-select') or contains(@class,'tsscmultitree')]";
+    else if (node.closest && node.closest('.el-select')) leaf = 'div[' + classTokenPred('el-select') + ']';
+    else if (node.closest && node.closest('.el-date-editor, .tsscdatepicker')) leaf = 'div[' + classTokenPred('el-date-editor') + ']';
+    else if (node.closest && node.closest('.el-radio-group')) leaf = 'div[' + classTokenPred('el-radio-group') + ']';
+    else if (node.closest && node.closest('.el-checkbox-group')) leaf = 'div[' + classTokenPred('el-checkbox-group') + ']';
+    else if (node.closest && node.closest('.el-cascader')) leaf = 'div[' + classTokenPred('el-cascader') + ']';
+    else if (node.closest && node.closest('.el-tree-select')) {
+      leaf = 'div[' + classTokenPred('el-tree-select') + ' or ' + classTokenPred('tsscmultitree') + ']';
+    }
     else if (node.closest && node.closest('.el-form-item')
       && node.closest('.el-form-item').querySelector('.tsscTree, .tree-popover')) {
       leaf = "span[contains(@class,'my-popover')]";
@@ -386,7 +414,13 @@ PAGE_LOCATOR_HELPERS = r'''
     else if (tagL === 'input' || /(^| )el-input__inner( |$)/.test(cls)) leaf = 'input';
     else if (tagL === 'button' || /(^| )el-button( |$)/.test(cls)) leaf = 'button';
     else leaf = tagL || 'input';
-    return scopedXPath(itemPred + '//' + leaf, scopeKind);
+    let base = scopedXPath(itemPred + '//' + leaf, scopeKind);
+    if (leaf === 'input' && evalXpathAll(base).length >= 2) {
+      const tightInp = 'input[not(ancestor::div[' + classTokenPred('el-select') + '])]';
+      const tight = scopedXPath(itemPred + '//' + tightInp, scopeKind);
+      if (evalXpathAll(tight).length >= 1) base = tight;
+    }
+    return pinFormFieldFamily(base, node).xpath;
   }
   function menuXpathSmartOf(node, text) {
     const t = normalizeControlText(text);
@@ -1711,6 +1745,15 @@ PAGE_LOCATOR_HELPERS = r'''
     }
     const iconClass = kind === 'icon' ? extractElIconClass(String(host.className || '')) : '';
     const placeholder = (host.getAttribute && host.getAttribute('placeholder')) || '';
+    let fieldSlot = '';
+    let displayLabel = '';
+    let fieldOcc = occurrence || 0;
+    if (String(kind).indexOf('form_') === 0 && smart) {
+      const pinM = String(smart).match(/\)\[(\d+)\]\s*$/);
+      if (pinM) fieldOcc = Number(pinM[1]) || fieldOcc;
+      fieldSlot = fieldSlotLetter(fieldOcc);
+      if (fieldSlot && formLbl) displayLabel = formLbl + '-' + fieldSlot;
+    }
     return {
       xpath: primary,
       xpath_smart: (smart && verified) ? smart : (smart || ''),
@@ -1728,7 +1771,9 @@ PAGE_LOCATOR_HELPERS = r'''
       icon_class: iconClass || undefined,
       placeholder: placeholder || undefined,
       locator_scope: scopeOf(host),
-      locator_occurrence: occurrence || undefined,
+      locator_occurrence: fieldOcc || occurrence || undefined,
+      field_slot: fieldSlot || undefined,
+      display_label: displayLabel || undefined,
       locator_verified: verified,
       locator_strategy: strategy,
       locator_fallback_reason: strategy === 'xpath_full'
