@@ -2,6 +2,13 @@
 
 > **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
 
+## 2026-09-16 14:33 · ZCode — 收工：同目录旧归档移除完成（回链 14:30 开工）
+
+- 完成：`docs/superpowers/` 下 09-05/09-06 两份归档原件已 `git rm`，`archive/logs/` 副本入库——git 识别为 100% 纯改名（`3d89dc67`，零内容改动），历史保留；同目录现无散置归档文件，三批归档（05/06/11）全部集中于 `docs/superpowers/archive/logs/`
+- 验收：删除前 blob 哈希比对原件=副本完全一致（2cb87df9 / 98ffbd59）；`git diff --cached -M` 2 renames 0 insertions/deletions；推送成功
+- 遵守：系收口并行会话在途复制搬迁（commit message 已注明）；他线 WIP 零触碰
+- 遗留：无
+
 ## 2026-09-16 14:30 · ZCode — 开工：移除 agent-log 同目录旧归档（09-05/09-06 → 收口进 archive/logs/）
 
 - 进行中：2026-09-16 14:30；用户指令：移除与 agent-log.md 同目录（`docs/superpowers/`）的归档文件。现状=并行会话已复制 09-05/09-06 两份进 `archive/logs/`（blob 哈希与已提交原件一致，已核验），但原件仍在——本单元删除原件 git rm + 追踪 archive/logs/ 副本，完成整体搬迁
