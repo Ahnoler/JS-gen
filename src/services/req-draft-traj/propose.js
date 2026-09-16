@@ -34,6 +34,7 @@ import {
   normalizeDataDependsOn,
   validateAtomDependGraph,
 } from './atom-depend.js';
+import { mixesSortWithBasicInfoSave } from './atom-capability.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
@@ -658,6 +659,9 @@ async function materializeLlmAtom(llmAtom, { moduleKey, modDir, chains, sourceDo
   const { taskDraft: cleanedDraft, extractedCodes } = sanitizeTaskDraftKeyData(filled);
   if (countPersistConfirms(cleanedDraft) > 1) {
     return { rejected: { atomKey, reason: 'multi_persist_task_draft' } };
+  }
+  if (mixesSortWithBasicInfoSave(`${title}\n${cleanedDraft}`)) {
+    return { rejected: { atomKey, reason: 'unrelated_capability_merge' } };
   }
 
   const zjjkCells = [];

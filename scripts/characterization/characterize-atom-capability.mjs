@@ -83,6 +83,13 @@ await run('mixesSortWithBasicInfoSave false for sort-only atom', () => {
   assert.equal(cap.mixesSortWithBasicInfoSave(SORT_ONLY), false);
 });
 
+await run('mixesSortWithBasicInfoSave true for 上移 + 【保存】 without 维护基本信息 phrase', () => {
+  assert.equal(
+    cap.mixesSortWithBasicInfoSave('1、【上移】与相邻节点互换序号\n2、编辑后【保存】\n'),
+    true,
+  );
+});
+
 await run('mixesSortWithBasicInfoSave false for fill+one save without sort', () => {
   assert.equal(
     cap.mixesSortWithBasicInfoSave('1、进入编辑页\n2、维护概况\n3、【保存】\n'),
@@ -143,7 +150,7 @@ await run('propose #708-shaped basic-info save is kept', async () => {
       taskDraft: GOLD_708_BASIC_INFO,
       phaseHints: ['定位产品', '保存'],
       produces: [],
-      dataDependsOn: ['产品'],
+      dataDependsOn: [{ key: '产品', source: 'preset' }],
       suggestedFunctionId: null,
     }],
   });

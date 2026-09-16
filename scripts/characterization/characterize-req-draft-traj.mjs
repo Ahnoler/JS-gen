@@ -548,8 +548,8 @@ async function main() {
   });
 
   const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
-  run('PROPOSE_CACHE_VERSION is 3 (persist-boundary confirm)', () => {
-    assert.equal(PROPOSE_CACHE_VERSION, 3);
+  run('PROPOSE_CACHE_VERSION is 4 (unrelated capability merge)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 4);
   });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
