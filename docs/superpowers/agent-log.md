@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 22:27 · OpenCode — 收工：修复 navigate 开放页证据门闩卡死录制（回链本会话 21:35 线；附排查结论）
+
+- 完成：**`c84f10c8`**（2 文件 / +142 -1）。用户报「录制在第二步报错中断」，并问是否上次改动所致。**结论：非上次改动（`6367f55`）所致**——该 run（sid 3718d161）阶段1 被 LLM 评审判为 `mode=navigate success.kinds=['url_change','page_opened']`（来自 ZCode 21:03 合入的 PR #45 G3 门闩，`navigate` 以前 `success_when=[]` 不受门闩约束）。点击【评级申请】(index 48) 打开的向导是**抽屉**：URL 不变、且 click 埋点的 overlay 标题在抽屉异步渲染前就采样 → `observed=[]` → `done(success=true)` 每步都被拒（step 3/5/6）→ `chosen=5` 步耗尽、录制中断。
+- 两处修复（`scripts/agent/recorder_emitters.py`）：①新增 `_guard_done_record_open_page_evidence`——navigate 且 `goals` 含 `open_page` 时，done() 时**可见的目标 overlay 本身即 `page_opened` 证据**（click 埋点漏采的兜底；零业务动作守卫仍要求本阶段确有真实点击）；②新增 `_guard_done_nav_evidence_ok`——navigate 阶段自身 `success_when` 已满足时，可见 overlay 就是目标页/下一步，`_guard_done_reject_overlay` 不再误拒（保留 introduce_ok/save_ok/navigated_ok 豁免；错误门闩 `_guard_done_reject_errors` 未动，可见错误通知仍拦）。
+- 验收证据：pin 追加到**已注册**的 `characterize-phase-runtime`（新 `test_open_page_overlay_evidence_and_overlay_gate`：open_page 无证据→门关；打 overlay→`page_opened` 记录→门开；overlay 门从拒到放行；wizard `click_next` 无 open_page 不吃 stray overlay）；**verify-all 全跑 = 与既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。期间 `characterize-recorder-phase-reset` 曾因 pin 正则 `_guard_done_reject_\w+\([^)]*\)` 不容嵌套括号而红——改为先把 `nav_evidence_ok` 落变量再传参（**未改 pin**），复跑 39 checks OK。
+- 遗留移交：①**真机复测**建议：对公客户评级「点击评级申请→向导抽屉」应一次 done 通过；②生产须重启执行机侧 Python agent 进程生效；③回退点=本提交；④不维护 CHANGELOG。
+
 ## 2026-09-16 21:59 · OpenCode — 收工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（回链 21:35 开工）
 
 - 完成：**`6367f55`**（5 文件 / +114 -10）。根因：对公客户评级申请阶段3（任务=点击【下一步】→进入风险阻断）的 LLM 评审合约 `mode=other` 自造了**不可录制**的成功 token `success.kinds=['step_change']`；PR #45 的 G3 证据门闩要求边界 `success_when` 被观测，`step_change` 永不满足 → `done(success=true)` 反复被拒 → 恢复处方兜底写死 `click_save()` → agent 去点「确定」，点到整个向导的提交确定并触发服务端业务异常「该客户已发起评级流程…」——即用户反馈的「阶段3 页面没有确定按钮却跑出一个点击确定步骤」。
