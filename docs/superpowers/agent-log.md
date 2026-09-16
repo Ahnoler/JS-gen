@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 10:55 · ZCode — 开工：协作协议补条（push 冲突处理规则）
+
+- 用户指令：push 遇到冲突时须处理冲突、合并后再 push。补进 AGENTS.md「跨 Agent 协作」区段
+- 范围：仅 `AGENTS.md`（协作区段）+ 本日志条目；仓库外记忆文件同步
+- 禁入区：其余文件不动；agent-log 他人条目只读
+- 方式：主线程；纯文档改动。现场注记：pull 时 SSH 22 端口间歇被 reset，改走 ssh.github.com:443 通道完成（认证正常）
+
 ## 2026-09-16 10:52 · ZCode — 开工：协作协议再升级固化（开工前 pull / log 条目 commit+push）
 
 - 用户指令：开工声明之前先 `git pull`；写完 agent log 后一律 commit 并 push（原约定只 commit）。今日将其固化进 AGENTS.md「跨 Agent 协作」区段
