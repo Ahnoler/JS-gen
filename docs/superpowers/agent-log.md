@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-16 11:xx · OpenCode — 收工：迁移本机后端发版 CMD 至 tmp/cmds（回链本次开工）
+
+- 完成：删除仓库根目录 `release-backend.cmd`；本机发版命令迁至被 gitignore 的 `tmp/cmds/release-backend.cmd`，不保留根目录兼容入口。
+- 保留：`pack-control-plane.sh`（README 公开的 Git Bash 打包入口）和 `release-backend-remote.sh`（上传后在服务器运行的部署逻辑）继续置于仓库根目录，供共用发布流程调用。
+- 兼容：新 CMD 由自身位置回溯到仓库根目录，并以绝对路径调用上述共享脚本；远端上传名固定为 `release-backend-remote.sh`，与服务器清理和 SSH 执行路径一致。
+- 验收：新 CMD 路径解析为仓库根目录且两个共享脚本均存在；实际运行到 Git Bash 前置检测（本机未安装 Git Bash，按原有保护逻辑在上传前退出，未连接服务器）；`git diff --check` 通过。
+- 遗留移交：本机安装 Git Bash 后可从 `tmp/cmds/release-backend.cmd` 双击直接发版；未触碰 `config/.db-whitelist-seen` 和其他忽略的本地运行文件。
+
 ## 2026-09-16 11:xx · OpenCode — 开工：迁移本机后端发版 CMD 至 tmp/cmds
 
 - 进行中：将仅供本机 Windows 双击发版的 `release-backend.cmd` 移到 `tmp/cmds/`，并使其按自身位置回溯仓库根目录后继续调用共用的打包与远端部署脚本。
