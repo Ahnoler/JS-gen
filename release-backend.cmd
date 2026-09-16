@@ -103,7 +103,7 @@ if not defined BASH (
 )
 echo.
 echo [1/4] packing via pack-control-plane.sh (ts=%TS%, bash=%BASH%) ...
-"%BASH%" pack-control-plane.sh
+"%BASH%" pack-control-plane.sh "%TS%"
 if errorlevel 1 (
   echo [error] pack failed - stopped, server untouched. ^(bash: %BASH%^)
   goto fail
