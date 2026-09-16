@@ -401,6 +401,19 @@ export function buildV3Properties({
               };
             }
           }
+          // 像素回退转归一化：所属截图带尺寸（录制 meta contentWidth/Height 或弹窗
+          // rect 宽高）时除以宽高，与 rect_norm 直出格式对齐——录制侧断点 A/B
+          // （phase 首动作/弹窗首步）漏写 rect_norm 的存量步骤在此补救。
+          const shotEntry = pageLevelById?.get(pid);
+          const sw = Number(shotEntry?._shotW);
+          const sh = Number(shotEntry?._shotH);
+          if (Number.isFinite(sw) && Number.isFinite(sh) && sw > 0 && sh > 0) {
+            rect = {
+              x1: rect.x1 / sw, y1: rect.y1 / sh,
+              x2: rect.x2 / sw, y2: rect.y2 / sh,
+            };
+            normalizedRects += 1;
+          }
         } else {
           noRectControls += 1;
         }

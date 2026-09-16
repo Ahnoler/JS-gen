@@ -267,7 +267,7 @@ function testPageLevelScreenshots() {
   check(pageCtrl.propertiesPID === pageSection.propertiesID, '页面控件 pid 指向页面 card 节点');
   check(pageCtrl.regionId === `${pageKey}|card:产品目录`, '页面控件 regionId 保留 pageKey|card');
   check(popupCtrl.propertiesPID === dialogSection.propertiesID, '弹窗控件 pid 指向弹窗 popup 节点');
-  check(JSON.stringify(popupCtrl.rect) === JSON.stringify({ x1: 20, y1: 20, x2: 220, y2: 40 }), '弹窗控件 rect 相对弹窗截图换算');
+  check(JSON.stringify(popupCtrl.rect) === JSON.stringify({ x1: 0.05, y1: 0.05, x2: 0.55, y2: 0.1 }), '弹窗控件 rect 相对弹窗截图换算并除宽高归一化（400×400）');
 
   const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
   check(covered.ok === true, '页面级截图覆盖校验通过（object pid→中间节点→page 上溯）');
@@ -412,6 +412,12 @@ async function testRealData() {
   const db = getDB();
   try {
     const traj = await trajectoryDao.getById(33);
+    if (!traj) {
+      // traj 33 已从库中删除（2026-09-16 核实 rows=0）——存量数据问题，非导出回归。
+      // 跳过 real-data 段保住门禁判别新红的能力；要恢复请重录或指定新 trajId。
+      console.log('  SKIP: trajectory 33 not found in DB (data drift, not an export regression)');
+      return;
+    }
     const phases = await trajectoryPhaseDao.listByTrajectory(33);
     const shots = await screenshotDao.listPhaseHighlightsByTrajectory(33);
     const built = buildTransactionEntryV3(traj, { systemId: 'sys', projectId: 'proj', phases, phaseScreenshots: shots });

@@ -109,7 +109,8 @@ const ok = (n) => console.log(`ok: ${n}`);
   assert.equal(properties.length, 5);
   assert.equal(pageCtrl.propertiesPID, pageSection.propertiesID);
   assert.equal(popupCtrl.propertiesPID, dialogSection.propertiesID);
-  assert.deepEqual(popupCtrl.rect, { x1: 20, y1: 20, x2: 220, y2: 40 });
+  // 像素回退归一化：减法后除以弹窗 rect 宽高（400×400）→ 0~1（录制断点 A/B 补救）
+  assert.deepEqual(popupCtrl.rect, { x1: 0.05, y1: 0.05, x2: 0.55, y2: 0.1 });
   assert.equal(noElement.propertiesPID, page.propertiesID); // 无 element_json 步骤经页面上下文继承 pid
 
   const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
@@ -164,10 +165,11 @@ const ok = (n) => console.log(`ok: ${n}`);
   assert.equal(dlg.rect, '{"x1":100,"y1":200,"x2":500,"y2":600}');
   // 第一个控件走 rect_norm 直出（无弹窗减法）
   assert.equal(ctrls[0].rect, '{"x1":0.5,"y1":0.25,"x2":0.75,"y2":0.5}');
-  // 第二个控件无 rect_norm，走旧像素路径 + 弹窗减法不变
-  assert.equal(ctrls[1].rect, '{"x1":20,"y1":20,"x2":220,"y2":40}');
+  // 第二个控件无 rect_norm，走像素回退 + 弹窗减法 + 除弹窗宽高（400×400）→ 归一化
+  assert.equal(ctrls[1].rect, '{"x1":0.05,"y1":0.05,"x2":0.55,"y2":0.1}');
   assert.equal(built.stats.missingPageLevelScreenshots, 0);
-  assert.equal(built.stats.normalizedRects, 1);
+  // rect_norm 直出 1 + 像素回退归一化 1（除弹窗宽高）
+  assert.equal(built.stats.normalizedRects, 2);
   ok('payload rect serialized as JSON string');
 }
 

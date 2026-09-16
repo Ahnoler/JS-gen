@@ -197,6 +197,9 @@ export function buildTransactionEntryV3(traj, {
   reorderPopupSubtrees(properties, popupOrder);
   for (const p of properties) {
     p.rect = rectToString(p.rect);
+    // 内部归一化分母字段不外发（dry-run 响应与 partner wire payload 一致）
+    delete p._shotW;
+    delete p._shotH;
   }
   // 超长字段截断：合并后、uniquifyPropertiesNames 之前应用（只统计不阻断，截断数进 stats）
   const truncatedCounts = { elementType: 0, options: 0, objectValue: 0, propertiesName: 0 };

@@ -1,7 +1,7 @@
 # Agent 协作日志
 
-
 > **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
+
 
 ## 2026-09-16 14:xx · OpenCode — 收工：修复 tmp/cmds 后端发版 CMD 闪退（回链本次开工）
 
@@ -17,6 +17,27 @@
 - 禁入区：共享发布 shell 脚本、`src/`、`config/`、`migrations/`、线上发布目录和其他会话 WIP；不执行真实上传、迁移、重启或回滚。
 - 方式：以 CMD 包装运行捕获错误，验证根目录与 Git Bash 发现逻辑；修复后运行到安全的打包前确认边界，确保失败窗口保留并输出可诊断错误。
 
+## 2026-09-16 14:21 · ZCode — 收工：推送坐标归一化修复三件套落地（回链 14:11 开工）
+
+- 完成：**修复 1**（录制侧根治，`7f49d186`）state.py 加 `_CURRENT_PAGE_DIMS` 直通 + service.py wrapper 动作前注入 before_dims + `_stamp_rect_norm` 页面路径先读直通再回落注册表 + after-action 注册 meta 补 contentWidth/Height——三路径行为证明（直通/注册表/跳过）全过。**修复 2+3**（导出侧补救存量，`fba8084f`）截图条目带 `_shotW/_shotH`（page=meta contentWidth/Height、popup=meta 或 rect 宽高、旧链路弹窗=rect 宽高）+ properties 像素回退除以分母归一化（计 normalizedRects）+ 内部字段 dry-run/wire 双剥除 + 两 pin 期望更新
+- 验收：**verify-all 基线 4 红→3 红**（export-v3 存量红真因=traj 33 已从库删除 rows=0，pin 加 SKIP 守卫转绿；余 3 红均他线数据漂移已登记）；**真数据审计**（`tmp/rect-audit-post.mjs`，30 条可推轨迹全量走路由等价数据流）：337 ele props 归一化 156 / 空 113 / **仍像素 68——全部落在 823/824/829/835 这批无任何 screenshot 行的轨迹**（legacy 兜底链无分母，按守卫设计保留像素，除法会造假数据）；828（有截图）实证 normalizedRects=4 全绿
+- 事故与处置：中途 `git stash pop "stash@{1}"` 误弹他线 sovereignty WIP——**因冲突 pop 未消费、stash 条目保留无损**；已将误入工作区的 15 个他线文件精确还原 HEAD（内容仍在 stash@{0}，未丢未改），自己 7 文件按名弹回。教训再证：stash 必须带 message、pop 必须指名核对条目归属
+- 遗留移交：68 步像素=「轨迹无截图行」历史数据（录于 page_level 事件链上线前），要归一化需重录或回填截图行——建议不做（像素语义正确）；**生产 4097 重启后生效**（录制侧+导出侧都要）；伙伴侧无需改（收到的坐标将统一为 0~1）
+- 提交本文件顺带携带他线条目：无（14:30/14:33 归档条目为并行会话独立提交）
+
+## 2026-09-16 14:33 · ZCode — 收工：同目录旧归档移除完成（回链 14:30 开工）
+
+- 完成：`docs/superpowers/` 下 09-05/09-06 两份归档原件已 `git rm`，`archive/logs/` 副本入库——git 识别为 100% 纯改名（`3d89dc67`，零内容改动），历史保留；同目录现无散置归档文件，三批归档（05/06/11）全部集中于 `docs/superpowers/archive/logs/`
+- 验收：删除前 blob 哈希比对原件=副本完全一致（2cb87df9 / 98ffbd59）；`git diff --cached -M` 2 renames 0 insertions/deletions；推送成功
+- 遵守：系收口并行会话在途复制搬迁（commit message 已注明）；他线 WIP 零触碰
+- 遗留：无
+
+## 2026-09-16 14:30 · ZCode — 开工：移除 agent-log 同目录旧归档（09-05/09-06 → 收口进 archive/logs/）
+
+- 进行中：2026-09-16 14:30；用户指令：移除与 agent-log.md 同目录（`docs/superpowers/`）的归档文件。现状=并行会话已复制 09-05/09-06 两份进 `archive/logs/`（blob 哈希与已提交原件一致，已核验），但原件仍在——本单元删除原件 git rm + 追踪 archive/logs/ 副本，完成整体搬迁
+- 范围：`docs/superpowers/agent-log-archive-2026-09-05.md`（删）、`agent-log-archive-2026-09-06.md`（删）、`archive/logs/` 下两份副本（add 入库）、本文件
+- 禁入区：他线 WIP（plans/2026-09-09-flow-card-guided-propose.md、reports/2026-09-10-benchmark-leaderboard-scan.md、src/ 等）；本文件他线在途条目原样保留
+- 方式：开工/收工各一 commit + push；移动 commit 注明系收口并行会话在途搬迁
 
 ## 2026-09-16 14:22 · ZCode — 收工：agent-log 归档完成（回链 14:15 开工）
 
