@@ -72,7 +72,7 @@ function resolveOptions(entry) {
  * Whether export name candidates from tree clicks / tree-select should be sanitized.
  * @param {string} action normalized action name
  * @param {object} element element info
- * @returns {boolean}
+ * @returns {boolean} true when the step is tree-related for export sanitization
  */
 function isTreeExportContext(action, element = {}) {
   const el = element || {};
@@ -87,7 +87,7 @@ function isTreeExportContext(action, element = {}) {
  * @param {string} name candidate business-object name
  * @param {string} action normalized action name
  * @param {object} element element info
- * @returns {string}
+ * @returns {string} sanitized name when tree context, otherwise the original name
  */
 function maybeStripTreeExportName(name, action, element = {}) {
   if (!name || !isTreeExportContext(action, element)) return name;
