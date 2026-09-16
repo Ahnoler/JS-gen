@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 11:xx · OpenCode — 收工：修复后端一键发布脚本跨秒误拒绝（回链本次开工）
+
+- 完成：commit **ebd26411**；`release-backend.cmd` 将启动时生成的发布时间戳传给 `pack-control-plane.sh`，从而使压缩包名与上传前的同一时间戳校验一致，跨秒打包不再误报 stale pack。
+- 兼容：`pack-control-plane.sh` 保留无参行为，供同事直接执行时仍自行按当前时间命名；发布远端协议、包内容、SSH/SCP 和重启逻辑均未修改。
+- 验收：Git Bash `bash -n pack-control-plane.sh` 通过；固定时间戳 `20991231-235959` 打包、产物存在和 `tar -tzf` 校验通过；无参打包与产物完整性校验通过；`git diff --check` 通过。
+- 遗留移交：无；本次未连接或变更线上服务器，首次点击发布可直接按现有流程执行。
+
 ## 2026-09-16 10:55 · ZCode — 开工：协作协议补条（push 冲突处理规则）
 
 - 用户指令：push 遇到冲突时须处理冲突、合并后再 push。补进 AGENTS.md「跨 Agent 协作」区段
