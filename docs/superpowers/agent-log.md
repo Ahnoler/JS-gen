@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 20:48 · Cursor — 收工：能力内聚结构硬闸实现计划（回链 20:40 开工）
+
+- 完成：计划 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（T1 helper+C1/C5/C2/C6 → T2 C4+fallback `${title}产物` → T3 `materializeLlmAtom` 顺序+C3 → T4 cache 4→5 + verify-all → T5 prompt 一句/samples/api-docs → T6 自检+C1 证伪+湿测 W1–W4 清单）。**未实现闸、未 bump cache、未改 src/prompt。**
+- 验收证据：计划覆盖 spec §4.1–§4.5 / §5 / §6 / §7.2–§7.4 / §8 C1–C6；reason 锁死 `multi_capability_task_draft` / `produces_eq_title`；`multi_persist_task_draft` 保持第一；无场景黑名单；无 TBD。开工声明 `9ac7c1fb`。
+- 遗留移交：下一会话按该计划 Subagent-Driven 或 Inline 实现；湿测 W1–W4 只在本地 LMY；勿与 OpenCode 20:03 轨迹提示词线文件集相交。不维护 CHANGELOG
+
 ## 2026-09-16 20:40 · Cursor — 开工：能力内聚结构硬闸实现计划（writing-plans）
 
 - 进行中：只写实现计划，**不实现**硬闸 / 不 bump cache / 不改 `src/**` 与 prompt。产物=`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` + 本日志短开/收；PR 合入 `uara_V1.2`。规格源=`docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md`（PR #43 仍 OPEN，本分支自 `cursor/capability-cohesion-structural-gate-design-bb60` 起）。
