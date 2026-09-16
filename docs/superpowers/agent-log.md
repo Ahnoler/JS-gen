@@ -8,6 +8,14 @@
 - 遗留移交：①`characterization/cold/characterize-live-xpath-e2e.mjs` 内嵌 **JS_SMART_LOCATOR 手抄镜像**（未注册门禁，且其 pickControl 清单早已与实现漂移）——本轮未动，若复活该 fixture 须同步镜像 ②`scripts/smoke/result-protocol-live.py:89` 自带内联 kind 探测副本（smoke 豁免区）同样未同步 ③`base.py:157` placeholder 兜底仍为 `ph.includes(label) || normalizeFormLabel(ph) === want` 单次判断（末级兜底，未纳入本轮）④eslint 存量 25 warning 全在 .js（本次零 .js 改动，非本线引入）
 - 注：不维护 CHANGELOG
 
+## 2026-09-16 17:59 · OpenCode — 收工：回放汇总步数把自动注入的 meta 检查点也计入（回链 17:52 开工）
+
+- 根因：`prepareReplayBatch` 会把选中步区间内的 `META_STEP_ACTIONS`（本次= `save_form_snapshot`）补进 `actions`/`orderedStepIds`；`runReplayBatch` 的 `if (typeB.ok) successCount += 1` 与 `buildPayload` 的 `count: allResults.length` 把它当业务步，FE 用 WS `replay:finished.successCount` 显示「回放完成 N 步」（`useRecordingStudio.ts:726-741`）→ 勾选 4 步却提示 5 步
+- 完成：`4a812814`——`replay-batch-runner.js` 引入 `isMetaStepAction`，Type B 成功分支/普通成功分支/retry-ok 三处 successCount 均跳过 meta；`buildPayload` 的 `okCount`/`count` 只算业务步，`failCount` 保留 meta 失败（按用户拍板「成功不计；失败仍计入失败数」）；`/api/docs` 补 note（stepIds 含补入 meta；count/successCount 只计业务步）
+- 验收：`characterize-replay-batch` 新增 2 pin（meta 成功不计 / save_form_snapshot 无快照跳过不计）+ 1 结构 pin（meta 失败仍入 failedStepIds）——**先 RED**（还原旧实现跑出 2 处断言失败）**后 GREEN**；verify-all 复跑=既有 4 红不变（step-highlight/layer-tree/confirm-notification/network-capture 均他线数据/环境），本烟绿；eslint 改动文件 0
+- 用户口径确认：前端「失败步保持勾选 / 成功步取消勾选」为预期形态——本改纯后端计数，不动 `replay:step`，勾选逻辑不受影响；meta 检查点成功后不再让提示多 1 步，失败时仍会「成功4，失败1」提示（用户已确认接受）
+- 遗留移交：本地后端（交易 830 所属）重启后生效；未改 SPA 仓；未改 Type B 安全性策略；不维护 CHANGELOG
+
 ## 2026-09-16 18:03 · ZCode 引擎线 — 开工：字段 label 解析同族收敛（归一化 + 精确优先）
 
 - 进行中：接 10:52 收工的 tssc 病灶（`b3339e2a`），把**同族**的「按 label 定位字段」一并对齐到仓库既有规范——`select_trigger._tryItems` 与 `characterize-prefix-label-select`/`characterize-prefix-label-xpath` 已确立的「归一化（折叠空白/剥尾 `：:*`/剥首 `*`）→ 精确优先 → 首个 `includes` 兜底」。现存不合规点：`select_tree.py`（radio 与 tree select 仍用 `l === label || l.includes(label)` 首中即返）、`base.py`（`JS_LOCATOR` 首个 includes 且未归一化；`JS_SMART_LOCATOR` 部分匹配 last-wins）、`fill_core.py`（Pass1/Pass2/scope/clear 未归一化）、`scan_form.py`（pass1 裸等值）、`select_dispatch.py`（`_JS_LIVE_TSSC` 首中即返 → 同族字段非 tssc 时假阴性）、`fill_engine.py`（两处重复 kind probe 同形，假阴性致 select 走错分发）。**只治「按 label 定位字段」；不动按文案匹配选项/按钮/菜单/单元格的路径**

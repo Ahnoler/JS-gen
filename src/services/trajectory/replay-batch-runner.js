@@ -35,6 +35,7 @@ import {
   markStepReplayOk,
 } from './trajectory-step-service.js';
 import { handleFormStructureCheckpoint } from './form-structure-heal.js';
+import { isMetaStepAction } from '../../models/meta-step-actions.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import { navigateToFunctionMenu } from './menu-navigation.js';
 
@@ -136,6 +137,11 @@ export async function runReplayBatch({
 
       const entry = actions[i];
       const stepId = toNumericStepId(entry.id);
+      // Auto-injected meta checkpoints (prepareReplayBatch fills the selected
+      // range with META_STEP_ACTIONS) must not inflate the user-facing step
+      // counts: the product lists/counts only business steps. A meta checkpoint
+      // success stays silent; a meta checkpoint failure still counts as failed.
+      const entryIsMeta = isMetaStepAction(entry.action);
       if (stepId != null && skippedIds.has(stepId)) continue;
 
       const stepNum = i + 1;
@@ -196,7 +202,7 @@ export async function runReplayBatch({
           if (typeB.healed) healed.push(...typeB.healed);
           continue;
         }
-        if (typeB.ok) successCount += 1;
+        if (typeB.ok && !entryIsMeta) successCount += 1;
         allResults.push(...typeB.results);
         if (typeB.healed) healed.push(...typeB.healed);
         continue;
@@ -266,7 +272,7 @@ export async function runReplayBatch({
       const failResult = row?.result || result?.error || 'unknown';
 
       if (ok) {
-        successCount += 1;
+        if (!entryIsMeta) successCount += 1;
         if (stepId != null) {
           try { await markStepReplayOk(stepId); } catch { /* ignore */ }
         }
@@ -411,7 +417,7 @@ export async function runReplayBatch({
               const failedIndex = failedStepIds.indexOf(stepId);
               if (failedIndex !== -1) failedStepIds.splice(failedIndex, 1);
             }
-            successCount += 1;
+            successCount += entryIsMeta ? 0 : 1;
             emitReplay('replay:step', tid, {
               stepId,
               status: 'success',
@@ -577,14 +583,19 @@ export async function runReplayBatch({
  * @returns {object} 回放 API 结果载荷
  */
 function buildPayload(tid, doSuppress, rows, allResults, healed, error, counts = {}) {
-  const okCount = allResults.filter((r) => r.ok && !r.healed).length;
+  // Meta checkpoints (auto-injected save_form_snapshot / scan_* / task_* …) are
+  // hidden internal steps: exclude their successes from the user-facing counts
+  // and `count`, but keep their failures in `failCount` (a broken checkpoint is
+  // still surfaced). Explicit `counts.*` win, as before.
+  const businessResults = allResults.filter((r) => !isMetaStepAction(r.action));
+  const okCount = businessResults.filter((r) => r.ok && !r.healed).length;
   const failCount = allResults.filter((r) => !r.ok || r.healed || r.confirmed === false).length;
   return {
     trajectoryId: tid,
     trajectoryDbId: tid,
     isReplay: doSuppress,
     stepIds: rows.map((r) => r.id),
-    count: allResults.length,
+    count: businessResults.length,
     ok: counts.successCount ?? okCount,
     failed: counts.failedCount ?? failCount,
     successCount: counts.successCount ?? okCount,

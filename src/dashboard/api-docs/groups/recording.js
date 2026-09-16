@@ -196,6 +196,8 @@ export const GROUP_RECORDING = [
           'WS replay:step { trajectoryId, trajectoryDbId, stepId, status, error?, healType? }',
           'WS replay:form_structure { trajectoryId, healType:"form_structure", container, missing_required, added_required, ... }',
           'WS replay:finished { trajectoryId, successCount, failedCount, failedStepIds, error?, healType?, aborted?, reason? }',
+          'replay:started/replay:finished 的 stepIds = 实际执行序列（含自动补入的 meta 检查点 id）',
+          'count/successCount/ok 只计业务步；自动补入的 meta 检查点（save_form_snapshot 等）成功不计入，失败仍计入 failedCount/failedStepIds',
           '旧事件 recording:replay_heal 可带 healType；前端可按 healType 区分',
         ],
       },
