@@ -19,7 +19,7 @@ const OTHER_FAMILIES = {
 
 const PERSIST_AS_CAP_FAMILIES = new Set(['delete', 'status', 'clone']);
 const PERSIST_AS_CAP_RE = /(?<![未已])启用|禁用|克隆|删除|作废|撤销(?!查询)/;
-const CLOSER_RE = /确定|保存|提交/;
+const CLOSER_RE = /确定|保存(?!概况)|提交/;
 const STEP_DUNHAO_RE = /^\s*\d+、/;
 const STEP_DOT_RE = /^\s*\d+[\.．]\s+/;
 
@@ -60,14 +60,18 @@ function isVisible(text) {
 }
 
 /**
- * Haystack is the group with `操作：`/`操作:` markers stripped so both the
- * action clause and button text classify. Taking only the tail hid verbs
- * such as 维护概况 behind fill-step 【保存概况】.
+ * Haystack is text after 操作：/操作:, else the whole group.
  * @param {string} raw Group text
  * @returns {string} Classification haystack
  */
 function extractHaystack(raw) {
-  return String(raw || '').replace(/操作[:：]/g, '');
+  const src = String(raw || '');
+  const idx = src.search(/操作[:：]/);
+  if (idx >= 0) {
+    const mark = src.slice(idx).match(/^操作[:：]/);
+    return src.slice(idx + (mark ? mark[0].length : 0));
+  }
+  return src;
 }
 
 /**
