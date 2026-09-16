@@ -345,11 +345,14 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                 if not xpath_smart and not is_tree and not is_tssc:
                     result = resolve_error or 'xpath-not-found'
                 elif is_tssc:
-                    from .form_action_engines import SelectEngine
+                    from .form_action_engines import SelectEngine, _unwrap_action_result
                     select_engine = SelectEngine(
                         self.browser_context, self.business_data_store, self,
                     )
-                    result = await select_engine.select_option(label, value, xpath_smart)
+                    # Engine returns ActionResult on success (direct-call
+                    # contract); unwrap so ok-counting, cascade key collection
+                    # and json.dumps all see the ok-prefixed str.
+                    result = _unwrap_action_result(await select_engine.select_option(label, value, xpath_smart))
                     kind = 'select_option'
                     engine_handled_record = True
                 elif is_tree:

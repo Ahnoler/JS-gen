@@ -75,6 +75,7 @@ run "characterize-select-option-verify" "$PY" scripts/characterization/character
 run "characterize-select-option-suggest-field" "$PY" scripts/characterization/characterize-select-option-suggest-field.py
 run "characterize-close-dialog-replay" "$PY" scripts/characterization/characterize-close-dialog-replay.py
 run "characterize-cascade-three-round" "$PY" scripts/characterization/characterize-cascade-three-round.py
+run "characterize-autofill-engine-result-unwrap" "$PY" scripts/characterization/characterize-autofill-engine-result-unwrap.py
 run "characterize-dialog-tasklist-scope" "$PY" scripts/characterization/characterize-dialog-tasklist-scope.py
 run "characterize-container-naming" "$PY" scripts/characterization/characterize-container-naming.py
 run "characterize-result-protocol" "$PY" scripts/characterization/characterize-result-protocol.py
