@@ -1,7 +1,7 @@
 # 原子化组件草稿交易 — 拆分边界设计
 
 > 日期：2026-09-15  
-> 状态：待用户审阅 spec  
+> 状态：已审阅；实现按 2026-09-16 plan（PR #37）  
 > 决策：方案 B（结构化 `produces` / `dataDependsOn` + 短通用规则）  
 > 相关：`2026-09-07-req-to-draft-traj-design.md` §3 粒度；`2026-09-09-flow-card-guided-propose-design.md`；线上 prompt `scripts/prompts/req-draft-traj-atomize-prompt.md`；湿测对照 #675 / #676 / #678 / #504
 
