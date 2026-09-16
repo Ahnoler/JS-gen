@@ -279,6 +279,32 @@ def main() -> int:
         'G3 login keeps empty success_when',
     )
 
+    # Click-completion evidence helper (pure; no browser)
+    from scripts.controller.actions._phase_boundary import (
+        maybe_record_click_completion_evidence,
+    )
+    store_ev: dict = {}
+    apply_phase_boundary(store_ev, q_task)
+    kinds_ev = maybe_record_click_completion_evidence(
+        store_ev, btn_label='查询', url_changed=False,
+    )
+    assert_true('query_clicked' in kinds_ev, f'helper records query_clicked: {kinds_ev}')
+    ok_ev, _ = phase_done_ok(store_ev)
+    assert_true(ok_ev, 'helper evidence satisfies phase_done_ok')
+
+    store_nav_ev: dict = {}
+    apply_phase_boundary(store_nav_ev, open_t)
+    kinds_nav = maybe_record_click_completion_evidence(
+        store_nav_ev,
+        btn_label='评级申请',
+        url_changed=False,
+        overlay_title_before='',
+        overlay_title_after='评级申请',
+    )
+    assert_true('page_opened' in kinds_nav, f'helper records page_opened: {kinds_nav}')
+    ok_nav_ev, _ = phase_done_ok(store_nav_ev)
+    assert_true(ok_nav_ev, 'page_opened satisfies open_page done')
+
     print('characterize-phase-boundary: OK')
     return 0
 

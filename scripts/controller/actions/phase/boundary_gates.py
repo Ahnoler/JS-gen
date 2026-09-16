@@ -190,6 +190,50 @@ def maybe_record_picker_closed(
     mark_parent_form_stale(business_data_store, parent_container)
     return True
 
+
+_QUERY_BTN_RE = re.compile(r'^(查询|搜索|查找)')
+_NEXT_BTN_RE = re.compile(r'^(下一步|继续|下一步骤)')
+
+
+def maybe_record_click_completion_evidence(
+    business_data_store: dict | None,
+    *,
+    btn_label: str = '',
+    url_changed: bool = False,
+    overlay_title_before: str = '',
+    overlay_title_after: str = '',
+) -> list[str]:
+    """Record G3 query/nav evidence kinds after a successful index click.
+
+    Returns list of kinds newly recorded (empty if none / no boundary).
+    """
+    if not business_data_store or not phase_boundary_active(business_data_store):
+        return []
+    recorded: list[str] = []
+    compact = re.sub(r'\s+', '', (btn_label or '').strip())
+    before = (overlay_title_before or '').strip()
+    after = (overlay_title_after or '').strip()
+
+    if url_changed:
+        record_evidence(business_data_store, 'url_change', 'post-click-url')
+        recorded.append('url_change')
+
+    # New or retitled visible overlay → page_opened (OR evidence for navigate).
+    if after and after != before:
+        record_evidence(business_data_store, 'page_opened', after[:80])
+        recorded.append('page_opened')
+
+    if compact and _QUERY_BTN_RE.match(compact):
+        record_evidence(business_data_store, 'query_clicked', compact[:40])
+        recorded.append('query_clicked')
+
+    if compact and _NEXT_BTN_RE.match(compact):
+        record_evidence(business_data_store, 'nav_next_clicked', compact[:40])
+        recorded.append('nav_next_clicked')
+
+    return recorded
+
+
 def next_action_hint(business_data_store: dict | None) -> str:
     """NEXT_ACTION cue from boundary goals + current pending."""
     b = get_phase_boundary(business_data_store)

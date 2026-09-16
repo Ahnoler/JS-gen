@@ -8,7 +8,8 @@ from scripts.controller.actions.phase.boundary import (  # noqa: F401
     boundary_to_legacy_intent, can_submit_writes, classify_task_mode, clear_phase_boundary,
     compile_boundary, contract_summary_hint_boundary, force_refill_all_required, get_phase_boundary,
     is_login_task, is_open_page_task, is_picker_context, is_query_task,
-    is_wizard_nav_task, mark_parent_form_stale, maybe_record_picker_closed, next_action_hint,
+    is_wizard_nav_task, mark_parent_form_stale, maybe_record_click_completion_evidence,
+    maybe_record_picker_closed, next_action_hint,
     observed_kinds, phase_boundary_active, phase_boundary_enabled, phase_done_ok,
     re, record_evidence, should_block_index_submit_boundary,
 )

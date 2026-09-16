@@ -14,7 +14,8 @@ from scripts.controller.actions.phase.boundary_gates import *  # noqa: F401,F403
 from scripts.controller.actions.phase.boundary_gates import (  # noqa: F401
     Any, _CONFIRM_BTN_RE, _MAINTAIN_TITLE_RE, _PICKER_TITLE_RE,
     _SAVE_BTN_RE, annotations, can_submit_writes, get_phase_boundary,
-    is_picker_context, mark_parent_form_stale, maybe_record_picker_closed, next_action_hint,
+    is_picker_context, mark_parent_form_stale, maybe_record_click_completion_evidence,
+    maybe_record_picker_closed, next_action_hint,
     observed_kinds, phase_boundary_active, phase_done_ok, re,
     record_evidence, should_block_index_submit_boundary,
 )

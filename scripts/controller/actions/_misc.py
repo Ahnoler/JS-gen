@@ -825,16 +825,42 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                     sys.stderr.flush()
                     pass
             url_before = getattr(page, 'url', '') or ''
+            overlay_title_before = ''
+            try:
+                overlay_title_before = str(await page.evaluate('''() => {
+                    const pick = (d, sel) => {
+                        const wrap = d.closest('.el-dialog__wrapper, .el-drawer__wrapper') || d;
+                        const st = getComputedStyle(wrap);
+                        if (st.display === 'none' || st.visibility === 'hidden') return '';
+                        const r = wrap.getBoundingClientRect();
+                        if (r.width <= 0 || r.height <= 0) return '';
+                        return ((d.querySelector(sel) || {}).textContent || '').trim();
+                    };
+                    for (const d of document.querySelectorAll('.el-dialog')) {
+                        const t = pick(d, '.el-dialog__title');
+                        if (t) return t.slice(0, 80);
+                    }
+                    for (const d of document.querySelectorAll('.el-drawer')) {
+                        const t = pick(d, '.el-drawer__title, .el-drawer__header')
+                            || (d.getAttribute('aria-label') || '').trim();
+                        if (t) return t.slice(0, 80);
+                    }
+                    return '';
+                }''') or '')
+            except Exception:
+                overlay_title_before = ''
             download_path = await browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')
             # Navigation detection for page-transitioning clicks (e.g. 客户转正 → new page).
             # If URL changed after the click, record a flag that recorder_emitters turns
             # into a [导航] HumanMessage cue — recorded step stays ok-clicked-N.
+            url_changed = False
             try:
                 await _wait_if_loading(page)
                 url_after = getattr(page, 'url', '') or ''
                 if url_before and url_after and url_before != url_after:
+                    url_changed = True
                     if business_data_store is not None:
                         business_data_store['_last_click_navigated'] = {
                             'from': url_before,
@@ -842,6 +868,50 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                         }
             except Exception:
                 sys.stderr.write("[click] post-click navigation detection failed" + '\n')
+                sys.stderr.flush()
+                pass
+            # G3: record query/nav completion evidence (query_clicked / url_change /
+            # page_opened / nav_next_clicked) when phase boundary is active.
+            try:
+                overlay_title_after = ''
+                try:
+                    overlay_title_after = str(await page.evaluate('''() => {
+                        const pick = (d, sel) => {
+                            const wrap = d.closest('.el-dialog__wrapper, .el-drawer__wrapper') || d;
+                            const st = getComputedStyle(wrap);
+                            if (st.display === 'none' || st.visibility === 'hidden') return '';
+                            const r = wrap.getBoundingClientRect();
+                            if (r.width <= 0 || r.height <= 0) return '';
+                            return ((d.querySelector(sel) || {}).textContent || '').trim();
+                        };
+                        for (const d of document.querySelectorAll('.el-dialog')) {
+                            const t = pick(d, '.el-dialog__title');
+                            if (t) return t.slice(0, 80);
+                        }
+                        for (const d of document.querySelectorAll('.el-drawer')) {
+                            const t = pick(d, '.el-drawer__title, .el-drawer__header')
+                                || (d.getAttribute('aria-label') || '').trim();
+                            if (t) return t.slice(0, 80);
+                        }
+                        return '';
+                    }''') or '')
+                except Exception:
+                    overlay_title_after = ''
+                from scripts.controller.actions._phase_boundary import (
+                    maybe_record_click_completion_evidence,
+                )
+                kinds = maybe_record_click_completion_evidence(
+                    business_data_store,
+                    btn_label=btn_label or '',
+                    url_changed=url_changed,
+                    overlay_title_before=overlay_title_before,
+                    overlay_title_after=overlay_title_after,
+                )
+                if kinds:
+                    sys.stderr.write(f'[click] G3 evidence recorded: {kinds}\n')
+                    sys.stderr.flush()
+            except Exception:
+                sys.stderr.write("[click] G3 completion evidence recording failed" + '\n')
                 sys.stderr.flush()
                 pass
             if element_node:
