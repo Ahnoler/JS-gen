@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 10:52 · ZCode 引擎线 — 收工：select_option 字段解析错位修复湿测 PASS（回链 10:28 开工）
+
+- 完成：commit **b3339e2a**（4 文件 +105/-8）：tssc_multi_select 字段查找改 findFieldItem（精确优先→包含唯一兜底→多命中 ambiguous-label）、prompts 同步歧义错误码、新增 characterize-tssc-field-resolution.py 入 verify-all。
+- 验收（19242 活页面，选择要素弹窗）：修复版 finder 逐 label 实测——要素名称→DOM9 本体✓（修复前命中组件要素名称 DOM7）、要素编码→DOM10✓（修复前命中组件要素编码 DOM6）、所属列表要素编码→DOM11✓、组件要素编码→DOM6✓（精确查自身名仍正常）；模糊「要素」→正确返回 6 候选歧义。离线=py_compile+SYNTAX+新 pin+finder 假 DOM 单测（精确优先/唯一包含/歧义）+verify-all 基线 4 红零新增。
+- 遗留移交：①**同族 finder 排查**——`l === label || l.includes(label)` 模式还在 select_tree.py 等处、`_resolve_control`（Python 侧）同形风险，建议单独一批改精确优先（本次按批准范围只治 tssc 病灶）；②所属列表要素编码 下拉「暂无数据」是 SUT 侧级联/数据现状（真无数据，非引擎 bug），该新增可选字段在自愈里「填不了即跳过」的策略改进仍待裁决（见 09-16 早前分析）。
+
 ## 2026-09-16 10:28 · ZCode 引擎线 — 开工：select_option 字段解析错位修复（要素名称→组件要素名称，includes 包含匹配错位）
 
 - 现场实证（19242 活页面 + 引擎原版匹配逻辑）：选择要素弹窗 DOM 序含「组件要素编码(6)/组件要素名称(7)」前缀查询字段，`l === label || l.includes(label)` 首个命中被它们抢占——找「要素名称」命中「组件要素名称」、找「要素编码」命中「组件要素编码」（均为错字段）。回放 err-no-options 是对错字段弹层（所属列表要素编码，暂无数据）做出的误判。
