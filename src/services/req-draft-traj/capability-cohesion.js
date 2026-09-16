@@ -60,18 +60,14 @@ function isVisible(text) {
 }
 
 /**
- * Haystack is text after 操作：/操作:, else the whole group.
+ * Haystack is the group with `操作：`/`操作:` markers stripped so both the
+ * action clause and button text classify. Taking only the tail hid verbs
+ * such as 维护概况 behind fill-step 【保存概况】.
  * @param {string} raw Group text
  * @returns {string} Classification haystack
  */
 function extractHaystack(raw) {
-  const src = String(raw || '');
-  const idx = src.search(/操作[:：]/);
-  if (idx >= 0) {
-    const mark = src.slice(idx).match(/^操作[:：]/);
-    return src.slice(idx + (mark ? mark[0].length : 0));
-  }
-  return src;
+  return String(raw || '').replace(/操作[:：]/g, '');
 }
 
 /**

@@ -181,6 +181,20 @@ await run('helper: locate 进入编辑页 + maintain + verify + closer-only 保�
   assert.deepEqual(out, { ok: true });
 });
 
+await run('helper: fallback 操作：【保存概况】 then closer 【保存】 is cohesive', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '保存（信贷潜在客户）',
+    taskDraft: [
+      '1、进入编辑页',
+      '2、维护概况（客户编辑页），操作：【保存概况】',
+      '3、联网核查（客户编辑页），操作：【联网核查】',
+      '4、保存（信贷潜在客户）（客户编辑页），操作：【保存】',
+    ].join('\n'),
+    produces: ['保存（信贷潜在客户）产物'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
 await run('C1 helper: locate + maintain/save + reorder → multi_capability_task_draft', () => {
   const out = mod.assertCapabilityCohesion({
     title: '维护并排序',
