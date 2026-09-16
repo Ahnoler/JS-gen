@@ -2,19 +2,15 @@
 JS snippet constants: JS_CLICK_RADIO, JS_SELECT_TREE_OPTION (extracted from _js_snippets.py).
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
-from .base import JS_FIELD_DISABLED
+from .base import JS_FIELD_DISABLED, JS_FIELD_ITEM_CANDIDATES
 from .container import JS_GET_CONTAINER
 
 JS_CLICK_RADIO = '''([label, option]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const container = ''' + JS_GET_CONTAINER + ''';
-    const findItem = (root) => {
-        for (const item of root.querySelectorAll('.el-form-item')) {
-            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-            if (lbl.includes(label)) return item;
-        }
-        return null;
-    };
+    const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+    // 精确匹配优先（normalize 后）：找「要素名称」不得命中前缀兄弟「组件要素名称」。
+    const findItem = (root) => candidatesOf(root, label)[0] || null;
     let item = findItem(container);
     // KB-I5: 弹窗/抽屉（方案品种明细等）的 form-item 在页面容器之外——补扫可见 dialog/drawer
     if (!item) {
@@ -65,18 +61,14 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
     // Open the popover first so tree DOM is rendered
     const container = ''' + JS_GET_CONTAINER + ''';
     let fieldItem = null;
-    for (const item of container.querySelectorAll('.el-form-item')) {
-        const l = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (l === label || l.includes(label)) { fieldItem = item; break; }
-    }
+    const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+    // 精确匹配优先（normalize 后，含必填 * / 冒号）：找「要素名称」不得命中前缀兄弟「组件要素名称」。
+    fieldItem = candidatesOf(container, label)[0] || null;
     if (!fieldItem) {
         // KB-I5: 弹窗/抽屉（维护方案品种明细等）的 form-item 在页面容器之外——补扫可见 dialog/drawer
         for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
             if (dlg.offsetParent === null) continue;
-            for (const item of dlg.querySelectorAll('.el-form-item')) {
-                const l = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                if (l === label || l.includes(label)) { fieldItem = item; break; }
-            }
+            fieldItem = candidatesOf(dlg, label)[0] || null;
             if (fieldItem) break;
         }
     }

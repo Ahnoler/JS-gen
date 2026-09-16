@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .js_snippets.base import JS_FIELD_ITEM_CANDIDATES
+
 _TSSC_TARGET = frozenset({
     "form_tssc_multi_select",
     "tssc_multi_select",
@@ -16,18 +18,15 @@ _TREE_TARGET = frozenset({
 _TSSC_KIND = frozenset({"tssc-multi-select", "tssc_multi_select"})
 _TREE_KIND = frozenset({"tree-select", "tree", "tree_select"})
 
-_JS_LIVE_TSSC = r'''([lab]) => {
-  const want = String(lab || '').replace(/\s+/g, ' ').trim();
+_JS_LIVE_TSSC = '''([lab]) => {
+  const want = String(lab || '').replace(/\\s+/g, ' ').trim();
   if (!want) return false;
+  const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+  // 精确匹配优先：前缀兄弟（如「组件要素名称」）DOM 序在前时不得以兄弟的
+  // 无 tssc 控件短路判定——先解析到真正会被操作的字段，再验其控件。
   const hit = (root) => {
-    for (const item of root.querySelectorAll('.el-form-item')) {
-      const l = (item.querySelector('.el-form-item__label')?.textContent || '')
-        .replace(/\s+/g, ' ').trim();
-      if (l === want || l.includes(want)) {
-        return !!(item.querySelector('.tssc-multi-select'));
-      }
-    }
-    return false;
+    const item = candidatesOf(root, want)[0];
+    return item ? !!(item.querySelector('.tssc-multi-select')) : false;
   };
   if (hit(document)) return true;
   for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {

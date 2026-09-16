@@ -2,7 +2,7 @@
 JS snippet constants: JS_FILL_FORM_FIELD, JS_FILL_BY_XPATH, JS_CAPTURE_FROM_XPATH (extracted from _js_snippets.py).
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
-from .base import JS_FIELD_DISABLED
+from .base import JS_FIELD_DISABLED, JS_FIELD_LABEL_NORM, JS_FIELD_ITEM_CANDIDATES
 from .container import JS_GET_CONTAINER
 from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from .fill_date import JS_COMMIT_DATE_VUE_BODY
@@ -34,10 +34,15 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     };
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
+    // Shared label normalization (base.JS_FIELD_LABEL_NORM): strip Element UI
+    // required asterisk / trailing colons so Pass 1 raw equality can't miss
+    // `*要素名称` and fall through to includes() where 组件要素名称 steals the field.
+    const normLab = ''' + JS_FIELD_LABEL_NORM + ''';
+    const wantN = normLab(label);
     // Pass 1: exact label match
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (lbl !== label) continue;
+        if (normLab(lbl) !== wantN) continue;
         // Scroll the form-item into view so Element UI components render correctly
         item.scrollIntoView({ block: 'center', behavior: 'instant' });
         const input = item.querySelector('input:not([type="hidden"])');
@@ -62,8 +67,9 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     // Pass 2: partial label match (exclude exact matches already tried)
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (lbl === label) continue;
-        if (!lbl.includes(label)) continue;
+        const labN = normLab(lbl);
+        if (labN === wantN) continue;
+        if (!labN.includes(wantN)) continue;
         const input = item.querySelector('input:not([type="hidden"])');
         const textarea = item.querySelector('textarea');
         const trigger = item.querySelector('.el-select .el-input__inner');
@@ -139,7 +145,8 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
             for (const item of sc.querySelectorAll('.el-form-item')) {
                 const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
                 if (!lbl) continue;
-                if (want !== null ? lbl !== want : !lbl.includes(label)) continue;
+                const labN = normLab(lbl);
+                if (want !== null ? labN !== wantN : !labN.includes(wantN)) continue;
                 const r = fillInScope(item);
                 if (r) return r === 'ok' ? ('ok-scope:' + lbl) : r;
             }
@@ -469,11 +476,12 @@ JS_CAPTURE_FROM_XPATH = (
 
 
 # Clear a labeled field's input via native setter so Vue reacts.
+# Uses shared JS_FIELD_ITEM_CANDIDATES (exact normalized label first, then
+# includes) so a prefix sibling (组件要素名称) can't steal the field from 要素名称;
+# candidates without a clearable control are skipped, not treated as a match.
 JS_CLEAR_FIELD_VALUE = '''(label) => {
-            const items = document.querySelectorAll('.el-form-item');
-            for (const item of items) {
-                const lbl = item.querySelector('.el-form-item__label');
-                if (!lbl || !lbl.textContent.trim().includes(label)) continue;
+            const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+            for (const item of candidatesOf(document, label)) {
                 const trigger = item.querySelector('input, .el-input__inner, textarea');
                 if (!trigger) continue;
                 // Clear via native setter so Vue reacts

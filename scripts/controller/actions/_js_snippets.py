@@ -12,7 +12,7 @@ this module re-exports every constant so existing importers are unchanged.
 """
 
 from .js_snippets.container import JS_GET_CONTAINER
-from .js_snippets.base import JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR, JS_WAIT_LOADING, JS_CHECK_LOADING, JS_LOCATOR, JS_SMART_LOCATOR, JS_FIELD_DISABLED
+from .js_snippets.base import JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR, JS_WAIT_LOADING, JS_CHECK_LOADING, JS_LOCATOR, JS_SMART_LOCATOR, JS_FIELD_DISABLED, JS_FIELD_LABEL_NORM, JS_FIELD_ITEM_CANDIDATES
 from .js_snippets.fill_core import JS_FILL_FORM_FIELD, JS_FILL_BY_XPATH, JS_CAPTURE_FROM_XPATH, JS_CLEAR_FIELD_VALUE
 from .js_snippets.fill_date import JS_FILL_DATE_BY_XPATH, JS_CLICK_RADIO_BY_XPATH
 from .js_snippets.select_trigger import (

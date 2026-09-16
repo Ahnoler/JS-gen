@@ -2,6 +2,7 @@
 JS snippet constants: JS_SCENARIO_PAGE_SNAPSHOT, JS_VERIFY_FORM_STRUCTURE (extracted from _js_snippets.py).
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
+from .base import JS_FIELD_ITEM_CANDIDATES
 from .container import JS_GET_CONTAINER
 
 JS_SCENARIO_PAGE_SNAPSHOT = r'''() => {
@@ -373,9 +374,10 @@ JS_CLICK_LOGIN_BUTTON = '''() => {
 # Auto-click a 验证 (verify) button inside the labeled form item.
 JS_CLICK_VERIFY_BUTTON = '''([lbl]) => {
                                 const container = ''' + JS_GET_CONTAINER + ''';
-                                for (const item of container.querySelectorAll('.el-form-item')) {
-                                    const t = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                                    if (!t.includes(lbl)) continue;
+                                const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+                                // 精确匹配优先：找「纳税人识别号」不得点到前缀兄弟
+                                // 「纳税人识别号（备）」的验证按钮。
+                                for (const item of candidatesOf(container, lbl)) {
                                     for (const b of item.querySelectorAll('button')) {
                                         if (b.offsetParent !== null && b.textContent.includes('验证')) {
                                             b.click(); return 'ok-verify-clicked';

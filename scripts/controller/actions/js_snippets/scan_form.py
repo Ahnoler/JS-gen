@@ -3,7 +3,7 @@ JS snippet constants: JS_SCAN_FORM_FIELDS, JS_CHECK_SINGLE_FIELD (extracted from
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .scan_utils import JS_CLASSIFY_FIELD
-from .base import JS_FIELD_DISABLED
+from .base import JS_FIELD_DISABLED, JS_FIELD_LABEL_NORM
 from .scan_utils import JS_FIELD_REQUIRED
 from .container import JS_GET_CONTAINER
 from .scan_utils import JS_READ_CURRENT_VALUE
@@ -809,12 +809,18 @@ JS_CHECK_SINGLE_FIELD = '''([label, buttonKeywords]) => {
         const r = el.getBoundingClientRect();
         return !(r.width <= 0 || r.height <= 0);
     };
+    // Shared label normalization (base.JS_FIELD_LABEL_NORM): strip Element UI
+    // required asterisk / trailing colons so pass-1 raw equality can't miss
+    // `*要素名称` and fall through to includes() where a prefix sibling wins.
+    const normLab = ''' + JS_FIELD_LABEL_NORM + ''';
+    const wantN = normLab(label);
     for (let pass = 1; pass <= 2; pass++) {
         const exact = pass === 1;
         for (const item of container.querySelectorAll('.el-form-item')) {
             const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-            if (exact) { if (lbl !== label) continue; }
-            else { if (lbl === label || !lbl.includes(label)) continue; }
+            const labN = normLab(lbl);
+            if (exact) { if (labN !== wantN) continue; }
+            else { if (labN === wantN || !labN.includes(wantN)) continue; }
             // Scroll the form-item into view so Element UI components render
             // correctly before reading its value (covers already-filled / read-only checks).
             item.scrollIntoView({ block: 'center', behavior: 'instant' });

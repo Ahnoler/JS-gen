@@ -68,6 +68,9 @@ run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/charact
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
 run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py
 run "characterize-tssc-field-resolution" "$PY" scripts/characterization/characterize-tssc-field-resolution.py
+run "characterize-field-label-resolution" "$PY" scripts/characterization/characterize-field-label-resolution.py
+run "characterize-prefix-label-select" "$PY" scripts/characterization/cold/characterize-prefix-label-select.py
+run "characterize-prefix-label-xpath" "$PY" scripts/characterization/cold/characterize-prefix-label-xpath.py
 run "characterize-select-option-verify" "$PY" scripts/characterization/characterize-select-option-verify.py
 run "characterize-select-option-suggest-field" "$PY" scripts/characterization/characterize-select-option-suggest-field.py
 run "characterize-close-dialog-replay" "$PY" scripts/characterization/characterize-close-dialog-replay.py

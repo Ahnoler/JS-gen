@@ -20,6 +20,7 @@ from ._js_snippets import (
 )
 from .js_snippets.container import JS_VISIBLE_OVERLAY_OF
 from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
+from .js_snippets.base import JS_FIELD_ITEM_CANDIDATES
 from .form_rules import match_rule, match_cert_number, normalize_lat_lng_value
 from .form_scan_utils import (
     _is_query_mode, _with_submit_cue,
@@ -179,14 +180,8 @@ class FillEngine(_FormActionEngineBase):
             try:
                 live = await page.evaluate(
                     '''(label) => {
-                        const norm = (s) => String(s || '').replace(/\\s+/g, ' ').trim();
-                        const want = norm(label);
-                        const items = [...document.querySelectorAll('.el-form-item')];
-                        let fi = null;
-                        for (const it of items) {
-                            const t = norm((it.querySelector('.el-form-item__label') || {}).textContent);
-                            if (t && (t === want || t.includes(want))) { fi = it; break; }
-                        }
+                        const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+                        const fi = candidatesOf(document, label)[0] || null;
                         if (!fi) return '';
                         if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
                         if (fi.querySelector(
@@ -495,14 +490,8 @@ class FillEngine(_FormActionEngineBase):
             try:
                 live = await page.evaluate(
                     '''(label) => {
-                        const norm = (s) => String(s || '').replace(/\\s+/g, ' ').trim();
-                        const want = norm(label);
-                        const items = [...document.querySelectorAll('.el-form-item')];
-                        let fi = null;
-                        for (const it of items) {
-                            const t = norm((it.querySelector('.el-form-item__label') || {}).textContent);
-                            if (t && (t === want || t.includes(want))) { fi = it; break; }
-                        }
+                        const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+                        const fi = candidatesOf(document, label)[0] || null;
                         if (!fi) return '';
                         if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
                         if (fi.querySelector(

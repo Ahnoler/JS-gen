@@ -89,6 +89,42 @@ JS_CHECK_LOADING = '''() => {
 # ── Locators ──
 
 
+# Normalize a form label before comparing. Required-field asterisks and trailing
+# colons defeat raw equality, so a plain `lbl === label` never fires on
+# `*国民经济部门` / `要素名称：` and the caller silently falls through to the
+# includes() branch (characterize-prefix-label-select). Strip trailing separators
+# then the leading required marker — same normalization as select_trigger._tryItems.
+JS_FIELD_LABEL_NORM = '''(s) => String(s || '').replace(/\\s+/g, ' ').trim()
+        .replace(/[：:*\\s]+$/g, '').replace(/^[*\\s]+/, '')'''
+
+
+# Form items whose label means `label`, in priority order: exact-normalized
+# matches first, then includes() matches, then (opt-in) reverse-includes.
+#
+# Why ordering matters: the old shape was one includes() pass that returned the
+# first DOM hit, so a sibling whose label merely CONTAINS the target stole the
+# field. Three production incidents: 找「要素名称」命中「组件要素名称」、
+# 找「国民经济部门」命中「国民经济部门类别」、找「实际控制人客户编号」命中
+# 「实际控制人配偶客户编号」. Callers must take candidates in order and treat
+# a target-less candidate as "not this field" rather than as a match.
+JS_FIELD_ITEM_CANDIDATES = '''(root, label, allowReverse) => {
+    const norm = ''' + JS_FIELD_LABEL_NORM + ''';
+    const want = norm(label);
+    if (!want) return [];
+    const exact = [];
+    const fwd = [];
+    const rev = [];
+    for (const item of root.querySelectorAll('.el-form-item')) {
+        const lab = norm(item.querySelector('.el-form-item__label')?.textContent);
+        if (!lab) continue;
+        if (lab === want) exact.push(item);
+        else if (lab.includes(want)) fwd.push(item);
+        else if (allowReverse && want.includes(lab)) rev.push(item);
+    }
+    return exact.concat(fwd, rev);
+}'''
+
+
 JS_LOCATOR = '''(label) => {
     const xpath = (el) => {
         if (!el || el === document || el.nodeType !== 1) return '';
@@ -98,12 +134,10 @@ JS_LOCATOR = '''(label) => {
         return xpath(parent) + '/' + tag + '[' + idx + ']';
     };
     const container = ''' + JS_GET_CONTAINER + ''';
-    const items = container.querySelectorAll('.el-form-item');
-    for (const item of items) {
-        const lbl = item.querySelector('.el-form-item__label');
-        if (!lbl) continue;
-        const t = lbl.textContent.trim();
-        if (t !== label && !t.includes(label)) continue;
+    const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+    // Walk candidates in priority order; keep going when one carries no control
+    // (a label-only or button-only item is not the field being located).
+    for (const item of candidatesOf(container, label)) {
         const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
         if (target) return JSON.stringify({xpath: xpath(target), tag: target.tagName.toLowerCase(), attrs: (()=>{const a={};for(const at of target.attributes) if(at.value&&at.value.length<100) a[at.name]=at.value; return a;})()});
     }
@@ -138,17 +172,13 @@ JS_SMART_LOCATOR = '''([label]) => {
       return candidates[0] || null;
     }
 
-    let matched = null;
-    const items = container.querySelectorAll('.el-form-item');
-    for (const item of items) {
-      if (!isVisible(item) && item.offsetParent === null) continue;
-      const lbl = formItemLabel(item);
-      if (!lbl) continue;
-      if (lbl === want || lbl.includes(want) || want.includes(lbl)) {
-        matched = { item, label: lbl };
-        if (lbl === want) break;
-      }
-    }
+    // Exact label first, then includes() (and reverse-includes last) — a prefix
+    // sibling must not win the field. Visibility stays a filter over the ordered
+    // candidates, so an invisible exact match still yields to a visible partial.
+    const candidatesOf = ''' + JS_FIELD_ITEM_CANDIDATES + ''';
+    const hit = candidatesOf(container, label, true)
+      .find(function (it) { return isVisible(it) || it.offsetParent !== null; });
+    const matched = hit ? { item: hit, label: formItemLabel(hit) } : null;
     let target = matched ? pickControl(matched.item) : null;
     let formLabel = matched ? matched.label : '';
     if (!target) {
