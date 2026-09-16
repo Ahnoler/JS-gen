@@ -2,6 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-16 13:10 · Cursor Cloud — 收工：G3 phase_done 证据门闩（回链 12:22 开工）
+- 完成：Tasks 0–7 — query/navigate `success_when` + click 证据埋点 + recorder `needs_token` 双条件 + 控制面 0 步拒收 + verify-all 接入 pin + prompts 对齐
+- 提交链：`539c8e76` → `1d1afc3f` → `bb16b5e7` → `dd8d2f58` → `8c07eff9` → `0b65742a`（+本收工）
+- PR：https://github.com/Ahnoler/JS-gen/pull/45 （draft → master）
+- 验收：`characterize-phase-boundary` OK；`characterize-phase-runtime` PASS；`characterize-phase-done-evidence-gate` OK；eslint 触及 JS 0 warning；`verify-all` 中 G3 相关全绿
+- 注意：本云环境无 MySQL（3306 ECONNREFUSED）→ `characterize-step-highlight` / `layer-tree` / `export-v3` 仍红（与本刀无关）；湿测未跑
+- 遗留移交：对公建档/查询多阶段湿测确认 P3/P4 不再 0 步假成功；有 DB 的环境再跑全量 `verify-all`
+
 ## 2026-09-16 12:22 · Cursor Cloud — 开工声明：G3 phase_done 证据门闩
 - 开工：12:22 UTC。执行 Project store `docs/g3-phase-done-plan.md` Tasks 0–7
 - 范围：`scripts/controller/actions/phase/boundary_contract.py`、`boundary_gates.py`、`intent_contract.py`、`intent_gates.py`、`prompts.py`、`scripts/agent/recorder_emitters.py`、点击/导航证据埋点相关（`_misc` / form click 路径按需）、`scripts/characterization/characterize-phase-boundary.py`、`characterize-phase-runtime.py`（若触 needs_token）、`scripts/refactor/verify-all.sh`、`src/services/trajectory/trajectory-recording-runner.js`（及本阶段业务步数小 helper）、本文件
