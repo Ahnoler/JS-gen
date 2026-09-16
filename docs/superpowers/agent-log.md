@@ -1,5 +1,17 @@
 # Agent 协作日志
 
+## 2026-09-16 22:24 · ZCode 引擎线 — 收工：G3 证据门闩湿测 + 护栏固化（回链 22:16 开工）
+
+- 完成：`53dec0e9`（2 支新门禁 + verify-all 注册）。**湿测做了两半**：①**引擎侧活体** `characterize-g3-done-gate-live.py`（11 checks）——真 Chromium + 真 `compile_boundary`/`apply_phase_intent` 产出的 phase boundary + 真合并后 `_guard_done_on_step_end` 本体（仅 agent 用忠实 shim：守卫只读 browser_context/_message_manager/state，grep 实证）；②**runner 接缝** `characterize-g3-runner-seam.mjs`（9 checks）——把我合并时改写的那两处表达式（整轨聚合 + per-run 零步过滤）**从合并后源码逐字抽取后 eval**，不另抄一份，避免镜像漂移
+- 关键验证点：A 类「0 业务步（仅 meta）却自报成功」→ 必须被拒，**且返回值 identity 为 True**（这正是 `abea7695` 修的那一行：PR 原版裸 `return` 返 None，调用方 `recorder.py` 按 truthy 判定 → 静默放行）；B 类「真机点过查询并经 `maybe_record_click_completion_evidence` 写入 `query_clicked`」→ 放行（**无过度拒绝**）；C 类无 boundary → G3 不介入；D 类 0 步但 `done(success=false)` 诚实失败 → 放行。接缝侧另钉**键空间契约**（`phaseStepCounts` 写侧 `trajectoryPhaseId`/`phaseIdHint`、读侧 `phase.id`/`p.id`，同源数字键）与**迟到步不误杀**（本轮计数已 >0 的阶段不得降级）——后者正是刻意不采纳 PR 同步 DB 计数判定的理由
+- 证伪（门禁必须能红）：把该分支还原成 PR 原版裸 `return` → 活体门禁红（`2/11`，`return=None`）；源码 md5 逐位还原后复绿（`11 checks`）
+- verify-all 全量：3 红 = step-highlight / layer-tree / confirm-notification（既有基线，与合入前逐项同），两支新门禁均绿 → 无新增红
+- **未做（阻塞，非跳过）**：全链 `record/prepare → record/start` 湿测。三条硬前置：①合并后的控制面 JS（`trajectory-recording-runner.js`）要重启 4097 才生效，而**此刻他线有活跃录制**（remote-session 1908 / traj 832 / slot 0 / node 7 HZX），重启会掐断它——不越界；②`prepare` 自带默认登录，需 SUT 账号与凭据授权（凭据不经我手）；③执行机槽位会被抢占。条件具备即可补跑
+- **观测（不作因果声称）**：他线 traj 832 在**合并后的引擎代码**上跑过（22:14–22:16），phase 1 有 **1 步** `click_element_by_index` 后判 `failed`、phase 2/3 pending、`isSuccessful=0`、`hasStderrLog=false`。因 phase 1 **非 0 步**，零步门禁不可能对它生效；但 stderr 未留存，我无法判定其失败是否与 G3 证据门闩（`submit.required` OR boundary 的双条件 `needs_token`）有关——**已在此留痕供该线自查**，我不下结论
+- 顺带：本单元 `git pull` 并入他线 `6367f551`（非提交类阶段收口不再被指示点 click_save/确定），与 G3 互补，合并无冲突
+- 遗留移交：①条件具备时补跑全链（上面三条前置）；②`characterize-g3-runner-seam.mjs` 依赖从源码抽取表达式，若 runner 那两处被改写需同步更新抽取锚点；③临时脚本 `tmp/wet-g3/`（gitignore，含证伪用例）不入库
+- 注：不维护 CHANGELOG
+
 ## 2026-09-16 22:16 · ZCode 引擎线 — 开工：G3 证据门闩湿测取证 + 护栏固化
 
 - 进行中：对 PR #45 合并产物（`c0cfa03e`+`abea7695`）做湿测，并把可复用的活体验证固化为门禁。已跑：①引擎侧真机守卫（真 Chromium + 真 boundary 状态 + 真 `_guard_done_on_step_end`，含证伪）12/12 过；②runner 接缝（逐字抽取合并后源码里我改写的那两处表达式）9/9 过
