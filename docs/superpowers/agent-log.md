@@ -17,6 +17,22 @@
 - 禁入区：前端仓、线上数据库/执行机运行态、既有未提交 `config/.db-whitelist-seen`、其他会话工作区 WIP；不改变任何线上交易或会话状态。
 - 方式：先完成 `git pull` 尝试（因 GitHub 连接重置未成功），再以静态代码、迁移和测试证据追踪异常关闭后的 orphan session、重连和推流恢复路径，最后给出带文件/行号的根因与修复建议。
 
+## 2026-09-16 12:15 · Cursor — 开工：表单字段内同族控件 xpath 消歧（field_slot）
+
+- 进行中：真机调研「保证金比例」复合字段 → 方案 A 已定；写 design spec，待用户审阅后写 plan 再改代码。
+- 范围：`src/cdp/page-locator-helpers.js`（及 `_gen_locator_helpers_py` 生成物）、`src/models/element.js`、`src/cdp/locator-builders/controls.js`（若需对齐）、`scripts/manual_recorder/**`、characterization、本仓 `docs/superpowers/specs|plans`、本协作日志；前端仓 `D:\dev\ui-auto-recording-agent-vue-master\vue-project`（`trajectory-tree.ts` / step 标题路径）。
+- 禁入区：他线 WIP（白名单/发版 tmp/cmds、atomic-draft 计划线）；不改 `label_text` 语义；不回填历史轨迹；agent-log 他人条目只读。
+- 方式：主线程；先 spec→plan→实现；验证=characterization + 本页湿测。
+
+## 2026-09-16 · Zcode Lead — AI 录制管线讲解材料产出（培训交接用）
+- 完成：`docs/superpowers/research/2026-09-16-ai-recording-pipeline-handover.md`——三路并行调研（Node 生命周期 / Python 引擎 / 数据落库）汇总成文，与回放材料（2026-09-01）配套；含 prepare 四阶段、phase 循环+假成功门闩、四 LLM 角色、cue 纠偏体系、一个点击的落库旅程、9 条易混淆点；全部带 file:line
+- 声明：本轮只新增该 research 文档 + 本条目，未动任何代码
+
+## 2026-09-16 · Grok Bot · 原子草稿拆分边界实现计划
+
+- 计划：`docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md`
+- Spec：`2026-09-15-atomic-draft-tx-split-boundary-design.md` 已审阅；待选执行方式
+
 ## 2026-09-16 11:xx · OpenCode — 收工：迁移本机数据库白名单同步工具至 tmp/cmds（回链本次开工）
 
 - 完成：删除仓库共享 `config/update-db-whitelist.cmd` 与 `config/update-db-whitelist.ps1`；本机工具已迁至 gitignore 的 `tmp/cmds/`，两文件保持同目录调用关系。
