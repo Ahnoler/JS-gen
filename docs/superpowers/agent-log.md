@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 15:05 · Cursor — 收工：field_slot 终审 Important 修复（回链 14:50 开工）
+
+- 完成：`7ed9b6bd` persist AI/CDP `field_slot`/`display_label`；`ccdb68e1` offline input tight leaf；湿测 JSON `.superpowers/sdd/task-4-wet-result.json`；SPA `19130bf`/`041a1ef`（独立仓）
+- 验收：characterize-form-field-intra-slot / capture-element-xpath / locator-candidates / locator-parity OK；终审 Ready to merge
+- 遗留移交：Minors 不挡合并（occurrence=0 混排 leaf 近似、`_element_identity` 同 label coalesce、SPA 未 push）；不维护 CHANGELOG
+
 ## 2026-09-16 14:50 · Cursor — 开工：field_slot 终审 Important 修复（AI/CDP persist + offline leaf）
 
 - 进行中：终审 Important#1（inspect / resolve-by-label / JS_CAPTURE_FROM_XPATH / `_capture_element` 透传 `field_slot`/`display_label`）+ Important#2（`controls.js` input 紧 leaf 对齐 live）
