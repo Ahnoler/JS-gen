@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 16:50 · Cursor — 开工：atomize 能力内聚（通用规则，非场景禁令）
+
+- 进行中：在拆分边界下增加通用「能力内聚」；样例补正例（定位→填→一次落库）与反例「同页多能力合写」。不写上移/下移/产品树层/维护基本信息硬禁，不复活 PR #39
+- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`（轻量补记）、本协作日志
+- 禁入区：`src/services/req-draft-traj/**`（不新增关键词硬闸、不拆 flow-card JSON）；`product_library.json` / `prod_add_dlg`；他线 replay/field_slot；`config/` WIP；分支 `cursor/atomize-basic-info-quality-aae4`
+- 方式：主会话 Inline；新分支 `cursor/atomize-capability-cohesion-4c8c` 从 `uara_V1.2` 起；PR 合入 `uara_V1.2`；PR #39 标为已被能力内聚取代
+
 ## 2026-09-16 16:50 · Cursor — 开工：产品树脏后缀 design spec
 
 - 进行中：写入并提交 `docs/superpowers/specs/2026-09-16-tree-node-dirty-suffix-design.md`（用户裁决：剥 `(N)`/拼接 `-`，保留 `[V-…]`；DOM 优先取内层 span）
@@ -7,8 +14,8 @@
 - 禁入区：`src/cdp/**` 实现、`stripVolatileTreeText` 行为变更（待 spec 批准后）、他线 search-then-click、`config/` WIP
 - 方式：主会话 brainstorming → 用户审阅 spec 后再 writing-plans
 
-
 ## 2026-09-16 16:43 · OpenCode — 收工：回放 err-search-first 误拦截（回链 16:37 开工）
+
 
 - 完成：根因（回放引擎绕过录制态 STC flag 标记 → 守卫误拦 → 语意路径退化）修复 `c820ac76`：新增 `mark_stc_flags_on_replay_ok`（fill→search_filled / 查询点击→query_clicked，候选含 params 与 element/attrs placeholder）；`replay_action_entries` 成功分支接线；`FillEngine`/`ClickEngine` 录制路径行为不变
 - 验收：`characterize-search-then-click-guard` OK（先 RED import 失败、后 GREEN）；`characterize-search-then-click-prompts` OK；verify-all 其余烟均为已登记他线红（step-highlight/layer-tree/confirm-notification/network-capture 环境）——本线两烟绿；replay/heal 相关烟（heal-locate 39 / heal-decision 9 / replay-batch）复验全绿
