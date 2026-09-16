@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 21:35 · Cursor — 开工：能力内聚结构硬闸 Task 5（prompt 一句 + samples + api-docs）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 5**（TDD：pin `atomize prompt locates prep to locate-class only` RED → item-9 准备步骤仅限定位类 GREEN → samples 交叉引用 + api-docs notes）。不跑 Task 6 湿测 W1–W4。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 prompt pin）、`scripts/prompts/req-draft-traj-atomize-prompt.md`（item-9 一句）、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`（B1 交叉引用）、`src/dashboard/api-docs/groups/kb.js`（propose notes 一行）、本协作日志
+- 禁入区：`capability-cohesion.js` / `propose.js` / `propose-cache.js` 逻辑；`atom-depend.js`；`flow-card-guide.js`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 6 湿测
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
 ## 2026-09-16 21:25 · Cursor — 收工：BLOCKER 编辑页误判 maintain（回链 21:06 开工）
 
 - 完成：maintain `编辑` 不匹配导航复合 `编辑页/编辑页面/编辑界面`；真维护（`编辑字段`/`编辑基本信息`）仍计。闭环尾允许 other 后夹 locate/neutral。fill-step `保存概况` 不当 closer（对齐 `countPersistConfirms`）。未 bump cache，未改 Task 5 prompt。
