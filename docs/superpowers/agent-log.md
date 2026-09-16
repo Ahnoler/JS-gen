@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 14:15 · ZCode — 开工：agent-log 归档（09-11 及更早 → archive/logs/）
+
+- 进行中：2026-09-16 14:15；用户指令：5 天前（2026-09-11 及更早）条目归档至 `docs/superpowers/archive/logs/`
+- 范围：本文件（顶部插入本条目 + 截留 09-12 起条目 + 归档指引行）、`docs/superpowers/archive/logs/agent-log-archive-2026-09-11.md`（新建）
+- 禁入区：他线工作区 WIP（`src/services/partner-platform.js`、`transaction-export-v3-*.js`、`plans/2026-09-09-flow-card-guided-propose.md`、`reports/2026-09-10-benchmark-leaderboard-scan.md`、`scripts/maintenance/prune-same-xpath-menu-twins.mjs`、`.cursor/`、`config/`）；本文件他线在途条目原样保留不删
+- 方式：按既有归档规范（archive-09-06 头部格式）原样分流不改写；开工/收工各一 commit + push
+
 ## 2026-09-16 14:11 · ZCode — 开工：推送坐标归一化修复（录制侧直通尺寸 + 导出侧双兜底）
 
 - 进行中：14:11；承接 14:00 排查条目，用户批准三处修复。修复 1（录制侧）：state.py 加 `_CURRENT_PAGE_DIMS` 直通 + service.py wrapper 每动作前注入已采 before_dims + `_stamp_rect_norm` 页面路径先读直通再回落注册表 + after-action 注册 meta 补 contentWidth/Height；修复 2（导出侧）：弹窗像素回退减法后再除弹窗 rect 宽高（15 步存量立即转正）；修复 3（导出侧）：页面级像素回退从截图 metadataJson 收集 contentWidth/Height 作分母（46 步存量）
