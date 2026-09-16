@@ -67,7 +67,7 @@ taskDraft:
 
 ### B1 · same-page multi-capability（维护 + 列表侧可独立验收能力）
 
-不要因为两项能力出现在同一页面、同一需求段落、甚至同一对象上，就把它们写进同一 `taskDraft`。直觉（仅说明形态，不是场景法）：列表上另一次可独立验收的操作（如核对排序结果）与详情保存是**不同**能力。
+不要因为两项能力出现在同一页面、同一需求段落、甚至同一对象上，就把它们写进同一 `taskDraft`。直觉（仅说明形态，不是场景法）：列表上另一次可独立验收的操作（如核对排序结果）与详情保存是**不同**能力。结构闸 reason = `multi_capability_task_draft`（实现见 `src/services/req-draft-traj/capability-cohesion.js`；多次【确定】仍走既有 `multi_persist_task_draft`）。
 
 ```
 # 不要这样

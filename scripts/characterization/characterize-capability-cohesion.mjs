@@ -402,5 +402,17 @@ await run('C2 propose: cohesive maintain with business produce key is accepted',
   assert.equal(out.rejected.filter((r) => r.reason === 'multi_capability_task_draft').length, 0);
 });
 
+await run('atomize prompt locates prep to locate-class only', () => {
+  const prompt = readFileSync(
+    join(ROOT, 'scripts/prompts/req-draft-traj-atomize-prompt.md'),
+    'utf8',
+  );
+  assert.match(prompt, /仅限定位类/);
+  assert.match(prompt, /查询\/搜索\/过滤\/选中/);
+  assert.match(prompt, /same-page multi-capability/);
+  assert.match(prompt, /maintain missing locate\/search\/select prep/);
+  assert.doesNotMatch(prompt, /不得出现上移/);
+});
+
 if (failed) process.exit(1);
 console.log('all passed');

@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 21:50 · Cursor — 收工：能力内聚结构硬闸 Task 5（回链 21:35 开工）
+
+- 完成：atomize prompt item-9 准备步骤改为「仅限定位类（查询/搜索/过滤/选中/点行或节点/打开或进入目标/展开/切换页签）」；`atom-depend-split-samples.md` B1 交叉引用结构闸 `multi_capability_task_draft`（多次【确定】仍 `multi_persist_task_draft`）；`kb.js` propose `notes[]` 一行列出两新 reason。pin `atomize prompt locates prep to locate-class only`。开工声明 `15e5422d`。本提交即 Task 5 产品提交。
+- 前序：helper+pins `da1ed8f1`；C4+fallback `d2c6bfbb`；materialize 接线 `2f223e6b`；cache v5 `433f0b2c`；编辑页假阳性 `8a599873` / `a6d5e02e`。
+- 验收：RED=`atomize prompt locates prep to locate-class only` `仅限定位类` missing。GREEN：`node scripts/characterization/characterize-capability-cohesion.mjs` **all passed**（含 C1–C6 + prompt pin）；`npx eslint src/dashboard/api-docs/groups/kb.js` 0 warning。未改 helper 逻辑、无场景黑名单、无 `不得出现上移`、未跑湿测。
+- 遗留移交：Task 6 湿测 W1–W4 只在本地 LMY。不维护 CHANGELOG
+
 ## 2026-09-16 21:35 · Cursor — 开工：能力内聚结构硬闸 Task 5（prompt 一句 + samples + api-docs）
 
 - 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 5**（TDD：pin `atomize prompt locates prep to locate-class only` RED → item-9 准备步骤仅限定位类 GREEN → samples 交叉引用 + api-docs notes）。不跑 Task 6 湿测 W1–W4。
