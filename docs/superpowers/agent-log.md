@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 12:25 · Cursor — 收工：Task 1 atom-depend 图校验（回链 12:20 开工）
+
+- 完成：commit **`4b782ff6`** `feat(req-draft-traj): validate atom produces/dataDependsOn graph`
+- 范围：`src/services/req-draft-traj/atom-depend.js`、`scripts/characterization/characterize-atom-depend.mjs`、`scripts/refactor/verify-all.sh`（紧随 `characterize-atom-keydata`）
+- 验收：characterize-atom-depend **7/7 ok / all passed**（先 RED `ERR_MODULE_NOT_FOUND`，后 GREEN）；硬拒 `self_produce_depend` / `dangling_data_depend`；警告 `missing_depend_fields`；被拒 atom 不贡献 produces
+- 遗留移交：Task 2–4（`propose.js` 接线、atomize prompt、spec 交叉引用）未做，按计划下一切
+
 ## 2026-09-16 12:20 · Cursor — 开工：Task 1 atom-depend 图校验（纯 helper）
 
 - 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 1 only**（TDD：characterize → `atom-depend.js` → 接入 verify-all）
