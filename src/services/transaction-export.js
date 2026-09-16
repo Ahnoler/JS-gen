@@ -22,6 +22,7 @@ import {
   pickOperationValue,
   SKIP_ACTIONS,
 } from './legacy-engine-export.js';
+import { stripVolatileTreeText } from '../cdp/locator-candidates.js';
 
 export const TRANSACTION_SCHEMA_VERSION = 2;
 
@@ -68,6 +69,32 @@ function resolveOptions(entry) {
 }
 
 /**
+ * Whether export name candidates from tree clicks / tree-select should be sanitized.
+ * @param {string} action normalized action name
+ * @param {object} element element info
+ * @returns {boolean}
+ */
+function isTreeExportContext(action, element = {}) {
+  const el = element || {};
+  if (el.target_kind === 'tree_node') return true;
+  if (action === 'select_tree_option' || action === 'expand_all_el_tree') return true;
+  const xpath = String(el.xpath_smart || el.xpath_full || el.xpath || '').trim();
+  return xpath && /el-tree-node/i.test(xpath);
+}
+
+/**
+ * Strip volatile tree suffixes from export names when context is tree-related.
+ * @param {string} name candidate business-object name
+ * @param {string} action normalized action name
+ * @param {object} element element info
+ * @returns {string}
+ */
+function maybeStripTreeExportName(name, action, element = {}) {
+  if (!name || !isTreeExportContext(action, element)) return name;
+  return stripVolatileTreeText(name);
+}
+
+/**
  * Partner business-object name: field / control noun only (no 填写/选择/点击 verbs).
  * Event type is already shown as a tag (eventTypeName). Empty → uniquify falls back to「步骤」.
  * @param {string} action normalized action name
@@ -81,13 +108,13 @@ export function buildBusinessObjectName(action, params = {}, element = {}) {
   const label = String(p.label_text || p.label || el.formLabel || el.matchedLabel || '').trim();
   if (label) return label;
   const text = String(p.text || p.menu_text || p.tab_name || p.button_text || el.text || '').trim();
-  if (text) return text;
+  if (text) return maybeStripTreeExportName(text, action, el);
   const row = String(p.row_text || '').trim();
   if (row) return row;
   const dialog = String(p.dialog_name || '').trim();
   if (dialog) return dialog;
   const option = String(p.option_text || p.option || '').trim();
-  if (option) return option;
+  if (option) return maybeStripTreeExportName(option, action, el);
   switch (action) {
     case 'close_dialog':
       return '关闭弹窗';

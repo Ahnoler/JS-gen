@@ -174,6 +174,7 @@ run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-pro
 run "characterize-form-field-intra-slot" node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
 run "characterize-form-structure-container" node scripts/characterization/cold/characterize-form-structure-container.mjs
 run "characterize-tree-node-text" node scripts/characterization/cold/characterize-tree-node-text.mjs
+run "characterize-tree-text-export" node scripts/characterization/cold/characterize-tree-text-export.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
