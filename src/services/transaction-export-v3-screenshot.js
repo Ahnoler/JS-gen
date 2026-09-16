@@ -206,6 +206,18 @@ export function buildScreenshotEntries({
         regionLabel: String(meta.displayName || shot.name || '').trim(),
         rect,
       };
+      // 归一化分母直通（内部字段，payload 适配时剥除）：像素回退控件除以所属
+      // 截图的文档/弹窗尺寸，转成 0~1 归一化 rect（对齐 rect_norm 直出格式）。
+      const mw = Number(meta.contentWidth ?? meta.popupWidth);
+      const mh = Number(meta.contentHeight ?? meta.popupHeight);
+      if (Number.isFinite(mw) && Number.isFinite(mh) && mw > 0 && mh > 0) {
+        entry._shotW = mw;
+        entry._shotH = mh;
+      } else if (levelType === 'popup' && isLegalRect(rect)) {
+        // 弹窗截图尺寸 == 弹窗 rect 尺寸（元素截图）
+        entry._shotW = Number(rect.x2) - Number(rect.x1);
+        entry._shotH = Number(rect.y2) - Number(rect.y1);
+      }
       entries.push(entry);
       rememberPageLevelKey(levelKey, entryId);
       pageLevelById.set(String(entryId), entry);
@@ -309,6 +321,11 @@ export function buildScreenshotEntries({
       regionLabel: '',
       rect,
     };
+    // 旧链路弹窗：截图尺寸 == 弹窗 rect 尺寸（元素截图），供像素回退归一化。
+    if (isLegalRect(rect)) {
+      entry._shotW = Number(rect.x2) - Number(rect.x1);
+      entry._shotH = Number(rect.y2) - Number(rect.y1);
+    }
     entries.push(entry);
     pageLevelById.set(String(entryId), entry);
     if (name) idByDialog.set(name, entryId);
