@@ -12,6 +12,12 @@
 | [superpowers/guides/idle-review-prompt.md](superpowers/guides/idle-review-prompt.md) | 闲时代码审查提示词（六族检查单 + 子智能体团队） |
 | [jsdoc-convention.md](jsdoc-convention.md) | JSDoc 注释规范（eslint-plugin-jsdoc 配套） |
 
+## 架构指南
+
+| 文档 | 用途 |
+|------|------|
+| [superpowers/guides/context-management-flow.md](superpowers/guides/context-management-flow.md) | 上下文管理逻辑流程：6 层上下文架构、生命周期、事件路由、设计模式全景 |
+
 ## 设计/分析（保留）
 
 | 文档 | 用途 |

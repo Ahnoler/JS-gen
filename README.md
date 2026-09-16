@@ -401,6 +401,8 @@ Excel 上传后创建 batch job 和 batch item；系统按配置调用 LLM 分�
 
 Executor 使用 token 连接 `/ws/executor` 并注册节点；控制面在 attach 时租用 slot，发送 `session.open` 和动作指令。心跳超时会清理失效节点，断线超过配置时长后关闭 Python 会话；重连后会通过 action log 和 `action_id` 幂等补写断线期间的步骤。
 
+> 上下文管理（会话绑定、槽位租约、轨迹运行时、事件路由等）的完整架构说明见 [`docs/superpowers/guides/context-management-flow.md`](docs/superpowers/guides/context-management-flow.md)。
+
 ## 数据库模型
 
 ```text
