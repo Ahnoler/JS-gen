@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 16:55 · Cursor — 收工：product-mgmt atomize 「维护基本信息」与树排序误合并（回链 16:40 开工）
+
+- 完成：`0ee88fbf` helper `mixesSortWithBasicInfoSave` + materialize 硬拒 `unrelated_capability_merge`；atomize prompt 拆分边界 11–12（禁无关能力合并；详情页维护须搜索/定位选中 + `dataDependsOn`）；金样例 `#708` + 排序+保存反例；`PROPOSE_CACHE_VERSION` 3→4
+- 验收：`characterize-atom-capability` **11/11**（含 RED `ERR_MODULE_NOT_FOUND` → GREEN）；`characterize-req-draft-traj` **OK 63**；`characterize-persist-boundary` 11；`characterize-atom-depend` 8/8；eslint 改动 src 0 error
+- 遗留移交：湿缓存须重新 propose（v4）；不手改 through-chains；不拆 `prod_add_dlg`；不维护 CHANGELOG
+- 注意：创建 atom（L1/child/product）闸未改；`produces`/`dataDependsOn` 仍走通则可，无产品树分层特例
+
 ## 2026-09-16 16:40 · Cursor — 开工：product-mgmt atomize 「维护基本信息」与树排序误合并
 
 - 进行中：TDD 修 wet propose 后 `product-mgmt:chain-a:6` 把同层排序（上移/下移）并进维护基本信息【保存】；对照金轨迹 #708（搜索/定位选中未启用产品 → 右栏基本信息 → 保存）
