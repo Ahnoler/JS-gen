@@ -368,8 +368,8 @@ async def _capture_element(page, label_text, *, xpath_smart: str = "", target_ki
         return None
 
 
-async def _enrich_click_element(
-    page,
+def _element_info_from_locate(
+    info,
     *,
     xpath='',
     text='',
@@ -378,10 +378,9 @@ async def _enrich_click_element(
     target_kind='',
     form_label='',
 ):
-    """Build xpath_smart/candidates for AI click actions (before click).
-
-    Mirrors manual/CDP locator enrichment via PAGE_LOCATOR_HELPERS / buildLocatorSnap.
-    """
+    """Normalize a buildLocatorSnap-style JS dict into the element shape
+    passed to _record_action. Shared by _enrich_click_element (resolve-then-
+    enrich) and real_click (locator snapshot taken at click time)."""
     cleaned_text = (text or '').strip()[:80]
     if (target_kind or '') == 'tree_node':
         cleaned_text = _strip_volatile_tree_text(cleaned_text)
@@ -395,13 +394,7 @@ async def _enrich_click_element(
         'row_text': '',
     }
     try:
-        raw = await page.evaluate(
-            JS_ENRICH_CLICK_LOCATOR,
-            [xpath or '', text or '', tag_name or '', target_kind or '', form_label or ''],
-        )
-        if not raw:
-            return base
-        info = _as_dict(raw)
+        info = _as_dict(info)
         if not isinstance(info, dict) or not (info.get('xpath') or info.get('xpath_smart')):
             return base
         attrs = info.get('attributes') if isinstance(info.get('attributes'), dict) else {}
@@ -442,6 +435,62 @@ async def _enrich_click_element(
         return out
     except Exception:
         return base
+
+
+async def _enrich_click_element(
+    page,
+    *,
+    xpath='',
+    text='',
+    tag_name='',
+    attributes=None,
+    target_kind='',
+    form_label='',
+):
+    """Build xpath_smart/candidates for AI click actions (before click).
+
+    Mirrors manual/CDP locator enrichment via PAGE_LOCATOR_HELPERS / buildLocatorSnap.
+    """
+    try:
+        raw = await page.evaluate(
+            JS_ENRICH_CLICK_LOCATOR,
+            [xpath or '', text or '', tag_name or '', target_kind or '', form_label or ''],
+        )
+        if not raw:
+            cleaned_text = (text or '').strip()[:80]
+            if (target_kind or '') == 'tree_node':
+                cleaned_text = _strip_volatile_tree_text(cleaned_text)
+            return {
+                'tag_name': tag_name or '',
+                'xpath': xpath or '',
+                'attributes': attributes if isinstance(attributes, dict) else {},
+                'text': cleaned_text,
+                'target_kind': target_kind or '',
+                'formLabel': form_label or '',
+                'row_text': '',
+            }
+    except Exception:
+        cleaned_text = (text or '').strip()[:80]
+        if (target_kind or '') == 'tree_node':
+            cleaned_text = _strip_volatile_tree_text(cleaned_text)
+        return {
+            'tag_name': tag_name or '',
+            'xpath': xpath or '',
+            'attributes': attributes if isinstance(attributes, dict) else {},
+            'text': cleaned_text,
+            'target_kind': target_kind or '',
+            'formLabel': form_label or '',
+            'row_text': '',
+        }
+    return _element_info_from_locate(
+        raw,
+        xpath=xpath,
+        text=text,
+        tag_name=tag_name,
+        attributes=attributes,
+        target_kind=target_kind,
+        form_label=form_label,
+    )
 
 
 def _merge_ax_text(dom_fields: list[ScannedField], snapshot_text: str) -> None:

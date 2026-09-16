@@ -10,7 +10,7 @@ import asyncio
 import json
 
 from scripts.state import _record_action
-from ._helpers import _ok, _err, _as_dict
+from ._helpers import _ok, _err, _as_dict, _element_info_from_locate
 from ._js_snippets import (
     JS_READ_BUSINESS_DATE,
     JS_PICKER_DIALOG_QUERY,
@@ -254,7 +254,7 @@ def _register_workspace_actions(controller, browser_context, business_data_store
     _register_real_click_action(controller, browser_context)
 
 
-async def _real_click_via_cdp(page, selector='', text='', label_text=''):
+async def _real_click_via_cdp(page, selector='', text='', label_text='', locator_out=None):
     """Trusted (real mouse) click via CDP Input.dispatchMouseEvent (KB-I5 run7).
 
     Locate the visible target with JS_REAL_CLICK_RECT (viewport coords), then
@@ -264,6 +264,10 @@ async def _real_click_via_cdp(page, selector='', text='', label_text=''):
     only accept trusted events (TsscMultiTree tree-popover / el-cascader
     triggers, where synthetic mousedown chains never open the popover).
 
+    JS_REAL_CLICK_RECT takes the locator snapshot in the same evaluate (popover
+    targets usually close on the trusted click — a post-hoc enrich would miss).
+    Pass ``locator_out`` (list) to receive the element dict for _record_action.
+
     Returns 'ok-real-click:<x>,<y>' on success or 'err-real-click-fail:<reason>'.
     """
     try:
@@ -272,6 +276,8 @@ async def _real_click_via_cdp(page, selector='', text='', label_text=''):
         if not isinstance(rect, dict) or not rect.get('ok'):
             reason = rect.get('error', str(rect))[:120] if isinstance(rect, dict) else str(rect)[:120]
             return 'err-real-click-fail:' + reason
+        if locator_out is not None:
+            locator_out.append(rect.get('locator') or {})
         x, y = int(rect['x']), int(rect['y'])
         session = await page.context.new_cdp_session(page)
         try:
@@ -308,15 +314,23 @@ def _register_real_click_action(controller, browser_context):
         'components that ignore synthetic event chains: TsscMultiTree '
         'tree-popover triggers (品种明细 产品名称), el-cascader panels, etc. '
         'Fallback partner: try the synthetic click first, then real_click. '
+        'Records the locator snapshot (xpath_smart/xpath_full, same element '
+        'shape as click_element_by_index) taken at click time. '
         'Returns ok-real-click:<x>,<y> or err-real-click-fail:<reason>.'
     )
     async def real_click(selector: str = '', text: str = '', label_text: str = ''):
         page = await browser_context.get_current_page()
+        locator: list = []
         payload = await _real_click_via_cdp(
-            page, selector=selector, text=text, label_text=label_text)
+            page, selector=selector, text=text, label_text=label_text,
+            locator_out=locator)
         if payload.startswith('ok-real-click'):
+            element = _element_info_from_locate(
+                locator[0] if locator else None,
+                text=text, form_label=label_text,
+            ) if locator else None
             _record_action('real_click', {
                 'selector': selector, 'text': text, 'label_text': label_text,
-            }, payload)
+            }, payload, element=element)
             return _ok(payload)
         return payload

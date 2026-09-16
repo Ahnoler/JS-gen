@@ -8,6 +8,14 @@
 - 用户口径确认：前端「失败步保持勾选 / 成功步取消勾选」为预期形态——本改纯后端计数，不动 `replay:step`，勾选逻辑不受影响；meta 检查点成功后不再让提示多 1 步，失败时仍会「成功4，失败1」提示（用户已确认接受）
 - 遗留移交：本地后端（交易 830 所属）重启后生效；未改 SPA 仓；未改 Type B 安全性策略；不维护 CHANGELOG
 
+## 2026-09-16 18:03 · ZCode 引擎线 — 开工：字段 label 解析同族收敛（归一化 + 精确优先）
+
+- 进行中：接 10:52 收工的 tssc 病灶（`b3339e2a`），把**同族**的「按 label 定位字段」一并对齐到仓库既有规范——`select_trigger._tryItems` 与 `characterize-prefix-label-select`/`characterize-prefix-label-xpath` 已确立的「归一化（折叠空白/剥尾 `：:*`/剥首 `*`）→ 精确优先 → 首个 `includes` 兜底」。现存不合规点：`select_tree.py`（radio 与 tree select 仍用 `l === label || l.includes(label)` 首中即返）、`base.py`（`JS_LOCATOR` 首个 includes 且未归一化；`JS_SMART_LOCATOR` 部分匹配 last-wins）、`fill_core.py`（Pass1/Pass2/scope/clear 未归一化）、`scan_form.py`（pass1 裸等值）、`select_dispatch.py`（`_JS_LIVE_TSSC` 首中即返 → 同族字段非 tssc 时假阴性）、`fill_engine.py`（两处重复 kind probe 同形，假阴性致 select 走错分发）。**只治「按 label 定位字段」；不动按文案匹配选项/按钮/菜单/单元格的路径**
+- 范围（可写集）：`scripts/controller/actions/js_snippets/{base,select_tree,fill_core,scan_form}.py`、`scripts/controller/actions/{select_dispatch,fill_engine}.py`、新 `scripts/characterization/characterize-field-label-resolution.py`、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：`scripts/controller/actions/js_snippets/_locator_helpers_js.py` 与 `src/cdp/page-locator-helpers.js`（生成链，勿手改）；`js_snippets/tssc_multi_select.py`（已收工）；`scripts/prompts/**`（本轮纯对齐，不改提示词）；他线 `replay-batch-runner.js`/`trajectory-session-replay.js`（OpenCode 17:52 在途）、`src/services/req-draft-traj/**`、`src/services/trajectory/form-structure-heal.js`、`product_library.json`、`config/` WIP、SPA 仓
+- 方式：主会话先落共享片段 `JS_FIELD_ITEM_PICK`（单一写者，避免并行冲突）→ 3 个子智能体并行改**互不相交**文件集（子智能体不 commit、不写 agent-log，主会话代声明代提交）→ 主会话回收核对语法/lint/越界 + 新增 characterization + verify-all 基线比对
+- 说明：本轮为**行为对齐**（精确命中即调用方本意），不引入新的报错语义
+
 ## 2026-09-16 17:52 · OpenCode — 开工：回放汇总步数把自动注入的 meta 检查点也计入
 
 - 进行中：只勾选 4 步却提示「回放完成 5 步」——根因=`prepareReplayBatch` 自动补入选中区间内的 meta 检查点（`save_form_snapshot`）进 `actions`/`orderedStepIds`，`runReplayBatch` 的 `if (typeB.ok) successCount += 1` 与 `buildPayload` 的 `count/ok/failed` 把它算作业务步；FE 用 WS `replay:finished.successCount` 显示「回放完成 N 步」（`useRecordingStudio.ts:726-741`）。修向=汇总只计业务步（与 `trajectory.js` 文档「stepCount 亦只计业务步骤」一致），meta 检查点的成功/失败不计入用户面计数
