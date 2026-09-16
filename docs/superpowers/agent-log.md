@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 11:xx · OpenCode — 收工：迁移本机数据库白名单同步工具至 tmp/cmds（回链本次开工）
+
+- 完成：删除仓库共享 `config/update-db-whitelist.cmd` 与 `config/update-db-whitelist.ps1`；本机工具已迁至 gitignore 的 `tmp/cmds/`，两文件保持同目录调用关系。
+- 兼容：PowerShell 引擎按自身新位置回溯仓库根目录，继续读取/写入 `config/.db-whitelist-seen` 和 `config/.db-whitelist-sync.log`；CMD 的双击循环和 `once` 单次同步参数不变。
+- 验收：CMD、PS1、新位置回溯的仓库根目录及 `config/` 状态目录均存在；PowerShell AST 语法解析通过；同目录 PS1 引用和 `StateDir=config` 断言通过；`git diff --check` 通过。未执行 SSH、TCP 探测或服务器白名单变更。
+- 遗留移交：从 `tmp/cmds/update-db-whitelist.cmd` 启动即可；未触碰既有 `config/.db-whitelist-seen` 运行状态。
+
 ## 2026-09-16 11:xx · OpenCode — 开工：迁移本机数据库白名单同步工具至 tmp/cmds
 
 - 进行中：迁移 `config/update-db-whitelist.cmd` 及其同目录本机 PowerShell 引擎 `update-db-whitelist.ps1` 至 `tmp/cmds/`，保持双击循环同步与 `once` 单次同步用法。
