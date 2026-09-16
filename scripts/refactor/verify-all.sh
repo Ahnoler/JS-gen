@@ -68,6 +68,10 @@ run "characterize-phase-done-runid" "$PY" scripts/characterization/characterize-
 # 的注册意图，路径随归档同步（master 期路径 scripts/characterization/ 下已不存在）。
 run "characterize-phase-boundary" "$PY" scripts/characterization/cold/characterize-phase-boundary.py
 run "characterize-phase-done-evidence-gate" node scripts/characterization/characterize-phase-done-evidence-gate.mjs
+# G3 活体行为（真 Chromium + 真 boundary 状态 + 真守卫）与 runner 接缝（逐字抽取表达式）。
+# 前者抓"拒绝没生效"（裸 return → None → 调用方 truthy 判定静默放行）——源码形状 pin 抓不到。
+run "characterize-g3-done-gate-live" "$PY" scripts/characterization/characterize-g3-done-gate-live.py
+run "characterize-g3-runner-seam" node scripts/characterization/characterize-g3-runner-seam.mjs
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
 run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py
