@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-16 20:05 · ZCode 引擎线 — 收工：真机失败日志复盘四病灶最小修复（回链 18:45 开工）
+
+- 完成（4 commits，全为「先 RED pin 再最小实现」）：
+  - **D1** `3c1fc8ff`：`autofill_round.py` tssc 分支内嵌 `select_option` 结果过 `_unwrap_action_result`——根治 `run_form_assistant` 报 `Object of type ActionResult is not JSON serializable`（真机 4 次），顺带根治同因的级联不收敛（`_is_ok_result` 不认成功 → 已填 tssc 字段留 `still_empty` 反复重选 work=10/10、7/7）
+  - **D2** `711f9065`：`boundary_gates.maybe_record_picker_closed` 补 `clear_phase_section`——弹窗关闭即清被 stale 重试固化的弹窗瞬态区域（`客户放大镜选择器`），根治后续裸调 `click_save` 「from memory」在死区域找保存 → `err-save-button-not-found`；覆盖 4 个关闭出口，4 处 cue 消费者泄漏面一次收净
+  - **D3** `b00ec873`：`agent/service.py` 收尾门禁首次不过时按 ghost-prune 范式 DOM 实读纠正 task_list 后重跑 gate（新 helper `phase/pending_refresh.py`，只认「currentValue 非空」硬判据，空值/查无不动）+ 粘滞 `pending_fields:*` reason 按刷新后集合重生成（先于任何输出）——根治引入回填已生效仍被判过期 pending 的误判；`missing_success_token`/gate 本体一字未动（宁误拒不假绿不放宽）
+  - **D4** `b72e1150`：`base.py` 新增 `JS_FIELD_ITEM_PICK`（可见精确→隐藏精确→唯一包含→歧义标记，作用域 JS_GET_CONTAINER+可见 dialog/drawer 补扫，与动作体 `findFieldItem` 同源），`fill_engine.py` 两处探针与 `select_dispatch._JS_LIVE_TSSC` 换用——根治同一字段 fill 判「是 tssc」/select 判「不是」双判矛盾（探针 `[0]` 盲取落隐藏同名 tssc 节点的假阳性）；`tssc_multi_select.py` 未动
+- 验收：四个新/修订 pin 全部 RED 实证（D4 旧代码下 26 条断言失败）后 GREEN；复跑关联 pin 13 个（cascade/form-assistant/select-option-verify/phase-runtime/save-retry-scope/introduce-dialog-close/dual-save-section/ghost-pending-prune/budget-extend/fill-dispatch/fill-replay-engine/tssc-multi-select/form-engine-wiring）全绿；**全量 verify-all = 3 红（step-highlight/layer-tree/confirm-notification）与 19:20 条目基线完全一致，零新增红**；3 个新门禁已注册 verify-all。改动文件 py_compile 全过；D4 探针 JS 经 node --check 验语法（临时文件已删）
+- 方式与偏差声明：D3/D4 由 2 个子智能体并行实施（文件集互不相交、不 commit），主会话回收审查 diff/复跑 pin 后代提交；D4 偏差自报：`_js_snippets.py` 追加 1 行 barrel re-export（模块自述 re-exports every constant，沿 13cc5404 先例）
+- 遗留移交：①`select_tree.py` 尚有 3 处 `candidatesOf(...)[0]`（radio/tree 路径，本轮范围外；若同类假阳性复现可直接复用 `JS_FIELD_ITEM_PICK`）②budget extend（`service.py`）同用过期 pending 计步，本轮未动（`refresh_pending_from_dom` 可直接复用）③premature done 警告（`recorder_emitters.py`）仍按打开弹窗时的快照写——警告本身合理保留，粘滞由收尾 regen 清除 ④真机复验未做（四修均为离线修复+门禁；对公客户转正重跑需测试环境与数据，建议下次真机回归覆盖该流程）⑤不维护 CHANGELOG
+
 ## 2026-09-16 18:45 · ZCode 引擎线 — 开工：真机失败日志复盘四病灶最小修复（序列化炸/作用域污染/过期pending/tssc探针矛盾）
 
 - 进行中：真机失败日志（对公客户转正，桌面 log.txt 574 行）四路根因已定位，按最小修复实施：**D1** `autofill_round.py` tssc 分支内嵌 `select_option` 成功返回 `ActionResult` 未 unwrap → `autofill_pending.py` `json.dumps` 炸（4 次）+ `_is_ok_result` 不认成功致级联同批 tssc 反复重选不收敛；修=结果过 `_unwrap_action_result`（2 行）。**D2** `phase/boundary_gates.py` `maybe_record_picker_closed` 弹窗关闭不清 `_phase_section` 粘性记忆，stale 重试（`form_save.py:233`）把弹窗瞬态区域固化 → 弹窗关后裸调 `click_save` 在死区域找「保存」not-found；修=关闭钩子补 `clear_phase_section`（1 行）。**D4** `base.py`/`fill_engine.py` ×2/`select_dispatch.py` 三处 kind 探针 `candidatesOf(...)[0]` 盲取（无可见性偏好）与动作侧 `tssc_multi_select.findFieldItem` 可见分桶解析不一致 → 同一字段 fill 判「是 tssc」/select 判「不是」互相矛盾；修=抽共享可见分桶 pick 替换三处 `[0]`（解析失败/歧义=未知走正常流程），`characterize-field-label-resolution.py` 的 `[0]` 字面量 pin 同 commit 修订。**D3** `agent/service.py` 收尾门禁纯内存读 task_list、引入回填只记 evidence 不 `mark_done`、quality reason 粘滞只增 → 过期 pending 误判 QUALITY FAIL；修=门禁不过时按 `JS_CHECK_SINGLE_FIELD` DOM 实读纠正 task_list 再重跑 gate（复用已 pin 的 ghost-prune 范式）+ 粘滞 `pending_fields:` reason 按刷新后集合重生成；`missing_success_token` 判定不动（宁误拒不假绿不放宽）
