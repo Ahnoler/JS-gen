@@ -8,6 +8,22 @@
 - 方式：主会话 Inline；临时脚本在 `tmp/wet-g3/`（gitignore），只把可确定复现、不依赖 SUT/MySQL 的两支固化为门禁（证伪用的"临时改写源码再还原"不入门禁——硬杀可能留下已改文件；该形状已由 `characterize-recorder-phase-reset` 的"每个拒绝分支必须 return True"钉住）
 - 遗留：全链 `record/prepare → record/start` 湿测**待具备条件**（需 4097 重启加载合并 JS + 他线录制结束 + SUT 登录授权）
 
+## 2026-09-16 21:59 · OpenCode — 收工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（回链 21:35 开工）
+
+- 完成：**`6367f55`**（5 文件 / +114 -10）。根因：对公客户评级申请阶段3（任务=点击【下一步】→进入风险阻断）的 LLM 评审合约 `mode=other` 自造了**不可录制**的成功 token `success.kinds=['step_change']`；PR #45 的 G3 证据门闩要求边界 `success_when` 被观测，`step_change` 永不满足 → `done(success=true)` 反复被拒 → 恢复处方兜底写死 `click_save()` → agent 去点「确定」，点到整个向导的提交确定并触发服务端业务异常「该客户已发起评级流程…」——即用户反馈的「阶段3 页面没有确定按钮却跑出一个点击确定步骤」。
+- 四处修复：①`phase/reviewer.py` `_NO_SUBMIT_TOKEN_MODES` 加入 `other`——兜底态强制 `submit.required=false` / `success.kinds=[]`，与规则编译 `compile_boundary` 的 `role=other → success_when=[]` 对齐；②`phase/intent_gates.py` 恢复处方改 **mode-aware**：仅 `create/modify` 才 `click_save`，`introduce_pick`→「选行后点确认」，`navigate/query/login/other` 各给正确动作；非提交阶段同时撤下「确认 allowed」的暗示。口径遵循用户裁决「**不强行加，不是不能试**」——只撤下注入的处方，不加硬闸阻止 agent 自行尝试（`click_save` 引擎不再新增拦截，避免误伤 picker 确认 / introduce）；③`phase/intent_contract.py` 规则编译路径 `recovery.next_action` 同样改 mode-aware（此前 `other/login/query` 也写死 `click_save(保存)`）；④`scripts/prompts/phase-reviewer-prompt.md` 明确 `navigate/query/other` **必须** `submit.required=false` / `success.kinds=[]`、禁自造 token，并推荐向导「下一步」用 `navigate`（「下一步」本身就是该阶段的提交式收口）。
+- 关键判据（离线复现修复前/后）：`boundary success_when ['step_change']→[]`；`phase_done_ok after nav_next_clicked False→True`；恢复处方 `click_save() → done(success=true) ... (this phase requires no save/confirm step)`。即点完【下一步】`done()` 直接通过，不再产生恢复处方与额外确定步。
+- 验收证据：回归 pin 落在**已注册**的 `characterize-phase-reviewer`（`other` 无证据门 + 恢复处方不点 click_save + `create` 仍点 + 规则编译器 mode-aware）→ PASS；定向门禁全绿（phase-reviewer / reviewer-flow / runtime / boundary / introduce-dialog-close / save-cue-promote / done-accept-reason / ai-phase-element-guard / refill-contract / form-assistant / assistant-mission-context / phase-intent / phase-done-evidence-gate）；**verify-all 全跑 = 与既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红；三模块 `ast.parse` + import 通过。
+- 未改（防误伤）：`click_save` 引擎不加「非提交阶段一律拒点」硬闸——无匹配按钮时引擎本就 `save-button-not-found` 且不落步，故**消除「被指示去点确定」的处方即消除虚拟步**。
+- 遗留移交：①生产须重启执行机侧 Python agent 进程生效（LLM 评审器下次会话生效）；②若后续发现导航/查询阶段因 `other` 无证据门而过度宽松（过早 done），回退点=本提交；③不维护 CHANGELOG。
+
+## 2026-09-16 21:35 · OpenCode — 开工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（sid 4460cf2a 阶段3）
+
+- 进行中：真机日志显示阶段3 点击【下一步】后 `done(success=true)` 被反复拒绝（`success_when=['step_change'] observed=['nav_next_clicked']`），随后 agent 被引去 `click_save(button_text='确定')` 并触发服务端业务异常；用户要求查清并修好「当前页面区域没有确定按钮时不应强行加入点击确定步骤」。已离线定位：唯一注入源是 done 被拒后的 `recovery_prescription_message`（LLM 合约无 `recovery` 键 → 兜底 `'click_save()'`）。
+- 范围（可写集）：`scripts/controller/actions/phase/reviewer.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/phase/intent_gates.py`、`scripts/prompts/phase-reviewer-prompt.md`、`scripts/characterization/characterize-phase-reviewer.py`、本协作日志
+- 禁入区：`scripts/refactor/verify-all.sh`（他线在途 WIP，不新增注册项）、生成链 `_locator_helpers_js.py` / `src/cdp/page-locator-helpers.js`、SPA 仓、`config/`（含会话前既有 `config/.db-whitelist-seen` 运行态改动，未纳入本次提交）、线上数据库/执行机运行态
+- 方式：主会话 Inline；先离线复现（构造 `mode=other + success.kinds=['step_change']` 合约）确认 `phase_done_ok=False` 且恢复处方为 `click_save()`，再最小实现；pin 落已注册文件、不新增 verify-all 注册项；跑 verify-all 与既有基线比对；不维护 CHANGELOG
+
 ## 2026-09-16 21:03 · ZCode 引擎线 — 收工：本地合入 PR #45（G3 phase_done 证据门闩，回链 20:49 开工）
 
 - 完成：`c0cfa03e`（合并提交，17 文件）+ `abea7695`（集成修复）。PR 原提 master（分叉点 `5dddf2ea` 落后 uara_V1.2 **1034 提交**），按用户要求合到本地主线 `uara_V1.2`，未动 master。PR 作者分支 `cursor/g3-phase-done-evidence-gate-3b92`（7 提交 `539c8e76`→`9391f09c`，Cursor Cloud，12:22–12:41）
@@ -63,7 +79,6 @@
 - 范围（可写集）：`src/services/trajectory/trajectory-meta-service.js`、`src/services/trajectory/trajectory-text-extract.js`、`scripts/characterization/cold/characterize-analyze-case-data.mjs`、本协作日志
 - 禁入区：`scripts/controller/actions/**`（含他线已收工的 `phase/classify.py`，本轮只读不改）、生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`、`scripts/prompts/**`、`scripts/refactor/verify-all.sh`（本轮不新增注册项，pin 落已有 cold 文件）、SPA 仓、`config/`
 - 方式：主会话 Inline；先补 RED pin 再最小实现；pin 覆盖必须保留的既有子串（`先搜索/查询再点击`、`不要为了凑数量而拆分`、`必须原样保留`、`禁止把具体名抹成`、`状态边界原则`、`禁止让下一阶段承担上一阶段未完成的动作`）；跑 verify-all 比对基线；不维护 CHANGELOG
-
 
 ## 2026-09-16 19:27 · OpenCode — 收工：录制两病灶修复（回链 18:59 开工）
 
@@ -199,7 +214,6 @@
 
 ## 2026-09-16 16:50 · Cursor — 开工：atomize 能力内聚（通用规则，非场景禁令）
 
-
 - 进行中：在拆分边界下增加通用「能力内聚」；样例补正例（定位→填→一次落库）与反例「同页多能力合写」。不写上移/下移/产品树层/维护基本信息硬禁，不复活 PR #39
 - 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`（轻量补记）、本协作日志
 - 禁入区：`src/services/req-draft-traj/**`（不新增关键词硬闸、不拆 flow-card JSON）；`product_library.json` / `prod_add_dlg`；他线 replay/field_slot；`config/` WIP；分支 `cursor/atomize-basic-info-quality-aae4`
@@ -213,7 +227,6 @@
 - 方式：主会话 brainstorming → 用户审阅 spec 后再 writing-plans
 
 ## 2026-09-16 16:43 · OpenCode — 收工：回放 err-search-first 误拦截（回链 16:37 开工）
-
 
 - 完成：根因（回放引擎绕过录制态 STC flag 标记 → 守卫误拦 → 语意路径退化）修复 `c820ac76`：新增 `mark_stc_flags_on_replay_ok`（fill→search_filled / 查询点击→query_clicked，候选含 params 与 element/attrs placeholder）；`replay_action_entries` 成功分支接线；`FillEngine`/`ClickEngine` 录制路径行为不变
 - 验收：`characterize-search-then-click-guard` OK（先 RED import 失败、后 GREEN）；`characterize-search-then-click-prompts` OK；verify-all 其余烟均为已登记他线红（step-highlight/layer-tree/confirm-notification/network-capture 环境）——本线两烟绿；replay/heal 相关烟（heal-locate 39 / heal-decision 9 / replay-batch）复验全绿
@@ -309,7 +322,6 @@
 - 方式：主会话 Inline TDD；子智能体不 commit
 
 > **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
-
 
 ## 2026-09-16 14:xx · OpenCode — 收工：修复 tmp/cmds 后端发版 CMD 闪退（回链本次开工）
 
@@ -525,7 +537,6 @@
 - 禁入区：人工录制 mapper/CDP 采集、前端仓、`src/services/trajectory/trajectory-meta-service.js`、线上数据及其他会话 WIP；不改变 `click_save`、表格 radio、日期面板重复选日语义。
 - 方式：先在当前无未提交改动状态写入并提交声明，再补 click_button 与 click_element 的跨动作 identity 共享，验证 picker/按钮/日期相关 characterization、编译与 diff 后提交。
 
-
 ## 2026-09-15 22:15 · OpenCode — 收工：修复第四阶段重复执行与日期范围异常（回链 21:55 开工）
 
 - 完成：提交 **022f65a2**；“填写查询/筛选条件”规则回退归类为 query，运行时 query toolbar 可纠偏误判的 create/modify pending/success 门禁；AI 同阶段成功字段写入/选择及普通索引点击再次命中时直接返回 `already-operated-this-phase`，失败动作可重试、日期面板日格点击豁免、新阶段自动清空，人工录制不经过该保护。
@@ -636,7 +647,6 @@
 - 禁入区：主仓 `src/services/trajectory/trajectory-meta-service.js` 用户改动、线上轨迹/数据库、其他会话 WIP；前端仓 `vite.config.ts` 既有未提交改动及未明确相关文件；不修改部署配置和线上数据。
 - 方式：先修复确定性路由/生命周期问题，再增加首帧新鲜度门控；运行主仓定向 characterization/语法检查与前端 `npm run build`，分别提交并回报部署复测要求。
 
-
 ## 2026-09-15 · OpenCode — 开工：AI 录制 fill_form_field 作用域异常修复
 
 - 进行中：修复执行机 `fill_form_field` 因函数内条件 import 遮蔽模块级 `err_with`，导致 `UnboundLocalError`、AI 录制中断并将轨迹置为 `failed` 的问题。
@@ -663,7 +673,6 @@
 - 范围：`src/cdp/inspect.js`、`src/cdp/inspect-payload-script.js`、`src/cdp/remote-bridge/cdp-input.js`、`scripts/manual_recorder/js_parts/a.py`、`scripts/manual_recorder/js_parts/b.py`、相关 characterization、本协作日志；不修改回放动作名及线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动、其他会话 WIP、引擎仓；不处理日期面板关闭之外的基础设施告警。
 - 方式：沿日期点击确认链路扩展 editor 双 input 快照与范围值归并，保留单日期行为，补充离线 pin/语法检查后提交。
-
 
 ## 2026-09-15 15:26 · Cursor Lead — 收工：人工确认去掉状态闸（回链 15:13 / 14:49）
 
@@ -978,7 +987,6 @@
 - 方式：用户审过 REVISION 后覆盖线上；他线 WIP 未携带
 - 验证：Cursor 侧测试接管；本刀仅 prompt 文本
 
-
 ## 2026-09-12 09:45 · Cursor Lead — 收工：planner advisory discard 接线 + 湿测（回链 09:20）
 
 - 完成：`patch_planner_advice_filter` 挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard` + 事件 `planner_advice_discarded`；pin 扩 fence/kept/接线钉；湿测 traj 759/760；报告增补；提交 `49f18c0f`
@@ -1067,5 +1075,4 @@
 - 禁入：G1 报文捞取、G2 运维、G4 真上传 / KB 湿测主责、文件上传·SUT、`save_section.py`（禁止恢复）、他线 WIP（`scripts/agent/service.py` 未声明改动、`data/kb/flows/**` 湿测主链、req-upload）
 - 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
 - 分支：`cursor/g3-phase-done-evidence-gate-3b92`
-
 
