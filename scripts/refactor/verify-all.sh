@@ -52,6 +52,8 @@ run "characterize-xpath-primary-ops" "$PY" scripts/characterization/characterize
 run "characterize-xpath-fill-select" "$PY" scripts/characterization/characterize-xpath-fill-select.py
 run "characterize-region-section-alias" "$PY" scripts/characterization/characterize-region-section-alias.py
 run "characterize-phase-runtime" "$PY" scripts/characterization/characterize-phase-runtime.py
+run "characterize-phase-boundary" "$PY" scripts/characterization/characterize-phase-boundary.py
+run "characterize-phase-done-evidence-gate" node scripts/characterization/characterize-phase-done-evidence-gate.mjs
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
 run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py
