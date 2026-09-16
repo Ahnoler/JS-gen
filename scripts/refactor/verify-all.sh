@@ -115,6 +115,7 @@ run "characterize-form-engine-wiring" "$PY" scripts/characterization/characteriz
 run "characterize-ghost-pending-prune" "$PY" scripts/characterization/characterize-ghost-pending-prune.py
 run "characterize-done-accept-reason" "$PY" scripts/characterization/characterize-done-accept-reason.py
 run "characterize-save-retry-scope" "$PY" scripts/characterization/characterize-save-retry-scope.py
+run "characterize-picker-close-clears-section" "$PY" scripts/characterization/characterize-picker-close-clears-section.py
 run "characterize-duplicate-failure-cue" "$PY" scripts/characterization/characterize-duplicate-failure-cue.py
 run "characterize-click-navigation-cue" "$PY" scripts/characterization/characterize-click-navigation-cue.py
 run "characterize-confirm-notification" "$PY" scripts/characterization/characterize-confirm-notification.py
