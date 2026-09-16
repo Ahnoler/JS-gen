@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-16 11:xx · OpenCode — 开工：修复 tmp/cmds 后端发版 CMD 闪退
+
+- 进行中：排查 `tmp/cmds/release-backend.cmd` 双击后窗口闪退且未上传部署的问题，复现 CMD 执行并修复新位置的启动/路径/依赖检测。
+- 范围：仅本机忽略文件 `tmp/cmds/release-backend.cmd`、本协作日志；只读参考仓库根目录共享 `pack-control-plane.sh` 与 `release-backend-remote.sh`。
+- 禁入区：共享发布 shell 脚本、`src/`、`config/`、`migrations/`、线上发布目录和其他会话 WIP；不执行真实上传、迁移、重启或回滚。
+- 方式：以 CMD 包装运行捕获错误，验证根目录与 Git Bash 发现逻辑；修复后运行到安全的打包前确认边界，确保失败窗口保留并输出可诊断错误。
+
 ## 2026-09-16 · OpenCode — 收工：修复控制面重启后的录制推流会话恢复（回链本次开工）
 
 - 完成：commit **5fd439fb**。控制面不再在启动后按 executor 节点暂时 offline 状态批量 crash `remote_session`；执行机注册后以 `session.list` 的 `agent_session_id` 为会话存活真源，只有权威查询缺失才 crash 并清交易所有权。
