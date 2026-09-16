@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-16 17:45 · Cursor — 收工：atomize XML 合同 + missing_depend_fields 硬拒（回链 17:29 开工）
+
+- 完成：`d390a3ad` 线上 atomize prompt 改为 XML 分区（`<role>` / `<output_contract>` / `<split_rules>` / `<examples>` 含 3 good + 4 bad / `<anti_patterns>` / `<checklist>`）；样例对齐；物化后空 `produces` 硬拒 `missing_depend_fields`；fallback 用标题合成 produce 键；`PROPOSE_CACHE_VERSION` 3→4
+- 验收：`characterize-atom-depend` all passed（16 pins，含 propose 空字段硬拒 + XML few-shot pin）；`characterize-req-draft-traj` **OK 63**；`characterize-persist-boundary` all passed（11）；eslint 改动文件 0 error
+- 遗留移交：湿测须**重新 propose**（v3 缓存对 commit 已 STALE；仅重启控制面不够，prompt 只在下次 LLM propose 生效）。检查 product-mgmt：不再合写维护+排序、不再空 `produces`/`dataDependsOn`。不维护 CHANGELOG
+
 ## 2026-09-16 17:29 · Cursor — 开工：atomize XML 合同 + missing_depend_fields 硬拒
 
 - 进行中：湿测 `/draft-traj/propose`（product-mgmt）仍把无关能力合写且 `produces`/`dataDependsOn` 为空仅软警告。改线上 atomize prompt 为 XML 分区；样例补正/反例；`missing_depend_fields` 升硬拒；`PROPOSE_CACHE_VERSION` 3→4
