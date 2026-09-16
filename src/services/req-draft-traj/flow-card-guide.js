@@ -7,6 +7,7 @@
  */
 import { matchFlowForAtom } from './flow-card-recall.js';
 
+const PERSIST_VERB_RE = /保存|提交|(?<![未已])启用|禁用|克隆|删除|作废|撤销(?!查询)/;
 const PERSIST_BOUNDARY_RE = /保存|提交|(?<![未已])启用|禁用|克隆|删除|作废|撤销(?!查询)|确定/;
 const CONFIRM_MARK_RE = /【确定】|确定】/;
 
@@ -58,9 +59,11 @@ export function stepsShareClosedLoop({ stepActions }) {
 /**
  * Count persist confirms in taskDraft text (separate saves).
  *
- * Each `【确定】` / `确定】` counts once. Lines that are persist boundaries
+ * Each `【确定】` / `确定】` counts once. Lines that are persist verbs
  * without a confirm mark (保存/提交/启用/…) count as additional confirms so
  * a draft that lists two saves is rejected even if it never wrote 确定.
+ * Bare 「确定」 in confirm-dialog copy is not counted here (only the mark
+ * regex), so 「启用」 + 「确定执行此操作？」 stays one persist.
  * 「保存概况」 in a line is stripped first so a fill-step button does not
  * inflate the count next to a later 【保存】.
  * @param {unknown} text Task draft or other haystack
@@ -72,7 +75,7 @@ export function countPersistConfirms(text) {
   const otherLines = src.split(/\r?\n/).filter((line) => {
     if (CONFIRM_MARK_RE.test(line)) return false;
     const stripped = line.replaceAll('保存概况', '');
-    return PERSIST_BOUNDARY_RE.test(stripped);
+    return PERSIST_VERB_RE.test(stripped);
   });
   return confirmHits.length + otherLines.length;
 }

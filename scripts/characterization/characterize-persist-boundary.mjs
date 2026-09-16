@@ -63,6 +63,20 @@ const THREE_CONFIRM_DRAFT = [
   '',
 ].join('\n');
 
+const PRODUCT_LIBRARY_CHAIN_MD = `# 视图2：可贯通主链清单（demo-mod）
+
+### 主链 A：产品建库原子示例
+
+- **章节出处**：§产品库管理（ZJJK00110131）
+
+| # | 步骤 | 页面/弹窗 | ZJJK | 关键按钮 |
+|---|------|-----------|------|----------|
+| 1 | 进入产品库，加载产品树 | 产品库管理主页 | ZJJK00110131 | 【刷新产品树】 |
+| 2 | 新增一级分类（父层级空，层级=1） | 新增产品弹窗 | ZJJK00094361 | 【新增一级分类】→【确定】 |
+| 3 | 选中分类下新增子分类 | 同上 | ZJJK00094361 | 【新增分类】/【新增子分类】→【确定】 |
+| 4 | 分类下新增产品（叶子；类型=基础产品；状态=未启用；V-0.0.1；填 pdDsc） | 同上 | ZJJK00094361 | 【新增产品】→【确定】 |
+`;
+
 let failed = 0;
 async function run(name, fn) {
   try {
@@ -123,22 +137,35 @@ await run('countPersistConfirms: three 【确定】 lines', () => {
   assert.equal(guide.countPersistConfirms('1、进入编辑页\n2、维护概况\n3、保存\n'), 1);
 });
 
+await run('countPersistConfirms: 启用 + 确定执行此操作 is one persist', () => {
+  assert.equal(
+    guide.countPersistConfirms('1、启用产品，操作：【启用】\n2、确认：确定执行此操作？\n'),
+    1,
+  );
+  assert.equal(
+    guide.countPersistConfirms('1、维护概况，操作：【保存概况】\n2、保存（信贷潜在客户），操作：【保存】\n'),
+    1,
+  );
+});
+
+await run('stepsShareClosedLoop object-shaped fill+保存概况+one 保存 still closed', () => {
+  assert.equal(
+    guide.stepsShareClosedLoop({
+      stepActions: [
+        { action: '进入编辑页', buttons: '【进入】' },
+        { action: '维护概况', buttons: '【保存概况】' },
+        { action: '联网核查', buttons: '【联网核查】' },
+        { action: '保存（信贷潜在客户）', buttons: '【保存】' },
+      ],
+    }),
+    true,
+  );
+});
+
 await run('propose flowGuided L1+child+product with 【确定】 each → multi_write_atom', async () => {
   const tmp = mkdtempSync(join(tmpdir(), 'req-draft-persist-multi-write-'));
   cpSync(demoRoot, join(tmp, 'demo-mod'), { recursive: true });
-  writeFileSync(join(tmp, 'demo-mod/through-chains.md'), `# 视图2：可贯通主链清单（demo-mod）
-
-### 主链 A：产品建库原子示例
-
-- **章节出处**：§产品库管理（ZJJK00110131）
-
-| # | 步骤 | 页面/弹窗 | ZJJK | 关键按钮 |
-|---|------|-----------|------|----------|
-| 1 | 进入产品库，加载产品树 | 产品库管理主页 | ZJJK00110131 | 【刷新产品树】 |
-| 2 | 新增一级分类（父层级空，层级=1） | 新增产品弹窗 | ZJJK00094361 | 【新增一级分类】→【确定】 |
-| 3 | 选中分类下新增子分类 | 同上 | ZJJK00094361 | 【新增分类】/【新增子分类】→【确定】 |
-| 4 | 分类下新增产品（叶子；类型=基础产品；状态=未启用；V-0.0.1；填 pdDsc） | 同上 | ZJJK00094361 | 【新增产品】→【确定】 |
-`, 'utf8');
+  writeFileSync(join(tmp, 'demo-mod/through-chains.md'), PRODUCT_LIBRARY_CHAIN_MD, 'utf8');
 
   const fakeLLM = async () => JSON.stringify({
     atoms: [{
@@ -196,6 +223,28 @@ await run('propose taskDraft with three 【确定】 lines → multi_persist_tas
     out.rejected.some((r) => r.reason === 'multi_persist_task_draft'),
     `expected multi_persist_task_draft, got rejected=${JSON.stringify(out.rejected)} atoms=${out.atoms.length}`,
   );
+});
+
+await run('propose card-guided fallback splits three 【确定】 writes', async () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'req-draft-persist-fallback-split-'));
+  cpSync(demoRoot, join(tmp, 'demo-mod'), { recursive: true });
+  writeFileSync(join(tmp, 'demo-mod/through-chains.md'), PRODUCT_LIBRARY_CHAIN_MD, 'utf8');
+
+  const out = await proposeDraftTrajectories({
+    moduleKey: 'demo-mod',
+    rootDir: tmp,
+    callLLM: async () => { throw new Error('force fallback'); },
+    listSystemsFn: async () => [],
+    listFlowCardsFn: async () => [PRODUCT_LIBRARY_CARD],
+  });
+  rmSync(tmp, { recursive: true, force: true });
+  const writeAtoms = out.atoms.filter((a) => a.kind === 'write');
+  assert.equal(writeAtoms.length, 3, `expected 3 write atoms, got ${writeAtoms.length} atoms=${out.atoms.length} rejected=${JSON.stringify(out.rejected)}`);
+  assert.ok(
+    writeAtoms.every((a) => a.flowGuided === true && a.suggestedFlowRef === 'product_library'),
+    `expected flowGuided product_library writes, got ${JSON.stringify(writeAtoms.map((a) => ({ key: a.atomKey, flowGuided: a.flowGuided, ref: a.suggestedFlowRef })))}`,
+  );
+  assert.equal(out.rejected.filter((r) => r.reason === 'multi_write_atom').length, 0);
 });
 
 if (failed) process.exit(1);

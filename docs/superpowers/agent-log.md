@@ -2,9 +2,9 @@
 
 ## 2026-09-16 16:25 · Cursor — 收工：product-mgmt wet propose 多【确定】误合并（回链 16:05 开工）
 
-- 完成：`b8416216` RED pin；`bc9c1d82` persist 边界 + `multi_persist_task_draft` 闸
-- 验收：`characterize-persist-boundary` all passed（8 pins）；`characterize-req-draft-traj` **OK 63**；`characterize-atom-depend` **8/8**；eslint 改动文件 0 error
-- 遗留移交：不拆 `prod_add_dlg` 流程卡；`missing_depend_fields` 仍为警告；fallback 分组仍只看 action（本 PR 只改 `stepsShareClosedLoop` 入参 + taskDraft 闸）；不维护 CHANGELOG
+- 完成：`b8416216` RED pin；`bc9c1d82` persist 边界 + `multi_persist_task_draft` 闸；review follow-up：fallback 亦看 buttons、`countPersistConfirms` 不把裸「确定」当二次保存、`PROPOSE_CACHE_VERSION` 2→3
+- 验收：`characterize-persist-boundary` all passed（11 pins）；`characterize-req-draft-traj` **OK 63**；`characterize-atom-depend` **8/8**；eslint 改动文件 0 error
+- 遗留移交：不拆 `prod_add_dlg` 流程卡；`missing_depend_fields` 仍为警告；湿缓存须重新 propose（v3）；不维护 CHANGELOG
 
 ## 2026-09-16 16:05 · Cursor — 开工：product-mgmt wet propose 多【确定】误合并（persist boundary + taskDraft 闸）
 

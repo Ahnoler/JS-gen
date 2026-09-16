@@ -345,7 +345,10 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
       if (!action) continue;
 
       if (isNavigationStep(action) || isEntryOnlyStep(action)) {
-        const hasLaterPersist = steps.slice(i + 1).some((s) => isPersistBoundaryAction(s.action));
+        const hasLaterPersist = steps.slice(i + 1).some((s) => isPersistBoundaryAction({
+          action: s.action,
+          buttons: s.buttons,
+        }));
         if (leadingNavSteps.length === 0 && groupSteps.length === 0 && hasLaterPersist) {
           leadingNavSteps.push(step);
           continue;
@@ -357,7 +360,7 @@ function buildCardGuidedFallbackAtoms(chains, sourceDoc, cards) {
       }
 
       groupSteps.push(step);
-      if (isPersistBoundaryAction(action)) {
+      if (isPersistBoundaryAction({ action, buttons: step.buttons })) {
         flushGroup();
       }
     }
