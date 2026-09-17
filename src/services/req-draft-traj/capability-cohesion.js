@@ -19,9 +19,17 @@ const OTHER_FAMILIES = {
 
 /** Page/dialog titles: 维护…主页/页面/界面/弹窗 — not a maintain capability. */
 const MAINTAIN_TITLE_RE = /维护[\u4e00-\u9fff]{0,16}(?:主页|页面|界面|弹窗)|维护页(?!签)/g;
+/** Object noun: 待维护产品/项 — locate object, not a maintain capability. */
+const MAINTAIN_PENDING_NOUN_RE = /待维护/g;
 /** Closer-line residual: 「修改…后」+ closer is not a second maintain. */
 const MAINTAIN_AFTER_CLOSER_RE = /修改[^【\n]{0,16}后/g;
 const BRACKET_MAINTAIN_RE = /【[^】]*(?:维护|修改|编辑)[^】]*】/;
+/** Closer-line residual: 「复制…数据/信息」 after clone is not a second clone. */
+const CLONE_COPY_RESIDUAL_RE = /复制[^【\n]{0,40}(?:数据|信息)/g;
+const BRACKET_CLONE_RE = /【[^】]*(?:克隆|复制)[^】]*】/;
+/** Outcome narrative: 确认删除成功 / 删除成功 — not a second delete persist. */
+const DELETE_SUCCESS_OUTCOME_RE = /确认删除成功|删除成功/g;
+const BRACKET_DELETE_RE = /【[^】]*删除[^】]*】/;
 const BRACKET_ADD_RE = /【[^】]*添加[^】]*】/;
 const CLICK_ADD_RE = /(?:点击|点)添加/;
 const BRACKET_EXPORT_RE = /【[^】]*(?:导出|下载)[^】]*】/;
@@ -37,13 +45,25 @@ const STEP_DUNHAO_RE = /^\s*\d+、/;
 const STEP_DOT_RE = /^\s*\d+[\.．]\s+/;
 
 /**
+ * Drop outcome 确认删除成功 / 删除成功 unless a bracketed 【删除】 marks a real action.
+ * @param {string} haystack Group action text
+ * @returns {string} Haystack without delete-success restatement
+ */
+function stripDeleteSuccessOutcome(haystack) {
+  const src = String(haystack || '');
+  if (BRACKET_DELETE_RE.test(src)) return src;
+  return src.replace(DELETE_SUCCESS_OUTCOME_RE, '');
+}
+
+/**
  * True when haystack names a persist-as-capability action rather than a
  * noun modifier (启用状态 / 启用和禁用状态 / 禁用理由 / 克隆页).
+ * Outcome 确认删除成功 / 删除成功 is not a second delete.
  * @param {string} haystack Group action text
  * @returns {boolean} Persist-as-capability verb present
  */
 function hasPersistAsCapVerb(haystack) {
-  const src = String(haystack || '');
+  const src = stripDeleteSuccessOutcome(haystack);
   return PERSIST_AS_CAP_BRACKET_RE.test(src) || PERSIST_AS_CAP_BARE_RE.test(src);
 }
 
@@ -152,6 +172,9 @@ export function parseTaskDraftStepGroups(taskDraft) {
  * Create `添加` skips noun phrases (`需要添加的`); 【添加】 / 点击添加 / 添加一条 still count.
  * Export prefers 【导出】/【下载】 or 点击导出; bare restatement does not count.
  * Status/clone/delete skip noun modifiers (启用状态 / 启用和禁用状态 / 禁用理由 / 克隆页).
+ * Closer lines ignore residual `复制…数据/信息` unless a bracketed 克隆/复制 mark is present.
+ * Maintain `维护` skips object nouns (`待维护产品`).
+ * Delete outcome `确认删除成功` / `删除成功` is not a second persist-as-cap.
  * @param {string} haystack Group action text
  * @returns {Set<string>} Family ids
  */
@@ -168,13 +191,18 @@ function detectOtherFamilies(haystack) {
       continue;
     }
     if (id === 'clone') {
-      if (/【[^】]*克隆[^】]*】/.test(haystack) || /克隆(?!页)/.test(haystack) || haystack.includes('复制')) {
+      let src = haystack;
+      if (CLOSER_RE.test(haystack) && !BRACKET_CLONE_RE.test(haystack)) {
+        src = src.replace(CLONE_COPY_RESIDUAL_RE, '');
+      }
+      if (/【[^】]*克隆[^】]*】/.test(src) || /克隆(?!页)/.test(src) || src.includes('复制')) {
         found.add('clone');
       }
       continue;
     }
     if (id === 'delete') {
-      if (/【[^】]*删除[^】]*】/.test(haystack) || /删除(?!理由)/.test(haystack) || haystack.includes('移除')) {
+      const src = stripDeleteSuccessOutcome(haystack);
+      if (BRACKET_DELETE_RE.test(haystack) || /删除(?!理由)/.test(src) || src.includes('移除')) {
         found.add('delete');
       }
       continue;
@@ -196,7 +224,7 @@ function detectOtherFamilies(haystack) {
       continue;
     }
     if (id === 'maintain') {
-      let src = haystack.replace(MAINTAIN_TITLE_RE, '');
+      let src = haystack.replace(MAINTAIN_TITLE_RE, '').replace(MAINTAIN_PENDING_NOUN_RE, '');
       if (CLOSER_RE.test(haystack) && !BRACKET_MAINTAIN_RE.test(haystack)) {
         src = src.replace(MAINTAIN_AFTER_CLOSER_RE, '');
       }
@@ -229,8 +257,9 @@ function hasPersistAsCapability(haystack) {
 /**
  * True when haystack is a closer tail: 确定/保存/提交. Persist-as-capability
  * families (status/clone/delete) in the same closer line are allowed so
- * 「点击【确定】完成克隆」 stays one closer. Residual `修改…后` and fill-in
- * 填写/录入 are not maintain, so 「修改信息后点击【保存】」 is closer-only.
+ * 「点击【确定】完成克隆」 stays one closer. Residual `修改…后`, residual
+ * `复制…数据/信息`, and fill-in 填写/录入 are not a second family, so
+ * 「修改信息后点击【保存】」 / 「【确定】保存成功，复制…数据」 are closer-only.
  * Bracketed 维护/修改/编辑 still block.
  * @param {string} haystack Group action text
  * @returns {boolean} Closer-only persist

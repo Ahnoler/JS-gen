@@ -891,8 +891,8 @@ ${filler}
   });
 
   const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
-  run('PROPOSE_CACHE_VERSION is 10 (maintain-title/fill/closer-residual cohesion)', () => {
-    assert.equal(PROPOSE_CACHE_VERSION, 10);
+  run('PROPOSE_CACHE_VERSION is 11 (clone-copy residual / 待维护 noun / delete-success outcome cohesion)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 11);
   });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');

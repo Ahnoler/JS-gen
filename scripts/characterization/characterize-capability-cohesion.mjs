@@ -179,6 +179,30 @@ const WET_CREATE_PRODUCT_ELEMENT = [
   '5、点击【确定】成功',
 ].join('\n');
 
+/** LMY re-atomize 2026-09-17: closer residual 复制…数据 after clone opener. */
+const WET_CLONE_PRODUCT_COPY_RESIDUAL = [
+  '1、进入产品库管理主页（ZJJK00110131），等待加载',
+  '2、在左侧产品树定位并选中已有产品',
+  '3、点击【产品克隆】，在产品克隆页（ZJJK00097067）查看原产品编号、原产品名称、新产品编号，填写新产品名称',
+  '4、【确定】保存成功，复制产品信息、阶段关系、管控要素数据',
+].join('\n');
+
+/** LMY: 待维护产品 is locate/object noun, not maintain. */
+const WET_MAINTAIN_PRODUCT_BASIC = [
+  '1、进入查看产品信息主页（ZJJK00107304），等待加载',
+  '2、定位并进入待维护产品',
+  '3、修改产品基本信息',
+  '4、【保存】成功',
+].join('\n');
+
+/** LMY: 确认删除成功 is outcome narrative, not a second delete persist. */
+const WET_DELETE_CORE_MAPPING = [
+  '1、进入核心产品映射主页（ZJJK00095454），等待加载',
+  '2、在左侧产品树定位并选中已有产品，通过核心产品编号或核心产品名称关键字【查询】',
+  '3、选中已有核心产品映射记录，点击【删除】',
+  '4、确认删除成功',
+].join('\n');
+
 const { countPersistConfirms } = await import(
   pathToFileURL(join(ROOT, 'src/services/req-draft-traj/flow-card-guide.js')).href
 );
@@ -796,6 +820,126 @@ await run('wet word-bleed create/edit/export propose: accepted except long 管�
     0,
     'long 管控要素 must not rebrand two closers as multi_capability',
   );
+});
+
+await run('inspect: closer residual 复制…数据 is persist, not clone other', () => {
+  const info = mod.inspectCapabilityGroup('【确定】保存成功，复制产品信息、阶段关系、管控要素数据');
+  assert.equal(info.role, 'persist', JSON.stringify(info));
+  assert.equal(info.families.includes('clone'), false, JSON.stringify(info));
+});
+
+await run('inspect: 定位并进入待维护产品 is locate, not maintain', () => {
+  const info = mod.inspectCapabilityGroup('定位并进入待维护产品');
+  assert.equal(info.families.includes('maintain'), false, JSON.stringify(info));
+  assert.ok(info.role === 'locate' || info.role === 'neutral', `got ${info.role} ${JSON.stringify(info)}`);
+  assert.notEqual(info.role, 'other');
+});
+
+await run('inspect: 维护基本信息 / 【维护】 stay maintain other', () => {
+  const prose = mod.inspectCapabilityGroup('维护基本信息');
+  assert.equal(prose.role, 'other', JSON.stringify(prose));
+  assert.ok(prose.families.includes('maintain'), JSON.stringify(prose));
+  const bracket = mod.inspectCapabilityGroup('点击【维护】');
+  assert.equal(bracket.role, 'other', JSON.stringify(bracket));
+  assert.ok(bracket.families.includes('maintain'), JSON.stringify(bracket));
+});
+
+await run('inspect: 确认删除成功 / 删除成功 are outcome, not persist-as-cap delete', () => {
+  const confirm = mod.inspectCapabilityGroup('确认删除成功');
+  assert.equal(confirm.families.includes('delete'), false, JSON.stringify(confirm));
+  assert.notEqual(confirm.role, 'persist', JSON.stringify(confirm));
+  assert.notEqual(confirm.role, 'other', JSON.stringify(confirm));
+  const bare = mod.inspectCapabilityGroup('删除成功');
+  assert.equal(bare.families.includes('delete'), false, JSON.stringify(bare));
+  assert.notEqual(bare.role, 'persist', JSON.stringify(bare));
+  assert.notEqual(bare.role, 'other', JSON.stringify(bare));
+});
+
+await run('inspect: 点击【删除】 stays persist-as-cap', () => {
+  const info = mod.inspectCapabilityGroup('选中已有核心产品映射记录，点击【删除】');
+  assert.ok(info.families.includes('delete'), JSON.stringify(info));
+  assert.equal(info.role, 'persist', JSON.stringify(info));
+});
+
+await run('wet 产品克隆 residual 复制: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_CLONE_PRODUCT_COPY_RESIDUAL), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '产品克隆',
+    taskDraft: WET_CLONE_PRODUCT_COPY_RESIDUAL,
+    produces: ['已克隆产品'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet 维护产品基本信息 待维护: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_MAINTAIN_PRODUCT_BASIC), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '维护产品基本信息',
+    taskDraft: WET_MAINTAIN_PRODUCT_BASIC,
+    produces: ['已维护产品'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet 删除核心产品映射 确认删除成功: cohesion ok (outcome is not a second persist)', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '删除核心产品映射',
+    taskDraft: WET_DELETE_CORE_MAPPING,
+    produces: ['已删除映射'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('helper: 配置 closer then 删除 stays multi_capability', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '配置并删除',
+    taskDraft: [
+      '1、进入功能页，等待加载',
+      '2、配置管控要素后点击【保存】',
+      '3、删除该项',
+    ].join('\n'),
+    produces: ['已删对象'],
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, 'multi_capability_task_draft');
+});
+
+await run('inspect: 维护+删除 same group is multi', () => {
+  const info = mod.inspectCapabilityGroup('维护基本信息并删除该项');
+  assert.equal(info.role, 'multi', JSON.stringify(info));
+  assert.ok(info.families.includes('maintain'), JSON.stringify(info));
+  assert.ok(info.families.includes('delete'), JSON.stringify(info));
+});
+
+await run('wet LMY clone/maintain/delete-success propose: accepted, not multi_capability', async () => {
+  const cases = [
+    { title: '产品克隆', taskDraft: WET_CLONE_PRODUCT_COPY_RESIDUAL, produces: ['已克隆产品'] },
+    { title: '维护产品基本信息', taskDraft: WET_MAINTAIN_PRODUCT_BASIC, produces: ['已维护产品'] },
+    { title: '删除核心产品映射', taskDraft: WET_DELETE_CORE_MAPPING, produces: ['已删除映射'] },
+  ];
+  for (const c of cases) {
+    const out = await proposeOne({
+      chainId: 'chain-a',
+      stepIndexes: [2],
+      title: c.title,
+      flowRef: 'product_library',
+      nodeId: 'prod_add_dlg',
+      taskDraft: `${c.taskDraft}\n\n来源：demo.docx / chapters/01-product-library.md\n`,
+      produces: c.produces,
+      dataDependsOn: [],
+      phaseHints: [c.title],
+      suggestedFunctionId: null,
+    });
+    assert.ok(
+      out.atoms.length >= 1,
+      `${c.title}: expected atoms, rejected=${JSON.stringify(out.rejected)}`,
+    );
+    assert.equal(
+      out.rejected.filter((r) => r.reason === 'multi_capability_task_draft').length,
+      0,
+      `${c.title}: must not reject cohesive draft as multi_capability`,
+    );
+  }
 });
 
 await run('atomize prompt locates prep to locate-class only', () => {
