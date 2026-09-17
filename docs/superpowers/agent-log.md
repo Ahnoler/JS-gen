@@ -1272,3 +1272,9 @@
 - 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
 - 分支：`cursor/g3-phase-done-evidence-gate-3b92`
 
+
+## 2026-09-17 10:36 · ZCode — 开工声明：前后端发版（纯运维，后端等录制空闲）
+- 开工：10:36 UTC+8。不改任何业务代码；触碰面=本文件 + 服务器发版目录
+- 前端：vue-project `npx vite build` → /data/app/front-dist/releases 软链切换（本机 vite.config.ts 未提交的 127.0.0.1 baseURL 仅 dev proxy 用，不入产物，保持未提交原样）
+- 后端：pack-control-plane.sh → JS-gen-releases/<ts> 软链切换+重启 4097；**当前活跃录制（trajectory 840 @ local-server-proxy，10:32 起）→ 后端延后到录制结束**，轮询等待
+- 禁入：业务代码、提示词、migrations、他线 WIP
