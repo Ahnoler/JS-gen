@@ -45,6 +45,7 @@ run "characterize-run-event-ownership" node scripts/characterization/characteriz
 run "characterize-runid-bridge" node scripts/characterization/characterize-runid-bridge.mjs
 run "characterize-owned-wait-shape" node scripts/characterization/characterize-owned-wait-shape.mjs
 run "characterize-quality-final-gate" node scripts/characterization/characterize-quality-final-gate.mjs
+run "characterize-record-phase-finalize" node scripts/characterization/characterize-record-phase-finalize.mjs
 run "characterize-region-tree" node scripts/characterization/characterize-region-tree.mjs
 run "characterize-transaction-export-region" node scripts/characterization/characterize-transaction-export-region.mjs
 run "characterize-form-rules" "$PY" scripts/characterization/characterize-form-rules.py
