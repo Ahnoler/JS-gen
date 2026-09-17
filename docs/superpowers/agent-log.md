@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 11:30 · OpenCode — 收工：LLM 合约路径对齐规则边界，navigate 阶段证据可录（回链 11:15 开工）
+
+- 完成：**`af1d1cc0`** + pin **`42cb41a`**（4 文件 / +72）。用户复测 sid 64c9044b 时 phase 1 仍 `observed=[]`、phase 3 有 `nav_next_clicked` 但门闩只要 `url_change|page_opened`——根因是 `service.py` 里 LLM reviewer 路径 `apply_phase_contract(business_data_ref, reviewed)` 未传 `boundary_override`，边界 `goals`/`success_when` 全由 LLM 自然语言 `in_scope`/`success.kinds` 决定，丢失 `open_page`/`click_next`/`nav_next_clicked` 等可录制证据标签。
+- 修复：①`scripts/agent/service.py` 在 LLM 合约路径传入 `compile_boundary(phase_core)` 作为 `boundary_override`，使 gate 使用任务文本导出的规则边界（phase 1 含 `open_page`、phase 3 含 `click_next`+`nav_next_clicked`）；②`scripts/controller/actions/phase/classify.py` 把 `向导页` 加入 open_page 识别正则，使「打开…向导页」被归类为 open_page，触发 recorder_emitters 的 overlay/入口点击兜底；③`scripts/characterization/characterize-phase-runtime.py` 新增 pin，断言 LLM navigate 合约经 `boundary_override` 后 phase 1 边界 goals 含 `open_page`、phase 3 `success_when` 含 `nav_next_clicked`。
+- 验收：`characterize-phase-runtime`、`characterize-phase-reviewer`、`characterize-phase-reviewer-flow`、`characterize-recorder-phase-reset`（39 checks）、`characterize-g3-done-gate-live`（11 checks）、`characterize-phase-save-cue-promote`、`characterize-phase-intent` 全绿；**verify-all = 既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。
+- 遗留移交：①用户已停掉执行机，请拉取本提交后重启控制面 + 执行机，再复测 sid 64c9044b 的 phase 1/3；②若仍失败，请贴 `[recorder] open-page evidence check:` 与 `[click] G3 evidence recorded` 两行；③不维护 CHANGELOG。
+
 ## 2026-09-17 11:15 · OpenCode — 开工：LLM 合约路径未用规则边界，导致 navigate 阶段证据不可录（phase 1/3）
 
 - 进行中：用户复测 sid 64c9044b，phase 1 仍 `observed=[]` 失败，phase 3 有 `nav_next_clicked` 但门闩只要 `url_change|page_opened`。根因：LLM reviewer 路径 `service.py:apply_phase_contract(business_data_ref, reviewed)` 未传 `boundary_override`，边界 `goals`/`success_when` 全由 LLM 的 `in_scope`/`success.kinds` 决定，导致 `open_page`/`click_next`/`nav_next_clicked` 等可录制证据标签丢失；`classify.py` 也未把 `向导页` 识别为 open_page。
