@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-17 12:05 · ZCode 引擎线 — 收工：traj 840 末步 下一步=下拉选项，guard 补 select_option 处方（回链 11:52 开工）
+
+- 完成：`9e35b942`。`wf_submit_guard` 载海新增 **`opHint` 行动处方**：opValue 空 →「opOptions=[] 只说明弹层未展开、不代表没有选项（发起节点选项通常=下一步）；调用 `select_option(label_text=流程操作, option_text=下一步)`（select_option 自行展开弹层），重跑 guard 确认 opValue 变化后再 click 流程提交；**禁止对 下一步 这类名称 real_click/click_button——末步的 下一步 是这个下拉的选项，不是按钮**」；opValue 已选 → 复核后流程提交。`_todo.py` action 提示词与模块 docstring 同步
+- 根因（DB 步骤 + 活页面只读实证）：三次 `real_click('下一步')`（DB 44-46）**是生效的**——落库 el-steps 锚逐次移动（基本信息→影像资料→风险阻断），向导被推进到步骤 4；卡死在其后：末步「下一步」是 `流程操作` el-select 的**选项**（活 DOM 实证 label=流程操作、`nextButtons=[]`、截图下拉即它展开态），agent 全程零次 select_option——guard 找对了字段但返回 `opValue:''/opOptions:[]` 且无行动指引（Element UI 选项弹层首开才渲染、guard 刻意不开弹层），agent 读成「没东西可选」。模块 docstring 早写明「发起节点只有下一步」——知识在案但没到达决策现场
+- 验证（四层）：①**活页面湿测**（CDP 29242 只读 evaluate，guard 零点击）：改后 guard 在 840 现场 ok=true、opLabel=流程操作、用户手工已选 下一步 → 处方正确切到提交分支；②fixture 两分支 10/10；③新 pin `characterize-wf-submit-guard-hint`（14 needles）证伪成立（删 opHint 载荷键→红，md5 逐位还原→绿）并注册 verify-all；④全量 verify-all 3 红=既有基线零新增
+- 未改：`select_engine`/`real_click`——el-select 分发路径已在本页 phase 2 实证可用（审批状态=待发起 dispatch path=el-select）；本轮按「只留根因代码」不加闸不加兜底
+- 遗留移交：①**重录验证**——840 需在重启后的控制面/执行机（含 `gated` 崩溃修复 `7eea3bf8` + 本笔）重录，末步应看到 agent 依 opHint 走 `select_option(流程操作=下一步) → wf_submit_guard 复核 → 流程提交`；②本页字段 label 以活 DOM 为准=「流程操作」（截图分辨率低易误读为「选择操作」），wf_submit_guard 的 label 匹配本就正确、未改；③重录时若发现其他节点角色（审批节点）选项不同，opHint 措辞已留「通常」余地，届时按需细化
+- 注：不维护 CHANGELOG
+
 ## 2026-09-17 11:52 · ZCode 引擎线 — 开工：traj 840 末步「下一步」是下拉选项，引导走 select_option
 
 - 进行中（根因已取证，活页面 CDP 29242 只读实证）：840 评级向导三次 `real_click('下一步')`（DB 44-46）已把向导 1→4 推进成功（落库 el-steps 锚逐次移动），**卡死在末步**——末步的「下一步」不是按钮而是 **`流程操作` el-select 的选项**（活页面 `visibleSelectFields` 实证 label=流程操作、截图下拉即它展开态）；`wf_submit_guard` 找对了字段（opLabel=流程操作）但返回 `opValue:'' / opOptions:[]` 且**无任何行动指引**——Element UI 选项要弹层首开才渲染，guard 刻意不开弹层，agent 由此读出「没东西可选」而停滞。全程零次对流程操作的 select_option
