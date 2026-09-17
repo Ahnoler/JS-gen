@@ -6,6 +6,7 @@ import { detectStaleCards } from '../../services/change-impact-service.js';
 import * as systemDao from '../../dao/system-dao.js';
 import * as reqModules from '../../services/kb-req-modules.js';
 import * as reqDraftTraj from '../../services/req-draft-traj/index.js';
+import { parseReqModule } from '../../services/kb-req-parse/parse-req-module.js';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, basename } from 'node:path';
@@ -107,6 +108,16 @@ export default function registerKbRoutes(app) {
       }
     });
   });
+
+  /** POST /api/v2/kb/req-modules/:moduleKey/parse — 同步切片源文档为 chapters + through-chains。 */
+  app.post('/api/v2/kb/req-modules/:moduleKey/parse', asyncHandler(async (req, res) => {
+    const { force } = req.body || {};
+    const result = await parseReqModule({
+      moduleKey: req.params.moduleKey,
+      force: Boolean(force),
+    });
+    sendOk(res, result);
+  }));
 
   /** POST /api/v2/kb/req-modules/:moduleKey/draft-traj/propose — LLM 原子化候选（写 propose 缓存）。 */
   app.post('/api/v2/kb/req-modules/:moduleKey/draft-traj/propose', asyncHandler(async (req, res) => {
