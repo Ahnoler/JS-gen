@@ -1,5 +1,22 @@
 # Agent 协作日志
 
+## 2026-09-17 18:05 · OpenCode — 收工：query 阶段 LLM mode 与规则 boundary 不匹配修复（回链 15:50 开工）
+
+- 完成：`d61fa3d0`。修改 `scripts/controller/actions/phase/intent_contract.py`：在 query/navigate 分支中，当规则编译的 `boundary.role` 与 LLM `mode` 对应的期望 role 不一致时，信任 LLM mode 并重置 `role`/`goals`/`success_when` 为 mode-appropriate 集合。这样查询流程中不含查询词的子阶段（如“输入业务编号”）不会继承 form_fill 的 `['toast_ok','url_change','saved_navigation']`，而是使用 `['query_clicked']`。新增 cold pin `test_llm_query_mode_overrides_rule_form_fill_boundary` 在 `scripts/characterization/characterize-phase-runtime.py`。
+- 验收（合并后集成态重跑）：
+  - `python scripts/characterization/characterize-phase-runtime.py` **PASS**（含新增 pin）
+  - `python scripts/characterization/characterize-phase-reviewer.py` **PASS**
+  - `python scripts/characterization/characterize-phase-reviewer-flow.py` **PASS**
+  - `python scripts/characterization/characterize-g3-done-gate-live.py` **OK 11 checks**
+  - `python scripts/characterization/characterize-recorder-phase-reset.py` **PASS 39 checks**
+  - `node scripts/characterization/characterize-phase-done-evidence-gate.mjs` **OK**
+  - `node scripts/characterization/characterize-g3-runner-seam.mjs` **9/9 passed**
+  - 相关回归：`characterize-form-rules.py` / `characterize-case-data.py` / `characterize-save-section.py` / `characterize-real-click.py` / `characterize-phase-save-cue-promote.py` / `characterize-select-option-stamp.py` / `characterize-select-state-boundary.py` / `characterize-done-accept-reason.py` / `characterize-scan-editable-summary.py` / `characterize-scan-fullpage-p1.py` / `characterize-phase-section-scope.py` / `characterize-capture-element-xpath.py` / `characterize-xpath-primary-ops.py` / `characterize-xpath-fill-select.py` / `characterize-region-section-alias.py` / `characterize-introduce-query-fill.py` / `characterize-refill-contract.py` / `characterize-form-engine-wiring.py` / `characterize-form-assistant.py` **全部 OK**
+  - `npm run lint` **0 errors**（156 warnings 均为 `.venv` 第三方库或既有文件，非本次改动引入）
+- 偏差自报：`bash scripts/refactor/verify-all.sh` 全量门闩因本机未安装 bash/WSL 未能执行；上述 phase/G3/recorder 核心回归与相关相邻门禁已覆盖本次改动面。建议在部署环境/CI 补跑全量 verify-all。
+- 遗留移交：①用户需重启控制面 4097 + 执行机加载 `d61fa3d0` 后复测对公客户评级查询流程；②`config/.db-whitelist-seen` 在运行期被自动改写，与本任务无关，未提交。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-17 15:50 · OpenCode — 开工：修复 query 阶段 LLM mode 与规则 boundary 不匹配导致 success_when 错位
 
 - 进行中：用户录制的对公客户评级查询流程在 Phase 2（业务编号输入）异常结束。根因是 `af1d1cc0` 传入 `boundary_override` 后，规则编译按字面关键词把阶段判为 form_fill（success_when=['toast_ok','url_change','saved_navigation']），而 LLM 根据上下文判为 query。recorder 使用规则 boundary 的 token 集合，与 query_clicked 证据不匹配，done() 被无限拦截。
