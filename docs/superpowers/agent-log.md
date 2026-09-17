@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 14:55 · ZCode 引擎线 — 收工：按组件类型推荐动作（重构 opHint 硬编码，回链 12:30 开工）
+
+- 完成：`d9ace2b8`（real_click 分类器 + _workspace 处方透出 + guard/提示词去硬编码 + pin 重写）。**分类器落在 `real_click` 的文本目标解析里**（按文本找目标的唯一动作），四类载体四类处置：①启用按钮→照常点击（行为不变）；②载体是 `.el-select-dropdown__item` → **不做信任点击**，`err-real-click-select-option` + 处方 `select_option(label_text=<归属字段名现场推导>, option_text=<目标文本>)`（归属 label 从展开中触发器 `aria-expanded=true`→兜底聚焦 input 的 form-item 现场读出——与 index-click 的 use-select-option 栅栏同一仓库规则）；③禁用按钮（native/aria-disabled）→ `err-real-click-disabled-button`（消灭"信任点击禁用按钮=静默无效"一类）；④无可见载体 → not-found + 处方点破**「弹层未展开时选项不在 DOM 里，real_click 永远找不到」**。`_workspace.py` 失败时把 `prescription` 透出给 agent。guard opHint 与 `_todo.py` 提示词全部改类型制表述，`下一步/发起节点` 字面量从处方中删除且被 pin ban（docstring 的 DOM 事实记录保留——知识非处方）
+- 验证：新 pin `characterize-component-type-prescription`（取代 `characterize-wf-submit-guard-hint`，20 needles 含 ban）**证伪成立**（短路选项载体分支→红，md5 逐位还原→绿）；fixture 四分类 7/7——关键例 D2：弹层展开后 `real_click('下一步')` 返回处方 `select_option(label_text="流程操作", option_text="下一步")`，**label 从 DOM 现场推导零硬编码**；verify-all 全量 3 红=既有基线零新增
+- 偏差自报：29242 浏览器中途被收回（ECONNREFUSED），真页面 leg 未跑成——但同一页面此前的引擎原版序列 8/8 已证触发/拾取路径，且 fixture D2 覆盖分类器本体
+- 遗留移交：①真页面上归属 label 推导依赖触发器带 `aria-expanded` 或持焦点——若都不成立处方降级为 `<字段名>` 占位（agent 仍有 guard 的精确 label 兜底），下次活页面会话值得看一眼；②840 重录验证仍待重启控制面/执行机（`7eea3bf8`+`9e35b942`+`d9ace2b8` 三笔一起生效）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-17 14:40 · OpenCode — 收工：查询/筛选阶段「更多」收起条件尽力展开（icon-only `more-btn` 识别）
 
 - 完成（两条提交，均为用户代为提交）：**`aaa9f575`** 规则提示——`filter_expand_try_hint()` 注入 query 模式与「描述含查询/搜索/查找/筛选但未归入 query」的阶段（向导/打开页面不注入），`agent-core.md` 查询行同步；**`06fbf86d`**（作者 黄正祥）icon-only「更多」按钮识别落地。
