@@ -1,7 +1,7 @@
 /**
  * Orchestrate req-module parse: resolve source, extract, LLM slice, write artifacts.
  */
-import { access, readdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { basename, join, relative, resolve, isAbsolute } from 'node:path';
 import { AppError } from '../../http/app-error.js';
@@ -197,6 +197,7 @@ export async function parseReqModule({
   }
 
   const chaptersDir = join(modDir, 'chapters');
+  await mkdir(chaptersDir, { recursive: true });
   await clearChapterMarkdown(chaptersDir);
   const writtenNames = [];
   for (let i = 0; i < sliced.chapters.length; i += 1) {
@@ -233,7 +234,7 @@ export async function parseReqModule({
     sourceDoc: resolved.sourceDoc,
     chapterCount: writtenNames.length,
     chainCount: chains.length,
-    canProposeAtoms: true,
+    canProposeAtoms: chains.length > 0,
     warnings,
   };
 }

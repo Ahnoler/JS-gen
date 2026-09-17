@@ -148,7 +148,7 @@ export const GROUP_KB = [{
       desc: '优先读 source.link.json.localCopy，否则可读的 sourcePath；提取 .md/.txt 或 mammoth(.docx) 文本后调 LLM，'
         + ' 写出 chapters/*.md 与 through-chains.md，manifest.status=sliced，并删除 .draft-traj-propose.json。'
         + ' 始终覆盖切片产物；force 预留（未 force 且已有切片时 warnings 含 slice_overwritten）。'
-        + ' 同步调用可能 1–3+ 分钟，客户端须放宽超时。湿测顺序：upload → parse → propose。',
+        + ' 同步调用可能 1–3+ 分钟（LLM 超时 300s），客户端须放宽超时。湿测顺序：upload → parse → propose。',
       params: [
         { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
         { name: 'force', type: 'boolean', in: 'body', desc: '预留；MVP 仍覆盖切片产物' },

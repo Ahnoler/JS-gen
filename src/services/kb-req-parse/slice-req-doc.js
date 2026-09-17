@@ -13,7 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-module-parse-prompt.md');
 
 /** Parse LLM may run 1–3+ minutes; longer than the default 120s chat timeout. */
-export const PARSE_LLM_TIMEOUT_MS = 180_000;
+export const PARSE_LLM_TIMEOUT_MS = 300_000;
 
 /**
  * Load the req-module parse system prompt from disk.

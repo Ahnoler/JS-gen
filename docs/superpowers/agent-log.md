@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-17 10:58 · Cursor — 收工：sync req-module parse API MVP（回链 10:50 开工）
+
+- 完成：`be4aff1c` 开工+spec/plan → `34490b92` 实现 → 本条收工。PR **#50** → `uara_V1.2`。
+- 交付：`POST /api/v2/kb/req-modules/:moduleKey/parse`（sync）；mammoth(.docx)+md/txt；LLM JSON `{chapters,throughChainsMarkdown}` 必须 `hasProposeableChainSteps` 否则 `SLICE_INVALID`；写 chapters/through-chains、`status=sliced`、删 `.draft-traj-propose.json`；list/get 增 `hasLocalSource`。
+- 验收（本环境，假 LLM）：
+  - `characterize-kb-req-parse.mjs` **OK 21**
+  - `characterize-kb-req-modules.mjs` **OK 11**
+  - `characterize-kb-req-modules-list.mjs` **OK 3**
+  - `npx eslint` 改动 src **0**
+- 遗留移交：LMY 湿测顺序 **upload → parse → propose**；parse 同步 LLM 可能 1–3+ 分钟（超时 300s），须重启 4097 且客户端放宽超时。不维护 CHANGELOG。未跑真 LLM / 真 docx 湿抽。
+
 ## 2026-09-17 10:50 · Cursor — 开工：sync req-module parse API MVP
 
 - 进行中：落地已批准的同步 `POST /api/v2/kb/req-modules/:moduleKey/parse`（upload → parse → propose 中缺的切片步）；TDD 先行；不改 propose/atomize/chapter-excerpt。
