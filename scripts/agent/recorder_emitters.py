@@ -255,23 +255,33 @@ def _boundary_requires_evidence(business_data_store) -> bool:
 
 
 def _guard_done_record_open_page_evidence(business_data_store, open_overlay) -> None:
-    """Stamp ``page_opened`` for an open-page navigate phase whose target overlay is visible.
+    """Stamp ``page_opened`` for an open-page navigate phase.
 
-    The click-time capture (click_action_engine) measures the overlay title
-    immediately after the click; a drawer/dialog that renders asynchronously
-    (or has no readable title) is missed there, so the G3 token gate would reject
-    every ``done()`` (sid 3718d161 phase 1: 评级申请 → 对公客户评级申请 drawer).
-    By done() time the overlay is visible, which *is* the open-page success
-    condition — record it so the evidence gate can pass. The zero-business-action
-    guard still requires a real click for this phase.
+    Two evidence sources, in order:
+
+    1. A visible overlay at done() time. The click-time capture
+       (click_action_engine) measures the overlay title immediately after the
+       click; a drawer/dialog that renders asynchronously (or has no readable
+       title) is missed there, so the G3 token gate would reject every ``done()``.
+    2. The phase's own entry click. Some wizards open *inside the page* (inline
+       steps, no new URL, no `.el-dialog`/`.el-drawer`), so no overlay/url
+       evidence is ever observable — the gate would be unsatisfiable and the
+       recording aborts (sid 591434fa phase 1: 评级申请 → inline 向导页,
+       ``observed=[]`` on every step). A recorded business click this phase is
+       the available open-page signal; the zero-business-action guard still
+       rejects a no-click fake done.
+
+    Always logs the check inputs so a deployment that did not load this guard is
+    visible in the log (`open-page evidence check: ...`).
     """
     try:
         from scripts.controller.actions._phase_boundary import (
             get_phase_boundary,
+            observed_kinds,
             phase_boundary_active,
             record_evidence,
         )
-        if not open_overlay or not phase_boundary_active(business_data_store):
+        if not phase_boundary_active(business_data_store):
             return
         b = get_phase_boundary(business_data_store) or {}
         if b.get('role') != 'navigate' or 'open_page' not in (b.get('goals') or []):
@@ -279,12 +289,30 @@ def _guard_done_record_open_page_evidence(business_data_store, open_overlay) -> 
         needed = set(b.get('success_when') or [])
         if not (needed & {'page_opened', 'url_change', 'dialog_confirmed'}):
             return
-        record_evidence(business_data_store, 'page_opened', str(open_overlay)[:80])
+        have = observed_kinds(business_data_store)
+        if have & needed:
+            return
+        n_actions = _count_phase_business_actions(business_data_store)
         sys.stderr.write(
-            f'[recorder] open-page evidence recorded from visible overlay '
-            f'{str(open_overlay)[:60]!r}\n'
+            f'[recorder] open-page evidence check: overlay={str(open_overlay)[:60]!r} '
+            f'actions={n_actions} observed={sorted(have)} needed={sorted(needed)}\n'
         )
         sys.stderr.flush()
+        if open_overlay:
+            record_evidence(business_data_store, 'page_opened', str(open_overlay)[:80])
+            sys.stderr.write(
+                f'[recorder] open-page evidence recorded from visible overlay '
+                f'{str(open_overlay)[:60]!r}\n'
+            )
+            sys.stderr.flush()
+            return
+        if n_actions > 0:
+            record_evidence(business_data_store, 'page_opened', 'open-page entry click')
+            sys.stderr.write(
+                '[recorder] open-page evidence recorded from the phase entry click '
+                '(no overlay/url detected; inline wizard)\n'
+            )
+            sys.stderr.flush()
     except Exception as e:
         sys.stderr.write(f'[recorder] open-page evidence record skipped: {e}\n')
         sys.stderr.flush()

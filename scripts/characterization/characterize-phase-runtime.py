@@ -397,6 +397,36 @@ def test_open_page_overlay_evidence_and_overlay_gate() -> None:
     _guard_done_record_open_page_evidence(store2, 'dialog:unrelated')
     assert_true(not observed_kinds(store2), 'non-open-page navigate does not stamp page_opened')
 
+    # Inline wizard (no overlay / no url): the phase's own entry click is the
+    # available open-page evidence (sid 591434fa: observed=[] every step aborted it).
+    from scripts import state as action_state
+
+    store3: dict = {}
+    apply_phase_boundary(store3, '点击【评级申请】按钮。预期结果：打开“对公客户评级申请”向导页面。')
+    saved_phase, saved_log = action_state._CURRENT_PHASE, action_state._ACTION_LOG
+    try:
+        action_state._CURRENT_PHASE = 1
+        action_state._ACTION_LOG = [
+            {'action': 'click_element_by_index', 'meta': {'phaseNumber': 1}},
+            {'action': 'get_page_state', 'meta': {'phaseNumber': 1}},  # meta-only, not business
+        ]
+        _guard_done_record_open_page_evidence(store3, None)
+        assert_true(
+            'page_opened' in observed_kinds(store3),
+            'inline open_page with an entry click stamps page_opened',
+        )
+        assert_true(phase_done_ok(store3)[0], 'entry-click evidence satisfies the gate')
+
+        # No business action → must NOT stamp (zero-action guard still protects)
+        store4: dict = {}
+        apply_phase_boundary(store4, '点击【评级申请】按钮。预期结果：打开“对公客户评级申请”向导页面。')
+        action_state._ACTION_LOG = [{'action': 'get_page_state', 'meta': {'phaseNumber': 1}}]
+        _guard_done_record_open_page_evidence(store4, None)
+        assert_true(not observed_kinds(store4), 'zero business actions must not stamp evidence')
+    finally:
+        action_state._CURRENT_PHASE = saved_phase
+        action_state._ACTION_LOG = saved_log
+
 
 def test_resolve_infer_unique_and_longest() -> None:
     store = {

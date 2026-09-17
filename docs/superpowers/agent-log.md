@@ -1,8 +1,20 @@
 # Agent 协作日志
 
-## 2026-09-17 10:45 · Cursor — 收工：chapter excerpts into draft-traj propose（回链 10:15 开工）
+## 2026-09-17 10:37 · Cursor — 收工：merge origin/uara_V1.2 into PR #49（回链本条）
 
-- 完成：`bebb010f` 开工 → `e5929ae2` spec/plan → `6b168873` `chapter-excerpt.js` → `17638e20` payload+cache v8 → `43229cad` prompt `<chapter_excerpts>` → 本条收工（含 page-drop pin + ENOENT continue）。PR **#49** → `uara_V1.2`（叠在 #48 cache v7 之上）。
+- 完成：`cursor/chapter-excerpt-into-propose-ec84` 合入最新 `origin/uara_V1.2`（`4ce0e9d8`）。冲突仅本文件，按时刻交错保留双方条目。产品代码无冲突：chapter-excerpt / cache **v8** / `<chapter_excerpts>` / pins 全保留；他线 `ad817a95` 页内向导 open-page 证据 + executor-lb spec 一并带入。
+- 验收：merge 后 `PROPOSE_CACHE_VERSION === 8`；`chapter-excerpt.js` 仍在；再跑 req-draft-traj / atom-depend pins。
+- 遗留：PR **#49** 可单独合入 `uara_V1.2`（已含 #48 的 cache v7 提交）；#48 可标 superseded 关闭。湿测仍须 POST propose。不维护 CHANGELOG。
+
+## 2026-09-17 10:36 · ZCode — 开工声明：前后端发版（纯运维，后端等录制空闲）
+- 开工：10:36 UTC+8。不改任何业务代码；触碰面=本文件 + 服务器发版目录
+- 前端：vue-project `npx vite build` → /data/app/front-dist/releases 软链切换（本机 vite.config.ts 未提交的 127.0.0.1 baseURL 仅 dev proxy 用，不入产物，保持未提交原样）
+- 后端：pack-control-plane.sh → JS-gen-releases/<ts> 软链切换+重启 4097；**当前活跃录制（trajectory 840 @ local-server-proxy，10:32 起）→ 后端延后到录制结束**，轮询等待
+- 禁入：业务代码、提示词、migrations、他线 WIP
+
+## 2026-09-17 10:22 · Cursor — 收工：chapter excerpts into draft-traj propose（回链 10:15 开工）
+
+- 完成：`bebb010f` 开工 → `e5929ae2` spec/plan → `6b168873` `chapter-excerpt.js` → `17638e20` payload+cache v8 → `43229cad` prompt `<chapter_excerpts>` → `b3d0771f` page-drop pin + ENOENT continue。PR **#49** → `uara_V1.2`（叠在 #48 cache v7 之上）。
 - 验收（本机）：
   - `characterize-req-draft-traj.mjs` **OK 76**（H1+要点+ZJJK、空 dir `[]`、payload `chapterExcerpts`、先缩 excerpt 再丢 `page`、cache **8**）
   - `characterize-atom-depend.mjs` **all passed**（`<chapter_excerpts>` 分区 + 禁止编造/无摘录骨架/禁菜单）
@@ -11,6 +23,20 @@
   - `verify-all` 本环境大量红=缺 pydantic/langchain/Playwright 浏览器/MySQL，与本改动无关；上述三门禁在 verify-all 内亦 **ok**
 - 遗留移交：LMY 湿测须 **POST** `…/product-mgmt/draft-traj/propose`（cache v8）；仅重启不够。无章节时 `chapterExcerpts=[]`、短骨架是预期。不维护 CHANGELOG。
 
+## 2026-09-17 10:20 · DSH — 收工：执行机多节点负载均衡 spec 交付（回链 10:16 开工）
+
+- 完成：`docs/superpowers/specs/2026-09-17-executor-lb-design.md`——现状速查表（file:line 锚点均本会话实读核实）、缺口 G1–G11、P0 T1–T6 / P1 T7–T10 / P2 T11–T14 任务拆解、兼容性契约（heartbeat 增量字段双向兼容；409 形状不变；api-docs catalog.js 同步义务）、风险回退、给评审人的开放问题 Q1–Q7、实施约定
+- 调研新增实锤（已入 spec G3/T2）：执行机侧拒绝（槽满/draining）经 `session.error` 回发（`executor/agent.mjs:181`），但控制面 `openSession` 只等 `session.ready`（`src/executor-event-hub.js:74` 单一事件）→ **执行机侧槽满退化为 120s 挂起 + 500**（409 正则不匹配超时消息），现有 409 映射实际只覆盖控制面自判路径
+- 验收：纯文档交付，无代码改动；spec 状态标注「草案待控制面同事评审，评审通过前不落实现」
+- 遗留移交：①评审后按 spec §4–6 逐项立项（建议发布顺序 T1→T2→T3→T4→T5→T6）；②T10/T12 分别依赖 Q3（client_key 供数）/Q4（SUT 站点口径）；③实现期 `scripts/refactor/verify-all.sh` 注册须与他线协调（热文件）；④不维护 CHANGELOG
+
+## 2026-09-17 10:16 · DSH — 开工：执行机多节点负载均衡 spec（交控制面同事评审）
+
+- 进行中：把 09-17 上午的执行资源调度调研落成正式 spec `docs/superpowers/specs/2026-09-17-executor-lb-design.md`——现状速查表（file:line 锚点）+ 缺口清单 + P0/P1/P2 设计与任务拆解 + characterization 钉位方案 + 开放问题
+- 范围（可写集）：**仅**新增该 spec 文件 + 本协作日志。不改任何产品代码/门禁/生成物
+- 禁入区：他线 WIP（`scripts/refactor/verify-all.sh`、`scripts/agent/recorder_emitters.py`、req-draft-traj 线文件、engine 仓）；线上数据库/执行机运行态；`origin/master`；活跃录制会话
+- 方式：主会话 Inline；纯文档交付；spec 经用户转控制面负责同事评审，评审通过前不落实现
+
 ## 2026-09-17 10:15 · Cursor — 开工：chapter excerpts into draft-traj propose（cache v8）
 
 - 进行中：把已解析 `chapters/*.md` 按链注入 atomize user payload（`chapterExcerpts`），使 `taskDraft` 能投影字段/控件/断言；cache 7→8；不改 JSON atom schema、不 enrich parse、不新 upload API、不跑 LMY 湿测。
@@ -18,6 +44,14 @@
 - 禁入区：`capability-cohesion.js` / `atom-depend.js` 闸逻辑；`provenance.js` 匹配打分（复用 `resolveChapterRef`，不另写 matcher）；parse enrich；upload API；atom JSON schema；LMY wet propose；`scripts/refactor/verify-all.sh`（不新增注册，pin 挂已有门禁）；他线 WIP（G3 / recorder / phase）；`origin/master`
 - 方式：主会话 Inline TDD；基线 `cursor/taskdraft-atomize-prompts-e2f1`（PR #48）；新 PR → `uara_V1.2`；摘录 H1+要点+ZJJK 窗、~2800/条、超 28k 先缩 excerpt 再丢 `step.page`；空 chapters → `[]`
 - 遗留：湿测 checklist 写入 PR body，由用户在 LMY POST propose
+
+## 2026-09-17 10:15 · OpenCode — 收工：开放页 navigate 门闩对「页内向导」不可满足，改以入口点击为证据
+
+- 完成：**`ad817a95`**（2 文件 / +71 -13）。重启复测（sid 591434fa）仍 `observed=[]`、阶段1 判失败中止——**非部署未生效的必然证据**，而是门闩本身对该 SUT 形态不可满足：对公客户评级申请向导**页内渲染**（URL 不变，且不被 `_guard_done_capture_page_block` 的 `.el-dialog`/`.el-drawer` 探针识别，overlay 标题前后相同/为空）→ `url_change`/`page_opened` 永不可观测 → 每步 done 被拒。
+- 修复：`_guard_done_record_open_page_evidence` 增**第二证据源**——overlay 不可见且本阶段已有**业务点击**（`_count_phase_business_actions>0`）时，以该入口点击作为 `page_opened` 证据（detail `open-page entry click`）。零业务动作守卫仍拦无点击假 done；错误门闩不豁免。
+- **可观测性**：该 helper 对 open_page navigate 阶段**每次 done 必打** `[recorder] open-page evidence check: overlay=... actions=... observed=... needed=...` —— 若下次日志**没有**这行，即说明执行机仍在跑旧代码（未拉取/未重启到本提交）。
+- 验收：`characterize-phase-runtime` pin 增两断言（页内 open_page + 有入口点击→打证据；仅 meta 动作→不打）；`characterize-g3-done-gate-live` 11/11、`characterize-recorder-phase-reset` 39、phase-reviewer/flow 全绿；**verify-all = 既有基线同 4 红**，无新增红。
+- 遗留移交：①请再重启执行机并复测；若日志出现 `open-page evidence check:` 行则应一次过（若仍失败，请把该行回传以便定位 overlay/actions 实际值）；②回退点=本提交；③不维护 CHANGELOG。
 
 ## 2026-09-17 10:03 · Cursor — 收工：atomize taskDraft 投影已有解析细节（回链 10:00 开工）
 
@@ -36,6 +70,7 @@
 - 禁入区：`capability-cohesion.js` / `propose.js` / `atom-depend.js` 闸逻辑；场景黑名单（树层/按钮文案）；系统菜单导航；他线 WIP（G3 证据门闩 / recorder / phase / `verify-all.sh` 新增注册）；`origin/master`；不跑 product-mgmt 湿测 propose
 - 方式：主会话 Inline；从 `uara_V1.2` 新分支；PR 目标 `uara_V1.2`；XML 分区保持；抽象规则 + few-shot（产品要素仅作标注示例）
 - 遗留：湿测由用户在 LMY 清 cache 后 `POST .../product-mgmt/draft-traj/propose`
+
 
 ## 2026-09-17 09:50 · OpenCode — 收工：复核远程拉取（ZCode G3 湿测 pin）对本线修复的影响
 
@@ -1286,4 +1321,3 @@
 - 禁入：G1 报文捞取、G2 运维、G4 真上传 / KB 湿测主责、文件上传·SUT、`save_section.py`（禁止恢复）、他线 WIP（`scripts/agent/service.py` 未声明改动、`data/kb/flows/**` 湿测主链、req-upload）
 - 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
 - 分支：`cursor/g3-phase-done-evidence-gate-3b92`
-
