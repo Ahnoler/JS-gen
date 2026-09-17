@@ -256,3 +256,44 @@ JS_TREE_POPOVER_OPEN = '''async (args) => {
     }
     return JSON.stringify({ ok: true, open: false });
 }'''
+
+
+# 按组件类型给行动处方（2026-09-17，用户定调「按钮→click，下拉→select」）。
+# 独立于 JS_REAL_CLICK_RECT 供其它文本型动作复用：click_button 未命中时，
+# 「下一步」这类文本很可能藏在某个开着的下拉里——扫描可见载体并按类型给处方。
+# 与 real_click 解析器内联的分类保持同一条仓库规则（选项走 select_option，
+# 与 click_element_by_index 的 use-select-option 栅栏一致）。
+JS_TEXT_CARRIER_PRESCRIPTION = '''(txt) => {
+    const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
+    const visible = (el) => el && (el.offsetParent !== null || el.getClientRects().length > 0);
+    const t = norm(txt);
+    if (!t) return '';
+    for (const c of document.querySelectorAll('*')) {
+        if (!visible(c)) continue;
+        const tt = norm(c.textContent);
+        if (!tt || tt.indexOf(t) === -1) continue;
+        if (c.children.length > 0 && [...c.children].some((k) => norm(k.textContent).indexOf(t) !== -1)) continue;
+        // 最小可见载体分类
+        if (c.closest('.el-select-dropdown__item')) {
+            const trig = [...document.querySelectorAll('.el-select .el-input__inner')]
+                .find((i) => visible(i) && i.getAttribute('aria-expanded') === 'true')
+                || ((document.activeElement && document.activeElement.closest
+                    && document.activeElement.closest('.el-select')) ? document.activeElement : null);
+            const it = trig && trig.closest ? trig.closest('.el-form-item') : null;
+            const lbl = it ? norm(it.querySelector('.el-form-item__label')?.textContent)
+                .replace(/[：:*]+$/, '') : '';
+            return '「' + t + '」是下拉' + (lbl ? '「' + lbl + '」' : '')
+                + '的选项 → 用 select_option(label_text="' + (lbl || '<字段名>')
+                + '", option_text="' + t + '")（select_option 会自行展开弹层）。';
+        }
+        const btn = c.closest('button, .el-button, [role="button"]');
+        if (btn) {
+            return (btn.disabled === true || btn.getAttribute('aria-disabled') === 'true')
+                ? '「' + t + '」当前是禁用按钮，点击无效——确认前置步骤是否完成，或寻找替代路径。'
+                : '「' + t + '」是可见按钮 → 用 click_button(button_text="' + t + '")。';
+        }
+    }
+    return '「' + t + '」在页面上没有可见载体。若它是某下拉的选项：弹层未展开时选项不在'
+        + ' DOM 里，应对该字段用 select_option(label_text=<字段名>, option_text="' + t
+        + '")（select_option 会自行展开弹层）；若它应是按钮，先确认当前步骤/页面状态。';
+}'''

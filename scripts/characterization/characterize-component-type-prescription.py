@@ -68,6 +68,14 @@ need(REAL_CLICK, "err-real-click-target-not-found", "无载体仍返回原错误
 # ── _workspace：prescription 透出给 agent ───────────────────────────────────
 need(WORKSPACE, "rect.get('prescription')", "失败时透出处方")
 
+# ── click_button not-found 同规则处方（对称口：文本型动作不止 real_click）────
+need(REAL_CLICK, "JS_TEXT_CARRIER_PRESCRIPTION = ", "独立处方片段定义")
+need(REAL_CLICK, "是可见按钮 → 用 click_button(button_text=", "片段：按钮载体→click")
+need(REAL_CLICK, "「' + t + '」是下拉' + (lbl ? '「' + lbl + '」' : '')", "片段：下拉选项→select（label 现场推导）")
+CLICK_ENGINE = _read("scripts/controller/actions/click_action_engine.py")
+need(CLICK_ENGINE, "JS_TEXT_CARRIER_PRESCRIPTION, button_text,", "click_button 未命中时评估处方")
+need(CLICK_ENGINE, "JS_TEXT_CARRIER_PRESCRIPTION,", "click_button 接线 import")
+
 # ── guard opHint：字段类型驱动，无硬编码选项/节点名 ──────────────────────────
 need(TODO_CARDS, "const opName = opLabel || '流程操作';", "opName 兜底")
 need(TODO_CARDS, "let opHint = '';", "opHint 定义")
