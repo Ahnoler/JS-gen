@@ -18,6 +18,16 @@
 - 禁入区：Cursor 在途 18:20 行（`search_then_click_guard.py`/`_table.py`/`click_action_engine.py`/`replay_table.py`/`src/cdp/locator-builders/controls.js`/`scripts/prompts/**`）——`verify-all.sh` 双方可能各自增行，若遇冲突保双方条目；他线 WIP `scripts/characterization/characterize-phase-done-validate.py`；`phase-done-evidence-gate.js`；SPA 仓；`src/**` 其余文件；`config/`
 - 方式：①②③ 派 3 个后台子智能体并行（文件集互不相交，子智能体不 commit 不写 log，主会话回收核验 diff/语法/pin 后代提交）；④ 主线程收尾落地；全部完成后合并后验收（git pull 重跑关键验证 + 全量 verify-all 与 3 红基线比对）再收工
 
+# Agent 协作日志
+
+## 2026-09-17 18:55 · Cursor — 收工：STC 后选首行/首叶 + 结构 xpath（回链 18:20 开工）
+
+- 完成（SDD Tasks 1–7）：`318c44d7` `stc_satisfied` → `8dd77b8d` first-row/first-leaf builders → `f6a05ea6` 表 STC 强制首行+结构 xpath 落库 → `2fca7e4d` 回放 xpath-first → `347f61f5` 提示词 → `ffed27bd` 树 index-click **录制归一 MVP**（物理点击未改道首叶）
+- Spec/Plan：`docs/superpowers/specs/2026-09-17-stc-first-row-xpath-design.md` / `docs/superpowers/plans/2026-09-17-stc-first-row-xpath.md`（开工提交 `cd36a688`）
+- 验收：`characterize-search-then-click-guard` / `prompts` / `locator-candidates` 全绿；verify-all 仅既有基线 4 红（step-highlight/layer-tree/confirm-notification/network-capture），零新增；终审 Approve ship-with-handoff
+- 遗留移交：①树完整「点到首叶」evaluate + `select_tree_option`/`tree_engine` STC 接线；②§7.1 查询锚容器仅 TODO（湿测撞错表再做）；③§11 湿测（弹窗查询→首行；换查询条件回放仍首行；旧业务键轨迹不变）；④次要：同名行消歧文案与 STC-first 交叉说明、`_replay.py` 旧注释
+- 注：不维护 CHANGELOG
+
 ## 2026-09-17 18:20 · Cursor — 开工：STC 后选首行/首叶 + 结构 xpath（SDD）
 
 - 进行中：按 `docs/superpowers/plans/2026-09-17-stc-first-row-xpath.md` + spec `2026-09-17-stc-first-row-xpath-design.md` 子代理驱动实现；STC 满足后表/树定位落库 `row_text=first` + 结构相对 xpath；查询锚容器仅 TODO
