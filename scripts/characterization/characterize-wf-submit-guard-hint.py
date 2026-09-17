@@ -29,7 +29,6 @@ TODO_ACTION = (ROOT / "scripts/controller/actions/_todo.py").read_text(encoding=
 REAL_CLICK = (ROOT / "scripts/controller/actions/js_snippets/real_click.py").read_text(encoding="utf-8")
 CLICK_ENGINE = (ROOT / "scripts/controller/actions/click_action_engine.py").read_text(encoding="utf-8")
 WORKSPACE = (ROOT / "scripts/controller/actions/_workspace.py").read_text(encoding="utf-8")
-PROMPTS_FORM = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
 
 failures: list[str] = []
 
@@ -60,8 +59,8 @@ need(TODO_ACTION, "Pick the action for that ", "动作面 docstring 明确由 ag
 need(TODO_ACTION, "component type yourself (see the el-select rules", "动作面 docstring 指向 agent 自身的规则")
 
 # ── 知识单一来源：类型→动作的族规住在 agent 指引里，不在引擎 ────────────────
-need(PROMPTS_FORM, "这是选择 el-select 选项的唯一正确方式", "EL-SELECT 规则已在 agent 指引")
-need(PROMPTS_FORM, "绝不使用 `click_element_by_index(index)` 点击下拉选项", "指引已禁点下拉选项")
+# 边界措辞（禁点下拉选项，且现在按行为覆盖 real_click/click_button）由
+# characterize-real-click.py 单点钉住——本 pin 不重复同一断言。
 
 # ── 防回潮：click 族不得接管 select 族，动作不得被拓宽到别的场景 ────────────
 for src, where in ((REAL_CLICK, "real_click"), (CLICK_ENGINE, "click_button"),
