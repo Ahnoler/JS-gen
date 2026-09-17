@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 11:52 · ZCode 引擎线 — 开工：traj 840 末步「下一步」是下拉选项，引导走 select_option
+
+- 进行中（根因已取证，活页面 CDP 29242 只读实证）：840 评级向导三次 `real_click('下一步')`（DB 44-46）已把向导 1→4 推进成功（落库 el-steps 锚逐次移动），**卡死在末步**——末步的「下一步」不是按钮而是 **`流程操作` el-select 的选项**（活页面 `visibleSelectFields` 实证 label=流程操作、截图下拉即它展开态）；`wf_submit_guard` 找对了字段（opLabel=流程操作）但返回 `opValue:'' / opOptions:[]` 且**无任何行动指引**——Element UI 选项要弹层首开才渲染，guard 刻意不开弹层，agent 由此读出「没东西可选」而停滞。全程零次对流程操作的 select_option
+- 修向（用户定调「下拉框应该使用 select option」）：guard 载荷加 `opHint` 处方——opValue 空时明说「opOptions=[] 只代表弹层未展开、不代表没有选项；用 select_option(label_text=opLabel, option_text=…)（发起节点通常=下一步），select_option 自行展开弹层；禁止对 下一步 这类选项 real_click/click_button——它是下拉选项不是按钮」；opValue 已选时给「复核后流程提交」指引。同步 `_todo.py` guard 提示词
+- 范围（可写集）：`scripts/controller/actions/js_snippets/todo_cards.py`（JS_WF_SUBMIT_GUARD + 模块 docstring 返回形状行）、`scripts/controller/actions/_todo.py`（guard docstring）、新 `scripts/characterization/characterize-wf-submit-guard-hint.py`、`scripts/refactor/verify-all.sh`、本协作日志。**不改 select_engine/real_click**（el-select 分发路径已在该页 phase 2 实证可用）
+- 禁入区：**工作区他线 WIP `data/kb/req/product-mgmt/**`（pull 后工作区出现的删改，勿 touch 勿混提交）**；会话 1917（traj 832 正在 node 7 录制）与 1915（840 node 8）的浏览器只做只读 evaluate；`origin/master`；他线 phase/navigate 证据线（af1d1cc0 刚收工）
+- 方式：主会话 Inline；改完在活页面只读评估新 guard JS（guard 本身零点击）+ fixture 验空值分支 + 新 pin 入 verify-all
+
 ## 2026-09-17 11:30 · OpenCode — 收工：LLM 合约路径对齐规则边界，navigate 阶段证据可录（回链 11:15 开工）
 
 - 完成：**`af1d1cc0`** + pin **`42cb41a`**（4 文件 / +72）。用户复测 sid 64c9044b 时 phase 1 仍 `observed=[]`、phase 3 有 `nav_next_clicked` 但门闩只要 `url_change|page_opened`——根因是 `service.py` 里 LLM reviewer 路径 `apply_phase_contract(business_data_ref, reviewed)` 未传 `boundary_override`，边界 `goals`/`success_when` 全由 LLM 自然语言 `in_scope`/`success.kinds` 决定，丢失 `open_page`/`click_next`/`nav_next_clicked` 等可录制证据标签。
