@@ -60,18 +60,17 @@ function isVisible(text) {
 }
 
 /**
- * Haystack is text after 操作：/操作:, else the whole group.
+ * Haystack is the full step-group body (step prose + 操作 block).
+ * Strips a leading numbering prefix and the `操作：`/`操作:` marker, but
+ * does not drop the description before the marker. Metadata is already
+ * removed by parse.
  * @param {string} raw Group text
  * @returns {string} Classification haystack
  */
 function extractHaystack(raw) {
-  const src = String(raw || '');
-  const idx = src.search(/操作[:：]/);
-  if (idx >= 0) {
-    const mark = src.slice(idx).match(/^操作[:：]/);
-    return src.slice(idx + (mark ? mark[0].length : 0));
-  }
-  return src;
+  let src = String(raw || '');
+  src = src.replace(STEP_DUNHAO_RE, '').replace(STEP_DOT_RE, '');
+  return src.replace(/操作[:：]/g, '');
 }
 
 /**
