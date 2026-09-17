@@ -12,10 +12,12 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
 /**
  * Cache format version — bump on breaking cache shape **or** persist-boundary
  * semantics that invalidate previously proposed atoms; commit rejects caches
- * whose version differs (STALE_PROPOSE_CACHE). v4: `missing_depend_fields` is a
- * hard reject (empty produces after materialize); atomize prompt XML contract.
+ * whose version differs (STALE_PROPOSE_CACHE). v6: capability-cohesion
+ * haystack is the full step-group body (prose + 操作 block), not only text
+ * after `操作：` (wet maintain-before-操作 must re-propose). v5 was the
+ * structural gate (`multi_capability_task_draft`) + title-as-key reject.
  */
-export const PROPOSE_CACHE_VERSION = 4;
+export const PROPOSE_CACHE_VERSION = 6;
 
 /**
  * Read cached propose result from a module directory.

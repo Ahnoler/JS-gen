@@ -183,6 +183,7 @@ export const GROUP_KB = [{
         'atoms[].kind=write|nav；maxAtoms 截断优先保留 write，dropped 计入 truncated；rejected 不受 maxAtoms 影响',
         'suggestedFunctionId 为空时附 functionIdCandidates（≤3，reason=page_code/menu_path/name_match），commit 仍以 functionIdOverrides 为准',
         'pageCodes 为页面/组件编号元数据；关键数据块不应再堆 ZJJK 表',
+        'taskDraft 同笔多项能力 → rejected multi_capability_task_draft；produces 规范化后精确等于 title → rejected produces_eq_title；多次落库确认仍为 multi_persist_task_draft（先于新闸）',
       ],
     },
     {
