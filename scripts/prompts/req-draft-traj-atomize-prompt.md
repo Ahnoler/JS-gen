@@ -5,6 +5,7 @@
 - `moduleKey`：需求模块键
 - `chains`：解析后的主链数组，每条含 `chainId`、`title`、`chapterHint`、步骤表 `steps`（含 `index`、`action`、`page`、`zjjk`、`buttons`）
 - `flowCards`：KB 流程卡摘要（含 `flowRef`、`flow`、`nodes` 等），用于按卡上闭环切 atom；**不得**当作章节出处
+- `chapterExcerpts`：按 `chainId` 对齐的已解析章节摘录（H1 / 要点摘要 / 相关 ZJJK 窗）。没有匹配章节时为 `[]`
 </role>
 
 <output_contract>
@@ -63,7 +64,7 @@
 <taskdraft_quality>
 `taskDraft` 仍是字符串。密度跟输入走，不要为了像录制员 TX 而补造界面。
 
-- **有则写入**：`chains[].steps`（含 `action` / `page` / `buttons`）或章节正文里已经出现的页名、按钮、字段、树节点、页签、断言，照抄进步骤。
+- **有则写入**：`chains[].steps`（含 `action` / `page` / `buttons`）、`chapterExcerpts` 或章节正文里已经出现的页名、按钮、字段、树节点、页签、断言，照抄进步骤。
 - **无则保持短**：输入没给出目标元素/预期结果时，用下面 G1/G2/G3 骨架（定位 → 一项能力 → 一次落库），步骤诚实、短。禁止编造悬停提示、弹窗标题、只读字段、原型图文案。
 - 可选文首 `功能：` / `前置：` / `测试数据：` 仅当需求里已有对应信息；没有就省略。
 - 维护形态不变：选中对象 → 改本能力字段 → 一次【保存】；不得与同页另一项可独立验收能力合并。
@@ -71,6 +72,15 @@
 - 录制员级密度是**上限**：仅当上传并解析了详细需求、链上已有那些文案时才写到那一档。样例见仓库 `docs/superpowers/prompt-engineering/product-element-taskdraft-samples.md`（产品要素仅作富输入示意，规则通用）。
 </taskdraft_quality>
 </split_rules>
+
+<chapter_excerpts>
+`chapterExcerpts` 是已解析需求事实，按 `chainId` 绑定对应主链。写该链的 atom 时：
+
+- **投影**：摘录里已有的可见标签、按钮、字段、页签、断言，照抄进该链 `taskDraft`。
+- **禁止编造**：不得使用 chains + chapterExcerpts + flowCards 之外的控件文案（含悬停提示、弹窗标题、只读字段、原型图用语）。
+- **无摘录**：该 `chainId` 没有 excerpt 时，保持「定位 → 一项能力 → 一次落库」短骨架（与 `<taskdraft_quality>` 无则保持短一致）。
+- 摘录可能提到系统菜单路径；`taskDraft` **仍禁止**系统菜单导航，从功能页进入即可。
+</chapter_excerpts>
 
 <examples>
 步骤密度跟输入走。G1/G2/G3 是链较瘦时的诚实形态。链/章节已点名按钮字段时，把那些文案代入骨架，不要用「打开新建入口」替换已经给出的【新增】。完整上限样例（须输入里真有那些字符串）见 `product-element-taskdraft-samples.md` 的 Atom A（新增）与 Atom D（维护）。
@@ -243,7 +253,7 @@ taskDraft:
 - 把「点【新增】打开向导抽屉」这类无落库入口拆成独立 atom。
 - 系统菜单导航；从功能页进入即可。
 - 虚构 `chapters/` 路径或文档名。
-- 编造 `chains`/章节里未出现的控件文案、悬停提示、弹窗标题、只读行为。
+- 编造 `chains` / `chapterExcerpts` / 章节里未出现的控件文案、悬停提示、弹窗标题、只读行为。
 - 维护笔在拆开多项能力后漏写，留下空洞。
 </anti_patterns>
 
