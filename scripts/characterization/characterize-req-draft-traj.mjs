@@ -204,6 +204,196 @@ async function main() {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  const excerptMod = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/chapter-excerpt.js')).href);
+
+  await runAsync('buildChapterExcerpts empty chapters dir returns []', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'chap-ex-'));
+    const chaptersDir = join(tmp, 'chapters');
+    mkdirSync(chaptersDir, { recursive: true });
+    const out = await excerptMod.buildChapterExcerpts({
+      chains: [{
+        chainId: 'chain-a',
+        title: '新增一级分类',
+        chapterHint: '§产品库管理',
+        steps: [{ index: 1, action: '进页', zjjk: 'ZJJK00110131' }],
+      }],
+      chaptersDir,
+    });
+    assert.deepEqual(out, []);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('buildChapterExcerpts missing chapters dir returns []', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'chap-ex-'));
+    const out = await excerptMod.buildChapterExcerpts({
+      chains: [{ chainId: 'chain-a', title: 'x', chapterHint: '§无', steps: [] }],
+      chaptersDir: join(tmp, 'no-such-chapters'),
+    });
+    assert.deepEqual(out, []);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('buildChapterExcerpts includes H1, 要点摘要, and ZJJK windows (no invent)', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'chap-ex-'));
+    const chaptersDir = join(tmp, 'chapters');
+    mkdirSync(chaptersDir, { recursive: true });
+    writeFileSync(join(chaptersDir, '03-配置产品信息.md'), `# 配置产品信息
+
+- 菜单路径：【产品管理】→【产品库管理】
+
+## 要点摘要
+
+配置产品信息是模块核心：产品库主页维护分类与产品。
+
+## 其它无关节
+
+这里没有页面码，也没有控件清单。
+
+## 关键规则
+
+### 新增弹窗 ZJJK00094361
+- 字段：pdNm 必填≤50；seqNo 必填数字。按钮【确定】。
+`, 'utf8');
+
+    const out = await excerptMod.buildChapterExcerpts({
+      chains: [{
+        chainId: 'chain-a',
+        title: '新增一级分类',
+        chapterHint: '§配置产品信息',
+        steps: [
+          { index: 1, action: '进入产品库', page: '产品库管理主页', zjjk: 'ZJJK00110131', buttons: '【刷新产品树】' },
+          { index: 2, action: '新增一级分类', page: '新增产品弹窗', zjjk: 'ZJJK00094361', buttons: '【新增一级分类】' },
+        ],
+      }],
+      chaptersDir,
+    });
+    assert.equal(out.length, 1);
+    assert.equal(out[0].chainId, 'chain-a');
+    assert.equal(out[0].fileName, '03-配置产品信息.md');
+    assert.match(String(out[0].ref || ''), /chapters\/03-配置产品信息/);
+    assert.match(out[0].excerpt, /# 配置产品信息/);
+    assert.match(out[0].excerpt, /要点摘要/);
+    assert.match(out[0].excerpt, /模块核心/);
+    assert.match(out[0].excerpt, /ZJJK00094361/);
+    assert.match(out[0].excerpt, /pdNm 必填/);
+    assert.doesNotMatch(out[0].excerpt, /悬停提示|原型图文案|编造控件/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('buildChapterExcerpts emits one entry per chainId even when same file', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'chap-ex-'));
+    const chaptersDir = join(tmp, 'chapters');
+    mkdirSync(chaptersDir, { recursive: true });
+    writeFileSync(join(chaptersDir, '03-配置产品信息.md'), `# 配置产品信息
+
+## 要点摘要
+
+共享章节正文。
+
+## 规则
+
+ZJJK00094361 字段 pdNm。
+ZJJK00110131 产品树。
+`, 'utf8');
+    const out = await excerptMod.buildChapterExcerpts({
+      chains: [
+        {
+          chainId: 'chain-a',
+          title: '新增',
+          chapterHint: '§配置产品信息',
+          steps: [{ index: 1, action: '新增', zjjk: 'ZJJK00094361' }],
+        },
+        {
+          chainId: 'chain-b',
+          title: '刷树',
+          chapterHint: '§配置产品信息',
+          steps: [{ index: 1, action: '刷树', zjjk: 'ZJJK00110131' }],
+        },
+      ],
+      chaptersDir,
+    });
+    assert.equal(out.length, 2);
+    assert.deepEqual(out.map((e) => e.chainId).sort(), ['chain-a', 'chain-b']);
+    assert.equal(out[0].fileName, out[1].fileName);
+    assert.ok(out.every((e) => /要点摘要/.test(e.excerpt)));
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('buildChapterExcerpts prefers first step with ZJJK over later hint-only noise', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'chap-ex-'));
+    const chaptersDir = join(tmp, 'chapters');
+    mkdirSync(chaptersDir, { recursive: true });
+    writeFileSync(join(chaptersDir, '01-总体概述.md'), '# 总体概述\n\n功能列表提及 ZJJK00094361\n', 'utf8');
+    writeFileSync(join(chaptersDir, '03-配置产品信息.md'), `# 配置产品信息
+
+## 要点摘要
+
+定义章。
+
+ZJJK00094361 新增弹窗字段 pdNm。
+`, 'utf8');
+    const out = await excerptMod.buildChapterExcerpts({
+      chains: [{
+        chainId: 'chain-a',
+        title: '新增一级分类',
+        chapterHint: '§总体概述 → §配置产品信息',
+        steps: [
+          { index: 1, action: '进入', zjjk: '—' },
+          { index: 2, action: '新增一级分类', zjjk: 'ZJJK00094361' },
+        ],
+      }],
+      chaptersDir,
+    });
+    assert.equal(out.length, 1);
+    assert.match(out[0].fileName, /03-配置产品信息/);
+    assert.match(out[0].excerpt, /定义章/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('buildChapterExcerpts caps ~2800 at paragraph boundary and keeps H1+要点+ZJJK', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'chap-ex-'));
+    const chaptersDir = join(tmp, 'chapters');
+    mkdirSync(chaptersDir, { recursive: true });
+    const filler = Array.from({ length: 80 }, (_, i) => `填充段落${String(i).padStart(4, '0')}：${'甲'.repeat(80)}`).join('\n\n');
+    writeFileSync(join(chaptersDir, '03-配置产品信息.md'), `# 配置产品信息
+
+## 要点摘要
+
+短要点：维护产品库分类。
+
+## 填充噪音
+
+${filler}
+
+## 关键规则
+
+### 新增弹窗 ZJJK00094361
+- 字段：pdNm 必填≤50。
+`, 'utf8');
+    const out = await excerptMod.buildChapterExcerpts({
+      chains: [{
+        chainId: 'chain-a',
+        title: '新增',
+        chapterHint: '§配置产品信息',
+        steps: [{ index: 1, action: '新增', zjjk: 'ZJJK00094361' }],
+      }],
+      chaptersDir,
+      maxPerExcerpt: 2800,
+    });
+    assert.equal(out.length, 1);
+    const excerpt = out[0].excerpt;
+    assert.ok(excerpt.length <= 2800 + '…(truncated)'.length + 8, `excerpt length ${excerpt.length}`);
+    assert.match(excerpt, /# 配置产品信息/);
+    assert.match(excerpt, /短要点/);
+    assert.match(excerpt, /ZJJK00094361/);
+    assert.match(excerpt, /pdNm 必填/);
+    assert.doesNotMatch(excerpt, /填充段落0079/);
+    if (excerpt.includes('…(truncated)') || excerpt.includes('...(truncated)')) {
+      assert.ok(!excerpt.endsWith('甲'.repeat(80)));
+    }
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   run('assertAtomProvenance rejects empty sourceDoc', () => {
     const parsed = parseMod.parseThroughChainsMarkdown(md);
     const key = parseMod.buildAtomKey({
@@ -220,8 +410,149 @@ async function main() {
     assert.equal(bad.ok, false);
   });
 
-  const { proposeDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href);
+  const proposeMod = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href);
+  const { proposeDraftTrajectories, buildAtomizeUserPayload } = proposeMod;
   const { AppError } = await import(pathToFileURL(join(ROOT, 'src/http/app-error.js')).href);
+
+  run('buildAtomizeUserPayload exported for excerpt budget pins', () => {
+    assert.equal(typeof buildAtomizeUserPayload, 'function');
+  });
+
+  run('buildAtomizeUserPayload includes empty chapterExcerpts array', () => {
+    const payload = buildAtomizeUserPayload(
+      [{ chainId: 'chain-a', title: 't', chapterHint: '', steps: [{ index: 1, action: 'a', page: 'p', zjjk: 'ZJJK00000001' }] }],
+      [],
+      [],
+    );
+    const obj = JSON.parse(payload);
+    assert.deepEqual(obj.chapterExcerpts, []);
+    assert.ok(Array.isArray(obj.chains));
+  });
+
+  run('buildAtomizeUserPayload embeds chapterExcerpts beside chains', () => {
+    const payload = buildAtomizeUserPayload(
+      [{
+        chainId: 'chain-a',
+        title: '新增',
+        chapterHint: '§配置',
+        steps: [{ index: 1, action: '新增', page: '弹窗', zjjk: 'ZJJK00094361', buttons: '【确定】' }],
+      }],
+      [],
+      [{ chainId: 'chain-a', fileName: '03.md', ref: 'chapters/03.md#配置', excerpt: '# 配置\n\n## 要点摘要\n\npdNm 必填' }],
+    );
+    assert.match(payload, /"chapterExcerpts"/);
+    const obj = JSON.parse(payload);
+    assert.equal(obj.chapterExcerpts.length, 1);
+    assert.equal(obj.chapterExcerpts[0].chainId, 'chain-a');
+    assert.match(obj.chapterExcerpts[0].excerpt, /pdNm 必填/);
+    assert.equal(obj.chains[0].steps[0].page, '弹窗');
+  });
+
+  run('buildAtomizeUserPayload shrinks excerpts before dropping step.page', () => {
+    const pageToken = 'UNIQUE_PAGE_TOKEN_XYZ';
+    const huge = `HUGE_EXCERPT_MARKER_${'W'.repeat(30_000)}`;
+    const payload = buildAtomizeUserPayload(
+      [{
+        chainId: 'chain-a',
+        title: 't',
+        chapterHint: 'h',
+        steps: [{ index: 1, action: 'act', page: pageToken, zjjk: 'ZJJK00000001', buttons: '【确定】' }],
+      }],
+      [],
+      [{ chainId: 'chain-a', fileName: 'c.md', ref: 'chapters/c.md#C', excerpt: huge }],
+    );
+    assert.doesNotMatch(payload, /\/\* truncated \*\//);
+    const obj = JSON.parse(payload);
+    assert.equal(obj.chains[0].steps[0].page, pageToken);
+    assert.ok(obj.chapterExcerpts[0].excerpt.length < huge.length);
+    assert.ok(!obj.chapterExcerpts[0].excerpt.includes(huge));
+    assert.ok(payload.length <= 28_000);
+  });
+
+  run('buildAtomizeUserPayload drops step.page after excerpts can shrink no further', () => {
+    const pageToken = 'UNIQUE_PAGE_DROP_TOKEN';
+    const fatPage = `${pageToken}-${'P'.repeat(800)}`;
+    const steps = Array.from({ length: 40 }, (_, i) => ({
+      index: i + 1,
+      action: `a${i}`,
+      page: fatPage,
+      zjjk: 'ZJJK00000001',
+      buttons: '【确定】',
+    }));
+    const payload = buildAtomizeUserPayload(
+      [{ chainId: 'chain-a', title: 't', chapterHint: 'h', steps }],
+      [],
+      [{ chainId: 'chain-a', fileName: 'c.md', ref: 'chapters/c.md#C', excerpt: `HUGE_${'W'.repeat(20_000)}` }],
+    );
+    assert.doesNotMatch(payload, /\/\* truncated \*\//);
+    const obj = JSON.parse(payload);
+    assert.equal(obj.truncated, true);
+    assert.ok(obj.chains[0].steps.every((s) => !Object.prototype.hasOwnProperty.call(s, 'page')));
+    assert.doesNotMatch(payload, new RegExp(pageToken));
+    assert.ok(Array.isArray(obj.chapterExcerpts));
+    assert.ok(payload.length <= 28_000);
+  });
+
+  await runAsync('propose atomize prompt includes chapterExcerpts from fixture chapters', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    let captured = '';
+    const fakeLLM = async (prompt) => {
+      captured = String(prompt || '');
+      return JSON.stringify({
+        atoms: [{
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '1、新增一级分类。\n\n来源：<sourceDoc> / <sourceChapter>\n',
+          phaseHints: ['x'],
+          produces: ['一级分类'],
+          dataDependsOn: [],
+        }],
+      });
+    };
+    await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+    });
+    assert.match(captured, /"chapterExcerpts"/);
+    assert.match(captured, /产品库管理/);
+    assert.match(captured, /ZJJK00094361|ZJJK00110131/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose atomize prompt uses [] when chapters dir is empty', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    rmSync(join(tmp, 'demo-mod', 'chapters'), { recursive: true, force: true });
+    mkdirSync(join(tmp, 'demo-mod', 'chapters'), { recursive: true });
+    let captured = '';
+    const fakeLLM = async (prompt) => {
+      captured = String(prompt || '');
+      return JSON.stringify({
+        atoms: [{
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '1、新增一级分类。\n\n来源：<sourceDoc> / <sourceChapter>\n',
+          phaseHints: ['x'],
+          produces: ['一级分类'],
+          dataDependsOn: [],
+        }],
+      });
+    };
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+    });
+    assert.ok(out && Array.isArray(out.atoms) && Array.isArray(out.rejected));
+    assert.match(captured, /"chapterExcerpts"\s*:\s*\[\s*\]/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
 
   await runAsync('proposeDraftTrajectories on fixture with fakeLLM', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
@@ -560,8 +891,8 @@ async function main() {
   });
 
   const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
-  run('PROPOSE_CACHE_VERSION is 6 (capability-cohesion full-body haystack)', () => {
-    assert.equal(PROPOSE_CACHE_VERSION, 6);
+  run('PROPOSE_CACHE_VERSION is 8 (chapter excerpts in atomize payload)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 8);
   });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');

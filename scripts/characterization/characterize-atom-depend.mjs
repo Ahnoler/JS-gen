@@ -205,7 +205,7 @@ await run('propose LLM omitted depend fields after materialize → missing_depen
 await run('atomize prompt XML partitions + few-shots', async () => {
   const { readFileSync } = await import('node:fs');
   const prompt = readFileSync(join(ROOT, 'scripts/prompts/req-draft-traj-atomize-prompt.md'), 'utf8');
-  for (const tag of ['role', 'output_contract', 'split_rules', 'examples', 'anti_patterns', 'checklist']) {
+  for (const tag of ['role', 'output_contract', 'split_rules', 'chapter_excerpts', 'examples', 'anti_patterns', 'checklist']) {
     assert.ok(prompt.includes(`<${tag}>`), `missing <${tag}>`);
     assert.ok(prompt.includes(`</${tag}>`), `missing </${tag}>`);
   }
@@ -227,6 +227,11 @@ await run('atomize prompt XML partitions + few-shots', async () => {
   assert.match(contract, /taskDraft/);
   const split = prompt.slice(prompt.indexOf('<split_rules>'), prompt.indexOf('</split_rules>'));
   assert.doesNotMatch(split, /产品树每一层|上移|下移/);
+  const excerpts = prompt.slice(prompt.indexOf('<chapter_excerpts>'), prompt.indexOf('</chapter_excerpts>'));
+  assert.match(excerpts, /chainId/);
+  assert.match(excerpts, /禁止编造/);
+  assert.match(excerpts, /无摘录|没有 excerpt/);
+  assert.match(excerpts, /系统菜单/);
 });
 
 await run('atom-depend samples cover good/bad pairs from prompt', async () => {

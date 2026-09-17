@@ -13,6 +13,7 @@ export {
   extractZjjkCodes,
   fillTaskDraftProvenancePlaceholders,
 } from './provenance.js';
+export { buildChapterExcerpts } from './chapter-excerpt.js';
 export { readProposeCache, writeProposeCache, PROPOSE_CACHE_FILENAME } from './propose-cache.js';
 export { proposeDraftTrajectories } from './propose.js';
 export { commitDraftTrajectories, validateCommitAtoms } from './commit.js';

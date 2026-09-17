@@ -35,6 +35,7 @@ import {
   validateAtomDependGraph,
 } from './atom-depend.js';
 import { assertCapabilityCohesion, synthesizeFallbackProduceKey } from './capability-cohesion.js';
+import { buildChapterExcerpts, shrinkExcerptsToTotal } from './chapter-excerpt.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
@@ -477,16 +478,42 @@ function foldEntryOnlyLlmAtoms(llmAtoms, chains) {
 
 /**
  * Build atomize user payload object with optional truncation for huge chains.
+ * Truncation order: shrink `chapterExcerpts` (shortest chains first) → drop
+ * `step.page` → hard slice with a truncated marker.
  * @param {import('./parse-through-chains.js').ThroughChain[]} chains Chains to serialize
  * @param {object[]} [flowCards] Relevant flow cards for LLM guidance
+ * @param {import('./chapter-excerpt.js').ChapterExcerpt[]} [chapterExcerpts] Per-chain chapter windows
  * @returns {string} JSON string for user payload
  */
-function buildAtomizeUserPayload(chains, flowCards = []) {
+export function buildAtomizeUserPayload(chains, flowCards = [], chapterExcerpts = []) {
   const summarized = summarizeCardsForLlm(flowCards);
-  let chainsObj = { chains };
-  let payload = JSON.stringify(chainsObj, null, 2);
+  let excerpts = Array.isArray(chapterExcerpts) ? chapterExcerpts.map((e) => ({ ...e })) : [];
+  let chainsForPayload = chains;
+  let truncated = false;
+
+  const pack = (chainList, excerptList, isTruncated) => {
+    const body = isTruncated
+      ? { chains: chainList, truncated: true, flowCards: summarized, chapterExcerpts: excerptList }
+      : { chains: chainList, flowCards: summarized, chapterExcerpts: excerptList };
+    return JSON.stringify(body, null, 2);
+  };
+
+  let payload = pack(chainsForPayload, excerpts, truncated);
   if (payload.length > MAX_CHAIN_PAYLOAD_CHARS) {
-    const trimmed = chains.map((chain) => ({
+    const skeleton = pack(chainsForPayload, [], truncated);
+    let budget = Math.max(0, MAX_CHAIN_PAYLOAD_CHARS - skeleton.length - 128);
+    const originals = excerpts.map((e) => ({ ...e }));
+    for (let i = 0; i < 8 && payload.length > MAX_CHAIN_PAYLOAD_CHARS; i += 1) {
+      excerpts = shrinkExcerptsToTotal(originals, chains, budget);
+      payload = pack(chainsForPayload, excerpts, truncated);
+      if (payload.length <= MAX_CHAIN_PAYLOAD_CHARS) {
+        break;
+      }
+      budget = Math.floor(budget / 2);
+    }
+  }
+  if (payload.length > MAX_CHAIN_PAYLOAD_CHARS) {
+    chainsForPayload = chains.map((chain) => ({
       ...chain,
       steps: (chain.steps || []).map((step) => ({
         index: step.index,
@@ -495,9 +522,9 @@ function buildAtomizeUserPayload(chains, flowCards = []) {
         buttons: step.buttons,
       })),
     }));
-    chainsObj = { chains: trimmed, truncated: true };
+    truncated = true;
+    payload = pack(chainsForPayload, excerpts, truncated);
   }
-  payload = JSON.stringify({ ...chainsObj, flowCards: summarized }, null, 2);
   if (payload.length > MAX_CHAIN_PAYLOAD_CHARS) {
     return `${payload.slice(0, MAX_CHAIN_PAYLOAD_CHARS)}\n/* truncated */`;
   }
@@ -510,11 +537,17 @@ function buildAtomizeUserPayload(chains, flowCards = []) {
  * @param {string} moduleKey Module key
  * @param {(text: string) => Promise<string>} llmFn Injectable LLM caller
  * @param {object[]} [flowCards] Relevant flow cards for LLM guidance
+ * @param {string} [chaptersDir] Absolute path to module `chapters/`
  * @returns {Promise<Array<Record<string, unknown>>|null>} 原始 LLM 原子对象；atoms 载荷无效时为 null
  */
-async function callAtomizeLlm(chains, moduleKey, llmFn, flowCards = []) {
+async function callAtomizeLlm(chains, moduleKey, llmFn, flowCards = [], chaptersDir) {
   const systemPrompt = loadAtomizePrompt();
-  const userPayload = buildAtomizeUserPayload(chains, flowCards);
+  const chapterExcerpts = await buildChapterExcerpts({
+    chains,
+    chaptersDir,
+    maxPerExcerpt: 2800,
+  });
+  const userPayload = buildAtomizeUserPayload(chains, flowCards, chapterExcerpts);
   const prompt = `${systemPrompt}\n\n---\n\nmoduleKey: ${moduleKey}\n\n${userPayload}`;
   const raw = await llmFn(prompt);
   const parsed = parseLlmJsonObject(raw);
@@ -899,7 +932,7 @@ export async function proposeDraftTrajectories({
 
   let llmAtoms = null;
   try {
-    llmAtoms = await callAtomizeLlm(chains, moduleKey, llmFn, relevant);
+    llmAtoms = await callAtomizeLlm(chains, moduleKey, llmFn, relevant, join(modDir, 'chapters'));
   } catch {
     llmAtoms = null;
   }

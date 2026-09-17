@@ -12,12 +12,16 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
 /**
  * Cache format version — bump on breaking cache shape **or** persist-boundary
  * semantics that invalidate previously proposed atoms; commit rejects caches
- * whose version differs (STALE_PROPOSE_CACHE). v6: capability-cohesion
- * haystack is the full step-group body (prose + 操作 block), not only text
- * after `操作：` (wet maintain-before-操作 must re-propose). v5 was the
- * structural gate (`multi_capability_task_draft`) + title-as-key reject.
+ * whose version differs (STALE_PROPOSE_CACHE). v8: atomize user payload includes
+ * per-chain `chapterExcerpts` (H1+要点+ZJJK windows) so taskDraft can project
+ * parsed chapter fields. v7: atomize prompt/taskDraft semantics — project parsed
+ * through-chains/chapter detail; thin input stays G1–G3 length (do not hallucinate
+ * prototype UI strings). v6: capability-cohesion haystack is the full step-group
+ * body (prose + 操作 block), not only text after `操作：` (wet maintain-before-操作
+ * must re-propose). v5 was the structural gate (`multi_capability_task_draft`)
+ * + title-as-key reject.
  */
-export const PROPOSE_CACHE_VERSION = 6;
+export const PROPOSE_CACHE_VERSION = 8;
 
 /**
  * Read cached propose result from a module directory.
