@@ -328,6 +328,27 @@ export function buildTableRowRadioXPathSmart({
 }
 
 /**
+ * Table first visible data row radio/checkbox (structural; no business text).
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @returns {string} Scoped first-row radio xpath.
+ */
+export function buildTableRowRadioFirstXPathSmart({
+  xpathFull = '',
+  className = '',
+  container = '',
+} = {}) {
+  const kind = detectContainerKind(xpathFull, className, container);
+  const local =
+    `div[${classTokenPred('el-table__body-wrapper')}]`
+    + `//tr[${classTokenPred('el-table__row')}][1]`
+    + `//*[${classTokenPred('el-radio')} or ${classTokenPred('el-radio-button')} or ${classTokenPred('el-checkbox')}]`;
+  return scopedXPath(local, kind);
+}
+
+/**
  * Dialog / drawer / notification close control.
  * @param {object} opts Element meta + builder options.
  * @param {string} [opts.targetKind] Close kind (dialog_close / notification_close).
@@ -446,6 +467,28 @@ export function buildTreeNodeXPathSmart({
       + `//${local}`;
   }
   return withOccurrence(scopedXPath(local, kind), occurrence);
+}
+
+/**
+ * Tree first leaf node content (structural; no business text anchor).
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @returns {string} Scoped first-leaf tree xpath.
+ */
+export function buildTreeFirstLeafXPathSmart({
+  xpathFull = '',
+  className = '',
+  container = '',
+} = {}) {
+  const kind = detectContainerKind(xpathFull, className, container);
+  const local =
+    `div[${classTokenPred('el-tree')}]`
+    + `//div[${classTokenPred('el-tree-node')}]`
+    + `[.//span[${classTokenPred('el-tree-node__expand-icon')} and ${classTokenPred('is-leaf')}]][1]`
+    + `/div[${classTokenPred('el-tree-node__content')}]`;
+  return scopedXPath(local, kind);
 }
 
 /**

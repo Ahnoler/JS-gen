@@ -26,6 +26,10 @@ import {
   isGeneratedId,
   xpathLiteral,
 } from '../../../src/cdp/locator-candidates.js';
+import {
+  buildTableRowRadioFirstXPathSmart,
+  buildTreeFirstLeafXPathSmart,
+} from '../../../src/cdp/locator-builders/controls.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -484,5 +488,27 @@ function ok(name) {
   assert.ok(py.includes('MENU_CLASS_TOKENS'));
   ok('python PAGE_LOCATOR_HELPERS mirror present');
 }
+
+function testFirstRowRadioXPath() {
+  const xp = buildTableRowRadioFirstXPathSmart({ container: 'dialog' });
+  assert.ok(xp.includes("el-dialog") || xp.includes('el-message-box'), xp);
+  assert.ok(xp.includes('el-table__body-wrapper'), xp);
+  assert.ok(/el-table__row/.test(xp) && /\[1\]/.test(xp), xp);
+  assert.ok(/el-radio/.test(xp), xp);
+  assert.equal(xp.includes("normalize-space()="), false, 'must not embed business text');
+}
+
+function testFirstLeafXPath() {
+  const xp = buildTreeFirstLeafXPathSmart({ container: 'drawer' });
+  assert.ok(xp.includes('el-drawer'), xp);
+  assert.ok(xp.includes('el-tree'), xp);
+  assert.ok(xp.includes('is-leaf'), xp);
+  assert.ok(xp.includes('el-tree-node__content'), xp);
+  assert.equal(xp.includes("starts-with(normalize-space()"), false, xp);
+}
+
+testFirstRowRadioXPath();
+testFirstLeafXPath();
+ok('first-row radio and first-leaf tree structural xpath');
 
 console.log('characterize-locator-candidates: OK');
