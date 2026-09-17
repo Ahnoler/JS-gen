@@ -18,7 +18,7 @@ import {
   prepareElementJson,
 } from '../../models/element.js';
 import { normalizeActionName } from '../../models/action-name.js';
-import { META_STEP_ACTIONS } from '../../models/meta-step-actions.js';
+import { META_STEP_ACTIONS, ENGINEERING_STEP_ACTIONS } from '../../models/meta-step-actions.js';
 
 /**
  * Recompute step + phase counts for a trajectory (business steps only).
@@ -27,11 +27,14 @@ import { META_STEP_ACTIONS } from '../../models/meta-step-actions.js';
  */
 export async function refreshTrajectoryCounts(trajectoryDbId) {
   const db = getDB();
-  // Product stepCount = business steps only (hide meta like save_form_snapshot)
+  // Product stepCount = business steps only: exclude meta steps
+  // (save_form_snapshot 等) AND engineering/observation actions
+  // (semantic_snapshot 等，2026-09-11 起新数据已不落库，老数据仍留在 trajectory_step).
   let stepsQ = db('trajectory_step').where({ trajectory_id: trajectoryDbId });
   if (META_STEP_ACTIONS.length) {
     stepsQ = stepsQ.whereNotIn('action_type', META_STEP_ACTIONS);
   }
+  stepsQ = stepsQ.whereNotIn('action_type', ENGINEERING_STEP_ACTIONS);
   const [{ steps }] = await stepsQ.count('* as steps');
   const [{ phases }] = await db('trajectory_phase')
     .where({ trajectory_id: trajectoryDbId })

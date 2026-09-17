@@ -85,3 +85,17 @@ export function filterMetaSteps(steps, { includeMeta = false } = {}) {
   if (includeMeta || !Array.isArray(steps)) return steps || [];
   return steps.filter((s) => !isMetaStep(s));
 }
+
+/**
+ * 过滤元步骤 + 工程/观察类步骤（默认剔除；includeMeta 时原样返回）。
+ * 产品步骤列表口径：与 refreshTrajectoryCounts 的 stepCount 统计一致，
+ * 老数据里已落库的 semantic_snapshot 等工程行不在前端步骤列表出现。
+ * @template T
+ * @param {T[]} steps 步骤列表
+ * @param {{ includeMeta?: boolean }} [opts] 选项
+ * @returns {T[]} 过滤后的步骤列表
+ */
+export function filterProductSteps(steps, { includeMeta = false } = {}) {
+  if (includeMeta || !Array.isArray(steps)) return steps || [];
+  return steps.filter((s) => !isMetaStep(s) && !isEngineeringStepAction(s?.actionType || s?.action || ''));
+}

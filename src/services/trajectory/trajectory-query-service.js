@@ -9,7 +9,7 @@ import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import * as businessDataDao from '../../dao/business-data-dao.js';
 import * as screenshotDao from '../../dao/screenshot-dao.js';
-import { filterMetaSteps, isMetaStep } from '../../models/meta-step-actions.js';
+import { filterProductSteps, isMetaStep } from '../../models/meta-step-actions.js';
 import { countBusinessSteps } from './action-log-copy.js';
 
 /**
@@ -93,7 +93,7 @@ export async function getTrajectoryTree(trajectoryDbId, { includeMeta = false } 
 
   const phases = await trajectoryPhaseDao.listByTrajectory(tid);
   const allStepsRaw = await trajectoryStepDao.listByTrajectory(tid);
-  const allSteps = filterMetaSteps(allStepsRaw, { includeMeta }).map(annotateStep);
+  const allSteps = filterProductSteps(allStepsRaw, { includeMeta }).map(annotateStep);
   const groupShots = await screenshotDao.listPhaseGroupsByTrajectory(tid);
 
   const assigned = new Set();
@@ -221,7 +221,7 @@ export async function listPhasesByTrajectory(trajectoryDbId) {
  */
 export async function listStepsByPhase(phaseDbId, { includeMeta = false } = {}) {
   const steps = await trajectoryStepDao.listByPhase(+phaseDbId);
-  return filterMetaSteps(steps, { includeMeta }).map(annotateStep);
+  return filterProductSteps(steps, { includeMeta }).map(annotateStep);
 }
 
 /**
