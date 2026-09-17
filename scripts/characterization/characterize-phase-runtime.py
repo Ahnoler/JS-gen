@@ -493,6 +493,50 @@ def test_llm_contract_uses_rule_boundary_for_navigate_evidence() -> None:
     )
 
 
+def test_llm_query_mode_overrides_rule_form_fill_boundary() -> None:
+    """Query-pipeline sub-step with no query keyword must not inherit form-fill tokens.
+
+    A stage like '在"业务编号"输入框中输入业务编号。预期结果：业务编号填写完成。'
+    contains fill verbs, so compile_boundary() classifies it as form_fill and gives
+    success_when=['toast_ok','url_change','saved_navigation']. The LLM reviewer,
+    seeing the full pipeline context, classifies it as query. af1d1cc0 made
+    service.py pass compile_boundary() as boundary_override; if we blindly keep the
+    rule-based success_when, recorder expects save tokens while the agent only
+    records query_clicked, causing infinite premature-done rejection.
+    """
+    from scripts.controller.actions._phase_boundary import (
+        compile_boundary,
+        get_phase_boundary,
+    )
+    from scripts.controller.actions.phase.intent_contract import apply_phase_contract
+
+    reviewed = {
+        'mode': 'query',
+        'allow_form_assistant': False,
+        'refill': 'none',
+        'goal': '在业务编号输入框输入业务编号',
+        'in_scope': [],
+        'out_of_scope': [],
+        'done_when': '业务编号填写完成',
+        'submit': {'required': False, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': ['query_clicked'], 'evidence': []},
+        'brief_plan': [],
+    }
+    store: dict = {}
+    boundary = compile_boundary('在"业务编号"输入框中输入业务编号。预期结果：业务编号填写完成。')
+    apply_phase_contract(store, reviewed, boundary_override=boundary)
+    b = get_phase_boundary(store)
+    assert_true(b and b.get('role') == 'query', f'boundary role must be query: {b}')
+    assert_true(
+        b and b.get('success_when') == ['query_clicked'],
+        f'boundary success_when must be query_clicked: {b}',
+    )
+    assert_true(
+        b and b.get('goals') == ['query_filter'],
+        f'boundary goals must be query_filter: {b}',
+    )
+
+
 def test_resolve_infer_unique_and_longest() -> None:
     store = {
         "_phase_intent": {
@@ -532,6 +576,7 @@ def main() -> None:
     test_quality_fail_logging_in_session_runner()
     test_create_submit_budget_includes_recovery_buffer()
     test_open_page_overlay_evidence_and_overlay_gate()
+    test_llm_query_mode_overrides_rule_form_fill_boundary()
     test_resolve_infer_unique_and_longest()
     print("PASS characterize-phase-runtime")
 

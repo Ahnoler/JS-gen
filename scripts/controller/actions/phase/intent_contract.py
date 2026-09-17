@@ -324,14 +324,33 @@ def apply_phase_contract(
     elif boundary_override is not None and mode in ('navigate', 'query'):
         # Keep compile_boundary success_when; only clear write-all.
         boundary['requires_write_all_editable'] = False
-        if mode == 'query' and not (boundary.get('success_when') or []):
-            boundary['success_when'] = ['query_clicked']
-        if mode == 'navigate' and not (boundary.get('success_when') or []):
-            goals = boundary.get('goals') or []
-            if 'click_next' in goals:
-                boundary['success_when'] = ['nav_next_clicked', 'url_change', 'page_opened']
-            else:
-                boundary['success_when'] = ['url_change', 'page_opened']
+        expected_role = _MODE_TO_ROLE.get(mode)
+        # When the rule-based boundary role disagrees with the LLM-reviewed mode,
+        # the task text is ambiguous (e.g. a query-pipeline sub-step that literally
+        # says "input value" but is part of a filter flow). Trust the LLM mode for
+        # evidence tokens to keep success_when aligned with actual phase semantics.
+        if boundary.get('role') != expected_role:
+            boundary['role'] = expected_role
+            if mode == 'query':
+                boundary['success_when'] = ['query_clicked']
+                boundary['goals'] = ['query_filter']
+            else:  # navigate
+                goals = boundary.get('goals') or []
+                if 'click_next' in goals:
+                    boundary['success_when'] = ['nav_next_clicked', 'url_change', 'page_opened']
+                    boundary['goals'] = ['set_conditions', 'click_next']
+                else:
+                    boundary['success_when'] = ['url_change', 'page_opened']
+                    boundary['goals'] = ['open_page']
+        else:
+            if mode == 'query' and not (boundary.get('success_when') or []):
+                boundary['success_when'] = ['query_clicked']
+            if mode == 'navigate' and not (boundary.get('success_when') or []):
+                goals = boundary.get('goals') or []
+                if 'click_next' in goals:
+                    boundary['success_when'] = ['nav_next_clicked', 'url_change', 'page_opened']
+                else:
+                    boundary['success_when'] = ['url_change', 'page_opened']
     business_data_store['_phase_boundary'] = boundary
     business_data_store['_phase_boundary_flag_locked'] = True
     business_data_store['_phase_intent'] = c
