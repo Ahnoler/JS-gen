@@ -18,8 +18,10 @@ Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. Th
 - 主会话派发子智能体时**代为声明**（子智能体不直接写 agent-log，避免并行编辑冲突）；子智能体一律不 commit，由主会话验收后代提交
 
 **收工回报（任务单元结束时）：**
+- **合并后验收（2026-09-17 起为硬约定，先合并再验收）**：代码改动 commit 后、写收工条目之前，必须先 `git pull`（或 `git fetch` + merge/rebase）把远端最新代码合入本地，**在合并后的集成状态上重跑该任务单元的验收命令**（相关 smoke / characterization / `bash scripts/refactor/verify-all.sh` 等）；确认他线改动未破坏本次修复、本次改动也未破坏他线功能后，才插入**收工条目**并 push。禁止只凭合并前的本地验收结果收工——各线分别"通过"的验收在合流后可能变成修复不彻底或新问题。
+- **合并后验收不通过的处理**：先用 `git log`/`git diff`（相对合并前）定位是本次改动还是他线改动所致；本次所致→修好后重新走"合并后验收"；他线所致→在收工条目"遗留移交"显式记录（文件:行、复现命令、现象）移交对应线，不得隐瞒或自行放宽验收口径。
 - 在顶部插入**收工条目**回链开工条目：完成（含 commit hash）/ 验收证据 / 遗留移交——开工条目中的"进行中"至此闭环，状态以收工条目为准；写完立即 **commit + push**（2026-09-16 起 push 为硬约定）
-- **push 冲突处理**（2026-09-16 起）：push 被拒（non-fast-forward）时先 `git pull`，逐处解决冲突（agent-log 条目冲突=保留双方条目并排，不删他线内容）后合并提交，再重新 push；**禁止 force push、禁止以丢弃他线条目换取合并**
+- **push 冲突处理**（2026-09-16 起）：push 被拒（non-fast-forward）时先 `git pull`，逐处解决冲突（agent-log 条目冲突=保留双方条目并排，不删他线内容）后合并提交，再重新 push；**禁止 force push、禁止以丢弃他线条目换取合并**。合并引入了他线代码改动时，须按上条**重跑验收**再 push
 - 提交 agent-log 时若顺带携带了其他会话的未提交条目，在 commit message 注明
 - 任务单元的代码改动结束即 commit；agent-log 条目（开工/收工）写完一律 commit + push——未提交/未推送的工作对其他 Agent 不可见
 - **不维护 CHANGELOG.md**（2026-09-04 已移除）：变更史以翔实的 git commit message 为准，不要重建该文件
