@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 10:50 · Cursor — 开工：sync req-module parse API MVP
+
+- 进行中：落地已批准的同步 `POST /api/v2/kb/req-modules/:moduleKey/parse`（upload → parse → propose 中缺的切片步）；TDD 先行；不改 propose/atomize/chapter-excerpt。
+- 范围（可写集）：`docs/superpowers/specs/2026-09-17-req-module-parse-api-design.md`、`docs/superpowers/plans/2026-09-17-req-module-parse-api.md`、`scripts/prompts/req-module-parse-prompt.md`、`src/services/kb-req-parse/**`（新）、`src/services/kb-req-modules.js`（`hasLocalSource`）、`src/routes/v2/kb.js`、`src/dashboard/api-docs/groups/kb.js`、`scripts/characterization/characterize-kb-req-parse.mjs`（新）、顺手扩 `characterize-kb-req-modules*.mjs` 钉 `hasLocalSource`、`scripts/refactor/verify-all.sh`（注册新门禁）、`package.json`/`package-lock.json`（mammoth）、本协作日志
+- 禁入区：`src/services/req-draft-traj/propose.js` / `chapter-excerpt.js` / atomize schema；`capability-cohesion.js`；wet-test.md / drafts / promote；Vue SPA；executor-lb spec；recorder/phase/G3；`origin/master`；活跃录制会话
+- 方式：主会话 Inline TDD（任务紧耦合，不派子智能体写同一文件）；基线 `uara_V1.2`；新分支 `cursor/req-module-parse-api-dfb7` → PR `uara_V1.2`
+- 遗留：湿测由用户在 LMY 跑 upload → parse → propose（同步 LLM 可能 1–3+ 分钟，客户端需放宽超时）
+
 ## 2026-09-17 10:42 · ZCode — 收工：executor LB spec 状态行措辞定稿（回链 10:41 重发开工）
 
 - 完成：**`7eef33ec`**——`docs/superpowers/specs/2026-09-17-executor-lb-design.md` 第 4 行状态行改为用户给定措辞「**草案，待控制面负责同事评审，评审通过前不落实现**」（原文语义相同、句读不同：`草案，待控制面负责同事评审 —— 评审通过前不落任何实现`）；正文其余 224 行未动
