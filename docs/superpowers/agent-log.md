@@ -1,5 +1,17 @@
 # Agent 协作日志
 
+## 2026-09-17 17:10 · Cursor — 收工：capability-cohesion LMY FP cache v11（回链 16:53 开工）
+
+- 完成：`cca2245d` cohesion 闸 + cache **v11**。PR → `uara_V1.2`。
+- 三笔 LMY 误杀：① closer 残留 `复制…数据` 不再当第二 clone；② `待维护产品` 当 locate 名词，不再 maintain；③ `确认删除成功` / `删除成功` 当结局，不再第二 delete persist。`flow-card-guide.js` 未改（persistConfirms 本就不计叙事删除）。
+- 验收：
+  - `characterize-capability-cohesion.mjs` **all passed**（三笔 cohesion ok；inspect 钉 word-bleed；maintain+sort / 添加一条+删除 / 配置 closer 后删除 / 同组维护+删除仍拒；v10 湿 pin 仍过）
+  - `characterize-persist-boundary.mjs` **all passed**（两次【保存】/【确定】仍 multi）
+  - `characterize-atom-depend.mjs` **all passed**
+  - `characterize-req-draft-traj.mjs` **OK 76**（cache **11**）
+  - `npx eslint` 改动 src **0**
+- 遗留移交：LMY 须 **POST** `…/product-mgmt/draft-traj/propose`（cache **v11**）；仅重启不够。parse / atomize prompt / UI / dangling_data_depend 未动。不维护 CHANGELOG。
+
 ## 2026-09-17 16:53 · Cursor — 开工：capability-cohesion LMY FP（clone 复制残留 / 待维护名词 / 删除成功结局，cache v10→11）
 
 - 进行中：LMY `reject-drafts-reprobe.json` re-atomize 2026-09-17 三笔 cohesion 误杀——①产品克隆 closer 行裸 `复制…数据` 当第二 clone；②`待维护产品` 当 maintain；③`确认删除成功` 当第二 delete persist。同精神收 residual `修改…后` / 标题 `维护…主页`。
