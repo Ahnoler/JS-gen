@@ -267,6 +267,26 @@ await run('helper: wet product-mgmt reorder then maintain+save → multi_capabil
   assert.equal(out.reason, 'multi_capability_task_draft');
 });
 
+await run('classify: 新增…主页 page title + closer 【保存】 is persist, not create', () => {
+  const info = mod.inspectCapabilityGroup(
+    '新增对公客户主页：选类型→录证件→【保存】（新增对公客户主页），【保存】',
+  );
+  assert.equal(info.role, 'persist', `expected persist, got ${JSON.stringify(info)}`);
+  assert.equal(info.families.includes('create'), false);
+});
+
+await run('helper: open-drawer 【新增】 fold + 新增…主页 closer 【保存】 is cohesive', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '新增对公客户',
+    taskDraft: [
+      '1、对公客户主页，点【新增】打开向导抽屉',
+      '2、新增对公客户主页：选类型→录证件→【保存】（新增对公客户主页），操作：【保存】',
+    ].join('\n'),
+    produces: ['新增对公客户产物'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
 await run('sequence: trailing locate after save still passes this gate', () => {
   const out = mod.assertCapabilityCohesion({
     title: '保存后查询说明',
