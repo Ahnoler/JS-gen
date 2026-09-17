@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 10:15 · Cursor — 开工：chapter excerpts into draft-traj propose（cache v8）
+
+- 进行中：把已解析 `chapters/*.md` 按链注入 atomize user payload（`chapterExcerpts`），使 `taskDraft` 能投影字段/控件/断言；cache 7→8；不改 JSON atom schema、不 enrich parse、不新 upload API、不跑 LMY 湿测。
+- 范围（可写集）：`docs/superpowers/specs/2026-09-17-chapter-excerpt-into-propose-design.md`、`docs/superpowers/plans/2026-09-17-chapter-excerpt-into-propose.md`、`src/services/req-draft-traj/chapter-excerpt.js`（新）、`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`、`src/services/req-draft-traj/index.js`、`scripts/prompts/req-draft-traj-atomize-prompt.md`、`scripts/characterization/characterize-req-draft-traj.mjs`、`scripts/characterization/characterize-atom-depend.mjs`（prompt XML pin）、本协作日志
+- 禁入区：`capability-cohesion.js` / `atom-depend.js` 闸逻辑；`provenance.js` 匹配打分（复用 `resolveChapterRef`，不另写 matcher）；parse enrich；upload API；atom JSON schema；LMY wet propose；`scripts/refactor/verify-all.sh`（不新增注册，pin 挂已有门禁）；他线 WIP（G3 / recorder / phase）；`origin/master`
+- 方式：主会话 Inline TDD；基线 `cursor/taskdraft-atomize-prompts-e2f1`（PR #48）；新 PR → `uara_V1.2`；摘录 H1+要点+ZJJK 窗、~2800/条、超 28k 先缩 excerpt 再丢 `step.page`；空 chapters → `[]`
+- 遗留：湿测 checklist 写入 PR body，由用户在 LMY POST propose
+
 ## 2026-09-17 10:03 · Cursor — 收工：atomize taskDraft 投影已有解析细节（回链 10:00 开工）
 
 - 完成：`96d9c4fd`（prompt + 富输入上限样例 + G3 交叉引用 + `PROPOSE_CACHE_VERSION` 6→7）。课程纠正：不要求缺解析时写录制员级目标元素；**有则投影、无则短骨架、禁止编造原型文案**。PR **#48** → `uara_V1.2`。开工 `3dfc5890`。
