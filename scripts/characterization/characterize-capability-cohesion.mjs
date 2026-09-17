@@ -126,6 +126,59 @@ const WET_CLONE_PRODUCT = [
   '5、点击【确定】完成克隆',
 ].join('\n');
 
+/** LMY cache v9 reject-drafts-reprobe: page-title 维护…主页 + fill 填写. */
+const WET_CREATE_PRODUCT_STAGE = [
+  '1、进入维护产品阶段主页【ZJJK00095902】，等待加载',
+  '2、点击【新增阶段】，填写阶段信息',
+  '3、点击【保存】成功',
+].join('\n');
+
+/** LMY: 维护弹窗 noun + 录入 as second maintain. */
+const WET_CREATE_CORE_MAPPING = [
+  '1、进入核心产品映射主页【ZJJK00095454】，等待加载',
+  '2、选中产品后点击【新增】，打开核心产品映射维护弹窗【ZJJK00095468】',
+  '3、录入核心产品编号与名称',
+  '4、点击【保存】成功',
+].join('\n');
+
+/** LMY: 【修改】 then closer-line residual 修改…后. */
+const WET_EDIT_CORE_MAPPING = [
+  '1、进入核心产品映射主页【ZJJK00095454】，等待加载',
+  '2、选中映射记录，点击【修改】',
+  '3、修改信息后点击【保存】成功',
+].join('\n');
+
+/** LMY: 【导出】 then 启用和禁用状态 noun-modifier. */
+const WET_EXPORT_PRODUCT = [
+  '1、进入查询产品信息主页【ZJJK00095907】，等待加载',
+  '2、点击【导出】',
+  '3、导出启用和禁用状态的叶子产品',
+].join('\n');
+
+/** LMY reprobe long form: 编辑主页 + 需要添加的. persistConfirms===2 (picker 【确定】 + 【保存】). */
+const WET_SET_CONTROL_ELEMENTS_LONG = [
+  '1、进入查看产品信息主页【ZJJK00107304】，打开产品个性化要素配置页签',
+  '2、点击【设置管控要素】，进入产品要素编辑主页【ZJJK00098070】',
+  '3、勾选需要添加的组件，点击【确定】反显',
+  '4、配置管控要素后点击【保存】',
+].join('\n');
+
+/** Wet-accepted shorter 设置产品管控要素 — must stay cohesive. */
+const WET_SET_CONTROL_ELEMENTS_SHORT = [
+  '1、进入查看产品信息主页【ZJJK00107304】，等待加载',
+  '2、打开产品个性化要素配置页签',
+  '3、点击【设置管控要素】，配置后点击【保存】成功',
+].join('\n');
+
+/** Wet-accepted 新增产品要素 (【新增】→【确定】) — must stay cohesive. */
+const WET_CREATE_PRODUCT_ELEMENT = [
+  '1、进入产品要素分组主页【ZJJK00094373】，等待加载',
+  '2、选中组件节点，打开产品要素页签',
+  '3、点击【新增】，打开新增产品要素弹窗',
+  '4、选择要素名称与要素类型',
+  '5、点击【确定】成功',
+].join('\n');
+
 const { countPersistConfirms } = await import(
   pathToFileURL(join(ROOT, 'src/services/req-draft-traj/flow-card-guide.js')).href
 );
@@ -165,11 +218,11 @@ await run('C5 classify: single haystack 维护+上移 → multi with both famili
   assert.ok(info.families.includes('reorder'));
 });
 
-await run('classify: 填写+【保存】 same group is other not multi', () => {
-  assert.equal(
-    mod.classifyCapabilityGroup('打开该项能力对应的表单或页签，填写本能力字段并【保存】'),
-    'other',
-  );
+await run('classify: 填写+【保存】 same group is persist not multi (填写 is fill-in)', () => {
+  const info = mod.inspectCapabilityGroup('打开该项能力对应的表单或页签，填写本能力字段并【保存】');
+  assert.notEqual(info.role, 'multi');
+  assert.equal(info.families.includes('maintain'), false);
+  assert.equal(info.role, 'persist');
 });
 
 await run('classify: 选中 then 启用 (unique persist-as-capability) is persist', () => {
@@ -348,7 +401,7 @@ await run('sequence: 维护 + 启用 is multi_capability_task_draft', () => {
 await run('sequence: locate → persist → other is multi_capability_task_draft', () => {
   const out = mod.assertCapabilityCohesion({
     title: '保存后再维护',
-    taskDraft: '1、进入功能页\n2、【保存】\n3、填写本能力字段',
+    taskDraft: '1、进入功能页\n2、【保存】\n3、维护本能力字段',
     produces: ['已保存对象'],
   });
   assert.equal(out.ok, false);
@@ -556,6 +609,180 @@ await run('wet A/B/C/D propose: accepted, not multi_capability or multi_persist'
       `${c.title}: must not reject cohesive single-closer draft`,
     );
   }
+});
+
+await run('inspect: 进入维护产品阶段主页 is locate, not maintain', () => {
+  const info = mod.inspectCapabilityGroup('进入维护产品阶段主页【ZJJK00095902】，等待加载');
+  assert.equal(info.families.includes('maintain'), false, JSON.stringify(info));
+  assert.ok(info.role === 'locate' || info.role === 'neutral', `got ${info.role}`);
+});
+
+await run('inspect: 打开核心产品映射维护弹窗 is locate, not maintain', () => {
+  const info = mod.inspectCapabilityGroup('选中产品后点击【新增】，打开核心产品映射维护弹窗【ZJJK00095468】');
+  assert.equal(info.families.includes('maintain'), false, JSON.stringify(info));
+  assert.notEqual(info.role, 'other');
+  assert.notEqual(info.role, 'multi');
+});
+
+await run('inspect: 填写/录入 are not standalone maintain', () => {
+  const fill = mod.inspectCapabilityGroup('点击【新增阶段】，填写阶段信息');
+  assert.equal(fill.families.includes('maintain'), false, JSON.stringify(fill));
+  assert.notEqual(fill.role, 'other');
+  const enter = mod.inspectCapabilityGroup('录入核心产品编号与名称');
+  assert.equal(enter.families.includes('maintain'), false, JSON.stringify(enter));
+  assert.notEqual(enter.role, 'other');
+});
+
+await run('inspect: 修改信息后点击【保存】 is closer-only persist', () => {
+  const info = mod.inspectCapabilityGroup('修改信息后点击【保存】成功');
+  assert.equal(info.role, 'persist', JSON.stringify(info));
+  assert.equal(info.families.includes('maintain'), false, JSON.stringify(info));
+});
+
+await run('inspect: 导出启用和禁用状态的叶子 is not status/persist/multi', () => {
+  const info = mod.inspectCapabilityGroup('导出启用和禁用状态的叶子产品');
+  assert.equal(info.families.includes('status'), false, JSON.stringify(info));
+  assert.equal(info.families.includes('export'), false, JSON.stringify(info));
+  assert.notEqual(info.role, 'multi');
+  assert.notEqual(info.role, 'persist');
+  assert.notEqual(info.role, 'other');
+});
+
+await run('inspect: 需要添加的 + 【确定】反显 is persist, not create', () => {
+  const info = mod.inspectCapabilityGroup('勾选需要添加的组件，点击【确定】反显');
+  assert.equal(info.families.includes('create'), false, JSON.stringify(info));
+  assert.notEqual(info.role, 'other');
+  assert.notEqual(info.role, 'multi');
+});
+
+await run('inspect: 进入产品要素编辑主页 is locate, not maintain', () => {
+  const info = mod.inspectCapabilityGroup('点击【设置管控要素】，进入产品要素编辑主页【ZJJK00098070】');
+  assert.equal(info.families.includes('maintain'), false, JSON.stringify(info));
+  assert.ok(info.role === 'locate' || info.role === 'neutral', `got ${info.role}`);
+});
+
+await run('wet 新增产品阶段: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_CREATE_PRODUCT_STAGE), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '新增产品阶段',
+    taskDraft: WET_CREATE_PRODUCT_STAGE,
+    produces: ['产品阶段'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet 新增核心产品映射: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_CREATE_CORE_MAPPING), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '新增核心产品映射',
+    taskDraft: WET_CREATE_CORE_MAPPING,
+    produces: ['核心产品映射'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet 修改核心产品映射: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_EDIT_CORE_MAPPING), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '修改核心产品映射',
+    taskDraft: WET_EDIT_CORE_MAPPING,
+    produces: ['已修改映射'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet 导出产品信息: cohesion ok (启用和禁用状态 is not status)', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '导出产品信息',
+    taskDraft: WET_EXPORT_PRODUCT,
+    produces: ['导出文件'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet 设置产品管控要素 long: cohesion ok (picker 确定 + save owned by persist gate)', () => {
+  assert.equal(countPersistConfirms(WET_SET_CONTROL_ELEMENTS_LONG), 2);
+  const out = mod.assertCapabilityCohesion({
+    title: '设置产品管控要素',
+    taskDraft: WET_SET_CONTROL_ELEMENTS_LONG,
+    produces: ['管控要素配置'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet 设置产品管控要素 short: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_SET_CONTROL_ELEMENTS_SHORT), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '设置产品管控要素',
+    taskDraft: WET_SET_CONTROL_ELEMENTS_SHORT,
+    produces: ['管控要素配置'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet 新增产品要素: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_CREATE_PRODUCT_ELEMENT), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '新增产品要素',
+    taskDraft: WET_CREATE_PRODUCT_ELEMENT,
+    produces: ['产品要素'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet word-bleed create/edit/export propose: accepted except long 管控要素 (multi_persist)', async () => {
+  const accepted = [
+    { title: '新增产品阶段', taskDraft: WET_CREATE_PRODUCT_STAGE, produces: ['产品阶段'] },
+    { title: '新增核心产品映射', taskDraft: WET_CREATE_CORE_MAPPING, produces: ['核心产品映射'] },
+    { title: '修改核心产品映射', taskDraft: WET_EDIT_CORE_MAPPING, produces: ['已修改映射'] },
+    { title: '导出产品信息', taskDraft: WET_EXPORT_PRODUCT, produces: ['导出文件'] },
+    { title: '设置产品管控要素', taskDraft: WET_SET_CONTROL_ELEMENTS_SHORT, produces: ['管控要素配置'] },
+    { title: '新增产品要素', taskDraft: WET_CREATE_PRODUCT_ELEMENT, produces: ['产品要素'] },
+  ];
+  for (const c of accepted) {
+    const out = await proposeOne({
+      chainId: 'chain-a',
+      stepIndexes: [2],
+      title: c.title,
+      flowRef: 'product_library',
+      nodeId: 'prod_add_dlg',
+      taskDraft: `${c.taskDraft}\n\n来源：demo.docx / chapters/01-product-library.md\n`,
+      produces: c.produces,
+      dataDependsOn: [],
+      phaseHints: [c.title],
+      suggestedFunctionId: null,
+    });
+    assert.ok(
+      out.atoms.length >= 1,
+      `${c.title}: expected atoms, rejected=${JSON.stringify(out.rejected)}`,
+    );
+    assert.equal(
+      out.rejected.filter((r) => r.reason === 'multi_capability_task_draft').length,
+      0,
+      `${c.title}: must not reject cohesive draft as multi_capability`,
+    );
+  }
+  const longOut = await proposeOne({
+    chainId: 'chain-a',
+    stepIndexes: [2],
+    title: '设置产品管控要素',
+    flowRef: 'product_library',
+    nodeId: 'prod_add_dlg',
+    taskDraft: `${WET_SET_CONTROL_ELEMENTS_LONG}\n\n来源：demo.docx / chapters/01-product-library.md\n`,
+    produces: ['管控要素配置'],
+    dataDependsOn: [],
+    phaseHints: ['设置产品管控要素'],
+    suggestedFunctionId: null,
+  });
+  assert.ok(
+    longOut.rejected.some((r) => r.reason === 'multi_persist_task_draft'),
+    `long 管控要素: expected multi_persist, got ${JSON.stringify(longOut.rejected)}`,
+  );
+  assert.equal(
+    longOut.rejected.filter((r) => r.reason === 'multi_capability_task_draft').length,
+    0,
+    'long 管控要素 must not rebrand two closers as multi_capability',
+  );
 });
 
 await run('atomize prompt locates prep to locate-class only', () => {
