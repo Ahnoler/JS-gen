@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 12:20 · ZCode 引擎线 — 补记：29242 真场景调研 8/8，840 处方动作全链实证（回链 12:12 开工）
+
+- 结论：`select_option(流程操作=下一步)` 的引擎原版路径在该真实页面**全链可用**，guard 复核回路闭环。页面已恢复原状（opValue=下一步、弹层已关），**未触碰 流程提交/流程撤销**
+- 引擎原版 JS 序列实测（Playwright over CDP，零仿写）：①基线 guard ok（opValue=下一步→提交分支）；②**末步弹层关时 `real_click('下一步')` 解析=`err-real-click-target-not-found`——实锤 agent 旧动作在末步无目标可选，opHint 的指引不是锦上添花而是唯一可行路径**；③`clear_field_value('流程操作')`→cleared、guard 读 opValue=''（引擎 clear 能正确重置该 el-select 的 model）；④`JS_SELECT_TRIGGER_MAIN_AREA`（frz round-5 主区触发兜底）→ok-triggered；⑤弹层展开实测选项=`['下一步']`（与截图一致，单选项）；⑥`JS_SELECT_OPTION(['下一步', exact])`→ok:下一步（录制路径同款拾取）；⑦`check` 回读 ok-already:下一步；⑧guard →opValue=下一步→处方切提交分支
+- 附带确认：`resolve_select_dispatch` 对该字段走 el-select default 路径（非 tssc）；`_resolve_control` 清单无此字段时由 main-area 触发兜底接管（代码注释 frz round-5/流程操作 在案）——840 重录时引擎 action 层无需任何新改动
+- 遗留不变：重录验证待控制面/执行机重启加载 `7eea3bf8`+`9e35b942`
+- 注：不维护 CHANGELOG
+
 ## 2026-09-17 12:12 · ZCode 引擎线 — 开工：29242 真场景调研（验证 840 处方动作）
 
 - 进行中：用户授权占用 29242 浏览器（840 现场页）。真场景验证 `9e35b942` 处方的前提：①`select_option(流程操作=下一步)` 的引擎 el-select 原版路径在该真实组件上是否可选成功；②guard 复核回路（opValue 变化 → opHint 切提交分支）是否闭环；③顺带实证末步 `real_click('下一步')`（弹层关）的解析结果（预期 err-real-click-target-not-found，佐证旧路径已死）
