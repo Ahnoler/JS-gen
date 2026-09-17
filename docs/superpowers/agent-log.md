@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 10:00 · Cursor — 开工：atomize taskDraft 质量（对齐录制员 TX，禁菜单导航）
+
+- 进行中：优化 JS-gen req-draft-traj atomize 提示词与样板，使 `taskDraft` 贴近录制员 TX（可见文案 + 断言 + 维护=选中→改本能力字段→一次保存），**不**另写业务测试员 atomize 设计、**不**改 JSON schema / 能力内聚闸逻辑。
+- 范围（可写集）：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/product-element-taskdraft-samples.md`（新，提交已适配金样）、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` 6→7 注释）、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin）、本协作日志
+- 禁入区：`capability-cohesion.js` / `propose.js` / `atom-depend.js` 闸逻辑；场景黑名单（树层/按钮文案）；系统菜单导航；他线 WIP（G3 证据门闩 / recorder / phase / `verify-all.sh` 新增注册）；`origin/master`；不跑 product-mgmt 湿测 propose
+- 方式：主会话 Inline；从 `uara_V1.2` 新分支；PR 目标 `uara_V1.2`；XML 分区保持；抽象规则 + few-shot（产品要素仅作标注示例）
+- 遗留：湿测由用户在 LMY 清 cache 后 `POST .../product-mgmt/draft-traj/propose`
+
 ## 2026-09-17 09:50 · OpenCode — 收工：复核远程拉取（ZCode G3 湿测 pin）对本线修复的影响
 
 - 完成：**`2dd46f0b`**（1 文件 / +9）。远程新增 `53dec0e9`（ZCode G3 湿测：`characterize-g3-done-gate-live.py` 11 checks 真 Chromium + `characterize-g3-runner-seam.mjs` 9 checks，均注册 verify-all）并 merge 到本线 `07569560`。
