@@ -898,19 +898,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     };
     runtime.phaseOutcomes[phase.id] = phaseOutcome;
     runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;
-    if (gated.rejectedZeroStep) {
-      await appendPhaseDoneLog(phase.id, {
-        text: gated.text,
-        source: 'fail',
-      });
-      console.warn(
-        `[record] G3 zero_step_rejected phase=${phase.phaseNumber} id=${phase.id}`,
-      );
-    } else {
-      const rawDoneText = String(donePayload?.text || '').trim();
-      if (rawDoneText) {
-        await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
-      }
+    const rawDoneText = String(donePayload?.text || '').trim();
+    if (rawDoneText) {
+      await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
     }
     if (zeroStepPhase) {
       await appendPhaseDoneLog(phase.id, {
