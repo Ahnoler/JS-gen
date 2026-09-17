@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 11:15 · ZCode — 收工：executor LB spec 证据核验与设计切面调研（评审支持材料）
+
+- 完成：`docs/superpowers/reports/2026-09-17-executor-lb-spec-evidence.md`——3 个并行只读 Explore 子智能体（控制面调度内核 / 执行机侧与生命周期 / 入口·数据面·API 契约）核验 spec 全部 file:line 断言 + 主会话抽查 4 条载重断言属实。**spec 现状速查表与 G1–G11 断言全部证实**，3 处量化/边界漂移待修（G5 探测实为 Promise.all 并行非 O(N×probe)、sweep 实值 22.5s、CDP 端口 fallback 撞端口边界）
+- 评审重点（spec 未覆盖，报告 §4 共 13 条）：**T7 亲和数据存活窗口被高估**（dao close 对 closed/crashed 均清 trajectory_id → detach 后查无行，需评审拍板数据落点）；**T9 适用面更窄**（batch 已有 DB 队列+409 自动重试 waiting_executor）；**drain 状态机双向漂移**（重连重注册把 DB 翻回 online 而 agent 仍拒 open、无 undrain、无完成信号）；失败 open 泄漏 session hub 条目（T6 放大 3 倍）；T2 error 监听必须先于 sendToExecutor 注册
+- 方式：主会话派发 3 子智能体（用户指示免开工声明）；子智能体只读零改动零提交；证据报告随本条 commit+push
+- 移交：报告与 spec 一并转控制面负责同事评审；Q2/Q3/Q6/Q7 已按证据补强建议（报告 §6）
+
 ## 2026-09-17 11:06 · Cursor — 收工：merge origin/uara_V1.2 into PR #50（回链本条）
 
 - 完成：`cursor/req-module-parse-api-dfb7` 合入最新 `origin/uara_V1.2`（`76dc73f0`）。冲突仅本文件，按时刻交错保留双方条目。产品代码无冲突：parse 路由 / kb-req-parse / mammoth / hasLocalSource / characterize-kb-req-parse 全保留；他线 `7eea3bf8` recordPhaseResult gated-orphan 修复 + `characterize-record-phase-finalize` 一并带入。
