@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 14:40 · OpenCode — 收工：查询/筛选阶段「更多」收起条件尽力展开（icon-only `more-btn` 识别）
+
+- 完成（两条提交，均为用户代为提交）：**`aaa9f575`** 规则提示——`filter_expand_try_hint()` 注入 query 模式与「描述含查询/搜索/查找/筛选但未归入 query」的阶段（向导/打开页面不注入），`agent-core.md` 查询行同步；**`06fbf86d`**（作者 黄正祥）icon-only「更多」按钮识别落地。
+- 识别方式（`scripts/controller/actions/js_snippets/icons.py`）：主信号=容器 class 含 `more-btn`（`more-btn/moreBtn/more_btn/more-filter/moreFilter`）+ 内层按钮类型（`button/.el-button/a/[role=button]`），命中真实结构 `<span class="tsscBtn more-btn"><label><button class="el-button">`，无文字/无 tooltip 亦可；兜底=aria/title/tooltip 含「更多/展开/高级」，再兜底=查询工具栏内纯 caret/箭头图标按钮。状态护栏：`caret-bottom/arrow-down`=未展开→可点，`caret-top/arrow-up`=已展开→**不点**（再点会收起藏字段），歧义→`err-more-toggle-ambiguous`；`click_action_engine.py` 为二者补信封（`more-toggle-ambiguous` / `more-toggle-already-expanded`）。仅在 `click_button('更多')` 且文本/图标标签均未命中时触发，故不影响其它按钮路径。
+- 范围（可写集）：`scripts/controller/actions/phase/prompts.py`、`scripts/prompts/agent-core.md`、`scripts/controller/actions/js_snippets/icons.py`、`scripts/controller/actions/click_action_engine.py`、`scripts/characterization/cold/characterize-icon-buttons.py`、`scripts/characterization/characterize-case-data.py`（pin）、本协作日志。
+- 验收（合并后集成态复跑）：`characterize-icon-buttons` OK（未展开点击 ✓ / 已展开不点 ✓ / aria-label 纯图标 ✓ / 多候选歧义 ✓ / 无候选保持 miss ✓）；`characterize-case-data` OK（query 与纯「筛选」描述带提示、导航/向导不带）；`characterize-click-scope-picker-login` OK；全量 verify-all = **既有 4 条基线红**（step-highlight/layer-tree/confirm-notification/network-capture），零新增红。
+- 遗留移交：①本会话未单独提交开工声明（内联完成，范围即上列文件），以本条补记闭环；②`06fbf86d` 顺带带入 `config/.db-whitelist-seen`（运行期自动重写，与本任务无关），如需可单独 revert；③prompt 与 JS 识别均为「尽力尝试」，湿测若遇非常规「更多」表示（非 `more-btn`、非 caret）请回传 DOM 再扩识别式。不维护 CHANGELOG。
+
 ## 2026-09-17 12:30 · ZCode 引擎线 — 开工：按组件类型推荐动作（重构 840 opHint 硬编码，用户定调）
 
 - 进行中：用户反馈 9e35b942 的 opHint 太死板（硬编码 下一步/发起节点）。改为**按目标文本的载体组件类型给推荐**：按钮→click，下拉选项→select。落点=「按文本找目标」的唯一动作 `real_click` 的解析器内：①命中载体是 `.el-select-dropdown__item` → 不信任点击，返回 `err-real-click-select-option` + 处方 `select_option(label_text=<展开中的下拉字段名,取 aria-expanded/activeElement 归属 form-item>, option_text=X)`；②命中载体是禁用按钮（native disabled/aria-disabled）→ `err-real-click-disabled-button` + 处方（点亦无效，找替代）；③目标无可见载体 → 处方点破「下拉选项弹层未展开时不在 DOM 里，对该字段 select_option；是按钮则先确认步骤」；④启用按钮 → 行为不变（点击）。guard opHint 去硬编码：只按字段类型表述（opOptions=[] 语义 + select_option(label_text=opLabel, option_text=<选项原文>)），删除「下一步/发起节点」字面量；`_todo.py` 提示词同步改类型制表述
