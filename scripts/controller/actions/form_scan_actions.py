@@ -500,6 +500,31 @@ async def sync_tasks_from_errors_impl(browser_context, business_data_store):
         )
         sys.stderr.flush()
 
+    # Auto-scroll to first error so agent can see and fix it immediately
+    if retried:
+        scroll_raw = await page.evaluate(JS_SCROLL_TO_FIRST_ERROR)
+        try:
+            scroll_info = json.loads(scroll_raw) if isinstance(scroll_raw, str) else scroll_raw
+        except Exception:
+            sys.stderr.write("[sync-errors] parse JS_SCROLL_TO_FIRST_ERROR result failed" + '\n')
+            sys.stderr.flush()
+            scroll_info = {}
+        jumped_label = (scroll_info.get('label') or '').strip()
+        jumped_error = (scroll_info.get('error') or '').strip()
+        if jumped_label:
+            sys.stderr.write(f'[sync-errors] auto-scrolled to: "{jumped_label}" → {jumped_error}\n')
+            sys.stderr.flush()
+
+    # 构建返回消息
+    msg = f'sync-errors | retried:{len(retried)}'
+    if fillable:
+        msg += ' | fillable:' + json.dumps([item.label for item in fillable], ensure_ascii=False)
+    if intervene:
+        msg += ' | disabled_button_fields:' + json.dumps(
+            [item.label for item in intervene], ensure_ascii=False
+        )
+    return _ok(msg, include_in_memory=True)
+
 
 def _scan_fields_are_stub(fields) -> bool:
     """Return True when a scan result looks like a DOM-not-stable "stub" scan.
@@ -559,28 +584,3 @@ async def _scan_visible_dom_fields(browser_context, button_keywords):
         sys.stderr.flush()
         pass
     return dom_fields
-
-    # Auto-scroll to first error so agent can see and fix it immediately
-    if retried:
-        scroll_raw = await page.evaluate(JS_SCROLL_TO_FIRST_ERROR)
-        try:
-            scroll_info = json.loads(scroll_raw) if isinstance(scroll_raw, str) else scroll_raw
-        except Exception:
-            sys.stderr.write("[sync-errors] parse JS_SCROLL_TO_FIRST_ERROR result failed" + '\n')
-            sys.stderr.flush()
-            scroll_info = {}
-        jumped_label = (scroll_info.get('label') or '').strip()
-        jumped_error = (scroll_info.get('error') or '').strip()
-        if jumped_label:
-            sys.stderr.write(f'[sync-errors] auto-scrolled to: "{jumped_label}" → {jumped_error}\n')
-            sys.stderr.flush()
-
-    # 构建返回消息
-    msg = f'sync-errors | retried:{len(retried)}'
-    if fillable:
-        msg += ' | fillable:' + json.dumps([item.label for item in fillable], ensure_ascii=False)
-    if intervene:
-        msg += ' | disabled_button_fields:' + json.dumps(
-            [item.label for item in intervene], ensure_ascii=False
-        )
-    return _ok(msg, include_in_memory=True)
