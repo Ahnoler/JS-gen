@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 10:20 · DSH — 收工：执行机多节点负载均衡 spec 交付（回链 10:16 开工）
+
+- 完成：`docs/superpowers/specs/2026-09-17-executor-lb-design.md`——现状速查表（file:line 锚点均本会话实读核实）、缺口 G1–G11、P0 T1–T6 / P1 T7–T10 / P2 T11–T14 任务拆解、兼容性契约（heartbeat 增量字段双向兼容；409 形状不变；api-docs catalog.js 同步义务）、风险回退、给评审人的开放问题 Q1–Q7、实施约定
+- 调研新增实锤（已入 spec G3/T2）：执行机侧拒绝（槽满/draining）经 `session.error` 回发（`executor/agent.mjs:181`），但控制面 `openSession` 只等 `session.ready`（`src/executor-event-hub.js:74` 单一事件）→ **执行机侧槽满退化为 120s 挂起 + 500**（409 正则不匹配超时消息），现有 409 映射实际只覆盖控制面自判路径
+- 验收：纯文档交付，无代码改动；spec 状态标注「草案待控制面同事评审，评审通过前不落实现」
+- 遗留移交：①评审后按 spec §4–6 逐项立项（建议发布顺序 T1→T2→T3→T4→T5→T6）；②T10/T12 分别依赖 Q3（client_key 供数）/Q4（SUT 站点口径）；③实现期 `scripts/refactor/verify-all.sh` 注册须与他线协调（热文件）；④不维护 CHANGELOG
+
 ## 2026-09-17 10:16 · DSH — 开工：执行机多节点负载均衡 spec（交控制面同事评审）
 
 - 进行中：把 09-17 上午的执行资源调度调研落成正式 spec `docs/superpowers/specs/2026-09-17-executor-lb-design.md`——现状速查表（file:line 锚点）+ 缺口清单 + P0/P1/P2 设计与任务拆解 + characterization 钉位方案 + 开放问题
