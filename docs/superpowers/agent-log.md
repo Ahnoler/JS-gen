@@ -1,7 +1,5 @@
 # Agent 协作日志
 
-# Agent 协作日志
-
 ## 2026-09-17 10:16 · DSH — 开工：执行机多节点负载均衡 spec（交控制面同事评审）
 
 - 进行中：把 09-17 上午的执行资源调度调研落成正式 spec `docs/superpowers/specs/2026-09-17-executor-lb-design.md`——现状速查表（file:line 锚点）+ 缺口清单 + P0/P1/P2 设计与任务拆解 + characterization 钉位方案 + 开放问题
