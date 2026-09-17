@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 16:45 · ZCode 引擎线 — 开工：下拉族边界改按行为写（指引层，零引擎改动）
+
+- 进行中（用户批准方案；起因=用户追问「面对下拉框 Agent 为什么会用真实点击」）：审计两份只读调研已定因——①`agent-tools-common.md:72` 命令 agent「**必须先读选项再选**」却没给读通道（真实只读通道是 `scan_visible_fields`/`scan_form_fields` 的 `field.options`，源码注释明确「不打开下拉框」）；②禁令**按工具名写**且 `real_click`/`click_button` 从未被排除（`common.md:3`/`form.md:114`/`:117` 只点名 `click_element(_by_index)`，而 `form.md:144` 早有三工具一起点名的先例）；③`real_click` 被宣传成「合成点击无效时用」的信任通道（`common.md:124-127`），范围未排除选项。**因此 agent 被指引推去开下拉，而它唯一会用的开法是点击。**
+- 范围（可写集）：`scripts/prompts/agent-tools-common.md:3/:72/:124-127`（子智能体 A）、`scripts/prompts/agent-tools-form.md:113/:114/:117`（子智能体 B）、`scripts/controller/actions/_todo.py` 动作 docstring（主会话）、`scripts/characterization/characterize-real-click.py`（主会话，扩边界针脚）、`scripts/refactor/verify-all.sh`（如需）、本协作日志。**子智能体不 commit、不写 agent-log，由主会话代声明代提交**
+- 禁入区：`real_click.py`/`_workspace.py`/`click_action_engine.py`（保持 `791e5c44` 的回退态）；`select_engine`/`select_dispatch`；不新增引擎动作、不给 `check_field_value` 加 options（用户选"只改指引"）；他线 `data/kb/**` WIP；`origin/master`
+- 方式：主会话定稿逐字文案（子智能体只做精确替换，不自拟措辞）→ 并行 A/B → 主会话回收核对（含 grep 确认合法 real_click 用法未被误伤）→ 扩 pin 并**逐条证伪**（改回旧措辞必红）→ verify-all 基线比对
+- 交付边界：**只交付指引改动+门禁**；840 重录验证另开窗口（需重启 4097+执行机，避开他线在途录制）
+
 ## 2026-09-17 15:35 · ZCode 引擎线 — 收工：纠正过拟合（撤回跨族分类器，guard 只报组件类型）
 
 - **更正前一条**：`598d8a75` 收工条目把「real_click 载体分类器 + 处方」记为已交付成果——**是过拟合，已撤回**，该条目的成果描述作废，以本条为准
