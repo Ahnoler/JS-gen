@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 12:12 · ZCode 引擎线 — 开工：29242 真场景调研（验证 840 处方动作）
+
+- 进行中：用户授权占用 29242 浏览器（840 现场页）。真场景验证 `9e35b942` 处方的前提：①`select_option(流程操作=下一步)` 的引擎 el-select 原版路径在该真实组件上是否可选成功；②guard 复核回路（opValue 变化 → opHint 切提交分支）是否闭环；③顺带实证末步 `real_click('下一步')`（弹层关）的解析结果（预期 err-real-click-target-not-found，佐证旧路径已死）
+- 边界：**绝不点击 流程提交/流程撤销**（不可逆）；会先 `JS_CLEAR_FIELD_VALUE` 清掉用户手工选的「下一步」再测 select_option 全路径，测完即恢复原值（恢复动作=被测动作本身）；下拉若被展开则收尾关闭
+- 范围：只读+上述受控页面操作；不改代码（除非调研发现 select_option 在该组件上失败=新缺陷，届时另立修复单再声明）
+- 方式：主会话 Playwright connectOverCDP 跑引擎原版 JS 片段
+
 ## 2026-09-17 12:05 · ZCode 引擎线 — 收工：traj 840 末步 下一步=下拉选项，guard 补 select_option 处方（回链 11:52 开工）
 
 - 完成：`9e35b942`。`wf_submit_guard` 载海新增 **`opHint` 行动处方**：opValue 空 →「opOptions=[] 只说明弹层未展开、不代表没有选项（发起节点选项通常=下一步）；调用 `select_option(label_text=流程操作, option_text=下一步)`（select_option 自行展开弹层），重跑 guard 确认 opValue 变化后再 click 流程提交；**禁止对 下一步 这类名称 real_click/click_button——末步的 下一步 是这个下拉的选项，不是按钮**」；opValue 已选 → 复核后流程提交。`_todo.py` action 提示词与模块 docstring 同步
