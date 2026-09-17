@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 10:50 · ZCode 引擎线 — 开工：多阶段录制阶段收尾必崩（gated 未定义残留）修复
+
+- 进行中：真机多阶段录制「第一阶段完成后整批终止、插入 Stop requested (cancel_step)」。根因已三方实证：合并 `c0cfa03e`（昨天 20:53，PR #45 G3 门禁）在 `recordPhaseResult` 冲突区解成杂交——保留基线 v2/v3 内联零步降级逻辑，又留下 PR 侧 `if (gated.rejectedZeroStep)` 消费块、丢了 `const gated = applyZeroStepFakeSuccessGate(...)` 定义行 → 每次阶段收尾必抛 ReferenceError → 循环中止 → 失败终局化（今晨轨迹 #832/#840 failed，done_logs 存原文 `gated is not defined`）→ finally 补发 cancel_step 砍 agent
+- 修法（最小，删残留）：删 `trajectory-recording-runner.js` L901-914 孤儿块（保留 else 侧 rawDoneText 落日志），import 去掉不再使用的 `applyZeroStepFakeSuccessGate`（`aggregateTrajectorySuccessful` 仍被终局门闩使用）；零步降级语义由 v2/v3 内联实现（强制 null + `[0步完成]` 日志 + 终局双源复核）完整承担，不恢复 v1 定义行以免双门禁语义冲突（false vs null）
+- 范围（可写集）：`src/services/trajectory/trajectory-recording-runner.js`、新 pin `scripts/characterization/characterize-record-phase-finalize.mjs`、`scripts/refactor/verify-all.sh`（仅主线程注册）、本协作日志；DB 只读盘点 + 数据善后：`trajectory_phase` 表轨迹 #840 卡 running 的阶段复位 failed（UPDATE 单行，语义=生命周期本应写入的终态）
+- 禁入区：`phase-done-evidence-gate.js`（模块本身不动，`applyZeroStepFakeSuccessGate` 导出保留）、`trajectory-record-lifecycle.js`、SPA 仓、他线在途文件（10:36 发版声明=纯运维无文件交集）、`scripts/prompts/**`、`config/`
+- 方式：主线程内联（RED pin 先行：钉「runner 不得引用 gated / 不得导入 applyZeroStepFakeSuccessGate + v2/v3 降级字面量在位」）；eslint + 关联 pin（quality-final-gate/run-event-ownership/owned-wait-shape）回归；全量 verify-all 与 3 红基线比对；完成后 agent-log 收工
+
 ## 2026-09-17 10:42 · ZCode — 收工：executor LB spec 状态行措辞定稿（回链 10:41 重发开工）
 
 - 完成：**`7eef33ec`**——`docs/superpowers/specs/2026-09-17-executor-lb-design.md` 第 4 行状态行改为用户给定措辞「**草案，待控制面负责同事评审，评审通过前不落实现**」（原文语义相同、句读不同：`草案，待控制面负责同事评审 —— 评审通过前不落任何实现`）；正文其余 224 行未动
