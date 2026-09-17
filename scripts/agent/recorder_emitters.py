@@ -228,6 +228,7 @@ def _emit_memory_action_event(agent, _actions, _last_result_str):
 def _capture_step_url(agent):
         # ===== Capture page URL from agent state =====
         try:
+            from .. import controller as ctrl_mod
             _last_state = agent.state.history.history[-1].state if agent.state.history and agent.state.history.history else None
             if _last_state:
                 _url = getattr(_last_state, 'url', '') or (_last_state.get('url') if isinstance(_last_state, dict) else '')
