@@ -12,7 +12,9 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
 /**
  * Cache format version — bump on breaking cache shape **or** persist-boundary
  * semantics that invalidate previously proposed atoms; commit rejects caches
- * whose version differs (STALE_PROPOSE_CACHE). v10: cohesion ignores maintain
+ * whose version differs (STALE_PROPOSE_CACHE). v11: cohesion ignores closer
+ * residual 复制…数据/信息 after clone, object noun 待维护, and outcome 确认删除成功 /
+ * 删除成功 (wet clone/maintain/delete false positives). v10: cohesion ignores maintain
  * page/dialog titles, fill-in 填写/录入, closer residual 修改…后, noun 添加,
  * and 启用和禁用状态 (wet create/edit/export false positives). v9: persist-confirm
  * count uses closer marks (【确定】/【保存】/【提交】) not narrative 禁用/克隆/删除;
@@ -26,7 +28,7 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
  * must re-propose). v5 was the structural gate (`multi_capability_task_draft`)
  * + title-as-key reject.
  */
-export const PROPOSE_CACHE_VERSION = 10;
+export const PROPOSE_CACHE_VERSION = 11;
 
 /**
  * Read cached propose result from a module directory.

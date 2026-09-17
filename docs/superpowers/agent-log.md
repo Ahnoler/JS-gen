@@ -1,5 +1,21 @@
 # Agent 协作日志
 
+## 2026-09-17 17:18 · Cursor — 补钉：cohesion v11 边界 pin（回链 17:10 收工）
+
+- 评审补：inspect 钉 `点击【复制】` 仍 clone、`确认删除`（无成功）仍 persist-as-cap、closer `复制产品` 无数据/信息仍 clone（保守残留式不扩）；删除湿 pin `persistConfirms===0`；cache 注释补 `信息`。生产规则未扩。
+
+## 2026-09-17 17:10 · Cursor — 收工：capability-cohesion LMY FP cache v11（回链 16:53 开工）
+
+- 完成：`cca2245d` cohesion 闸 + cache **v11**。PR → `uara_V1.2`。
+- 三笔 LMY 误杀：① closer 残留 `复制…数据` 不再当第二 clone；② `待维护产品` 当 locate 名词，不再 maintain；③ `确认删除成功` / `删除成功` 当结局，不再第二 delete persist。`flow-card-guide.js` 未改（persistConfirms 本就不计叙事删除）。
+- 验收：
+  - `characterize-capability-cohesion.mjs` **all passed**（三笔 cohesion ok；inspect 钉 word-bleed；maintain+sort / 添加一条+删除 / 配置 closer 后删除 / 同组维护+删除仍拒；v10 湿 pin 仍过）
+  - `characterize-persist-boundary.mjs` **all passed**（两次【保存】/【确定】仍 multi）
+  - `characterize-atom-depend.mjs` **all passed**
+  - `characterize-req-draft-traj.mjs` **OK 76**（cache **11**）
+  - `npx eslint` 改动 src **0**
+- 遗留移交：LMY 须 **POST** `…/product-mgmt/draft-traj/propose`（cache **v11**）；仅重启不够。parse / atomize prompt / UI / dangling_data_depend 未动。不维护 CHANGELOG。
+
 ## 2026-09-17 17:05 · ZCode 引擎线 — 收工：下拉族边界改按行为写（回链 16:45 开工，`0dc1863c`）
 
 - 完成：`0dc1863c`（6 处指引文本 + 1 处引擎 docstring + 门禁）。**两股拉力都堵住了**：①`common.md:72`「必须先读选项再选」现在给读通道——`scan_visible_fields` / `scan_form_fields` 的 `field.options`（**从 Vue 实例读，不打开下拉**），并说明 `select_option` 自行负责开/关弹层与滚动；②禁令**按行为**写：`common.md:3`（**每模式都加载**）把排除从 `click_element` 扩到**任何 click 类工具**（含 `real_click`/`click_button`），`common.md:124-127` 给信任通道**宣告适用范围**（触发器/树节点/级联面板/合成点击无效的按钮）并明写**不得用于选择下拉选项**，`form.md:113` 补明点的是**触发器**、选项仍走 select_option，`form.md:114/:117` 同步扩写。体例沿用本仓既有先例 `form.md:144`（该处早把三工具一起点名）
@@ -9,6 +25,14 @@
 - **对上一轮的更正**：`791e5c44` 漏提交了 `characterize-component-type-prescription.py` 的删除（该路径不在当次 `git add` 清单内，我误把 `git status` 的未暂存 `D` 当已提交）——本笔补交
 - 遗留移交：①**840 重录验证**待窗口（需重启控制面 4097 + 执行机加载 `7eea3bf8` + `791e5c44` + `0dc1863c`，并避开他线在途录制）；②`form.md:56/:115` 仍是工具名制的**禁令**（非拉力，且已被 `common.md:3` 的行为规则覆盖）——按最小改动未动，若要完全统一为行为措辞可另开一笔；③`characterize-wf-submit-guard-hint.py` 的 9 行防回潮 ban 保留（编码用户裁定）
 - 注：不维护 CHANGELOG
+
+## 2026-09-17 16:53 · Cursor — 开工：capability-cohesion LMY FP（clone 复制残留 / 待维护名词 / 删除成功结局，cache v10→11）
+
+- 进行中：LMY `reject-drafts-reprobe.json` re-atomize 2026-09-17 三笔 cohesion 误杀——①产品克隆 closer 行裸 `复制…数据` 当第二 clone；②`待维护产品` 当 maintain；③`确认删除成功` 当第二 delete persist。同精神收 residual `修改…后` / 标题 `维护…主页`。
+- 范围（可写集）：`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` 10→11）、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin）、本协作日志。`flow-card-guide.js` 仅当 closer/persist-as-cap 计数必须一致才动。
+- 禁入区：parse API、atomize prompt、Vue SPA、`dangling_data_depend`、executor/phase/wf-guard、`origin/master`、他线 840 指引/`scripts/prompts/agent-tools-*.md`/`data/kb/**` WIP
+- 方式：主会话 Inline TDD；基线 `uara_V1.2`；分支 `cursor/cohesion-fp-cache-v11-66fb` → PR `uara_V1.2`
+- 真阳性保持：maintain+上移/下移、两次【保存】/【确定】 persist 闸、`添加一条记录`+删除、v10 湿 pin、同组配置+删除
 
 ## 2026-09-17 16:45 · ZCode 引擎线 — 开工：下拉族边界改按行为写（指引层，零引擎改动）
 
