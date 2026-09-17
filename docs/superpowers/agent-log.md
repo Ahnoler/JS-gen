@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-17 11:06 · Cursor — 收工：merge origin/uara_V1.2 into PR #50（回链本条）
+
+- 完成：`cursor/req-module-parse-api-dfb7` 合入最新 `origin/uara_V1.2`（`76dc73f0`）。冲突仅本文件，按时刻交错保留双方条目。产品代码无冲突：parse 路由 / kb-req-parse / mammoth / hasLocalSource / characterize-kb-req-parse 全保留；他线 `7eea3bf8` recordPhaseResult gated-orphan 修复 + `characterize-record-phase-finalize` 一并带入。
+- 验收：再跑 `characterize-kb-req-parse.mjs`。不 `gh pr merge`（父会话合入）。
+- 遗留：湿测仍须 upload → parse → propose；发版后 #840/#832 重录见下行 ZCode 11:05。不维护 CHANGELOG。
+
 ## 2026-09-17 11:05 · ZCode 引擎线 — 收工：多阶段录制阶段收尾必崩（gated 未定义残留）修复（回链 10:50 开工）
 
 - 完成：`7eea3bf8`——删 `recordPhaseResult` 中合并 `c0cfa03e`（PR #45）遗留的孤儿块 `if (gated.rejectedZeroStep){...} else {...}`，保留 else 侧 rawDoneText 落日志；import 未动（复查发现 `applyZeroStepFakeSuccessGate` 仍被终局 v3 per-run 零阶段降级 L1215 合法使用，最初误判为无主、由 pin 与 grep 当场纠回）。零步降级语义由 v2/v3 内联门禁（success→null + `[0步完成]` 日志 + 终局双源复核）单一承担
@@ -7,6 +13,25 @@
 - 数据说明（未做 DB 手术）：轨迹 #840 阶段 1/2 的 failed 为修复前两次真录的真实终态（done_logs 存 `gated is not defined` 原文）；收工时阶段 3 正在用旧代码录制中，其收尾仍会崩并自行终局化——无卡死 running 残留，不碰在录数据。**发版后整批重录 #840（record/start 会自动把所选阶段重置 pending）即真机闭环**；今晨 #832 同病灶同修覆盖
 - 移交：用户协调测试重新发版（控制面非热加载）→ 发版后 #840 重录验证多阶段贯通；#832 如需一并重录同理
 - 注：不维护 CHANGELOG
+
+## 2026-09-17 10:58 · Cursor — 收工：sync req-module parse API MVP（回链 10:50 开工）
+
+- 完成：`be4aff1c` 开工+spec/plan → `34490b92` 实现 → 本条收工。PR **#50** → `uara_V1.2`。
+- 交付：`POST /api/v2/kb/req-modules/:moduleKey/parse`（sync）；mammoth(.docx)+md/txt；LLM JSON `{chapters,throughChainsMarkdown}` 必须 `hasProposeableChainSteps` 否则 `SLICE_INVALID`；写 chapters/through-chains、`status=sliced`、删 `.draft-traj-propose.json`；list/get 增 `hasLocalSource`。
+- 验收（本环境，假 LLM）：
+  - `characterize-kb-req-parse.mjs` **OK 21**
+  - `characterize-kb-req-modules.mjs` **OK 11**
+  - `characterize-kb-req-modules-list.mjs` **OK 3**
+  - `npx eslint` 改动 src **0**
+- 遗留移交：LMY 湿测顺序 **upload → parse → propose**；parse 同步 LLM 可能 1–3+ 分钟（超时 300s），须重启 4097 且客户端放宽超时。不维护 CHANGELOG。未跑真 LLM / 真 docx 湿抽。
+
+## 2026-09-17 10:50 · Cursor — 开工：sync req-module parse API MVP
+
+- 进行中：落地已批准的同步 `POST /api/v2/kb/req-modules/:moduleKey/parse`（upload → parse → propose 中缺的切片步）；TDD 先行；不改 propose/atomize/chapter-excerpt。
+- 范围（可写集）：`docs/superpowers/specs/2026-09-17-req-module-parse-api-design.md`、`docs/superpowers/plans/2026-09-17-req-module-parse-api.md`、`scripts/prompts/req-module-parse-prompt.md`、`src/services/kb-req-parse/**`（新）、`src/services/kb-req-modules.js`（`hasLocalSource`）、`src/routes/v2/kb.js`、`src/dashboard/api-docs/groups/kb.js`、`scripts/characterization/characterize-kb-req-parse.mjs`（新）、顺手扩 `characterize-kb-req-modules*.mjs` 钉 `hasLocalSource`、`scripts/refactor/verify-all.sh`（注册新门禁）、`package.json`/`package-lock.json`（mammoth）、本协作日志
+- 禁入区：`src/services/req-draft-traj/propose.js` / `chapter-excerpt.js` / atomize schema；`capability-cohesion.js`；wet-test.md / drafts / promote；Vue SPA；executor-lb spec；recorder/phase/G3；`origin/master`；活跃录制会话
+- 方式：主会话 Inline TDD（任务紧耦合，不派子智能体写同一文件）；基线 `uara_V1.2`；新分支 `cursor/req-module-parse-api-dfb7` → PR `uara_V1.2`
+- 遗留：湿测由用户在 LMY 跑 upload → parse → propose（同步 LLM 可能 1–3+ 分钟，客户端需放宽超时）
 
 ## 2026-09-17 10:50 · ZCode 引擎线 — 开工：多阶段录制阶段收尾必崩（gated 未定义残留）修复
 

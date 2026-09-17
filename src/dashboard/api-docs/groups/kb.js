@@ -16,6 +16,7 @@ export const GROUP_KB = [{
   description:
     '信贷知识库：洞察只读面（流程卡溯源与失效检测，与 data/kb/flows 单向只读）'
     + '；需求作业区登记（data/kb/req/<moduleKey>/ manifest + chapters/drafts 工作区）'
+    + '；需求切片 parse（同步 LLM：chapters + proposeable through-chains）'
     + '；需求切片→draft 交易两段式（draft-traj/propose 原子候选 → commit 建 draft，全程不录制）。',
   endpoints: [
     {
@@ -83,6 +84,7 @@ export const GROUP_KB = [{
             warnings: [],
             hasThroughChains: true,
             canProposeAtoms: true,
+            hasLocalSource: true,
             createdAt: '2026-09-05T10:00:00.000Z',
             updatedAt: '2026-09-05T10:00:00.000Z',
           }],
@@ -90,6 +92,7 @@ export const GROUP_KB = [{
       }),
       notes: [
         'hasThroughChains=文件存在；canProposeAtoms=解析后至少一条表格步骤（draft-traj propose 可结构化出候选）',
+        'hasLocalSource=source.link.json.localCopy 文件存在（已上传源副本）',
       ],
     },
     {
@@ -110,12 +113,13 @@ export const GROUP_KB = [{
           warnings: [],
           hasChapters: true,
           hasThroughChains: false,
+          hasLocalSource: false,
           draftCount: 0,
           createdAt: '2026-09-05T10:00:00.000Z',
           updatedAt: '2026-09-05T10:00:00.000Z',
         },
       }),
-      notes: ['模块不存在 → NOT_FOUND'],
+      notes: ['模块不存在 → NOT_FOUND', 'hasLocalSource=已上传 localCopy'],
     },
     {
       method: 'POST', path: '/api/v2/kb/req-modules/{moduleKey}/source',
@@ -137,6 +141,42 @@ export const GROUP_KB = [{
         },
       }),
       notes: ['模块不存在 → NOT_FOUND', '非文档扩展名 → 400', '无本地副本的旧模块行为不变（回退 sourcePath）'],
+    },
+    {
+      method: 'POST', path: '/api/v2/kb/req-modules/{moduleKey}/parse',
+      summary: '同步切片源文档为 chapters + proposeable through-chains',
+      desc: '优先读 source.link.json.localCopy，否则可读的 sourcePath；提取 .md/.txt 或 mammoth(.docx) 文本后调 LLM，'
+        + ' 写出 chapters/*.md 与 through-chains.md，manifest.status=sliced，并删除 .draft-traj-propose.json。'
+        + ' 始终覆盖切片产物；force 预留（未 force 且已有切片时 warnings 含 slice_overwritten）。'
+        + ' 同步调用可能 1–3+ 分钟（LLM 超时 300s），客户端须放宽超时。湿测顺序：upload → parse → propose。',
+      params: [
+        { name: 'moduleKey', type: 'string', required: true, in: 'path', desc: '模块键', example: 'product-mgmt' },
+        { name: 'force', type: 'boolean', in: 'body', desc: '预留；MVP 仍覆盖切片产物' },
+      ],
+      reqExample: J({ force: false }),
+      respExample: J({
+        code: 200,
+        message: 'ok',
+        data: {
+          moduleKey: 'product-mgmt',
+          status: 'sliced',
+          sourceDoc: 'source/K01天阳信贷管理系统-产品管理需求分册.docx',
+          chapterCount: 6,
+          chainCount: 4,
+          canProposeAtoms: true,
+          warnings: [],
+        },
+      }),
+      notes: [
+        '模块未登记 → NOT_FOUND/404',
+        '无 localCopy 且 sourcePath 不可读 → 400 SOURCE_REQUIRED',
+        '非 md/txt/docx 或抽取失败 → 400',
+        'LLM 产物缺 proposeable 步骤表 → 400 SLICE_INVALID（不写盘）',
+        'LLM 调用失败 → 502 LLM_FAILED',
+        '超长源文截断约 80–100k 字 → warnings 含 source_truncated',
+        'hasLocalSource 见 GET list/detail，供 UI 强制 upload → parse → propose',
+        '不改 propose/atomize/chapter-excerpt；本请求不自动 propose',
+      ],
     },
     {
       method: 'POST', path: '/api/v2/kb/req-modules/{moduleKey}/draft-traj/propose',

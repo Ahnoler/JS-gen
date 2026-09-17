@@ -161,7 +161,7 @@ export async function registerReqModule({
  * 列出已登记模块（跳过无 manifest 的子目录）。
  * @param {object} [opts] 查询选项
  * @param {string} [opts.rootDir] 作业区根目录（缺省=data/kb/req）
- * @returns {Promise<(ReqModuleManifest & { hasThroughChains: boolean, canProposeAtoms: boolean })[]>} manifest 列表（按 moduleKey 排序）
+ * @returns {Promise<(ReqModuleManifest & { hasThroughChains: boolean, canProposeAtoms: boolean, hasLocalSource: boolean })[]>} manifest 列表（按 moduleKey 排序）
  */
 export async function listReqModules({ rootDir } = {}) {
   const root = resolveRootDir(rootDir);
@@ -193,6 +193,7 @@ export async function listReqModules({ rootDir } = {}) {
       ...manifest,
       hasThroughChains,
       canProposeAtoms,
+      hasLocalSource: await moduleHasLocalSource(join(root, ent.name)),
     });
   }
   return rows.sort((a, b) => a.moduleKey.localeCompare(b.moduleKey));
@@ -228,6 +229,22 @@ async function pathExists(filePath) {
 }
 
 /**
+ * True when source.link.json.localCopy exists as a file under the module dir.
+ * @param {string} modDir Module workspace directory
+ * @returns {Promise<boolean>} Whether an uploaded local copy is present
+ */
+async function moduleHasLocalSource(modDir) {
+  try {
+    const link = JSON.parse(await readFile(join(modDir, 'source.link.json'), 'utf-8'));
+    const localCopy = String(link.localCopy || '').trim();
+    if (!localCopy) return false;
+    return pathExists(join(modDir, localCopy));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 统计模块草稿目录中的 JSON 草稿文件。
  * @param {string} draftsDir 草稿目录路径
  * @returns {Promise<number>} JSON 草稿文件数量
@@ -247,7 +264,7 @@ async function countDraftFiles(draftsDir) {
  * @param {object} opts 查询选项
  * @param {string} [opts.rootDir] 作业区根目录（缺省=data/kb/req）
  * @param {string} opts.moduleKey 模块键
- * @returns {Promise<ReqModuleManifest & { hasChapters: boolean, hasThroughChains: boolean, draftCount: number }>} 详情
+ * @returns {Promise<ReqModuleManifest & { hasChapters: boolean, hasThroughChains: boolean, hasLocalSource: boolean, draftCount: number }>} 详情
  */
 export async function getReqModule({ rootDir, moduleKey }) {
   assertModuleKey(moduleKey);
@@ -261,6 +278,7 @@ export async function getReqModule({ rootDir, moduleKey }) {
     ...manifest,
     hasChapters: await dirHasEntries(join(modDir, 'chapters')),
     hasThroughChains: await pathExists(join(modDir, 'through-chains.md')),
+    hasLocalSource: await moduleHasLocalSource(modDir),
     draftCount: await countDraftFiles(join(modDir, 'drafts')),
   };
 }
