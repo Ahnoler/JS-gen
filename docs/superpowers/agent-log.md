@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 10:15 · OpenCode — 收工：开放页 navigate 门闩对「页内向导」不可满足，改以入口点击为证据
+
+- 完成：**`ad817a95`**（2 文件 / +71 -13）。重启复测（sid 591434fa）仍 `observed=[]`、阶段1 判失败中止——**非部署未生效的必然证据**，而是门闩本身对该 SUT 形态不可满足：对公客户评级申请向导**页内渲染**（URL 不变，且不被 `_guard_done_capture_page_block` 的 `.el-dialog`/`.el-drawer` 探针识别，overlay 标题前后相同/为空）→ `url_change`/`page_opened` 永不可观测 → 每步 done 被拒。
+- 修复：`_guard_done_record_open_page_evidence` 增**第二证据源**——overlay 不可见且本阶段已有**业务点击**（`_count_phase_business_actions>0`）时，以该入口点击作为 `page_opened` 证据（detail `open-page entry click`）。零业务动作守卫仍拦无点击假 done；错误门闩不豁免。
+- **可观测性**：该 helper 对 open_page navigate 阶段**每次 done 必打** `[recorder] open-page evidence check: overlay=... actions=... observed=... needed=...` —— 若下次日志**没有**这行，即说明执行机仍在跑旧代码（未拉取/未重启到本提交）。
+- 验收：`characterize-phase-runtime` pin 增两断言（页内 open_page + 有入口点击→打证据；仅 meta 动作→不打）；`characterize-g3-done-gate-live` 11/11、`characterize-recorder-phase-reset` 39、phase-reviewer/flow 全绿；**verify-all = 既有基线同 4 红**，无新增红。
+- 遗留移交：①请再重启执行机并复测；若日志出现 `open-page evidence check:` 行则应一次过（若仍失败，请把该行回传以便定位 overlay/actions 实际值）；②回退点=本提交；③不维护 CHANGELOG。
+
 ## 2026-09-17 09:50 · OpenCode — 收工：复核远程拉取（ZCode G3 湿测 pin）对本线修复的影响
 
 - 完成：**`2dd46f0b`**（1 文件 / +9）。远程新增 `53dec0e9`（ZCode G3 湿测：`characterize-g3-done-gate-live.py` 11 checks 真 Chromium + `characterize-g3-runner-seam.mjs` 9 checks，均注册 verify-all）并 merge 到本线 `07569560`。
