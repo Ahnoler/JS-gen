@@ -7,6 +7,24 @@
 - 禁入区：`click_element_by_index` 的 use-select-option 栅栏（已存在，不动）；`select_engine`（分发与拾取不动）；29242 页面只做受控验证（开弹层→解析→RESET 收尾，不点选项不点提交）；他线 `data/kb/req/product-mgmt/**` WIP
 - 方式：主会话 Inline；活页面+fixture 双验（真页面：开弹层后 real_click 解析应带 `select_option(label_text='流程操作', option_text='下一步')` 处方——label 从 DOM 现场推导，非硬编码）；pin 先行更新并证伪；verify-all 基线比对
 
+## 2026-09-17 12:40 · Cursor — 收工：capability-cohesion word-bleed FP（回链 12:22 开工）
+
+- 完成：`4c727358` word-bleed 闸 + cache **v10**；`729fb399` 收窄 `添加` 为名词 lookaround（`添加一条记录` 仍 create）。PR **#52** → `uara_V1.2`。
+- 验收：
+  - `characterize-capability-cohesion.mjs` **all passed**（新增产品阶段 / 核心映射新增·修改 / 导出 / 管控要素 long cohesion-ok；新增产品要素 / short 管控要素仍过；maintain+sort 仍拒；long 管控要素 propose=`multi_persist` 非 multi_capability）
+  - `characterize-persist-boundary.mjs` **all passed**
+  - `characterize-atom-depend.mjs` **all passed**
+  - `characterize-req-draft-traj.mjs` **OK 76**（cache **10**）
+  - `npx eslint` 改动 src **0**
+- 遗留移交：LMY 须 **POST** `…/product-mgmt/draft-traj/propose`（cache **v10**）；仅重启不够。long 设置产品管控要素 仍 `multi_persist`（picker【确定】+【保存】）属 persist 闸，非本轮 cohesion miss。2026-09-16 spec 仍写 `填写`/`录入`∈maintain，未改 spec（原计划锁文件）；parse / atomize prompt / UI 未动。不维护 CHANGELOG。
+
+## 2026-09-17 12:22 · Cursor — 开工：capability-cohesion create-draft word-bleed FP（cache v9→10）
+
+- 进行中：PR #51 后 LMY cache v9 湿测 create 笔仍 `multi_capability_task_draft`。根因是 `detectOtherFamilies` word-bleed，不是简化 create 形状：`维护…主页/维护弹窗` 当 maintain；`填写`/`录入` 当第二能力；closer 行残留 `修改…后`；裸 `添加`（需要添加的）；`启用和禁用状态` 当 status。
+- 范围（可写集）：`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` 9→10）、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin）、本协作日志
+- 禁入区：parse API、atomize prompt、Vue SPA、`dangling_data_depend`、executor/phase/wf-guard、`origin/master`、他线 840 处方/`data/kb/req/product-mgmt/**`
+- 方式：主会话 Inline TDD；基线 `uara_V1.2`；分支 `cursor/cohesion-word-bleed-fp-abb0` → PR `uara_V1.2`
+
 ## 2026-09-17 12:20 · ZCode 引擎线 — 补记：29242 真场景调研 8/8，840 处方动作全链实证（回链 12:12 开工）
 
 - 结论：`select_option(流程操作=下一步)` 的引擎原版路径在该真实页面**全链可用**，guard 复核回路闭环。页面已恢复原状（opValue=下一步、弹层已关），**未触碰 流程提交/流程撤销**
@@ -218,7 +236,6 @@
 - 方式：主会话 Inline；从 `uara_V1.2` 新分支；PR 目标 `uara_V1.2`；XML 分区保持；抽象规则 + few-shot（产品要素仅作标注示例）
 - 遗留：湿测由用户在 LMY 清 cache 后 `POST .../product-mgmt/draft-traj/propose`
 
-
 ## 2026-09-17 09:50 · OpenCode — 收工：复核远程拉取（ZCode G3 湿测 pin）对本线修复的影响
 
 - 完成：**`2dd46f0b`**（1 文件 / +9）。远程新增 `53dec0e9`（ZCode G3 湿测：`characterize-g3-done-gate-live.py` 11 checks 真 Chromium + `characterize-g3-runner-seam.mjs` 9 checks，均注册 verify-all）并 merge 到本线 `07569560`。
@@ -253,7 +270,6 @@
 - 两处修复（`scripts/agent/recorder_emitters.py`）：①新增 `_guard_done_record_open_page_evidence`——navigate 且 `goals` 含 `open_page` 时，done() 时**可见的目标 overlay 本身即 `page_opened` 证据**（click 埋点漏采的兜底；零业务动作守卫仍要求本阶段确有真实点击）；②新增 `_guard_done_nav_evidence_ok`——navigate 阶段自身 `success_when` 已满足时，可见 overlay 就是目标页/下一步，`_guard_done_reject_overlay` 不再误拒（保留 introduce_ok/save_ok/navigated_ok 豁免；错误门闩 `_guard_done_reject_errors` 未动，可见错误通知仍拦）。
 - 验收证据：pin 追加到**已注册**的 `characterize-phase-runtime`（新 `test_open_page_overlay_evidence_and_overlay_gate`：open_page 无证据→门关；打 overlay→`page_opened` 记录→门开；overlay 门从拒到放行；wizard `click_next` 无 open_page 不吃 stray overlay）；**verify-all 全跑 = 与既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。期间 `characterize-recorder-phase-reset` 曾因 pin 正则 `_guard_done_reject_\w+\([^)]*\)` 不容嵌套括号而红——改为先把 `nav_evidence_ok` 落变量再传参（**未改 pin**），复跑 39 checks OK。
 - 遗留移交：①**真机复测**建议：对公客户评级「点击评级申请→向导抽屉」应一次 done 通过；②生产须重启执行机侧 Python agent 进程生效；③回退点=本提交；④不维护 CHANGELOG。
-
 
 ## 2026-09-16 21:59 · OpenCode — 收工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（回链 21:35 开工）
 
@@ -313,6 +329,7 @@
 - 范围：只读调研=JS-gen `docs/superpowers/agent-log.md`（991 行）+ engine 仓 `ui_execute/engine/actions/**` 现状盘点；实现=engine 仓 `ui_execute/engine/actions/**`（具体文件集待清单确定后在本条目追加）+ 本地测试件（不提交）+ 本文件
 - 禁入区：JS-gen 源码（只读）、engine 仓 config.py、push、SUT 真实数据变更；他线 WIP（`scripts/refactor/verify-all.sh` 等在途件不碰）
 - 方式：lead 设计；调研双子智能体并行（R1=挖 log、R2=引擎盘点，均只读不 commit）；实现子智能体按清单文件集不相交派发；主会话复核+验证后代提交
+
 ## 2026-09-17 09:40 · Cursor — 收工：湿测 haystack 假绿（回链 09:10 开工）
 
 - 完成：分类 haystack 改为整组正文（步骤描述 + 操作块，仍剥编号/`操作：`/来源/关键数据）。湿测「排序 + 维护…操作：【保存】」现拒 `multi_capability_task_draft`。`新增…主页` 页名不当 create（同 `编辑页` 复合词口径），open-drawer fold 仍内聚。`PROPOSE_CACHE_VERSION` 5→6。开工 `b0451600`。
@@ -824,6 +841,7 @@
 - 范围：`src/` 控制面路由与 session/recording/stream 服务、`scripts/` 执行机生命周期与推流相关代码、数据库迁移/查询定义、相关文档与 characterization；本协作日志。
 - 禁入区：前端仓、线上数据库/执行机运行态、既有未提交 `config/.db-whitelist-seen`、其他会话工作区 WIP；不改变任何线上交易或会话状态。
 - 方式：先完成 `git pull` 尝试（因 GitHub 连接重置未成功），再以静态代码、迁移和测试证据追踪异常关闭后的 orphan session、重连和推流恢复路径，最后给出带文件/行号的根因与修复建议。
+
 ## 2026-09-16 12:15 · Cursor — 开工：表单字段内同族控件 xpath 消歧（field_slot）
 
 - 进行中：真机调研「保证金比例」复合字段 → 方案 A 已定；写 design spec，待用户审阅后写 plan 再改代码。

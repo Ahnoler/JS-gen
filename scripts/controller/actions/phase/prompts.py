@@ -6,11 +6,35 @@ Prompt fragments appended to the AI preamble per task mode, and heal-mode
 
 from __future__ import annotations
 
+import re
+
 from .classify import (
     TaskMode,
+    classification_task_text,
     is_open_page_task,
     is_wizard_nav_task,
 )
+
+# 查询/筛选类描述（用于判断是否注入「筛选字段可能收起」提示；不改任务分类）。
+_FILTER_QUERY_TASK_RE = re.compile(r'查询|搜索|查找|筛选')
+
+
+def filter_expand_try_hint() -> str:
+    """Best-effort cue: collapsed filter fields may hide behind 更多/展开.
+
+    Query/filter areas commonly collapse part of their conditions by default;
+    the task-named field may only appear after clicking a 「更多 / 展开」 toggle.
+    Only a try — never a hard requirement (no repeated clicking, no stalling).
+    """
+    return (
+        '\n【筛选条件可能默认收起】\n'
+        '若在搜索（筛选）区域**找不到任务点名的筛选字段**，先尝试展开默认收起的条件：'
+        '在同一区域内寻找「更多 / 更多条件 / 高级筛选 / 展开」类按钮'
+        '（图标按钮用 click_button(label) 或按索引点击），点开后再找该字段。\n'
+        '⚠️ 这只是**尽力尝试**：区域内没有此类按钮、或点开后仍无目标字段，'
+        '就按现有条件继续——不要反复点同一按钮、不要为找按钮卡住。\n'
+    )
+
 
 def query_task_hint() -> str:
     """Phase preamble: query/filter — AI-driven, no auto-fill."""
@@ -23,6 +47,7 @@ def query_task_hint() -> str:
         '4. 仅当已实际点过「查询/搜索」后才允许 done(success=true)；'
         '禁止 0 步或未点查询就声称成功。\n'
         '5. 本页没有「保存/提交」语义；click_save 不适用。\n'
+        + filter_expand_try_hint()
     )
 
 
@@ -140,6 +165,12 @@ def recording_refill_hint(
             return wizard_nav_task_hint()
         if is_open_page_task(task_text):
             return open_page_task_hint()
+        hint = task_mode_hint(mode, force_refill_all=force_refill_all)
+        # 描述为筛选/查询类但未归入 query 模式（如「按…筛选」无查询动词）：
+        # 同样补「筛选字段可能收起在更多后面」的尽力尝试提示。
+        if _FILTER_QUERY_TASK_RE.search(classification_task_text(task_text)):
+            hint = hint + filter_expand_try_hint()
+        return hint
     return task_mode_hint(mode, force_refill_all=force_refill_all)
 
 

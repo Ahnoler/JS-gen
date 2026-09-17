@@ -39,6 +39,7 @@ from scripts.controller.actions._phase_context import (  # noqa: E402
     format_prior_outcome_line,
     is_open_page_task,
     is_query_task,
+    recording_refill_hint,
     task_mode_hint,
 )
 
@@ -305,6 +306,41 @@ def test_recording_runner_all_phases_from_full_trajectory() -> None:
     )
 
 
+def test_filter_expand_try_hint() -> None:
+    """Query/filter phases get a best-effort cue to reveal collapsed 更多 conditions."""
+    q = recording_refill_hint('query', task_text='查询产品信息')
+    assert_true('筛选条件可能默认收起' in q, 'query hint carries filter-expand cue')
+    assert_true('更多' in q, 'query hint names the 更多 toggle')
+
+    # 描述含「筛选」但未归入 query（无查询/搜索动词）也要拿到提示。
+    other = recording_refill_hint('other', task_text='按客户名称、合同编号筛选列表')
+    assert_true('筛选条件可能默认收起' in other, 'filter-only description gets cue')
+    assert_true('尽力尝试' in other, 'cue stays best-effort')
+
+    # 非筛选/查询的 other 阶段不得注入该提示（避免新噪声）。
+    nav = recording_refill_hint(
+        'other',
+        task_text='点击客户管理。预期结果：打开对公客户管理页面。',
+    )
+    assert_true('筛选条件可能默认收起' not in nav, 'navigate hint has no filter cue')
+
+    # open-page 即便带「筛选」字样也走导航 hint，不混入查询提示。
+    nav_filter = recording_refill_hint(
+        'other',
+        task_text='进入列表按条件筛选。预期结果：打开客户管理列表页面。',
+    )
+    assert_true('任务类型：打开页面/导航' in nav_filter, 'open-page still navigate hint')
+    assert_true('筛选条件可能默认收起' not in nav_filter, 'open-page no filter cue')
+
+    # 向导/下一步与 open-page 仍走各自专属 hint，不混入查询提示。
+    wizard = recording_refill_hint(
+        'other',
+        task_text='客户名称搜索为（恒通商贸有限公司）后筛选，点击下一步。预期结果：成功进入下一步。',
+    )
+    assert_true('任务类型：向导/下一步' in wizard, 'wizard still wizard hint')
+    assert_true('筛选条件可能默认收起' not in wizard, 'wizard no filter cue')
+
+
 def main() -> None:
     test_lookup_exact_and_fuzzy()
     test_hint_includes_block_and_flat_kv()
@@ -312,6 +348,7 @@ def main() -> None:
     test_hint_lists_user_keys_only()
     test_search_dialog_heuristic()
     test_three_task_modes()
+    test_filter_expand_try_hint()
     test_phase_preamble_catalog_and_prior()
     test_recording_runner_all_phases_from_full_trajectory()
     print('characterize-case-data: OK')
