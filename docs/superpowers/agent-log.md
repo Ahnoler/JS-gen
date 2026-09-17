@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 09:10 · Cursor — 开工：湿测 haystack 假绿（操作：后丢失维护）
+
+- 进行中：修 PR #46 湿测假 PASS——`extractHaystack` 只取 `操作：` 之后，导致「排序 + 维护…操作：【保存】」被当成 other→closer-only persist。TDD：先加 wet pin RED，再改分类 haystack 为**整组正文**（步骤描述 + 操作块），`PROPOSE_CACHE_VERSION` 5→6。
+- 范围（可写集）：`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin 5→6）、本协作日志；必要时规格 §4.1 haystack 一句（防再次按旧口径回退）
+- 禁入区：`propose.js` 接线、`atom-depend.js`、`flow-card-guide.js`、prompt/samples/api-docs、场景黑名单、他线 WIP、不 merge
+- 方式：主会话 Inline TDD；C2/C6 必须保持绿；不跑 product-mgmt 湿测 propose
+
 ## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 6 unit/falsify（回链 21:19 开工）
 
 - 完成：Task 6 冷测自检 + C1 证伪 + `src/` 无 `missing_locate_prep` + 计划 Tasks 1–5 勾选 + PR #46 ready-for-review。**未跑** product-mgmt 湿测 propose。开工声明 `274188c8`。
