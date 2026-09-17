@@ -206,8 +206,8 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
         sys.stderr.write(
             f"[step {agent.state.n_steps}] "
             f"done={'yes' if _done else 'no'} stopped={'yes' if _stopped else 'no'} | "
-            f"goal={(_next_goal or '-')[:100]} | "
-            f"act={(', '.join(_actions))[:200] if _actions else '-'} | "
+            f"goal={(_next_goal or '-')[:200]} | "
+            f"act={(', '.join(_actions))[:500] if _actions else '-'} | "
             f"{_compact_last_result(_last_result)}\n"
         )
         sys.stderr.flush()
@@ -281,9 +281,9 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
             try:
                 log_line = (
                     f"[{step_num}] "
-                    f"goal: {_next_goal[:80] if _next_goal else '-'} | "
+                    f"goal: {_next_goal[:120] if _next_goal else '-'} | "
                     f"actions: {'; '.join(_actions) if _actions else '-'} | "
-                    f"result: {_last_result_str[:120]}"
+                    f"result: {_last_result_str[:400]}"
                 )
                 _ACTION_LOG.append(log_line)
             except Exception:
