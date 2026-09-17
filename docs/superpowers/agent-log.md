@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+# Agent 协作日志
+
+## 2026-09-17 10:16 · DSH — 开工：执行机多节点负载均衡 spec（交控制面同事评审）
+
+- 进行中：把 09-17 上午的执行资源调度调研落成正式 spec `docs/superpowers/specs/2026-09-17-executor-lb-design.md`——现状速查表（file:line 锚点）+ 缺口清单 + P0/P1/P2 设计与任务拆解 + characterization 钉位方案 + 开放问题
+- 范围（可写集）：**仅**新增该 spec 文件 + 本协作日志。不改任何产品代码/门禁/生成物
+- 禁入区：他线 WIP（`scripts/refactor/verify-all.sh`、`scripts/agent/recorder_emitters.py`、req-draft-traj 线文件、engine 仓）；线上数据库/执行机运行态；`origin/master`；活跃录制会话
+- 方式：主会话 Inline；纯文档交付；spec 经用户转控制面负责同事评审，评审通过前不落实现
+
 ## 2026-09-17 10:15 · OpenCode — 收工：开放页 navigate 门闩对「页内向导」不可满足，改以入口点击为证据
 
 - 完成：**`ad817a95`**（2 文件 / +71 -13）。重启复测（sid 591434fa）仍 `observed=[]`、阶段1 判失败中止——**非部署未生效的必然证据**，而是门闩本身对该 SUT 形态不可满足：对公客户评级申请向导**页内渲染**（URL 不变，且不被 `_guard_done_capture_page_block` 的 `.el-dialog`/`.el-drawer` 探针识别，overlay 标题前后相同/为空）→ `url_change`/`page_opened` 永不可观测 → 每步 done 被拒。
