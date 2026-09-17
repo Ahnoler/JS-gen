@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 18:22 · ZCode 引擎线 — 开工：同族缺陷三雷修复 + 门禁加固（no-undef / ruff F821）
+
+- 进行中：接上午「多阶段录制 gated 孤儿」事故的四路同族普查结论，带队修复三颗同族真雷并堵门禁缺口：**①P0** `form_scan_actions.py` `sync_tasks_from_errors_impl` 搬运断尾（L563-586 孤儿尾段引用未定义 `retried`/`intervene`，动作返回 None 行为回归；考古锚点 0a7c06a9 完整版 / 0fa6a8ee 搬运）——复位 return 半段并清孤儿块；**②P1** `agent/recorder_emitters.py:235` `_capture_step_url` 漏 `ctrl_mod` 导入、NameError 被 `except:pass` 静默吞（轨迹 URL 捕获整体失效）——按本模块「函数级 lazy import」惯例补 `from .. import controller as ctrl_mod`（先例 agent_utils.py:128-130）；**③P1** `trajectory-recording-runner.js:549` `captureAndPersistPhaseGroupShot` 全仓零定义（定义于 577d322a 删除，调用残留，click_save 提交前组图采集静默失败）——考古后接线现存等价实现或恢复原实现；**④门禁加固（主线程，回收后落地在干净树上）**：eslint 启用 `no-undef: error`（补 Node/browser globals，api-docs 分 browser override），verify-all 新增 eslint 与 `ruff --select F821` 条目（command -v 守卫，缺工具跳过并注明）
+- 范围（可写集）：`scripts/controller/actions/form_scan_actions.py`（+罩它的 pin 同 commit 修订）、`scripts/agent/recorder_emitters.py`（+pin）、`src/services/trajectory/trajectory-recording-runner.js`、`scripts/characterization/characterize-record-phase-finalize.mjs`（③可扩充）、`eslint.config.js`、`scripts/refactor/verify-all.sh`（仅主线程）、本协作日志
+- 禁入区：Cursor 在途 18:20 行（`search_then_click_guard.py`/`_table.py`/`click_action_engine.py`/`replay_table.py`/`src/cdp/locator-builders/controls.js`/`scripts/prompts/**`）——`verify-all.sh` 双方可能各自增行，若遇冲突保双方条目；他线 WIP `scripts/characterization/characterize-phase-done-validate.py`；`phase-done-evidence-gate.js`；SPA 仓；`src/**` 其余文件；`config/`
+- 方式：①②③ 派 3 个后台子智能体并行（文件集互不相交，子智能体不 commit 不写 log，主会话回收核验 diff/语法/pin 后代提交）；④ 主线程收尾落地；全部完成后合并后验收（git pull 重跑关键验证 + 全量 verify-all 与 3 红基线比对）再收工
+
 ## 2026-09-17 18:20 · Cursor — 开工：STC 后选首行/首叶 + 结构 xpath（SDD）
 
 - 进行中：按 `docs/superpowers/plans/2026-09-17-stc-first-row-xpath.md` + spec `2026-09-17-stc-first-row-xpath-design.md` 子代理驱动实现；STC 满足后表/树定位落库 `row_text=first` + 结构相对 xpath；查询锚容器仅 TODO
