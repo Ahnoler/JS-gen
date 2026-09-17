@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 15:10 · ZCode 引擎线 — 开工：组件类型处方补对称口（click_button not-found），并答「real_click 落库是什么」
+
+- 进行中：用户问「为什么只用 real_click、real_click 落库是什么操作」。取证：real_click 落库=actionType `real_click` + params{selector,text,label_text} + **点击当场抓的定位快照**（popover 点完即关，事后补抓扑空）；回放侧 real_click **零直派接线**，走「控制器兜底」=把录制时动作函数原样重调（同 text 现场重找 + 再打 CDP 信任点击）——**非确定性回放**，对下拉选项录制时开着、回放时关着必失败 → 佐证「选项必须以 select_option 落库」。对称缺口：`click_button` 的 not-found（err-icon-label-miss）今天不带处方——agent 在末步调 click_button('下一步') 同样该拿到「若是下拉选项→select_option」
+- 修法：real_click.py 新增独立片段 `JS_TEXT_CARRIER_PRESCRIPTION(text)`（可见载体扫描+分类：开着的下拉选项→带现场 label 的 select_option 处方/禁用按钮/无载体→未展开不在 DOM），接进 `click_action_engine.py` 的 icon-label-miss 分支（next_action 附处方）；pin 增 needle
+- 范围：`scripts/controller/actions/js_snippets/real_click.py`、`scripts/controller/actions/click_action_engine.py`、pin `characterize-component-type-prescription.py`、本协作日志
+- 禁入区：`click_element_by_index` 既有栅栏、`select_engine`、他线 `data/kb/**` WIP
+- 方式：主会话 Inline；snippet fixture 验证 + 相邻 click 门禁回归 + verify-all
+
 ## 2026-09-17 14:55 · ZCode 引擎线 — 收工：按组件类型推荐动作（重构 opHint 硬编码，回链 12:30 开工）
 
 - 完成：`d9ace2b8`（real_click 分类器 + _workspace 处方透出 + guard/提示词去硬编码 + pin 重写）。**分类器落在 `real_click` 的文本目标解析里**（按文本找目标的唯一动作），四类载体四类处置：①启用按钮→照常点击（行为不变）；②载体是 `.el-select-dropdown__item` → **不做信任点击**，`err-real-click-select-option` + 处方 `select_option(label_text=<归属字段名现场推导>, option_text=<目标文本>)`（归属 label 从展开中触发器 `aria-expanded=true`→兜底聚焦 input 的 form-item 现场读出——与 index-click 的 use-select-option 栅栏同一仓库规则）；③禁用按钮（native/aria-disabled）→ `err-real-click-disabled-button`（消灭"信任点击禁用按钮=静默无效"一类）；④无可见载体 → not-found + 处方点破**「弹层未展开时选项不在 DOM 里，real_click 永远找不到」**。`_workspace.py` 失败时把 `prescription` 透出给 agent。guard opHint 与 `_todo.py` 提示词全部改类型制表述，`下一步/发起节点` 字面量从处方中删除且被 pin ban（docstring 的 DOM 事实记录保留——知识非处方）
