@@ -233,6 +233,16 @@ def main() -> int:
     ):
         print("FAIL: click_action_engine.py missing structural first-leaf xpath in STC branch")
         return 1
+    # Index-click → click_table_row_radio record override must also STC→first
+    if "is_table_row_radio" not in engine_src:
+        print("FAIL: click_action_engine.py must detect table row radio for record override")
+        return 1
+    if "record_row = 'first'" not in engine_src and "record_row='first'" not in engine_src:
+        print("FAIL: index→table radio path must set record_row=first when STC satisfied")
+        return 1
+    if "_structural_first_row_radio_xpath" not in engine_src:
+        print("FAIL: index→table radio STC path missing structural first-row xpath helper")
+        return 1
     if (
         "'option_text': 'first'" not in engine_src
         and '"option_text": "first"' not in engine_src

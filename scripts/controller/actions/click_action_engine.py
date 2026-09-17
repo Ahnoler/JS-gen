@@ -31,6 +31,13 @@ _FIRST_LEAF_TREE_LOCAL = (
     "/div[contains(@class,'el-tree-node__content')]"
 )
 
+_FIRST_ROW_RADIO_LOCAL = (
+    "div[contains(@class,'el-table__body-wrapper')]"
+    "//tr[contains(@class,'el-table__row')][1]"
+    "//*[contains(@class,'el-radio') or contains(@class,'el-radio-button') "
+    "or contains(@class,'el-checkbox')]"
+)
+
 _JS_STC_OVERLAY_SCOPE = '''() => {
     const overlays = [...document.querySelectorAll('.el-drawer, .el-dialog, .el-message-box')]
         .filter((d) => {
@@ -61,6 +68,18 @@ def _structural_first_leaf_tree_xpath(scope_kind: str) -> str:
             "//" + _FIRST_LEAF_TREE_LOCAL
         )
     return "//" + _FIRST_LEAF_TREE_LOCAL
+
+
+def _structural_first_row_radio_xpath(scope_kind: str) -> str:
+    """Structural first-row radio xpath (mirrors _table._structural_first_row_radio_xpath)."""
+    if scope_kind == 'drawer':
+        return "//div[contains(@class,'el-drawer')]//" + _FIRST_ROW_RADIO_LOCAL
+    if scope_kind == 'dialog':
+        return (
+            "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+            "//" + _FIRST_ROW_RADIO_LOCAL
+        )
+    return "//" + _FIRST_ROW_RADIO_LOCAL
 
 
 class ClickEngine:
@@ -345,16 +364,20 @@ class ClickEngine:
                         detect_search_ui,
                         stc_satisfied,
                     )
-                    if await xpath_is_tree_node(page, gate_xp):
+                    is_tree_for_stc = await xpath_is_tree_node(page, gate_xp)
+                    # Tree: block click if STC gate not met. Table-radio index
+                    # clicks already happened — only need satisfied flag for
+                    # record-override (same MVP shape as tree first-leaf).
+                    if is_tree_for_stc:
                         stc_err = await guard_locate_or_err(page, self.business_data_store)
                         if stc_err:
                             return _err(stc_err, include_in_memory=True)
-                        snap = await detect_search_ui(page)
-                        stc_force_first = stc_satisfied(self.business_data_store, snap)
-                        if stc_force_first:
-                            stc_scope_kind = str(
-                                await page.evaluate(_JS_STC_OVERLAY_SCOPE) or ''
-                            )
+                    snap = await detect_search_ui(page)
+                    stc_force_first = stc_satisfied(self.business_data_store, snap)
+                    if stc_force_first:
+                        stc_scope_kind = str(
+                            await page.evaluate(_JS_STC_OVERLAY_SCOPE) or ''
+                        )
                 except Exception:
                     sys.stderr.write("[click] search-then-click tree gate failed index={index!r}" + '\n')
                     sys.stderr.flush()
@@ -678,13 +701,29 @@ class ClickEngine:
                         element=element_info,
                     )
                 elif is_table_row_radio:
+                    record_row = table_row_text[:160]
+                    if stc_force_first:
+                        record_row = 'first'
                     if element_info is not None:
                         element_info = dict(element_info)
-                        element_info['row_text'] = table_row_text[:160]
+                        element_info['row_text'] = record_row
                         element_info['target_kind'] = 'table_row_radio'
+                        if stc_force_first:
+                            element_info['xpath_smart'] = _structural_first_row_radio_xpath(
+                                stc_scope_kind,
+                            )
+                    else:
+                        element_info = {
+                            'row_text': record_row,
+                            'target_kind': 'table_row_radio',
+                        }
+                        if stc_force_first:
+                            element_info['xpath_smart'] = _structural_first_row_radio_xpath(
+                                stc_scope_kind,
+                            )
                     _state._record_action(
                         'click_table_row_radio',
-                        {'row_text': table_row_text[:160]},
+                        {'row_text': record_row},
                         f'ok-clicked-{index}',
                         element=element_info,
                     )

@@ -7,6 +7,21 @@
 - 验收补充：合并态（含 STC 两笔）重跑三 pin + ruff F821 + eslint 全绿；verify-all 3 红基线一致零新增
 - 遗留：无新增（结构收敛专项、P2 清理清单、engines pin、ClickEngine 形状 pin 四项见 19:15 收工条目）
 
+## 2026-09-17 21:05 · Cursor — 收工：STC 湿测 + 索引点选行 first 归一（回链 20:40 / 20:55）
+
+- 完成：重启控制面/执行机；参照 traj 848 客户选择器录制；湿测发现 Agent 主路径是 `click_element_by_index`→归一 `click_table_row_radio`，原 STC 只挂在 `_table.py` 专用动作上 → 补 `click_action_engine` 表行录制覆盖
+- 证据：traj **#857** `recorded`，`click_table_row_radio` 的 `row_text=first` + dialog 作用域结构 xpath（`el-table__body-wrapper`…`tr…[1]`…`el-radio`）；对照 #856 仍为业务键；报告 `tmp/stc-first-row-wet/through-report.md`
+- 验收：`characterize-search-then-click-guard` OK；#857 落库目视核对 PASS
+- 遗留移交：改动尚未 commit（待用户明示）；#854/#855 假成功/失败样例可作门闩对照；§7.1 查询锚容器仍 TODO
+- 注：不维护 CHANGELOG
+
+## 2026-09-17 20:55 · Cursor — 开工：STC 索引点选行录制归一补 first（湿测缺口）
+
+- 进行中：湿测 traj **#856** 已走通「查询→选行→确认」，但 Agent 用 `click_element_by_index` 点行内 radio，归一为 `click_table_row_radio` 时**未**走 `_table.py` STC 分支，落库仍 `row_text=业务键`；补 `click_action_engine` 表行路径与树同形的 STC 录制覆盖，再重录验收
+- 范围：`scripts/controller/actions/click_action_engine.py`；`scripts/characterization/cold/characterize-search-then-click-guard.py`；证据续写 `tmp/stc-first-row-wet/`；本协作日志
+- 禁入区：`_table.py` / `search_then_click_guard.py`（已合入）；他线录制槽；`data/kb/req/product-mgmt/**`
+- 方式：主会话 Inline 最小修复 + 重启执行机 Python 会话 + 重录
+
 ## 2026-09-17 20:40 · Cursor — 开工：重启控制面/执行机 + STC 首行湿测录制
 
 - 进行中：`config\restart-local.cmd` 重启 4097 + local executor；参照含查询的历史交易（评级查询/客户选择器类，如 traj 848）新建交易，验收 STC 后选行落库 `row_text=first` + 结构 xpath
