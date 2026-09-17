@@ -22,6 +22,7 @@ def main() -> int:
         xpath_is_tree_node,
         guard_locate_or_err,
         mark_stc_flags_on_replay_ok,
+        stc_satisfied,
         STC_SEARCH_FILLED,
         STC_QUERY_CLICKED,
     )
@@ -187,6 +188,18 @@ def main() -> int:
         return 1
     if ".el-tree-node, .tree-popover" not in engine_src:
         print("FAIL: trigger classification must exclude nested tree/popover popper contents")
+        return 1
+    # stc_satisfied: has UI + not blocked
+    snap_q = SearchUiSnapshot(has_search_input=True, has_query_button=True)
+    if stc_satisfied({STC_QUERY_CLICKED: True}, snap_q) is not True:
+        print("FAIL: stc_satisfied should be True after query click")
+        return 1
+    if stc_satisfied({}, snap_q) is not False:
+        print("FAIL: stc_satisfied should be False before query")
+        return 1
+    snap_none = SearchUiSnapshot(has_search_input=False, has_query_button=False)
+    if stc_satisfied({STC_QUERY_CLICKED: True}, snap_none) is not False:
+        print("FAIL: no search UI → stc_satisfied False even if flags set")
         return 1
     print("OK search-then-click-guard")
     return 0

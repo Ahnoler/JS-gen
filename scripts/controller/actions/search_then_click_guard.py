@@ -40,6 +40,19 @@ def should_block_locate(
         return False, ""
     return True, "need-fill-search"
 
+def stc_satisfied(store: dict | None, snapshot: SearchUiSnapshot) -> bool:
+    """True when page has search UI and this phase has completed the STC gate."""
+    if not snapshot.has_search_input and not snapshot.has_query_button:
+        return False
+    filled = bool((store or {}).get(STC_SEARCH_FILLED))
+    clicked = bool((store or {}).get(STC_QUERY_CLICKED))
+    block, _ = should_block_locate(
+        snapshot=snapshot,
+        search_filled=filled,
+        query_clicked=clicked,
+    )
+    return not block
+
 def mark_search_filled(store: dict | None) -> None:
     if store is not None:
         store[STC_SEARCH_FILLED] = True
