@@ -137,14 +137,66 @@ await run('countPersistConfirms: three 【确定】 lines', () => {
   assert.equal(guide.countPersistConfirms('1、进入编辑页\n2、维护概况\n3、保存\n'), 1);
 });
 
-await run('countPersistConfirms: 启用 + 确定执行此操作 is one persist', () => {
-  assert.equal(
-    guide.countPersistConfirms('1、启用产品，操作：【启用】\n2、确认：确定执行此操作？\n'),
-    1,
+await run('countPersistConfirms: 启用 + 确定执行此操作 is not multi-persist', () => {
+  assert.ok(
+    guide.countPersistConfirms('1、启用产品，操作：【启用】\n2、确认：确定执行此操作？\n') <= 1,
+    'bare 启用 / dialog 确定 copy must not inflate persist confirms',
   );
   assert.equal(
     guide.countPersistConfirms('1、维护概况，操作：【保存概况】\n2、保存（信贷潜在客户），操作：【保存】\n'),
     1,
+  );
+});
+
+const WET_CREATE_FACTOR_GROUP = [
+  '1、进入产品要素分组主页【ZJJK00094373】，等待加载',
+  '2、在左侧树选中「产品公共要素」或「产品个性化要素」根节点',
+  '3、点击【新增类型】，打开“要素类型”弹窗并自动带入上级分组编号',
+  '4、录入组件名称与序号，点击【保存】成功',
+].join('\n');
+
+const WET_CREATE_PRODUCT = [
+  '1、进入产品库管理主页【ZJJK00110131】，等待加载',
+  '2、定位并选中已有产品分类目录',
+  '3、点击【新增产品】，打开新增产品页【ZJJK00094361】',
+  '4、系统自动生成编号，选择上级分类目录，填写名称与序号',
+  '5、点击【确定】保存成功，首次版本号 V-0.0.1',
+].join('\n');
+
+const WET_DISABLE_PRODUCT = [
+  '1、进入产品库管理主页【ZJJK00110131】，等待加载',
+  '2、搜索/定位并选中启用状态产品',
+  '3、点击【禁用】，进入产品下架页【ZJJK00101226】',
+  '4、选择禁用理由，二次确认借据余额',
+  '5、点击【确定】保存成功',
+].join('\n');
+
+const WET_CLONE_PRODUCT = [
+  '1、进入产品库管理主页【ZJJK00110131】，等待加载',
+  '2、定位并选中已有产品',
+  '3、点击【产品克隆】，进入产品克隆页【ZJJK00097067】',
+  '4、输入新产品名称',
+  '5、点击【确定】完成克隆',
+].join('\n');
+
+await run('countPersistConfirms: wet product-mgmt A/B/C/D each have one closer', () => {
+  assert.equal(guide.countPersistConfirms(WET_CREATE_FACTOR_GROUP), 1);
+  assert.equal(guide.countPersistConfirms(WET_CREATE_PRODUCT), 1);
+  assert.equal(guide.countPersistConfirms(WET_DISABLE_PRODUCT), 1);
+  assert.equal(guide.countPersistConfirms(WET_CLONE_PRODUCT), 1);
+});
+
+await run('countPersistConfirms: two 【保存】 on one line (prose + 操作) is one persist', () => {
+  assert.equal(
+    guide.countPersistConfirms('1、选类型→录证件→【保存】（新增页），操作：【保存】\n'),
+    1,
+  );
+});
+
+await run('countPersistConfirms: two distinct 【保存】/【确定】 loops still multi', () => {
+  assert.equal(
+    guide.countPersistConfirms('1、填写甲并【保存】成功\n2、填写乙并【确定】成功\n'),
+    2,
   );
 });
 
