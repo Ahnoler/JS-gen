@@ -102,6 +102,152 @@
 - 范围：只读调研=JS-gen `docs/superpowers/agent-log.md`（991 行）+ engine 仓 `ui_execute/engine/actions/**` 现状盘点；实现=engine 仓 `ui_execute/engine/actions/**`（具体文件集待清单确定后在本条目追加）+ 本地测试件（不提交）+ 本文件
 - 禁入区：JS-gen 源码（只读）、engine 仓 config.py、push、SUT 真实数据变更；他线 WIP（`scripts/refactor/verify-all.sh` 等在途件不碰）
 - 方式：lead 设计；调研双子智能体并行（R1=挖 log、R2=引擎盘点，均只读不 commit）；实现子智能体按清单文件集不相交派发；主会话复核+验证后代提交
+## 2026-09-17 09:40 · Cursor — 收工：湿测 haystack 假绿（回链 09:10 开工）
+
+- 完成：分类 haystack 改为整组正文（步骤描述 + 操作块，仍剥编号/`操作：`/来源/关键数据）。湿测「排序 + 维护…操作：【保存】」现拒 `multi_capability_task_draft`。`新增…主页` 页名不当 create（同 `编辑页` 复合词口径），open-drawer fold 仍内聚。`PROPOSE_CACHE_VERSION` 5→6。开工 `b0451600`。
+- 提交：`57f57627` wet/cache-v6 RED pins → `2c1456be` full-body haystack + cache v6 + spec §4.1 → `8eb0a873` open-drawer page-title RED pins → `e522f1a8` 新增…主页 非 create。本条收工。
+- 验收（本机）：
+  - RED：wet group2 haystack=`【保存】`；`assertCapabilityCohesion` `ok:true`；cache pin `5 !== 6`；open-drawer `role=other/create`
+  - GREEN：`characterize-capability-cohesion.mjs` **all passed**（含 C2/C6 + wet reject + 新增…主页 persist）
+  - `characterize-req-draft-traj.mjs` **OK 63**（`PROPOSE_CACHE_VERSION is 6` + open-drawer fold）
+  - `characterize-persist-boundary.mjs` **11 passed**
+  - `characterize-atom-depend.mjs` **16 passed**
+  - `npx eslint` capability-cohesion.js / propose-cache.js **0**
+- 遗留移交：湿测 product-mgmt 须 cache v6 后重新 propose，勿复用 v5。Follow-up PR #47 → #46 分支。不 merge。无场景黑名单。
+
+## 2026-09-17 09:10 · Cursor — 开工：湿测 haystack 假绿（操作：后丢失维护）
+
+- 进行中：修 PR #46 湿测假 PASS——`extractHaystack` 只取 `操作：` 之后，导致「排序 + 维护…操作：【保存】」被当成 other→closer-only persist。TDD：先加 wet pin RED，再改分类 haystack 为**整组正文**（步骤描述 + 操作块），`PROPOSE_CACHE_VERSION` 5→6。
+- 范围（可写集）：`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin 5→6）、本协作日志；必要时规格 §4.1 haystack 一句（防再次按旧口径回退）
+- 禁入区：`propose.js` 接线、`atom-depend.js`、`flow-card-guide.js`、prompt/samples/api-docs、场景黑名单、他线 WIP、不 merge
+- 方式：主会话 Inline TDD；C2/C6 必须保持绿；不跑 product-mgmt 湿测 propose
+
+## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 6 unit/falsify（回链 21:19 开工）
+
+- 完成：Task 6 冷测自检 + C1 证伪 + `src/` 无 `missing_locate_prep` + 计划 Tasks 1–5 勾选 + PR #46 ready-for-review。**未跑** product-mgmt 湿测 propose。开工声明 `274188c8`。
+- 验收：
+  - `characterize-capability-cohesion.mjs` **31 passed**（C1–C6 + 编辑页 pins + prompt pin）
+  - `characterize-persist-boundary.mjs` **11 passed**
+  - `characterize-atom-depend.mjs` **16 passed**
+  - `characterize-req-draft-traj.mjs` **OK 63**（含 `PROPOSE_CACHE_VERSION is 5`）
+  - `npx eslint` 四文件 **0 warning**
+  - C1 证伪：clean tree 上 `git stash push` 对已提交 helper 无效果；等价隐藏 `git rm capability-cohesion.js` → `ERR_MODULE_NOT_FOUND` exit 1（C1 无法绿）；`git checkout HEAD --` 恢复 → **31 passed**
+  - grep `missing_locate_prep`：`src/` **0 hits**（仅 spec/plan/agent-log 文档出现）
+- 遗留移交：湿测 W1–W4 只在本地 LMY（控制面须 cache v5 + 重新 propose，勿复用 v4 缓存）。不 merge。不维护 CHANGELOG
+
+## 2026-09-16 21:19 · Cursor — 开工：能力内聚结构硬闸 Task 6（unit/falsify，不跑湿测）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 6** 的 unit/falsify（表征全绿、stash C1 证伪、grep `missing_locate_prep` 不得出现在 `src/`、PR #46 ready-for-review + W1–W4 未勾清单）。**不跑** product-mgmt 湿测 propose。
+- 范围（可写集）：`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（Tasks 1–5 勾选；Task 6 仅勾 unit/falsify 步，W1–W4 保持未勾）、本协作日志、PR #46 描述
+- 禁入区：`src/services/req-draft-traj/**` 产品逻辑；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；湿测 W1–W4 / product-mgmt wet propose
+- 方式：主会话 Inline 自检+证伪；不 merge
+
+## 2026-09-16 21:50 · Cursor — 收工：能力内聚结构硬闸 Task 5（回链 21:35 开工）
+
+- 完成：atomize prompt item-9 准备步骤改为「仅限定位类（查询/搜索/过滤/选中/点行或节点/打开或进入目标/展开/切换页签）」；`atom-depend-split-samples.md` B1 交叉引用结构闸 `multi_capability_task_draft`（多次【确定】仍 `multi_persist_task_draft`）；`kb.js` propose `notes[]` 一行列出两新 reason。pin `atomize prompt locates prep to locate-class only`。开工声明 `15e5422d`。本提交即 Task 5 产品提交。
+- 前序：helper+pins `da1ed8f1`；C4+fallback `d2c6bfbb`；materialize 接线 `2f223e6b`；cache v5 `433f0b2c`；编辑页假阳性 `8a599873` / `a6d5e02e`。
+- 验收：RED=`atomize prompt locates prep to locate-class only` `仅限定位类` missing。GREEN：`node scripts/characterization/characterize-capability-cohesion.mjs` **all passed**（含 C1–C6 + prompt pin）；`npx eslint src/dashboard/api-docs/groups/kb.js` 0 warning。未改 helper 逻辑、无场景黑名单、无 `不得出现上移`、未跑湿测。
+- 遗留移交：Task 6 湿测 W1–W4 只在本地 LMY。不维护 CHANGELOG
+
+## 2026-09-16 21:35 · Cursor — 开工：能力内聚结构硬闸 Task 5（prompt 一句 + samples + api-docs）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 5**（TDD：pin `atomize prompt locates prep to locate-class only` RED → item-9 准备步骤仅限定位类 GREEN → samples 交叉引用 + api-docs notes）。不跑 Task 6 湿测 W1–W4。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 prompt pin）、`scripts/prompts/req-draft-traj-atomize-prompt.md`（item-9 一句）、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`（B1 交叉引用）、`src/dashboard/api-docs/groups/kb.js`（propose notes 一行）、本协作日志
+- 禁入区：`capability-cohesion.js` / `propose.js` / `propose-cache.js` 逻辑；`atom-depend.js`；`flow-card-guide.js`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 6 湿测
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 21:25 · Cursor — 收工：BLOCKER 编辑页误判 maintain（回链 21:06 开工）
+
+- 完成：maintain `编辑` 不匹配导航复合 `编辑页/编辑页面/编辑界面`；真维护（`编辑字段`/`编辑基本信息`）仍计。闭环尾允许 other 后夹 locate/neutral。fill-step `保存概况` 不当 closer（对齐 `countPersistConfirms`）。未 bump cache，未改 Task 5 prompt。
+- 提交：`8a599873` 编辑页 maintain 假阳性 + pins；`8588f04d` 曾改 haystack（回退）；`a6d5e02e` 恢复 spec haystack + `保存(?!概况)` closer。开工 `8e203550`。
+- 验收：`characterize-capability-cohesion.mjs` **all passed**；`characterize-req-draft-traj.mjs` **OK 63**（含 `propose merges same-loop steps when LLM returns flowRef` 与 card-guided fallback）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**；eslint `capability-cohesion.js` 0 warning。
+- 遗留移交：Task 5+ prompt 一句 / samples / api-docs / 湿测 W1–W4。不维护 CHANGELOG
+
+## 2026-09-16 21:06 · Cursor — 开工：BLOCKER 编辑页误判 maintain
+
+- 进行中：`capability-cohesion.js` `detectOtherFamilies` / maintain 匹配不把导航复合「编辑页 / 编辑页面 / 编辑界面」计为 maintain（真维护如「编辑字段」仍计）；`characterize-capability-cohesion.mjs` 加 pin；`propose merges same-loop steps when LLM returns flowRef` 转绿。不 bump cache，不做 Task 5 prompt。
+- 范围：`src/services/req-draft-traj/capability-cohesion.js`、`scripts/characterization/characterize-capability-cohesion.mjs`、本协作日志
+- 禁入：`propose-cache.js`；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 5+
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 22:25 · Cursor — 收工：能力内聚结构硬闸 Task 4（回链 22:10 开工）
+
+- 完成：`characterize-req-draft-traj.mjs` pin 改为 `PROPOSE_CACHE_VERSION === 5`；`propose-cache.js` 4→5（注释 v5 = capability-cohesion + title-as-key reject）；`verify-all.sh` 在 `characterize-persist-boundary` 后注册 `characterize-capability-cohesion`。chore **`433f0b2c`**。开工声明 `3926a134`。
+- 验收：RED=`PROPOSE_CACHE_VERSION is 5` actual `4 !== 5`（未 bump 时）。GREEN：version pin ✓；`characterize-capability-cohesion.mjs` **all passed**（25 pins）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**；eslint 三 src 文件 0 warning。
+- **未全绿**：`characterize-req-draft-traj.mjs` 在 version pin 通过后于 `propose merges same-loop steps when LLM returns flowRef` 失败（`atoms.length` `0 !== 1`）。诊断：`进入编辑页` 因 maintain 族子串 `编辑` 被标 `other`，与 `维护概况` 构成两个 `other` → `multi_capability_task_draft`；fallback 同稿同样被拒。未改 `capability-cohesion.js` / `propose.js`（Task 4 禁入）。未改 prompt / samples / api-docs。
+- 遗留移交：Task 5+（prompt 一句 / samples / api-docs）前需处理该既有 flowRef 闭环节 pin 与 `编辑页` 假阳性；湿测 W1–W4 仍只在本地 LMY。不维护 CHANGELOG
+
+## 2026-09-16 22:10 · Cursor — 开工：能力内聚结构硬闸 Task 4（cache v5 + verify-all）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 4**（TDD：先改 `characterize-req-draft-traj.mjs` pin `PROPOSE_CACHE_VERSION === 5` RED actual 4 → bump `propose-cache.js` 4→5 GREEN → `verify-all.sh` 注册 `characterize-capability-cohesion`）。不改 prompt / samples / api-docs（Task 5+）。
+- 范围（可写集）：`scripts/characterization/characterize-req-draft-traj.mjs`（version pin 4→5）、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` + 注释）、`scripts/refactor/verify-all.sh`（persist-boundary 后注册 cohesion pin）、本协作日志
+- 禁入区：`capability-cohesion.js` / `propose.js` 逻辑；`atom-depend.js`；`flow-card-guide.js`；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 5+ prompt / samples / api-docs / 湿测 W1–W4
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 21:55 · Cursor — 收工：能力内聚结构硬闸 Task 3（回链 21:40 开工）
+
+- 完成：`materializeLlmAtom` 在 `normalizeProduces`/`normalizeDataDependsOn` 之后、`assertAtomProvenance` 之前调用 `assertCapabilityCohesion`；`!ok` → `rejected: { atomKey, reason: cohesion.reason }`。`countPersistConfirms(cleanedDraft) > 1` 仍为 sanitize 后第一拒绝。未改 `validateAtomDependGraph`。feat **`2f223e6b`**。开工声明 `cdd5b8ce`。
+- 验收：RED=`C1 propose` atoms length `1 !== 0`（merged 仍入 atoms）+ `C4 propose` `1 !== 0`（title-as-key 仍入 atoms）；helper 全 ok；`C3 propose` 已 ok（`multi_persist_task_draft`）。GREEN：`characterize-capability-cohesion.mjs` **all passed**（25 pins：helper 21 + C1/C3/C4/C2 propose）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**。`npx eslint src/services/req-draft-traj/propose.js` 0 warning。未 bump cache、未改 prompt。
+- 遗留移交：Task 4+（cache 4→5 + verify-all / prompt 一句 / api-docs / 湿测 W1–W4）。不维护 CHANGELOG
+
+## 2026-09-16 21:40 · Cursor — 开工：能力内聚结构硬闸 Task 3（materializeLlmAtom 接线 + C3）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 3**（TDD：propose-level C1/C3/C4/C2 pins RED → `materializeLlmAtom` 在 `normalizeProduces` 之后、`assertAtomProvenance` 之前调用 `assertCapabilityCohesion` GREEN）。`countPersistConfirms > 1` 保持 sanitize 后第一拒绝；不把 cohesion 放进 `validateAtomDependGraph`。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 propose-level pins）、`src/services/req-draft-traj/propose.js`（import `assertCapabilityCohesion` + `materializeLlmAtom` 接线）、本协作日志
+- 禁入区：`propose-cache.js`（Task 4 cache 4→5）；`atom-depend.js`；`flow-card-guide.js`；`scripts/prompts/**`；`verify-all.sh`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 4+ prompt / api-docs / samples
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 2（回链 21:15 开工）
+
+- 完成：`synthesizeFallbackProduceKey`（空/`'  '`→`atom_output`，否则 `` `${trim}产物` ``）+ `assertCapabilityCohesion` 序列通过后 title-as-key（`length===1` 且 `produces[0]===trim(title)` → `produces_eq_title`；空 produces / title+另一 key 仍 ok）+ `propose.js` `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`（未豁免 fallback、未保留 `produces:[title]`）。feat **`d2c6bfbb`**。开工声明 `2dce38a0`。
+- 验收：RED=`C4 helper: produces exact title` `true !== false` + `synthesizeFallbackProduceKey` `undefined`≠`function`；C1/C2/C5/C6 仍 ok。GREEN：`characterize-capability-cohesion.mjs` **all passed**（21 pins）；`characterize-persist-boundary.mjs` **all passed**（含 fallback 三分写 + `multi_persist_task_draft`）；`characterize-atom-depend.mjs` **all passed**。`npx eslint` 两 src 文件 0 warning。未接线 `materializeLlmAtom`、未 bump cache、未改 prompt。
+- 遗留移交：Task 3+（`materializeLlmAtom` 顺序+C3 / cache 4→5 / prompt 一句 / verify-all / 湿测 W1–W4）。不维护 CHANGELOG
+
+## 2026-09-16 21:15 · Cursor — 开工：能力内聚结构硬闸 Task 2（C4 produces_eq_title + fallback synthesizer）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 2**（TDD：C4/synthesizer pins RED → `synthesizeFallbackProduceKey` + title-as-key 闸 GREEN → `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`）。不接线 `materializeLlmAtom` 硬闸、不 bump cache、不改 prompt。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 C4+synthesizer pins）、`src/services/req-draft-traj/capability-cohesion.js`（synthesizer + `assertCapabilityCohesion` title-as-key）、`src/services/req-draft-traj/propose.js`（import + `fallbackDependFields` 仅改 produce key）、本协作日志
+- 禁入区：`propose-cache.js`；`atom-depend.js`；`flow-card-guide.js`；`materializeLlmAtom` 闸接线（Task 3）；`scripts/prompts/**`；`verify-all.sh`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 3+ cache bump / prompt / api-docs
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 21:05 · Cursor — 收工：能力内聚结构硬闸 Task 1（回链 20:55 开工）
+
+- 完成：helper `src/services/req-draft-traj/capability-cohesion.js`（parse / inspect / classify / sequence-only `assertCapabilityCohesion`）+ pins `scripts/characterization/characterize-capability-cohesion.mjs`。feat **`da1ed8f1`**。开工声明 `ff456d8b`。
+- 验收：`node scripts/characterization/characterize-capability-cohesion.mjs` **all passed**（17 pins：parse×3、C5 classify、classify×4、C1/C5 reject、C2/C6 pass、sequence×4、no scene literals）。RED 先为 `ERR_MODULE_NOT_FOUND`。`npx eslint src/services/req-draft-traj/capability-cohesion.js` 0 warning。reason 仅 `multi_capability_task_draft`；无 `synthesizeFallbackProduceKey`；无场景黑名单字面量。
+- 遗留移交：Task 2+（`produces_eq_title` / fallback `${title}产物` / propose 接线 / cache 4→5 / prompt / verify-all）。湿测 W1–W4 仍只在本地 LMY。不维护 CHANGELOG
+
+## 2026-09-16 20:55 · Cursor — 开工：能力内聚结构硬闸 Task 1（helper + C1/C5/C2/C6 pins）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 1**（TDD：characterization RED → helper GREEN）。`assertCapabilityCohesion` 本任务只做序列闸；`produces_eq_title` / `synthesizeFallbackProduceKey` 留给 Task 2。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（新建）、`src/services/req-draft-traj/capability-cohesion.js`（新建）、本协作日志
+- 禁入区：`propose.js` / `propose-cache.js` / `atom-depend.js` / `flow-card-guide.js`（只 import `isPersistBoundaryAction`）；`scripts/prompts/**`；`verify-all.sh`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 2+ 接线与 cache bump
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 20:48 · Cursor — 收工：能力内聚结构硬闸实现计划（回链 20:40 开工）
+
+- 完成：计划 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（T1 helper+C1/C5/C2/C6 → T2 C4+fallback `${title}产物` → T3 `materializeLlmAtom` 顺序+C3 → T4 cache 4→5 + verify-all → T5 prompt 一句/samples/api-docs → T6 自检+C1 证伪+湿测 W1–W4 清单）。**未实现闸、未 bump cache、未改 src/prompt。**
+- 验收证据：计划覆盖 spec §4.1–§4.5 / §5 / §6 / §7.2–§7.4 / §8 C1–C6；reason 锁死 `multi_capability_task_draft` / `produces_eq_title`；`multi_persist_task_draft` 保持第一；无场景黑名单；无 TBD。开工声明 `9ac7c1fb`。
+- 遗留移交：下一会话按该计划 Subagent-Driven 或 Inline 实现；湿测 W1–W4 只在本地 LMY；勿与 OpenCode 20:03 轨迹提示词线文件集相交。不维护 CHANGELOG
+
+## 2026-09-16 20:40 · Cursor — 开工：能力内聚结构硬闸实现计划（writing-plans）
+
+- 进行中：只写实现计划，**不实现**硬闸 / 不 bump cache / 不改 `src/**` 与 prompt。产物=`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` + 本日志短开/收；PR 合入 `uara_V1.2`。规格源=`docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md`（PR #43 仍 OPEN，本分支自 `cursor/capability-cohesion-structural-gate-design-bb60` 起）。
+- 范围（可写集）：`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`、本协作日志
+- 禁入区：`src/**`（含 `req-draft-traj/**` / `propose.js` / `propose-cache.js` / `flow-card-guide.js` / `atom-depend.js`）；`scripts/prompts/**`；characterization；`scripts/refactor/verify-all.sh`；规格正文（不回改 reason 字符串）；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；生成链；SPA；`config/`
+- 方式：主会话 writing-plans；TDD/接线顺序/C1–C6/W1–W4 写进计划，本轮零产品代码
+
+## 2026-09-16 20:28 · Cursor — 收工：能力内聚结构硬闸设计规格（回链 20:21 开工）
+
+- 完成：**`55138813`** 规格 `docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md`（开工声明 `10849cd9`）。**未实现闸、未 bump cache、未改 prompt/src。**
+- 验收证据：文档钉死算法（步骤组解析 → locate/persist/other 族分类 → 序列规则）、新 reason `multi_capability_task_draft` / `produces_eq_title`、与既有 `multi_persist_task_draft` 分工、PR #41 已合入依赖、实现时 cache 4→5、湿测 W1–W4、characterization C1–C6。本轮交付=规格 + 本日志；实现另开任务。
+- 遗留移交：实现 plan 按 spec §7–§8 接线 `capability-cohesion.js`（或 flow-card-guide 旁）+ `propose.js` + fallback 去 title 化 + prompt 一句；勿与 OpenCode 20:03 轨迹提示词线文件集相交。不维护 CHANGELOG
+
+## 2026-09-16 20:21 · Cursor — 开工：能力内聚结构硬闸设计规格（propose 同页多能力）
+
+- 进行中：只写已批准设计规格，**不实现**硬闸。产物=`docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md` + 本日志短开/收；PR 合入 `uara_V1.2`。依赖 PR #41（空 produces 硬拒 + cache v4 + XML prompt）**已合入**本线。
+- 范围（可写集）：`docs/superpowers/specs/2026-09-16-capability-cohesion-structural-gate-design.md`、本协作日志
+- 禁入区：`src/**`（含 `req-draft-traj/**` / `flow-card-guide.js` / `propose.js` / `atom-depend.js` / `propose-cache.js`）；`scripts/prompts/**`；characterization；`scripts/refactor/verify-all.sh`；他线 OpenCode 20:03 在途（`trajectory-meta-service.js` / `trajectory-text-extract.js` / analyze-case-data pin）；生成链；SPA；`config/`
+- 方式：主会话 Inline；分支 `cursor/capability-cohesion-structural-gate-design-bb60` 从 `uara_V1.2` 起；不 bump cache、不改代码
 
 ## 2026-09-16 20:03 · OpenCode — 开工：阶段拆分提示词加固 + JS 侧业务数据判定对齐（承接 18:59/19:27 线）
 
