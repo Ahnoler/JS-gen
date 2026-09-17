@@ -95,6 +95,12 @@ const C1_MERGED_MAINTAIN_REORDER = [
 
 const C5_SINGLE_GROUP = '1、操作：维护基本信息后上移该项并【保存】';
 
+/** Wet product-mgmt atom: maintain verb sits in prose before 操作：【保存】. */
+const WET_PRODUCT_MGMT_REORDER_THEN_MAINTAIN = [
+  '1、同层排序（与相邻节点互换序号）（主页），操作：【上移】/【下移】',
+  '2、（可选）维护基本信息（征信三级联动等 14 必填）→【保存】（查看产品信息主页），操作：【保存】',
+].join('\n');
+
 console.log('characterize-capability-cohesion');
 
 await run('parse: fallback 顿号 draft yields 3 groups; 来源 stripped', () => {
@@ -236,6 +242,29 @@ await run('C6 helper: numbered fill then closer-only 【保存】 passes', () =>
     produces: ['已维护对象'],
   });
   assert.deepEqual(out, { ok: true });
+});
+
+await run('parse: wet product-mgmt group2 haystack surfaces maintain (not persist-only)', () => {
+  const groups = mod.parseTaskDraftStepGroups(WET_PRODUCT_MGMT_REORDER_THEN_MAINTAIN);
+  assert.equal(groups.length, 2);
+  assert.match(groups[1].haystack, /维护/);
+  assert.match(groups[1].haystack, /【保存】/);
+  const info = mod.inspectCapabilityGroup(groups[1].haystack);
+  assert.ok(
+    info.families.includes('maintain'),
+    `expected maintain family, got ${JSON.stringify(info)}`,
+  );
+  assert.notEqual(info.role, 'persist');
+});
+
+await run('helper: wet product-mgmt reorder then maintain+save → multi_capability_task_draft', () => {
+  const out = mod.assertCapabilityCohesion({
+    title: '排序并维护',
+    taskDraft: WET_PRODUCT_MGMT_REORDER_THEN_MAINTAIN,
+    produces: ['已维护对象'],
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, 'multi_capability_task_draft');
 });
 
 await run('sequence: trailing locate after save still passes this gate', () => {
