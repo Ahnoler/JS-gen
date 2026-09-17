@@ -1,7 +1,7 @@
 """Table actions: click row actions in el-table."""
 
 from scripts.state import _record_action
-from ._helpers import _ok, _err, _is_ok_result, _enrich_click_element
+from ._helpers import _ok, _err, _is_ok_result, _enrich_click_element, _wait_if_loading
 from .result_protocol import err_with
 from ._js_snippets import (
     JS_STRIP_STALE_WRAPPERS,
@@ -11,6 +11,26 @@ from ._js_snippets import (
 )
 from .replay_timing import WAIT_500_MS
 from ._workspace import _workspace_result, _real_click_via_cdp
+
+
+_FIRST_ROW_RADIO_LOCAL = (
+    "div[contains(@class,'el-table__body-wrapper')]"
+    "//tr[contains(@class,'el-table__row')][1]"
+    "//*[contains(@class,'el-radio') or contains(@class,'el-radio-button') "
+    "or contains(@class,'el-checkbox')]"
+)
+
+
+def _structural_first_row_radio_xpath(scope_kind: str) -> str:
+    """Structural first-row radio xpath (mirrors buildTableRowRadioFirstXPathSmart)."""
+    if scope_kind == 'drawer':
+        return "//div[contains(@class,'el-drawer')]//" + _FIRST_ROW_RADIO_LOCAL
+    if scope_kind == 'dialog':
+        return (
+            "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+            "//" + _FIRST_ROW_RADIO_LOCAL
+        )
+    return "//" + _FIRST_ROW_RADIO_LOCAL
 
 
 async def _table_cell_impl(browser_context, row_text, column_index, value, kind,
@@ -152,26 +172,44 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
     @controller.action('Click the radio button in an el-table row, identified by row text. Clicks label.el-radio > .el-radio__inner. Supports Element UI fixed columns.')
     async def click_table_row_radio(row_text: str):
         page = await browser_context.get_current_page()
-        from .search_then_click_guard import guard_locate_or_err
+        from .search_then_click_guard import (
+            guard_locate_or_err,
+            detect_search_ui,
+            stc_satisfied,
+        )
         err = await guard_locate_or_err(page, business_data_store)
         if err:
             return err
+        snap = await detect_search_ui(page)
+        force_first = stc_satisfied(business_data_store, snap)
+        effective_row = 'first' if force_first else row_text
+        # TODO(stc-query-anchor): If wet tests show main-page query selecting an overlay
+        # table (or multi-table wrong target), remember the 查询 button's closest
+        # dialog/drawer/toolbar root on click_button success and restrict first-row
+        # locate + xpath synthesis to that root. See spec
+        # docs/superpowers/specs/2026-09-17-stc-first-row-xpath-design.md §7.1
         # Pre-strip stale dialog wrappers (tsscMutilDialog 关闭残留) so real
         # clicks reach the row radio; idempotent, <10ms.
         try:
             await page.evaluate(JS_STRIP_STALE_WRAPPERS)
         except Exception:
             pass
-        element = await _enrich_click_element(
-            page,
-            text=row_text,
-            target_kind='table_row_radio',
-        )
-        if element:
-            # Prefer the enriched unique-key row text (customer-number / credit code)
-            # over the caller-supplied row_text, which may be an easily duplicated name.
-            element['row_text'] = element.get('row_text') or row_text
-            element['target_kind'] = 'table_row_radio'
+        try:
+            await _wait_if_loading(page)
+        except Exception:
+            pass
+        element = None
+        if not force_first:
+            element = await _enrich_click_element(
+                page,
+                text=row_text,
+                target_kind='table_row_radio',
+            )
+            if element:
+                # Prefer the enriched unique-key row text (customer-number / credit code)
+                # over the caller-supplied row_text, which may be an easily duplicated name.
+                element['row_text'] = element.get('row_text') or row_text
+                element['target_kind'] = 'table_row_radio'
         result = await page.evaluate('''
             async ([rowText]) => {
                 if (!rowText) return 'row-text-empty';
@@ -279,7 +317,11 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                             return 'radio-not-found-in-row';
                         }
                         await clickSel(radio);
-                        return 'ok';
+                        let scopeKind = '';
+                        if (scope) {
+                            scopeKind = scope.classList.contains('el-drawer') ? 'drawer' : 'dialog';
+                        }
+                        return 'ok|scope=' + scopeKind;
                     }
                 }
                 // N2: zero VISIBLE matched rows — an empty table (0 rows, e.g.
@@ -291,11 +333,25 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                 }
                 return 'row-not-found';
             }
-        ''', [row_text])
+        ''', [effective_row])
         await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
-            _record_action('click_table_row_radio', {'row_text': row_text}, result, element=element)
-            return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
+            record_params = {'row_text': row_text}
+            if force_first:
+                scope_kind = ''
+                if '|scope=' in str(result):
+                    scope_kind = str(result).split('|scope=', 1)[1].split('|', 1)[0]
+                if element is None:
+                    element = {}
+                element['xpath_smart'] = _structural_first_row_radio_xpath(scope_kind)
+                element['row_text'] = 'first'
+                element['target_kind'] = 'table_row_radio'
+                record_params = {'row_text': 'first'}
+            _record_action(
+                'click_table_row_radio', record_params, result, element=element,
+            )
+            loc_row = 'first' if force_first else row_text
+            return _ok(result + ' | loc:.el-table__row:has-text("' + loc_row + '")')
         if str(result).startswith('err-no-row-match:'):
             # N2: explicit zero-row failure — never treat rowCount=0 as success.
             return err_with(

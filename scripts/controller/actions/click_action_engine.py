@@ -114,6 +114,7 @@ class ClickEngine:
                 from scripts.controller.actions.container_naming import remember_trigger_button
                 remember_trigger_button(self.business_data_store, button_text)
                 if re.sub(r'\s+', '', bt) == '查询':
+                    # TODO(stc-query-anchor): anchor 查询 button container on success — §7.1
                     from scripts.controller.actions.search_then_click_guard import mark_query_clicked
                     mark_query_clicked(self.business_data_store)
             return _ok(result)
@@ -657,6 +658,7 @@ class ClickEngine:
                     # mark_stc_flags_on_replay_ok 早已对 index 点击标记）→ 阶段失败 →
                     # 前阶段动作被下一阶段补做并记到下一阶段。
                     if re.sub(r'\s+', '', btn_label) == '查询':
+                        # TODO(stc-query-anchor): anchor 查询 button container on success — §7.1
                         from scripts.controller.actions.search_then_click_guard import mark_query_clicked
                         mark_query_clicked(self.business_data_store)
                 try:

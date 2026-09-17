@@ -201,6 +201,28 @@ def main() -> int:
     if stc_satisfied({STC_QUERY_CLICKED: True}, snap_none) is not False:
         print("FAIL: no search UI → stc_satisfied False even if flags set")
         return 1
+    # Task 3: STC-satisfied click_table_row_radio → first row + structural xpath
+    if "stc_satisfied" not in table_src:
+        print("FAIL: _table.py must use stc_satisfied for first-row record path")
+        return 1
+    if (
+        "'row_text': 'first'" not in table_src
+        and '"row_text": "first"' not in table_src
+    ):
+        print("FAIL: _table.py must record row_text=first when STC satisfied")
+        return 1
+    if (
+        "_structural_first_row_radio_xpath" not in table_src
+        and "el-table__body-wrapper" not in table_src
+    ):
+        print("FAIL: _table.py missing structural first-row xpath in STC branch")
+        return 1
+    if "stc-query-anchor" not in table_src and "query-button container anchor" not in table_src.lower():
+        print("FAIL: _table.py missing TODO for query-button container anchor (§7.1)")
+        return 1
+    if "stc-query-anchor" not in engine_src and "query-button container anchor" not in engine_src.lower():
+        print("FAIL: click_action_engine.py missing TODO near mark_query_clicked (§7.1)")
+        return 1
     print("OK search-then-click-guard")
     return 0
 
