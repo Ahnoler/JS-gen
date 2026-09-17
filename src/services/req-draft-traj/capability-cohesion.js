@@ -8,7 +8,7 @@ import { isPersistBoundaryAction } from './flow-card-guide.js';
 
 const OTHER_FAMILIES = {
   reorder: ['上移', '下移', '置顶', '置底', '排序'],
-  maintain: ['维护', '修改', '编辑', '填写', '录入'],
+  maintain: ['维护', '修改', '编辑'],
   create: ['新增', '添加', '创建', '新建'],
   delete: ['删除', '移除'],
   export: ['导出', '下载'],
@@ -17,9 +17,19 @@ const OTHER_FAMILIES = {
   clone: ['克隆', '复制'],
 };
 
+/** Page/dialog titles: 维护…主页/页面/界面/弹窗 — not a maintain capability. */
+const MAINTAIN_TITLE_RE = /维护[\u4e00-\u9fff]{0,16}(?:主页|页面|界面|弹窗)|维护页(?!签)/g;
+/** Closer-line residual: 「修改…后」+ closer is not a second maintain. */
+const MAINTAIN_AFTER_CLOSER_RE = /修改[^【\n]{0,16}后/g;
+const BRACKET_MAINTAIN_RE = /【[^】]*(?:维护|修改|编辑)[^】]*】/;
+const BRACKET_ADD_RE = /【[^】]*添加[^】]*】/;
+const CLICK_ADD_RE = /(?:点击|点)添加/;
+const BRACKET_EXPORT_RE = /【[^】]*(?:导出|下载)[^】]*】/;
+const CLICK_EXPORT_RE = /(?:点击|点)(?:【)?(?:导出|下载)/;
+
 const PERSIST_AS_CAP_FAMILIES = new Set(['delete', 'status', 'clone']);
 const PERSIST_AS_CAP_BRACKET_RE = /【[^】]*(?:启用|禁用|克隆|删除|作废|撤销)[^】]*】/;
-const PERSIST_AS_CAP_BARE_RE = /(?<![未已])启用(?!状态)|禁用(?!理由|页)|克隆(?!页)|删除(?!理由)|作废|撤销(?!查询)/;
+const PERSIST_AS_CAP_BARE_RE = /(?<![未已])启用(?![\u4e00-\u9fff]{0,8}状态)|禁用(?!理由|页|[\u4e00-\u9fff]{0,8}状态)|克隆(?!页)|删除(?!理由)|作废|撤销(?!查询)/;
 const CLOSER_RE = /确定|保存(?!概况)|提交/;
 const CREATE_OPENER_MARK_RE = /【[^】]*(?:新增|添加|创建|新建)[^】]*】/;
 const CREATE_WORD_RE = /新增|添加|创建|新建/;
@@ -28,7 +38,7 @@ const STEP_DOT_RE = /^\s*\d+[\.．]\s+/;
 
 /**
  * True when haystack names a persist-as-capability action rather than a
- * noun modifier (启用状态 / 禁用理由 / 克隆页).
+ * noun modifier (启用状态 / 启用和禁用状态 / 禁用理由 / 克隆页).
  * @param {string} haystack Group action text
  * @returns {boolean} Persist-as-capability verb present
  */
@@ -133,10 +143,15 @@ export function parseTaskDraftStepGroups(taskDraft) {
 
 /**
  * Other-family ids whose substrings hit haystack.
- * Maintain `编辑` matches only when not immediately followed by `页`/`界面`/`页面`.
+ * Maintain `编辑` matches only when not immediately followed by `主页`/`页`/`界面`/`页面`.
+ * Maintain `维护` skips page/dialog titles (`维护…主页|页面|界面|弹窗`).
+ * `填写`/`录入` are not maintain (fill-in within create/edit).
+ * Closer lines ignore residual `修改…后` unless a bracketed 修改/编辑/维护 mark is present.
  * Create `新增` matches only when not a page-title compound (`新增…主页/页面/界面/页`)
  * and not a closer-less 【新增…】 / open-create opener (locate-prep).
- * Status/clone/delete skip noun modifiers (启用状态 / 禁用理由 / 克隆页).
+ * Create `添加` skips noun phrases (`需要添加的`); 【添加】 / 点击添加 / 添加一条 still count.
+ * Export prefers 【导出】/【下载】 or 点击导出; bare restatement does not count.
+ * Status/clone/delete skip noun modifiers (启用状态 / 启用和禁用状态 / 禁用理由 / 克隆页).
  * @param {string} haystack Group action text
  * @returns {Set<string>} Family ids
  */
@@ -146,8 +161,8 @@ function detectOtherFamilies(haystack) {
   for (const [id, words] of Object.entries(OTHER_FAMILIES)) {
     if (id === 'status') {
       if (/【[^】]*(?:启用|禁用)[^】]*】/.test(haystack)
-        || /(?<![未已])启用(?!状态)/.test(haystack)
-        || /禁用(?!理由|页)/.test(haystack)) {
+        || /(?<![未已])启用(?![\u4e00-\u9fff]{0,8}状态)/.test(haystack)
+        || /禁用(?!理由|页|[\u4e00-\u9fff]{0,8}状态)/.test(haystack)) {
         found.add('status');
       }
       continue;
@@ -166,18 +181,33 @@ function detectOtherFamilies(haystack) {
     }
     if (id === 'create') {
       if (isCreateOpenerPrep(haystack)) continue;
-      if (words.some((w) => (
-        w === '新增'
-          ? /新增(?![\u4e00-\u9fff]{0,16}(?:主页|页面|界面|页))/.test(haystack)
-          : haystack.includes(w)
-      ))) {
+      if (words.some((w) => {
+        if (w === '新增') {
+          return /新增(?![\u4e00-\u9fff]{0,16}(?:主页|页面|界面|页))/.test(haystack);
+        }
+        if (w === '添加') {
+          if (BRACKET_ADD_RE.test(haystack) || CLICK_ADD_RE.test(haystack)) return true;
+          return /(?<!需要)添加(?!的)/.test(haystack);
+        }
+        return haystack.includes(w);
+      })) {
         found.add(id);
       }
       continue;
     }
     if (id === 'maintain') {
-      if (words.some((w) => (w === '编辑' ? /编辑(?!页|界面|页面)/.test(haystack) : haystack.includes(w)))) {
+      let src = haystack.replace(MAINTAIN_TITLE_RE, '');
+      if (CLOSER_RE.test(haystack) && !BRACKET_MAINTAIN_RE.test(haystack)) {
+        src = src.replace(MAINTAIN_AFTER_CLOSER_RE, '');
+      }
+      if (words.some((w) => (w === '编辑' ? /编辑(?!主页|页|界面|页面)/.test(src) : src.includes(w)))) {
         found.add(id);
+      }
+      continue;
+    }
+    if (id === 'export') {
+      if (BRACKET_EXPORT_RE.test(haystack) || CLICK_EXPORT_RE.test(haystack)) {
+        found.add('export');
       }
       continue;
     }
@@ -199,7 +229,9 @@ function hasPersistAsCapability(haystack) {
 /**
  * True when haystack is a closer tail: 确定/保存/提交. Persist-as-capability
  * families (status/clone/delete) in the same closer line are allowed so
- * 「点击【确定】完成克隆」 stays one closer. Maintain/create/reorder still block.
+ * 「点击【确定】完成克隆」 stays one closer. Residual `修改…后` and fill-in
+ * 填写/录入 are not maintain, so 「修改信息后点击【保存】」 is closer-only.
+ * Bracketed 维护/修改/编辑 still block.
  * @param {string} haystack Group action text
  * @returns {boolean} Closer-only persist
  */
@@ -300,8 +332,9 @@ function assertSequence(groups) {
   let i = mainIdx + 1;
   while (i < roles.length && (roles[i] === 'locate' || roles[i] === 'neutral')) i += 1;
   if (i < roles.length && roles[i] === 'persist' && isCloserOnlyPersistHaystack(groups[i].haystack)) {
-    const mainRole = roles[mainIdx];
-    if (mainRole === 'other' || mainIsPersistCap) i += 1;
+    // Closer tail after other / persist-as-cap / persist main. Extra confirms
+    // are owned by multi_persist_task_draft, not this gate.
+    if (roles[mainIdx] === 'other' || mainIsPersistCap || roles[mainIdx] === 'persist') i += 1;
     else return { ok: false, reason: 'multi_capability_task_draft' };
   }
   for (; i < roles.length; i += 1) {

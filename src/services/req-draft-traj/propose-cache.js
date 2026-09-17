@@ -12,10 +12,12 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
 /**
  * Cache format version — bump on breaking cache shape **or** persist-boundary
  * semantics that invalidate previously proposed atoms; commit rejects caches
- * whose version differs (STALE_PROPOSE_CACHE). v9: persist-confirm count uses
- * closer marks (【确定】/【保存】/【提交】) not narrative 禁用/克隆/删除; cohesion
- * allows locate-prep + single create/maintain + one closer (wet product-mgmt
- * 新增/禁用/克隆 false positives). v8: atomize user payload includes per-chain
+ * whose version differs (STALE_PROPOSE_CACHE). v10: cohesion ignores maintain
+ * page/dialog titles, fill-in 填写/录入, closer residual 修改…后, noun 添加,
+ * and 启用和禁用状态 (wet create/edit/export false positives). v9: persist-confirm
+ * count uses closer marks (【确定】/【保存】/【提交】) not narrative 禁用/克隆/删除;
+ * cohesion allows locate-prep + single create/maintain + one closer (wet
+ * product-mgmt 新增/禁用/克隆 false positives). v8: atomize user payload includes per-chain
  * `chapterExcerpts` (H1+要点+ZJJK windows) so taskDraft can project parsed
  * chapter fields. v7: atomize prompt/taskDraft semantics — project parsed
  * through-chains/chapter detail; thin input stays G1–G3 length (do not hallucinate
@@ -24,7 +26,7 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
  * must re-propose). v5 was the structural gate (`multi_capability_task_draft`)
  * + title-as-key reject.
  */
-export const PROPOSE_CACHE_VERSION = 9;
+export const PROPOSE_CACHE_VERSION = 10;
 
 /**
  * Read cached propose result from a module directory.

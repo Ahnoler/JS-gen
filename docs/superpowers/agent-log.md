@@ -1,5 +1,23 @@
 # Agent 协作日志
 
+## 2026-09-17 12:40 · Cursor — 收工：capability-cohesion word-bleed FP（回链 12:22 开工）
+
+- 完成：`4c727358` word-bleed 闸 + cache **v10**；`729fb399` 收窄 `添加` 为名词 lookaround（`添加一条记录` 仍 create）。PR **#52** → `uara_V1.2`。
+- 验收：
+  - `characterize-capability-cohesion.mjs` **all passed**（新增产品阶段 / 核心映射新增·修改 / 导出 / 管控要素 long cohesion-ok；新增产品要素 / short 管控要素仍过；maintain+sort 仍拒；long 管控要素 propose=`multi_persist` 非 multi_capability）
+  - `characterize-persist-boundary.mjs` **all passed**
+  - `characterize-atom-depend.mjs` **all passed**
+  - `characterize-req-draft-traj.mjs` **OK 76**（cache **10**）
+  - `npx eslint` 改动 src **0**
+- 遗留移交：LMY 须 **POST** `…/product-mgmt/draft-traj/propose`（cache **v10**）；仅重启不够。long 设置产品管控要素 仍 `multi_persist`（picker【确定】+【保存】）属 persist 闸，非本轮 cohesion miss。2026-09-16 spec 仍写 `填写`/`录入`∈maintain，未改 spec（原计划锁文件）；parse / atomize prompt / UI 未动。不维护 CHANGELOG。
+
+## 2026-09-17 12:22 · Cursor — 开工：capability-cohesion create-draft word-bleed FP（cache v9→10）
+
+- 进行中：PR #51 后 LMY cache v9 湿测 create 笔仍 `multi_capability_task_draft`。根因是 `detectOtherFamilies` word-bleed，不是简化 create 形状：`维护…主页/维护弹窗` 当 maintain；`填写`/`录入` 当第二能力；closer 行残留 `修改…后`；裸 `添加`（需要添加的）；`启用和禁用状态` 当 status。
+- 范围（可写集）：`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` 9→10）、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin）、本协作日志
+- 禁入区：parse API、atomize prompt、Vue SPA、`dangling_data_depend`、executor/phase/wf-guard、`origin/master`、他线 840 处方/`data/kb/req/product-mgmt/**`
+- 方式：主会话 Inline TDD；基线 `uara_V1.2`；分支 `cursor/cohesion-word-bleed-fp-abb0` → PR `uara_V1.2`
+
 ## 2026-09-17 12:20 · ZCode 引擎线 — 补记：29242 真场景调研 8/8，840 处方动作全链实证（回链 12:12 开工）
 
 - 结论：`select_option(流程操作=下一步)` 的引擎原版路径在该真实页面**全链可用**，guard 复核回路闭环。页面已恢复原状（opValue=下一步、弹层已关），**未触碰 流程提交/流程撤销**
