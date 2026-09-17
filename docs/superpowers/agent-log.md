@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-17 11:35 · Cursor — 收工：draft-traj propose 闸 false positive（回链 11:21 开工）
+
+- 完成：`3daae354` — persist 确认改计 closer（【确定】/【保存】/【提交】，同行去重）；cohesion 允许 locate-prep + 单次新增/维护 + 一次 closer；`PROPOSE_CACHE_VERSION` 8→9。开工 `62d92350`。PR **#51** → `uara_V1.2`。
+- 验收（本环境，假 LLM）：
+  - `characterize-persist-boundary.mjs` **all passed**（A/B/C/D persistConfirms===1；同行双【保存】=1；两闭环=2）
+  - `characterize-capability-cohesion.mjs` **all passed**（A/B/C/D cohesion ok + propose accepted；maintain+sort 仍拒）
+  - `characterize-req-draft-traj.mjs` **OK 76**（cache **9**；open-drawer fold 仍 1 atom）
+  - `characterize-atom-depend.mjs` **all passed**
+  - `npx eslint` 改动 src **0**
+- 遗留移交：LMY 湿测须 **POST** `…/product-mgmt/draft-traj/propose`（cache v9）；仅重启不够。parse / atomize prompt / UI 未动。不维护 CHANGELOG。
+
 ## 2026-09-17 11:21 · Cursor — 开工：draft-traj propose 闸 false positive（禁用/克隆 persist 计数 + 新增 cohesion）
 
 - 进行中：修 LMY 湿测 product-mgmt propose 闸误杀（parse 14 笔好稿 accepted 0/14）。根因 1：`countPersistConfirms` 把叙事里的 禁用/克隆/删除/启用 当落库确认；根因 2：`assertCapabilityCohesion` 把 locate-prep + 单次新增/维护 + 一次 closer 判成 `multi_capability_task_draft`。TDD 先行：A 新增产品要素分组 / B 新增产品 / C 禁用产品 / D 产品克隆 必须 cohesion ok 且 persistConfirms===1；maintain+sort 与两次【保存】/【确定】闭环仍拒。
