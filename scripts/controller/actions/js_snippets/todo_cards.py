@@ -23,10 +23,9 @@ JS snippet constants: JS_LIST_TODO_CARDS, JS_WF_SUBMIT_GUARD.
 - JS_WF_SUBMIT_GUARD() -> '{"ok":true,"submit":{...},"undo":{...},
   "opLabel","opValue","opOptions":[...],"opHint","opinionLen","opinionMax",
   "historyRows","lastHistoryNode"}'；页面不可辨识时
-  '{"ok":false,"error":"wf-page-not-found"}'。opHint 为行动处方：opValue
-  为空时处方=select_option(label_text=opLabel, option_text=…)（弹层未展开
-  不代表没有选项；末步的「下一步」是该下拉的选项，不是按钮），已选时处方
-  =复核后流程提交。
+  '{"ok":false,"error":"wf-page-not-found"}'。opHint 为行动处方（按组件
+  类型推荐，不硬编码选项名）：opValue 为空时——字段是下拉，选项用
+  select_option（弹层未展开不代表没有选项）；已选时——复核后提交。
 
 两个片段均为零参数箭头函数，只读元信息、绝不点击任何按钮/下拉；
 返回 JSON 字符串。
@@ -156,23 +155,22 @@ JS_WF_SUBMIT_GUARD = '''() => {
             lastHistoryNode = firstCell ? norm(firstCell.innerText || firstCell.textContent).slice(0, 20) : '';
         }
     }
-    // 行动处方（traj 840 实证）：opValue 为空时 agent 停滞——它把「下一步」当按钮
-    // 去 real_click，而末步的 下一步 是 流程操作 el-select 的选项；opOptions=[] 又被
-    // 读成「没东西可选」。Element UI 选项要弹层首次展开才渲染，本 guard 刻意不开
-    // 弹层，所以必须在这里把正确动作（select_option，它会自行展开）讲清楚。
+    // 行动处方（按组件类型给推荐，不硬编码页面/字段/选项名）：opValue 为空时
+    // agent 停滞——它把选项名当按钮去 real_click，而弹层未展开时选项不在 DOM 里；
+    // opOptions=[] 又被读成「没东西可选」。本 guard 只讲字段类型与正确动作：
+    // 这是下拉 → 选项用 select_option（会自行展开弹层）。
     const opName = opLabel || '流程操作';
     let opHint = '';
     if (opItem && submit && submit.visible) {
         if (opValue) {
-            opHint = '流程操作已选「' + opValue + '」。复核与任务意图一致后即可 click 流程提交'
+            opHint = '「' + opName + '」已选「' + opValue + '」。复核与任务意图一致后即可执行后续提交'
                    + '（不可逆：先声明意图，提交后用审批历史行核验）。';
         } else {
-            opHint = '流程操作（' + opName + '，下拉）尚未选择。opOptions=[] 只说明弹层尚未展开'
-                   + '（Element UI 首次展开才渲染选项），不代表没有选项——发起节点的选项通常就是「下一步」。'
-                   + '请调用 select_option(label_text="' + opName + '", option_text="下一步") 完成选择'
-                   + '（select_option 会自行展开弹层，无需也不应先 real_click 展开或点击选项），'
-                   + '然后重跑本 guard 确认 opValue 已变化，再 click 流程提交。'
-                   + '禁止对「下一步」这类名称做 real_click/click_button——末步的 下一步 是这个下拉的选项，不是按钮。';
+            opHint = '「' + opName + '」是下拉（el-select），尚未选择。opOptions=[] 只说明弹层尚未展开'
+                   + '（Element UI 首次展开才渲染选项），不代表没有选项。按组件类型选择动作：'
+                   + '下拉的选项用 select_option(label_text="' + opName + '", option_text=<选项原文>)'
+                   + '——select_option 会自行展开弹层，real_click 点不到未展开的选项；'
+                   + '完成后重跑本 guard 确认 opValue 已变化，再执行后续提交。';
         }
     }
     return JSON.stringify({

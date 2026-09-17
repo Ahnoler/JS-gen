@@ -275,7 +275,9 @@ async def _real_click_via_cdp(page, selector='', text='', label_text='', locator
         rect = _as_dict(rect_raw)
         if not isinstance(rect, dict) or not rect.get('ok'):
             reason = rect.get('error', str(rect))[:120] if isinstance(rect, dict) else str(rect)[:120]
-            return 'err-real-click-fail:' + reason
+            # 组件类型处方（如「X 是下拉 L 的选项 → select_option」）随错误透出给 agent
+            rx = str(rect.get('prescription') or '') if isinstance(rect, dict) else ''
+            return 'err-real-click-fail:' + reason + ((' | ' + rx[:300]) if rx else '')
         if locator_out is not None:
             locator_out.append(rect.get('locator') or {})
         x, y = int(rect['x']), int(rect['y'])

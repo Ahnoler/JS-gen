@@ -95,7 +95,47 @@ JS_REAL_CLICK_RECT = '''async (args) => {
         }
     }
     if (!el) {
-        return JSON.stringify({ ok: false, error: 'err-real-click-target-not-found' });
+        // 组件类型处方（不硬编码页面/字段名）：文本无可见载体时最常见的坑是
+        // 「它是某下拉的选项」——弹层未展开时选项根本不在 DOM 里，real_click
+        // 永远找不到，必须改走 select_option（它会自行展开弹层）。
+        return JSON.stringify({
+            ok: false,
+            error: 'err-real-click-target-not-found',
+            prescription: txt
+                ? ('「' + txt + '」在页面上没有可见载体。若它是某下拉的选项：弹层未展开时选项不在'
+                   + ' DOM 里，应对该字段用 select_option(label_text=<字段名>, option_text="' + txt
+                   + '")（select_option 会自行展开弹层）；若它应是按钮，先确认当前步骤/页面状态。')
+                : '',
+        });
+    }
+    // 组件类型驱动（按钮→click，下拉选项→select）：文本载体若落在 el-select
+    // 选项上，不做信任点击——录制与回放都应走 select_option（与
+    // click_element_by_index 的 use-select-option 栅栏同一条仓库规则）。
+    if (el.closest('.el-select-dropdown__item')) {
+        const trig = [...document.querySelectorAll('.el-select .el-input__inner')]
+            .find((i) => visible(i) && i.getAttribute('aria-expanded') === 'true')
+            || ((document.activeElement && document.activeElement.closest
+                && document.activeElement.closest('.el-select')) ? document.activeElement : null);
+        const it = trig && trig.closest ? trig.closest('.el-form-item') : null;
+        const ownerLbl = it ? norm(it.querySelector('.el-form-item__label')?.textContent)
+            .replace(/[：:*]+$/, '') : '';
+        return JSON.stringify({
+            ok: false,
+            error: 'err-real-click-select-option',
+            prescription: '「' + txt + '」是下拉' + (ownerLbl ? '「' + ownerLbl + '」' : '')
+                + '的选项 → 用 select_option(label_text="' + (ownerLbl || '<字段名>')
+                + '", option_text="' + txt + '")（select_option 会自行展开弹层；录制与回放都走 select_option，不要对选项做真实点击）。',
+        });
+    }
+    const btnCarrier = el.closest('button, .el-button, [role="button"]');
+    if (btnCarrier && (btnCarrier.disabled === true
+        || btnCarrier.getAttribute('aria-disabled') === 'true')) {
+        return JSON.stringify({
+            ok: false,
+            error: 'err-real-click-disabled-button',
+            prescription: '「' + txt + '」当前是禁用按钮，点击无效——确认前置步骤是否完成，'
+                + '或寻找替代路径（如同名操作藏在某下拉里则用 select_option）。',
+        });
     }
     el.scrollIntoView({ block: 'center', behavior: 'instant' });
     await new Promise((r) => setTimeout(r, 150));
