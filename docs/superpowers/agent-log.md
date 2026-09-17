@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 15:50 · OpenCode — 开工：修复 query 阶段 LLM mode 与规则 boundary 不匹配导致 success_when 错位
+
+- 进行中：用户录制的对公客户评级查询流程在 Phase 2（业务编号输入）异常结束。根因是 `af1d1cc0` 传入 `boundary_override` 后，规则编译按字面关键词把阶段判为 form_fill（success_when=['toast_ok','url_change','saved_navigation']），而 LLM 根据上下文判为 query。recorder 使用规则 boundary 的 token 集合，与 query_clicked 证据不匹配，done() 被无限拦截。
+- 修向：`apply_phase_contract` 在 query/navigate 分支中检测规则 boundary 的 role 与 LLM mode 是否一致；不一致时信任 LLM mode 重置 role/goals/success_when，避免 mode 与 token 集合错位。
+- 范围（可写集）：`scripts/controller/actions/phase/intent_contract.py`、本协作日志。
+- 禁入区：`scripts/agent/service.py`（`af1d1cc0` 本体不动）、`scripts/controller/actions/phase/boundary_contract.py`（规则编译逻辑不动）、他线 WIP、活跃录制会话。
+- 方式：主会话 Inline；跑 `characterize-phase-runtime`、`characterize-phase-reviewer*`、`characterize-g3-done-gate-live`、`characterize-recorder-phase-reset` 及 `bash scripts/refactor/verify-all.sh` 回归。
+
 ## 2026-09-17 15:35 · ZCode 引擎线 — 收工：纠正过拟合（撤回跨族分类器，guard 只报组件类型）
 
 - **更正前一条**：`598d8a75` 收工条目把「real_click 载体分类器 + 处方」记为已交付成果——**是过拟合，已撤回**，该条目的成果描述作废，以本条为准
