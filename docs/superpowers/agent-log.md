@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 10:41 · ZCode — 重发开工：executor LB spec 状态行措辞按用户定稿对齐
+
+- 进行中：将 `docs/superpowers/specs/2026-09-17-executor-lb-design.md` 头部状态行对齐为用户给定措辞「草案，待控制面负责同事评审，评审通过前不落实现」（DSH 10:20 交付版语义相同、句读不同，本次仅措辞定稿，不动正文）
+- ⚠️ 事故留痕：本会话 10:39 的开工提交 `10683611` 及其后的 agent-log 合并被并行会话 `git reset --hard origin/uara_V1.2`（发版线，reflog 实证）丢弃；本次在当前 HEAD（`b322bbb4`，Cursor 10:37 顶条）上重发声明。并行会话操作共享检出请勿 reset 他人提交
+- 范围（可写集）：仅该 spec 的状态行（第 4 行）+ 本协作日志
+- 禁入区：该 spec 其余内容（DSH 刚交付，file:line 锚点经实读核实）；他线 WIP（`scripts/refactor/verify-all.sh`、`scripts/agent/recorder_emitters.py`、req-draft-traj 线文件、engine 仓）；活跃录制会话与发版线在途操作
+- 方式：主会话 Inline；纯文档一处改动
+
 ## 2026-09-17 10:37 · Cursor — 收工：merge origin/uara_V1.2 into PR #49（回链本条）
 
 - 完成：`cursor/chapter-excerpt-into-propose-ec84` 合入最新 `origin/uara_V1.2`（`4ce0e9d8`）。冲突仅本文件，按时刻交错保留双方条目。产品代码无冲突：chapter-excerpt / cache **v8** / `<chapter_excerpts>` / pins 全保留；他线 `ad817a95` 页内向导 open-page 证据 + executor-lb spec 一并带入。
