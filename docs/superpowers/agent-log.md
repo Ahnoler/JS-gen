@@ -1,5 +1,9 @@
 # Agent 协作日志
 
+## 2026-09-17 17:18 · Cursor — 补钉：cohesion v11 边界 pin（回链 17:10 收工）
+
+- 评审补：inspect 钉 `点击【复制】` 仍 clone、`确认删除`（无成功）仍 persist-as-cap、closer `复制产品` 无数据/信息仍 clone（保守残留式不扩）；删除湿 pin `persistConfirms===0`；cache 注释补 `信息`。生产规则未扩。
+
 ## 2026-09-17 17:10 · Cursor — 收工：capability-cohesion LMY FP cache v11（回链 16:53 开工）
 
 - 完成：`cca2245d` cohesion 闸 + cache **v11**。PR → `uara_V1.2`。

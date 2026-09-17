@@ -861,6 +861,35 @@ await run('inspect: 点击【删除】 stays persist-as-cap', () => {
   assert.equal(info.role, 'persist', JSON.stringify(info));
 });
 
+await run('inspect: 点击【复制】 stays clone other', () => {
+  const info = mod.inspectCapabilityGroup('点击【复制】');
+  assert.equal(info.role, 'other', JSON.stringify(info));
+  assert.ok(info.families.includes('clone'), JSON.stringify(info));
+});
+
+await run('inspect: 确认删除 (no 成功) stays persist-as-cap; do not widen outcome strip to 确认删除', () => {
+  const info = mod.inspectCapabilityGroup('确认删除');
+  assert.ok(info.families.includes('delete'), JSON.stringify(info));
+  assert.equal(info.role, 'persist', JSON.stringify(info));
+});
+
+await run('inspect: closer 复制 without 数据/信息 still clone (residual strip stays conservative)', () => {
+  const info = mod.inspectCapabilityGroup('【确定】保存成功，复制产品');
+  assert.ok(info.families.includes('clone'), JSON.stringify(info));
+  assert.equal(info.role, 'other', JSON.stringify(info));
+  const out = mod.assertCapabilityCohesion({
+    title: '产品克隆',
+    taskDraft: [
+      '1、进入产品库管理主页，等待加载',
+      '2、点击【产品克隆】',
+      '3、【确定】保存成功，复制产品',
+    ].join('\n'),
+    produces: ['已克隆产品'],
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, 'multi_capability_task_draft');
+});
+
 await run('wet 产品克隆 residual 复制: cohesion ok and persistConfirms===1', () => {
   assert.equal(countPersistConfirms(WET_CLONE_PRODUCT_COPY_RESIDUAL), 1);
   const out = mod.assertCapabilityCohesion({
@@ -881,7 +910,8 @@ await run('wet 维护产品基本信息 待维护: cohesion ok and persistConfir
   assert.deepEqual(out, { ok: true });
 });
 
-await run('wet 删除核心产品映射 确认删除成功: cohesion ok (outcome is not a second persist)', () => {
+await run('wet 删除核心产品映射 确认删除成功: cohesion ok and persistConfirms===0', () => {
+  assert.equal(countPersistConfirms(WET_DELETE_CORE_MAPPING), 0);
   const out = mod.assertCapabilityCohesion({
     title: '删除核心产品映射',
     taskDraft: WET_DELETE_CORE_MAPPING,
