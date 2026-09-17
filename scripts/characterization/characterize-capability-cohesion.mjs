@@ -655,6 +655,19 @@ await run('inspect: 需要添加的 + 【确定】反显 is persist, not create'
   assert.notEqual(info.role, 'multi');
 });
 
+await run('inspect: 添加一条记录 stays create; 添加+删除 is multi_capability', () => {
+  const info = mod.inspectCapabilityGroup('添加一条记录');
+  assert.equal(info.role, 'other', JSON.stringify(info));
+  assert.ok(info.families.includes('create'), JSON.stringify(info));
+  const out = mod.assertCapabilityCohesion({
+    title: '添加并删除',
+    taskDraft: '1、添加一条记录\n2、删除该项',
+    produces: ['已删对象'],
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, 'multi_capability_task_draft');
+});
+
 await run('inspect: 进入产品要素编辑主页 is locate, not maintain', () => {
   const info = mod.inspectCapabilityGroup('点击【设置管控要素】，进入产品要素编辑主页【ZJJK00098070】');
   assert.equal(info.families.includes('maintain'), false, JSON.stringify(info));

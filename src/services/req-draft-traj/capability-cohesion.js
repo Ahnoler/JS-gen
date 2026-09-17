@@ -149,7 +149,7 @@ export function parseTaskDraftStepGroups(taskDraft) {
  * Closer lines ignore residual `修改…后` unless a bracketed 修改/编辑/维护 mark is present.
  * Create `新增` matches only when not a page-title compound (`新增…主页/页面/界面/页`)
  * and not a closer-less 【新增…】 / open-create opener (locate-prep).
- * Create `添加` prefers 【添加】 / 点击添加; noun phrases like `需要添加的` do not count.
+ * Create `添加` skips noun phrases (`需要添加的`); 【添加】 / 点击添加 / 添加一条 still count.
  * Export prefers 【导出】/【下载】 or 点击导出; bare restatement does not count.
  * Status/clone/delete skip noun modifiers (启用状态 / 启用和禁用状态 / 禁用理由 / 克隆页).
  * @param {string} haystack Group action text
@@ -186,7 +186,8 @@ function detectOtherFamilies(haystack) {
           return /新增(?![\u4e00-\u9fff]{0,16}(?:主页|页面|界面|页))/.test(haystack);
         }
         if (w === '添加') {
-          return BRACKET_ADD_RE.test(haystack) || CLICK_ADD_RE.test(haystack);
+          if (BRACKET_ADD_RE.test(haystack) || CLICK_ADD_RE.test(haystack)) return true;
+          return /(?<!需要)添加(?!的)/.test(haystack);
         }
         return haystack.includes(w);
       })) {
