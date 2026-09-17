@@ -159,6 +159,94 @@ async def main() -> int:
         plain = [e for e in captured if e.get("kind") == "click"]
         assert plain, f"expected generic click for plain button, got {captured!r}"
 
+        # ── 更多/展开 icon-only toggle fallback ─────────────────────────────
+        # Real SUT markup: <span class="tsscBtn more-btn"><label><button
+        # class="el-button ... is-plain"><i class="el-icon-caret-bottom"/></button></label></span>
+        # 未展开 = caret-bottom（可点开）；已展开 = caret-top（勿点，否则收起）。
+        more_html = """<!doctype html><html><head><style>
+          button.el-button { display: inline-block; min-width: 24px; height: 24px; }
+          span.tsscBtn.more-btn { display: inline-block; }
+        </style></head><body>
+        <div class="search-bar">
+          <div class="el-form-item"><label>客户名称</label><input id="kw"></div>
+          <button type="button" class="el-button">查询</button>
+          <button type="button" class="el-button">重置</button>
+          <span class="tsscBtn more-btn"><label><button id="more-icon" type="button"
+            class="el-button disableBtn el-button--primary el-button--small is-plain">
+            <i class="el-icon-caret-bottom"></i></button></label></span>
+        </div></body></html>"""
+
+        page3 = await browser.new_page()
+        await page3.set_content(more_html)
+        clicked3: list[str] = []
+        await page3.expose_function("onMore3", lambda name: clicked3.append(name))
+        await page3.evaluate(
+            """() => {
+              document.getElementById('more-icon')
+                .addEventListener('click', () => window.onMore3('more-icon'));
+            }"""
+        )
+        r3 = await page3.evaluate(JS_CLICK_ICON_BUTTON, "更多")
+        assert r3.startswith("ok-more-toggle"), r3
+        assert clicked3 == ["more-icon"], clicked3
+
+        # Already-expanded (caret-top) must NOT be clicked (would collapse/hide fields).
+        expanded_html = more_html.replace("el-icon-caret-bottom", "el-icon-caret-top")
+        page3b = await browser.new_page()
+        await page3b.set_content(expanded_html)
+        clicked3b: list[str] = []
+        await page3b.expose_function("onMore3b", lambda name: clicked3b.append(name))
+        await page3b.evaluate(
+            """() => {
+              document.getElementById('more-icon')
+                .addEventListener('click', () => window.onMore3b('more-icon'));
+            }"""
+        )
+        r3b = await page3b.evaluate(JS_CLICK_ICON_BUTTON, "更多")
+        assert r3b == "err-more-toggle-already-expanded", r3b
+        assert clicked3b == [], clicked3b
+
+        # aria-label/tooltip-only toggle (textless) also resolves.
+        label_html = more_html.replace('class="tsscBtn more-btn"', 'class="tsscBtn"')
+        label_html = label_html.replace(
+            'class="el-button disableBtn el-button--primary el-button--small is-plain"',
+            'class="el-button" aria-label="展开"',
+        )
+        page4 = await browser.new_page()
+        await page4.set_content(label_html)
+        clicked4: list[str] = []
+        await page4.expose_function("onMore4", lambda name: clicked4.append(name))
+        await page4.evaluate(
+            """() => {
+              document.getElementById('more-icon')
+                .addEventListener('click', () => window.onMore4('more-icon'));
+            }"""
+        )
+        r4 = await page4.evaluate(JS_CLICK_ICON_BUTTON, "更多")
+        assert r4.startswith("ok-more-toggle"), r4
+        assert clicked4 == ["more-icon"], clicked4
+
+        # Ambiguous (two collapsed more-btn) → refuse to guess.
+        ambig_html = more_html.replace(
+            "</div></body>",
+            '<span class="tsscBtn more-btn"><label><button type="button" class="el-button">'
+            '<i class="el-icon-caret-bottom"></i></button></label></span></div></body>',
+        )
+        page5 = await browser.new_page()
+        await page5.set_content(ambig_html)
+        r5 = await page5.evaluate(JS_CLICK_ICON_BUTTON, "更多")
+        assert r5.startswith("err-more-toggle-ambiguous"), r5
+
+        # No candidate at all → keep the original miss result.
+        miss_html = """<!doctype html><html><body>
+          <div><button type="button" class="el-button">
+            <i class="el-icon-caret-bottom"></i></button></div>
+        </body></html>"""
+        page6 = await browser.new_page()
+        await page6.set_content(miss_html)
+        r6 = await page6.evaluate(JS_CLICK_ICON_BUTTON, "更多")
+        assert r6 == "err-icon-label-miss", r6
+
         await browser.close()
 
     print("characterize-icon-buttons: OK")

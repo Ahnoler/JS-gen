@@ -126,6 +126,21 @@ class ClickEngine:
                 observed=result.split(':', 1)[1],
                 next_action="从 现场/textButtons 取完整按钮文字后用 click_element_by_index，或提供更精确 button_text 重试本动作",
             )
+        if str(result).startswith('err-more-toggle-ambiguous:'):
+            # 「更多/展开」icon-only 兜底发现多个候选，不盲点——交给 agent 判定。
+            return err_with(
+                "more-toggle-ambiguous",
+                "搜索区内发现多个「更多/展开」类图标按钮，无法唯一选择",
+                observed=result.split(':', 1)[1],
+                next_action="按索引点击目标区域的「更多/展开」图标按钮（click_element_by_index），或先收窄到正确的搜索区",
+            )
+        if str(result).startswith('err-more-toggle-already-expanded'):
+            # 「更多」开关已是展开态 → 再点会收起并隐藏字段，因此不点，提示换策略。
+            return err_with(
+                "more-toggle-already-expanded",
+                "搜索区的「更多/展开」已是展开态（图标向上），再点会收起",
+                next_action="不要再点该开关；重新扫描当前可见筛选字段（可用 scan_visible_fields），必要时滚动页面查找目标字段",
+            )
         if str(result).startswith('err-icon-label-miss'):
             return err_with(
                 "icon-label-miss",

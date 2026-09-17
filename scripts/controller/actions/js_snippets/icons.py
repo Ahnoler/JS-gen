@@ -92,6 +92,75 @@ function _iconCandidates(root) {
 function _iconIsVisible(el) {
   return el.offsetParent !== null || !!el.closest('.el-table__fixed');
 }
+function _isMoreLabel(text) {
+  const t = _iconNormText(text);
+  return t === '更多' || t === '展开' || t === '展开更多' || t === '更多条件'
+    || t === '更多筛选' || t === '高级筛选' || t === '高级查询';
+}
+function _moreToggleLabelHit(el) {
+  const lbl = _iconResolveLabel(el)
+    || _iconShortLabel(el.getAttribute('aria-label'))
+    || _iconShortLabel(el.getAttribute('title'))
+    || '';
+  return /更多|展开|高级/.test(lbl);
+}
+function _moreToggleExpanded(el) {
+  // Real SUT toggle: <span class="tsscBtn more-btn"> > button.el-button > i.el-icon-caret-*.
+  // 未展开 = caret/arrow DOWN，已展开 = caret/arrow UP（再点会收起，必须避免）。
+  const icons = el.querySelectorAll('i[class*="el-icon-"]');
+  for (const i of icons) {
+    const cls = typeof i.className === 'string' ? i.className : '';
+    if (/el-icon-caret-top|el-icon-arrow-up|el-icon-d-arrow-up/.test(cls)) return true;
+    if (/el-icon-caret-bottom|el-icon-arrow-down|el-icon-d-arrow-down/.test(cls)) return false;
+  }
+  return false; // unknown direction → treat as collapsed (allow the try)
+}
+function _moreToggleInQueryBar(btn) {
+  // Scope hint: an ancestor that also holds 查询/搜索/重置 toggles = query toolbar.
+  let node = btn.parentElement;
+  for (let i = 0; i < 5 && node; i++) {
+    for (const b of node.querySelectorAll('button, .el-button, a')) {
+      const t = _iconNormText(b.innerText || '');
+      if (t === '查询' || t === '搜索' || t === '重置') return true;
+    }
+    node = node.parentElement;
+  }
+  return false;
+}
+function _moreToggleCandidates(root) {
+  // 「更多/展开」常是纯图标按钮（无文字/无 tooltip，如 <span class="tsscBtn more-btn">
+  // 内嵌 el-button + caret 图标）。仅在文本/图标标签都未命中时用于兜底。
+  const scope = root || document;
+  const out = [];
+  const seen = new Set();
+  const push = (el) => {
+    if (!el || seen.has(el) || !_iconIsVisible(el)) return;
+    if (el.closest('.el-table__body-wrapper')) return; // row affordances → table tools
+    seen.add(el); out.push(el);
+  };
+  // 1) explicit class signal (e.g. tsscBtn more-btn)
+  for (const host of scope.querySelectorAll(
+      '[class*="more-btn"], [class*="moreBtn"], [class*="more_btn"],'
+      + ' [class*="more-filter"], [class*="moreFilter"]')) {
+    if (host.matches('button, .el-button, a, [role="button"]')) { push(host); continue; }
+    push(host.querySelector('button, .el-button, a, [role="button"]'));
+  }
+  if (out.length) return out;
+  // 2) tooltip/aria/title label carries 更多/展开/高级
+  for (const b of scope.querySelectorAll('button, .el-button, a, [role="button"]')) {
+    if (_iconIsVisible(b) && _moreToggleLabelHit(b)) push(b);
+  }
+  if (out.length) return out;
+  // 3) textless caret-only button sitting in the query toolbar (查询/搜索/重置 siblings)
+  for (const b of scope.querySelectorAll('button, .el-button')) {
+    if (!_iconIsVisible(b) || !_moreToggleInQueryBar(b)) continue;
+    if (_iconNormText(b.innerText || '').length > 2) continue;
+    if (!b.querySelector('i[class*="el-icon-caret-"], i[class*="el-icon-arrow-"],'
+        + ' i[class*="el-icon-d-arrow-"]')) continue;
+    push(b);
+  }
+  return out;
+}
 '''
 
 
@@ -214,6 +283,31 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
       reason: 'ambiguous',
       textButtons: pool.map((m) => ({ text: m.text, tag: m.el.tagName.toLowerCase() })),
     });
+  }
+  // 更多/展开 开关常为纯图标按钮（无文字/无 tooltip）——文本与图标标签都未命中时，
+  // 在查询区内按启发式点开（尽力尝试，非必须；歧义时返回候选数不盲点）。
+  if (_isMoreLabel(want0)) {
+    const cands = _moreToggleCandidates(document);
+    // 只点「未展开」的（caret/arrow down）；已展开的再点会收起、反而隐藏字段。
+    const collapsed = cands.filter((el) => !_moreToggleExpanded(el));
+    if (collapsed.length === 1) {
+      const el = collapsed[0];
+      el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      el.click();
+      const cls = typeof el.className === 'string' ? el.className.slice(0, 60) : '';
+      return 'ok-more-toggle:' + cls;
+    }
+    if (collapsed.length > 1) {
+      return 'err-more-toggle-ambiguous:' + JSON.stringify({
+        wanted: buttonText,
+        reason: 'ambiguous',
+        count: collapsed.length,
+      });
+    }
+    if (cands.length) {
+      // 命中的「更多」开关都已是展开态 → 目标字段本应可见，不要再点（会收起）。
+      return 'err-more-toggle-already-expanded';
+    }
   }
   return 'err-icon-label-miss';
 }'''
