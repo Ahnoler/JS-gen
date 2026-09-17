@@ -410,8 +410,125 @@ ${filler}
     assert.equal(bad.ok, false);
   });
 
-  const { proposeDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href);
+  const proposeMod = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href);
+  const { proposeDraftTrajectories, buildAtomizeUserPayload } = proposeMod;
   const { AppError } = await import(pathToFileURL(join(ROOT, 'src/http/app-error.js')).href);
+
+  run('buildAtomizeUserPayload exported for excerpt budget pins', () => {
+    assert.equal(typeof buildAtomizeUserPayload, 'function');
+  });
+
+  run('buildAtomizeUserPayload includes empty chapterExcerpts array', () => {
+    const payload = buildAtomizeUserPayload(
+      [{ chainId: 'chain-a', title: 't', chapterHint: '', steps: [{ index: 1, action: 'a', page: 'p', zjjk: 'ZJJK00000001' }] }],
+      [],
+      [],
+    );
+    const obj = JSON.parse(payload);
+    assert.deepEqual(obj.chapterExcerpts, []);
+    assert.ok(Array.isArray(obj.chains));
+  });
+
+  run('buildAtomizeUserPayload embeds chapterExcerpts beside chains', () => {
+    const payload = buildAtomizeUserPayload(
+      [{
+        chainId: 'chain-a',
+        title: '新增',
+        chapterHint: '§配置',
+        steps: [{ index: 1, action: '新增', page: '弹窗', zjjk: 'ZJJK00094361', buttons: '【确定】' }],
+      }],
+      [],
+      [{ chainId: 'chain-a', fileName: '03.md', ref: 'chapters/03.md#配置', excerpt: '# 配置\n\n## 要点摘要\n\npdNm 必填' }],
+    );
+    assert.match(payload, /"chapterExcerpts"/);
+    const obj = JSON.parse(payload);
+    assert.equal(obj.chapterExcerpts.length, 1);
+    assert.equal(obj.chapterExcerpts[0].chainId, 'chain-a');
+    assert.match(obj.chapterExcerpts[0].excerpt, /pdNm 必填/);
+    assert.equal(obj.chains[0].steps[0].page, '弹窗');
+  });
+
+  run('buildAtomizeUserPayload shrinks excerpts before dropping step.page', () => {
+    const pageToken = 'UNIQUE_PAGE_TOKEN_XYZ';
+    const huge = `HUGE_EXCERPT_MARKER_${'W'.repeat(30_000)}`;
+    const payload = buildAtomizeUserPayload(
+      [{
+        chainId: 'chain-a',
+        title: 't',
+        chapterHint: 'h',
+        steps: [{ index: 1, action: 'act', page: pageToken, zjjk: 'ZJJK00000001', buttons: '【确定】' }],
+      }],
+      [],
+      [{ chainId: 'chain-a', fileName: 'c.md', ref: 'chapters/c.md#C', excerpt: huge }],
+    );
+    assert.doesNotMatch(payload, /\/\* truncated \*\//);
+    const obj = JSON.parse(payload);
+    assert.equal(obj.chains[0].steps[0].page, pageToken);
+    assert.ok(obj.chapterExcerpts[0].excerpt.length < huge.length);
+    assert.ok(!obj.chapterExcerpts[0].excerpt.includes(huge));
+    assert.ok(payload.length <= 28_000);
+  });
+
+  await runAsync('propose atomize prompt includes chapterExcerpts from fixture chapters', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    let captured = '';
+    const fakeLLM = async (prompt) => {
+      captured = String(prompt || '');
+      return JSON.stringify({
+        atoms: [{
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '1、新增一级分类。\n\n来源：<sourceDoc> / <sourceChapter>\n',
+          phaseHints: ['x'],
+          produces: ['一级分类'],
+          dataDependsOn: [],
+        }],
+      });
+    };
+    await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+    });
+    assert.match(captured, /"chapterExcerpts"/);
+    assert.match(captured, /产品库管理/);
+    assert.match(captured, /ZJJK00094361|ZJJK00110131/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose atomize prompt uses [] when chapters dir is empty', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    rmSync(join(tmp, 'demo-mod', 'chapters'), { recursive: true, force: true });
+    mkdirSync(join(tmp, 'demo-mod', 'chapters'), { recursive: true });
+    let captured = '';
+    const fakeLLM = async (prompt) => {
+      captured = String(prompt || '');
+      return JSON.stringify({
+        atoms: [{
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增一级分类',
+          taskDraft: '1、新增一级分类。\n\n来源：<sourceDoc> / <sourceChapter>\n',
+          phaseHints: ['x'],
+          produces: ['一级分类'],
+          dataDependsOn: [],
+        }],
+      });
+    };
+    const out = await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+    });
+    assert.ok(out && Array.isArray(out.atoms) && Array.isArray(out.rejected));
+    assert.match(captured, /"chapterExcerpts"\s*:\s*\[\s*\]/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
 
   await runAsync('proposeDraftTrajectories on fixture with fakeLLM', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
@@ -750,8 +867,8 @@ ${filler}
   });
 
   const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
-  run('PROPOSE_CACHE_VERSION is 7 (atomize taskDraft project-not-invent)', () => {
-    assert.equal(PROPOSE_CACHE_VERSION, 7);
+  run('PROPOSE_CACHE_VERSION is 8 (chapter excerpts in atomize payload)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 8);
   });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
