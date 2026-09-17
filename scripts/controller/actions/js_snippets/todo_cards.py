@@ -21,11 +21,12 @@ JS snippet constants: JS_LIST_TODO_CARDS, JS_WF_SUBMIT_GUARD.
 - JS_LIST_TODO_CARDS() -> '{"ok":true,"count":n,"cards":[{"title","bizPk",
   "status","actions":[...]}]}'；无卡片时 count=0、cards=[]（空态合法）。
 - JS_WF_SUBMIT_GUARD() -> '{"ok":true,"submit":{...},"undo":{...},
-  "opLabel","opValue","opOptions":[...],"opHint","opinionLen","opinionMax",
+  "opLabel","opValue","opKind","opOptions":[...],"opinionLen","opinionMax",
   "historyRows","lastHistoryNode"}'；页面不可辨识时
-  '{"ok":false,"error":"wf-page-not-found"}'。opHint 为行动处方（按组件
-  类型推荐，不硬编码选项名）：opValue 为空时——字段是下拉，选项用
-  select_option（弹层未展开不代表没有选项）；已选时——复核后提交。
+  '{"ok":false,"error":"wf-page-not-found"}'。opKind=流程操作字段的组件类型
+  （el-select/textarea/input/other），只报事实、不给处方；opOptions **只列
+  已渲染的可见选项**——el-select 首次展开才渲染选项，故空列表不等于「没有
+  选项」，选哪个动作由 agent 按其工具规则决定。
 
 两个片段均为零参数箭头函数，只读元信息、绝不点击任何按钮/下拉；
 返回 JSON 字符串。
@@ -155,23 +156,14 @@ JS_WF_SUBMIT_GUARD = '''() => {
             lastHistoryNode = firstCell ? norm(firstCell.innerText || firstCell.textContent).slice(0, 20) : '';
         }
     }
-    // 行动处方（按组件类型给推荐，不硬编码页面/字段/选项名）：opValue 为空时
-    // agent 停滞——它把选项名当按钮去 real_click，而弹层未展开时选项不在 DOM 里；
-    // opOptions=[] 又被读成「没东西可选」。本 guard 只讲字段类型与正确动作：
-    // 这是下拉 → 选项用 select_option（会自行展开弹层）。
-    const opName = opLabel || '流程操作';
-    let opHint = '';
-    if (opItem && submit && submit.visible) {
-        if (opValue) {
-            opHint = '「' + opName + '」已选「' + opValue + '」。复核与任务意图一致后即可执行后续提交'
-                   + '（不可逆：先声明意图，提交后用审批历史行核验）。';
-        } else {
-            opHint = '「' + opName + '」是下拉（el-select），尚未选择。opOptions=[] 只说明弹层尚未展开'
-                   + '（Element UI 首次展开才渲染选项），不代表没有选项。按组件类型选择动作：'
-                   + '下拉的选项用 select_option(label_text="' + opName + '", option_text=<选项原文>)'
-                   + '——select_option 会自行展开弹层，real_click 点不到未展开的选项；'
-                   + '完成后重跑本 guard 确认 opValue 已变化，再执行后续提交。';
-        }
+    // 只报事实：流程操作字段的组件类型。动作选择归 agent（其指引已有
+    // 「EL-SELECT 规则：el-select 下拉框必须用 select_option」）——引擎不在这
+    // 里复述处方，也不替任何动作族接管别的族（traj 840 教训）。
+    let opKind = null;
+    if (opItem) {
+        opKind = opItem.querySelector('.el-select') ? 'el-select'
+            : (opItem.querySelector('textarea') ? 'textarea'
+                : (opItem.querySelector('input:not([type="hidden"])') ? 'input' : 'other'));
     }
     return JSON.stringify({
         ok: true,
@@ -179,8 +171,8 @@ JS_WF_SUBMIT_GUARD = '''() => {
         undo: undo,
         opLabel: opLabel,
         opValue: opValue,
+        opKind: opKind,
         opOptions: opOptions,
-        opHint: opHint,
         opinionLen: opinionLen,
         opinionMax: opinionMax,
         historyRows: historyRows,

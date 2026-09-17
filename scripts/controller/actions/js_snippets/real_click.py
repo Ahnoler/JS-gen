@@ -95,47 +95,7 @@ JS_REAL_CLICK_RECT = '''async (args) => {
         }
     }
     if (!el) {
-        // 组件类型处方（不硬编码页面/字段名）：文本无可见载体时最常见的坑是
-        // 「它是某下拉的选项」——弹层未展开时选项根本不在 DOM 里，real_click
-        // 永远找不到，必须改走 select_option（它会自行展开弹层）。
-        return JSON.stringify({
-            ok: false,
-            error: 'err-real-click-target-not-found',
-            prescription: txt
-                ? ('「' + txt + '」在页面上没有可见载体。若它是某下拉的选项：弹层未展开时选项不在'
-                   + ' DOM 里，应对该字段用 select_option(label_text=<字段名>, option_text="' + txt
-                   + '")（select_option 会自行展开弹层）；若它应是按钮，先确认当前步骤/页面状态。')
-                : '',
-        });
-    }
-    // 组件类型驱动（按钮→click，下拉选项→select）：文本载体若落在 el-select
-    // 选项上，不做信任点击——录制与回放都应走 select_option（与
-    // click_element_by_index 的 use-select-option 栅栏同一条仓库规则）。
-    if (el.closest('.el-select-dropdown__item')) {
-        const trig = [...document.querySelectorAll('.el-select .el-input__inner')]
-            .find((i) => visible(i) && i.getAttribute('aria-expanded') === 'true')
-            || ((document.activeElement && document.activeElement.closest
-                && document.activeElement.closest('.el-select')) ? document.activeElement : null);
-        const it = trig && trig.closest ? trig.closest('.el-form-item') : null;
-        const ownerLbl = it ? norm(it.querySelector('.el-form-item__label')?.textContent)
-            .replace(/[：:*]+$/, '') : '';
-        return JSON.stringify({
-            ok: false,
-            error: 'err-real-click-select-option',
-            prescription: '「' + txt + '」是下拉' + (ownerLbl ? '「' + ownerLbl + '」' : '')
-                + '的选项 → 用 select_option(label_text="' + (ownerLbl || '<字段名>')
-                + '", option_text="' + txt + '")（select_option 会自行展开弹层；录制与回放都走 select_option，不要对选项做真实点击）。',
-        });
-    }
-    const btnCarrier = el.closest('button, .el-button, [role="button"]');
-    if (btnCarrier && (btnCarrier.disabled === true
-        || btnCarrier.getAttribute('aria-disabled') === 'true')) {
-        return JSON.stringify({
-            ok: false,
-            error: 'err-real-click-disabled-button',
-            prescription: '「' + txt + '」当前是禁用按钮，点击无效——确认前置步骤是否完成，'
-                + '或寻找替代路径（如同名操作藏在某下拉里则用 select_option）。',
-        });
+        return JSON.stringify({ ok: false, error: 'err-real-click-target-not-found' });
     }
     el.scrollIntoView({ block: 'center', behavior: 'instant' });
     await new Promise((r) => setTimeout(r, 150));
@@ -255,45 +215,4 @@ JS_TREE_POPOVER_OPEN = '''async (args) => {
         }
     }
     return JSON.stringify({ ok: true, open: false });
-}'''
-
-
-# 按组件类型给行动处方（2026-09-17，用户定调「按钮→click，下拉→select」）。
-# 独立于 JS_REAL_CLICK_RECT 供其它文本型动作复用：click_button 未命中时，
-# 「下一步」这类文本很可能藏在某个开着的下拉里——扫描可见载体并按类型给处方。
-# 与 real_click 解析器内联的分类保持同一条仓库规则（选项走 select_option，
-# 与 click_element_by_index 的 use-select-option 栅栏一致）。
-JS_TEXT_CARRIER_PRESCRIPTION = '''(txt) => {
-    const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
-    const visible = (el) => el && (el.offsetParent !== null || el.getClientRects().length > 0);
-    const t = norm(txt);
-    if (!t) return '';
-    for (const c of document.querySelectorAll('*')) {
-        if (!visible(c)) continue;
-        const tt = norm(c.textContent);
-        if (!tt || tt.indexOf(t) === -1) continue;
-        if (c.children.length > 0 && [...c.children].some((k) => norm(k.textContent).indexOf(t) !== -1)) continue;
-        // 最小可见载体分类
-        if (c.closest('.el-select-dropdown__item')) {
-            const trig = [...document.querySelectorAll('.el-select .el-input__inner')]
-                .find((i) => visible(i) && i.getAttribute('aria-expanded') === 'true')
-                || ((document.activeElement && document.activeElement.closest
-                    && document.activeElement.closest('.el-select')) ? document.activeElement : null);
-            const it = trig && trig.closest ? trig.closest('.el-form-item') : null;
-            const lbl = it ? norm(it.querySelector('.el-form-item__label')?.textContent)
-                .replace(/[：:*]+$/, '') : '';
-            return '「' + t + '」是下拉' + (lbl ? '「' + lbl + '」' : '')
-                + '的选项 → 用 select_option(label_text="' + (lbl || '<字段名>')
-                + '", option_text="' + t + '")（select_option 会自行展开弹层）。';
-        }
-        const btn = c.closest('button, .el-button, [role="button"]');
-        if (btn) {
-            return (btn.disabled === true || btn.getAttribute('aria-disabled') === 'true')
-                ? '「' + t + '」当前是禁用按钮，点击无效——确认前置步骤是否完成，或寻找替代路径。'
-                : '「' + t + '」是可见按钮 → 用 click_button(button_text="' + t + '")。';
-        }
-    }
-    return '「' + t + '」在页面上没有可见载体。若它是某下拉的选项：弹层未展开时选项不在'
-        + ' DOM 里，应对该字段用 select_option(label_text=<字段名>, option_text="' + t
-        + '")（select_option 会自行展开弹层）；若它应是按钮，先确认当前步骤/页面状态。';
 }'''

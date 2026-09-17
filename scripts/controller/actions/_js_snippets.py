@@ -51,7 +51,7 @@ from .js_snippets.guarantee_intro_snippet import (
 )
 from .js_snippets.close_dialog import JS_CLOSE_VISIBLE_DIALOG
 from .js_snippets.strip_dialogs import JS_STRIP_STALE_WRAPPERS
-from .js_snippets.real_click import JS_REAL_CLICK_RECT, JS_REAL_CLICK_ECHO, JS_TREE_POPOVER_OPEN, JS_TEXT_CARRIER_PRESCRIPTION
+from .js_snippets.real_click import JS_REAL_CLICK_RECT, JS_REAL_CLICK_ECHO, JS_TREE_POPOVER_OPEN
 from .js_snippets.xhr_log import JS_XHR_HOOK, JS_XHR_RECENT
 from .js_snippets.error_notify import JS_READ_ERROR_NOTIFY, JS_NOTIFY_HOOK
 from .js_snippets.step_notice import JS_SCAN_STEP_NOTICES

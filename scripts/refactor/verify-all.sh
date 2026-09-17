@@ -73,8 +73,8 @@ run "characterize-phase-done-evidence-gate" node scripts/characterization/charac
 # 前者抓"拒绝没生效"（裸 return → None → 调用方 truthy 判定静默放行）——源码形状 pin 抓不到。
 run "characterize-g3-done-gate-live" "$PY" scripts/characterization/characterize-g3-done-gate-live.py
 run "characterize-g3-runner-seam" node scripts/characterization/characterize-g3-runner-seam.mjs
-# 按组件类型推荐动作（traj 840）：real_click 载体分类器 + guard opHint 类型制处方
-run "characterize-component-type-prescription" "$PY" scripts/characterization/characterize-component-type-prescription.py
+# traj 840：wf_submit_guard 按字段类型给下一步动作（下拉→select_option；空 options≠没选项）
+run "characterize-wf-submit-guard-hint" "$PY" scripts/characterization/characterize-wf-submit-guard-hint.py
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
 run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py

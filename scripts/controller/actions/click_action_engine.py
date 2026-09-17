@@ -13,7 +13,6 @@ from ._js_snippets import (
     JS_CLICK_ICON_BUTTON,
     JS_STAMP_ICON_ARIA_LABELS,
     JS_STRIP_STALE_WRAPPERS,
-    JS_TEXT_CARRIER_PRESCRIPTION,
 )
 from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from .replay_timing import WAIT_400_MS, WAIT_450_MS
@@ -143,22 +142,10 @@ class ClickEngine:
                 next_action="不要再点该开关；重新扫描当前可见筛选字段（可用 scan_visible_fields），必要时滚动页面查找目标字段",
             )
         if str(result).startswith('err-icon-label-miss'):
-            # 组件类型处方（与 real_click 同规则）：未命中时目标文本可能藏在
-            # 开着的下拉里——扫描可见载体并按类型给推荐（按钮→click，下拉
-            # 选项→select_option），让 agent 换对动作而不是反复重试。
-            rx = ''
-            try:
-                rx = str(await page.evaluate(
-                    JS_TEXT_CARRIER_PRESCRIPTION, button_text,
-                ) or '')
-            except Exception as _rx_exc:
-                sys.stderr.write("[click-button] carrier prescription failed: " + repr(_rx_exc) + '\n')
-                sys.stderr.flush()
             return err_with(
                 "icon-label-miss",
                 f"页面未找到标签含「{button_text}」的图标宿主或文字按钮",
-                next_action='核对 get_page_state().iconButtons 清单；确认目标可见；行内目标请用 click_table_row_button'
-                            + (f'。{rx}' if rx else ''),
+                next_action='核对 get_page_state().iconButtons 清单；确认目标可见；行内目标请用 click_table_row_button',
             )
         return result
 
