@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 18:20 · Cursor — 开工：STC 后选首行/首叶 + 结构 xpath（SDD）
+
+- 进行中：按 `docs/superpowers/plans/2026-09-17-stc-first-row-xpath.md` + spec `2026-09-17-stc-first-row-xpath-design.md` 子代理驱动实现；STC 满足后表/树定位落库 `row_text=first` + 结构相对 xpath；查询锚容器仅 TODO
+- 范围（可写集）：`scripts/controller/actions/search_then_click_guard.py`、`_table.py`、`click_action_engine.py`（TODO 注释）、`replay_table.py`、`src/cdp/locator-builders/controls.js`、相关 cold pins / prompts、本协作日志、plan/spec（已写入）
+- 禁入区：他线 `data/kb/req/product-mgmt/**` WIP、默认文案 xpath builder 行为、生成物 `_locator_helpers_js.py` 手改、查询锚容器硬实现
+- 方式：主会话 SDD 派发子智能体；子智能体不直接写 agent-log；代码改动由主会话验收后提交
+
 ## 2026-09-17 18:05 · OpenCode — 收工：query 阶段 LLM mode 与规则 boundary 不匹配修复（回链 15:50 开工）
 
 - 完成：`d61fa3d0`。修改 `scripts/controller/actions/phase/intent_contract.py`：在 query/navigate 分支中，当规则编译的 `boundary.role` 与 LLM `mode` 对应的期望 role 不一致时，信任 LLM mode 并重置 `role`/`goals`/`success_when` 为 mode-appropriate 集合。这样查询流程中不含查询词的子阶段（如“输入业务编号”）不会继承 form_fill 的 `['toast_ok','url_change','saved_navigation']`，而是使用 `['query_clicked']`。新增 cold pin `test_llm_query_mode_overrides_rule_form_fill_boundary` 在 `scripts/characterization/characterize-phase-runtime.py`。
