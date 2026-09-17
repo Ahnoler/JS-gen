@@ -37,7 +37,7 @@ _WIZARD_NAV_RE = re.compile(r'下一步|上一步|进入下一步|点击下一�
 # Open-page / navigate phases:「点击评级申请。预期结果：打开评级申请相关页面」—
 # done once the target page/dialog appears; do NOT continue the flow inside it.
 _OPEN_PAGE_EXPECT_RE = re.compile(
-    r'预期结果[:：]?[^。；\n]{0,12}(?:打开|进入|抵达|到达)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框)'
+    r'预期结果[:：]?[^。；\n]{0,12}(?:打开|进入|抵达|到达)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框|向导页?)'
 )
 # Save-to-open phases (点击保存。预期结果：保存成功并进入列表页) keep prompt rule 3
 # (click_save → ok-save-navigation → done) — NOT open-page navigation.

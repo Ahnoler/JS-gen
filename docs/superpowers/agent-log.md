@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 11:15 · OpenCode — 开工：LLM 合约路径未用规则边界，导致 navigate 阶段证据不可录（phase 1/3）
+
+- 进行中：用户复测 sid 64c9044b，phase 1 仍 `observed=[]` 失败，phase 3 有 `nav_next_clicked` 但门闩只要 `url_change|page_opened`。根因：LLM reviewer 路径 `service.py:apply_phase_contract(business_data_ref, reviewed)` 未传 `boundary_override`，边界 `goals`/`success_when` 全由 LLM 的 `in_scope`/`success.kinds` 决定，导致 `open_page`/`click_next`/`nav_next_clicked` 等可录制证据标签丢失；`classify.py` 也未把 `向导页` 识别为 open_page。
+- 范围（可写集）：`scripts/agent/service.py`、`scripts/controller/actions/phase/classify.py`、`scripts/characterization/characterize-phase-runtime.py`（补 pin）、`docs/superpowers/agent-log.md`。
+- 禁入区：`scripts/agent/recorder_emitters.py` 本体已由 `ad817a95` 修复，本次不动；`scripts/controller/actions/phase/reviewer.py` prompt 不动（规则已在）。
+- 方式：主会话 Inline；让 LLM 合约沿用规则编译出的 `boundary_override`，使 gate 证据与实际动作对齐。
+
 ## 2026-09-17 11:06 · Cursor — 收工：merge origin/uara_V1.2 into PR #50（回链本条）
 
 - 完成：`cursor/req-module-parse-api-dfb7` 合入最新 `origin/uara_V1.2`（`76dc73f0`）。冲突仅本文件，按时刻交错保留双方条目。产品代码无冲突：parse 路由 / kb-req-parse / mammoth / hasLocalSource / characterize-kb-req-parse 全保留；他线 `7eea3bf8` recordPhaseResult gated-orphan 修复 + `characterize-record-phase-finalize` 一并带入。

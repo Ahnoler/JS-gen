@@ -261,7 +261,18 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     llm=_get_reviewer_llm(llm),
                 )
                 if reviewed:
-                    contract = apply_phase_contract(business_data_ref, reviewed)
+                    # Use the deterministic rule-based boundary as the canonical shape;
+                    # the LLM contract supplies mode/refill/goal but the gate evidence
+                    # kinds (open_page / click_next / nav_next_clicked) must come from
+                    # the task text so they are actually recordable (sid 64c9044b:
+                    # phase 1 LLM said navigate url_change+page_opened but boundary
+                    # goals were empty → open-page fallback never ran; phase 3 LLM
+                    # omitted nav_next_clicked for 下一步 wizard step).
+                    from ..controller.actions._phase_boundary import compile_boundary
+                    boundary = compile_boundary(phase_core)
+                    contract = apply_phase_contract(
+                        business_data_ref, reviewed, boundary_override=boundary
+                    )
                     mode = business_data_ref.get('_task_mode') or 'other'
                     from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
