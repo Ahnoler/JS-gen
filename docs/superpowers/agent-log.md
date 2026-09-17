@@ -1,5 +1,18 @@
 # Agent 协作日志
 
+## 2026-09-17 09:40 · Cursor — 收工：湿测 haystack 假绿（回链 09:10 开工）
+
+- 完成：分类 haystack 改为整组正文（步骤描述 + 操作块，仍剥编号/`操作：`/来源/关键数据）。湿测「排序 + 维护…操作：【保存】」现拒 `multi_capability_task_draft`。`新增…主页` 页名不当 create（同 `编辑页` 复合词口径），open-drawer fold 仍内聚。`PROPOSE_CACHE_VERSION` 5→6。开工 `b0451600`。
+- 提交：`57f57627` wet/cache-v6 RED pins → `2c1456be` full-body haystack + cache v6 + spec §4.1 → `8eb0a873` open-drawer page-title RED pins → `e522f1a8` 新增…主页 非 create。本条收工。
+- 验收（本机）：
+  - RED：wet group2 haystack=`【保存】`；`assertCapabilityCohesion` `ok:true`；cache pin `5 !== 6`；open-drawer `role=other/create`
+  - GREEN：`characterize-capability-cohesion.mjs` **all passed**（含 C2/C6 + wet reject + 新增…主页 persist）
+  - `characterize-req-draft-traj.mjs` **OK 63**（`PROPOSE_CACHE_VERSION is 6` + open-drawer fold）
+  - `characterize-persist-boundary.mjs` **11 passed**
+  - `characterize-atom-depend.mjs` **16 passed**
+  - `npx eslint` capability-cohesion.js / propose-cache.js **0**
+- 遗留移交：湿测 product-mgmt 须 cache v6 后重新 propose，勿复用 v5。Follow-up PR #47 → #46 分支。不 merge。无场景黑名单。
+
 ## 2026-09-17 09:10 · Cursor — 开工：湿测 haystack 假绿（操作：后丢失维护）
 
 - 进行中：修 PR #46 湿测假 PASS——`extractHaystack` 只取 `操作：` 之后，导致「排序 + 维护…操作：【保存】」被当成 other→closer-only persist。TDD：先加 wet pin RED，再改分类 haystack 为**整组正文**（步骤描述 + 操作块），`PROPOSE_CACHE_VERSION` 5→6。
