@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 11:21 · Cursor — 开工：draft-traj propose 闸 false positive（禁用/克隆 persist 计数 + 新增 cohesion）
+
+- 进行中：修 LMY 湿测 product-mgmt propose 闸误杀（parse 14 笔好稿 accepted 0/14）。根因 1：`countPersistConfirms` 把叙事里的 禁用/克隆/删除/启用 当落库确认；根因 2：`assertCapabilityCohesion` 把 locate-prep + 单次新增/维护 + 一次 closer 判成 `multi_capability_task_draft`。TDD 先行：A 新增产品要素分组 / B 新增产品 / C 禁用产品 / D 产品克隆 必须 cohesion ok 且 persistConfirms===1；maintain+sort 与两次【保存】/【确定】闭环仍拒。
+- 范围（可写集）：`src/services/req-draft-traj/flow-card-guide.js`、`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` 8→9）、`scripts/characterization/characterize-persist-boundary.mjs`、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin）、本协作日志
+- 禁入区：parse API、atomize prompt、Vue SPA、`propose.js` 接线顺序以外的解析/切片、executor-lb spec、recorder/phase、`origin/master`、活跃录制会话；他线在途文件无交集（capability-cohesion / flow-card-guide 无在途声明）
+- 方式：主会话 Inline TDD；基线 `uara_V1.2`；新分支 `cursor/draft-traj-propose-gate-fp-be06` → PR `uara_V1.2`
+
 ## 2026-09-17 11:06 · Cursor — 收工：merge origin/uara_V1.2 into PR #50（回链本条）
 
 - 完成：`cursor/req-module-parse-api-dfb7` 合入最新 `origin/uara_V1.2`（`76dc73f0`）。冲突仅本文件，按时刻交错保留双方条目。产品代码无冲突：parse 路由 / kb-req-parse / mammoth / hasLocalSource / characterize-kb-req-parse 全保留；他线 `7eea3bf8` recordPhaseResult gated-orphan 修复 + `characterize-record-phase-finalize` 一并带入。
