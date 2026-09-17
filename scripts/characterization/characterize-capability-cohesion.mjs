@@ -95,6 +95,41 @@ const C1_MERGED_MAINTAIN_REORDER = [
 
 const C5_SINGLE_GROUP = '1、操作：维护基本信息后上移该项并【保存】';
 
+const WET_CREATE_FACTOR_GROUP = [
+  '1、进入产品要素分组主页【ZJJK00094373】，等待加载',
+  '2、在左侧树选中「产品公共要素」或「产品个性化要素」根节点',
+  '3、点击【新增类型】，打开“要素类型”弹窗并自动带入上级分组编号',
+  '4、录入组件名称与序号，点击【保存】成功',
+].join('\n');
+
+const WET_CREATE_PRODUCT = [
+  '1、进入产品库管理主页【ZJJK00110131】，等待加载',
+  '2、定位并选中已有产品分类目录',
+  '3、点击【新增产品】，打开新增产品页【ZJJK00094361】',
+  '4、系统自动生成编号，选择上级分类目录，填写名称与序号',
+  '5、点击【确定】保存成功，首次版本号 V-0.0.1',
+].join('\n');
+
+const WET_DISABLE_PRODUCT = [
+  '1、进入产品库管理主页【ZJJK00110131】，等待加载',
+  '2、搜索/定位并选中启用状态产品',
+  '3、点击【禁用】，进入产品下架页【ZJJK00101226】',
+  '4、选择禁用理由，二次确认借据余额',
+  '5、点击【确定】保存成功',
+].join('\n');
+
+const WET_CLONE_PRODUCT = [
+  '1、进入产品库管理主页【ZJJK00110131】，等待加载',
+  '2、定位并选中已有产品',
+  '3、点击【产品克隆】，进入产品克隆页【ZJJK00097067】',
+  '4、输入新产品名称',
+  '5、点击【确定】完成克隆',
+].join('\n');
+
+const { countPersistConfirms } = await import(
+  pathToFileURL(join(ROOT, 'src/services/req-draft-traj/flow-card-guide.js')).href
+);
+
 /** Wet product-mgmt atom: maintain verb sits in prose before 操作：【保存】. */
 const WET_PRODUCT_MGMT_REORDER_THEN_MAINTAIN = [
   '1、同层排序（与相邻节点互换序号）（主页），操作：【上移】/【下移】',
@@ -449,6 +484,78 @@ await run('C2 propose: cohesive maintain with business produce key is accepted',
   });
   assert.ok(out.atoms.length >= 1, `expected atoms, rejected=${JSON.stringify(out.rejected)}`);
   assert.equal(out.rejected.filter((r) => r.reason === 'multi_capability_task_draft').length, 0);
+});
+
+await run('wet A 新增产品要素分组: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_CREATE_FACTOR_GROUP), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '新增产品要素分组',
+    taskDraft: WET_CREATE_FACTOR_GROUP,
+    produces: ['产品要素分组'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet B 新增产品: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_CREATE_PRODUCT), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '新增产品',
+    taskDraft: WET_CREATE_PRODUCT,
+    produces: ['已新增产品'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet C 禁用产品: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_DISABLE_PRODUCT), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '禁用产品',
+    taskDraft: WET_DISABLE_PRODUCT,
+    produces: ['已禁用产品'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet D 产品克隆: cohesion ok and persistConfirms===1', () => {
+  assert.equal(countPersistConfirms(WET_CLONE_PRODUCT), 1);
+  const out = mod.assertCapabilityCohesion({
+    title: '产品克隆',
+    taskDraft: WET_CLONE_PRODUCT,
+    produces: ['已克隆产品'],
+  });
+  assert.deepEqual(out, { ok: true });
+});
+
+await run('wet A/B/C/D propose: accepted, not multi_capability or multi_persist', async () => {
+  const cases = [
+    { title: '新增产品要素分组', taskDraft: WET_CREATE_FACTOR_GROUP, produces: ['产品要素分组'] },
+    { title: '新增产品', taskDraft: WET_CREATE_PRODUCT, produces: ['已新增产品'] },
+    { title: '禁用产品', taskDraft: WET_DISABLE_PRODUCT, produces: ['已禁用产品'] },
+    { title: '产品克隆', taskDraft: WET_CLONE_PRODUCT, produces: ['已克隆产品'] },
+  ];
+  for (const c of cases) {
+    const out = await proposeOne({
+      chainId: 'chain-a',
+      stepIndexes: [2],
+      title: c.title,
+      flowRef: 'product_library',
+      nodeId: 'prod_add_dlg',
+      taskDraft: `${c.taskDraft}\n\n来源：demo.docx / chapters/01-product-library.md\n`,
+      produces: c.produces,
+      dataDependsOn: [],
+      phaseHints: [c.title],
+      suggestedFunctionId: null,
+    });
+    assert.ok(
+      out.atoms.length >= 1,
+      `${c.title}: expected atoms, rejected=${JSON.stringify(out.rejected)}`,
+    );
+    assert.equal(
+      out.rejected.filter((r) => r.reason === 'multi_capability_task_draft' || r.reason === 'multi_persist_task_draft').length,
+      0,
+      `${c.title}: must not reject cohesive single-closer draft`,
+    );
+  }
 });
 
 await run('atomize prompt locates prep to locate-class only', () => {
