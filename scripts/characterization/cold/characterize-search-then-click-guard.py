@@ -223,6 +223,17 @@ def main() -> int:
     if "stc-query-anchor" not in engine_src and "query-button container anchor" not in engine_src.lower():
         print("FAIL: click_action_engine.py missing TODO near mark_query_clicked (§7.1)")
         return 1
+    # Task 4: replay_table prefers structural xpath before semantic row_text
+    replay_table_path = ROOT / "scripts/controller/actions/replay_table.py"
+    replay_table_src = replay_table_path.read_text(encoding="utf-8")
+    if "locate=xpath-first" not in replay_table_src:
+        print("FAIL: replay_table.py missing locate=xpath-first marker (spec §6)")
+        return 1
+    click_idx = replay_table_src.find("await _replay_click_by_index")
+    semantic_call_idx = replay_table_src.find("await _replay_controller_action(act")
+    if click_idx < 0 or semantic_call_idx < 0 or click_idx > semantic_call_idx:
+        print("FAIL: replay_table.py must call durable/xpath before semantic when smart xpath present")
+        return 1
     print("OK search-then-click-guard")
     return 0
 
