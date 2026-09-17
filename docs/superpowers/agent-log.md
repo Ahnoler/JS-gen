@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 16:53 · Cursor — 开工：capability-cohesion LMY FP（clone 复制残留 / 待维护名词 / 删除成功结局，cache v10→11）
+
+- 进行中：LMY `reject-drafts-reprobe.json` re-atomize 2026-09-17 三笔 cohesion 误杀——①产品克隆 closer 行裸 `复制…数据` 当第二 clone；②`待维护产品` 当 maintain；③`确认删除成功` 当第二 delete persist。同精神收 residual `修改…后` / 标题 `维护…主页`。
+- 范围（可写集）：`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` 10→11）、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin）、本协作日志。`flow-card-guide.js` 仅当 closer/persist-as-cap 计数必须一致才动。
+- 禁入区：parse API、atomize prompt、Vue SPA、`dangling_data_depend`、executor/phase/wf-guard、`origin/master`、他线 840 指引/`scripts/prompts/agent-tools-*.md`/`data/kb/**` WIP
+- 方式：主会话 Inline TDD；基线 `uara_V1.2`；分支 `cursor/cohesion-fp-cache-v11-66fb` → PR `uara_V1.2`
+- 真阳性保持：maintain+上移/下移、两次【保存】/【确定】 persist 闸、`添加一条记录`+删除、v10 湿 pin、同组配置+删除
+
 ## 2026-09-17 16:45 · ZCode 引擎线 — 开工：下拉族边界改按行为写（指引层，零引擎改动）
 
 - 进行中（用户批准方案；起因=用户追问「面对下拉框 Agent 为什么会用真实点击」）：审计两份只读调研已定因——①`agent-tools-common.md:72` 命令 agent「**必须先读选项再选**」却没给读通道（真实只读通道是 `scan_visible_fields`/`scan_form_fields` 的 `field.options`，源码注释明确「不打开下拉框」）；②禁令**按工具名写**且 `real_click`/`click_button` 从未被排除（`common.md:3`/`form.md:114`/`:117` 只点名 `click_element(_by_index)`，而 `form.md:144` 早有三工具一起点名的先例）；③`real_click` 被宣传成「合成点击无效时用」的信任通道（`common.md:124-127`），范围未排除选项。**因此 agent 被指引推去开下拉，而它唯一会用的开法是点击。**
