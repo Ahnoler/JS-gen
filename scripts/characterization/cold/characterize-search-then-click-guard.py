@@ -223,6 +223,30 @@ def main() -> int:
     if "stc-query-anchor" not in engine_src and "query-button container anchor" not in engine_src.lower():
         print("FAIL: click_action_engine.py missing TODO near mark_query_clicked (§7.1)")
         return 1
+    # Task 6: STC-satisfied tree click → first-leaf structural xpath
+    if "stc_satisfied" not in engine_src:
+        print("FAIL: click_action_engine.py must use stc_satisfied for first-leaf record path")
+        return 1
+    if (
+        "_structural_first_leaf_tree_xpath" not in engine_src
+        and "is-leaf" not in engine_src
+    ):
+        print("FAIL: click_action_engine.py missing structural first-leaf xpath in STC branch")
+        return 1
+    if (
+        "'option_text': 'first'" not in engine_src
+        and '"option_text": "first"' not in engine_src
+        and "record_opt = 'first'" not in engine_src
+    ):
+        print("FAIL: click_action_engine.py must record option_text=first when STC satisfied")
+        return 1
+    if (
+        "'text': 'first'" not in engine_src
+        and '"text": "first"' not in engine_src
+        and "record_text = 'first'" not in engine_src
+    ):
+        print("FAIL: click_action_engine.py must record text=first for generic tree STC clicks")
+        return 1
     # Task 4: replay_table prefers structural xpath before semantic row_text
     replay_table_path = ROOT / "scripts/controller/actions/replay_table.py"
     replay_table_src = replay_table_path.read_text(encoding="utf-8")

@@ -23,6 +23,45 @@ from ._misc import (
     _JS_VISIBLE_FORM_OVERLAY,
 )
 
+_FIRST_LEAF_TREE_LOCAL = (
+    "div[contains(@class,'el-tree')]"
+    "//div[contains(@class,'el-tree-node')]"
+    "[.//span[contains(@class,'el-tree-node__expand-icon')"
+    " and contains(@class,'is-leaf')]][1]"
+    "/div[contains(@class,'el-tree-node__content')]"
+)
+
+_JS_STC_OVERLAY_SCOPE = '''() => {
+    const overlays = [...document.querySelectorAll('.el-drawer, .el-dialog, .el-message-box')]
+        .filter((d) => {
+            if (d.offsetParent !== null) return true;
+            const st = getComputedStyle(d);
+            if (st.display === 'none' || st.visibility === 'hidden') return false;
+            const r = d.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+        });
+    let scope = null;
+    let bestZ = -1;
+    for (const o of overlays) {
+        const z = parseInt(getComputedStyle(o).zIndex || '0', 10) || 0;
+        if (z >= bestZ) { bestZ = z; scope = o; }
+    }
+    if (!scope) return '';
+    return scope.classList.contains('el-drawer') ? 'drawer' : 'dialog';
+}'''
+
+
+def _structural_first_leaf_tree_xpath(scope_kind: str) -> str:
+    """Structural first-leaf tree xpath (mirrors buildTreeFirstLeafXPathSmart)."""
+    if scope_kind == 'drawer':
+        return "//div[contains(@class,'el-drawer')]//" + _FIRST_LEAF_TREE_LOCAL
+    if scope_kind == 'dialog':
+        return (
+            "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+            "//" + _FIRST_LEAF_TREE_LOCAL
+        )
+    return "//" + _FIRST_LEAF_TREE_LOCAL
+
 
 class ClickEngine:
     def __init__(self, browser_context, business_data_store=None):
@@ -296,13 +335,26 @@ class ClickEngine:
             if str((element_info or {}).get('target_kind') or '').lower() == 'form_select':
                 select_trigger_click = True
 
+            stc_force_first = False
+            stc_scope_kind = ''
             if gate_xp:
                 try:
-                    from .search_then_click_guard import guard_locate_or_err, xpath_is_tree_node
+                    from .search_then_click_guard import (
+                        guard_locate_or_err,
+                        xpath_is_tree_node,
+                        detect_search_ui,
+                        stc_satisfied,
+                    )
                     if await xpath_is_tree_node(page, gate_xp):
                         stc_err = await guard_locate_or_err(page, self.business_data_store)
                         if stc_err:
                             return _err(stc_err, include_in_memory=True)
+                        snap = await detect_search_ui(page)
+                        stc_force_first = stc_satisfied(self.business_data_store, snap)
+                        if stc_force_first:
+                            stc_scope_kind = str(
+                                await page.evaluate(_JS_STC_OVERLAY_SCOPE) or ''
+                            )
                 except Exception:
                     sys.stderr.write("[click] search-then-click tree gate failed index={index!r}" + '\n')
                     sys.stderr.flush()
@@ -608,16 +660,20 @@ class ClickEngine:
                     is_tree_node_click
                     and (element_info or {}).get('target_kind') == 'form_tree_select'
                     and form_label
-                    and tree_opt
+                    and (tree_opt or stc_force_first)
                 ):
-                    if element_info is not None:
-                        element_info = dict(element_info)
-                        element_info['text'] = tree_opt[:80]
-                        element_info['target_kind'] = 'form_tree_select'
-                        element_info['formLabel'] = form_label
+                    record_opt = 'first' if stc_force_first else tree_opt
+                    element_info = dict(element_info or {})
+                    element_info['text'] = record_opt[:80]
+                    element_info['target_kind'] = 'form_tree_select'
+                    element_info['formLabel'] = form_label
+                    if stc_force_first:
+                        element_info['xpath_smart'] = _structural_first_leaf_tree_xpath(
+                            stc_scope_kind,
+                        )
                     _state._record_action(
                         'select_tree_option',
-                        {'label_text': form_label, 'option_text': tree_opt},
+                        {'label_text': form_label, 'option_text': record_opt},
                         f'ok-clicked-{index}',
                         element=element_info,
                     )
@@ -635,10 +691,19 @@ class ClickEngine:
                 elif not select_trigger_click:
                     record_text = (element_info or {}).get('text') or elem_text or ''
                     if is_tree_node_click:
-                        record_text = _strip_volatile_tree_text(record_text)
-                        if element_info is not None:
-                            element_info = dict(element_info)
-                            element_info['text'] = record_text[:80]
+                        if stc_force_first:
+                            record_text = 'first'
+                            element_info = dict(element_info or {})
+                            element_info['text'] = 'first'
+                            element_info['xpath_smart'] = _structural_first_leaf_tree_xpath(
+                                stc_scope_kind,
+                            )
+                            element_info['target_kind'] = 'tree_node'
+                        else:
+                            record_text = _strip_volatile_tree_text(record_text)
+                            if element_info is not None:
+                                element_info = dict(element_info)
+                                element_info['text'] = record_text[:80]
                     _state._record_action('click_element_by_index', {
                         'index': index,
                         'tag_name': element_info.get('tag_name') if element_info else tag_name,

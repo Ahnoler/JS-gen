@@ -13,6 +13,12 @@ NEEDLES: dict[str, tuple[str, ...]] = {
         "树/列表先查再点",
         "err-search-first",
         'click_table_row_radio(row_text="first")',
+        'option_text="first"',
+    ),
+    "scripts/prompts/agent-tools-tree.md": (
+        "STC 后选首叶",
+        'option_text="first"',
+        "勿传业务节点名",
     ),
     "scripts/prompts/agent-tools-table.md": (
         "树/列表先查再点",
