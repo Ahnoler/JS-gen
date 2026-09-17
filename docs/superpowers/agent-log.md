@@ -1,5 +1,29 @@
 # Agent 协作日志
 
+## 2026-09-17 11:36 · Cursor — 收工：merge origin/uara_V1.2 into PR #51（回链本条）
+
+- 完成：`cursor/draft-traj-propose-gate-fp-be06` 合入最新 `origin/uara_V1.2`（`549e7a5c` executor LB spec 证据报告）。冲突仅本文件，按时刻交错保留双方条目。产品代码无冲突：gate FP 修复 / cache **v9** / persist-boundary·cohesion pins 全保留；他线 `docs/superpowers/reports/2026-09-17-executor-lb-spec-evidence.md` 一并带入。
+- 验收：再跑 persist-boundary / capability-cohesion / req-draft-traj pins。不 `gh pr merge`（用户要求保持 PR 不合入）。
+- 遗留：LMY 湿测仍须 POST propose（cache v9）。不维护 CHANGELOG。
+
+## 2026-09-17 11:35 · Cursor — 收工：draft-traj propose 闸 false positive（回链 11:21 开工）
+
+- 完成：`3daae354` — persist 确认改计 closer（【确定】/【保存】/【提交】，同行去重）；cohesion 允许 locate-prep + 单次新增/维护 + 一次 closer；`PROPOSE_CACHE_VERSION` 8→9。开工 `62d92350`。PR **#51** → `uara_V1.2`。
+- 验收（本环境，假 LLM）：
+  - `characterize-persist-boundary.mjs` **all passed**（A/B/C/D persistConfirms===1；同行双【保存】=1；两闭环=2）
+  - `characterize-capability-cohesion.mjs` **all passed**（A/B/C/D cohesion ok + propose accepted；maintain+sort 仍拒）
+  - `characterize-req-draft-traj.mjs` **OK 76**（cache **9**；open-drawer fold 仍 1 atom）
+  - `characterize-atom-depend.mjs` **all passed**
+  - `npx eslint` 改动 src **0**
+- 遗留移交：LMY 湿测须 **POST** `…/product-mgmt/draft-traj/propose`（cache v9）；仅重启不够。parse / atomize prompt / UI 未动。不维护 CHANGELOG。
+
+## 2026-09-17 11:21 · Cursor — 开工：draft-traj propose 闸 false positive（禁用/克隆 persist 计数 + 新增 cohesion）
+
+- 进行中：修 LMY 湿测 product-mgmt propose 闸误杀（parse 14 笔好稿 accepted 0/14）。根因 1：`countPersistConfirms` 把叙事里的 禁用/克隆/删除/启用 当落库确认；根因 2：`assertCapabilityCohesion` 把 locate-prep + 单次新增/维护 + 一次 closer 判成 `multi_capability_task_draft`。TDD 先行：A 新增产品要素分组 / B 新增产品 / C 禁用产品 / D 产品克隆 必须 cohesion ok 且 persistConfirms===1；maintain+sort 与两次【保存】/【确定】闭环仍拒。
+- 范围（可写集）：`src/services/req-draft-traj/flow-card-guide.js`、`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` 8→9）、`scripts/characterization/characterize-persist-boundary.mjs`、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin）、本协作日志
+- 禁入区：parse API、atomize prompt、Vue SPA、`propose.js` 接线顺序以外的解析/切片、executor-lb spec、recorder/phase、`origin/master`、活跃录制会话；他线在途文件无交集（capability-cohesion / flow-card-guide 无在途声明）
+- 方式：主会话 Inline TDD；基线 `uara_V1.2`；新分支 `cursor/draft-traj-propose-gate-fp-be06` → PR `uara_V1.2`
+
 ## 2026-09-17 11:15 · ZCode — 收工：executor LB spec 证据核验与设计切面调研（评审支持材料）
 
 - 完成：`docs/superpowers/reports/2026-09-17-executor-lb-spec-evidence.md`——3 个并行只读 Explore 子智能体（控制面调度内核 / 执行机侧与生命周期 / 入口·数据面·API 契约）核验 spec 全部 file:line 断言 + 主会话抽查 4 条载重断言属实。**spec 现状速查表与 G1–G11 断言全部证实**，3 处量化/边界漂移待修（G5 探测实为 Promise.all 并行非 O(N×probe)、sweep 实值 22.5s、CDP 端口 fallback 撞端口边界）

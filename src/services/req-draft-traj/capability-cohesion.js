@@ -18,10 +18,38 @@ const OTHER_FAMILIES = {
 };
 
 const PERSIST_AS_CAP_FAMILIES = new Set(['delete', 'status', 'clone']);
-const PERSIST_AS_CAP_RE = /(?<![未已])启用|禁用|克隆|删除|作废|撤销(?!查询)/;
+const PERSIST_AS_CAP_BRACKET_RE = /【[^】]*(?:启用|禁用|克隆|删除|作废|撤销)[^】]*】/;
+const PERSIST_AS_CAP_BARE_RE = /(?<![未已])启用(?!状态)|禁用(?!理由|页)|克隆(?!页)|删除(?!理由)|作废|撤销(?!查询)/;
 const CLOSER_RE = /确定|保存(?!概况)|提交/;
+const CREATE_OPENER_MARK_RE = /【[^】]*(?:新增|添加|创建|新建)[^】]*】/;
+const CREATE_WORD_RE = /新增|添加|创建|新建/;
 const STEP_DUNHAO_RE = /^\s*\d+、/;
 const STEP_DOT_RE = /^\s*\d+[\.．]\s+/;
+
+/**
+ * True when haystack names a persist-as-capability action rather than a
+ * noun modifier (启用状态 / 禁用理由 / 克隆页).
+ * @param {string} haystack Group action text
+ * @returns {boolean} Persist-as-capability verb present
+ */
+function hasPersistAsCapVerb(haystack) {
+  const src = String(haystack || '');
+  return PERSIST_AS_CAP_BRACKET_RE.test(src) || PERSIST_AS_CAP_BARE_RE.test(src);
+}
+
+/**
+ * Clicking 【新增…】 (or opening a create page) without a closer is locate-prep,
+ * not a second create capability beside the later fill+save.
+ * @param {string} haystack Group action text
+ * @returns {boolean} Create-opener prep
+ */
+function isCreateOpenerPrep(haystack) {
+  const src = String(haystack || '');
+  if (CLOSER_RE.test(src)) return false;
+  if (CREATE_OPENER_MARK_RE.test(src)) return true;
+  if ((src.includes('打开') || src.includes('进入')) && CREATE_WORD_RE.test(src)) return true;
+  return false;
+}
 
 /**
  * Drop trailing 来源： / 关键数据 metadata so classification sees only steps.
@@ -106,7 +134,9 @@ export function parseTaskDraftStepGroups(taskDraft) {
 /**
  * Other-family ids whose substrings hit haystack.
  * Maintain `编辑` matches only when not immediately followed by `页`/`界面`/`页面`.
- * Create `新增` matches only when not a page-title compound (`新增…主页/页面/界面/页`).
+ * Create `新增` matches only when not a page-title compound (`新增…主页/页面/界面/页`)
+ * and not a closer-less 【新增…】 / open-create opener (locate-prep).
+ * Status/clone/delete skip noun modifiers (启用状态 / 禁用理由 / 克隆页).
  * @param {string} haystack Group action text
  * @returns {Set<string>} Family ids
  */
@@ -115,21 +145,38 @@ function detectOtherFamilies(haystack) {
   const found = new Set();
   for (const [id, words] of Object.entries(OTHER_FAMILIES)) {
     if (id === 'status') {
-      if (/(?<![未已])启用/.test(haystack) || haystack.includes('禁用')) found.add('status');
+      if (/【[^】]*(?:启用|禁用)[^】]*】/.test(haystack)
+        || /(?<![未已])启用(?!状态)/.test(haystack)
+        || /禁用(?!理由|页)/.test(haystack)) {
+        found.add('status');
+      }
       continue;
     }
-    if (id === 'maintain') {
-      if (words.some((w) => (w === '编辑' ? /编辑(?!页|界面|页面)/.test(haystack) : haystack.includes(w)))) {
-        found.add(id);
+    if (id === 'clone') {
+      if (/【[^】]*克隆[^】]*】/.test(haystack) || /克隆(?!页)/.test(haystack) || haystack.includes('复制')) {
+        found.add('clone');
+      }
+      continue;
+    }
+    if (id === 'delete') {
+      if (/【[^】]*删除[^】]*】/.test(haystack) || /删除(?!理由)/.test(haystack) || haystack.includes('移除')) {
+        found.add('delete');
       }
       continue;
     }
     if (id === 'create') {
+      if (isCreateOpenerPrep(haystack)) continue;
       if (words.some((w) => (
         w === '新增'
           ? /新增(?![\u4e00-\u9fff]{0,16}(?:主页|页面|界面|页))/.test(haystack)
           : haystack.includes(w)
       ))) {
+        found.add(id);
+      }
+      continue;
+    }
+    if (id === 'maintain') {
+      if (words.some((w) => (w === '编辑' ? /编辑(?!页|界面|页面)/.test(haystack) : haystack.includes(w)))) {
         found.add(id);
       }
       continue;
@@ -146,20 +193,22 @@ function detectOtherFamilies(haystack) {
  */
 function hasPersistAsCapability(haystack) {
   if (!isPersistBoundaryAction(haystack)) return false;
-  return PERSIST_AS_CAP_RE.test(haystack);
+  return hasPersistAsCapVerb(haystack);
 }
 
 /**
- * True when haystack is a closer tail: 确定/保存/提交, no other family, no persist-as-capability.
- * Prose around the closer (一次…成功) is allowed.
+ * True when haystack is a closer tail: 确定/保存/提交. Persist-as-capability
+ * families (status/clone/delete) in the same closer line are allowed so
+ * 「点击【确定】完成克隆」 stays one closer. Maintain/create/reorder still block.
  * @param {string} haystack Group action text
  * @returns {boolean} Closer-only persist
  */
 function isCloserOnlyPersistHaystack(haystack) {
   const src = String(haystack || '');
   if (!CLOSER_RE.test(src)) return false;
-  if (detectOtherFamilies(src).size > 0) return false;
-  if (hasPersistAsCapability(src)) return false;
+  for (const family of detectOtherFamilies(src)) {
+    if (!PERSIST_AS_CAP_FAMILIES.has(family)) return false;
+  }
   return true;
 }
 

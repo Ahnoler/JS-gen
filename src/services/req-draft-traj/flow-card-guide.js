@@ -7,9 +7,9 @@
  */
 import { matchFlowForAtom } from './flow-card-recall.js';
 
-const PERSIST_VERB_RE = /保存|提交|(?<![未已])启用|禁用|克隆|删除|作废|撤销(?!查询)/;
 const PERSIST_BOUNDARY_RE = /保存|提交|(?<![未已])启用|禁用|克隆|删除|作废|撤销(?!查询)|确定/;
-const CONFIRM_MARK_RE = /【确定】|确定】/;
+const CLOSER_MARK_RE = /【(?:确定|保存|提交)】|(?:确定|保存|提交)】/;
+const CLOSER_VERB_LINE_RE = /保存(?!概况)|提交/;
 
 /**
  * True when a step-shaped value has any action/buttons text.
@@ -59,11 +59,12 @@ export function stepsShareClosedLoop({ stepActions }) {
 /**
  * Count persist confirms in taskDraft text (separate saves).
  *
- * Each `【确定】` / `确定】` counts once. Lines that are persist verbs
- * without a confirm mark (保存/提交/启用/…) count as additional confirms so
- * a draft that lists two saves is rejected even if it never wrote 确定.
- * Bare 「确定」 in confirm-dialog copy is not counted here (only the mark
- * regex), so 「启用」 + 「确定执行此操作？」 stays one persist.
+ * Each numbered line contributes at most one closer: a `【确定】` /
+ * `【保存】` / `【提交】` mark (or leftover `确定】`), else a bare 保存/提交
+ * verb. Repeat marks on the same line (action prose plus `操作：【保存】`)
+ * are one persist, not two. Narrative 禁用/克隆/删除/启用 verbs are not
+ * confirms. Bare 「确定」 in confirm-dialog copy is not counted, so 「启用」
+ * + 「确定执行此操作？」 stays a single persist (zero or one, never two).
  * 「保存概况」 in a line is stripped first so a fill-step button does not
  * inflate the count next to a later 【保存】.
  * @param {unknown} text Task draft or other haystack
@@ -71,13 +72,16 @@ export function stepsShareClosedLoop({ stepActions }) {
  */
 export function countPersistConfirms(text) {
   const src = String(text || '');
-  const confirmHits = src.match(new RegExp(CONFIRM_MARK_RE.source, 'g')) || [];
-  const otherLines = src.split(/\r?\n/).filter((line) => {
-    if (CONFIRM_MARK_RE.test(line)) return false;
+  let n = 0;
+  for (const line of src.split(/\r?\n/)) {
+    if (CLOSER_MARK_RE.test(line)) {
+      n += 1;
+      continue;
+    }
     const stripped = line.replaceAll('保存概况', '');
-    return PERSIST_VERB_RE.test(stripped);
-  });
-  return confirmHits.length + otherLines.length;
+    if (CLOSER_VERB_LINE_RE.test(stripped)) n += 1;
+  }
+  return n;
 }
 
 /**
