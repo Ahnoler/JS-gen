@@ -1,5 +1,31 @@
 # Agent 协作日志
 
+## 2026-09-17 15:35 · ZCode 引擎线 — 收工：纠正过拟合（撤回跨族分类器，guard 只报组件类型）
+
+- **更正前一条**：`598d8a75` 收工条目把「real_click 载体分类器 + 处方」记为已交付成果——**是过拟合，已撤回**，该条目的成果描述作废，以本条为准
+- 用户两条裁定（都成立）：①`real_click` 属 click 族，**不得在内部接管 select 族操作**——推荐应由 **Agent 按组件类型自己选动作**，而不是拓宽某个动作；②把分类接进 `click_button` 的 not-found（err-icon-label-miss）同样不可取——**Agent 只需选择合适的操作，不是拓展某个操作的使用场景**
+- 撤回（`791e5c44`）：`real_click` 载体分类器 + `err-real-click-select-option`/`err-real-click-disabled-button` + not-found 处方、`_workspace` 处方透出、`click_action_engine` 接线、`_js_snippets` 桶导出、旧 pin `characterize-component-type-prescription.py` 删除。**无事故证据**：840 三次 real_click 落库锚都是 `el-steps`（合法页脚按钮），从未落到达下拉选项，click_button 也没走过那条路径——纯属我从单一事故外推
+- 保留（最窄形态，对准有证据的缺陷：guard 返回 `opOptions=[]` 被 agent 读成「没东西可选」）：`JS_WF_SUBMIT_GUARD` 新增 **`opKind`**（流程操作字段的组件类型，现场 DOM 读：el-select/textarea/input/other）——**只报事实，不给处方、不写选项名、不写节点角色**；模块/动作 docstring 记录 `opOptions` 的真实语义（**只列已渲染可见项**，el-select 首次展开才渲染，空列表≠没有选项）——这是**返回值语义说明**，不是建议。类型→动作的知识**单一来源留在 agent 自己的指引**（`agent-tools-form.md` EL-SELECT 规则已有「el-select 必须用 select_option」），引擎不复述
+- 验证：pin 改为 facts-only 并**反向钉住被否的形状**（click 族 needle、opHint 处方字段一律 ban），三方证伪各自红后还原——删 `opKind`→红 / real_click 回潮→红 / opHint 回潮→红；活页面 fixture：`opKind=el-select`、无 `opHint`、载荷其余形状不变；verify-all 3 红=既有基线零新增
+- 教训（自省）：单点事故 ≠ 通用规则。把「文本没找到」推广成「载体分类器 + 处方」，等于用一次事故的语言去写引擎规则；且**同一个事故被我复述进了 4 个地方**（引擎处方、两个动作族、pin 词汇 ban）——正是用户说的「职责重复/场景拓宽」。今后此类外推先问：有没有第二次事故证据？这条知识该住在谁的层？
+- 注：不维护 CHANGELOG
+
+## 2026-09-17 15:10 · ZCode 引擎线 — 开工：组件类型处方补对称口（click_button not-found），并答「real_click 落库是什么」
+
+- 进行中：用户问「为什么只用 real_click、real_click 落库是什么操作」。取证：real_click 落库=actionType `real_click` + params{selector,text,label_text} + **点击当场抓的定位快照**（popover 点完即关，事后补抓扑空）；回放侧 real_click **零直派接线**，走「控制器兜底」=把录制时动作函数原样重调（同 text 现场重找 + 再打 CDP 信任点击）——**非确定性回放**，对下拉选项录制时开着、回放时关着必失败 → 佐证「选项必须以 select_option 落库」。对称缺口：`click_button` 的 not-found（err-icon-label-miss）今天不带处方——agent 在末步调 click_button('下一步') 同样该拿到「若是下拉选项→select_option」
+- 修法：real_click.py 新增独立片段 `JS_TEXT_CARRIER_PRESCRIPTION(text)`（可见载体扫描+分类：开着的下拉选项→带现场 label 的 select_option 处方/禁用按钮/无载体→未展开不在 DOM），接进 `click_action_engine.py` 的 icon-label-miss 分支（next_action 附处方）；pin 增 needle
+- 范围：`scripts/controller/actions/js_snippets/real_click.py`、`scripts/controller/actions/click_action_engine.py`、pin `characterize-component-type-prescription.py`、本协作日志
+- 禁入区：`click_element_by_index` 既有栅栏、`select_engine`、他线 `data/kb/**` WIP
+- 方式：主会话 Inline；snippet fixture 验证 + 相邻 click 门禁回归 + verify-all
+
+## 2026-09-17 14:55 · ZCode 引擎线 — 收工：按组件类型推荐动作（重构 opHint 硬编码，回链 12:30 开工）
+
+- 完成：`d9ace2b8`（real_click 分类器 + _workspace 处方透出 + guard/提示词去硬编码 + pin 重写）。**分类器落在 `real_click` 的文本目标解析里**（按文本找目标的唯一动作），四类载体四类处置：①启用按钮→照常点击（行为不变）；②载体是 `.el-select-dropdown__item` → **不做信任点击**，`err-real-click-select-option` + 处方 `select_option(label_text=<归属字段名现场推导>, option_text=<目标文本>)`（归属 label 从展开中触发器 `aria-expanded=true`→兜底聚焦 input 的 form-item 现场读出——与 index-click 的 use-select-option 栅栏同一仓库规则）；③禁用按钮（native/aria-disabled）→ `err-real-click-disabled-button`（消灭"信任点击禁用按钮=静默无效"一类）；④无可见载体 → not-found + 处方点破**「弹层未展开时选项不在 DOM 里，real_click 永远找不到」**。`_workspace.py` 失败时把 `prescription` 透出给 agent。guard opHint 与 `_todo.py` 提示词全部改类型制表述，`下一步/发起节点` 字面量从处方中删除且被 pin ban（docstring 的 DOM 事实记录保留——知识非处方）
+- 验证：新 pin `characterize-component-type-prescription`（取代 `characterize-wf-submit-guard-hint`，20 needles 含 ban）**证伪成立**（短路选项载体分支→红，md5 逐位还原→绿）；fixture 四分类 7/7——关键例 D2：弹层展开后 `real_click('下一步')` 返回处方 `select_option(label_text="流程操作", option_text="下一步")`，**label 从 DOM 现场推导零硬编码**；verify-all 全量 3 红=既有基线零新增
+- 偏差自报：29242 浏览器中途被收回（ECONNREFUSED），真页面 leg 未跑成——但同一页面此前的引擎原版序列 8/8 已证触发/拾取路径，且 fixture D2 覆盖分类器本体
+- 遗留移交：①真页面上归属 label 推导依赖触发器带 `aria-expanded` 或持焦点——若都不成立处方降级为 `<字段名>` 占位（agent 仍有 guard 的精确 label 兜底），下次活页面会话值得看一眼；②840 重录验证仍待重启控制面/执行机（`7eea3bf8`+`9e35b942`+`d9ace2b8` 三笔一起生效）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-17 14:40 · OpenCode — 收工：查询/筛选阶段「更多」收起条件尽力展开（icon-only `more-btn` 识别）
 
 - 完成（两条提交，均为用户代为提交）：**`aaa9f575`** 规则提示——`filter_expand_try_hint()` 注入 query 模式与「描述含查询/搜索/查找/筛选但未归入 query」的阶段（向导/打开页面不注入），`agent-core.md` 查询行同步；**`06fbf86d`**（作者 黄正祥）icon-only「更多」按钮识别落地。

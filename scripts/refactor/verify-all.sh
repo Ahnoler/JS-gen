@@ -73,7 +73,7 @@ run "characterize-phase-done-evidence-gate" node scripts/characterization/charac
 # 前者抓"拒绝没生效"（裸 return → None → 调用方 truthy 判定静默放行）——源码形状 pin 抓不到。
 run "characterize-g3-done-gate-live" "$PY" scripts/characterization/characterize-g3-done-gate-live.py
 run "characterize-g3-runner-seam" node scripts/characterization/characterize-g3-runner-seam.mjs
-# traj 840：wf_submit_guard 必须给 opHint 行动处方（末步 下一步=流程操作下拉选项，走 select_option）
+# traj 840：wf_submit_guard 按字段类型给下一步动作（下拉→select_option；空 options≠没选项）
 run "characterize-wf-submit-guard-hint" "$PY" scripts/characterization/characterize-wf-submit-guard-hint.py
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py

@@ -21,12 +21,12 @@ JS snippet constants: JS_LIST_TODO_CARDS, JS_WF_SUBMIT_GUARD.
 - JS_LIST_TODO_CARDS() -> '{"ok":true,"count":n,"cards":[{"title","bizPk",
   "status","actions":[...]}]}'；无卡片时 count=0、cards=[]（空态合法）。
 - JS_WF_SUBMIT_GUARD() -> '{"ok":true,"submit":{...},"undo":{...},
-  "opLabel","opValue","opOptions":[...],"opHint","opinionLen","opinionMax",
+  "opLabel","opValue","opKind","opOptions":[...],"opinionLen","opinionMax",
   "historyRows","lastHistoryNode"}'；页面不可辨识时
-  '{"ok":false,"error":"wf-page-not-found"}'。opHint 为行动处方：opValue
-  为空时处方=select_option(label_text=opLabel, option_text=…)（弹层未展开
-  不代表没有选项；末步的「下一步」是该下拉的选项，不是按钮），已选时处方
-  =复核后流程提交。
+  '{"ok":false,"error":"wf-page-not-found"}'。opKind=流程操作字段的组件类型
+  （el-select/textarea/input/other），只报事实、不给处方；opOptions **只列
+  已渲染的可见选项**——el-select 首次展开才渲染选项，故空列表不等于「没有
+  选项」，选哪个动作由 agent 按其工具规则决定。
 
 两个片段均为零参数箭头函数，只读元信息、绝不点击任何按钮/下拉；
 返回 JSON 字符串。
@@ -156,24 +156,14 @@ JS_WF_SUBMIT_GUARD = '''() => {
             lastHistoryNode = firstCell ? norm(firstCell.innerText || firstCell.textContent).slice(0, 20) : '';
         }
     }
-    // 行动处方（traj 840 实证）：opValue 为空时 agent 停滞——它把「下一步」当按钮
-    // 去 real_click，而末步的 下一步 是 流程操作 el-select 的选项；opOptions=[] 又被
-    // 读成「没东西可选」。Element UI 选项要弹层首次展开才渲染，本 guard 刻意不开
-    // 弹层，所以必须在这里把正确动作（select_option，它会自行展开）讲清楚。
-    const opName = opLabel || '流程操作';
-    let opHint = '';
-    if (opItem && submit && submit.visible) {
-        if (opValue) {
-            opHint = '流程操作已选「' + opValue + '」。复核与任务意图一致后即可 click 流程提交'
-                   + '（不可逆：先声明意图，提交后用审批历史行核验）。';
-        } else {
-            opHint = '流程操作（' + opName + '，下拉）尚未选择。opOptions=[] 只说明弹层尚未展开'
-                   + '（Element UI 首次展开才渲染选项），不代表没有选项——发起节点的选项通常就是「下一步」。'
-                   + '请调用 select_option(label_text="' + opName + '", option_text="下一步") 完成选择'
-                   + '（select_option 会自行展开弹层，无需也不应先 real_click 展开或点击选项），'
-                   + '然后重跑本 guard 确认 opValue 已变化，再 click 流程提交。'
-                   + '禁止对「下一步」这类名称做 real_click/click_button——末步的 下一步 是这个下拉的选项，不是按钮。';
-        }
+    // 只报事实：流程操作字段的组件类型。动作选择归 agent（其指引已有
+    // 「EL-SELECT 规则：el-select 下拉框必须用 select_option」）——引擎不在这
+    // 里复述处方，也不替任何动作族接管别的族（traj 840 教训）。
+    let opKind = null;
+    if (opItem) {
+        opKind = opItem.querySelector('.el-select') ? 'el-select'
+            : (opItem.querySelector('textarea') ? 'textarea'
+                : (opItem.querySelector('input:not([type="hidden"])') ? 'input' : 'other'));
     }
     return JSON.stringify({
         ok: true,
@@ -181,8 +171,8 @@ JS_WF_SUBMIT_GUARD = '''() => {
         undo: undo,
         opLabel: opLabel,
         opValue: opValue,
+        opKind: opKind,
         opOptions: opOptions,
-        opHint: opHint,
         opinionLen: opinionLen,
         opinionMax: opinionMax,
         historyRows: historyRows,

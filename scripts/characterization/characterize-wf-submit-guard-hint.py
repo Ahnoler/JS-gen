@@ -1,19 +1,22 @@
-"""Characterization: wf_submit_guard 的 opHint 行动处方（traj 840，2026-09-17）。
+"""Characterization: wf_submit_guard 只报事实（组件类型），动作由 agent 选（traj 840）。
 
-Born from traj 840: at the wizard's final step the agent stalled — 「下一步」 there is
-an OPTION of the 流程操作 el-select, not a button, yet nothing in the guard payload or
-its prompt said so. The guard reported opValue=''/opOptions=[] (Element UI renders
-options only after the first open; the guard deliberately never opens the dropdown),
-which the agent read as "nothing to select", and it kept pattern-matching real_click
-on the option name instead of using select_option.
+Born from traj 840: at the wizard's final step the agent stalled — the guard
+returned opValue='' / opOptions=[] and the agent read that as "nothing to select"
+(Element UI renders a select's options only after the dropdown first opens, and
+this guard deliberately never opens it).
 
-Pinned here:
-- the payload carries ``opHint`` (prescription) and keeps the rest of the shape;
-- empty-opValue branch prescribes select_option(label_text=opLabel, option_text=…),
-  explains opOptions=[] means "dropdown not opened yet", and forbids
-  real_click/click_button on the option name (下一步 is an option, not a button);
-- selected-opValue branch prescribes recheck-then-流程提交;
-- the agent-facing action docstring (_todo.py) carries the same guidance.
+Two rejected shapes are pinned out here, both by user verdict 2026-09-17:
+  - a prescription that names the action (and worse, the option name / node role):
+    the Agent must pick the action from the component type, per its own tool
+    guidance (agent-tools-form.md already carries the EL-SELECT rule: an el-select
+    is filled with select_option, never a click);
+  - pushing that classification into the click family (real_click's resolver,
+    click_button's not-found): a click-family action must not take over
+    select-family operations, and an action must not be broadened to other
+    scenarios. Both were written and reverted in this session.
+
+What the engine owes the agent is therefore the FACT it was missing: the field's
+component type (opKind), plus an honest account of what opOptions contains.
 """
 from __future__ import annotations
 
@@ -21,8 +24,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SNIPPET = (ROOT / "scripts/controller/actions/js_snippets/todo_cards.py").read_text(encoding="utf-8")
-ACTION = (ROOT / "scripts/controller/actions/_todo.py").read_text(encoding="utf-8")
+TODO_CARDS = (ROOT / "scripts/controller/actions/js_snippets/todo_cards.py").read_text(encoding="utf-8")
+TODO_ACTION = (ROOT / "scripts/controller/actions/_todo.py").read_text(encoding="utf-8")
+REAL_CLICK = (ROOT / "scripts/controller/actions/js_snippets/real_click.py").read_text(encoding="utf-8")
+CLICK_ENGINE = (ROOT / "scripts/controller/actions/click_action_engine.py").read_text(encoding="utf-8")
+WORKSPACE = (ROOT / "scripts/controller/actions/_workspace.py").read_text(encoding="utf-8")
+PROMPTS_FORM = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
 
 failures: list[str] = []
 
@@ -32,32 +39,40 @@ def need(src: str, needle: str, where: str) -> None:
         failures.append(f"MISSING {where} :: {needle!r}")
 
 
-# ── 载荷带 opHint，形状其余保持 ─────────────────────────────────────────────
-need(SNIPPET, "const opName = opLabel || '流程操作';", "opName 兜底")
-need(SNIPPET, "let opHint = '';", "opHint 定义")
-need(SNIPPET, "opHint: opHint,", "opHint 进入返回载荷")
+def ban(src: str, needle: str, where: str) -> None:
+    if needle in src:
+        failures.append(f"FORBIDDEN {where} :: {needle!r}")
 
-# ── 空值分支：select_option 处方 + 点破 opOptions 语义 + 禁止 real_click 选项 ──
-need(SNIPPET, 'select_option(label_text="' + "' + opName + '", "空值分支 select_option 处方（label_text=opLabel）")
-need(SNIPPET, 'option_text="下一步")', "空值分支给出 下一步 示例")
-need(SNIPPET, "不代表没有选项", "点破 opOptions=[] 只因弹层未展开")
-need(SNIPPET, "select_option 会自行展开弹层", "说明 select_option 自开弹层")
-need(SNIPPET, "禁止对「下一步」这类名称做 real_click/click_button", "明令禁止对选项名 real_click/click_button")
-need(SNIPPET, "是这个下拉的选项，不是按钮", "点破 下一步 是选项非按钮")
-need(SNIPPET, "重跑本 guard 确认 opValue 已变化", "要求复核闭环")
 
-# ── 已选分支：复核后提交 ───────────────────────────────────────────────────
-need(SNIPPET, "流程操作已选「' + opValue + '」", "已选分支确认当前值")
-need(SNIPPET, "click 流程提交", "已选分支指向流程提交")
+# ── 载荷：报事实（组件类型），不给处方 ──────────────────────────────────────
+need(TODO_CARDS, "let opKind = null;", "opKind 定义")
+need(TODO_CARDS, "opItem.querySelector('.el-select') ? 'el-select'", "类型取自现场 DOM=el-select")
+need(TODO_CARDS, "opKind: opKind,", "opKind 进入返回载荷")
+ban(TODO_CARDS, "opHint", "不给行动处方（动作由 agent 按组件类型选）")
 
-# ── agent 面提示词同步（_todo.py action docstring）─────────────────────────
-need(ACTION, "Act on its opHint:", "提示词指向 opHint")
-need(ACTION, "select_option(label_text=opLabel, option_text=…, e.g. 下一步 at a", "提示词给 select_option 处方")
-need(ACTION, "not a button.", "提示词点破 下一步 不是按钮")
+# ── 语义诚实：只列已渲染选项，空列表≠没有选项 ──────────────────────────────
+need(TODO_CARDS, "只列", "docstring 说明 opOptions 只含已渲染项")
+need(TODO_CARDS, "不等于「没有", "docstring 点破空列表 ≠ 没有选项")
+need(TODO_CARDS, "选哪个动作由 agent 按其工具规则决定", "docstring 明确动作归 agent")
+need(TODO_ACTION, "opKind reports the ", "动作面 docstring 说明 opKind")
+need(TODO_ACTION, "component type, and opOptions lists only ", "动作面 docstring 说明类型 + 已渲染语义")
+need(TODO_ACTION, "Pick the action for that ", "动作面 docstring 明确由 agent 选")
+need(TODO_ACTION, "component type yourself (see the el-select rules", "动作面 docstring 指向 agent 自身的规则")
+
+# ── 知识单一来源：类型→动作的族规住在 agent 指引里，不在引擎 ────────────────
+need(PROMPTS_FORM, "这是选择 el-select 选项的唯一正确方式", "EL-SELECT 规则已在 agent 指引")
+need(PROMPTS_FORM, "绝不使用 `click_element_by_index(index)` 点击下拉选项", "指引已禁点下拉选项")
+
+# ── 防回潮：click 族不得接管 select 族，动作不得被拓宽到别的场景 ────────────
+for src, where in ((REAL_CLICK, "real_click"), (CLICK_ENGINE, "click_button"),
+                   (WORKSPACE, "_workspace")):
+    for bad in ("JS_TEXT_CARRIER_PRESCRIPTION", "err-real-click-select-option",
+                "err-real-click-disabled-button", "err-real-click-fail:' + reason + ' | '"):
+        ban(src, bad, where)
 
 if failures:
     for f in failures:
         print(f)
     sys.exit(1)
 
-print("characterize-wf-submit-guard-hint: OK (opHint prescription pinned)")
+print("characterize-wf-submit-guard-hint: OK (facts-only opKind; action choice stays with the agent)")

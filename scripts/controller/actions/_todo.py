@@ -31,12 +31,10 @@ def _register_todo_actions(controller, browser_context):
         'by approval node role), 意见详情 length, and approval-history row count/last node. '
         'Mandatory before clicking 流程提交 or 流程撤销: declare your intent, call this to '
         'verify, act, then confirm via approval-history rows. Never clicks anything. '
-        'Act on its opHint: empty opValue + empty opOptions means the dropdown merely has '
-        'not been opened yet (Element UI renders options on first open) — choose the '
-        'operation with select_option(label_text=opLabel, option_text=…, e.g. 下一步 at a '
-        'start node); select_option opens the dropdown itself. NEVER real_click/click_button '
-        '「下一步」 at the final step — that 下一步 is an option of the 流程操作 select, '
-        'not a button.'
+        'opKind reports the 流程操作 field\'s component type, and opOptions lists only the '
+        'options already rendered — a select renders its options on first open, so an empty '
+        'opOptions is not evidence that there are no options. Pick the action for that '
+        'component type yourself (see the el-select rules in your tool guidance).'
     )
     async def wf_submit_guard():
         page = await browser_context.get_current_page()
