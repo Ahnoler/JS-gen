@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-17 10:45 · Cursor — 收工：chapter excerpts into draft-traj propose（回链 10:15 开工）
+
+- 完成：`bebb010f` 开工 → `e5929ae2` spec/plan → `6b168873` `chapter-excerpt.js` → `17638e20` payload+cache v8 → `43229cad` prompt `<chapter_excerpts>` → 本条收工（含 page-drop pin + ENOENT continue）。PR **#49** → `uara_V1.2`（叠在 #48 cache v7 之上）。
+- 验收（本机）：
+  - `characterize-req-draft-traj.mjs` **OK 76**（H1+要点+ZJJK、空 dir `[]`、payload `chapterExcerpts`、先缩 excerpt 再丢 `page`、cache **8**）
+  - `characterize-atom-depend.mjs` **all passed**（`<chapter_excerpts>` 分区 + 禁止编造/无摘录骨架/禁菜单）
+  - `characterize-capability-cohesion.mjs` **all passed**
+  - `npx eslint` 改动 src **0**
+  - `verify-all` 本环境大量红=缺 pydantic/langchain/Playwright 浏览器/MySQL，与本改动无关；上述三门禁在 verify-all 内亦 **ok**
+- 遗留移交：LMY 湿测须 **POST** `…/product-mgmt/draft-traj/propose`（cache v8）；仅重启不够。无章节时 `chapterExcerpts=[]`、短骨架是预期。不维护 CHANGELOG。
+
 ## 2026-09-17 10:15 · Cursor — 开工：chapter excerpts into draft-traj propose（cache v8）
 
 - 进行中：把已解析 `chapters/*.md` 按链注入 atomize user payload（`chapterExcerpts`），使 `taskDraft` 能投影字段/控件/断言；cache 7→8；不改 JSON atom schema、不 enrich parse、不新 upload API、不跑 LMY 湿测。

@@ -285,7 +285,7 @@ export async function buildChapterExcerpts({
       });
     } catch (e) {
       if (e && e.code === 'ENOENT') {
-        return [];
+        continue;
       }
       throw e;
     }

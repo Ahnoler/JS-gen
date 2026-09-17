@@ -469,6 +469,30 @@ ${filler}
     assert.ok(payload.length <= 28_000);
   });
 
+  run('buildAtomizeUserPayload drops step.page after excerpts can shrink no further', () => {
+    const pageToken = 'UNIQUE_PAGE_DROP_TOKEN';
+    const fatPage = `${pageToken}-${'P'.repeat(800)}`;
+    const steps = Array.from({ length: 40 }, (_, i) => ({
+      index: i + 1,
+      action: `a${i}`,
+      page: fatPage,
+      zjjk: 'ZJJK00000001',
+      buttons: '【确定】',
+    }));
+    const payload = buildAtomizeUserPayload(
+      [{ chainId: 'chain-a', title: 't', chapterHint: 'h', steps }],
+      [],
+      [{ chainId: 'chain-a', fileName: 'c.md', ref: 'chapters/c.md#C', excerpt: `HUGE_${'W'.repeat(20_000)}` }],
+    );
+    assert.doesNotMatch(payload, /\/\* truncated \*\//);
+    const obj = JSON.parse(payload);
+    assert.equal(obj.truncated, true);
+    assert.ok(obj.chains[0].steps.every((s) => !Object.prototype.hasOwnProperty.call(s, 'page')));
+    assert.doesNotMatch(payload, new RegExp(pageToken));
+    assert.ok(Array.isArray(obj.chapterExcerpts));
+    assert.ok(payload.length <= 28_000);
+  });
+
   await runAsync('propose atomize prompt includes chapterExcerpts from fixture chapters', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
     cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
