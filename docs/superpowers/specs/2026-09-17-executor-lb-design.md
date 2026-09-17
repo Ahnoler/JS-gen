@@ -1,7 +1,7 @@
 # Design: 执行机多节点负载均衡（executor LB）
 
 **日期**：2026-09-17
-**状态**：**草案，待控制面负责同事评审** —— 评审通过前不落任何实现
+**状态**：**草案，待控制面负责同事评审，评审通过前不落实现**
 **作者**：DSH（用户委托，基于 2026-09-17 上午的全量源码调研成文；所有 file:line 锚点均实读核实）
 **影响面**：控制面调度内核（`src/executor-*`、`src/services/executor-node-service.js`）；执行机侧仅 heartbeat 负载增量字段；P0/P1 无 DB 迁移；HTTP API 仅新增可选字段
 **协作约定**：遵循 `AGENTS.md`（开工/收工声明、JSDoc 规范、characterization 门禁、`src/dashboard/api-docs/catalog.js` 为唯一前端契约）
