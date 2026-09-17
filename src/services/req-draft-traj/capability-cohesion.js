@@ -106,6 +106,7 @@ export function parseTaskDraftStepGroups(taskDraft) {
 /**
  * Other-family ids whose substrings hit haystack.
  * Maintain `编辑` matches only when not immediately followed by `页`/`界面`/`页面`.
+ * Create `新增` matches only when not a page-title compound (`新增…主页/页面/界面/页`).
  * @param {string} haystack Group action text
  * @returns {Set<string>} Family ids
  */
@@ -119,6 +120,16 @@ function detectOtherFamilies(haystack) {
     }
     if (id === 'maintain') {
       if (words.some((w) => (w === '编辑' ? /编辑(?!页|界面|页面)/.test(haystack) : haystack.includes(w)))) {
+        found.add(id);
+      }
+      continue;
+    }
+    if (id === 'create') {
+      if (words.some((w) => (
+        w === '新增'
+          ? /新增(?![\u4e00-\u9fff]{0,16}(?:主页|页面|界面|页))/.test(haystack)
+          : haystack.includes(w)
+      ))) {
         found.add(id);
       }
       continue;
