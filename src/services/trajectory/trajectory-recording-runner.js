@@ -546,7 +546,13 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     queuePhaseGroupShot(runtime, async () => {
       let ok = false;
       try {
-        ok = await captureAndPersistPhaseGroupShot(runtime, Number(phaseNum), stateKey);
+        // 577d322a 拆分后的接线：串行采集完成即 ack，MinIO 持久化排入
+        // _phaseShotPersistChain 独立队列（慢持久化不阻塞下一次采集/ack）。
+        const shot = await capturePhaseGroupShot(runtime, Number(phaseNum), stateKey);
+        if (shot) {
+          queuePhaseGroupPersistence(runtime, () => persistPhaseGroupShot(runtime, shot));
+          ok = true;
+        }
       } catch (err) {
         console.warn('[record] phase candidate capture failed:', err?.message || err);
       }

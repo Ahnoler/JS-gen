@@ -13,6 +13,18 @@
  * Pin: the runner must never reference `gated` nor import
  * applyZeroStepFakeSuccessGate (the v2/v3 inline gate owns those semantics),
  * while the downgrade literals and the kept rawDoneText logging stay in place.
+ *
+ * Second incident (same file, 2026-09-17): 577d322a ("capture phase shots
+ * before slow persistence") split captureAndPersistPhaseGroupShot into
+ * capturePhaseGroupShot (serial browser capture) + persistPhaseGroupShot
+ * (MinIO persistence on its own _phaseShotPersistChain queue) and rewired
+ * ensurePhaseGroup — but missed the handlePhaseShotCandidateRequest call
+ * site. Every phase_shot_candidate_request then threw ReferenceError inside
+ * the try/catch, acked `ok:false`, and pre-submit (click_save) state-group
+ * shots were silently lost.
+ *
+ * Pin: the orphan name must stay gone, and every capture/persist call in the
+ * candidate handler must be paired with a definition in this file.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -58,5 +70,34 @@ assert.ok(
   src.includes('aggregateTrajectorySuccessful'),
   'aggregateTrajectorySuccessful must stay imported/used at finalize',
 );
+
+// ── Phase-shot candidate request wiring (577d322a split orphan) ──
+// The renamed-away function must never reappear as a dangling reference.
+assert.ok(
+  !src.includes('captureAndPersistPhaseGroupShot'),
+  'runner must not reference captureAndPersistPhaseGroupShot (577d322a rename orphan → ReferenceError in phase_shot_candidate_request handler)',
+);
+// The candidate handler must capture serially and queue persistence on the
+// dedicated chain — completing 577d322a's intent (capture before slow MinIO).
+const handlerStart = src.indexOf('const handlePhaseShotCandidateRequest');
+assert.ok(handlerStart >= 0, 'handlePhaseShotCandidateRequest handler must exist');
+const handlerEnd = src.indexOf('const handleActionLogSync');
+const handler = src.slice(handlerStart, handlerEnd > handlerStart ? handlerEnd : undefined);
+assert.ok(
+  handler.includes('await capturePhaseGroupShot('),
+  'candidate handler must capture via capturePhaseGroupShot (serial _phaseShotChain)',
+);
+assert.ok(
+  handler.includes('queuePhaseGroupPersistence(') && handler.includes('persistPhaseGroupShot('),
+  'candidate handler must queue persistence via persistPhaseGroupShot (async _phaseShotPersistChain)',
+);
+// Reference/definition pairing: every phase-shot call name must be defined in
+// this file (prevents another swallowed-ReferenceError orphan in this path).
+for (const fn of ['capturePhaseGroupShot', 'persistPhaseGroupShot', 'queuePhaseGroupPersistence']) {
+  assert.ok(
+    new RegExp(`\\bfunction ${fn}\\(`).test(src),
+    `phase-shot function must be defined in runner: ${fn}`,
+  );
+}
 
 console.log('characterize-record-phase-finalize: all passed');
