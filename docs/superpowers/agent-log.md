@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-17 15:35 · ZCode 引擎线 — 收工：纠正过拟合（撤回跨族分类器，guard 只报组件类型）
+
+- **更正前一条**：`598d8a75` 收工条目把「real_click 载体分类器 + 处方」记为已交付成果——**是过拟合，已撤回**，该条目的成果描述作废，以本条为准
+- 用户两条裁定（都成立）：①`real_click` 属 click 族，**不得在内部接管 select 族操作**——推荐应由 **Agent 按组件类型自己选动作**，而不是拓宽某个动作；②把分类接进 `click_button` 的 not-found（err-icon-label-miss）同样不可取——**Agent 只需选择合适的操作，不是拓展某个操作的使用场景**
+- 撤回（`791e5c44`）：`real_click` 载体分类器 + `err-real-click-select-option`/`err-real-click-disabled-button` + not-found 处方、`_workspace` 处方透出、`click_action_engine` 接线、`_js_snippets` 桶导出、旧 pin `characterize-component-type-prescription.py` 删除。**无事故证据**：840 三次 real_click 落库锚都是 `el-steps`（合法页脚按钮），从未落到达下拉选项，click_button 也没走过那条路径——纯属我从单一事故外推
+- 保留（最窄形态，对准有证据的缺陷：guard 返回 `opOptions=[]` 被 agent 读成「没东西可选」）：`JS_WF_SUBMIT_GUARD` 新增 **`opKind`**（流程操作字段的组件类型，现场 DOM 读：el-select/textarea/input/other）——**只报事实，不给处方、不写选项名、不写节点角色**；模块/动作 docstring 记录 `opOptions` 的真实语义（**只列已渲染可见项**，el-select 首次展开才渲染，空列表≠没有选项）——这是**返回值语义说明**，不是建议。类型→动作的知识**单一来源留在 agent 自己的指引**（`agent-tools-form.md` EL-SELECT 规则已有「el-select 必须用 select_option」），引擎不复述
+- 验证：pin 改为 facts-only 并**反向钉住被否的形状**（click 族 needle、opHint 处方字段一律 ban），三方证伪各自红后还原——删 `opKind`→红 / real_click 回潮→红 / opHint 回潮→红；活页面 fixture：`opKind=el-select`、无 `opHint`、载荷其余形状不变；verify-all 3 红=既有基线零新增
+- 教训（自省）：单点事故 ≠ 通用规则。把「文本没找到」推广成「载体分类器 + 处方」，等于用一次事故的语言去写引擎规则；且**同一个事故被我复述进了 4 个地方**（引擎处方、两个动作族、pin 词汇 ban）——正是用户说的「职责重复/场景拓宽」。今后此类外推先问：有没有第二次事故证据？这条知识该住在谁的层？
+- 注：不维护 CHANGELOG
+
 ## 2026-09-17 15:10 · ZCode 引擎线 — 开工：组件类型处方补对称口（click_button not-found），并答「real_click 落库是什么」
 
 - 进行中：用户问「为什么只用 real_click、real_click 落库是什么操作」。取证：real_click 落库=actionType `real_click` + params{selector,text,label_text} + **点击当场抓的定位快照**（popover 点完即关，事后补抓扑空）；回放侧 real_click **零直派接线**，走「控制器兜底」=把录制时动作函数原样重调（同 text 现场重找 + 再打 CDP 信任点击）——**非确定性回放**，对下拉选项录制时开着、回放时关着必失败 → 佐证「选项必须以 select_option 落库」。对称缺口：`click_button` 的 not-found（err-icon-label-miss）今天不带处方——agent 在末步调 click_button('下一步') 同样该拿到「若是下拉选项→select_option」
