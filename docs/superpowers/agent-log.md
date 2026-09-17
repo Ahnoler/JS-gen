@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-17 12:30 · ZCode 引擎线 — 开工：按组件类型推荐动作（重构 840 opHint 硬编码，用户定调）
+
+- 进行中：用户反馈 9e35b942 的 opHint 太死板（硬编码 下一步/发起节点）。改为**按目标文本的载体组件类型给推荐**：按钮→click，下拉选项→select。落点=「按文本找目标」的唯一动作 `real_click` 的解析器内：①命中载体是 `.el-select-dropdown__item` → 不信任点击，返回 `err-real-click-select-option` + 处方 `select_option(label_text=<展开中的下拉字段名,取 aria-expanded/activeElement 归属 form-item>, option_text=X)`；②命中载体是禁用按钮（native disabled/aria-disabled）→ `err-real-click-disabled-button` + 处方（点亦无效，找替代）；③目标无可见载体 → 处方点破「下拉选项弹层未展开时不在 DOM 里，对该字段 select_option；是按钮则先确认步骤」；④启用按钮 → 行为不变（点击）。guard opHint 去硬编码：只按字段类型表述（opOptions=[] 语义 + select_option(label_text=opLabel, option_text=<选项原文>)），删除「下一步/发起节点」字面量；`_todo.py` 提示词同步改类型制表述
+- 范围（可写集）：`scripts/controller/actions/js_snippets/real_click.py`、`scripts/controller/actions/_workspace.py`（prescription 透出）、`scripts/controller/actions/js_snippets/todo_cards.py`、`scripts/controller/actions/_todo.py`、pin `characterize-wf-submit-guard-hint.py`（改 needle+扩 real_click 接线）、`scripts/refactor/verify-all.sh`（如需）、本协作日志
+- 禁入区：`click_element_by_index` 的 use-select-option 栅栏（已存在，不动）；`select_engine`（分发与拾取不动）；29242 页面只做受控验证（开弹层→解析→RESET 收尾，不点选项不点提交）；他线 `data/kb/req/product-mgmt/**` WIP
+- 方式：主会话 Inline；活页面+fixture 双验（真页面：开弹层后 real_click 解析应带 `select_option(label_text='流程操作', option_text='下一步')` 处方——label 从 DOM 现场推导，非硬编码）；pin 先行更新并证伪；verify-all 基线比对
+
 ## 2026-09-17 12:20 · ZCode 引擎线 — 补记：29242 真场景调研 8/8，840 处方动作全链实证（回链 12:12 开工）
 
 - 结论：`select_option(流程操作=下一步)` 的引擎原版路径在该真实页面**全链可用**，guard 复核回路闭环。页面已恢复原状（opValue=下一步、弹层已关），**未触碰 流程提交/流程撤销**
