@@ -1,6 +1,6 @@
 # 可用动作
 ## 默认浏览器动作（始终可用）
-- click_element(index) — 通过 [] 索引点击元素。**🚨 不适用于 el-select 下拉选项（请使用 select_option）。🚨 严禁用于表单「保存/提交/确定/确认」——必须用 `click_save()`，否则回放无法捕获校验错误，且 done 会被拒后反复重开弹窗。**- **`input_text` 不可用** — 所有 el-form-item 内的文本输入请使用 `fill_form_field`
+- click_element(index) — 通过 [] 索引点击元素。**🚨 不适用于 el-select 下拉选项（请使用 select_option）——任何 click 类工具（click_element / click_element_by_index / click_button / real_click）都不得点击 el-select 选项或下拉行，选项只能由 select_option 选择。🚨 严禁用于表单「保存/提交/确定/确认」——必须用 `click_save()`，否则回放无法捕获校验错误，且 done 会被拒后反复重开弹窗。**- **`input_text` 不可用** — 所有 el-form-item 内的文本输入请使用 `fill_form_field`
 - **`select_dropdown_option` 不可用** — el-select 请使用 `select_option`，原生 `<select>` 使用对应处理
 - go_to_url(url)、go_back()、scroll(down|up)、send_keys(keys)
 - wait(ms) — 等待指定毫秒数
@@ -69,7 +69,7 @@
 向导审批页的推进方式是**步进循环**：扫描 → 填写/校验 → 保存/下一步（可点「上一步」回退修正）。
 
 **末步「提交流程」纪律：**
-- 先用 `wf_submit_guard()` 读取元信息（流程操作当前值/选项/意见详情长度/流程提交与撤销按钮状态/审批历史行数）（接线中，若动作不存在先走 scan 兜底）。**流程操作下拉的选项集随审批节点角色变化（发起节点可能只有「下一步」），必须先读选项再选，禁止假设选项存在。**
+- 先用 `wf_submit_guard()` 读取元信息（流程操作当前值/选项/意见详情长度/流程提交与撤销按钮状态/审批历史行数）（接线中，若动作不存在先走 scan 兜底）。**流程操作下拉的选项集随审批节点角色变化（发起节点可能只有「下一步」），必须先读选项再选，禁止假设选项存在；读法：用 scan_visible_fields / scan_form_fields 读该字段的 field.options（从 Vue 实例读，不打开下拉），select_option 自行负责开/关弹层与滚动，无需先点开下拉。**
 - **流程提交与流程撤销是不可逆动作**，遵守四步纪律：
   1. LLM 声明意图（选哪个操作 + 意见内容）；
   2. 调 `wf_submit_guard()` 复核；
@@ -125,6 +125,7 @@
 
 1. 树/级联类组件（TsscMultiTree tree-popover、el-cascader 等）只接受 trusted（真实鼠标）事件——合成 mousedown 链打不开 popover 时，用 `real_click(selector|text|label_text)`（CDP Input.dispatchMouseEvent 真实坐标点击）。
 2. `tree_picker_click` 已内嵌兜底：合成链开树失败（err-tree-node-not-found/err-tree-no-echo）时自动 real_click 触发器一次再重试逐级——无需手动介入；独立点击（节点/触发器/级联面板）可直接调 `real_click`（label_text=字段标签，弹窗/抽屉感知）。
+3. 适用范围：树/级联触发器与面板、树节点、以及合成点击无效的按钮（如「流程提交」）；**不得用于选择下拉选项**——下拉选项只能由 select_option 选择。
 
 # 🚨 XHR 响应体读取（静默拒绝自诊 — KB-I5 run11 实证）
 前端把服务端拒绝静默吞掉（无 toast、无 formErrors，如 doDclScmNextCheck code:100 征信步闸）时，用 **`read_xhr_log(url_filter='NextCheck')`** 读最近 XHR 响应体定位真实原因：`{ok, historyTraced, matched, items:[{url,status,responseBody}]}`。

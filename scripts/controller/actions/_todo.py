@@ -27,8 +27,9 @@ def _register_todo_actions(controller, browser_context):
     @controller.action(
         'Read-only metadata of the workflow wizard 提交流程 step BEFORE any irreversible '
         'action: 流程提交/流程撤销 button state, 流程操作 current value and ALREADY-RENDERED '
-        'options (open the dropdown first if you need the full option set — options vary '
-        'by approval node role), 意见详情 length, and approval-history row count/last node. '
+        'options (read a field\'s full option set with scan_visible_fields / scan_form_fields '
+        'field.options — read from the Vue instance, it does not open the dropdown), '
+        '意见详情 length, and approval-history row count/last node. '
         'Mandatory before clicking 流程提交 or 流程撤销: declare your intent, call this to '
         'verify, act, then confirm via approval-history rows. Never clicks anything. '
         'opKind reports the 流程操作 field\'s component type, and opOptions lists only the '
