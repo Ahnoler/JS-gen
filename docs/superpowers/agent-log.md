@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-17 10:03 · Cursor — 收工：atomize taskDraft 投影已有解析细节（回链 10:00 开工）
+
+- 完成：`96d9c4fd`（prompt + 富输入上限样例 + G3 交叉引用 + `PROPOSE_CACHE_VERSION` 6→7）。课程纠正：不要求缺解析时写录制员级目标元素；**有则投影、无则短骨架、禁止编造原型文案**。PR **#48** → `uara_V1.2`。开工 `3dfc5890`。
+- 验收（本机，未跑 product-mgmt 湿测 propose）：
+  - `characterize-atom-depend.mjs` **all passed**（含 XML 分区 + samples G1–G3 / bad reasons）
+  - `characterize-capability-cohesion.mjs` **all passed**（含 `仅限定位类` pin；闸逻辑未改）
+  - `characterize-req-draft-traj.mjs` **OK 63**（`PROPOSE_CACHE_VERSION is 7`）
+  - `npx eslint src/services/req-draft-traj/propose-cache.js` **0**
+- 遗留移交：LMY 湿测须 **upload → parse → 清/bump v7 cache → POST .../product-mgmt/draft-traj/propose**；仅重启不够。链瘦时抽象草稿是预期，不是 prompt 回归。不维护 CHANGELOG。
+
 ## 2026-09-17 10:00 · Cursor — 开工：atomize taskDraft 质量（对齐录制员 TX，禁菜单导航）
 
 - 进行中：优化 JS-gen req-draft-traj atomize 提示词与样板，使 `taskDraft` 贴近录制员 TX（可见文案 + 断言 + 维护=选中→改本能力字段→一次保存），**不**另写业务测试员 atomize 设计、**不**改 JSON schema / 能力内聚闸逻辑。
