@@ -1,5 +1,19 @@
 # Agent 协作日志
 
+## 2026-09-17 20:50 · ZCode 引擎线 — 复审补充：三雷+门禁改动影响面复审结论（回链 19:15 收工）
+
+- 复审范围：`39434171`/`3bcdc2d3`/`94f3b9f7`/`3c599e5a`。结论：**无回滚项**——四处改动均为复活休眠路径、恢复设计内行为，且有既有机制兜底：①`sync_tasks_from_errors` 属 META 步（`meta-step-actions.js:16`）不进业务步计数，heal 流程明令禁用（`heal-instruction.js:36`），滚动副作用仅在有字段被修复重试时触发；②`_TRAJECTORY_URL` 修复写的 `scripts.controller` 槽位本有 `agent_utils.py:130` 活写入方，读取方仅本地辅助快照文件（产品真相在 MySQL），无 src 消费者；③组图 upsert 按 phase×stateGroup 唯一（api-docs 契约）不产生重复行，`groupShotId` 消费方仅 query-service 透出可选字段，采集函数与 ensurePhaseGroup 共享、有生产运行背书
+- **知情项知会各线**：①**组图行数回升**——click_save 提交前截图在故障 3 天间未落库，修复后恢复设计增速，每阶段有 cap 封顶，非异常；②**本地辅助快照 `scripts/action_*.json`/`log_*.txt` 的 `url` 字段从 `http://unknown` 占位变真实页面地址**——有脚本解析这批文件且依赖旧占位值者需注意；③**eslint `no-undef` 已 error 级生效并入 verify-all**——所有线新代码引用未定义标识符将被 pre-commit/verify-all 拦截（报错 `'XXX' is not defined`；确属合法全局在 `eslint.config.js` globals 补映射）。最终 HEAD（含 Cursor STC `ffed27bd`/`347f61f5`）实测全仓 0 error，在飞线不受阻
+- 验收补充：合并态（含 STC 两笔）重跑三 pin + ruff F821 + eslint 全绿；verify-all 3 红基线一致零新增
+- 遗留：无新增（结构收敛专项、P2 清理清单、engines pin、ClickEngine 形状 pin 四项见 19:15 收工条目）
+
+## 2026-09-17 20:40 · Cursor — 开工：重启控制面/执行机 + STC 首行湿测录制
+
+- 进行中：`config\restart-local.cmd` 重启 4097 + local executor；参照含查询的历史交易（评级查询/客户选择器类，如 traj 848）新建交易，验收 STC 后选行落库 `row_text=first` + 结构 xpath
+- 范围：控制面/执行机进程；新建 wet traj（API）；证据 `tmp/stc-first-row-wet/`；本协作日志
+- 禁入区：他线在途录制槽；改引擎代码（本轮只验证已合入提交）；`data/kb/req/product-mgmt/**` WIP
+- 方式：主会话 Inline 运维 + 录制 API
+
 ## 2026-09-17 19:15 · ZCode 引擎线 — 收工：同族缺陷三雷修复 + 门禁加固（回链 18:22 开工）
 
 - 完成（4 commits，①②③由 3 个后台子智能体实施、主会话回收核验后代提交，全部先 RED pin 再最小实现）：
@@ -17,8 +31,6 @@
 - 范围（可写集）：`scripts/controller/actions/form_scan_actions.py`（+罩它的 pin 同 commit 修订）、`scripts/agent/recorder_emitters.py`（+pin）、`src/services/trajectory/trajectory-recording-runner.js`、`scripts/characterization/characterize-record-phase-finalize.mjs`（③可扩充）、`eslint.config.js`、`scripts/refactor/verify-all.sh`（仅主线程）、本协作日志
 - 禁入区：Cursor 在途 18:20 行（`search_then_click_guard.py`/`_table.py`/`click_action_engine.py`/`replay_table.py`/`src/cdp/locator-builders/controls.js`/`scripts/prompts/**`）——`verify-all.sh` 双方可能各自增行，若遇冲突保双方条目；他线 WIP `scripts/characterization/characterize-phase-done-validate.py`；`phase-done-evidence-gate.js`；SPA 仓；`src/**` 其余文件；`config/`
 - 方式：①②③ 派 3 个后台子智能体并行（文件集互不相交，子智能体不 commit 不写 log，主会话回收核验 diff/语法/pin 后代提交）；④ 主线程收尾落地；全部完成后合并后验收（git pull 重跑关键验证 + 全量 verify-all 与 3 红基线比对）再收工
-
-# Agent 协作日志
 
 ## 2026-09-17 18:55 · Cursor — 收工：STC 后选首行/首叶 + 结构 xpath（回链 18:20 开工）
 
