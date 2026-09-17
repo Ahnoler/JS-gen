@@ -560,8 +560,8 @@ async function main() {
   });
 
   const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
-  run('PROPOSE_CACHE_VERSION is 6 (capability-cohesion full-body haystack)', () => {
-    assert.equal(PROPOSE_CACHE_VERSION, 6);
+  run('PROPOSE_CACHE_VERSION is 7 (atomize taskDraft project-not-invent)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 7);
   });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');

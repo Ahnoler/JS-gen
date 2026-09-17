@@ -2,7 +2,7 @@
 
 这些例子说明**依赖图**与**能力内聚**怎么切 atom。它们碰巧来自产品库湿测（#675 / #676 / #678 / #504 / 维护形态），**不是**「树的每一层必须拆」教条，也不是按钮文案黑名单。换到客户、合同或其它对象，规则相同：后一步要新建/修改的对象依赖前一步 `produces` 的键，就必须拆成两笔；同页上另一项可独立验证的能力也必须另起 atom。每笔 `produces` 必须非空；`dataDependsOn` 根笔为 `[]`，否则指向上游 atom 或 `preset`。
 
-线上 prompt 分区见 `scripts/prompts/req-draft-traj-atomize-prompt.md`（`<role>` / `<output_contract>` / `<split_rules>` / `<examples>` / `<anti_patterns>` / `<checklist>`）。下列正/反例与 prompt 内 `<good>` / `<bad reason="...">` 对齐。
+线上 prompt 分区见 `scripts/prompts/req-draft-traj-atomize-prompt.md`（`<role>` / `<output_contract>` / `<split_rules>` / `<examples>` / `<anti_patterns>` / `<checklist>`）。下列正/反例与 prompt 内 `<good>` / `<bad reason="...">` 对齐。`taskDraft` 密度跟输入走：链瘦时用本节 G1/G2/G3；上传并解析了详细需求之后的录制员上限见 [`product-element-taskdraft-samples.md`](product-element-taskdraft-samples.md)（产品要素仅示意；不要把那里的控件文案抄进没有这些字符串的模块）。
 
 ## 正例
 
@@ -46,7 +46,7 @@ taskDraft:
 
 ### G3 · 维护：定位 → 填写本能力字段 → 一次落库
 
-搜索/选中已有对象、打开表单、填写**该项能力**的字段、一次落库——准备步骤服务于这一项能力，不是另一项能力。
+搜索/选中已有对象、打开表单、填写**该项能力**的字段、一次落库——准备步骤服务于这一项能力，不是另一项能力。链瘦时保持下面骨架；链/章节已点名节点、页签、字段时代入这些名字（形态对齐富输入样例 Atom D：选中对象 → 改本能力字段 → 一次【保存】，见 [`product-element-taskdraft-samples.md`](product-element-taskdraft-samples.md)）。输入没有的悬停提示/弹窗标题不要编。
 
 ```
 produces: ["已维护对象"]
