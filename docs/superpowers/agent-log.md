@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-17 09:50 · OpenCode — 收工：复核远程拉取（ZCode G3 湿测 pin）对本线修复的影响
+
+- 完成：**`2dd46f0b`**（1 文件 / +9）。远程新增 `53dec0e9`（ZCode G3 湿测：`characterize-g3-done-gate-live.py` 11 checks 真 Chromium + `characterize-g3-runner-seam.mjs` 9 checks，均注册 verify-all）并 merge 到本线 `07569560`。
+- 影响复核：①`git diff c84f10c8 HEAD -- scripts/agent/recorder_emitters.py scripts/controller/actions/phase/** scripts/prompts/phase-reviewer-prompt.md scripts/characterization/characterize-phase-runtime.py characterize-phase-reviewer.py` **为空**——合并没有改动本线任何修复文件；②新品 pin 与本线改动**共用被合并的 `_guard_done_on_step_end` 本体**，实测 `characterize-g3-done-gate-live` **11/11 OK**、`characterize-g3-runner-seam` **9/9 passed** —— 本线两处修复（other→无 token、navigate open-page overlay 证据）与新品 pin 不冲突。
+- 修复：新品 pin 在 Windows GBK 控制台 / verify-all 重定向下打印 `✓/✗/—` 抛 `UnicodeEncodeError`（本机 verify-all 因**编码**而非逻辑报红）→ 在该文件顶部把 stdout/stderr `reconfigure(encoding='utf-8', errors='replace')`（**不改任何断言/逻辑**）。
+- 验收：`characterize-g3-done-gate-live` 默认环境下 **OK (11 checks)**；**verify-all 全跑 = 既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。
+- 遗留移交：①生产须重启执行机侧 Python agent 进程生效（本线两处修复 `6367f55`/`c84f10c8`）；②`53dec0e9` 自述「未覆盖完整 record/prepare→start 周期（需重启控制面，且有他线在途录制 1908/832）」；③不维护 CHANGELOG。
+
 ## 2026-09-16 22:24 · ZCode 引擎线 — 收工：G3 证据门闩湿测 + 护栏固化（回链 22:16 开工）
 
 - 完成：`53dec0e9`（2 支新门禁 + verify-all 注册）。**湿测做了两半**：①**引擎侧活体** `characterize-g3-done-gate-live.py`（11 checks）——真 Chromium + 真 `compile_boundary`/`apply_phase_intent` 产出的 phase boundary + 真合并后 `_guard_done_on_step_end` 本体（仅 agent 用忠实 shim：守卫只读 browser_context/_message_manager/state，grep 实证）；②**runner 接缝** `characterize-g3-runner-seam.mjs`（9 checks）——把我合并时改写的那两处表达式（整轨聚合 + per-run 零步过滤）**从合并后源码逐字抽取后 eval**，不另抄一份，避免镜像漂移
