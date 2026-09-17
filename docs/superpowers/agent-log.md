@@ -1,11 +1,32 @@
 # Agent 协作日志
 
+## 2026-09-16 22:24 · ZCode 引擎线 — 收工：G3 证据门闩湿测 + 护栏固化（回链 22:16 开工）
+
+- 完成：`53dec0e9`（2 支新门禁 + verify-all 注册）。**湿测做了两半**：①**引擎侧活体** `characterize-g3-done-gate-live.py`（11 checks）——真 Chromium + 真 `compile_boundary`/`apply_phase_intent` 产出的 phase boundary + 真合并后 `_guard_done_on_step_end` 本体（仅 agent 用忠实 shim：守卫只读 browser_context/_message_manager/state，grep 实证）；②**runner 接缝** `characterize-g3-runner-seam.mjs`（9 checks）——把我合并时改写的那两处表达式（整轨聚合 + per-run 零步过滤）**从合并后源码逐字抽取后 eval**，不另抄一份，避免镜像漂移
+- 关键验证点：A 类「0 业务步（仅 meta）却自报成功」→ 必须被拒，**且返回值 identity 为 True**（这正是 `abea7695` 修的那一行：PR 原版裸 `return` 返 None，调用方 `recorder.py` 按 truthy 判定 → 静默放行）；B 类「真机点过查询并经 `maybe_record_click_completion_evidence` 写入 `query_clicked`」→ 放行（**无过度拒绝**）；C 类无 boundary → G3 不介入；D 类 0 步但 `done(success=false)` 诚实失败 → 放行。接缝侧另钉**键空间契约**（`phaseStepCounts` 写侧 `trajectoryPhaseId`/`phaseIdHint`、读侧 `phase.id`/`p.id`，同源数字键）与**迟到步不误杀**（本轮计数已 >0 的阶段不得降级）——后者正是刻意不采纳 PR 同步 DB 计数判定的理由
+- 证伪（门禁必须能红）：把该分支还原成 PR 原版裸 `return` → 活体门禁红（`2/11`，`return=None`）；源码 md5 逐位还原后复绿（`11 checks`）
+- verify-all 全量：3 红 = step-highlight / layer-tree / confirm-notification（既有基线，与合入前逐项同），两支新门禁均绿 → 无新增红
+- **未做（阻塞，非跳过）**：全链 `record/prepare → record/start` 湿测。三条硬前置：①合并后的控制面 JS（`trajectory-recording-runner.js`）要重启 4097 才生效，而**此刻他线有活跃录制**（remote-session 1908 / traj 832 / slot 0 / node 7 HZX），重启会掐断它——不越界；②`prepare` 自带默认登录，需 SUT 账号与凭据授权（凭据不经我手）；③执行机槽位会被抢占。条件具备即可补跑
+- **观测（不作因果声称）**：他线 traj 832 在**合并后的引擎代码**上跑过（22:14–22:16），phase 1 有 **1 步** `click_element_by_index` 后判 `failed`、phase 2/3 pending、`isSuccessful=0`、`hasStderrLog=false`。因 phase 1 **非 0 步**，零步门禁不可能对它生效；但 stderr 未留存，我无法判定其失败是否与 G3 证据门闩（`submit.required` OR boundary 的双条件 `needs_token`）有关——**已在此留痕供该线自查**，我不下结论
+- 顺带：本单元 `git pull` 并入他线 `6367f551`（非提交类阶段收口不再被指示点 click_save/确定），与 G3 互补，合并无冲突
+- 遗留移交：①条件具备时补跑全链（上面三条前置）；②`characterize-g3-runner-seam.mjs` 依赖从源码抽取表达式，若 runner 那两处被改写需同步更新抽取锚点；③临时脚本 `tmp/wet-g3/`（gitignore，含证伪用例）不入库
+- 注：不维护 CHANGELOG
+
+## 2026-09-16 22:16 · ZCode 引擎线 — 开工：G3 证据门闩湿测取证 + 护栏固化
+
+- 进行中：对 PR #45 合并产物（`c0cfa03e`+`abea7695`）做湿测，并把可复用的活体验证固化为门禁。已跑：①引擎侧真机守卫（真 Chromium + 真 boundary 状态 + 真 `_guard_done_on_step_end`，含证伪）12/12 过；②runner 接缝（逐字抽取合并后源码里我改写的那两处表达式）9/9 过
+- 范围（可写集）：新 `scripts/characterization/characterize-g3-done-gate-live.py`、新 `scripts/characterization/characterize-g3-runner-seam.mjs`、`scripts/refactor/verify-all.sh`、本协作日志。**不改产品代码**
+- 禁入区：**此刻有他线活跃录制**（remote-session 1908 / traj 832 `recording`，22:14:48 创建）——故**不重启 4097、不动该会话、不抢执行机槽位**；`origin/master` 不动；他线 `replay-*`/`req-draft-traj`/`form-structure-heal` WIP
+- 方式：主会话 Inline；临时脚本在 `tmp/wet-g3/`（gitignore），只把可确定复现、不依赖 SUT/MySQL 的两支固化为门禁（证伪用的"临时改写源码再还原"不入门禁——硬杀可能留下已改文件；该形状已由 `characterize-recorder-phase-reset` 的"每个拒绝分支必须 return True"钉住）
+- 遗留：全链 `record/prepare → record/start` 湿测**待具备条件**（需 4097 重启加载合并 JS + 他线录制结束 + SUT 登录授权）
+
 ## 2026-09-16 22:27 · OpenCode — 收工：修复 navigate 开放页证据门闩卡死录制（回链本会话 21:35 线；附排查结论）
 
 - 完成：**`c84f10c8`**（2 文件 / +142 -1）。用户报「录制在第二步报错中断」，并问是否上次改动所致。**结论：非上次改动（`6367f55`）所致**——该 run（sid 3718d161）阶段1 被 LLM 评审判为 `mode=navigate success.kinds=['url_change','page_opened']`（来自 ZCode 21:03 合入的 PR #45 G3 门闩，`navigate` 以前 `success_when=[]` 不受门闩约束）。点击【评级申请】(index 48) 打开的向导是**抽屉**：URL 不变、且 click 埋点的 overlay 标题在抽屉异步渲染前就采样 → `observed=[]` → `done(success=true)` 每步都被拒（step 3/5/6）→ `chosen=5` 步耗尽、录制中断。
 - 两处修复（`scripts/agent/recorder_emitters.py`）：①新增 `_guard_done_record_open_page_evidence`——navigate 且 `goals` 含 `open_page` 时，done() 时**可见的目标 overlay 本身即 `page_opened` 证据**（click 埋点漏采的兜底；零业务动作守卫仍要求本阶段确有真实点击）；②新增 `_guard_done_nav_evidence_ok`——navigate 阶段自身 `success_when` 已满足时，可见 overlay 就是目标页/下一步，`_guard_done_reject_overlay` 不再误拒（保留 introduce_ok/save_ok/navigated_ok 豁免；错误门闩 `_guard_done_reject_errors` 未动，可见错误通知仍拦）。
 - 验收证据：pin 追加到**已注册**的 `characterize-phase-runtime`（新 `test_open_page_overlay_evidence_and_overlay_gate`：open_page 无证据→门关；打 overlay→`page_opened` 记录→门开；overlay 门从拒到放行；wizard `click_next` 无 open_page 不吃 stray overlay）；**verify-all 全跑 = 与既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。期间 `characterize-recorder-phase-reset` 曾因 pin 正则 `_guard_done_reject_\w+\([^)]*\)` 不容嵌套括号而红——改为先把 `nav_evidence_ok` 落变量再传参（**未改 pin**），复跑 39 checks OK。
 - 遗留移交：①**真机复测**建议：对公客户评级「点击评级申请→向导抽屉」应一次 done 通过；②生产须重启执行机侧 Python agent 进程生效；③回退点=本提交；④不维护 CHANGELOG。
+
 
 ## 2026-09-16 21:59 · OpenCode — 收工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（回链 21:35 开工）
 
@@ -78,7 +99,6 @@
 - 范围（可写集）：`src/services/trajectory/trajectory-meta-service.js`、`src/services/trajectory/trajectory-text-extract.js`、`scripts/characterization/cold/characterize-analyze-case-data.mjs`、本协作日志
 - 禁入区：`scripts/controller/actions/**`（含他线已收工的 `phase/classify.py`，本轮只读不改）、生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`、`scripts/prompts/**`、`scripts/refactor/verify-all.sh`（本轮不新增注册项，pin 落已有 cold 文件）、SPA 仓、`config/`
 - 方式：主会话 Inline；先补 RED pin 再最小实现；pin 覆盖必须保留的既有子串（`先搜索/查询再点击`、`不要为了凑数量而拆分`、`必须原样保留`、`禁止把具体名抹成`、`状态边界原则`、`禁止让下一阶段承担上一阶段未完成的动作`）；跑 verify-all 比对基线；不维护 CHANGELOG
-
 
 ## 2026-09-16 19:27 · OpenCode — 收工：录制两病灶修复（回链 18:59 开工）
 
@@ -214,7 +234,6 @@
 
 ## 2026-09-16 16:50 · Cursor — 开工：atomize 能力内聚（通用规则，非场景禁令）
 
-
 - 进行中：在拆分边界下增加通用「能力内聚」；样例补正例（定位→填→一次落库）与反例「同页多能力合写」。不写上移/下移/产品树层/维护基本信息硬禁，不复活 PR #39
 - 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`（轻量补记）、本协作日志
 - 禁入区：`src/services/req-draft-traj/**`（不新增关键词硬闸、不拆 flow-card JSON）；`product_library.json` / `prod_add_dlg`；他线 replay/field_slot；`config/` WIP；分支 `cursor/atomize-basic-info-quality-aae4`
@@ -228,7 +247,6 @@
 - 方式：主会话 brainstorming → 用户审阅 spec 后再 writing-plans
 
 ## 2026-09-16 16:43 · OpenCode — 收工：回放 err-search-first 误拦截（回链 16:37 开工）
-
 
 - 完成：根因（回放引擎绕过录制态 STC flag 标记 → 守卫误拦 → 语意路径退化）修复 `c820ac76`：新增 `mark_stc_flags_on_replay_ok`（fill→search_filled / 查询点击→query_clicked，候选含 params 与 element/attrs placeholder）；`replay_action_entries` 成功分支接线；`FillEngine`/`ClickEngine` 录制路径行为不变
 - 验收：`characterize-search-then-click-guard` OK（先 RED import 失败、后 GREEN）；`characterize-search-then-click-prompts` OK；verify-all 其余烟均为已登记他线红（step-highlight/layer-tree/confirm-notification/network-capture 环境）——本线两烟绿；replay/heal 相关烟（heal-locate 39 / heal-decision 9 / replay-batch）复验全绿
@@ -324,7 +342,6 @@
 - 方式：主会话 Inline TDD；子智能体不 commit
 
 > **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
-
 
 ## 2026-09-16 14:xx · OpenCode — 收工：修复 tmp/cmds 后端发版 CMD 闪退（回链本次开工）
 
@@ -540,7 +557,6 @@
 - 禁入区：人工录制 mapper/CDP 采集、前端仓、`src/services/trajectory/trajectory-meta-service.js`、线上数据及其他会话 WIP；不改变 `click_save`、表格 radio、日期面板重复选日语义。
 - 方式：先在当前无未提交改动状态写入并提交声明，再补 click_button 与 click_element 的跨动作 identity 共享，验证 picker/按钮/日期相关 characterization、编译与 diff 后提交。
 
-
 ## 2026-09-15 22:15 · OpenCode — 收工：修复第四阶段重复执行与日期范围异常（回链 21:55 开工）
 
 - 完成：提交 **022f65a2**；“填写查询/筛选条件”规则回退归类为 query，运行时 query toolbar 可纠偏误判的 create/modify pending/success 门禁；AI 同阶段成功字段写入/选择及普通索引点击再次命中时直接返回 `already-operated-this-phase`，失败动作可重试、日期面板日格点击豁免、新阶段自动清空，人工录制不经过该保护。
@@ -651,7 +667,6 @@
 - 禁入区：主仓 `src/services/trajectory/trajectory-meta-service.js` 用户改动、线上轨迹/数据库、其他会话 WIP；前端仓 `vite.config.ts` 既有未提交改动及未明确相关文件；不修改部署配置和线上数据。
 - 方式：先修复确定性路由/生命周期问题，再增加首帧新鲜度门控；运行主仓定向 characterization/语法检查与前端 `npm run build`，分别提交并回报部署复测要求。
 
-
 ## 2026-09-15 · OpenCode — 开工：AI 录制 fill_form_field 作用域异常修复
 
 - 进行中：修复执行机 `fill_form_field` 因函数内条件 import 遮蔽模块级 `err_with`，导致 `UnboundLocalError`、AI 录制中断并将轨迹置为 `failed` 的问题。
@@ -678,7 +693,6 @@
 - 范围：`src/cdp/inspect.js`、`src/cdp/inspect-payload-script.js`、`src/cdp/remote-bridge/cdp-input.js`、`scripts/manual_recorder/js_parts/a.py`、`scripts/manual_recorder/js_parts/b.py`、相关 characterization、本协作日志；不修改回放动作名及线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动、其他会话 WIP、引擎仓；不处理日期面板关闭之外的基础设施告警。
 - 方式：沿日期点击确认链路扩展 editor 双 input 快照与范围值归并，保留单日期行为，补充离线 pin/语法检查后提交。
-
 
 ## 2026-09-15 15:26 · Cursor Lead — 收工：人工确认去掉状态闸（回链 15:13 / 14:49）
 
@@ -993,7 +1007,6 @@
 - 方式：用户审过 REVISION 后覆盖线上；他线 WIP 未携带
 - 验证：Cursor 侧测试接管；本刀仅 prompt 文本
 
-
 ## 2026-09-12 09:45 · Cursor Lead — 收工：planner advisory discard 接线 + 湿测（回链 09:20）
 
 - 完成：`patch_planner_advice_filter` 挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard` + 事件 `planner_advice_discarded`；pin 扩 fence/kept/接线钉；湿测 traj 759/760；报告增补；提交 `49f18c0f`
@@ -1082,5 +1095,4 @@
 - 禁入：G1 报文捞取、G2 运维、G4 真上传 / KB 湿测主责、文件上传·SUT、`save_section.py`（禁止恢复）、他线 WIP（`scripts/agent/service.py` 未声明改动、`data/kb/flows/**` 湿测主链、req-upload）
 - 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
 - 分支：`cursor/g3-phase-done-evidence-gate-3b92`
-
 
