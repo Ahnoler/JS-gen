@@ -428,6 +428,71 @@ def test_open_page_overlay_evidence_and_overlay_gate() -> None:
         action_state._ACTION_LOG = saved_log
 
 
+def test_llm_contract_uses_rule_boundary_for_navigate_evidence() -> None:
+    """sid 64c9044b: LLM reviewer must not lose recordable navigate evidence tags.
+
+    The LLM reviewer only sees natural-language in_scope/success.kinds. Without a
+    rule-based boundary override, phase 1 '打开...向导页' got empty goals (no
+    open_page) and phase 3 '点击下一步' got success_when without nav_next_clicked.
+    Service.py now passes compile_boundary(task_text) as boundary_override so the
+    gate uses actually-recordable evidence kinds.
+    """
+    from scripts.controller.actions._phase_boundary import (
+        compile_boundary,
+        get_phase_boundary,
+    )
+    from scripts.controller.actions.phase.intent_contract import apply_phase_contract
+
+    # Phase 1: LLM says navigate + url_change/page_opened, in_scope empty.
+    reviewed_p1 = {
+        'mode': 'navigate',
+        'allow_form_assistant': False,
+        'refill': 'none',
+        'goal': '点击评级申请按钮打开向导页',
+        'in_scope': [],
+        'out_of_scope': [],
+        'done_when': '向导页打开',
+        'submit': {'required': False, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': ['url_change', 'page_opened'], 'evidence': []},
+        'brief_plan': [],
+    }
+    store1: dict = {}
+    boundary1 = compile_boundary('点击【评级申请】按钮。预期结果：打开“对公客户评级申请”向导页。')
+    apply_phase_contract(store1, reviewed_p1, boundary_override=boundary1)
+    b1 = get_phase_boundary(store1)
+    assert_true(b1 and 'open_page' in b1.get('goals', []), f'p1 boundary goals: {b1}')
+    assert_true(
+        b1 and set(b1.get('success_when', [])) >= {'url_change', 'page_opened'},
+        f'p1 boundary success_when: {b1}',
+    )
+
+    # Phase 3: LLM says navigate but forgets nav_next_clicked for 下一步 wizard step.
+    reviewed_p3 = {
+        'mode': 'navigate',
+        'allow_form_assistant': False,
+        'refill': 'none',
+        'goal': '点击下一步进入风险阻断',
+        'in_scope': [],
+        'out_of_scope': [],
+        'done_when': '进入风险阻断步骤',
+        'submit': {'required': False, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': ['url_change', 'page_opened'], 'evidence': []},
+        'brief_plan': [],
+    }
+    store3: dict = {}
+    boundary3 = compile_boundary('点击【下一步】按钮。预期结果：进入“风险阻断”步骤。')
+    apply_phase_contract(store3, reviewed_p3, boundary_override=boundary3)
+    b3 = get_phase_boundary(store3)
+    assert_true(
+        b3 and 'nav_next_clicked' in b3.get('success_when', []),
+        f'p3 boundary success_when must include nav_next_clicked: {b3}',
+    )
+    assert_true(
+        b3 and 'click_next' in b3.get('goals', []),
+        f'p3 boundary goals must include click_next: {b3}',
+    )
+
+
 def test_resolve_infer_unique_and_longest() -> None:
     store = {
         "_phase_intent": {
