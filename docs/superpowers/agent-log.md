@@ -1336,3 +1336,8 @@
 - 禁入：G1 报文捞取、G2 运维、G4 真上传 / KB 湿测主责、文件上传·SUT、`save_section.py`（禁止恢复）、他线 WIP（`scripts/agent/service.py` 未声明改动、`data/kb/flows/**` 湿测主链、req-upload）
 - 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
 - 分支：`cursor/g3-phase-done-evidence-gate-3b92`
+
+## 2026-09-17 10:56 · ZCode — 更新：前端已发 20260917-1035，后端发版撤回（先修 bug）
+- 前端：入口 index-DMDGH5NM.js → /data/app/front-dist/releases/20260917-1035 已上线，页面/API 200 验证过
+- 后端：预上传包（20260917-103602）已全部撤回（本地 dist + 服务器 /tmp 均清理）；/data/app/JS-gen 软链与 4097 未动（仍 20260916-212853，pid 3596493）；原因=发现 bug 需先修完再发
+- 后续：bug 修完重新 pack→上传→部署（部署前仍需确认无活跃录制）
