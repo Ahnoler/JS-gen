@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-17 19:15 · ZCode 引擎线 — 收工：同族缺陷三雷修复 + 门禁加固（回链 18:22 开工）
+
+- 完成（4 commits，①②③由 3 个后台子智能体实施、主会话回收核验后代提交，全部先 RED pin 再最小实现）：
+  - **①P0** `39434171`：`form_scan_actions.py` `sync_tasks_from_errors_impl` 断尾复位——考古定案切割点为 `0fa6a8ee`（observe 修复时插入两个新函数、尾段未随函数带走），尾段（自动滚动到首个报错字段 + `sync-errors | retried:N` 汇总 + return）按 `0a7c06a9` 完整版逐字符复位（+25/-25 纯位移，头段定义完整无需补）；动作不再返回 None。新 pin `characterize-sync-tasks-from-errors-intact`
+  - **②P1** `3bcdc2d3`：`agent/recorder_emitters.py` `_capture_step_url` 补 `from .. import controller as ctrl_mod`（函数内 lazy，与本文件「depth-adjusted relative import」惯例及 agent_utils 先例同形）——轨迹 URL 捕获自 6aeedcb0 提取以来被 `except:pass` 静默吞掉的 NameError 修复。新 pin `characterize-recorder-emitters-url-capture`（钉导入行/防先用后导/_TRAJECTORY_URL 写入）；9 个相关 pin 复跑绿；离线行为冒烟 3 路径全过
+  - **③P1** `94f3b9f7`：`trajectory-recording-runner.js` 组图采集接线——考古定案 `577d322a` 意图为「拆三件套让慢 MinIO 不阻塞采集」（capture/persist/queue + 独立持久化链），ensurePhaseGroup 已接而 candidate 路径漏改；选型**接线现存实现**（恢复原函数反而违背该提交自身意图、重新引入 5s 超时风险），ack 语义=采集成功即 ok、持久化异步。事件协议与 `characterize-phase-group-shot` pin 未动。`characterize-record-phase-finalize.mjs` 扩充（孤儿名归零 + 引用/定义成对）
+  - **④门禁** `3c599e5a`：`eslint.config.js` 启用 `no-undef: error`（手写 globals 补 Node 18+/21+ 全局 fetch/AbortController/AbortSignal/crypto/setImmediate/queueMicrotask/WebSocket；`src/dashboard/api-docs/**` 浏览器分区；`**/*.cjs` commonjs 源型 + 包装层全局显式声明）+ verify-all 新增 `eslint-core` 与 `ruff-f821`（`command -v` 守卫，缺工具跳过注明）。全仓 eslint **0 error**（25 条存量 jsdoc warning 不变）、ruff F821 全绿
+- 合并后验收：`git pull` 无新远端提交（Cursor 线 STC 提交 `f6a05ea6`/`2fca7e4d` 已在本地历史合流，其推送已带上本线修复）；合并态重跑三个新 pin + ruff F821 + eslint 全绿；全量 verify-all = 3 红基线（step-highlight/layer-tree/confirm-notification）一致、零新增
+- 遗留移交：①结构专项——lifecycle stop 状态机双实现（非 Safe 版可把 completed 降级 failed）与零步门禁 v1/v2/v3 三代杂交 + 四种业务步计数口径，建议立「单一真相源」专项收敛（本线已按用户口径不含此批）②P2 清理存量子弹：11 条 unused import（`src/cdp/inspect.js:4`、`src/routes/browser-session/register.js:31` 最可疑）、~138 条 py 拆分残留 F401、170 条死导出、`session_runner.py` 的 `shutdown_memory_writer` 导入后无调用（疑似丢退出清理）③`package.json` 无 engines/`.nvmrc`（代码依赖 Node 18+/21+ 全局）④普查报告建议：对 `_misc.py`→`click_action_engine.py` 的 G3 手工移植块补源码形状 pin（防未来反向合并静默丢弃）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-17 18:22 · ZCode 引擎线 — 开工：同族缺陷三雷修复 + 门禁加固（no-undef / ruff F821）
 
 - 进行中：接上午「多阶段录制 gated 孤儿」事故的四路同族普查结论，带队修复三颗同族真雷并堵门禁缺口：**①P0** `form_scan_actions.py` `sync_tasks_from_errors_impl` 搬运断尾（L563-586 孤儿尾段引用未定义 `retried`/`intervene`，动作返回 None 行为回归；考古锚点 0a7c06a9 完整版 / 0fa6a8ee 搬运）——复位 return 半段并清孤儿块；**②P1** `agent/recorder_emitters.py:235` `_capture_step_url` 漏 `ctrl_mod` 导入、NameError 被 `except:pass` 静默吞（轨迹 URL 捕获整体失效）——按本模块「函数级 lazy import」惯例补 `from .. import controller as ctrl_mod`（先例 agent_utils.py:128-130）；**③P1** `trajectory-recording-runner.js:549` `captureAndPersistPhaseGroupShot` 全仓零定义（定义于 577d322a 删除，调用残留，click_save 提交前组图采集静默失败）——考古后接线现存等价实现或恢复原实现；**④门禁加固（主线程，回收后落地在干净树上）**：eslint 启用 `no-undef: error`（补 Node/browser globals，api-docs 分 browser override），verify-all 新增 eslint 与 `ruff --select F821` 条目（command -v 守卫，缺工具跳过并注明）
