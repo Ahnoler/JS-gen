@@ -46,6 +46,16 @@ run "characterize-runid-bridge" node scripts/characterization/characterize-runid
 run "characterize-owned-wait-shape" node scripts/characterization/characterize-owned-wait-shape.mjs
 run "characterize-quality-final-gate" node scripts/characterization/characterize-quality-final-gate.mjs
 run "characterize-record-phase-finalize" node scripts/characterization/characterize-record-phase-finalize.mjs
+# Static gates (2026-09-17): eslint no-undef catches merge-orphan references
+# (the 'gated' incident class) — pre-commit hooks do not run on merge commits
+# and text pins cannot see undefined identifiers. ruff F821 is the Python
+# counterpart for the scripts/ runtime tree; skipped with a note when absent.
+run "eslint-core" npx eslint .
+if command -v ruff >/dev/null 2>&1; then
+  run "ruff-f821" ruff check --select F821 scripts/
+else
+  echo "skip: ruff-f821 (ruff not on PATH)"
+fi
 run "characterize-region-tree" node scripts/characterization/characterize-region-tree.mjs
 run "characterize-transaction-export-region" node scripts/characterization/characterize-transaction-export-region.mjs
 run "characterize-form-rules" "$PY" scripts/characterization/characterize-form-rules.py
