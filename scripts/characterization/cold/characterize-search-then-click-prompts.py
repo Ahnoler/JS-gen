@@ -12,11 +12,14 @@ NEEDLES: dict[str, tuple[str, ...]] = {
     "scripts/prompts/agent-core.md": (
         "树/列表先查再点",
         "err-search-first",
+        'click_table_row_radio(row_text="first")',
     ),
     "scripts/prompts/agent-tools-table.md": (
         "树/列表先查再点",
         "err-search-first",
         "click_table_row_button",
+        'click_table_row_radio(row_text="first")',
+        "勿传客户编号/名称",
     ),
     "scripts/prompts/agent-tools-common.md": (
         "树/列表先查再点",
