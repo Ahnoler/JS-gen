@@ -110,11 +110,11 @@ run_form_assistant(region='系统评级结论')
 
 # 🚨 EL-SELECT 规则（关键 — 不可忽略）
 1. 对于 el-select 下拉框，必须使用 `select_option(label_text, option_text)`。
-   - **TsscMultiSelect**（扫描 kind=`tssc-multi-select`，如「要素名称」「客户名称」）：仍只调 **`select_option(label_text, option_text, xpath_smart)`**。引擎自动走远程表行/字典子路径；`option_text="first"` 表示任意首项。失败且提示真实点击时，改 `click_element`/`real_click`，勿盲重试，勿 fill_form_field。
-2. **绝不使用 `click_element_by_index(index)` 点击下拉选项** — 会命中 `<span>` 文本而非 Vue 监听的 `<li>` 项，事件不触发。
+   - **TsscMultiSelect**（扫描 kind=`tssc-multi-select`，如「要素名称」「客户名称」）：仍只调 **`select_option(label_text, option_text, xpath_smart)`**。引擎自动走远程表行/字典子路径；`option_text="first"` 表示任意首项。失败且提示真实点击时，改用 `real_click` 点**触发器**展开，选项仍用 `select_option` 选择，不得用任何 click 工具点选项，勿盲重试，勿 fill_form_field。
+2. **绝不使用任何 click 类工具（`click_element` / `click_element_by_index` / `click_button` / `real_click`）点击下拉选项** — 会命中 `<span>` 文本而非 Vue 监听的 `<li>` 项，事件不触发。
 3. **`scroll(down|up)` 可用于页面滚动，但不适用于 `.tssc-multi-select` 下拉弹窗**（固定定位，页面滚动不动它）。弹层内 `el-table` 行选的 TsscMultiSelect 仍用 **`select_option`**，不要用 `click_element_by_index` 点表行。
 4. 如果 `select_option` 返回 `"ok-already:XXX"` — 字段已有值 XXX。**停止。不要再次尝试选择。**
-5. **如果 `select_option` 返回 `"no-items"`：** 工具已重置下拉状态。重新 `scan_visible_fields` / `get_pending_tasks`，确认该字段仍可操作后，**最多再调用一次** `select_option`。**禁止**用 `click_element_by_index` 点 el-option 或下拉行。仅当第二次仍返回 `"no-items"` 且新扫描中该字段确无可用选项时，才可视为真实空级联并跳过。
+5. **如果 `select_option` 返回 `"no-items"`：** 工具已重置下拉状态。重新 `scan_visible_fields` / `get_pending_tasks`，确认该字段仍可操作后，**最多再调用一次** `select_option`。**禁止**用任何 click 类工具（含 `real_click` / `click_button`）点 el-option 或下拉行。仅当第二次仍返回 `"no-items"` 且新扫描中该字段确无可用选项时，才可视为真实空级联并跳过。
 6. 选择后，通过检查返回值确认值已更改。
 7. **如果 `select_option` 返回 `"option-not-found:..."` 且列出的项明显来自其他字段**（如"企业类"、"营业执照"），说明级联数据为空（如"乡镇/街道"、"行政村/社区"无数据）。**跳过此字段。**
 
