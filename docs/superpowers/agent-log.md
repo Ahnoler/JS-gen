@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-18 16:23 · ZCode 引擎线 — 开工：引擎管线专用工作树建立 + B1-B3 缺陷修复批（用户指示引擎线此后全部改动走独立 worktree）
+
+- 进行中：用户定盘「本对话专用于引擎管线开发，此后所有引擎管线修改另起工作树进行」。已建 worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918`，基于 `5956ab7a`=origin/uara_V1.2，node_modules/python junction + .env 已落）。本单元工作清单=五轮湿测移交报告 B 类（`docs/superpowers/reports/2026-09-18-wet-test-defect-handover.md`）：**B-1（P1）TsscMultiSelect fill/select_option 路由互拒震荡**（`scripts/controller/actions/fill_dispatch.py`/`select_dispatch.py`）、**B-2（P2）stepCount 与 trajectory_step 行数对账日志**（`scripts/state.py` _record_action coalesce 口径）、**B-3（P2）executor 同 uuid 僵尸双进程互斥**（`executor/agent.mjs`）；并行调研挂账专项「stop 双实现 + 零步门禁三代收敛」（只调研不实施）。B-4 观察项/B-5 P3 不动。
+- 范围（可写集）：**worktree `D:\dev\JS-gen-engine` 内** `scripts/controller/actions/fill_dispatch.py`、`select_dispatch.py`、`scripts/state.py`（或步持久化对账点）、`executor/agent.mjs`、新 pins `scripts/characterization/characterize-*`、`scripts/refactor/verify-all.sh`（主线程登记）、`tmp/engine-pipeline/`；**主检出仅 agent-log 本条目与收工条目**
+- 禁入区：**合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918` 全部文件**（classify/intent_contract/boundary_contract/boundary_gates/click_action_engine/recorder_emitters/phase/save.py/session_runner.py——4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件；他线 WIP（`data/kb/req/product-mgmt/**`、Cursor 证据目录）；`scripts/prompts/**`；运行中录制会话
+- 方式：主线程编排；4 个 Explore 并行调研（B-1 路由判定 / B-3 executor 生命周期 / B-2 计数对账 / 专项地图）；实施子智能体文件集不相交、一律不 commit；主线程回收验收（RED pin→修→全量 verify-all 基线比对）后代提交推送分支
+- 注：合并回 uara_V1.2 时机待用户拍板（沿用合约线先例：交付分支+验收证据+未合并待批）
+
 ## 2026-09-18 12:00 · OpenCode — 收工：约束录制期「重置」按钮点击行为（回链 12:00 开工）
 
 - 完成：`c1eb92a2`——在 `ClickEngine` 入口对「重置/清空/清除/恢复默认」类按钮加阶段语义 guard：`_is_reset_button_label` 识别按钮文本；`_reset_click_allowed` 仅当 `_phase_intent` / `_phase_boundary` 的 `task_text_excerpt` 含重置语义时才允许；`click_button()` 与 `click_element_by_index()` 均拦截。Prompt 同步在 `agent-tools-table.md` / `agent-core.md` 中明确禁止查询阶段为清空已填条件而点重置。新增 pin `characterize-reset-button-guard.py` 钉死标签识别/阶段 excerpt 来源/允许与拒绝场景/复合查询+重置阶段。
