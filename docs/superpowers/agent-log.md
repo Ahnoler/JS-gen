@@ -1,5 +1,32 @@
 # Agent 协作日志
 
+## 2026-09-18 17:27 · ZCode 引擎线 — 开工：B-6 fill_engine 局部 import 遮蔽 UnboundLocalError 修复（用户指示不合入 uara_V1.2、继续修复缺陷）
+
+- 进行中：接用户指令「不要合入 uara_V1.2，继续修复缺陷」，实施 wet6 新报 B-6（P1，`docs/superpowers/reports/2026-09-18-fill-engine-unboundlocal-bug.md`，traj #877 实证）：`fill_engine.py` 的 `fill_form_field` 内四处分支级 `from .result_protocol import …`（实测 :220 tssc / :232 tree-select / :334 与 :471 两处 field-disabled 旁路——比报告多一处）把 err_with/recommend_action_for_kind 绑定成函数局部名，field-disabled 路径未经过前两处 import 即调用 err_with → UnboundLocalError，agent 收不到 err-field-disabled 结构化指引（#877 实测单阶段试错硬耗 119 步）。修法=模块级 :37 统一导入 + 删四处局部 import；新 pin `characterize-fill-err-with-scope.py`（symtable 编译器级作用域断言：fill_form_field 内 err_with/recommend_action_for_kind 必须 GLOBAL 非 LOCAL——该谓词即 UnboundLocalError 充要条件 + 行为 needle 不回归）先 RED 后 GREEN。
+- 范围（可写集）：**worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918` @ 583b1ffd）内** `scripts/controller/actions/fill_engine.py`、新 pin `scripts/characterization/characterize-fill-err-with-scope.py`、`scripts/refactor/verify-all.sh`（登记一行）；主检出仅 agent-log 本条目与收工条目
+- 禁入区：合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918`（4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件与他线 WIP（`data/kb/req/product-mgmt/**`、`.cursor/`）；`scripts/prompts/**`；B1-B3 已交付文件（select_engine.py/runner 等）本单元不动；Cursor 在途 `tools/recording-coach/**`（17:30 开工，文件集不相交；verify-all.sh 双方各登记一行，push 时按协作约定并排解决）；运行中录制会话
+- 方式：主线程内联实施（单文件小修不派子智能体）；RED pin→最小修复→相关既有 pin 回归→全量 verify-all 基线比对（3 红）→合并后验收→代提交推送；不合入 uara_V1.2
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 17:30 · Cursor — 开工：recording-coach MVP 实现（回链 design/plan）
+
+- 进行中：按 `plans/2026-09-18-recording-coach-opencode.md` Tasks 1–6 落地 `tools/recording-coach/`（assert_steps、workflow、HTTP tools、OpenCode 会话、README、WET-CHECKLIST）；skill 已在 `tools/recording-coach/skill/`
+- 范围：`tools/recording-coach/**`；`scripts/characterization/cold/characterize-recording-coach-assert.mjs`；`scripts/refactor/verify-all.sh` 登记一行；本协作日志
+- 禁入区：控制面 `src/**` 产品主链；引擎/合约 worktree；运行中录制槽（本单元不做真机 wet Task 6 全链路除非执行机空闲）
+- 方式：主会话 Inline
+
+## 2026-09-18 17:25 · Cursor — 补记：ui-record-wet-test skill 迁入 recording-coach
+
+- 完成：`scripts/prompts/skills/ui-record-wet-test/SKILL.md` → **`tools/recording-coach/skill/SKILL.md`**（真源）；旧路径留跳转 stub；废除旁路 `brief.md` 设想；同步 design / plan / ui-record guide
+- 范围：skill 迁移 + 文档交叉链接；无 OpenCode 代码实现
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 17:15 · Cursor — 补记：录制陪跑设计增补双层会话与数据存放
+
+- 完成：修订 `docs/superpowers/specs/2026-09-18-recording-coach-opencode-design.md` §3/§5.1–§5.2/§9–§14——OpenCode Session≠Workflow；权威 `workflow.json` 落 `tmp/recording-coach-*/`；步骤仍在 MySQL；tool 推进相；Recording 互斥
+- 范围：仅该 design spec；无代码
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 17:12 · ZCode 引擎线 — 收工：B1-B3 实施批完成（回链 16:48 开工；分支已交付未合并，待用户审阅）
 
 - 完成：引擎分支 `engine/pipeline-20260918` 两个提交——`216b2688`（B1-B3 修复本体，11 文件 +639/−27）+ `583b1ffd`（合并 origin/uara_V1.2 集成态验收后推送）：
