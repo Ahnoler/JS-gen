@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-18 09:18 · ZCode 引擎线 — 开工：重置排除精确化——含显式查询动作的复合阶段保留 query 合同
+
+- 进行中：用户问「查询+重置复合阶段属什么任务」实测暴露昨日 `c14d1c1f` 的次生风险——`_RESET_PHASE_RE` 无差别早返回把「填写查询条件并点击查询，然后点击重置」这类真复合文本从可满足的 query 合同（点查询即得令牌）误路由进 maintain 合同（`toast_ok/url_change/saved_navigation`，查询重置流程产不出 → 新死锁形态）。最小精确化：新 `_QUERY_ACTION_RE = r'点击查询|点击搜索|执行查询|执行搜索|查询按钮|搜索按钮'`，重置排除**仅当文本无显式查询动作短语时生效**（`and not` 一处）——复合阶段回 query（令牌可产出、合同更实），纯重置/名词性「查询条件」排除不变，真查询合同不放松
+- 范围（可写集）：`scripts/controller/actions/phase/classify.py`、既有 pin `scripts/characterization/characterize-reset-phase-not-query.py`（扩充复合用例）、本协作日志（pin 已注册 verify-all 无需改）
+- 禁入区：同 09:05 开工条目（phase 其他模块、他线 WIP、prompts、config、SPA）
+- 方式：主线程内联，先扩 pin 跑 RED（两复合用例当前为 False 即红）再一行条件修正；回归=该 pin 全量 + boundary/runtime/g3-done-gate 四 pin + ruff；全量 verify-all 后收工
+
 ## 2026-09-18 09:40 · ZCode 引擎线 — 收工：重置类阶段误签 query 合同最小修法（回链 09:05 开工）
 
 - 完成：`c14d1c1f`——`classify.py is_query_task` 对含 `重置|清空|恢复默认` 语义的文本早返回 False（新 `_RESET_PHASE_RE`，仅 +5 行），重置类阶段落回 `role='other'`、`success_when=[]`，done 正常放行；真查询阶段的 `query_clicked` 硬合同原样保留（G3 无放松）
