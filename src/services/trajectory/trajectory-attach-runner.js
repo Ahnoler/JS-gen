@@ -61,9 +61,14 @@ async function injectFlowTemplateHintIfNeeded(traj) {
  * @param {boolean} [opts.skipDefaultLogin] when true, skip the prepare-time
  *   default login (same effect as runtime.skipDefaultLogin, but known before
  *   the runtime object exists — auth dry-run login segment)
+ * @param {boolean} [opts.preserveRecordStatus] when true, only attach browser/stream
+ *   without entering the transient 'recording' state (keeps failed/recorded/completed)
  * @returns {Promise<object>} prepare result with trajectory, account, and session info
  */
-export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin = false } = {}) {
+export async function prepareTrajectoryRecordingUnlocked(tid, {
+  skipDefaultLogin = false,
+  preserveRecordStatus = false,
+} = {}) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
 
   await injectFlowTemplateHintIfNeeded(traj);
@@ -216,11 +221,16 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
-    // 状态流转 V3：启动浏览器/占用执行资源成功即进入临时「录制中」(recording)。
-    // 进入时记录持久状态基线，关闭浏览器/释放资源时恢复到该基线，持久状态不被临时态降级。
-    await trajectoryDao.enterTransientRecording(tid).catch((err) => {
-      console.warn(`[prepare] enterTransientRecording failed for #${tid}:`, err?.message || err);
-    });
+    if (preserveRecordStatus) {
+      // 仅连接浏览器/推流，不进入 recording 临时态；保持当前持久态（failed/recorded/completed）。
+      console.log(`[prepare] preserveRecordStatus=true for traj #${tid}; staying in ${traj?.recordStatus || 'unknown'}`);
+    } else {
+      // 状态流转 V3：启动浏览器/占用执行资源成功即进入临时「录制中」(recording)。
+      // 进入时记录持久状态基线，关闭浏览器/释放资源时恢复到该基线，持久状态不被临时态降级。
+      await trajectoryDao.enterTransientRecording(tid).catch((err) => {
+        console.warn(`[prepare] enterTransientRecording failed for #${tid}:`, err?.message || err);
+      });
+    }
   }
 
   emitStage('login', 'running', { accountId });
@@ -279,7 +289,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
   return {
     trajectoryId: tid,
     trajectory: fresh || traj,
-    recordStatus: fresh?.recordStatus || (streamOk ? 'recording' : traj?.recordStatus) || null,
+    recordStatus: fresh?.recordStatus || traj?.recordStatus || null,
     phases: tree?.phases || [],
     orphanSteps: tree?.orphanSteps || [],
     sessionId: runtime.sessionId,

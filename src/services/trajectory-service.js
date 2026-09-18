@@ -81,3 +81,10 @@ export {
   resolveTrajectoryElement,
   toggleTrajectoryManualRecord,
 } from './trajectory/trajectory-recording-service.js';
+
+export {
+  enterViewer,
+  leaveViewer,
+  touchViewer,
+  getViewerCount,
+} from './trajectory/trajectory-recording-service.js';
