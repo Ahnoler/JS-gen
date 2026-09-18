@@ -111,12 +111,14 @@
 4. 主线程合并态全量 `verify-all.sh`：与干净基线逐行一致（3 红零新增）+ 3 新 pin 全绿；
 5. 全部改动 commit 于 `engine/pipeline-20260918` 并 push 分支；收工条目 commit+push（agent-log 在主检出 uara_V1.2 写）。
 
-## 六、决策点（待用户批准后开工）
+## 六、决策点（附证据，待用户批准后开工）
 
-1. B-1 采用方案 1（select 侧落穿+文案），方案 2/3 后置 hardening——确认。
-2. B-2 本批只加日志不修逻辑（遵移交报告）——确认。
-3. B-3 401 处理采用「连续 5 次退出（exit 3）」而非无限重连——确认。
-4. 挂账专项本批不实施，只交地图——确认。
+> 证据补采（2026-09-18 16:5x）：B-2 直查生产 DB（`tmp/recon-evidence-859.mjs`，只读）；B-3 逐行核对 `executor/ws-client.js`/`config.js`/`src/executor-ws.js` 原文与 git 历史。
+
+1. **B-1 采用方案 1**（select 侧落穿+文案），方案 2/3 后置 hardening——证据：wet4 报告 + `tmp/executor-main.log` L829-865 七步震荡实录逐字摘录（`err-use-tssc-multi-select ↔ no-tssc-multi-select`，select 每步 `dispatch path=tssc reason=field_kind`=store 缓存驱动）；#865 换会话一次成功与「store kind 缓存在場与否」机理吻合；grep 证实**无任何 pin 钉住 fill/select 同判一致性**（#864 漏网原因）。
+2. **B-2 本批只加日志不修逻辑**——证据（DB 实测，判别性）：**#859 DB 15 行 = 13 业务步 + 2 条 save_form_snapshot，分毫不差、无僵尸行**（`SELECT action_type,COUNT(*)`：click×6/fill×4/select×3/save_form_snapshot×2）——**15 vs 13 是 meta 口径差，非缺陷（假说 A1 实锤）**；**#858 空号 #8 为真**（序列 #1-#7 后直接 #9#10，与「删除重排后 `_nextStepNumber` 不回退」假说 B1 吻合，且瞬态可被下次删除重排自愈）。→ 对账日志仍值得落（A2 映射缺失漏删尚未被证伪，gaps 检测可固化 B1 观测），但**预期主要产出=口径证明 + 空号确认**，修法（`_nextStepNumber` 回补）可待下一轮读数后小步实施。
+3. **B-3 401 连续 5 次退出（exit 3）**——证据：`ws-client.js:104-114` close 不分 code 无条件重连、`:116-118` error 仅打日志；grep 全 executor/ + git -S 均无 401 特判（当前与历史皆无）。**记忆勘误**：台账「错 token=WS 401 后进程直接退出」（09-02 实操记录）是 606277a 之前的 unref 时代形态——当时重连定时器 unref 导致升级被拒后进程静默退出，**该「直接退出」正是 606277a 修掉的 bug**；现行为=无限 401 重连循环。锁路径（`config.js:114-116` 锁在 `EXECUTOR_DIR` 内）与 upsert 时序（`executor-ws.js:58-66` `executorService.register` 先于 `registry.attach`，被拒仍刷 DB online）均已原文复核。
+4. **挂账专项本批不实施，只交地图**——证据：收敛地图已落盘（`reports/2026-09-18-stop-zero-gate-convergence-survey.md`），最大假成功复活口（stop(success) 绕过全部零步门禁）有 file:line 实证，实施需湿测配合另开单元。
 
 ## 七、评审对照（reviewer/QA 移交单 2026-09-18 vs 本 spec）
 
