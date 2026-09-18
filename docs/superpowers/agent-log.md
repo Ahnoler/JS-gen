@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-19 06:14 · ZCode 合约线 — 收工：uara_V2.0 上游基线确立（吸收 V1.2 尾差）
+
+- 完成：`35527f80`——`origin/uara_V1.2` 剩余 5 提交合入 `uara_V2.0`（用户拍板 V2.0 为今后唯一上游，基点 `1b421bad`）。前序基线：engine 线 `22aa7648` 已合 V1.2 至 `105e87a4`（含 a1cf8b50 LLM 失败提示 + da4aad68 中文总结备注规范）；本笔带入尾差 5 提交（172cb1fd 录制失败原因分类落库、8d33ad9d 交易详情页串台修复说明、e150a186 录制状态流程指南、迁移 `20260918180000_trajectory_failed_reason`、backfill 日志）
+- 验收（合并态）：`characterize-agent-llm-error` OK / `characterize-quality-final-gate` 4/4 / `characterize-record-phase-finalize` all passed / eslint `src/ executor/ scripts/` 0 errors（22 warnings 存量）；合并无冲突（14 文件 +566/−41）
+- 状态知会各线：**V1.2 已冻结**，后续开工声明上游一律写 `uara_V2.0`；合约线 `fix/phase-contract-20260918`（293f9f56）仍独立未并，并入时机待用户拍板；V1.2 尾部 2 笔未入任何 V2.0 祖先的提交无（当前 V1.2 tip `e150a186` 已全部吸收）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 19:46 · OpenCode 体验线 — 收工：录制状态流程开发者文档（回链 19:46 补记开工）
 
 - 完成：**新 `docs/superpowers/guides/recording-status-flow.md` + `docs/README.md` 索引登记**——把录制状态与执行机资源连接流程整理为开发者指南：双字段状态模型与流转总表、prepare/start/stop/confirm/manual-record/detach 各结果、资源三层绑定与释放三语义、观众统计自动释放、idle-reaper 兜底、前端录制页进入/准备会话/重新录制/画布流程、API 与 WS 事件清单、坑（详情页 `:key` 隔离、观众注册早于 prepare、`recording` 临时态判定、`preserveRecordStatus`、idle-reaper 不感知观众）、验证门禁、历史条目。关键结论均带 `file:line`/端点引用。
