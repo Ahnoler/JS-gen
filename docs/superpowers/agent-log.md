@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-18 18:40 · OpenCode 引擎/体验线 — 收工：LLM 提示方案 B + 录制失败原因分类落库与列表悬浮（回链 18:33 开工；本线两批合计）
+
+- 完成：**JS-gen `172cb1fd`（11 文件 +328/−40，本批）+ `a1cf8b50`（本线第一批：LLM 识别+广播）+ 收工/开工条目**；**前端另仓 `801bb9c`（5 文件 +27/−7）+ `a7e06f5`（第一批 toast）**
+  - 后端：新增 `src/models/failure-reason.js`（kind→类别文案，LLM 五子类统一「LLM 调用异常」）；`agent-llm-error.js` 返回 `{kind,reason,logReason,upstream}`；`executor-ws.js` 落库 `failed_kind/failed_reason`（首次为准）+ 日志用 logReason + 广播带 reason；迁移 `20260918180000_trajectory_failed_reason.js` 增 `failed_kind/failed_reason/failed_at`（同步 init.sql）；`trajectory-dao` 增 `markFailedReason`/`clearFailedReason`，进入录制与成功收官自动清；runner 写 `zero_step`/`quality_failed`/`phase_failed`/`runner_error`；lifecycle 写 `user_marked_failed`/`batch_failed`；api-docs websocket/trajectory 同步。
+  - 前端：列表状态列 failed 且有 reason 时 `el-tooltip` 悬浮类别文案（无值不兜底）；`Trajectory`/`TableRecord`/mapper 透传 `failedReason`；LLM toast 用事件 `reason`（类别），固定「AI 录制失败：<类别>」。
+- 验收证据（当前集成态，`git pull` 后 uara_V1.2 已是最新无需合并；前端 dev 无新远端提交）：新 pin `characterize-agent-llm-error` 扩为 **8 组断言 OK**（识别/类别文案/误报守卫/去重/分类表/executor-ws 接线/落库接线/api-docs+schema）；既有 node pin 回归全绿（record-status/trajectory/g3-runner-seam/record-phase-finalize/quality-final-gate/run-event-ownership/owned-wait-shape/executor-orphan-reconcile）；`npx eslint src/ executor/ scripts/` = **0 errors / 23 warnings**（基线一致零新增）；前端 `npx vue-tsc --noEmit` exit 0；`node --check` 全部改动 JS/迁移通过。
+- 影响面/生效：**需执行迁移 `20260918180000_trajectory_failed_reason` 并重启控制面**；执行机/Python 无需改；前端需重新构建部署。录制本身的行为未改（仍不会自动停止）。
+- 遗留移交：① D 类（执行机断连/会话崩溃/登录失败）按要求**未纳入**，现状不置 failed，列表悬浮不会显示；② 旧数据/无 reason 不做兜底，悬浮不出现（按用户要求）；③ 前端列表页 `index.vue` 有一处他线未提交的 `label-width 80→100` WIP，本提交已按 hunk 精确暂存未纳入、工作区保留，合并时由该线自行提交；④ 迁移上线前请确认 MySQL 5.7 兼容（VARCHAR/DATETIME(3) 均兼容）。
+- 注：不维护 CHANGELOG；主线程内联实施，未派子智能体
+
 ## 2026-09-18 18:33 · OpenCode 引擎/体验线 — 开工（backfill，续 17:52 收工）：LLM 提示收敛方案 B + 录制失败原因分类落库与列表悬浮
 
 - 背景：用户确认——① 前端 toast 与列表悬浮只展示**类别级**原因，LLM 类统一「LLM 调用异常」，详细原因只留后端日志；② 列表「录制异常」状态悬浮展示该类别原因；③ 旧数据/无原因不做悬浮兜底；D 类（执行机/会话/登录）暂不纳入；④ 允许直接改他线热区文件，提交前合并检验。
