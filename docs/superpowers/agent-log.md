@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-18 11:40 · ZCode 合约线 — 收工：阶段合约冲突普查三批修复（回链 10:20 开工；按用户指示不合并）
+
+- 完成：**`4902b3f4`（分支 `fix/phase-contract-20260918`，worktree `D:\dev\JS-gen-contract` 内，未合并 uara_V1.2）**——三批修复：批A=classify.py S1（条件路径硬排除补 新增/录入/维护）/S2（动作子句轴：查询词仅在预期结果子句不判 query）/S2b（开页型动作排除）/S3（查询排除补 维护/更新/变更）+ 回归修复（全量 verify-all 抓到「查询工具栏填条件」因下拉框取值"新增"误落 form_fill/maintain，按矩阵③落 other 免令牌）；批B=令牌对称（`_NEXT_BTN_RE` 补 上一步/返回上一步；click_button 成功路径接 `maybe_record_click_completion_evidence`）；批C=仲裁盲区补全（intent_contract.py：LLM mode='other' 且规则签出 query/navigate 严格合同→降级 other/无令牌，stderr 留痕 `source='llm+arbitrated'`）+ done 熔断（同 missing 集连拒 ≥3 次→`contract_suspect` 放行、不改写 history、其余守卫不动）+ boundary_to_legacy_intent 空合同不再抬升默认令牌（276 收敛）。共 11 文件 +830/-7，三个子智能体并行实施（文件集不相交），主线程越界审查通过（diff 恰为授权文件）
+- **用户指示：不合并回 uara_V1.2**——曾 fast-forward 合并后已按用户指示外科手术式撤销（mixed reset + 定点 restore 8 文件 + 删 3 新文件；主检出现回到 `4fd0ef41`，KB 线 data/kb WIP 完好未触碰）；**合并态验收因此未执行**（AGENTS.md 合并后验收约定本次由用户指示豁免），验收基线=worktree 分支状态；worktree 与分支**保留**供用户审阅/后续合并拍板
+- 验收（均在 worktree 分支态）：全量 verify-all 与干净基线逐行一致（3 红=step-highlight/layer-tree/confirm-notification 零新增）；pin 全绿——`characterize-reset-phase-not-query`（扩至 S1/S2/S2b/S3/工具栏填条件 + 4 真查询反例）、新 `characterize-contract-arbitration-circuit-breaker`（26 checks：仲裁降级/事故端到端/熔断时序/276）、新 `characterize-click-evidence-symmetry`（11 checks 含真 Chromium 活体：click_button(查询)→query_clicked、上一步→nav_next_clicked）、`characterize-g3-done-gate-live` 11/11、`characterize-ai-phase-element-guard`（同步修订落点断言 query→other）+ boundary/runtime/case-data/recorder-phase-reset 回归绿 + ruff F821 零
+- 调研交付：`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`（冲突普查表 C1/S1-S5/R1-R5 + LLM 置信评估：新增独立 LLM 通道=伪需求，补全既有 reviewer 仲裁接线=真需求，已与用户拍板）
+- 遗留移交：①合并时机由用户拍板——合并后须控制面重启生效（先 server 后 executor）并真机复跑对公客户评级三阶段批次验证阶段 3 done 一次放行；②R1-R5 假绿窗口清单在报告 §2（放松向，非死循环）留后续专项；③LLM 判对但页面真无查询钮的 DOM 感知可产出性判定留观察（熔断 stderr `✂ contract suspect` 日志为观测点）；④熔断计数键 `_done_token_reject_streak` 有意不随阶段清理（同款不可满足合同跨阶段快速熔断属期望语义）；⑤修复分支已推送远端（仅分支，不动 uara_V1.2）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 10:20 · ZCode 合约线 — 开工：阶段合约冲突普查三批修复（worktree 隔离）
 
 - 进行中：重置死循环（C1）同族普查完结，本单元实施三批修复——批A=classify.py 冲突家族 S1（硬排除缺新增/录入/维护）/S2（「查询条件字段展开」few-shot 文本）/S2b（导航含查询词）/S3（`_QUERY_EXCLUDE_RE` 缺维护/更新/变更）+ 动作子句轴；批B=令牌对称 S4（`_NEXT_BTN_RE` 扩上一步）/S5（click_button 接 `maybe_record_click_completion_evidence`）；批C=仲裁盲区补全（intent_contract.py:324 mode='other' 信 LLM 降级留痕）+ done 熔断（同 missing 集≥3 次→contract_suspect 放行+审计）+ boundary_contract.py:276 兜底收敛。LLM 置信评估结论=新增独立通道伪需求、补全既有 reviewer 仲裁接线为真（已与用户拍板）
