@@ -33,7 +33,11 @@ def main() -> None:
         '在“审批状态”下拉框中选择“通过”，在“评级发生类型”下拉框中选择“新增”，'
         '在“申请日期”日期控件中分别选择开始日期和结束日期。预期结果：查询条件填写完成。'
     )
-    assert classify_task_mode(phase_four) == 'query'
+    # 2026-09-18 冲突普查后落点修订：该文本是查询工具栏填条件（查询词仅在预期
+    # 结果子句、动作子句的「新增」只是下拉框取值），动作子句轴排除后按矩阵③落
+    # other 免令牌——旧断言 'query' 会签出流程可产不出 query_clicked 的死循环
+    # 合同；本 pin 其余断言（element dedup / gates）不依赖该 mode 取值。
+    assert classify_task_mode(phase_four) == 'other'
 
     store = {}
     remember_successful_element_action(store, '审批状态', 'select_option', Result('err-no-option', False))

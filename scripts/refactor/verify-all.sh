@@ -85,6 +85,11 @@ run "characterize-phase-done-evidence-gate" node scripts/characterization/charac
 # 前者抓"拒绝没生效"（裸 return → None → 调用方 truthy 判定静默放行）——源码形状 pin 抓不到。
 run "characterize-g3-done-gate-live" "$PY" scripts/characterization/characterize-g3-done-gate-live.py
 run "characterize-g3-runner-seam" node scripts/characterization/characterize-g3-runner-seam.mjs
+# 2026-09-18 phase-contract 冲突普查三批修复的三个 pin（仲裁盲区/熔断/反向仲裁/降噪、
+# save 通知正则「校验成功」/裸「校验」、probe 收口 doneLog 留痕 + ✂ 转移点单行）。
+run "characterize-contract-arbitration-circuit-breaker" "$PY" scripts/characterization/characterize-contract-arbitration-circuit-breaker.py
+run "characterize-save-notification-classify" "$PY" scripts/characterization/characterize-save-notification-classify.py
+run "characterize-probe-donelog-and-suspect-noise" "$PY" scripts/characterization/characterize-probe-donelog-and-suspect-noise.py
 # traj 840：wf_submit_guard 按字段类型给下一步动作（下拉→select_option；空 options≠没选项）
 run "characterize-wf-submit-guard-hint" "$PY" scripts/characterization/characterize-wf-submit-guard-hint.py
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py

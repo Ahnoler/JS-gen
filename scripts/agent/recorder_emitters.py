@@ -693,6 +693,78 @@ def _guard_done_claims(_last_result, done_success) -> tuple[str, bool]:
     )
     return done_text, claims_save_ok
 
+_PROBE_CLOSEOUT_SUFFIX = "（agent 步数耗尽，probe 收口）"
+
+
+def probe_force_close_context(business_data_store, agent=None):
+    """probe 收口语境：返回 (reason, last_done_text)。
+
+    reason 优先级：_quality_failed_reasons（done 门禁拒绝原因登记，逗号 join）
+    → agent history 最后一次 done 拒绝文案（剥 'Premature done()' 前缀）
+    → 'zero actions in phase'。last_done_text = history 最后一段非空
+    extracted_content（agent 最后一次 done 声明/摘要）。只读，不写 store。
+    """
+    reason = ''
+    last_done_text = ''
+    try:
+        reasons = list((business_data_store or {}).get('_quality_failed_reasons') or [])
+    except Exception:
+        reasons = []
+    if reasons:
+        reason = ', '.join(str(r) for r in reasons)
+    if agent is not None:
+        try:
+            for h in reversed(agent.state.history.history):
+                if not getattr(h, 'result', None):
+                    continue
+                for r in reversed(h.result):
+                    if not last_done_text and getattr(r, 'extracted_content', None):
+                        last_done_text = str(r.extracted_content).strip()
+                    if not reason:
+                        _err = str(getattr(r, 'error', None) or '')
+                        if 'Premature done()' in _err:
+                            reason = re.sub(
+                                r'^.*?Premature done\(\)\s*(rejected:\s*)?', '', _err
+                            ).strip().rstrip('.')
+                if reason and last_done_text:
+                    break
+        except Exception:
+            pass
+    if not reason:
+        reason = 'zero actions in phase'
+    return reason, last_done_text
+
+
+def record_probe_done_log(business_data_store, phase_number, *, reason, last_done_text=''):
+    """probe 收口合成 outcome（与正常 done 同通路：_phase_outcomes）。
+
+    已有 accepted outcome 时不覆盖（返回 None）；success=None 维持 unknown
+    语义（控制面不伪造成败）；text 封顶 400（同 record_phase_outcome 口径）。
+    返回写入的条目 dict（与 store 内为同一对象），None store / 非法相位 / 不
+    覆盖时返回 None。控制面 recordPhaseResult 经 phase_done.text →
+    appendPhaseDoneLog(source='agent') 落 doneLogs——probe 合成条目随事件落库。
+    """
+    if business_data_store is None:
+        return None
+    try:
+        from ..controller.actions.phase.outcomes import truncate_text
+        phase = int(phase_number)
+    except (TypeError, ValueError):
+        return None
+    except Exception:
+        return None
+    store = business_data_store.setdefault('_phase_outcomes', {})
+    existing = store.get(phase)
+    if isinstance(existing, dict):
+        return None
+    text = f"probe force-close: {reason}{_PROBE_CLOSEOUT_SUFFIX}"
+    if last_done_text:
+        text += f" — {str(last_done_text).strip()[-120:]}"
+    entry = {'success': None, 'text': truncate_text(text, 400), 'source': 'probe'}
+    store[phase] = entry
+    return entry
+
+
 def _guard_done_reject_missing_token(agent, business_data_store, contract, done_success, introduce_ok, needs_token) -> bool:
     """done 拦截-缺失成功令牌门禁（原 375-416 段逐字搬移）。
 
@@ -703,6 +775,7 @@ def _guard_done_reject_missing_token(agent, business_data_store, contract, done_
     if needs_token and done_success and not has_contract_success(business_data_store):
         if not (introduce_ok and contract and is_introduce_phase(contract)):
             missing_hint = ''
+            missing: list[str] = []
             try:
                 from scripts.controller.actions._phase_boundary import (
                     get_phase_boundary,
@@ -718,17 +791,58 @@ def _guard_done_reject_missing_token(agent, business_data_store, contract, done_
                 )
             except Exception:
                 missing_hint = ''
+            # done 熔断（2026-09-18 冲突普查）：同一 missing 集连续拒绝达 3 次 →
+            # 判定合同可能不可满足，熔断放行本次 done——宁 bounded 放松不 unbounded
+            # 死锁。事故背景：2026-09-17 评级重置阶段 LLM 判对 mode=other 但规则
+            # 误判 query 合同，门禁听规则 → done 死循环 6 次 + 预算 +42。放行只
+            # 跳过本守卫，门禁链后续守卫（zero-business-actions/overlay/errors/
+            # legacy_claim）照常执行；熔断时不再改写 history（跳过下方循环）。
+            if missing and business_data_store is not None:
+                _key = tuple(sorted(missing))
+                _streak = business_data_store.get('_done_token_reject_streak')
+                if not (isinstance(_streak, dict) and _streak.get('key') == _key):
+                    _streak = {'key': _key, 'count': 0}
+                _first_reject = int(_streak.get('count') or 0) == 0
+                if int(_streak.get('count') or 0) >= 3:
+                    business_data_store['_phase_contract_suspect'] = True
+                    # A4 降噪：✂ 行只在转移点（首次放行）打一次，之后放行静默
+                    # （#867 P5 连续同文行）；suspect 照常置位、history 照常不改写。
+                    if not business_data_store.get('_phase_suspect_logged'):
+                        business_data_store['_phase_suspect_logged'] = True
+                        sys.stderr.write(
+                            f"[recorder] ✂ contract suspect — missing-token gate bypassed "
+                            f"after {_streak.get('count')} identical rejections "
+                            f"(missing={list(_key)}) — possible unsatisfiable contract\n"
+                        )
+                        sys.stderr.flush()
+                    return False
+                _streak['count'] = int(_streak.get('count') or 0) + 1
+                business_data_store['_done_token_reject_streak'] = _streak
+            else:
+                # 无 missing / 无 boundary 时熔断不参与，拒绝行保持逐次全量
+                _first_reject = True
             submit = (contract or {}).get('submit') or {}
             recovery = recovery_prescription_message(
                 contract,
                 reason='Premature done() rejected: missing success token.',
             )
-            sys.stderr.write(
-                f"[recorder] ⚠ Premature done() — no success token at step "
-                f"{agent.state.n_steps} mode={(contract or {}).get('mode')} "
-                f"submit.required={bool(submit.get('required'))}"
-                f"{missing_hint}\n"
-            )
+            # A4 降噪（2026-09-18 wet5 traj #866-868）：同一 missing 集的重复拒绝
+            # 此前每次都打全量 stderr 行（#867 P5 连续 9 次 = 9 行近重复）。全量
+            # 细节（mode/submit/missing_hint）仅首次打印，重复拒只打短行留存在感；
+            # 换 missing 集（streak key 变化）视为新序列，重新给全量行。
+            if _first_reject:
+                sys.stderr.write(
+                    f"[recorder] ⚠ Premature done() — no success token at step "
+                    f"{agent.state.n_steps} mode={(contract or {}).get('mode')} "
+                    f"submit.required={bool(submit.get('required'))}"
+                    f"{missing_hint}\n"
+                )
+            else:
+                sys.stderr.write(
+                    f"[recorder] ⚠ Premature done() — no success token (repeat "
+                    f"x{_streak['count'] if isinstance(_streak, dict) else '?'}"
+                    f" same missing) at step {agent.state.n_steps}\n"
+                )
             sys.stderr.flush()
             for h in agent.state.history.history:
                 if h.result:

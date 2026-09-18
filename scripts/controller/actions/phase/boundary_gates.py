@@ -204,7 +204,7 @@ def maybe_record_picker_closed(
 
 
 _QUERY_BTN_RE = re.compile(r'^(查询|搜索|查找)')
-_NEXT_BTN_RE = re.compile(r'^(下一步|继续|下一步骤)')
+_NEXT_BTN_RE = re.compile(r'^(下一步|继续|下一步骤|上一步|返回上一步)')
 
 
 def maybe_record_click_completion_evidence(

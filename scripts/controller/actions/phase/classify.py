@@ -26,12 +26,18 @@ _FORCE_REFILL_RE = re.compile(
 _QUERY_TASK_RE = re.compile(r'查询|搜索|查找')
 _RESET_PHASE_RE = re.compile(r'重置|清空|恢复默认')
 _QUERY_ACTION_RE = re.compile(r'点击查询|点击搜索|执行查询|执行搜索|查询按钮|搜索按钮')
+# 2026-09-18 冲突普查 S3：补 维护/更新/变更（_MODIFY_TASK_RE 已有 维护）——
+# 「维护客户信息：查询定位后修改」族否则被判 query，且 is_modify_task 被
+# is_query_task 先否决（从菜单直进详情的维护不点查询 → done 死循环）。
 _QUERY_EXCLUDE_RE = re.compile(
-    r'新增|创建|编辑|修改|保存|提交|删除|录入|校验|导入'
+    r'新增|创建|编辑|修改|保存|提交|删除|录入|校验|导入|维护|更新|变更'
 )
 _QUERY_CONDITION_RE = re.compile(r'(?:查询|筛选)条件')
+# 条件路径先于 _QUERY_EXCLUDE_RE 生效，硬排除词表必须对齐其 CRUD 词表——
+# 2026-09-18 冲突普查 S1：缺 新增/录入/维护 时「新增后在查询条件中输入…」
+# 会经条件路径误判 query，签出流程产不出的 query_clicked 令牌（done 死循环）。
 _QUERY_CONDITION_HARD_EXCLUDE_RE = re.compile(
-    r'创建|编辑|修改|保存|提交|删除|校验|导入'
+    r'新增|录入|维护|创建|编辑|修改|保存|提交|删除|校验|导入'
 )
 # Wizard / multi-step pages often say「客户名称搜索为…，点击下一步」— that is NOT
 # list-filter query (must not force「点查询 → done」).
@@ -44,6 +50,13 @@ _OPEN_PAGE_EXPECT_RE = re.compile(
 # Save-to-open phases (点击保存。预期结果：保存成功并进入列表页) keep prompt rule 3
 # (click_save → ok-save-navigation → done) — NOT open-page navigation.
 _OPEN_PAGE_EXCLUDE_RE = re.compile(r'保存|提交')
+# S2b（2026-09-18 冲突普查）：动作子句本身是「打开/进入…页面」的开页导航、
+# 页面名恰含查询词（「打开查询中心页面。预期结果：抵达查询中心页面」）——
+# 语义是导航开页，不签 query_clicked 合同。限定动作子句匹配（而非全文本）
+# 是为放过真查询的「打开查询结果页」预期（cold pin: query + open expectation）。
+_OPEN_PAGE_ACTION_RE = re.compile(
+    r'(?:打开|进入|抵达|到达)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框|向导页?)'
+)
 
 # Suffixes appended for AI fill context — must NOT affect task-mode / boundary classify.
 _BUSINESS_DATA_MARK_RE = re.compile(
@@ -61,6 +74,17 @@ _LOGIN_TASK_RE = re.compile(r'登录|登入|/login|#/login', re.IGNORECASE)
 _LOGIN_EXCLUDE_RE = re.compile(
     r'新增|创建|录入|填写|修改|编辑|查询|搜索|删除|保存|提交|校验'
 )
+
+
+def _action_clause(task_text: str) -> str:
+    """动作子句 = 任务文本中「预期结果」之前的部分（2026-09-18 冲突普查 S2 轴检查）。
+
+    「点击【更多】按钮。预期结果：查询条件字段展开。」——查询词只出现在预期
+    结果子句（名词性观察描述，如「查询条件字段展开」「列表展示匹配客户」），
+    动作子句无任何查询语义，不构成 query 任务。无「预期结果」时返回原文，
+    行为不变。
+    """
+    return re.split(r'预期结果[:：]?', task_text, maxsplit=1)[0]
 
 
 def force_refill_all_required(task_text: str) -> bool:
@@ -197,6 +221,27 @@ def is_query_task(task_text: str) -> bool:
         # 但文本含显式查询动作（点击查询/执行搜索…）的复合阶段不排除：其流程
         # 真会点查询、令牌可产出，落 other/maintain 反而签出新的永不满足合同。
         return False
+    if not _QUERY_TASK_RE.search(_action_clause(t)):
+        # S2 动作子句轴（2026-09-18 冲突普查）：查询词只出现在预期结果子句的
+        # 文本不构成 query——预期结果里的「查询条件字段展开」「列表展示匹配
+        # 客户」是名词性观察描述，动作子句才承载任务语义。
+        return False
+    expect_parts = re.split(r'(预期结果[:：]?)', t, maxsplit=1)
+    if len(expect_parts) == 3:
+        expect_clause = expect_parts[1] + expect_parts[2]
+        if (
+            _OPEN_PAGE_EXPECT_RE.search(expect_clause)
+            and not _QUERY_ACTION_RE.search(t)
+            and _OPEN_PAGE_ACTION_RE.search(_action_clause(t))
+        ):
+            # S2b 开页型预期排除（2026-09-18 冲突普查）：「打开查询中心页面。
+            # 预期结果：抵达查询中心页面」——动作子句是「打开…页面」导航、
+            # 页面名恰含查询词，落 open_page/navigate 管辖（url_change/
+            # page_opened 令牌可产出），不签永不可满足的 query_clicked 合同。
+            # 动作子句须自身为开页导航：真查询的自然预期「打开查询结果页」
+            # （cold pin: query + open expectation → query）不得被误排除；
+            # 显式查询动作（点击查询/查询按钮）命中的复合阶段同样不排除。
+            return False
     if (
         _QUERY_CONDITION_RE.search(t)
         and not _QUERY_CONDITION_HARD_EXCLUDE_RE.search(t)
@@ -234,6 +279,14 @@ def is_fill_task(task_text: str) -> bool:
     """True when the phase is explicit new/entry form filling."""
     t = classification_task_text(task_text)
     if not t or is_query_task(t) or is_login_task(t) or is_modify_task(t):
+        return False
+    if _QUERY_CONDITION_RE.search(t) and not _QUERY_ACTION_RE.search(t):
+        # 查询工具栏填条件、无显式查询动作（2026-09-18 冲突普查回归修复，全量
+        # verify-all 抓到）：查询词仅落在预期结果子句时 is_query_task 已被动作
+        # 子句轴排除，但「新增/填写」等 fill 词可能只是下拉框取值或预期结果描述
+        # （如评级发生类型选择"新增"），落 form_fill 会签出查询工具栏永不产出
+        # 的 toast/save 保存合同（maintain 死循环同族）。按四分类矩阵第③类落
+        # other 免令牌。
         return False
     return bool(_FILL_TASK_RE.search(t))
 
