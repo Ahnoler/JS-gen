@@ -1,5 +1,47 @@
 # Agent 协作日志
 
+## 2026-09-18 17:52 · OpenCode 引擎/体验线 — 收工：AI 录制 LLM 失败前端提示 + 后端日志（回链 17:34 开工）
+
+- 完成：**`a1cf8b50`（JS-gen 代码，5 文件 +300）+ 合并 `416f2569`**；**前端另仓 `ui-auto-recording-agent-vue` `a7e06f5`（vue-project 2 文件 +22/−1）**
+  - 新增 `src/services/agent-llm-error.js`：纯函数识别 agent stderr 中 LLM 网关失败（402 余额不足 / 401 鉴权 / 429 限流 / 5xx / unknown），带 LLM 上下文锚点防误报 + 有界去重器。
+  - `src/executor-ws.js`：`session.agent_stderr` 分支命中时 → 控制面 `console.error('[agent-llm-error] …')` + 往该 session stderr 日志追加中文标记行 + WS 广播 `recording:llm_error`（trajectoryId/sessionId/sid/kind/message/upstream/at）。
+  - `src/dashboard/api-docs/groups/websocket.js` 登记契约；新 pin `characterize-agent-llm-error.mjs`（6 组断言）入 `verify-all.sh`。
+  - 前端：`useWsClient.ts` 订阅 `recording:llm_error`；`useRecordingStudio.ts` 新增 `aiRunError`，`doStartAi` 结束把「AI 录制结束」成功提示改为失败提示，事件晚到且录制已结束时立即 `ElMessage.error`。
+- 验收证据（合并后集成态）：新 pin `characterize-agent-llm-error` **OK**；`characterize-executor-orphan-reconcile` OK（executor-ws 既有 pin 未破）；`npx eslint src/ executor/ scripts/` = **0 errors / 23 warnings**（与既有基线一致，零新增；pre-commit 亦过）；前端 `npx vue-tsc --noEmit` exit 0。合并仅带入 agent-log 条目（无他线代码改动）。
+- 影响面/生效：只新增识别+广播旁路，不改 agent 与录制状态机行为；**控制面重启后生效**，执行机/Python 无需改（stderr 原样回传）；前端需重新构建部署。
+- 遗留移交：① 依赖控制面 `getLiveBindingByAgentSession(sessionId)` 解析 trajectoryId——若绑定缺失则 trajectoryId=null，前端按 id 过滤不会弹提示（录制中绑定通常存在，边界已知）；② 全量 `npx eslint .` 对 `.venv/tmp` 等越界目录报 3343 errors（既有基线问题，非本批引入；本批按文档口径 `src/ executor/ scripts/` 校验）；③ **push 网络不稳定**——本地提交完成，本收工条目提交后如仍 push 失败由网络恢复后补推。
+- 注：不维护 CHANGELOG；主线程内联实施，未派子智能体
+
+## 2026-09-18 17:34 · OpenCode 引擎/体验线 — 开工：AI 录制 LLM 失败（余额不足等）前端提示 + 后端日志
+
+- 背景：用户排查某交易「录制不出任何步骤」——执行机日志全量 `Error code: 402 - Insufficient Balance`（phase_reviewer + 每步 agent 调用），agent 零动作空跑结束后控制面前端仍提示「AI 录制结束」，误导为成功。要求：此类 LLM 失败在前端弹出提示（成功提示改失败），并在后端日志中明确体现。
+- 进行中：控制面识别执行机 `session.agent_stderr` 中的 LLM 网关错误（402 余额不足 / 401 鉴权 / 429 限流 / 5xx），命中时：① `console.error('[agent-llm-error] …')` 写控制面日志；② 往该 session 的 agent-stderr 日志追加一行中文标记；③ WS 广播新事件 `recording:llm_error`（带 trajectoryId/sessionId/kind/message/upstream，按 session+kind 去重）。前端 `ui-auto-recording-agent-vue/vue-project`：订阅该事件，`doStartAi` 结束时把「AI 录制结束」成功提示改为失败提示。
+- 范围（可写集，主检出）：`src/services/agent-llm-error.js`（新）、`src/executor-ws.js`、`src/dashboard/api-docs/groups/websocket.js`、`scripts/characterization/characterize-agent-llm-error.mjs`（新）、`scripts/refactor/verify-all.sh`、本协作日志；**前端另仓** `ui-auto-recording-agent-vue/vue-project`：`src/composables/useWsClient.ts`、`src/composables/useRecordingStudio.ts`
+- 禁入区：他线 worktree 与分支（`D:\dev\JS-gen-engine`/`engine/pipeline-20260918`、`D:\dev\JS-gen-contract`/`fix/phase-contract-20260918`）及其运行中服务；他线 WIP（前端 `src/views/ui-recording/index.vue` 未提交改动、`data/kb/req/product-mgmt/**`、Cursor 证据目录）；运行中控制面/执行机进程；`scripts/prompts/**`；Python 引擎录制链路（`scripts/**`，本轮不动，避免与 engine 线 B1-B3 冲突）
+- 风险声明：`src/executor-ws.js` 与 16:48 ZCode 引擎线 B-3 声明同名（其改动在 `D:\dev\JS-gen-engine` worktree、写明主检出代码不在其可写集），本线只改该文件 `session.agent_stderr` 分支，与该线 attach 校验前置区域不相交；合并冲突时以「双方区域并排保留」处理。
+- 方式：主线程内联实现；先写纯函数 + pin，再接线；验收 eslint + 新 pin + 全量 verify-all 基线比对；前端 `vue-tsc`/lint。**注意：本机到 github.com:443 不通，push 暂不可用**——先本地 commit，网络恢复后补 push（收工条目如实登记）。
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 17:36 · ZCode 引擎线 — 收工：B-6 fill_engine import 遮蔽修复完成（回链 17:27 开工；分支续做未合并，待用户审阅）
+
+- 完成：引擎分支 `engine/pipeline-20260918` 两提交——`9c16e1a6`（B-6 修复本体，3 文件 +129/−5）+ `1b421bad`（合并 origin/uara_V1.2 增量后推送；该增量仅 agent-log 条目无代码改动，符合合并后验收约定）：
+  - **根因修复**：`fill_engine.py` `fill_form_field` 内四处分支级 `from .result_protocol import …`（实测 :220 tssc / :232 tree-select / :334 与 :471 两处 field-disabled 旁路——比报告多一处）把 err_with/recommend_action_for_kind 绑定为函数局部名，field-disabled 路径未经过前两处 import 即调用 err_with → UnboundLocalError（traj #877 实证 agent 试错硬耗 119 步）。修法=模块级 :37 统一导入三名字 + 删四处局部 import，行为零变更。
+  - **同款遮蔽自查（AST 级）**：同函数其余局部 import（resolve_fill_attempt_order ×2、field_values_equivalent ×2、xpath_smart_fill_only_enabled、_replay 组等 11 处）逐一核对——全部 import 先于全部使用（import-first-ok，含 ：147/:421 既有文档化局部对），无同款风险；`_fill_form_field_replay_impl` 无此缺陷。
+- 验收（合并后集成态）：
+  - 新 pin `characterize-fill-err-with-scope.py`（已入 verify-all.sh）**RED 7 败**（symtable 判 err_with/recommend 为 LOCAL=UnboundLocalError 充要判据，且精确定位 4 处局部 import 行号）→ **GREEN 15/15**（symtable 作用域断言 + 模块导入完备性 + 零残留局部 import 扫描 + 四调用点行为 needle）
+  - err_with 结构冒烟：field-disabled 场景返回完整结构化 envelope（`err-field-disabled | 原因 | 现场 | 下一步:select_option`）
+  - 相关既有 pin 回归 6 个全绿：select-option-verify / result-protocol / use-field / fill-dispatch / fill-already-filled / introduce-query-fill
+  - 全量 verify-all 失败集与 B1-B3 基线逐行比对**零变化**（恰为已知 3 红 step-highlight/layer-tree/confirm-notification），唯一差异=新 pin 段（绿）；py_compile 过
+- 遗留移交：①**Python 侧修复生效需控制面重启**——4097 正从合约 worktree 运行（禁入），重启时机须与用户协调（B-1 select_engine.py 同）；②本批与 B1-B3 均在引擎分支未合并 uara_V1.2（用户指示），合并时机待拍板；③Cursor recording-coach（17:35 收工）与 B-6 verify-all.sh 登记行不同区，合并无冲突预期
+- 注：不维护 CHANGELOG；主线程内联实施未派子智能体
+
+## 2026-09-18 17:35 · Cursor — 收工：recording-coach MVP 脚手架（回链 17:30 开工）
+
+- 完成：`tools/recording-coach/` 旁路包落地——`assert-steps` + pin（`characterize-recording-coach-assert` 已登记 verify-all）、`workflow.json` 相迁移、`http`/`tools`（Strategy A start）、`index`（OpenCode + CLI REPL 降级）、`opencode-plugin`、`README`、`WET-CHECKLIST`；sidecar `npm install`（`@opencode-ai/sdk` 0.15.31）；`list_executors` 干跑 OK（LMY connected inUse=0）
+- 验收：`node scripts/characterization/cold/characterize-recording-coach-assert.mjs` → OK；workflow 非法相自检 OK；`node --check` 全过
+- 遗留移交：①全链路 wet（create→prepare→start→assert）未跑——见 `tools/recording-coach/WET-CHECKLIST.md`；②design §13 代码 MVP 全勾待 wet PASS；③本批未 commit/push（等用户明示）；④`verify-all.sh` 与引擎线 B-6 各加一行——push 时并排保留
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 17:27 · ZCode 引擎线 — 开工：B-6 fill_engine 局部 import 遮蔽 UnboundLocalError 修复（用户指示不合入 uara_V1.2、继续修复缺陷）
 
 - 进行中：接用户指令「不要合入 uara_V1.2，继续修复缺陷」，实施 wet6 新报 B-6（P1，`docs/superpowers/reports/2026-09-18-fill-engine-unboundlocal-bug.md`，traj #877 实证）：`fill_engine.py` 的 `fill_form_field` 内四处分支级 `from .result_protocol import …`（实测 :220 tssc / :232 tree-select / :334 与 :471 两处 field-disabled 旁路——比报告多一处）把 err_with/recommend_action_for_kind 绑定成函数局部名，field-disabled 路径未经过前两处 import 即调用 err_with → UnboundLocalError，agent 收不到 err-field-disabled 结构化指引（#877 实测单阶段试错硬耗 119 步）。修法=模块级 :37 统一导入 + 删四处局部 import；新 pin `characterize-fill-err-with-scope.py`（symtable 编译器级作用域断言：fill_form_field 内 err_with/recommend_action_for_kind 必须 GLOBAL 非 LOCAL——该谓词即 UnboundLocalError 充要条件 + 行为 needle 不回归）先 RED 后 GREEN。
