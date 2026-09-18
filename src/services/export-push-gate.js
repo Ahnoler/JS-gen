@@ -2,8 +2,8 @@
  * Partner push eligibility by trajectory.persistent_record_status.
  * Product: only confirmed (completed) may push.
  *
- * 判定源是持久基线 persistent_record_status（录制/detach 过程中 record_status 会被
- * 临时改写为 recording 等，detach 后由后端恢复基线；推送不应被瞬态状态拦截）。
+ * 判定源是持久基线 persistent_record_status（录制过程中 record_status 会进入临时
+ * recording；非显式 stop 的释放会标 failed，不会恢复基线；推送不应被瞬态状态拦截）。
  */
 
 export const PUSHABLE_RECORD_STATUSES = Object.freeze(['completed']);

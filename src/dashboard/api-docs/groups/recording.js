@@ -29,12 +29,12 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/prepare',
         summary: '一键准备（占槽 + 登录 + 推流）',
-        desc: '幂等。① 复用本交易已存活 session；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录为硬编码 go_to_url + login（不启动 Agent），不写入 trajectory_step。默认 prepare 会把 record_status 进入临时 recording；传 preserveRecordStatus=true 时只连接浏览器/推流，保持当前持久状态（failed/recorded/completed）不变，用于查看/回放/人工录制调整。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
+        desc: '幂等。① 复用本交易已存活 session；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录为硬编码 go_to_url + login（不启动 Agent），不写入 trajectory_step。默认 prepare 只连接浏览器/推流，不进入 recording 临时态；显式传 preserveRecordStatus=false 时才会进入 recording（由 record/start / 人工录制开启内部使用）。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
-          { name: 'preserveRecordStatus', type: 'boolean', in: 'body', desc: '为 true 时只连接资源，不进入 recording 临时态，保持当前持久状态', example: 'false' },
+          { name: 'preserveRecordStatus', type: 'boolean', in: 'body', desc: '为 true 时只连接资源，不进入 recording 临时态（默认）；为 false 时进入 recording 临时态', example: 'true' },
         ],
-        reqExample: J({ preserveRecordStatus: false }),
+        reqExample: J({ preserveRecordStatus: true }),
         respExample: J({
           trajectoryId: 42, sessionId: 'uuid', executorNodeUuid: 'node-uuid',
           remoteSessionId: 7, ready: true, attached: true, reused: false, reusedChrome: true,
@@ -51,8 +51,8 @@ export const GROUP_RECORDING = [
           '409 `grace_owned`：宽限期内他交易 idle Chrome 仍归属原 traj — body 含 `code`、`ownerTrajectoryId`、`graceUntil`（见 attach / attach-live）',
           '503：会话/执行机其它不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
-          '状态模型（V3）：draft/recording/failed/recorded/completed，其中 recording 是临时态，持久态为 draft/failed/recorded/completed；非终结性释放（关浏览器/断开/回收/重启）恢复到持久基线，不降级。',
-          'prepare（默认，preserveRecordStatus=false）→ recording（临时态）；prepare(preserveRecordStatus=true) 保持 failed/recorded/completed 不变；record/start(draft|failed|recorded|completed) → recording（临时态）；stop(success) → recorded（待确认）；stop(!success)/失败 → failed（录制异常）；completed 重新录制 stop(success) → recorded（需再次人工确认）；detach/stream-detach/回收/清理 → 恢复到录制前持久状态基线（不降级为未录制）。',
+          '状态模型（V4）：draft/recording/failed/recorded/completed，其中 recording 是临时态，仅表示「正在录制」；持久态为 draft/failed/recorded/completed。prepare 默认不进入 recording；record/start 与人工录制开启时进入 recording；stop(success) → recorded（待确认），stop(!success)/失败 → failed（录制异常）；非用户显式 stop 的资源释放（关浏览器/断开/回收/重启/无观众/空闲回收）一律标为 failed + 录制中断（interrupted）。',
+          'prepare（默认，preserveRecordStatus=true）保持 failed/recorded/completed/draft 不变；prepare(preserveRecordStatus=false) → recording（临时态，内部路径）；record/start(draft|failed|recorded|completed) → recording（临时态）；stop(success) → recorded（待确认）；stop(!success)/失败 → failed（录制异常）；completed 重新录制 stop(success) → recorded（需再次人工确认）；detach/stream-detach/回收/清理/无观众/空闲回收 → failed（interrupted）。',
         ],
       },
       {

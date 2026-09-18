@@ -4,8 +4,10 @@
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as remoteSessionDao from '../../dao/remote-session-dao.js';
 import * as executorNodeDao from '../../dao/executor-node-dao.js';
+import { failReasonText } from '../../models/failure-reason.js';
 import * as execSession from '../../executor-session-client.js';
 import * as slotLease from '../../executor-slot-lease.js';
 import * as remoteSessionService from '../remote-session-service.js';
@@ -398,7 +400,8 @@ export async function attachTrajectoryLive(trajectoryId) {
 }
 
 /**
- * Disconnect stream only (浏览器置 idle，清 FK，录制中(非AI)→draft). Agent session kept.
+ * Disconnect stream only (浏览器置 idle，清 FK). Agent session kept.
+ * 只断画面，录制仍可在后台继续，因此不改变 record_status。
  * Idempotent when already disconnected.
  * @param {number} trajectoryId trajectory DB id
  * @returns {Promise<object>} detach result (trajectoryId, streamDetached, sessionKept, …)
@@ -459,6 +462,31 @@ export async function detachTrajectoryStream(trajectoryId) {
 }
 
 /**
+ * Mark a recording trajectory as failed due to interruption (non-explicit stop release).
+ * Idempotent: safe to call even when the trajectory is no longer recording.
+ * @param {number} tid trajectory DB id
+ * @returns {Promise<string|null>} resulting record status or null on error
+ */
+async function markRecordingInterrupted(tid) {
+  try {
+    const row = await trajectoryDao.getRecordStatusRow(tid);
+    if (!row || row.recordStatus !== 'recording') return row?.recordStatus || null;
+    const next = await trajectoryDao.finishTransientRecording(tid, 'failure');
+    await trajectoryDao.markFailedReason(tid, {
+      failedKind: 'interrupted',
+      failedReason: failReasonText('interrupted'),
+    });
+    await trajectoryPhaseDao.updateRunningStatus(tid, 'failed').catch((err) => {
+      console.warn(`[detach] updateRunningStatus failed for #${tid}:`, err?.message || err);
+    });
+    return next;
+  } catch (err) {
+    console.warn(`[detach] markRecordingInterrupted failed for #${tid}:`, err?.message || err);
+    return null;
+  }
+}
+
+/**
  * Release executor resources: kill Chrome + Python + slot.
  * Only touches THIS trajectory's remote_session / agent session.
  * @param {number} trajectoryId trajectory DB id
@@ -477,9 +505,10 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     }
 
     const sessionId = runtime?.sessionId || null;
+    const wasRecording = traj?.recordStatus === 'recording';
     if (runtime) {
-      // Closing the browser also aborts any in-flight recording, but detach must not
-      // change recordStatus. Mark userStop so the aborted runner keeps the current status.
+      // Closing the browser aborts any in-flight recording. Mark abortRecording so the
+      // runner exits cleanly; we will mark the trajectory failed(interrupted) below.
       runtime.abortRecording = true;
       runtime.userStop = { success: false };
     }
@@ -551,8 +580,12 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     slotLease.releaseByTrajectory(tid);
     deleteTrajectoryRuntime(tid);
 
-    // V3：detach 是非终结性释放，后端已把 record_status 恢复到持久基线。
-    // 这里必须取清理后的最新状态（而不是 detach 前的 recording）返回/广播。
+    // V4：非用户显式 stop 的资源释放会中断录制。若 detach 前处于 recording，
+    // 则标为 failed + 录制中断（interrupted），而不是恢复旧基线。
+    if (wasRecording) {
+      await markRecordingInterrupted(tid);
+    }
+
     const freshTraj = await trajectoryDao.getById(tid).catch(() => null);
     const recordStatus = freshTraj?.recordStatus ?? traj?.recordStatus ?? null;
 
@@ -589,10 +622,11 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
 
 /**
  * Best-effort cleanup after control-plane restart using DB bindings only
- * (runtime map may be empty). 录制中(非AI)→draft；AI活跃→failed when requested.
+ * (runtime map may be empty). recording → failed(interrupted) when demoteLive.
  * @param {number} trajectoryId trajectory DB id
  * @param {object} [root0] options
- * @param {boolean} [root0.demoteLive] whether to demote recording → draft, default true
+ * @param {boolean} [root0.demoteLive] whether to mark recording → failed(interrupted),
+ *   default true
  * @param {string} [root0.reason] cleanup reason, default 'batch_recovery'
  * @returns {Promise<object>} cleanup result (trajectoryId, cleaned, via, …)
  */
@@ -665,8 +699,8 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
   slotLease.releaseByTrajectory(tid);
 
   if (demoteLive && traj.recordStatus === 'recording') {
-    // 清理/重启回收：非终结性恢复，回到录制前持久状态基线，不降级。
-    await trajectoryDao.restorePersistentRecordStatus(tid);
+    // 清理/重启回收：非用户显式 stop 的资源释放，标为 failed + 录制中断。
+    await markRecordingInterrupted(tid);
   } else if (traj.remoteSessionId) {
     await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
   }

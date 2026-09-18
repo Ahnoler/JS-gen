@@ -1,6 +1,35 @@
 # Agent 协作日志
 
 
+## 2026-09-18 21:10 · OpenCode — 收工：实施方案 A，recording 仅表示「正在录制」，非显式 stop 释放标 failed(interrupted)（回链 20:25）
+
+- 完成：JS-gen 11 文件 + 前端另仓 1 文件，实现方案 A。
+  - 后端核心：
+    - `src/models/failure-reason.js` 新增 `interrupted: '录制中断'`。
+    - `src/services/trajectory/trajectory-attach-runner.js`：`prepare` 默认 `preserveRecordStatus=true`，不再进入 `recording`；仅显式 `preserveRecordStatus=false` 才进入；录制中 idempotent prepare 不再重置 running 阶段。
+    - `src/services/trajectory/trajectory-attach-service.js`：新增 `markRecordingInterrupted`；`detachTrajectoryLive` / `cleanupPersistedTrajectoryResources` 录制中释放时标 `failed(interrupted)`；`detachTrajectoryStream` 不改状态。
+    - `src/services/trajectory/trajectory-manual-record.js`：任意非 `recording` 状态开启人工录制都进入 `recording`（含 draft/failed）。
+    - `src/dao/trajectory-dao.js`：`clearMountByRemoteSessionId` / `repairStaleRemoteMounts` 对 recording 轨迹标 `failed(interrupted)` 并重置 running 阶段；`restorePersistentRecordStatus` 保留但标记为兼容性函数。
+    - `src/services/trajectory/trajectory-batch-service.js`：重启恢复不再调用 `restorePersistentRecordStatus`，改由 `cleanupPersistedTrajectoryResources` 标 interrupted。
+    - `src/routes/v2/trajectory-record.js` + `src/dashboard/api-docs/groups/recording.js`：`/record/prepare` 默认 `preserveRecordStatus=true`；API 文档状态模型升级到 V4。
+    - `src/models/constants.js` + `src/services/export-push-gate.js`：注释更新为 V4 语义。
+  - 前端另仓 `ui-auto-recording-agent-vue/vue-project/src/composables/useRecordingStudio.ts`：`autoPrepareStatuses` 移除 `recording`，仅 `draft` 自动 prepare；detach/stream-detached 注释更新为 V4。
+  - 文档：`docs/superpowers/guides/recording-status-flow.md` 状态机/流转表/前端行为更新为 V4。
+  - pin：`scripts/characterization/characterize-record-status.mjs` 断言更新，非终结释放改为 `markRecordingInterrupted`/`finishTransientRecording('failure')` + `interrupted`。
+- 验收证据（本地集成态，`git pull` 因网络失败未合入远端最新，验收基于本地 `uara_V2.0.1` 当前 HEAD）：
+  - `node scripts/characterization/characterize-record-status.mjs` OK
+  - `node scripts/characterization/characterize-trajectory.mjs` OK
+  - `node scripts/characterization/characterize-session-lifecycle.mjs` OK
+  - `node scripts/characterization/characterize-agent-llm-error.mjs` OK
+  - `node scripts/characterization/characterize-batch-import.mjs` OK
+  - `node scripts/characterization/characterize-executor-orphan-reconcile.mjs` OK
+  - `npx eslint src/ executor/ scripts/ --max-warnings=100` = 0 errors / 22 warnings（与基线一致，零新增）
+  - `node --check` 全部改动 JS/迁移通过
+  - 前端 `npx vue-tsc --noEmit` exit 0
+- 影响面/生效：需执行迁移 `20260918180000_trajectory_failed_reason`（已存在）并重启控制面；旧数据无 reason 不兜底悬浮；长流程录制可能被 idle-reaper 误杀，后续可调大 `IDLE_MS`。
+- 遗留：① `git pull` 因 `github.com:443` 网络失败，push 也可能失败，需网络恢复后补推；② 未能在合并远端最新后的集成态上重跑验收，待网络恢复后补做。
+- 注：不维护 CHANGELOG；`config/.db-whitelist-seen` 为他线/历史遗留改动，本次提交排除。
+
 ## 2026-09-18 20:25 · OpenCode — 方案确认：进入实现阶段，分支勘误 uara_V2.0.1，idle-reaper 录制中回收纳入 failed(interrupted)
 
 - 用户确认：① 在 `uara_V2.0.1` 分支继续实施方案 A（原开工声明误写为 `uara_V2.0`）；② 所有非用户显式 `record/stop` 的资源释放，包括 idle-reaper 对录制中交易的 2h 空闲回收，一律标为 `failed` + `interrupted`（录制中断），后续如长流程误杀可再调整超时阈值；③ 前端 `recording` 不再自动 prepare、prepare 不再进入 `recording` 临时态的语义不变。
