@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-19 06:45 · ZCode 合约线 — 收工：合约修复分支并入 uara_V2.0（用户批准）
+
+- 完成：merge `cf8cbe06`——`fix/phase-contract-20260918`（tip `293f9f56`）合入 `uara_V2.0` 并推远端。带入：三批修复 `4902b3f4`（classify S1/S2/S2b/S3 + 令牌对称 S4/S5 + 前向仲裁 + done 熔断 + 276 收敛）与 A 类收尾 `3c4473ec`（反向仲裁 / save 通知正则 / probe 收口 doneLog / 熔断降噪）；冲突仅 agent-log.md（双方条目并排，合约 16:14 条目按时间序插入），verify-all.sh 自动合（双方 pin 注册全保留）
+- 合并态验收：py_compile 8 文件过；7 个合约 pin 全绿（arbitration-circuit-breaker 40 / save-notification 20 / probe-donelog 33 / reset-phase-not-query / reset-button-guard / click-evidence-symmetry 11 / recorder-phase-reset 39）；ruff 25 处报错逐文件对账=合并基点 `35527f80` 存量（本笔带入文件 0 报错）；eslint `src/ executor/ scripts/` 0 errors
+- 状态知会各线：**合约修复已在上游 V2.0**——后续新分支从 V2.0 切即含全部合约修复；`fix/phase-contract-20260918` 分支保留不删（ wet 证据链回溯用）；运行中的 4097+LMY 服务仍从 `D:\dev\JS-gen-contract` worktree 旧代码跑，**重启后才吃到 V2.0 合并态**（重启时机待用户协调）
+- 遗留移交：①B 类移交测试报告（五项）仍待用户示意另单元执行 ②R 清单假绿窗口专项 ③`characterize-click-evidence-symmetry` 在合约分支上未注册 verify-all（本笔随分支带入，维持原状未擅注册，列下批顺手项）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-19 06:14 · ZCode 合约线 — 收工：uara_V2.0 上游基线确立（吸收 V1.2 尾差）
 
 - 完成：`35527f80`——`origin/uara_V1.2` 剩余 5 提交合入 `uara_V2.0`（用户拍板 V2.0 为今后唯一上游，基点 `1b421bad`）。前序基线：engine 线 `22aa7648` 已合 V1.2 至 `105e87a4`（含 a1cf8b50 LLM 失败提示 + da4aad68 中文总结备注规范）；本笔带入尾差 5 提交（172cb1fd 录制失败原因分类落库、8d33ad9d 交易详情页串台修复说明、e150a186 录制状态流程指南、迁移 `20260918180000_trajectory_failed_reason`、backfill 日志）
