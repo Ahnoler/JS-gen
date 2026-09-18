@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-18 18:00 · OpenCode — 开工：重构 record_status 语义，让 recording 真正表示「正在录制」
+
+- 进行中：按任务 §6 出第一阶段设计方案（现状梳理/状态机/方案对比/迁移/前端/回归/风险），用户确认后才进入实现；当前禁止修改源码/迁移/pin/api-docs/前端。
+- 范围（可写集，设计阶段）：`docs/superpowers/agent-log.md`、后续设计方案文档（如 `docs/superpowers/specs/2026-09-18-record-status-semantics-design.md`）；实现阶段可写集待方案确认后声明。
+- 禁入区：当前工作区未提交改动（`config/.db-whitelist-seen`、`src/services/trajectory/trajectory-viewer-service.js`）属上一任务遗留，本任务不动；他线 worktree（`D:\dev\JS-gen-engine`、`D:\dev\JS-gen-contract`）及其服务；`scripts/prompts/**`；运行中 4097/执行机进程；`data/kb/req/product-mgmt/**`。
+- 分支：在已存在的 `uara_V2.0` 上工作，不新建/切换分支。
+- 方式：主线程内联完成设计；实现阶段视复杂度决定是否派子智能体。先读代码 + 出方案，等待用户确认。
+
 ## 2026-09-18 17:52 · OpenCode 引擎/体验线 — 收工：AI 录制 LLM 失败前端提示 + 后端日志（回链 17:34 开工）
 
 - 完成：**`a1cf8b50`（JS-gen 代码，5 文件 +300）+ 合并 `416f2569`**；**前端另仓 `ui-auto-recording-agent-vue` `a7e06f5`（vue-project 2 文件 +22/−1）**
