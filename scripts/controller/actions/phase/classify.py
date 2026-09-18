@@ -25,6 +25,7 @@ _FORCE_REFILL_RE = re.compile(
 # Query/filter-only phases — no 保存/提交; agent must click 查询, not click_save.
 _QUERY_TASK_RE = re.compile(r'查询|搜索|查找')
 _RESET_PHASE_RE = re.compile(r'重置|清空|恢复默认')
+_QUERY_ACTION_RE = re.compile(r'点击查询|点击搜索|执行查询|执行搜索|查询按钮|搜索按钮')
 _QUERY_EXCLUDE_RE = re.compile(
     r'新增|创建|编辑|修改|保存|提交|删除|录入|校验|导入'
 )
@@ -189,10 +190,12 @@ def is_query_task(task_text: str) -> bool:
     t = classification_task_text(task_text)
     if not _QUERY_TASK_RE.search(t):
         return False
-    if _RESET_PHASE_RE.search(t):
+    if _RESET_PHASE_RE.search(t) and not _QUERY_ACTION_RE.search(t):
         # 重置/清空类阶段（如「点击重置，清空所有查询条件字段并恢复默认状态」）
         # 恢复默认态、不产生 query_clicked 证据——按查询合同会签出永不满足的
         # done 门禁（2026-09-17 评级重置阶段 done 死循环）。归 other：无需令牌。
+        # 但文本含显式查询动作（点击查询/执行搜索…）的复合阶段不排除：其流程
+        # 真会点查询、令牌可产出，落 other/maintain 反而签出新的永不满足合同。
         return False
     if (
         _QUERY_CONDITION_RE.search(t)

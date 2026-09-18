@@ -65,6 +65,27 @@ def main() -> int:
         f"genuine query boundary must still demand query_clicked, got {bq['success_when']!r}",
     )
 
+    # Compound query+reset phases keep the query contract: the flow genuinely
+    # clicks 查询 so query_clicked is producible — the reset exclusion must
+    # only fire when no explicit query action is present (otherwise such texts
+    # fall through to a maintain contract whose toast/url tokens a query-reset
+    # flow can never produce — a fresh done-loop of the same family).
+    compound = "填写查询条件并点击查询，然后点击重置按钮恢复默认。"
+    assert_true(
+        is_query_task(compound),
+        "compound fill+query+reset must stay query when an explicit query action is present",
+    )
+    bc = compile_boundary(compound)
+    assert_true(bc["role"] == "query", f"compound boundary role must be query, got {bc['role']!r}")
+    assert_true(
+        bc["success_when"] == ["query_clicked"],
+        f"compound boundary must keep query_clicked, got {bc['success_when']!r}",
+    )
+    assert_true(
+        is_query_task("点击查询执行检索，再点击重置。"),
+        "query-then-reset compound must stay query",
+    )
+
     print("characterize-reset-phase-not-query: all passed")
     return 0
 
