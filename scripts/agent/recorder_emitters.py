@@ -703,6 +703,7 @@ def _guard_done_reject_missing_token(agent, business_data_store, contract, done_
     if needs_token and done_success and not has_contract_success(business_data_store):
         if not (introduce_ok and contract and is_introduce_phase(contract)):
             missing_hint = ''
+            missing: list[str] = []
             try:
                 from scripts.controller.actions._phase_boundary import (
                     get_phase_boundary,
@@ -718,6 +719,28 @@ def _guard_done_reject_missing_token(agent, business_data_store, contract, done_
                 )
             except Exception:
                 missing_hint = ''
+            # done 熔断（2026-09-18 冲突普查）：同一 missing 集连续拒绝达 3 次 →
+            # 判定合同可能不可满足，熔断放行本次 done——宁 bounded 放松不 unbounded
+            # 死锁。事故背景：2026-09-17 评级重置阶段 LLM 判对 mode=other 但规则
+            # 误判 query 合同，门禁听规则 → done 死循环 6 次 + 预算 +42。放行只
+            # 跳过本守卫，门禁链后续守卫（zero-business-actions/overlay/errors/
+            # legacy_claim）照常执行；熔断时不再改写 history（跳过下方循环）。
+            if missing and business_data_store is not None:
+                _key = tuple(sorted(missing))
+                _streak = business_data_store.get('_done_token_reject_streak')
+                if not (isinstance(_streak, dict) and _streak.get('key') == _key):
+                    _streak = {'key': _key, 'count': 0}
+                if int(_streak.get('count') or 0) >= 3:
+                    business_data_store['_phase_contract_suspect'] = True
+                    sys.stderr.write(
+                        f"[recorder] ✂ contract suspect — missing-token gate bypassed "
+                        f"after {_streak.get('count')} identical rejections "
+                        f"(missing={list(_key)}) — possible unsatisfiable contract\n"
+                    )
+                    sys.stderr.flush()
+                    return False
+                _streak['count'] = int(_streak.get('count') or 0) + 1
+                business_data_store['_done_token_reject_streak'] = _streak
             submit = (contract or {}).get('submit') or {}
             recovery = recovery_prescription_message(
                 contract,

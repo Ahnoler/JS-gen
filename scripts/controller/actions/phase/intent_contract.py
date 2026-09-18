@@ -7,6 +7,7 @@ and refill mapping tables. Lazy-imports _phase_boundary only.
 from __future__ import annotations
 
 import re
+import sys
 from typing import Any, Literal
 
 from scripts.feature_flags import phase_intent_contract_enabled
@@ -351,6 +352,25 @@ def apply_phase_contract(
                     boundary['success_when'] = ['nav_next_clicked', 'url_change', 'page_opened']
                 else:
                     boundary['success_when'] = ['url_change', 'page_opened']
+    elif boundary_override is not None and mode == 'other':
+        # 仲裁盲区补全（2026-09-18 冲突普查）：上面的仲裁分支只覆盖 LLM 与规则同为
+        # navigate/query 家族的不一致；mode='other' 是盲区——规则签出 query/navigate
+        # 严格合同时 LLM 的 other 判定被无视，done 门禁听规则 → 2026-09-17 评级
+        # 重置阶段 done 死循环 6 次 + 预算 +42（LLM 判对 mode=other/kinds=[]，
+        # 规则误判 query 合同）。信 LLM 降级为 other/no-token；只做这个降级方向，
+        # 规则本就是 other/maintain/introduce 时不动（maintain 升级由
+        # promote_contract_for_save_cues 在上游负责）。
+        if boundary.get('role') in ('query', 'navigate') and (boundary.get('success_when') or []):
+            sys.stderr.write(
+                "[contract] arbitrated: llm=other rules="
+                f"{boundary.get('role')}({boundary.get('success_when')})"
+                " → downgrade to other/no-token\n"
+            )
+            sys.stderr.flush()
+            boundary['role'] = 'other'
+            boundary['success_when'] = []
+            boundary['goals'] = []
+            boundary['source'] = 'llm+arbitrated'
     business_data_store['_phase_boundary'] = boundary
     business_data_store['_phase_boundary_flag_locked'] = True
     business_data_store['_phase_intent'] = c

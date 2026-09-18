@@ -175,6 +175,25 @@ class ClickEngine:
                     # TODO(stc-query-anchor): anchor 查询 button container on success — §7.1
                     from scripts.controller.actions.search_then_click_guard import mark_query_clicked
                     mark_query_clicked(self.business_data_store)
+            # G3: record query/nav completion evidence (query_clicked /
+            # nav_next_clicked) when phase boundary is active — symmetry with
+            # the click_element_by_index success path (S5, 2026-09-18).
+            if self.business_data_store is not None:
+                try:
+                    from scripts.controller.actions._phase_boundary import (
+                        maybe_record_click_completion_evidence,
+                    )
+                    kinds = maybe_record_click_completion_evidence(
+                        self.business_data_store,
+                        btn_label=bt,
+                    )
+                    if kinds:
+                        sys.stderr.write(f'[click-button] G3 evidence recorded: {kinds}\n')
+                        sys.stderr.flush()
+                except Exception:
+                    sys.stderr.write("[click-button] G3 completion evidence recording failed" + '\n')
+                    sys.stderr.flush()
+                    pass
             return _ok(result)
         if str(result).startswith('err-icon-label-ambiguous:'):
             # Generalized fallback found same-label buttons but could not pick
