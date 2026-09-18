@@ -331,18 +331,40 @@ def apply_phase_contract(
         # says "input value" but is part of a filter flow). Trust the LLM mode for
         # evidence tokens to keep success_when aligned with actual phase semantics.
         if boundary.get('role') != expected_role:
-            boundary['role'] = expected_role
-            if mode == 'query':
-                boundary['success_when'] = ['query_clicked']
-                boundary['goals'] = ['query_filter']
-            else:  # navigate
-                goals = boundary.get('goals') or []
-                if 'click_next' in goals:
-                    boundary['success_when'] = ['nav_next_clicked', 'url_change', 'page_opened']
-                    boundary['goals'] = ['set_conditions', 'click_next']
-                else:
-                    boundary['success_when'] = ['url_change', 'page_opened']
-                    boundary['goals'] = ['open_page']
+            # 反向仲裁（2026-09-18 真机湿测实证 traj #861/#858）：规则四分类矩阵判
+            # role='other'（重置/纯填写/开页导航族——success 令牌在该阶段流程产不出）
+            # 而 LLM 升级签 mode=query 时，此前无条件信 LLM → 门禁索要
+            # query_clicked → Premature done 连拒（#861 纯重置阶段 2 连拒后步数
+            # 耗尽 probe 收口；#858 纯填写阶段各 1 拒，agent 被迫补点【查询】凑
+            # 证据）。与前向 llm=other 降级（下方 mode=='other' 分支）对称：冲突
+            # 方向统一 no-token 降级。口语化查询词面鸿沟的假绿窗口已登记冲突普查
+            # R 清单，熔断仍兜底。规则
+            # role='maintain'/'create'/'introduce_pick' 或 query/navigate 家族内部
+            # 不一致时保持信 LLM（不扩范围）。
+            if boundary.get('role') == 'other' and not (boundary.get('success_when') or []):
+                sys.stderr.write(
+                    "[contract] arbitrated: "
+                    f"llm={mode}({(c.get('success') or {}).get('kinds')}) "
+                    f"rules={boundary.get('role')} → downgrade to other/no-token\n"
+                )
+                sys.stderr.flush()
+                boundary['role'] = 'other'
+                boundary['success_when'] = []
+                boundary['goals'] = []
+                boundary['source'] = 'rules+arbitrated'
+            else:
+                boundary['role'] = expected_role
+                if mode == 'query':
+                    boundary['success_when'] = ['query_clicked']
+                    boundary['goals'] = ['query_filter']
+                else:  # navigate
+                    goals = boundary.get('goals') or []
+                    if 'click_next' in goals:
+                        boundary['success_when'] = ['nav_next_clicked', 'url_change', 'page_opened']
+                        boundary['goals'] = ['set_conditions', 'click_next']
+                    else:
+                        boundary['success_when'] = ['url_change', 'page_opened']
+                        boundary['goals'] = ['open_page']
         else:
             if mode == 'query' and not (boundary.get('success_when') or []):
                 boundary['success_when'] = ['query_clicked']

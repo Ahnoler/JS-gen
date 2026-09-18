@@ -19,6 +19,14 @@
   D 276 兜底收敛（boundary_to_legacy_intent）：空 success_when 显式传播为空
     kinds，不再凭空抬升为 ['query_clicked'] / ['url_change','page_opened']
     （空合同默认值职责已由 apply_phase_contract 承担）。
+  E 反向仲裁（2026-09-18 真机湿测实证）：规则四分类矩阵判 role='other'
+    （重置/纯填写/开页导航族——success 令牌在该阶段流程产不出）而 LLM 升级签
+    mode=query 时，旧逻辑无条件信 LLM（"Trust the LLM mode"）→ 门禁要求
+    query_clicked → Premature done 连拒（traj #861 重置阶段 2 连拒后步数耗尽
+    probe 收口；traj #858 纯填写阶段各 1 拒，agent 被迫补点【查询】凑证据）。
+    与批A 前向 llm=other 降级对称：冲突方向统一 no-token 降级
+    （source='rules+arbitrated'）；规则 role='maintain'/'create'/
+    'introduce_pick' 或 query/navigate 家族内部不一致时仍信 LLM（不扩范围）。
 
 无浏览器、无 LLM：仲裁/编译走纯函数，熔断直调
 ``_guard_done_reject_missing_token``（该子守卫只读 agent.state 与 store）。
@@ -59,6 +67,15 @@ INCIDENT_TEXT = "点击【重置】按钮。预期结果：清空所有查询条
 LLM_OTHER_CONTRACT = {"mode": "other", "refill": "none", "source": "llm", "success": {"kinds": []}}
 # 批A classify 修复前，规则编译器对该文本的误判形状。
 LEGACY_RULES_QUERY = {"role": "query", "success_when": ["query_clicked"], "goals": ["query_filter"]}
+# 批E 反向仲裁实证（traj #861/#858）：重置/纯填写族 LLM 误签 mode=query，
+# 而 query_clicked 令牌在该阶段流程产不出。
+LLM_QUERY_CONTRACT = {
+    "mode": "query",
+    "refill": "none",
+    "source": "llm",
+    "submit": {"required": False},
+    "success": {"kinds": ["query_clicked"]},
+}
 
 results: list[tuple[str, bool, str]] = []
 
@@ -254,12 +271,111 @@ def test_d_empty_success_when_passthrough() -> None:
     record("空 success_when → phase_done_ok 通过", ok_d is True and missing_d == [], f"ok={ok_d} missing={missing_d}")
 
 
+# ── E：反向仲裁（rules=other/no-token + llm=query → 降级 other/no-token） ────
+
+def test_e_reverse_arbitration() -> None:
+    print("E 反向仲裁：rules=other/no-token + llm=query → 降级 other/no-token（与批A对称）")
+    rules_e = compile_boundary(INCIDENT_TEXT)
+    record(
+        "重置阶段文本规则编译 other/no-token（四分类矩阵前提）",
+        rules_e.get("role") == "other" and list(rules_e.get("success_when") or []) == [],
+        f"compile_boundary: role={rules_e.get('role')} sw={rules_e.get('success_when')}",
+    )
+    store_e: dict = {}
+    buf_e = io.StringIO()
+    with contextlib.redirect_stderr(buf_e):
+        apply_phase_contract(store_e, dict(LLM_QUERY_CONTRACT), boundary_override=dict(rules_e))
+    err_e = buf_e.getvalue()
+    be = store_e.get("_phase_boundary") or {}
+    record("boundary role 降级为 other（不信 LLM）", be.get("role") == "other", f"role={be.get('role')!r}")
+    record("success_when 清空（门禁不再索要 query_clicked）", list(be.get("success_when") or []) == [],
+           f"sw={be.get('success_when')!r}")
+    record("goals 清空", list(be.get("goals") or []) == [], f"goals={be.get('goals')!r}")
+    record("source 登记为 rules+arbitrated", be.get("source") == "rules+arbitrated", f"source={be.get('source')!r}")
+    record("stderr 含 arbitrated: llm=query", "arbitrated: llm=query" in err_e,
+           err_e.strip().splitlines()[-1][:80] if err_e.strip() else "(无 stderr)")
+    # 事故终态对称：仲裁后 done 门禁不介入
+    ok_e, missing_e = phase_done_ok(store_e)
+    record("仲裁后 phase_done_ok 直接通过", ok_e is True and missing_e == [], f"ok={ok_e} missing={missing_e}")
+
+    # 非冲突回归钉死（防范围蔓延）：
+    # (a) rules='query' + llm='query' 同向一致 → query_clicked 合同原样保留。
+    store_e2: dict = {}
+    apply_phase_contract(store_e2, dict(LLM_QUERY_CONTRACT), boundary_override=dict(LEGACY_RULES_QUERY))
+    be2 = store_e2.get("_phase_boundary") or {}
+    record(
+        "同向 rules=query + llm=query → 仍 query_clicked",
+        be2.get("role") == "query" and list(be2.get("success_when") or []) == ["query_clicked"]
+        and be2.get("source") == "llm",
+        f"role={be2.get('role')} sw={be2.get('success_when')} source={be2.get('source')}",
+    )
+    # (b) rules='maintain' + llm='query' → 仍信 LLM（只降 rules=other，不扩范围）。
+    store_e3: dict = {}
+    apply_phase_contract(
+        store_e3, dict(LLM_QUERY_CONTRACT),
+        boundary_override={
+            "role": "maintain", "success_when": ["toast_ok", "url_change"],
+            "goals": ["fill_form", "save_form"],
+        },
+    )
+    be3 = store_e3.get("_phase_boundary") or {}
+    record(
+        "rules=maintain + llm=query → 仍信 LLM（query_clicked）",
+        be3.get("role") == "query" and list(be3.get("success_when") or []) == ["query_clicked"]
+        and be3.get("source") == "llm",
+        f"role={be3.get('role')} sw={be3.get('success_when')} source={be3.get('source')}",
+    )
+
+
+# ── F：熔断拒绝降噪（2026-09-18 wet5 traj #866-868） ─────────────────────────
+
+def test_f_reject_noise_reduction() -> None:
+    print("F 降噪：同一 missing 集重复拒绝只打短行（全量细节仅首次），换集重置")
+    store_f, contract_f = _query_store()
+    agent_f = _AgentShim()
+    err_full = []
+    # 3 次拒绝：第 1 次全量行（含 mode=/submit.required=/missing=），2、3 次短行
+    for _ in range(3):
+        _, err = _call_guard(agent_f, store_f, contract_f)
+        err_full.append(err)
+    record(
+        "第 1 次拒绝为全量行（含 mode= 与 missing=）",
+        "mode=" in err_full[0] and "missing=" in err_full[0] and "repeat" not in err_full[0],
+        err_full[0].strip().splitlines()[-1][:80] if err_full[0].strip() else "(无 stderr)",
+    )
+    record(
+        "第 2 次拒绝为短行（repeat x2，无全量细节）",
+        "repeat x2" in err_full[1] and "missing=" not in err_full[1],
+        err_full[1].strip().splitlines()[-1][:80] if err_full[1].strip() else "(无 stderr)",
+    )
+    record(
+        "第 3 次拒绝为短行（repeat x3）",
+        "repeat x3" in err_full[2],
+        err_full[2].strip().splitlines()[-1][:80] if err_full[2].strip() else "(无 stderr)",
+    )
+    record(
+        "3 行中 Premature done 各 1 行（未因降噪丢行）",
+        sum(1 for e in err_full if "Premature done" in e) == 3,
+        f"lines={sum(1 for e in err_full if 'Premature done' in e)}",
+    )
+    # 换 missing 集 → 新序列，恢复全量行
+    store_f["_phase_boundary"]["success_when"] = ["url_change", "page_opened"]
+    _, err_new = _call_guard(agent_f, store_f, contract_f)
+    record(
+        "换 missing 集后恢复全量行（新序列）",
+        "missing=" in err_new and "repeat" not in err_new,
+        err_new.strip().splitlines()[-1][:80] if err_new.strip() else "(无 stderr)",
+    )
+
+
 def main() -> int:
     tests = [
         test_a_arbitration_downgrade,
         test_b_incident_end_to_end,
         test_c_done_reject_circuit_breaker,
         test_d_empty_success_when_passthrough,
+        test_e_reverse_arbitration,
+        test_f_reject_noise_reduction,
     ]
     for t in tests:
         try:
