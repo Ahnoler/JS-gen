@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-18 12:00 · OpenCode — 开工：约束录制期「重置」按钮点击行为
+
+- 进行中：用户反馈录制查询/筛选流程时，agent 偶发在填完筛选字段后点击「重置」按钮再点「查询」，导致查询条件被清空、结果为空、流程卡住。目标：在 `click_button`/`click_element_by_index` 入口对「重置/清空/恢复默认」类按钮加阶段语义 guard，仅当当前阶段描述明确要求重置/清空/恢复默认时才允许点击；同时同步 prompt 与 characterization pin 钉死边界，避免误伤正常重置流程或查询流程。
+- 范围（可写集）：`scripts/controller/actions/click_action_engine.py`、prompts `scripts/prompts/agent-tools-table.md` / `scripts/prompts/agent-core.md`、新 pin `scripts/characterization/characterize-reset-button-guard.py`、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：`scripts/controller/actions/phase/classify.py` / `boundary_contract.py`（重置阶段分类已由 09-18 09:05/09:18 修复，本轮不动合约逻辑）、他线 WIP（data/kb/req/product-mgmt/**、Cursor STC 证据目录）、运行中录制会话、SPA 仓
+- 方式：主线程内联实现 + 新 pin 证伪；跑相关 phase/reset/click 门禁 + 全量 verify-all 基线比对后收工
+
 ## 2026-09-18 11:35 · ZCode 合约线 — 收工：worktree 分支真机湿测 DONE（traj 858，回链 11:00 开工）
 
 - 完成：traj **#858**（合约湿测-查询重置门闩-20260918-1100，fid 9000000011/acct 2，LMY slot0）一轮录制通过，5 阶段 8 步全落库（P5=click「查询」+click「重置」，重置步 paramsJson text=重置/ok-clicked-44，doneLog 含 check_field_value currentValue="" 真实核验）。**合约修复生效实证**：#831 事故门闩原文（「点击【重置】按钮，清空所有查询条件字段并恢复默认状态」）所在阶段 done **首次声明即接受**（phase outcome saved phase=5 success=True），Premature done 0 次——对照事故单 6 连拒+预算+42；全程仅 P2/P3/P4 各 1 次 query_clicked 证据拒绝、1 拒即补证据放行；仲裁降级与 `✂ contract suspect` 熔断均 0 触发（规则分类已正确，未走兜底路径）。报告+全量证据：`D:\dev\JS-gen-contract\tmp\contract-wet-20260918\through-report.md`
