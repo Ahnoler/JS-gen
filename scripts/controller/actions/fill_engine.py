@@ -34,7 +34,7 @@ from .form_engine_base import (
     _ReplayPageAdapter,
     _replay_engine_store,
 )
-from .result_protocol import err_with, affordances
+from .result_protocol import err_with, affordances, recommend_action_for_kind
 from .replay_timing import WAIT_300_MS
 
 # 置 False 可一键回退为守卫前的盲填行为。
@@ -217,7 +217,6 @@ class FillEngine(_FormActionEngineBase):
             except Exception:
                 pass
         if kind == 'tssc-multi-select':
-            from .result_protocol import err_with
             nxt = (
                 f'select_option(label_text="{resolved.label or label_text}", '
                 f'option_text="first" 或表行中文名原文)'
@@ -229,7 +228,6 @@ class FillEngine(_FormActionEngineBase):
                 next_action=nxt,
             )
         if kind == 'tree-select':
-            from .result_protocol import err_with, recommend_action_for_kind
             nxt = recommend_action_for_kind(kind).replace(
                 '<此字段label>', resolved.label or label_text,
             )
@@ -331,7 +329,6 @@ class FillEngine(_FormActionEngineBase):
                     obs.append("options=" + ",".join(kind_info['options'][:6]))
                 if kind_info.get('buttons'):
                     obs.append("adjacent=" + ",".join(b['text'] for b in kind_info['buttons'][:3]))
-                from .result_protocol import recommend_action_for_kind
                 nxt = recommend_action_for_kind(kind)
                 return err_with(
                     "err-field-disabled",
@@ -468,7 +465,6 @@ class FillEngine(_FormActionEngineBase):
                 obs.append("options=" + ",".join(kind_info['options'][:6]))
             if kind_info.get('buttons'):
                 obs.append("adjacent=" + ",".join(b['text'] for b in kind_info['buttons'][:3]))
-            from .result_protocol import recommend_action_for_kind
             nxt = recommend_action_for_kind(kind)
             return err_with(
                 "err-field-disabled",

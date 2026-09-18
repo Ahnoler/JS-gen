@@ -156,6 +156,7 @@ run "characterize-manual-radio-fill" "$PY" scripts/characterization/cold/charact
 run "characterize-date-range-recording" "$PY" scripts/characterization/cold/characterize-date-range-recording.py
 run "characterize-ai-phase-element-guard" "$PY" scripts/characterization/cold/characterize-ai-phase-element-guard.py
 run "characterize-fill-dispatch" "$PY" scripts/characterization/cold/characterize-fill-dispatch.py
+run "characterize-fill-err-with-scope" "$PY" scripts/characterization/characterize-fill-err-with-scope.py
 run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/characterize-search-then-click-guard.py
 run "characterize-search-then-click-prompts" "$PY" scripts/characterization/cold/characterize-search-then-click-prompts.py
 run "characterize-fill-replay-engine" "$PY" scripts/characterization/cold/characterize-fill-replay-engine.py
