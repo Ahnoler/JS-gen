@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-18 11:35 · ZCode 合约线 — 收工：worktree 分支真机湿测 DONE（traj 858，回链 11:00 开工）
+
+- 完成：traj **#858**（合约湿测-查询重置门闩-20260918-1100，fid 9000000011/acct 2，LMY slot0）一轮录制通过，5 阶段 8 步全落库（P5=click「查询」+click「重置」，重置步 paramsJson text=重置/ok-clicked-44，doneLog 含 check_field_value currentValue="" 真实核验）。**合约修复生效实证**：#831 事故门闩原文（「点击【重置】按钮，清空所有查询条件字段并恢复默认状态」）所在阶段 done **首次声明即接受**（phase outcome saved phase=5 success=True），Premature done 0 次——对照事故单 6 连拒+预算+42；全程仅 P2/P3/P4 各 1 次 query_clicked 证据拒绝、1 拒即补证据放行；仲裁降级与 `✂ contract suspect` 熔断均 0 触发（规则分类已正确，未走兜底路径）。报告+全量证据：`D:\dev\JS-gen-contract\tmp\contract-wet-20260918\through-report.md`
+- 服务状态：控制面 4097 + 执行机 LMY 继续从 worktree 运行（`fix/phase-contract-20260918` @ 4902b3f4），**保持观察稳定运行；不合并 uara_V1.2（用户指示，稳定后再定）**；主检出未重启未改代码
+- 遗留移交：①query_clicked 证据门闩外溢——phase_reviewer 给纯填写/下拉阶段（P2/P3/P4）也签 query_clicked，迫使 agent 补点「查询」凑证据（SUT 未拦；属 phase_boundary 语义粒度，另案收敛候选，与 R 清单同置）②P4 一次查询点击日志成功但未落库（stepNumber 8 空号，疑似 recording coalesce 吞并，不影响判据，列观察项）③13306 隧道已按用户指示关闭（白名单同步窗口替代）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 11:00 · ZCode 合约线 — 开工：worktree 分支真机湿测（合约修复验证，不合并）
 
 - 进行中：控制面 4097 + 执行机 LMY 已**从 worktree `D:\dev\JS-gen-contract` 启动**（分支 `fix/phase-contract-20260918` @ `4902b3f4`，日志 mtime 实证运行目录；executor/.env 已补复制、隧道已开）。湿测目标=重置/查询门闩文本（事故 #831 同族）在新合约下 done 一次放行且落库步骤真实。参考单 #831/#848（fid 9000000011/acct 2）。主检出**不合并、不重启**（保持他线代码状态），主检出仅动 agent-log；一切服务/录制/证据在 worktree 与 tmp/contract-wet-20260918/
