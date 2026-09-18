@@ -63,6 +63,7 @@ run "characterize-scan-editable-summary" "$PY" scripts/characterization/characte
 run "characterize-scan-fullpage-p1" "$PY" scripts/characterization/characterize-scan-fullpage-p1.py
 run "characterize-phase-section-scope" "$PY" scripts/characterization/characterize-phase-section-scope.py
 run "characterize-reset-phase-not-query" "$PY" scripts/characterization/characterize-reset-phase-not-query.py
+run "characterize-reset-button-guard" "$PY" scripts/characterization/characterize-reset-button-guard.py
 run "characterize-capture-element-xpath" "$PY" scripts/characterization/characterize-capture-element-xpath.py
 run "characterize-xpath-primary-ops" "$PY" scripts/characterization/characterize-xpath-primary-ops.py
 run "characterize-xpath-fill-select" "$PY" scripts/characterization/characterize-xpath-fill-select.py
