@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-18 09:05 · ZCode 引擎线 — 开工：重置类阶段被误签 query 合同致 done 死循环（最小修法）
+
+- 进行中：真机日志（对公客户评级三阶段，桌面 log.txt）——阶段 3「点击【重置】按钮，清空所有**查询**条件字段」done 被拒 6 次 + 预算 +42 死循环。根因已实测复现：`classify.py is_query_task` 关键词误伤——「查询条件」里的「查询」命中 `_QUERY_TASK_RE`+`_QUERY_CONDITION_RE` 且无排除 → 编译出 `role='query', success_when=['query_clicked']`，而重置动作永远产不出该令牌（仅点「查询/搜索」按钮记录），reviewer（mode=other, kinds=[]）与规则编译器打架、门禁听编译器。用户拍板最小修法（A）：`is_query_task` 对含 `重置/清空/恢复默认` 语义的文本早返回 False → role 落回 other、success_when=[]，done 正常放行；**接受小放松**（重置类阶段暂无正向证据校验，与其它 other 类阶段同级），`reset_clicked` 专属令牌列后续加固项
+- 范围（可写集）：`scripts/controller/actions/phase/classify.py`、新 pin `scripts/characterization/characterize-reset-phase-not-query.py`、`scripts/refactor/verify-all.sh`（仅主线程注册）、本协作日志；若既有 pin 钉了受影响分类行为，同 commit 修订并注明
+- 禁入区：`boundary_contract.py`/`recorder_emitters.py`/其他 phase 模块（本轮不动）、他线 WIP（`characterize-phase-done-validate.py` 等）、`scripts/prompts/**`、`config/`、SPA
+- 方式：主线程内联，先 RED pin（本案真实文本 + 真查询反例防过度排除）再一行分类修正；回归=classify/boundary 既有 pin 全跑 + ruff F821 + py_compile；全量 verify-all 基线比对（3 红基线）后收工
+
 ## 2026-09-17 20:50 · ZCode 引擎线 — 复审补充：三雷+门禁改动影响面复审结论（回链 19:15 收工）
 
 - 复审范围：`39434171`/`3bcdc2d3`/`94f3b9f7`/`3c599e5a`。结论：**无回滚项**——四处改动均为复活休眠路径、恢复设计内行为，且有既有机制兜底：①`sync_tasks_from_errors` 属 META 步（`meta-step-actions.js:16`）不进业务步计数，heal 流程明令禁用（`heal-instruction.js:36`），滚动副作用仅在有字段被修复重试时触发；②`_TRAJECTORY_URL` 修复写的 `scripts.controller` 槽位本有 `agent_utils.py:130` 活写入方，读取方仅本地辅助快照文件（产品真相在 MySQL），无 src 消费者；③组图 upsert 按 phase×stateGroup 唯一（api-docs 契约）不产生重复行，`groupShotId` 消费方仅 query-service 透出可选字段，采集函数与 ensurePhaseGroup 共享、有生产运行背书
