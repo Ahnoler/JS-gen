@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-18 17:34 · OpenCode 引擎/体验线 — 开工：AI 录制 LLM 失败（余额不足等）前端提示 + 后端日志
+
+- 背景：用户排查某交易「录制不出任何步骤」——执行机日志全量 `Error code: 402 - Insufficient Balance`（phase_reviewer + 每步 agent 调用），agent 零动作空跑结束后控制面前端仍提示「AI 录制结束」，误导为成功。要求：此类 LLM 失败在前端弹出提示（成功提示改失败），并在后端日志中明确体现。
+- 进行中：控制面识别执行机 `session.agent_stderr` 中的 LLM 网关错误（402 余额不足 / 401 鉴权 / 429 限流 / 5xx），命中时：① `console.error('[agent-llm-error] …')` 写控制面日志；② 往该 session 的 agent-stderr 日志追加一行中文标记；③ WS 广播新事件 `recording:llm_error`（带 trajectoryId/sessionId/kind/message/upstream，按 session+kind 去重）。前端 `ui-auto-recording-agent-vue/vue-project`：订阅该事件，`doStartAi` 结束时把「AI 录制结束」成功提示改为失败提示。
+- 范围（可写集，主检出）：`src/services/agent-llm-error.js`（新）、`src/executor-ws.js`、`src/dashboard/api-docs/groups/websocket.js`、`scripts/characterization/characterize-agent-llm-error.mjs`（新）、`scripts/refactor/verify-all.sh`、本协作日志；**前端另仓** `ui-auto-recording-agent-vue/vue-project`：`src/composables/useWsClient.ts`、`src/composables/useRecordingStudio.ts`
+- 禁入区：他线 worktree 与分支（`D:\dev\JS-gen-engine`/`engine/pipeline-20260918`、`D:\dev\JS-gen-contract`/`fix/phase-contract-20260918`）及其运行中服务；他线 WIP（前端 `src/views/ui-recording/index.vue` 未提交改动、`data/kb/req/product-mgmt/**`、Cursor 证据目录）；运行中控制面/执行机进程；`scripts/prompts/**`；Python 引擎录制链路（`scripts/**`，本轮不动，避免与 engine 线 B1-B3 冲突）
+- 风险声明：`src/executor-ws.js` 与 16:48 ZCode 引擎线 B-3 声明同名（其改动在 `D:\dev\JS-gen-engine` worktree、写明主检出代码不在其可写集），本线只改该文件 `session.agent_stderr` 分支，与该线 attach 校验前置区域不相交；合并冲突时以「双方区域并排保留」处理。
+- 方式：主线程内联实现；先写纯函数 + pin，再接线；验收 eslint + 新 pin + 全量 verify-all 基线比对；前端 `vue-tsc`/lint。**注意：本机到 github.com:443 不通，push 暂不可用**——先本地 commit，网络恢复后补 push（收工条目如实登记）。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 16:48 · ZCode 引擎线 — 开工（续接 16:45 移交）：B1-B3 实施批（用户指示「接手完成任务后待审阅」，视为 §六 四决策点按 spec 推荐方案放行）
 
 - 进行中：接手引擎线移交单元，按 spec `specs/2026-09-18-engine-pipeline-b123-fix-design.md` §五 剧本实施：**A（B-1）** `select_engine.py` tssc 落穿+冲突文案 + 新 pin `characterize-tssc-route-conflict.py`；**B（B-2）** `trajectory-recording-runner.js`/`trajectory-persist-service.js` 四挂点 `[traj-recon]` 对账日志（零行为变更）+ 新 pin `characterize-traj-recon-logging.mjs`；**C（B-3）** `executor/ws-client.js`（4001 即退 exit 2 / duplicate_node_uuid 识别 / 401 连续 5 次退 exit 3）+ `executor/config.js` 锁移 os.tmpdir() + `src/executor-registry.js`/`src/executor-ws.js` attach 校验前置 + 新 pin `characterize-executor-duplicate-uuid.mjs`。全部先 RED pin 后最小修复。
