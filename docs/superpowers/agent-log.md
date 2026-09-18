@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-18 11:00 · ZCode 合约线 — 开工：worktree 分支真机湿测（合约修复验证，不合并）
+
+- 进行中：控制面 4097 + 执行机 LMY 已**从 worktree `D:\dev\JS-gen-contract` 启动**（分支 `fix/phase-contract-20260918` @ `4902b3f4`，日志 mtime 实证运行目录；executor/.env 已补复制、隧道已开）。湿测目标=重置/查询门闩文本（事故 #831 同族）在新合约下 done 一次放行且落库步骤真实。参考单 #831/#848（fid 9000000011/acct 2）。主检出**不合并、不重启**（保持他线代码状态），主检出仅动 agent-log；一切服务/录制/证据在 worktree 与 tmp/contract-wet-20260918/
+- 范围（可写集）：worktree 代码（若湿测撞缺口最小修复+pin）、新交易录制数据、tmp/contract-wet-20260918/、本日志
+- 禁入区：主检出代码与重启（他线状态保持）；他线在途录制槽（执行机槽位占用前先查 /api/v2/executors）
+- 方式：主线程起服务+派湿测子智能体（照 ui-record-through-line-agent-prompt 管线），验收落库字段不只看 recorded
+
 ## 2026-09-18 11:40 · ZCode 合约线 — 收工：阶段合约冲突普查三批修复（回链 10:20 开工；按用户指示不合并）
 
 - 完成：**`4902b3f4`（分支 `fix/phase-contract-20260918`，worktree `D:\dev\JS-gen-contract` 内，未合并 uara_V1.2）**——三批修复：批A=classify.py S1（条件路径硬排除补 新增/录入/维护）/S2（动作子句轴：查询词仅在预期结果子句不判 query）/S2b（开页型动作排除）/S3（查询排除补 维护/更新/变更）+ 回归修复（全量 verify-all 抓到「查询工具栏填条件」因下拉框取值"新增"误落 form_fill/maintain，按矩阵③落 other 免令牌）；批B=令牌对称（`_NEXT_BTN_RE` 补 上一步/返回上一步；click_button 成功路径接 `maybe_record_click_completion_evidence`）；批C=仲裁盲区补全（intent_contract.py：LLM mode='other' 且规则签出 query/navigate 严格合同→降级 other/无令牌，stderr 留痕 `source='llm+arbitrated'`）+ done 熔断（同 missing 集连拒 ≥3 次→`contract_suspect` 放行、不改写 history、其余守卫不动）+ boundary_to_legacy_intent 空合同不再抬升默认令牌（276 收敛）。共 11 文件 +830/-7，三个子智能体并行实施（文件集不相交），主线程越界审查通过（diff 恰为授权文件）
