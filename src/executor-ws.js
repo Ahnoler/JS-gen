@@ -30,12 +30,25 @@ async function announceAgentLlmError(sessionId, llmError) {
   const sid = shortSid(sessionId);
   console.error(
     `[agent-llm-error] trajectory=${trajectoryId ?? '-'} session=${sessionId} sid=${sid} `
-    + `kind=${llmError.kind} upstream=${llmError.upstream || ''}`,
+    + `reason=${llmError.logReason} kind=${llmError.kind} upstream=${llmError.upstream || ''}`,
   );
+  // 落库失败原因（首次为准）：前端 toast / 列表「录制异常」悬浮用同一类别文案。
+  if (trajectoryId) {
+    try {
+      const { markFailedReason } = await import('./dao/trajectory-dao.js');
+      await markFailedReason(trajectoryId, {
+        failedKind: llmError.kind,
+        failedReason: llmError.reason,
+      });
+    } catch (err) {
+      console.warn('[agent-llm-error] failed_reason persist failed:', err?.message || err);
+    }
+  }
   try {
     const { appendLines } = await import('./services/agent-stderr-log-service.js');
     appendLines(sessionId, [
-      `[系统] AI 录制中断：${llmError.message}`
+      `[系统] AI 录制中断：${llmError.reason}`
+      + (llmError.logReason ? `（${llmError.logReason}）` : '')
       + (llmError.upstream ? `（上游：${llmError.upstream}）` : ''),
     ]);
   } catch (err) {
@@ -46,7 +59,7 @@ async function announceAgentLlmError(sessionId, llmError) {
     sessionId,
     sid,
     kind: llmError.kind,
-    message: llmError.message,
+    reason: llmError.reason,
     upstream: llmError.upstream || '',
     at: new Date().toISOString(),
   });

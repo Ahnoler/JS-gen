@@ -3,10 +3,11 @@
  *
  * 覆盖：
  *   - 识别真机 stderr 行（402 余额不足 / 401 鉴权 / 429 限流 / 5xx / 其他）
+ *   - 类别文案（前端 toast/悬浮统一 `LLM 调用异常`）+ 详细日志文案（仅后端）
  *   - 误报守卫：正常步骤/引导行、无 LLM 锚点的页面文案不识别
  *   - 去重器：同 session+kind 只通知一次
- *   - 接线：executor-ws.js 识别 → ERROR 日志 / stderr 标记 / broadcast recording:llm_error
- *   - api-docs websocket 契约登记
+ *   - 接线：executor-ws.js 识别 → ERROR 日志 / 落库失败原因 / stderr 标记 / broadcast
+ *   - 失败分类表 + api-docs websocket 契约登记
  *
  * Run: node scripts/characterization/characterize-agent-llm-error.mjs
  */
@@ -16,6 +17,11 @@ import {
   classifyAgentLlmErrorLine,
   createAgentLlmErrorDeduper,
 } from '../../src/services/agent-llm-error.js';
+import {
+  failReasonText,
+  isLlmFailKind,
+  TRAJECTORY_FAIL_REASONS,
+} from '../../src/models/failure-reason.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -32,28 +38,32 @@ const STEP_402 =
 function testInsufficientBalance() {
   const hit = detectAgentLlmError([PHASE_REVIEWER_402]);
   assert(hit, '402 line must be detected');
-  assert(hit.kind === 'insufficient_balance', `402 kind expected insufficient_balance, got ${hit?.kind}`);
-  assert(/余额不足/.test(hit.message), 'balance message must mention 余额不足');
+  assert(hit.kind === 'llm_insufficient_balance', `402 kind expected llm_insufficient_balance, got ${hit?.kind}`);
+  assert(hit.reason === 'LLM 调用异常', 'user-facing reason must be the unified category');
+  assert(hit.logReason === 'LLM 账户余额不足', 'backend log reason keeps the specific cause');
   assert(hit.upstream.includes('Insufficient Balance'), 'upstream keeps raw provider text');
+  assert(isLlmFailKind(hit.kind), 'llm kind recognized');
 
   const stepHit = detectAgentLlmError([STEP_402]);
-  assert(stepHit?.kind === 'insufficient_balance', 'per-step 402 line must also be detected');
+  assert(stepHit?.kind === 'llm_insufficient_balance', 'per-step 402 line must also be detected');
 }
 
 function testAuthRateLimitServer() {
   const auth = classifyAgentLlmErrorLine(
     "Error code: 401 - {'error': {'message': 'Authentication Fails, Your api key is invalid'}}",
   );
-  assert(auth?.kind === 'auth', `401 expected auth, got ${auth?.kind}`);
+  assert(auth?.kind === 'llm_auth', `401 expected llm_auth, got ${auth?.kind}`);
+  assert(auth.reason === 'LLM 调用异常', 'auth reason unified');
 
   const rate = classifyAgentLlmErrorLine('Error code: 429 - rate limit exceeded');
-  assert(rate?.kind === 'rate_limit', `429 expected rate_limit, got ${rate?.kind}`);
+  assert(rate?.kind === 'llm_rate_limit', `429 expected llm_rate_limit, got ${rate?.kind}`);
 
   const server = classifyAgentLlmErrorLine('Error code: 500 - internal server error');
-  assert(server?.kind === 'server', `500 expected server, got ${server?.kind}`);
+  assert(server?.kind === 'llm_server', `500 expected llm_server, got ${server?.kind}`);
 
   const other = classifyAgentLlmErrorLine("Error code: 403 - {'error': {'message': 'forbidden'}}");
-  assert(other?.kind === 'unknown', `403 expected unknown, got ${other?.kind}`);
+  assert(other?.kind === 'llm_unknown', `403 expected llm_unknown, got ${other?.kind}`);
+  assert(other.reason === 'LLM 调用异常', 'unknown reason unified');
 }
 
 function testFalsePositiveGuard() {
@@ -64,7 +74,6 @@ function testFalsePositiveGuard() {
   const cue = '[recorder] Injected empty-act cue (streak=1 last_step=False save_ok=False)';
   assert(detectAgentLlmError([cue]) === null, 'recorder cue line must not be classified');
 
-  // 无 LLM 锚点的页面文案（可能出现在工具结果里）不识别
   assert(detectAgentLlmError(['Unauthorized access to resource']) === null,
     'bare Unauthorized without LLM anchor must not be classified');
   assert(detectAgentLlmError(['internal server error while saving']) === null,
@@ -75,10 +84,27 @@ function testFalsePositiveGuard() {
 
 function testDeduper() {
   const shouldNotify = createAgentLlmErrorDeduper({ max: 10 });
-  assert(shouldNotify('s1', 'insufficient_balance') === true, 'first notify passes');
-  assert(shouldNotify('s1', 'insufficient_balance') === false, 'repeat same key suppressed');
-  assert(shouldNotify('s1', 'auth') === true, 'different kind passes');
-  assert(shouldNotify('s2', 'insufficient_balance') === true, 'different session passes');
+  assert(shouldNotify('s1', 'llm_insufficient_balance') === true, 'first notify passes');
+  assert(shouldNotify('s1', 'llm_insufficient_balance') === false, 'repeat same key suppressed');
+  assert(shouldNotify('s1', 'llm_auth') === true, 'different kind passes');
+  assert(shouldNotify('s2', 'llm_insufficient_balance') === true, 'different session passes');
+}
+
+function testFailureTaxonomy() {
+  assert(failReasonText('llm_insufficient_balance') === 'LLM 调用异常', 'llm category');
+  assert(failReasonText('llm_auth') === 'LLM 调用异常', 'llm category unified');
+  assert(failReasonText('phase_failed') === '阶段执行失败', 'phase category');
+  assert(failReasonText('quality_failed') === '录制质量未达标', 'quality category');
+  assert(failReasonText('zero_step') === '未录制到步骤', 'zero_step category');
+  assert(failReasonText('runner_error') === '录制执行异常', 'runner category');
+  assert(failReasonText('user_marked_failed') === '人工标记录制异常', 'user category');
+  assert(failReasonText('batch_failed') === '批量任务失败', 'batch category');
+  assert(failReasonText('nope') === '录制异常', 'unknown category fallback');
+  assert(!isLlmFailKind('phase_failed'), 'non-llm kind not llm');
+  // 前端只需看到类别，不出现具体供应商文案
+  for (const [kind, text] of Object.entries(TRAJECTORY_FAIL_REASONS)) {
+    assert(!/余额|鉴权|限流/.test(text), `category text must not be too specific: ${kind}`);
+  }
 }
 
 function testExecutorWsWiring() {
@@ -90,8 +116,33 @@ function testExecutorWsWiring() {
   assert(/announceAgentLlmError\(payload\.sessionId, llmError\)/.test(src),
     'executor-ws announces classified error');
   assert(/\[agent-llm-error\]/.test(src), 'control-plane ERROR log marker present');
+  assert(/reason=\$\{llmError\.logReason\}/.test(src), 'log line carries detailed logReason');
+  assert(/markFailedReason\(trajectoryId/.test(src), 'persists failed reason on trajectory');
   assert(/broadcast\('recording:llm_error'/.test(src), 'broadcasts recording:llm_error');
-  assert(/appendLines\(sessionId, \[/.test(src), 'appends Chinese marker to session stderr log');
+  assert(/appendLines\(sessionId, \[/.test(src), 'appends category marker to session stderr log');
+}
+
+function testPersistenceWiring() {
+  const runner = readFileSync(
+    new URL('../../src/services/trajectory/trajectory-recording-runner.js', import.meta.url), 'utf8',
+  );
+  assert(/import \{ failReasonText \}/.test(runner), 'runner imports failure taxonomy');
+  assert(/persistFailReason\('zero_step'\)/.test(runner), 'runner records zero_step');
+  assert(/persistFailReason\(qualityFails\.length \? 'quality_failed' : 'phase_failed'\)/.test(runner),
+    'runner records quality_failed / phase_failed');
+  assert(/persistFailReason\('runner_error'\)/.test(runner), 'runner records runner_error');
+
+  const lifecycle = readFileSync(
+    new URL('../../src/services/trajectory/trajectory-record-lifecycle.js', import.meta.url), 'utf8',
+  );
+  assert(/failedKind: 'user_marked_failed'/.test(lifecycle), 'manual stop records user_marked_failed');
+  assert(/failedKind = 'batch_failed'/.test(lifecycle), 'batch stop defaults to batch_failed');
+
+  const dao = readFileSync(new URL('../../src/dao/trajectory-dao.js', import.meta.url), 'utf8');
+  assert(/export async function markFailedReason/.test(dao), 'dao exposes markFailedReason');
+  assert(/export async function clearFailedReason/.test(dao), 'dao exposes clearFailedReason');
+  assert(/whereNull\('failed_kind'\)/.test(dao), 'first cause wins (whereNull guard)');
+  assert(/clearFailedReason\(trajectoryDbId\)/.test(dao), 'new attempt clears previous reason');
 }
 
 function testApiDocsContract() {
@@ -100,8 +151,12 @@ function testApiDocsContract() {
     'utf8',
   );
   assert(/recording:llm_error/.test(src), 'api-docs documents recording:llm_error');
-  assert(/insufficient_balance \| auth \| rate_limit \| server \| unknown/.test(src),
-    'api-docs documents error kinds');
+  assert(/insufficient_balance/.test(src), 'api-docs documents error kinds');
+
+  const initSql = readFileSync(new URL('../../schemas/init.sql', import.meta.url), 'utf8');
+  assert(/`failed_kind`/.test(initSql), 'schema has failed_kind');
+  assert(/`failed_reason`/.test(initSql), 'schema has failed_reason');
+  assert(/`failed_at`/.test(initSql), 'schema has failed_at');
 }
 
 function main() {
@@ -111,7 +166,9 @@ function main() {
     ['401/429/5xx classification', testAuthRateLimitServer],
     ['false-positive guard', testFalsePositiveGuard],
     ['deduper', testDeduper],
+    ['failure taxonomy', testFailureTaxonomy],
     ['executor-ws wiring', testExecutorWsWiring],
+    ['persistence wiring', testPersistenceWiring],
     ['api-docs contract', testApiDocsContract],
   ];
   let failed = 0;

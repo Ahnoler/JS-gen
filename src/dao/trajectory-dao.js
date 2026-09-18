@@ -431,6 +431,12 @@ export async function enterTransientRecording(trajectoryDbId) {
     : (isPersistentRecordStatus(row.persistentRecordStatus) ? row.persistentRecordStatus : 'draft');
 
   await updateMeta(trajectoryDbId, { recordStatus: 'recording' });
+  // 新一次录制开始 → 清掉上一轮的失败原因（列缺失时静默降级）。
+  await clearFailedReason(trajectoryDbId).catch((err) => {
+    console.warn(
+      `[trajectory] failed_reason clear skipped for #${trajectoryDbId}: ${err?.message || err}`,
+    );
+  });
   try {
     await updateMeta(trajectoryDbId, { persistentRecordStatus: base });
   } catch (err) {
@@ -459,7 +465,52 @@ export async function finishTransientRecording(trajectoryDbId, outcome, trx = nu
   // 录制中已人工确认（基线=已确认）：显式成功结束不把已确认降级回待确认
   if (base === 'completed' && outcome === 'success') next = 'completed';
   await writeRecordStatusResilient(trajectoryDbId, next, trx);
+  // 成功收官 → 清掉上一轮失败原因（列缺失时静默降级）。
+  if (outcome === 'success') {
+    await clearFailedReason(trajectoryDbId, trx).catch((err) => {
+      console.warn(
+        `[trajectory] failed_reason clear skipped for #${trajectoryDbId}: ${err?.message || err}`,
+      );
+    });
+  }
   return next;
+}
+
+/**
+ * Record the first failure cause of the current recording attempt.
+ * No-op when a cause is already recorded (first cause wins — e.g. an LLM
+ * gateway failure detected mid-run outranks the later zero-step symptom).
+ * @param {number} trajectoryDbId The trajectory ID to mark
+ * @param {object} [root0] failure cause
+ * @param {string} [root0.failedKind] machine kind code (see models/failure-reason.js)
+ * @param {string} [root0.failedReason] user-facing category text
+ * @param {Date} [root0.failedAt] failure timestamp (default now)
+ * @returns {Promise<number>} number of affected rows (0 when already recorded)
+ */
+export async function markFailedReason(trajectoryDbId, { failedKind, failedReason, failedAt = new Date() } = {}) {
+  return getDB()(TABLE)
+    .where({ id: trajectoryDbId })
+    .whereNull('failed_kind')
+    .update({
+      failed_kind: failedKind ?? null,
+      failed_reason: failedReason ?? null,
+      failed_at: failedAt,
+    });
+}
+
+/**
+ * Clear the recorded failure cause (new attempt / successful finalize).
+ * @param {number} trajectoryDbId The trajectory ID to clear
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<number>} number of affected rows
+ */
+export async function clearFailedReason(trajectoryDbId, trx = null) {
+  const db = trx || getDB();
+  return db(TABLE).where({ id: trajectoryDbId }).update({
+    failed_kind: null,
+    failed_reason: null,
+    failed_at: null,
+  });
 }
 
 /**
