@@ -24,6 +24,7 @@ Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. Th
 - **push 冲突处理**（2026-09-16 起）：push 被拒（non-fast-forward）时先 `git pull`，逐处解决冲突（agent-log 条目冲突=保留双方条目并排，不删他线内容）后合并提交，再重新 push；**禁止 force push、禁止以丢弃他线条目换取合并**。合并引入了他线代码改动时，须按上条**重跑验收**再 push
 - 提交 agent-log 时若顺带携带了其他会话的未提交条目，在 commit message 注明
 - 任务单元的代码改动结束即 commit；agent-log 条目（开工/收工）写完一律 commit + push——未提交/未推送的工作对其他 Agent 不可见
+- **commit message 用中文总结备注**（2026-09-18 起）：提交改动内容时一律写**中文总结式备注**——首行一句话概括"改了什么 + 为什么"（`fix`/`feat`/`docs` 等类型前缀可保留），正文用中文分条写改了什么、为什么、验收证据与影响面；禁止纯英文、`update`/`fix bug` 等无信息 message。变更史以 commit message 为准，备注须足以让他线判断影响范围与是否需重跑验收。
 - **不维护 CHANGELOG.md**（2026-09-04 已移除）：变更史以翔实的 git commit message 为准，不要重建该文件。**例外（2026-09-19 起）**：根目录 `CHANGELOG.md` 为用户指定的对外汇报文档（非技术读者、按月版本），仅按用户要求更新，Agent 不主动改写
 - **收工前现场清点（2026-09-19 起）**：stash 条目逐一看过再处置（只 drop 不裸 pop）；本地分支落后远端即 pull（可快进时安全）；工作区不遗留与本线无关的他线 WIP
 
