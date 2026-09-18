@@ -70,6 +70,8 @@ export class ExecutorWsClient {
     this.disconnectWatchdog = null;
     /** 最近一次 heartbeat ack（或注册成功）时间戳；半开连接检测基准。 */
     this.lastAckAt = 0;
+    /** 连续 401（升级阶段 EXECUTOR_TOKEN 被拒）计数；网络类错误重置连击，连续 5 次退出。 */
+    this.authFailCount = 0;
   }
 
   /**
@@ -106,6 +108,12 @@ export class ExecutorWsClient {
       this.stopHeartbeat();
       const r = reason?.toString?.() || '';
       console.log(`[executor] disconnected code=${code}${r ? ` reason=${r}` : ''}`);
+      // 4001 = 服务端判定本进程为同 uuid 僵尸双进程（另一活进程持有本 uuid）：
+      // 无条件重连会形成永生半开循环 → 置 stopping、清定时器后自杀退出（exit 2），
+      // 由启动锁与人工介入收场；其余 close code 维持既有重连语义。
+      if (code === 4001) {
+        this.exitDuplicateNodeUuid();
+      }
       this.onDisconnected?.();
       // 断线超时看门狗：长时间未恢复 → 调用方杀会话，避免 Python 继续执行
       // 且事件在断线处静默丢弃（录制数据静默丢失的根因）。
@@ -114,6 +122,26 @@ export class ExecutorWsClient {
     });
 
     ws.on('error', (err) => {
+      const msg = String(err?.message || '');
+      // 401 = 升级阶段 token 被拒（确定性配置错误）：连续 5 次退出；
+      // 网络类错误不计数且重置连击（网络问题重连、身份问题退出）。
+      if (msg.includes('Unexpected server response: 401')) {
+        this.authFailCount += 1;
+        console.error(
+          `[executor] ws auth rejected (401) — EXECUTOR_TOKEN misconfigured? (${this.authFailCount}/5)`,
+        );
+        if (this.authFailCount >= 5) {
+          this.stopping = true;
+          this.clearDisconnectWatchdog();
+          this.clearReconnectTimer();
+          console.error(
+            '✖ EXECUTOR_TOKEN rejected 5 times in a row (401) — fix EXECUTOR_TOKEN and restart, exiting',
+          );
+          process.exit(3);
+        }
+        return;
+      }
+      this.authFailCount = 0;
       console.error('[executor] ws error:', err.message);
     });
   }
@@ -148,6 +176,11 @@ export class ExecutorWsClient {
         return;
       case 'executor.error':
         console.error('[executor] server error:', payload?.error || payload);
+        // 结构化拒绝信号与 close 4001 双保险（close 可能未被本端收到）：
+        // 同 uuid 僵尸双进程被服务端拒绝 → 同 c-1 自杀退出路径。
+        if (payload?.code === 'duplicate_node_uuid') {
+          this.exitDuplicateNodeUuid();
+        }
         return;
       default:
         break;
@@ -231,6 +264,20 @@ export class ExecutorWsClient {
       clearTimeout(this.disconnectWatchdog);
       this.disconnectWatchdog = null;
     }
+  }
+
+  /**
+   * Duplicate node uuid fatal exit (close 4001 / executor.error duplicate_node_uuid):
+   * set stopping, clear watchdog and reconnect timers, print a single stderr line,
+   * and terminate the process — reconnecting would loop forever.
+   * @returns {void}
+   */
+  exitDuplicateNodeUuid() {
+    this.stopping = true;
+    this.clearDisconnectWatchdog();
+    this.clearReconnectTimer();
+    console.error('✖ duplicate node uuid — another live executor owns this uuid, exiting');
+    process.exit(2);
   }
 
   /**

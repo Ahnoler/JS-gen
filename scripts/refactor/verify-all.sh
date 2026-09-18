@@ -164,6 +164,7 @@ run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/char
 run "characterize-radio-replay-engine" "$PY" scripts/characterization/cold/characterize-radio-replay-engine.py
 run "characterize-click-replay-engine" "$PY" scripts/characterization/cold/characterize-click-replay-engine.py
 run "characterize-tssc-multi-select" "$PY" scripts/characterization/cold/characterize-tssc-multi-select.py
+run "characterize-tssc-route-conflict" "$PY" scripts/characterization/characterize-tssc-route-conflict.py
 run "characterize-picker-atomic-recording" "$PY" scripts/characterization/cold/characterize-picker-atomic-recording.py
 run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs
@@ -171,6 +172,7 @@ run "characterize-log-extract" node scripts/characterization/characterize-log-ex
 run "characterize-backfill" node scripts/characterization/characterize-backfill.mjs
 run "characterize-refill-contract" "$PY" scripts/characterization/characterize-refill-contract.py
 run "characterize-executor-orphan-reconcile" node scripts/characterization/characterize-executor-orphan-reconcile.mjs
+run "characterize-executor-duplicate-uuid" node scripts/characterization/characterize-executor-duplicate-uuid.mjs
 run "characterize-executor-only-bib" node scripts/characterization/cold/characterize-executor-only-bib.mjs
 run "characterize-remove-local-bib-mount" node scripts/characterization/cold/characterize-remove-local-bib-mount.mjs
 run "characterize-resolve-placeholder-search" node scripts/characterization/cold/characterize-resolve-placeholder-search.mjs
@@ -182,6 +184,7 @@ run "characterize-menu-uml-ecd-nav-guard" node scripts/characterization/characte
 run "characterize-special-element" node scripts/characterization/characterize-special-element.mjs
 run "characterize-replay-batch" node scripts/characterization/characterize-replay-batch.mjs
 run "characterize-record-status" node scripts/characterization/characterize-record-status.mjs
+run "characterize-traj-recon-logging" node scripts/characterization/characterize-traj-recon-logging.mjs
 run "characterize-menu-navigation" node scripts/characterization/characterize-menu-navigation.mjs
 run "characterize-page-bind" node scripts/characterization/characterize-page-bind.mjs
 run "characterize-kb-store" "$PY" scripts/characterization/characterize-kb-store.py

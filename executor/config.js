@@ -108,12 +108,17 @@ function resolveNodeUuidSync() {
   return id;
 }
 
-/** 执行器启动互斥锁文件路径（与 .node-uuid 同目录，内容为持锁进程 pid）。
- * uuid 经环境变量显式指定的多实例场景按 uuid 隔离锁文件，避免与默认实例互斥。 */
-const _uuidFromEnv = process.env.EXECUTOR_NODE_UUID || '';
-export const EXECUTOR_LOCK_FILE = _uuidFromEnv
-  ? path.join(EXECUTOR_DIR, `.node-uuid-${_uuidFromEnv.slice(0, 8)}.lock`)
-  : path.join(EXECUTOR_DIR, '.node-uuid.lock');
+export const EXECUTOR_NODE_UUID = resolveNodeUuidSync();
+
+/**
+ * 执行器启动互斥锁文件路径：置于 os.tmpdir()（跨检出/worktree 全局共享——uuid 相同则
+ * 跨检出互斥），按 node uuid 前 8 位隔离（uuid 不同的多实例共存各用各的锁互不影响）。
+ * 锁文件内容为持锁进程 pid。
+ */
+export const EXECUTOR_LOCK_FILE = path.join(
+  os.tmpdir(),
+  `js-gen-executor-${EXECUTOR_NODE_UUID.slice(0, 8)}.lock`,
+);
 
 /**
  * 判断进程是否存活（process.kill(pid, 0) 探活）。
@@ -164,7 +169,8 @@ function isPidAlive(pid) {
  * 获取执行器启动互斥锁：同一 node-uuid 只允许一个 executor 进程运行。
  * （双进程会以相同 nodeUuid 互相顶替 WS 连接，导致指令路由黑洞与误清租约。）
  *
- * 锁文件为 .node-uuid 同目录的 .node-uuid.lock，内容为持锁进程的 pid：
+ * 锁文件为 os.tmpdir() 下按 node uuid 前 8 位命名的 js-gen-executor-<uuid8>.lock
+ * （跨检出/worktree 共享），内容为持锁进程的 pid：
  * - `fs.openSync(lockPath, 'wx')` 独占创建成功 → 写入当前 pid，返回 true；
  * - 锁已存在（EEXIST）→ 读取旧 pid 探活：进程已死（或锁内容损坏）→
  *   覆盖写自己的 pid 返回 true；进程存活 → 核对身份（pidLooksLikeExecutor）：
@@ -224,7 +230,6 @@ export function releaseExecutorLock() {
 
 export const EXECUTOR_WS_URL = resolveWsUrl();
 export const EXECUTOR_TOKEN = resolve('EXECUTOR_TOKEN', '');
-export const EXECUTOR_NODE_UUID = resolveNodeUuidSync();
 export const EXECUTOR_NAME = resolve('EXECUTOR_NAME', os.hostname());
 export const EXECUTOR_HOST = resolve('EXECUTOR_HOST', os.hostname());
 export const EXECUTOR_CAPACITY = parseInt(resolve('EXECUTOR_CAPACITY', '16'), 10);

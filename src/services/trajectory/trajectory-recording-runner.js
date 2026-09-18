@@ -595,6 +595,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
 
     if (removedIds.length) {
       const dbIds = [];
+      const unmappedAids = [];
       for (const rid of removedIds) {
         const aid = String(rid || '');
         if (!aid) continue;
@@ -602,6 +603,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
           || session?._lastPersistByActionId?.get(aid);
         const dbId = info?.dbId != null ? Number(info.dbId) : null;
         if (Number.isFinite(dbId) && dbId > 0) dbIds.push(dbId);
+        else unmappedAids.push(aid);
         runtime.persistedActionIds.delete(aid);
         runtime._lastPersistByActionId.delete(aid);
         session?.persistedActionIds?.delete(aid);
@@ -610,6 +612,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         session?._pendingStepShots?.delete(aid);
         runtime._pendingStepGroup?.delete(aid);
       }
+      console.log(`[traj-recon] coalesce traj=${tid} removed=${removedIds.length} mapped=${dbIds.length} unmapped=[${unmappedAids.join(',')}]`);
       if (dbIds.length) {
         await removeRecordedStepsByDbIds(tid, dbIds).catch((err) => {
           console.warn('[record] remove coalesced steps failed:', err?.message || err);
@@ -927,6 +930,29 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         stepCount: counts.stepCount,
         phaseCount: counts.phaseCount,
       });
+      // traj-recon（B-2 口径对账，只读、零行为变更）：rawRows−bizRows=meta 行数 → 判 A1；
+      // gaps（step_number 断号）非空 → 判 B1。gaps 复用一次 listByTrajectory 现有 dao 查询。
+      try {
+        const reconRows = await trajectoryStepDao.listByTrajectory(tid);
+        const reconMaxStep = reconRows.reduce((mx, r) => Math.max(mx, Number(r.stepNumber) || 0), 0);
+        const gaps = [];
+        let prevStep = 0;
+        for (const r of reconRows) {
+          const sn = Number(r.stepNumber) || 0;
+          while (sn > prevStep + 1) {
+            gaps.push(prevStep + 1);
+            prevStep += 1;
+          }
+          prevStep = Math.max(prevStep, sn);
+        }
+        let copyBiz = 0;
+        try {
+          copyBiz = countBusinessSteps(tid);
+        } catch {}
+        console.log(`[traj-recon] phase traj=${tid} rawRows=${reconRows.length} bizRows=${counts.stepCount} copyBiz=${copyBiz} maxStep=${reconMaxStep} gaps=[${gaps.join(',')}]`);
+      } catch (err) {
+        console.warn(`[traj-recon] phase recon failed traj=${tid}: ${err?.message || err}`);
+      }
     } catch (err) {
       console.warn('[record] phase counts refresh failed:', err?.message || err);
     }
@@ -1133,6 +1159,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         copySteps = countBusinessSteps(tid);
       } catch {}
       let dbSteps = 0;
+      let reconRawRows = 0;
+      let reconMaxStep = 0;
       try {
         const { refreshTrajectoryCounts } = await import('./trajectory-step-service.js');
         // 注意返回键是 stepCount（业务步，已排除 save_form_snapshot 等 meta）
@@ -1142,10 +1170,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
           stepCount: counts.stepCount,
           phaseCount: counts.phaseCount,
         });
+        // traj-recon（B-2 口径对账，只读、零行为变更）：rawRows/maxStep 复用一次 listByTrajectory
+        const reconRows = await trajectoryStepDao.listByTrajectory(tid);
+        reconRawRows = reconRows.length;
+        reconMaxStep = reconRows.reduce((mx, r) => Math.max(mx, Number(r.stepNumber) || 0), 0);
       } catch (err) {
         console.warn('[record] async gate recount failed:', err?.message || err);
       }
-      console.log(`[record] async gate finalize traj=${tid}: copy=${copySteps} db=${dbSteps}`);
+      console.log(`[traj-recon] finalize traj=${tid} rawRows=${reconRawRows} biz=${dbSteps} copy=${copySteps} maxStep=${reconMaxStep}`);
       // 假成功防线 v2：快照为 0 业务步的阶段（关键写阶段假完成）→ 重取副本计数 + DB 复核，
       // 双源仍 0 → 整轨降级 failure。总数>0 但关键阶段 0 步（#612/#614：几步树点击
       // 掩盖写阶段 0 步）由该分支拦截，不再只卡全轨总数。

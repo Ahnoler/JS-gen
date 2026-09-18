@@ -550,13 +550,42 @@ class SelectEngine(_FormActionEngineBase):
         )
         sys.stderr.flush()
         if dispatch.path == "tssc":
-            return await self.tssc_multi_select(
-                label_text,
-                option_text,
-                xpath_smart,
-                mode=mode,
-                element=replay_element,
-            )
+            if dispatch.reason in ('target_kind', 'field_kind'):
+                # B-1 (traj #864): store-cached kind routed here, but the
+                # executor re-checks the live DOM and may deny
+                # (no-tssc-multi-select). Returning that denial feeds the
+                # fill/select mutual-rejection loop (fill says
+                # err-use-tssc-multi-select, select says no-tssc-multi-select).
+                # Trust the live evidence instead: fall through to the plain
+                # el-select path below; if that also fails the existing
+                # honest-failure chain applies (option-not-found etc.).
+                tssc_res = await self.tssc_multi_select(
+                    label_text,
+                    option_text,
+                    xpath_smart,
+                    mode=mode,
+                    element=replay_element,
+                )
+                if not (isinstance(tssc_res, str) and tssc_res.startswith('no-tssc-multi-select')):
+                    return tssc_res
+                sys.stderr.write(
+                    f'[tssc-route-conflict] store kind 与 live 不一致 → fall through el-select '
+                    f'label={label_text!r} reason={dispatch.reason}\n'
+                )
+                sys.stderr.flush()
+                # fall through to the el-select path below
+            else:
+                # Live-probe / legacy-forced tssc route: the executor's live
+                # verdict is authoritative — keep the original direct return
+                # (cold pin pins the `return await self.tssc_multi_select(`
+                # call shape).
+                return await self.tssc_multi_select(
+                    label_text,
+                    option_text,
+                    xpath_smart,
+                    mode=mode,
+                    element=replay_element,
+                )
         # tree path: select_option does not handle tree today — fall through to el-select.
 
         async def _final_select_failure(result_text: str, xpath_for_log: str = '') -> str:
@@ -1134,9 +1163,14 @@ class SelectEngine(_FormActionEngineBase):
                 f'Do NOT retry select_option — skip this field.'
             )
         if res_s.startswith('no-tssc-multi-select'):
+            # B-1 (traj #864): conflict guidance — no self-loop sentence, no
+            # fill_form_field steering. Store-kind routes never reach here
+            # (they fall through to el-select); this is for live-probe routes.
             return (
-                res_s + ' Field is not TsscMultiSelect. '
-                'Use select_option for plain el-select, or report.'
+                res_s
+                + ' | 字段种类缓存与现场不一致（扫描期 kind 记为 TsscMultiSelect，落点 live 复核不是）。'
+                + '先 scan_form_fields 刷新字段种类，再按刷新后的现场重试；'
+                + '勿回退 fill_form_field，勿用同参数重试本动作。'
             )
         if res_s.startswith('err-no-echo'):
             return (

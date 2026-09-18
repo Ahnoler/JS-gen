@@ -55,6 +55,20 @@ async function handleRegister(ws, payload) {
     return;
   }
 
+  // b-时序：先 attach 校验、通过后再 DB upsert —— 同 uuid 异 pid 双活被拒（close 4001）
+  // 时不再把 executor_node 刷成 online（DB 假活）。attach 需要 nodeId：已有行先只读取出
+  // id（不写库，常见于重连/顶替路径）；首注册时 registry 必无 entry、不可能被拒，
+  // 先以 null 挂载，upsert 产生行后回填 nodeId。
+  const existingNode = await executorService.getByUuid(nodeUuid);
+  const attached = registry.attach(nodeUuid, ws, existingNode?.id ?? null, pid);
+  if (!attached) {
+    // 同 uuid 异 pid 双活被 registry 拒绝（已向新连接回发 executor.error 并 close 4001）
+    console.warn(
+      `[executor-ws] register rejected for ${nodeUuid}: duplicate executor process`
+      + ` (incoming pid ${pid ?? 'unknown'}, active pid ${registry.get(nodeUuid)?.pid ?? 'unknown'})`,
+    );
+    return;
+  }
   const node = await executorService.register({
     nodeUuid,
     name,
@@ -63,14 +77,11 @@ async function handleRegister(ws, payload) {
     labels,
     agentVersion,
   });
-  const attached = registry.attach(nodeUuid, ws, node.id, pid);
-  if (!attached) {
-    // 同 uuid 异 pid 双活被 registry 拒绝（已向新连接回发 executor.error 并 close 4001）
-    console.warn(
-      `[executor-ws] register rejected for ${nodeUuid}: duplicate executor process`
-      + ` (incoming pid ${pid ?? 'unknown'}, active pid ${registry.get(nodeUuid)?.pid ?? 'unknown'})`,
-    );
-    return;
+  if (node?.id != null && node.id !== (existingNode?.id ?? null)) {
+    // 首注册：attach 时行尚不存在（nodeId=null），upsert 后回填，保证后续断连
+    // grace 到期仍能用 nodeId 定位 DB 行（markOfflineAndCrash）。
+    const entry = registry.get(nodeUuid);
+    if (entry) entry.nodeId = node.id;
   }
   sendJson(ws, 'executor.registered', {
     nodeId: node.id,
