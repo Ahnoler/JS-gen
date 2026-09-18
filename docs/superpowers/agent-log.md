@@ -1,5 +1,17 @@
 # Agent 协作日志
 
+## 2026-09-18 16:14 · ZCode 合约线 — 收工：A 类缺陷四件收尾（回链 10:20 开工三批修复）
+
+- 完成：`3c4473ec`（worktree 分支 `fix/phase-contract-20260918`）——上会话三批修复后的 A 类收尾四件：
+  - **A1+A3 反向仲裁**（`intent_contract.py`，回收上会话子智能体在途改动并验收）：规则四分类判 role='other'/无令牌（重置/纯填写/开页族）而 LLM 升级签 mode=query 时，旧逻辑无条件信 LLM → 门禁索 query_clicked 连拒（#861 重置阶段/#858 纯填写阶段）。修法与批A 前向 llm=other 降级对称：冲突统一降级 other/no-token，`source='rules+arbitrated'`；rules∈maintain/create/introduce_pick 或 query/navigate 家族内部不一致仍信 LLM（不扩范围）
+  - **A2 save 通知误判**（`js_snippets/save.py`，回收在途改动）：scan+watch 两对正则同步——successRe 增「校验成功」、failRe 去裸「校验」；SUT 保存成功 toast「客户校验成功」不再误入 errorNotifs → click_save 不再在 URL 检测前误 return，url_change 证据恢复可产出（#867/#868 熔断根因）
+  - **A4 probe 收口 doneLog**（上会话子智能体仅留 RED pin `characterize-probe-donelog-and-suspect-noise.py` 未落盘代码，本会话按 pin 实施补绿）：`recorder_emitters.py` 新增 `probe_force_close_context`/`record_probe_done_log`，probe 收口（步数耗尽无 accepted done）向 `_phase_outcomes` 同通路补写合成条目（success=None 维持 unknown、source='probe'、已有 outcome 不覆盖、400 封顶）；`session_runner.py` 以 `outcome is None and not step_canceled` 门接线，text 随 phase_done 落 doneLogs（#861 P6/#863 P1-P2/#866-868 doneLogs 空白修复）
+  - **A4 熔断降噪**（`recorder_emitters.py`）：✂ contract suspect 行改转移点（3 连拒后首次放行）单行，后续静默（#867 P5 曾 9 行同文）；Premature done 拒绝行全量细节仅同 missing 集首次打印，重复拒打 `repeat xN` 短行，换集重置——拒绝/放行行为不变
+- 合并后验收（AGENTS.md 硬约定）：先合并 `uara_V1.2`（merge `7cfaadce`，带入他线 OpenCode `c1eb92a2` 重置点击 guard——文件与本线不相交，其 `task_text_excerpt` 键经核实 intent/boundary contract 均有产出方），**合并态**全量 verify-all = 3 红基线一致（step-highlight/layer-tree/confirm-notification）零新增；新注册 3 pin 全绿：`characterize-contract-arbitration-circuit-breaker` 40 checks（+E 反向仲裁 9 +F 降噪 5）/ `characterize-save-notification-classify` 20 checks / `characterize-probe-donelog-and-suspect-noise` 33 checks；他线 `characterize-reset-button-guard` 亦绿。py_compile 全过；ruff 新增改动零报错（session_runner 5 处存量经 stash 对比确认非本线引入）
+- 生效说明：Python 引擎侧改动，**控制面+执行机重启后生效**；executor LMY 在线，按约不主动重启，重启时机待用户协调
+- 遗留移交：①**B 类移交测试报告**（TsscMultiSelect 路由互拒 #864/#865、stepNumber 空号 #859/#858、executor 僵死双进程 #861、MySQL deadlock 自愈 #863、analyze 合并阶段）——按用户决定写至主检出 `docs/reports` 由用户分发，本线待用户示意后另单元执行 ②冲突普查 R 清单假绿窗口（R1-R5）列后续专项 ③#858 登记的 query_clicked 外溢（纯填写阶段被索查询证据）与 P4 stepNumber 8 空号观察项维持 ④合并回 `uara_V1.2` 时机维持用户拍板，本分支已含合流态
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 12:00 · OpenCode — 收工：约束录制期「重置」按钮点击行为（回链 12:00 开工）
 
 - 完成：`c1eb92a2`——在 `ClickEngine` 入口对「重置/清空/清除/恢复默认」类按钮加阶段语义 guard：`_is_reset_button_label` 识别按钮文本；`_reset_click_allowed` 仅当 `_phase_intent` / `_phase_boundary` 的 `task_text_excerpt` 含重置语义时才允许；`click_button()` 与 `click_element_by_index()` 均拦截。Prompt 同步在 `agent-tools-table.md` / `agent-core.md` 中明确禁止查询阶段为清空已填条件而点重置。新增 pin `characterize-reset-button-guard.py` 钉死标签识别/阶段 excerpt 来源/允许与拒绝场景/复合查询+重置阶段。
