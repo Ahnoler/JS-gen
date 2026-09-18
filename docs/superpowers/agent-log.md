@@ -1,5 +1,25 @@
 # Agent 协作日志
 
+## 2026-09-18 17:36 · ZCode 引擎线 — 收工：B-6 fill_engine import 遮蔽修复完成（回链 17:27 开工；分支续做未合并，待用户审阅）
+
+- 完成：引擎分支 `engine/pipeline-20260918` 两提交——`9c16e1a6`（B-6 修复本体，3 文件 +129/−5）+ `1b421bad`（合并 origin/uara_V1.2 增量后推送；该增量仅 agent-log 条目无代码改动，符合合并后验收约定）：
+  - **根因修复**：`fill_engine.py` `fill_form_field` 内四处分支级 `from .result_protocol import …`（实测 :220 tssc / :232 tree-select / :334 与 :471 两处 field-disabled 旁路——比报告多一处）把 err_with/recommend_action_for_kind 绑定为函数局部名，field-disabled 路径未经过前两处 import 即调用 err_with → UnboundLocalError（traj #877 实证 agent 试错硬耗 119 步）。修法=模块级 :37 统一导入三名字 + 删四处局部 import，行为零变更。
+  - **同款遮蔽自查（AST 级）**：同函数其余局部 import（resolve_fill_attempt_order ×2、field_values_equivalent ×2、xpath_smart_fill_only_enabled、_replay 组等 11 处）逐一核对——全部 import 先于全部使用（import-first-ok，含 ：147/:421 既有文档化局部对），无同款风险；`_fill_form_field_replay_impl` 无此缺陷。
+- 验收（合并后集成态）：
+  - 新 pin `characterize-fill-err-with-scope.py`（已入 verify-all.sh）**RED 7 败**（symtable 判 err_with/recommend 为 LOCAL=UnboundLocalError 充要判据，且精确定位 4 处局部 import 行号）→ **GREEN 15/15**（symtable 作用域断言 + 模块导入完备性 + 零残留局部 import 扫描 + 四调用点行为 needle）
+  - err_with 结构冒烟：field-disabled 场景返回完整结构化 envelope（`err-field-disabled | 原因 | 现场 | 下一步:select_option`）
+  - 相关既有 pin 回归 6 个全绿：select-option-verify / result-protocol / use-field / fill-dispatch / fill-already-filled / introduce-query-fill
+  - 全量 verify-all 失败集与 B1-B3 基线逐行比对**零变化**（恰为已知 3 红 step-highlight/layer-tree/confirm-notification），唯一差异=新 pin 段（绿）；py_compile 过
+- 遗留移交：①**Python 侧修复生效需控制面重启**——4097 正从合约 worktree 运行（禁入），重启时机须与用户协调（B-1 select_engine.py 同）；②本批与 B1-B3 均在引擎分支未合并 uara_V1.2（用户指示），合并时机待拍板；③Cursor recording-coach（17:35 收工）与 B-6 verify-all.sh 登记行不同区，合并无冲突预期
+- 注：不维护 CHANGELOG；主线程内联实施未派子智能体
+
+## 2026-09-18 17:35 · Cursor — 收工：recording-coach MVP 脚手架（回链 17:30 开工）
+
+- 完成：`tools/recording-coach/` 旁路包落地——`assert-steps` + pin（`characterize-recording-coach-assert` 已登记 verify-all）、`workflow.json` 相迁移、`http`/`tools`（Strategy A start）、`index`（OpenCode + CLI REPL 降级）、`opencode-plugin`、`README`、`WET-CHECKLIST`；sidecar `npm install`（`@opencode-ai/sdk` 0.15.31）；`list_executors` 干跑 OK（LMY connected inUse=0）
+- 验收：`node scripts/characterization/cold/characterize-recording-coach-assert.mjs` → OK；workflow 非法相自检 OK；`node --check` 全过
+- 遗留移交：①全链路 wet（create→prepare→start→assert）未跑——见 `tools/recording-coach/WET-CHECKLIST.md`；②design §13 代码 MVP 全勾待 wet PASS；③本批未 commit/push（等用户明示）；④`verify-all.sh` 与引擎线 B-6 各加一行——push 时并排保留
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 17:27 · ZCode 引擎线 — 开工：B-6 fill_engine 局部 import 遮蔽 UnboundLocalError 修复（用户指示不合入 uara_V1.2、继续修复缺陷）
 
 - 进行中：接用户指令「不要合入 uara_V1.2，继续修复缺陷」，实施 wet6 新报 B-6（P1，`docs/superpowers/reports/2026-09-18-fill-engine-unboundlocal-bug.md`，traj #877 实证）：`fill_engine.py` 的 `fill_form_field` 内四处分支级 `from .result_protocol import …`（实测 :220 tssc / :232 tree-select / :334 与 :471 两处 field-disabled 旁路——比报告多一处）把 err_with/recommend_action_for_kind 绑定成函数局部名，field-disabled 路径未经过前两处 import 即调用 err_with → UnboundLocalError，agent 收不到 err-field-disabled 结构化指引（#877 实测单阶段试错硬耗 119 步）。修法=模块级 :37 统一导入 + 删四处局部 import；新 pin `characterize-fill-err-with-scope.py`（symtable 编译器级作用域断言：fill_form_field 内 err_with/recommend_action_for_kind 必须 GLOBAL 非 LOCAL——该谓词即 UnboundLocalError 充要条件 + 行为 needle 不回归）先 RED 后 GREEN。
