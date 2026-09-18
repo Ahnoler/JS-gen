@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-18 16:48 · ZCode 引擎线 — 开工（续接 16:45 移交）：B1-B3 实施批（用户指示「接手完成任务后待审阅」，视为 §六 四决策点按 spec 推荐方案放行）
+
+- 进行中：接手引擎线移交单元，按 spec `specs/2026-09-18-engine-pipeline-b123-fix-design.md` §五 剧本实施：**A（B-1）** `select_engine.py` tssc 落穿+冲突文案 + 新 pin `characterize-tssc-route-conflict.py`；**B（B-2）** `trajectory-recording-runner.js`/`trajectory-persist-service.js` 四挂点 `[traj-recon]` 对账日志（零行为变更）+ 新 pin `characterize-traj-recon-logging.mjs`；**C（B-3）** `executor/ws-client.js`（4001 即退 exit 2 / duplicate_node_uuid 识别 / 401 连续 5 次退 exit 3）+ `executor/config.js` 锁移 os.tmpdir() + `src/executor-registry.js`/`src/executor-ws.js` attach 校验前置 + 新 pin `characterize-executor-duplicate-uuid.mjs`。全部先 RED pin 后最小修复。
+- 范围（可写集）：**worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918`）内** 上列 7 个源文件 + 3 个新 pin + `scripts/refactor/verify-all.sh`（主线程登记）+ 本 spec 修订；主检出仅 agent-log 本条目与收工条目
+- 禁入区：合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918`（4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件与他线 WIP（`data/kb/req/product-mgmt/**`、`.cursor/`）；`scripts/prompts/**`；fill_engine.py/fill_dispatch.py/select_dispatch.py/tssc_multi_select.py（B-1 明确不动）；runner 内 gate/stop 逻辑（B-2 只加日志）；心跳/重连既有语义（B-3）；运行中录制会话
+- 方式：主线程代 3 个 general-purpose 实施子智能体声明（文件集互不相交、一律不 commit，主线程回收验收：RED 证据/越界审查/py_compile·node --check/eslint/全量 verify-all 3 红基线零新增后代提交推送）
+- 注：合并回 uara_V1.2 待用户拍板；本条目声明同时覆盖三个子智能体的工作范围
+
 ## 2026-09-18 16:45 · ZCode 引擎线 — 移交：会话移交下一引擎线会话（回链 16:23 开工；实施未开始，处于决策点待批中断态）
 
 - 交接背景：用户指示引擎管线专会话+独立工作树开发，本会话完成后移交另一会话继续。
