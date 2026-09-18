@@ -1,5 +1,21 @@
 # Agent 协作日志
 
+## 2026-09-18 19:46 · OpenCode 体验线 — 收工：录制状态流程开发者文档（回链 19:46 补记开工）
+
+- 完成：**新 `docs/superpowers/guides/recording-status-flow.md` + `docs/README.md` 索引登记**——把录制状态与执行机资源连接流程整理为开发者指南：双字段状态模型与流转总表、prepare/start/stop/confirm/manual-record/detach 各结果、资源三层绑定与释放三语义、观众统计自动释放、idle-reaper 兜底、前端录制页进入/准备会话/重新录制/画布流程、API 与 WS 事件清单、坑（详情页 `:key` 隔离、观众注册早于 prepare、`recording` 临时态判定、`preserveRecordStatus`、idle-reaper 不感知观众）、验证门禁、历史条目。关键结论均带 `file:line`/端点引用。
+- 范围（可写集）：`docs/superpowers/guides/recording-status-flow.md`、`docs/README.md`、本日志
+- 验收：纯文档；内容现读现写自源码（`models/constants.js`、`dao/trajectory-dao.js`、`services/trajectory/{trajectory-attach-service,trajectory-attach-runner,trajectory-manual-record,trajectory-recording-runner,trajectory-viewer-service,trajectory-idle-reaper,trajectory-meta-service}.js`、前端 composable），无代码改动、无 lint/typecheck 影响面
+- 提交：本 commit；push 见下（当前 `github.com:443` 不通，如失败待网络恢复补推）
+- 遗留：无
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 19:46 · OpenCode 体验线 — 开工（补记）：录制状态流程开发者文档
+
+- 进行中：用户要求把「录制状态流程」相关内容整理成文档放到合适位置，方便后续开发理解。定位=`docs/superpowers/guides/`（开发者指南），并在 `docs/README.md`「架构指南」登记。
+- 范围（可写集）：同上；JS-gen 代码零改动
+- 禁入区：`src/**`、`scripts/**`、他线 WIP（`data/kb/req/product-mgmt/**` 等）、引擎/合约 worktree
+- 方式：主线程内联撰写，边读关键源码边落文档。**本条为同批补记**
+
 ## 2026-09-18 19:38 · OpenCode 体验线 — 收工：修复交易详情页切换串台导致连不上执行机（前端 8bb8e03；回链 19:38 补记开工）
 
 - 完成：前端另仓 `ui-auto-recording-agent-vue` **`8bb8e03`**（2 文件 +22/−20）——
