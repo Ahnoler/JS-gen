@@ -27,7 +27,7 @@
   - `node --check` 全部改动 JS/迁移通过
   - 前端 `npx vue-tsc --noEmit` exit 0
 - 影响面/生效：需执行迁移 `20260918180000_trajectory_failed_reason`（已存在）并重启控制面；旧数据无 reason 不兜底悬浮；长流程录制可能被 idle-reaper 误杀，后续可调大 `IDLE_MS`。
-- 遗留：① `git pull` 因 `github.com:443` 网络失败，push 也可能失败，需网络恢复后补推；② 未能在合并远端最新后的集成态上重跑验收，待网络恢复后补做。
+- 遗留：① `git push origin uara_V2.0.1` 失败（`Failed to connect to github.com:443`），需网络恢复后补推；② 未能在合并远端最新后的集成态上重跑验收，待网络恢复后补做。
 - 注：不维护 CHANGELOG；`config/.db-whitelist-seen` 为他线/历史遗留改动，本次提交排除。
 
 ## 2026-09-18 20:25 · OpenCode — 方案确认：进入实现阶段，分支勘误 uara_V2.0.1，idle-reaper 录制中回收纳入 failed(interrupted)
