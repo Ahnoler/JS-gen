@@ -1,5 +1,23 @@
 # Agent 协作日志
 
+## 2026-09-18 19:38 · OpenCode 体验线 — 收工：修复交易详情页切换串台导致连不上执行机（前端 8bb8e03；回链 19:38 补记开工）
+
+- 完成：前端另仓 `ui-auto-recording-agent-vue` **`8bb8e03`**（2 文件 +22/−20）——
+  - **主因**：`/ui-recording/detail/:id`（及 `step-detail/:id`）共用组件，`layouts/Layout.vue` 的录制布局 `<router-view>` 无 `:key`、`detail/index.vue` 无 `route.params.id` 监听 → detail→detail 跳转复用组件实例，上一交易的 `prepare`/`sessionId`/`remoteSessionId`/画布 `preferredSessionId` 全部泄漏到新交易。实测抓到 WS 发 `{trajectoryId:885, sessionId: 883 的 sessionId}`，executor 无法路由 → 「未推流/连不到执行机」；且 `prepareReady` 因残留 session 为 true → 既不自动 prepare 也不显示「准备会话」按钮（故手动也无效）。修复=录制布局 `<router-view :key="route.path" />` 强制重建。
+  - **次因（09-18 16:45 观众统计改造引入）**：`onMounted` 先 `doPrepare()` 再 `enterViewer()`，上一次离开排出的「无观众 5s 延迟释放」可能在新 session 建好后触发并把它 detach。修复=先 `enterViewer`（含心跳/`beforeunload`）再 `doPrepare`。
+- 范围（可写集）：前端另仓 `vue-project/src/layouts/Layout.vue`、`vue-project/src/composables/useRecordingStudio.ts`、本日志；JS-gen 无代码改动
+- 验收（合并后集成态）：前端 `git pull --ff-only` 已最新（`801bb9c`）；`npx vue-tsc --noEmit` 通过；浏览器真机实测（控制面 4097 + 执行机 HZX）：① 883→885 不再携带旧 session（仅发 `{trajectoryId:885}`）；② 885→881（recording）自动 prepare 新 session `19e949dc` 并 subscribe，画布达「可操作」；③ 881→885→881 快速切换保持推流（`remote:input` 携带 `trajectoryId:881, remoteSessionId:2030`）。
+- 提交：前端 `8bb8e03` 已 push `origin/dev`；本日志 commit + push
+- 遗留移交：① 他线 WIP 前端 `vue-project/src/views/ui-recording/index.vue`（`label-width 80→100`）未纳入，保留工作区；② 本 bug 由「09-18 16:45 观众统计」改造的次因引入，其收工条目的「合并后验收」未覆盖 detail→detail 场景，已由本条补齐
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 19:38 · OpenCode 体验线 — 开工（补记）：修复交易详情页切换串台导致连不上执行机
+
+- 进行中：用户报「录制中/其他状态的交易进入录制页不连执行机，手动点准备会话也连不上」（在合并 LLM 提示/失败原因分类之后）。定位=详情页组件复用串台（主因）+ 观众注册晚于 prepare 的释放竞态（次因）。
+- 范围（可写集）：前端另仓 `ui-auto-recording-agent-vue/vue-project` 的 `src/layouts/Layout.vue`、`src/composables/useRecordingStudio.ts`、本协作日志；JS-gen 无代码改动
+- 禁入区：JS-gen `src/**`、`scripts/**`（本轮不涉及）；他线 WIP（前端 `src/views/ui-recording/index.vue`、`data/kb/req/product-mgmt/**`）；引擎/合约 worktree；运行中控制面/执行机（本轮以 API/浏览器只读诊断为主）
+- 方式：主线程内联修复；借助 chrome-devtools MCP 挂到用户浏览器实证（WS 帧/网络/props 泄漏）。**本条为收工前补记**
+
 ## 2026-09-18 18:40 · OpenCode 引擎/体验线 — 收工：LLM 提示方案 B + 录制失败原因分类落库与列表悬浮（回链 18:33 开工；本线两批合计）
 
 - 完成：**JS-gen `172cb1fd`（11 文件 +328/−40，本批）+ `a1cf8b50`（本线第一批：LLM 识别+广播）+ 收工/开工条目**；**前端另仓 `801bb9c`（5 文件 +27/−7）+ `a7e06f5`（第一批 toast）**
