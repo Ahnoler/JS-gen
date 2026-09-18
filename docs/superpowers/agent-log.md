@@ -1,5 +1,19 @@
 # Agent 协作日志
 
+## 2026-09-18 16:45 · ZCode 引擎线 — 移交：会话移交下一引擎线会话（回链 16:23 开工；实施未开始，处于决策点待批中断态）
+
+- 交接背景：用户指示引擎管线专会话+独立工作树开发，本会话完成后移交另一会话继续。
+- **状态**：本单元未收工——处于「调研/spec/评审对照/证据补采全部完成，spec §六 四决策点待用户批准，实施未开始」中断态。开工条目 16:23 的「进行中」由接收会话闭环收工。
+- **已交付（分支 `engine/pipeline-20260918`，worktree `D:\dev\JS-gen-engine`，全部已推送）**：
+  - 调研+spec+专项地图：`32a73fc2`（spec `specs/2026-09-18-engine-pipeline-b123-fix-design.md` + 报告 `reports/2026-09-18-stop-zero-gate-convergence-survey.md`）
+  - 评审对照：`e52f8ab0`（spec §七，reviewer/QA 移交单逐条对照=全覆盖一致，含落点更正：B-1 真实修复落点 `select_engine.py`，`fill_dispatch.py` 不含 tssc 判定）
+  - 证据补采：`b9f40e51`（spec §六）——B-2 **DB 实测翻案**：#859「15 行 vs stepCount 13」=13 业务步+2 条 save_form_snapshot meta 步，**口径差非缺陷**；真缺陷仅 #858 空号 #8（假说 B1 实锤）；B-3 考古：现码 401=无限重连循环（`ws-client.js:104-114`），台账「401 后重试一次即退出」系 606277a 前 unref 时代形态，**记忆已勘误**（memory `server-deployment-mysql57.md`）
+  - 交接文档：`ab2f0ec5`（`reports/2026-09-18-engine-pipeline-handover.md`——环境配方/调研结论表/批准后执行剧本/禁入区红线/接收第一步清单）
+- **主检出本单元零代码改动**（agent-log 条目除外）；一切代码/文档在引擎 worktree，符合「引擎管线改动走独立工作树」用户指示。
+- 环境事实（接收会话直接用）：worktree 已建 `D:\dev\JS-gen-engine`（node_modules/python junction + .env 已复制 + tmp/ 已建）；只读取证脚本 `tmp/recon-evidence-859.mjs` 可复跑；**服务（4097+LMY）仍从合约 worktree 运行，禁入不重启**。
+- 遗留移交：①spec §六 四决策点等用户批准（B-1 方案 1/B-2 只加日志/B-3 401 五次退出/专项只交地图）；②批准后按 spec §五 派 3 个实施子智能体（文件集互不相交，不 commit，主线程回收验收）；③合并回 uara_V1.2 待用户拍板；④挂账专项（stop 双实现+零步门禁三代）本批不实施。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 16:23 · ZCode 引擎线 — 开工：引擎管线专用工作树建立 + B1-B3 缺陷修复批（用户指示引擎线此后全部改动走独立 worktree）
 
 - 进行中：用户定盘「本对话专用于引擎管线开发，此后所有引擎管线修改另起工作树进行」。已建 worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918`，基于 `5956ab7a`=origin/uara_V1.2，node_modules/python junction + .env 已落）。本单元工作清单=五轮湿测移交报告 B 类（`docs/superpowers/reports/2026-09-18-wet-test-defect-handover.md`）：**B-1（P1）TsscMultiSelect fill/select_option 路由互拒震荡**（`scripts/controller/actions/fill_dispatch.py`/`select_dispatch.py`）、**B-2（P2）stepCount 与 trajectory_step 行数对账日志**（`scripts/state.py` _record_action coalesce 口径）、**B-3（P2）executor 同 uuid 僵尸双进程互斥**（`executor/agent.mjs`）；并行调研挂账专项「stop 双实现 + 零步门禁三代收敛」（只调研不实施）。B-4 观察项/B-5 P3 不动。
