@@ -35,3 +35,10 @@ export {
   acceptTrajectoryStepsReplay,
   stopTrajectoryStepsReplay,
 } from './trajectory-session-replay.js';
+
+export {
+  enterViewer,
+  leaveViewer,
+  touchViewer,
+  getViewerCount,
+} from './trajectory-viewer-service.js';

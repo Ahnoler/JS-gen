@@ -436,8 +436,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   runtime.userStop = null;
   runtime.recordStartAt = new Date().toISOString();
   touchTrajectoryRuntimeActivity(tid);
-  // 进入临时「录制中」：记录录制前持久状态基线（不降级待确认/已确认/录制异常）。
+  // 进入临时「录制中」：记录录制前持久状态基线（不降级待确认/录制异常）。
   await trajectoryDao.enterTransientRecording(tid);
+  // 已确认(completed)重新录制时，把持久基线改为待确认(recorded)，
+  // 这样停止后需要再次人工确认，而不是自动回到已确认。
+  const statusRow = await trajectoryDao.getRecordStatusRow(tid);
+  if (statusRow?.persistentRecordStatus === 'completed') {
+    await trajectoryDao.updateMeta(tid, { persistentRecordStatus: 'recorded' });
+  }
   await trajectoryDao.updateMeta(tid, { systemAccountId: acctId });
   for (const p of phases) await trajectoryPhaseDao.updateStatus(p.id, 'pending');
 
