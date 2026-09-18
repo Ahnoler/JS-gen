@@ -10,6 +10,8 @@
  * trajectory executor session.
  */
 import { detachTrajectoryLive } from './trajectory-attach-service.js';
+import { getTrajectoryRuntime } from './trajectory-runtime.js';
+import { state } from '../../state.js';
 
 /** Heartbeat interval expected from active viewers (ms). */
 const VIEWER_HEARTBEAT_MS = 10000;
@@ -17,6 +19,11 @@ const VIEWER_HEARTBEAT_MS = 10000;
 const VIEWER_STALE_MS = 30000;
 /** Grace period before detaching when count drops to zero, to survive page refresh. */
 const DETACH_GRACE_MS = 5000;
+/**
+ * When the last viewer leaves while a recording is still running, do NOT detach
+ * (that would abort the recording). Re-check after this interval instead.
+ */
+const RECORDING_RECHECK_MS = 15000;
 
 /** @type {Map<number, Map<string, {lastSeenAt: number}>>} */
 const viewersByTrajectory = new Map();
@@ -133,6 +140,61 @@ function cancelScheduledDetach(tid) {
 }
 
 /**
+ * Whether a trajectory is currently recording (AI run in flight or manual recording on).
+ * Used to avoid auto-releasing the executor mid-recording — detach aborts the run and
+ * reverts record_status to its persistent baseline (non-terminating release).
+ *
+ * Uses in-memory runtime flags, which the recording runner sets synchronously at run
+ * start (before the login window starts) and clears on finish — more timely than the
+ * DB-based running-phase check, which misses the login window.
+ * @param {number} tid trajectory DB id
+ * @returns {boolean} true when a recording is active
+ */
+function isActivelyRecording(tid) {
+  const runtime = getTrajectoryRuntime(tid);
+  if (!runtime) return false;
+  if (runtime.manualRecording || runtime.aiRecording) return true;
+  if (runtime.sessionId) {
+    const session = state.sessions.get(runtime.sessionId);
+    if (session?.aiRecording || session?.busy) return true;
+  }
+  return false;
+}
+
+/**
+ * Arm a detach check for a trajectory after `delayMs`.
+ * @param {number} tid trajectory DB id
+ * @param {number} delayMs delay in milliseconds
+ * @returns {void}
+ */
+function scheduleDetach(tid, delayMs) {
+  if (detachTimers.has(tid)) return;
+  const timer = setTimeout(() => {
+    detachTimers.delete(tid);
+    void runDetachCheck(tid);
+  }, delayMs);
+  detachTimers.set(tid, timer);
+}
+
+/**
+ * Release the executor only when nobody is watching AND no recording is running.
+ * If a recording is still in flight, re-check later instead of aborting it.
+ * @param {number} tid trajectory DB id
+ * @returns {Promise<void>} resolves after the check
+ */
+async function runDetachCheck(tid) {
+  if (getViewerCount(tid) !== 0) return;
+  if (isActivelyRecording(tid)) {
+    // Recording in progress with no viewers → keep resources, re-check later.
+    if (getViewerCount(tid) === 0) scheduleDetach(tid, RECORDING_RECHECK_MS);
+    return;
+  }
+  await detachTrajectoryLive(tid, { reason: 'no_viewers' }).catch((err) => {
+    console.warn(`[viewer-service] detach failed for traj #${tid}:`, err?.message || err);
+  });
+}
+
+/**
  * Schedule executor release if no viewers remain for a trajectory.
  * @param {number} tid trajectory DB id
  * @returns {void}
@@ -142,15 +204,5 @@ function scheduleDetachIfEmpty(tid) {
     cancelScheduledDetach(tid);
     return;
   }
-  if (detachTimers.has(tid)) return;
-
-  const timer = setTimeout(() => {
-    detachTimers.delete(tid);
-    if (getViewerCount(tid) === 0) {
-      detachTrajectoryLive(tid, { reason: 'no_viewers' }).catch((err) => {
-        console.warn(`[viewer-service] detach failed for traj #${tid}:`, err?.message || err);
-      });
-    }
-  }, DETACH_GRACE_MS);
-  detachTimers.set(tid, timer);
+  scheduleDetach(tid, DETACH_GRACE_MS);
 }

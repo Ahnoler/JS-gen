@@ -1,5 +1,6 @@
 # Agent 协作日志
 
+
 ## 2026-09-18 18:00 · OpenCode — 开工：重构 record_status 语义，让 recording 真正表示「正在录制」
 
 - 进行中：按任务 §6 出第一阶段设计方案（现状梳理/状态机/方案对比/迁移/前端/回归/风险），用户确认后才进入实现；当前禁止修改源码/迁移/pin/api-docs/前端。
@@ -7,6 +8,59 @@
 - 禁入区：当前工作区未提交改动（`config/.db-whitelist-seen`、`src/services/trajectory/trajectory-viewer-service.js`）属上一任务遗留，本任务不动；他线 worktree（`D:\dev\JS-gen-engine`、`D:\dev\JS-gen-contract`）及其服务；`scripts/prompts/**`；运行中 4097/执行机进程；`data/kb/req/product-mgmt/**`。
 - 分支：在已存在的 `uara_V2.0` 上工作，不新建/切换分支。
 - 方式：主线程内联完成设计；实现阶段视复杂度决定是否派子智能体。先读代码 + 出方案，等待用户确认。
+## 2026-09-18 19:46 · OpenCode 体验线 — 收工：录制状态流程开发者文档（回链 19:46 补记开工）
+
+- 完成：**新 `docs/superpowers/guides/recording-status-flow.md` + `docs/README.md` 索引登记**——把录制状态与执行机资源连接流程整理为开发者指南：双字段状态模型与流转总表、prepare/start/stop/confirm/manual-record/detach 各结果、资源三层绑定与释放三语义、观众统计自动释放、idle-reaper 兜底、前端录制页进入/准备会话/重新录制/画布流程、API 与 WS 事件清单、坑（详情页 `:key` 隔离、观众注册早于 prepare、`recording` 临时态判定、`preserveRecordStatus`、idle-reaper 不感知观众）、验证门禁、历史条目。关键结论均带 `file:line`/端点引用。
+- 范围（可写集）：`docs/superpowers/guides/recording-status-flow.md`、`docs/README.md`、本日志
+- 验收：纯文档；内容现读现写自源码（`models/constants.js`、`dao/trajectory-dao.js`、`services/trajectory/{trajectory-attach-service,trajectory-attach-runner,trajectory-manual-record,trajectory-recording-runner,trajectory-viewer-service,trajectory-idle-reaper,trajectory-meta-service}.js`、前端 composable），无代码改动、无 lint/typecheck 影响面
+- 提交：本 commit；push 见下（当前 `github.com:443` 不通，如失败待网络恢复补推）
+- 遗留：无
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 19:46 · OpenCode 体验线 — 开工（补记）：录制状态流程开发者文档
+
+- 进行中：用户要求把「录制状态流程」相关内容整理成文档放到合适位置，方便后续开发理解。定位=`docs/superpowers/guides/`（开发者指南），并在 `docs/README.md`「架构指南」登记。
+- 范围（可写集）：同上；JS-gen 代码零改动
+- 禁入区：`src/**`、`scripts/**`、他线 WIP（`data/kb/req/product-mgmt/**` 等）、引擎/合约 worktree
+- 方式：主线程内联撰写，边读关键源码边落文档。**本条为同批补记**
+
+## 2026-09-18 19:38 · OpenCode 体验线 — 收工：修复交易详情页切换串台导致连不上执行机（前端 8bb8e03；回链 19:38 补记开工）
+
+- 完成：前端另仓 `ui-auto-recording-agent-vue` **`8bb8e03`**（2 文件 +22/−20）——
+  - **主因**：`/ui-recording/detail/:id`（及 `step-detail/:id`）共用组件，`layouts/Layout.vue` 的录制布局 `<router-view>` 无 `:key`、`detail/index.vue` 无 `route.params.id` 监听 → detail→detail 跳转复用组件实例，上一交易的 `prepare`/`sessionId`/`remoteSessionId`/画布 `preferredSessionId` 全部泄漏到新交易。实测抓到 WS 发 `{trajectoryId:885, sessionId: 883 的 sessionId}`，executor 无法路由 → 「未推流/连不到执行机」；且 `prepareReady` 因残留 session 为 true → 既不自动 prepare 也不显示「准备会话」按钮（故手动也无效）。修复=录制布局 `<router-view :key="route.path" />` 强制重建。
+  - **次因（09-18 16:45 观众统计改造引入）**：`onMounted` 先 `doPrepare()` 再 `enterViewer()`，上一次离开排出的「无观众 5s 延迟释放」可能在新 session 建好后触发并把它 detach。修复=先 `enterViewer`（含心跳/`beforeunload`）再 `doPrepare`。
+- 范围（可写集）：前端另仓 `vue-project/src/layouts/Layout.vue`、`vue-project/src/composables/useRecordingStudio.ts`、本日志；JS-gen 无代码改动
+- 验收（合并后集成态）：前端 `git pull --ff-only` 已最新（`801bb9c`）；`npx vue-tsc --noEmit` 通过；浏览器真机实测（控制面 4097 + 执行机 HZX）：① 883→885 不再携带旧 session（仅发 `{trajectoryId:885}`）；② 885→881（recording）自动 prepare 新 session `19e949dc` 并 subscribe，画布达「可操作」；③ 881→885→881 快速切换保持推流（`remote:input` 携带 `trajectoryId:881, remoteSessionId:2030`）。
+- 提交：前端 `8bb8e03` 已 push `origin/dev`；本日志 commit + push
+- 遗留移交：① 他线 WIP 前端 `vue-project/src/views/ui-recording/index.vue`（`label-width 80→100`）未纳入，保留工作区；② 本 bug 由「09-18 16:45 观众统计」改造的次因引入，其收工条目的「合并后验收」未覆盖 detail→detail 场景，已由本条补齐
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 19:38 · OpenCode 体验线 — 开工（补记）：修复交易详情页切换串台导致连不上执行机
+
+- 进行中：用户报「录制中/其他状态的交易进入录制页不连执行机，手动点准备会话也连不上」（在合并 LLM 提示/失败原因分类之后）。定位=详情页组件复用串台（主因）+ 观众注册晚于 prepare 的释放竞态（次因）。
+- 范围（可写集）：前端另仓 `ui-auto-recording-agent-vue/vue-project` 的 `src/layouts/Layout.vue`、`src/composables/useRecordingStudio.ts`、本协作日志；JS-gen 无代码改动
+- 禁入区：JS-gen `src/**`、`scripts/**`（本轮不涉及）；他线 WIP（前端 `src/views/ui-recording/index.vue`、`data/kb/req/product-mgmt/**`）；引擎/合约 worktree；运行中控制面/执行机（本轮以 API/浏览器只读诊断为主）
+- 方式：主线程内联修复；借助 chrome-devtools MCP 挂到用户浏览器实证（WS 帧/网络/props 泄漏）。**本条为收工前补记**
+
+## 2026-09-18 18:40 · OpenCode 引擎/体验线 — 收工：LLM 提示方案 B + 录制失败原因分类落库与列表悬浮（回链 18:33 开工；本线两批合计）
+
+- 完成：**JS-gen `172cb1fd`（11 文件 +328/−40，本批）+ `a1cf8b50`（本线第一批：LLM 识别+广播）+ 收工/开工条目**；**前端另仓 `801bb9c`（5 文件 +27/−7）+ `a7e06f5`（第一批 toast）**
+  - 后端：新增 `src/models/failure-reason.js`（kind→类别文案，LLM 五子类统一「LLM 调用异常」）；`agent-llm-error.js` 返回 `{kind,reason,logReason,upstream}`；`executor-ws.js` 落库 `failed_kind/failed_reason`（首次为准）+ 日志用 logReason + 广播带 reason；迁移 `20260918180000_trajectory_failed_reason.js` 增 `failed_kind/failed_reason/failed_at`（同步 init.sql）；`trajectory-dao` 增 `markFailedReason`/`clearFailedReason`，进入录制与成功收官自动清；runner 写 `zero_step`/`quality_failed`/`phase_failed`/`runner_error`；lifecycle 写 `user_marked_failed`/`batch_failed`；api-docs websocket/trajectory 同步。
+  - 前端：列表状态列 failed 且有 reason 时 `el-tooltip` 悬浮类别文案（无值不兜底）；`Trajectory`/`TableRecord`/mapper 透传 `failedReason`；LLM toast 用事件 `reason`（类别），固定「AI 录制失败：<类别>」。
+- 验收证据（当前集成态，`git pull` 后 uara_V1.2 已是最新无需合并；前端 dev 无新远端提交）：新 pin `characterize-agent-llm-error` 扩为 **8 组断言 OK**（识别/类别文案/误报守卫/去重/分类表/executor-ws 接线/落库接线/api-docs+schema）；既有 node pin 回归全绿（record-status/trajectory/g3-runner-seam/record-phase-finalize/quality-final-gate/run-event-ownership/owned-wait-shape/executor-orphan-reconcile）；`npx eslint src/ executor/ scripts/` = **0 errors / 23 warnings**（基线一致零新增）；前端 `npx vue-tsc --noEmit` exit 0；`node --check` 全部改动 JS/迁移通过。
+- 影响面/生效：**需执行迁移 `20260918180000_trajectory_failed_reason` 并重启控制面**；执行机/Python 无需改；前端需重新构建部署。录制本身的行为未改（仍不会自动停止）。
+- 遗留移交：① D 类（执行机断连/会话崩溃/登录失败）按要求**未纳入**，现状不置 failed，列表悬浮不会显示；② 旧数据/无 reason 不做兜底，悬浮不出现（按用户要求）；③ 前端列表页 `index.vue` 有一处他线未提交的 `label-width 80→100` WIP，本提交已按 hunk 精确暂存未纳入、工作区保留，合并时由该线自行提交；④ 迁移上线前请确认 MySQL 5.7 兼容（VARCHAR/DATETIME(3) 均兼容）。
+- 注：不维护 CHANGELOG；主线程内联实施，未派子智能体
+
+## 2026-09-18 18:33 · OpenCode 引擎/体验线 — 开工（backfill，续 17:52 收工）：LLM 提示收敛方案 B + 录制失败原因分类落库与列表悬浮
+
+- 背景：用户确认——① 前端 toast 与列表悬浮只展示**类别级**原因，LLM 类统一「LLM 调用异常」，详细原因只留后端日志；② 列表「录制异常」状态悬浮展示该类别原因；③ 旧数据/无原因不做悬浮兜底；D 类（执行机/会话/登录）暂不纳入；④ 允许直接改他线热区文件，提交前合并检验。
+- 进行中：后端新增失败分类表 `src/models/failure-reason.js`（kind→类别文案 + LLM 类统一）；`agent-llm-error.js` 改返回 `{kind,reason(category),logReason(detailed),upstream}`；`executor-ws.js` 落库 `failed_kind/failed_reason`（首次为准）+ 日志用 logReason + 广播带 reason；迁移 `20260918180000_trajectory_failed_reason.js` 增 `failed_kind/failed_reason/failed_at`（同步 init.sql）；`trajectory-dao` 增 `markFailedReason`(whereNull 首次为准)/`clearFailedReason`，进入录制/成功收官自动清；runner 失败终局写 `zero_step`/`quality_failed`/`phase_failed`/`runner_error`；lifecycle 写 `user_marked_failed`/`batch_failed`。前端：列表状态列 failed 且有 reason 时 `el-tooltip` 悬浮；`Trajectory`/`TableRecord`/mapper 透传 `failedReason`；toast 改用事件 `reason`。
+- 范围（可写集，主检出）：`src/models/failure-reason.js`(新)、`src/services/agent-llm-error.js`、`src/executor-ws.js`、`src/dao/trajectory-dao.js`、`src/services/trajectory/trajectory-recording-runner.js`、`src/services/trajectory/trajectory-record-lifecycle.js`、`migrations/20260918180000_trajectory_failed_reason.js`(新)、`schemas/init.sql`、`src/dashboard/api-docs/groups/{websocket,trajectory}.js`、`scripts/characterization/characterize-agent-llm-error.mjs`、本日志；前端另仓 `vue-project`：`src/composables/useRecordingStudio.ts`、`src/api/recording.ts`、`src/types/index.ts`、`src/utils/recording-mapper.ts`、`src/views/ui-recording/index.vue`
+- 禁入区：他线 worktree 分支与服务（`D:\dev\JS-gen-engine`、`D:\dev\JS-gen-contract`）；运行中控制面/执行机进程；`scripts/prompts/**`；Python 引擎；前端 `src/views/ui-recording/index.vue` 的他线 WIP 行（只加状态列 tooltip，不动其余）；`data/kb/req/product-mgmt/**`
+- 风险声明：本批按要求直改 runner/lifecycle（引擎线在途文件）与列表页（他线 WIP），提交前 `git pull` 合并后重跑验收；如冲突按「双方区域并排保留」。
+- 方式：主线程内联；先改分类模块+pin 断言，再接线；验收 pin + 相关既有 pin 回归 + eslint + 前端 vue-tsc；合并后重跑。
+- 注：不维护 CHANGELOG
 
 ## 2026-09-18 17:52 · OpenCode 引擎/体验线 — 收工：AI 录制 LLM 失败前端提示 + 后端日志（回链 17:34 开工）
 

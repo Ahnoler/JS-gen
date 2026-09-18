@@ -11,28 +11,29 @@
  *
  * Pure module: no IO, no broadcast, no DB.
  */
+import { failReasonText } from '../models/failure-reason.js';
 
 /** Ordered classification rules — first match wins. */
 const RULES = [
   {
-    kind: 'insufficient_balance',
+    kind: 'llm_insufficient_balance',
     re: /insufficient[_\s-]?balance|insufficient[_\s-]?quota|余额不足|账户余额|欠费|no\s+balance|exceeded\s+your\s+current\s+quota/i,
-    message: 'LLM 服务账户余额不足，AI 录制未能执行任何操作。请为 LLM 账户充值或更换可用的模型密钥后重试。',
+    logReason: 'LLM 账户余额不足',
   },
   {
-    kind: 'auth',
+    kind: 'llm_auth',
     re: /invalid[_\s-]?api[_\s-]?key|incorrect\s+api\s+key|invalid\s+authentication|authentication\s+failed|no\s+auth\s+credentials|unauthorized|error\s+code:\s*401\b/i,
-    message: 'LLM 服务鉴权失败（密钥无效或已过期），AI 录制未能执行任何操作。请检查 LLM_API_KEY / LLM_BASE_URL 配置。',
+    logReason: 'LLM 鉴权失败',
   },
   {
-    kind: 'rate_limit',
+    kind: 'llm_rate_limit',
     re: /rate\s*limit|too\s+many\s+requests|error\s+code:\s*429\b|tpm\s+limit|rpm\s+limit/i,
-    message: 'LLM 服务触发限流（请求过于频繁），AI 录制未能执行操作。请稍后重试或降低并发。',
+    logReason: 'LLM 请求被限流',
   },
   {
-    kind: 'server',
+    kind: 'llm_server',
     re: /error\s+code:\s*5\d{2}\b|internal\s+server\s+error|service\s+(?:temporarily\s+)?unavailable|bad\s+gateway/i,
-    message: 'LLM 服务端错误，AI 录制未能执行操作。请稍后重试。',
+    logReason: 'LLM 服务异常',
   },
 ];
 
@@ -42,25 +43,45 @@ const RULES = [
  */
 const LLM_ERROR_ANCHOR_RE = /error\s+code:\s*\d{3}|llm\s+request\s+failed|invalid_request_error|invalid[_\s-]?api[_\s-]?key|incorrect\s+api\s+key|insufficient[_\s-]?(?:balance|quota)|rate\s*limit|too\s+many\s+requests|authentication\s+error|authenticationerror|ratelimiterror/i;
 
-const GENERIC_MESSAGE = 'LLM 调用失败，AI 录制未能执行操作。详情请查看执行机日志。';
+const GENERIC_LOG_REASON = 'LLM 调用失败';
 
-/** @typedef {'insufficient_balance'|'auth'|'rate_limit'|'server'|'unknown'} LlmErrorKind */
-/** @typedef {{ kind: LlmErrorKind, message: string, upstream: string }} AgentLlmError */
+/**
+ * @typedef {'llm_insufficient_balance'|'llm_auth'|'llm_rate_limit'|'llm_server'|'llm_unknown'} LlmErrorKind
+ * @typedef {{
+ *   kind: LlmErrorKind,
+ *   reason: string,
+ *   logReason: string,
+ *   upstream: string,
+ * }} AgentLlmError
+ */
 
 /**
  * Classify a single stderr line as an LLM error, or null when it is not one.
+ * `reason` is the user-facing category (always `LLM 调用异常`) persisted on the
+ * trajectory; `logReason` is the detailed label kept in backend logs only.
  * @param {string} line raw agent stderr line
  * @returns {AgentLlmError|null} classified error or null
  */
 export function classifyAgentLlmErrorLine(line) {
   const text = String(line || '');
   if (!text || !LLM_ERROR_ANCHOR_RE.test(text)) return null;
+  const upstream = text.trim().slice(0, 300);
   for (const rule of RULES) {
     if (rule.re.test(text)) {
-      return { kind: rule.kind, message: rule.message, upstream: text.trim().slice(0, 300) };
+      return {
+        kind: rule.kind,
+        reason: failReasonText(rule.kind),
+        logReason: rule.logReason,
+        upstream,
+      };
     }
   }
-  return { kind: 'unknown', message: GENERIC_MESSAGE, upstream: text.trim().slice(0, 300) };
+  return {
+    kind: 'llm_unknown',
+    reason: failReasonText('llm_unknown'),
+    logReason: GENERIC_LOG_REASON,
+    upstream,
+  };
 }
 
 /**
