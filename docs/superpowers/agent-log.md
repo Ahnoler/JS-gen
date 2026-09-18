@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-18 18:33 · OpenCode 引擎/体验线 — 开工（backfill，续 17:52 收工）：LLM 提示收敛方案 B + 录制失败原因分类落库与列表悬浮
+
+- 背景：用户确认——① 前端 toast 与列表悬浮只展示**类别级**原因，LLM 类统一「LLM 调用异常」，详细原因只留后端日志；② 列表「录制异常」状态悬浮展示该类别原因；③ 旧数据/无原因不做悬浮兜底；D 类（执行机/会话/登录）暂不纳入；④ 允许直接改他线热区文件，提交前合并检验。
+- 进行中：后端新增失败分类表 `src/models/failure-reason.js`（kind→类别文案 + LLM 类统一）；`agent-llm-error.js` 改返回 `{kind,reason(category),logReason(detailed),upstream}`；`executor-ws.js` 落库 `failed_kind/failed_reason`（首次为准）+ 日志用 logReason + 广播带 reason；迁移 `20260918180000_trajectory_failed_reason.js` 增 `failed_kind/failed_reason/failed_at`（同步 init.sql）；`trajectory-dao` 增 `markFailedReason`(whereNull 首次为准)/`clearFailedReason`，进入录制/成功收官自动清；runner 失败终局写 `zero_step`/`quality_failed`/`phase_failed`/`runner_error`；lifecycle 写 `user_marked_failed`/`batch_failed`。前端：列表状态列 failed 且有 reason 时 `el-tooltip` 悬浮；`Trajectory`/`TableRecord`/mapper 透传 `failedReason`；toast 改用事件 `reason`。
+- 范围（可写集，主检出）：`src/models/failure-reason.js`(新)、`src/services/agent-llm-error.js`、`src/executor-ws.js`、`src/dao/trajectory-dao.js`、`src/services/trajectory/trajectory-recording-runner.js`、`src/services/trajectory/trajectory-record-lifecycle.js`、`migrations/20260918180000_trajectory_failed_reason.js`(新)、`schemas/init.sql`、`src/dashboard/api-docs/groups/{websocket,trajectory}.js`、`scripts/characterization/characterize-agent-llm-error.mjs`、本日志；前端另仓 `vue-project`：`src/composables/useRecordingStudio.ts`、`src/api/recording.ts`、`src/types/index.ts`、`src/utils/recording-mapper.ts`、`src/views/ui-recording/index.vue`
+- 禁入区：他线 worktree 分支与服务（`D:\dev\JS-gen-engine`、`D:\dev\JS-gen-contract`）；运行中控制面/执行机进程；`scripts/prompts/**`；Python 引擎；前端 `src/views/ui-recording/index.vue` 的他线 WIP 行（只加状态列 tooltip，不动其余）；`data/kb/req/product-mgmt/**`
+- 风险声明：本批按要求直改 runner/lifecycle（引擎线在途文件）与列表页（他线 WIP），提交前 `git pull` 合并后重跑验收；如冲突按「双方区域并排保留」。
+- 方式：主线程内联；先改分类模块+pin 断言，再接线；验收 pin + 相关既有 pin 回归 + eslint + 前端 vue-tsc；合并后重跑。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 17:52 · OpenCode 引擎/体验线 — 收工：AI 录制 LLM 失败前端提示 + 后端日志（回链 17:34 开工）
 
 - 完成：**`a1cf8b50`（JS-gen 代码，5 文件 +300）+ 合并 `416f2569`**；**前端另仓 `ui-auto-recording-agent-vue` `a7e06f5`（vue-project 2 文件 +22/−1）**
