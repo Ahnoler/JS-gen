@@ -1,5 +1,57 @@
 # Agent 协作日志
 
+## 2026-09-18 16:48 · ZCode 引擎线 — 开工（续接 16:45 移交）：B1-B3 实施批（用户指示「接手完成任务后待审阅」，视为 §六 四决策点按 spec 推荐方案放行）
+
+- 进行中：接手引擎线移交单元，按 spec `specs/2026-09-18-engine-pipeline-b123-fix-design.md` §五 剧本实施：**A（B-1）** `select_engine.py` tssc 落穿+冲突文案 + 新 pin `characterize-tssc-route-conflict.py`；**B（B-2）** `trajectory-recording-runner.js`/`trajectory-persist-service.js` 四挂点 `[traj-recon]` 对账日志（零行为变更）+ 新 pin `characterize-traj-recon-logging.mjs`；**C（B-3）** `executor/ws-client.js`（4001 即退 exit 2 / duplicate_node_uuid 识别 / 401 连续 5 次退 exit 3）+ `executor/config.js` 锁移 os.tmpdir() + `src/executor-registry.js`/`src/executor-ws.js` attach 校验前置 + 新 pin `characterize-executor-duplicate-uuid.mjs`。全部先 RED pin 后最小修复。
+- 范围（可写集）：**worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918`）内** 上列 7 个源文件 + 3 个新 pin + `scripts/refactor/verify-all.sh`（主线程登记）+ 本 spec 修订；主检出仅 agent-log 本条目与收工条目
+- 禁入区：合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918`（4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件与他线 WIP（`data/kb/req/product-mgmt/**`、`.cursor/`）；`scripts/prompts/**`；fill_engine.py/fill_dispatch.py/select_dispatch.py/tssc_multi_select.py（B-1 明确不动）；runner 内 gate/stop 逻辑（B-2 只加日志）；心跳/重连既有语义（B-3）；运行中录制会话
+- 方式：主线程代 3 个 general-purpose 实施子智能体声明（文件集互不相交、一律不 commit，主线程回收验收：RED 证据/越界审查/py_compile·node --check/eslint/全量 verify-all 3 红基线零新增后代提交推送）
+- 注：合并回 uara_V1.2 待用户拍板；本条目声明同时覆盖三个子智能体的工作范围
+
+## 2026-09-18 16:45 · ZCode 引擎线 — 移交：会话移交下一引擎线会话（回链 16:23 开工；实施未开始，处于决策点待批中断态）
+
+- 交接背景：用户指示引擎管线专会话+独立工作树开发，本会话完成后移交另一会话继续。
+- **状态**：本单元未收工——处于「调研/spec/评审对照/证据补采全部完成，spec §六 四决策点待用户批准，实施未开始」中断态。开工条目 16:23 的「进行中」由接收会话闭环收工。
+- **已交付（分支 `engine/pipeline-20260918`，worktree `D:\dev\JS-gen-engine`，全部已推送）**：
+  - 调研+spec+专项地图：`32a73fc2`（spec `specs/2026-09-18-engine-pipeline-b123-fix-design.md` + 报告 `reports/2026-09-18-stop-zero-gate-convergence-survey.md`）
+  - 评审对照：`e52f8ab0`（spec §七，reviewer/QA 移交单逐条对照=全覆盖一致，含落点更正：B-1 真实修复落点 `select_engine.py`，`fill_dispatch.py` 不含 tssc 判定）
+  - 证据补采：`b9f40e51`（spec §六）——B-2 **DB 实测翻案**：#859「15 行 vs stepCount 13」=13 业务步+2 条 save_form_snapshot meta 步，**口径差非缺陷**；真缺陷仅 #858 空号 #8（假说 B1 实锤）；B-3 考古：现码 401=无限重连循环（`ws-client.js:104-114`），台账「401 后重试一次即退出」系 606277a 前 unref 时代形态，**记忆已勘误**（memory `server-deployment-mysql57.md`）
+  - 交接文档：`ab2f0ec5`（`reports/2026-09-18-engine-pipeline-handover.md`——环境配方/调研结论表/批准后执行剧本/禁入区红线/接收第一步清单）
+- **主检出本单元零代码改动**（agent-log 条目除外）；一切代码/文档在引擎 worktree，符合「引擎管线改动走独立工作树」用户指示。
+- 环境事实（接收会话直接用）：worktree 已建 `D:\dev\JS-gen-engine`（node_modules/python junction + .env 已复制 + tmp/ 已建）；只读取证脚本 `tmp/recon-evidence-859.mjs` 可复跑；**服务（4097+LMY）仍从合约 worktree 运行，禁入不重启**。
+- 遗留移交：①spec §六 四决策点等用户批准（B-1 方案 1/B-2 只加日志/B-3 401 五次退出/专项只交地图）；②批准后按 spec §五 派 3 个实施子智能体（文件集互不相交，不 commit，主线程回收验收）；③合并回 uara_V1.2 待用户拍板；④挂账专项（stop 双实现+零步门禁三代）本批不实施。
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 16:45 · OpenCode — 收工：执行机资源连接策略 + 录制状态流转收口 + 后端观众统计（回链 16:45 补记开工）
+
+- 完成：**`79ee592c`（JS-gen）**——
+  - **prepare 分流**（`trajectory-attach-runner.js`）：新增 `preserveRecordStatus` 选项；为 true 时只连接浏览器/推流、不进入 `recording` 临时态，保持 failed/recorded/completed 持久态；返回的 `recordStatus` 去掉 `streamOk ? 'recording'` 兜底。
+  - **人工录制状态收口**（`trajectory-manual-record.js`）：recorded/completed 上开启人工录制先 `enterTransientRecording`，原 completed 持久基线降为 recorded（停止/释放后需再次人工确认，不清空步骤）。
+  - **重录基线**（`trajectory-recording-runner.js`）：completed 重新录制时把持久基线降为 recorded（stop 后回待确认）。
+  - **后端观众统计**（新 `trajectory-viewer-service.js`）：控制面内存登记跨机器/跨浏览器观众（enter/leave/touch + 30s 心跳过期清理）；末位观众离开后延迟 5s 释放执行机，避免刷新误杀。
+  - **路由/facade/api-docs**：`record/prepare` 读取 `preserveRecordStatus`；新增 `POST /api/v2/trajectories/:id/viewers/enter|leave|heartbeat`；`trajectory-service` / `trajectory-recording-service` facade 导出；`api-docs/groups/recording.js` 同步。
+  - **前端（Vue 另仓，用户已提交 `a3d1a55`）**：仅 draft/recording 自动 prepare；「准备会话」对 failed/recorded/completed 传 `preserveRecordStatus=true`；「重新录制」未连接时先 prepare；人工录制开启后刷新树；观众 `enterViewer/leaveViewer/heartbeatViewer` + `beforeunload` sendBeacon（后端主导、前端只协助，取代初版 localStorage 方案）。
+- 范围：同开工（补记）声明 + 前端 `a3d1a55`
+- 验收（合并后集成态）：`git pull --ff-only` 集成远端 `c2cd58be` 后——`npx eslint src/ executor/ scripts/` = **0 errors**（23 既有 warnings，零新增）；`node --check` 全部改动 JS 文件通过；`characterize-record-status.mjs` **OK**（`enterTransientRecording\(tid\)` 等 wiring 断言仍绿）；`characterize-trajectory.mjs` **OK**（facade 表面含 prepare/manual-record）；前端 `a3d1a55` 已 `vue-tsc --noEmit` 通过。`scripts/refactor/verify-all.sh` 本机无 bash（`Get-Command bash` 为空），按既有口径跳过；本轮为 Node 控制面改动，已 grep 确认无 Python pin 受影响。
+- 提交：`79ee592c`（代码，pre-commit eslint 通过）+ 本日志 commit；随后 push
+- 遗留移交：① **idle-reaper 不感知 viewer 计数**——recorded/failed/completed 页面长时间停留仍会被 2h 空闲收割、画面可能断（如需「页面在场豁免」须把 `getViewerCount(tid)` 纳入 `trajectory-idle-reaper.js:131` 跳过条件）② 观众计数为控制面内存态，重启清零（重启时资源本身走恢复链，短暂不一致可接受）③ 列表页「交易是否连接执行机」结论=可用 `slotLease.listHolders()` 一次快照 + 行标注（无 N+1、非实时），本轮未实现
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 16:45 · OpenCode — 开工（补记）：执行机资源连接策略 + 录制状态流转收口 + 后端观众统计
+
+- 进行中：产品诉求——① 只有 draft/recording 才自动连执行机；failed/recorded/completed 需显式「准备会话」，且只连资源不进入 recording 临时态；② completed 重录 stop 后回 recorded（需再次确认），recorded/completed 开人工录制不重录、不清步骤；③ 执行资源的释放**由后端主导、前端只协助**——多个页面/多台机器同时看同一交易录制页时保持连接，只有当**没有任何前端页面**在该交易录制页时才释放。第③点初版用 localStorage 做跨标签页协商，发现**跨机器失效**（不同机器 localStorage 不互通，会误关他人正在看的执行机）后改为后端观众登记。
+- 范围（可写集）：`src/routes/v2/trajectory-record.js`、`src/services/trajectory-service.js`、`src/services/trajectory/{trajectory-attach-runner,trajectory-manual-record,trajectory-recording-runner,trajectory-recording-service,trajectory-viewer-service}.js`、`src/dashboard/api-docs/groups/recording.js`、本协作日志；**前端 SPA 另仓** `ui-auto-recording-agent-vue`（用户自行提交）
+- 禁入区：他线工作树引擎改动（`D:\dev\JS-gen-contract`、`D:\dev\JS-gen-engine` 及其分支/服务）、`scripts/controller/**`、`scripts/prompts/**`、他线 WIP（`data/kb/req/product-mgmt/**`、Cursor 证据目录）、运行中控制面/执行机进程
+- 方式：主线程内联实现（后端 viewer 服务 + 路由 + 状态流转）；验收=eslint 全量 + `node --check` + characterize-record-status / characterize-trajectory。**本条为收工前补记**（本线会话开工时未单独声明，特此登记范围与禁入区）
+
+## 2026-09-18 16:23 · ZCode 引擎线 — 开工：引擎管线专用工作树建立 + B1-B3 缺陷修复批（用户指示引擎线此后全部改动走独立 worktree）
+
+- 进行中：用户定盘「本对话专用于引擎管线开发，此后所有引擎管线修改另起工作树进行」。已建 worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918`，基于 `5956ab7a`=origin/uara_V1.2，node_modules/python junction + .env 已落）。本单元工作清单=五轮湿测移交报告 B 类（`docs/superpowers/reports/2026-09-18-wet-test-defect-handover.md`）：**B-1（P1）TsscMultiSelect fill/select_option 路由互拒震荡**（`scripts/controller/actions/fill_dispatch.py`/`select_dispatch.py`）、**B-2（P2）stepCount 与 trajectory_step 行数对账日志**（`scripts/state.py` _record_action coalesce 口径）、**B-3（P2）executor 同 uuid 僵尸双进程互斥**（`executor/agent.mjs`）；并行调研挂账专项「stop 双实现 + 零步门禁三代收敛」（只调研不实施）。B-4 观察项/B-5 P3 不动。
+- 范围（可写集）：**worktree `D:\dev\JS-gen-engine` 内** `scripts/controller/actions/fill_dispatch.py`、`select_dispatch.py`、`scripts/state.py`（或步持久化对账点）、`executor/agent.mjs`、新 pins `scripts/characterization/characterize-*`、`scripts/refactor/verify-all.sh`（主线程登记）、`tmp/engine-pipeline/`；**主检出仅 agent-log 本条目与收工条目**
+- 禁入区：**合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918` 全部文件**（classify/intent_contract/boundary_contract/boundary_gates/click_action_engine/recorder_emitters/phase/save.py/session_runner.py——4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件；他线 WIP（`data/kb/req/product-mgmt/**`、Cursor 证据目录）；`scripts/prompts/**`；运行中录制会话
+- 方式：主线程编排；4 个 Explore 并行调研（B-1 路由判定 / B-3 executor 生命周期 / B-2 计数对账 / 专项地图）；实施子智能体文件集不相交、一律不 commit；主线程回收验收（RED pin→修→全量 verify-all 基线比对）后代提交推送分支
+- 注：合并回 uara_V1.2 时机待用户拍板（沿用合约线先例：交付分支+验收证据+未合并待批）
+
 ## 2026-09-18 12:00 · OpenCode — 收工：约束录制期「重置」按钮点击行为（回链 12:00 开工）
 
 - 完成：`c1eb92a2`——在 `ClickEngine` 入口对「重置/清空/清除/恢复默认」类按钮加阶段语义 guard：`_is_reset_button_label` 识别按钮文本；`_reset_click_allowed` 仅当 `_phase_intent` / `_phase_boundary` 的 `task_text_excerpt` 含重置语义时才允许；`click_button()` 与 `click_element_by_index()` 均拦截。Prompt 同步在 `agent-tools-table.md` / `agent-core.md` 中明确禁止查询阶段为清空已填条件而点重置。新增 pin `characterize-reset-button-guard.py` 钉死标签识别/阶段 excerpt 来源/允许与拒绝场景/复合查询+重置阶段。
