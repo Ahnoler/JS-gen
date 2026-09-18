@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-18 12:00 · OpenCode — 收工：约束录制期「重置」按钮点击行为（回链 12:00 开工）
+
+- 完成：`c1eb92a2`——在 `ClickEngine` 入口对「重置/清空/清除/恢复默认」类按钮加阶段语义 guard：`_is_reset_button_label` 识别按钮文本；`_reset_click_allowed` 仅当 `_phase_intent` / `_phase_boundary` 的 `task_text_excerpt` 含重置语义时才允许；`click_button()` 与 `click_element_by_index()` 均拦截。Prompt 同步在 `agent-tools-table.md` / `agent-core.md` 中明确禁止查询阶段为清空已填条件而点重置。新增 pin `characterize-reset-button-guard.py` 钉死标签识别/阶段 excerpt 来源/允许与拒绝场景/复合查询+重置阶段。
+- 范围：同开工声明
+- 验收（合并后集成态）：`characterize-reset-button-guard` ✅ / `characterize-reset-phase-not-query` ✅ / `characterize-real-click` ✅ / `characterize-phase-runtime` ✅ / `characterize-recorder-phase-reset` ✅ / `characterize-phase-reviewer` ✅ / `characterize-g3-done-gate-live` ✅ / `characterize-search-then-click-guard` ✅ / `characterize-click-replay-engine` ✅；`py_compile click_action_engine.py` ✅；`npx eslint src/ executor/ scripts/` 0 errors（仅既有 23 warnings，零新增）；ruff 本机未安装按 verify-all 口径跳过
+- 生效说明：控制面 + 执行机重启后生效（Python 引擎侧改动）。合并前已 `git pull` 集成远端最新（`1bc8c95e`），push 成功 `c1eb92a2`
+- 遗留：① 真机湿测建议用含「查询后误点重置」历史轨迹复录验证；② `config/.db-whitelist-seen` 运行期自动改写，未提交
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 12:00 · OpenCode — 开工：约束录制期「重置」按钮点击行为
 
 - 进行中：用户反馈录制查询/筛选流程时，agent 偶发在填完筛选字段后点击「重置」按钮再点「查询」，导致查询条件被清空、结果为空、流程卡住。目标：在 `click_button`/`click_element_by_index` 入口对「重置/清空/恢复默认」类按钮加阶段语义 guard，仅当当前阶段描述明确要求重置/清空/恢复默认时才允许点击；同时同步 prompt 与 characterization pin 钉死边界，避免误伤正常重置流程或查询流程。
