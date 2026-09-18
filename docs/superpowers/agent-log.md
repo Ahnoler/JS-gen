@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-18 09:40 · ZCode 引擎线 — 收工：重置类阶段误签 query 合同最小修法（回链 09:05 开工）
+
+- 完成：`c14d1c1f`——`classify.py is_query_task` 对含 `重置|清空|恢复默认` 语义的文本早返回 False（新 `_RESET_PHASE_RE`，仅 +5 行），重置类阶段落回 `role='other'`、`success_when=[]`，done 正常放行；真查询阶段的 `query_clicked` 硬合同原样保留（G3 无放松）
+- 验收：新 pin `characterize-reset-phase-not-query`（本案真实文本/预期结果片段/#831 式标题三路钉死 + 真查询两例反例防过度排除 + query_clicked 合同保留断言）先 RED（案件断言即红）后 GREEN；boundary/runtime/g3-done-gate-live/section-scope 四个既有 pin 复跑绿；ruff F821 归零；已注册 verify-all；合并态全量 verify-all = 3 红基线一致（step-highlight/layer-tree/confirm-notification）零新增
+- 生效说明：**控制面重启后生效**（classify 属 Python 引擎侧，执行机进程加载）；重跑对公客户评级三阶段批次即可验证阶段 3 done 一次放行
+- 遗留移交：①`reset_clicked` 专属证据令牌（重置按钮点击证据 + role='reset' 合同分支）作为后续合约加固项，顺带覆盖 wizard「下一步」等靠 `or` 兜底的角色 ②`boundary_contract.py:276` 的 `or ['query_clicked']` 兜底仍是把空合同抬升为 query 合同的隐患点（本案非其直接肇因，role=query 时才触达），列结构收敛专项一并处理 ③不维护 CHANGELOG
+
 ## 2026-09-18 09:05 · ZCode 引擎线 — 开工：重置类阶段被误签 query 合同致 done 死循环（最小修法）
 
 - 进行中：真机日志（对公客户评级三阶段，桌面 log.txt）——阶段 3「点击【重置】按钮，清空所有**查询**条件字段」done 被拒 6 次 + 预算 +42 死循环。根因已实测复现：`classify.py is_query_task` 关键词误伤——「查询条件」里的「查询」命中 `_QUERY_TASK_RE`+`_QUERY_CONDITION_RE` 且无排除 → 编译出 `role='query', success_when=['query_clicked']`，而重置动作永远产不出该令牌（仅点「查询/搜索」按钮记录），reviewer（mode=other, kinds=[]）与规则编译器打架、门禁听编译器。用户拍板最小修法（A）：`is_query_task` 对含 `重置/清空/恢复默认` 语义的文本早返回 False → role 落回 other、success_when=[]，done 正常放行；**接受小放松**（重置类阶段暂无正向证据校验，与其它 other 类阶段同级），`reset_clicked` 专属令牌列后续加固项
