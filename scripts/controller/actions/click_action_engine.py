@@ -38,6 +38,44 @@ _FIRST_ROW_RADIO_LOCAL = (
     "or contains(@class,'el-checkbox')]"
 )
 
+# Reset/clear button labels — dangerous in query phases because they wipe
+# conditions the agent just filled.  Only allowed when the phase description
+# explicitly asks for a reset action.
+_RESET_BTN_RE = re.compile(
+    r'^(重置|清空|清除|恢复默认|全部清空|清空条件|清空筛选|清除条件|清除筛选)$'
+)
+_RESET_PHASE_RE = re.compile(r'重置|清空|清除|恢复默认')
+
+
+def _is_reset_button_label(text: str) -> bool:
+    t = re.sub(r'\s+', '', (text or '').strip())
+    return bool(t and _RESET_BTN_RE.match(t))
+
+
+def _phase_text_excerpt(store: dict | None) -> str:
+    if not store:
+        return ''
+    for key in ('_phase_intent', '_phase_boundary'):
+        blob = store.get(key)
+        if isinstance(blob, dict):
+            excerpt = blob.get('task_text_excerpt') or ''
+            if excerpt:
+                return str(excerpt)
+    return ''
+
+
+def _reset_click_allowed(store: dict | None, button_text: str = '') -> bool:
+    """True only when the current phase description explicitly requests reset/clear."""
+    excerpt = _phase_text_excerpt(store)
+    if not excerpt:
+        # No phase contract -> conservative: still allow if button text itself
+        # signals reset and we cannot know intent.  In practice phase contract
+        # is always present during AI recording; default-deny here prevents
+        # accidental clears in the rare no-contract path.
+        return False
+    return bool(_RESET_PHASE_RE.search(excerpt))
+
+
 _JS_STC_OVERLAY_SCOPE = '''() => {
     const overlays = [...document.querySelectorAll('.el-drawer, .el-dialog, .el-message-box')]
         .filter((d) => {
@@ -97,6 +135,18 @@ class ClickEngine:
                 f'err-use-click-save:{bt} | '
                 f'"保存/提交/确认"类按钮请改用 click_save(button_text="{bt}")；'
                 f'分区保存用 click_save(button_text="{bt}", region="<分区标题>")'
+            )
+        if _is_reset_button_label(bt) and not _reset_click_allowed(
+            self.business_data_store, bt
+        ):
+            excerpt = _phase_text_excerpt(self.business_data_store)
+            return err_with(
+                "reset-not-allowed",
+                f"当前阶段未要求重置/清空，禁止点击「{bt}」按钮",
+                observed=f"阶段描述：{excerpt or '无'}",
+                next_action="按阶段要求继续点击「查询/搜索」或直接 done；"
+                "如确需重置，请在阶段描述中明确包含「重置/清空/恢复默认」",
+                include_in_memory=True,
             )
         page = await self.browser_context.get_current_page()
         # Pre-strip stale dialog wrappers (tsscMutilDialog 关闭残留) so real
@@ -235,6 +285,35 @@ class ClickEngine:
                     tag_name=tag_name,
                     attributes=element_node.attributes or {},
                 )
+
+            # Reset-button guard for index clicks: stop agents from wiping query
+            # filters via an indexed reset/clear button unless the phase asks for it.
+            idx_label = ((element_info or {}).get('text') or elem_text or '').strip()
+            if idx_label and _is_reset_button_label(idx_label):
+                is_btn = False
+                if element_info:
+                    e_tag = str(element_info.get('tag_name') or tag_name or '').lower()
+                    e_cls = str(
+                        (element_info.get('attributes') or {}).get('class') or ''
+                    ).lower()
+                    e_kind = str(element_info.get('target_kind') or '').lower()
+                    is_btn = (
+                        e_tag in ('button', 'a')
+                        or 'button' in e_kind
+                        or 'el-button' in e_cls
+                    )
+                if is_btn and not _reset_click_allowed(
+                    self.business_data_store, idx_label
+                ):
+                    excerpt = _phase_text_excerpt(self.business_data_store)
+                    return err_with(
+                        "reset-not-allowed",
+                        f"当前阶段未要求重置/清空，禁止通过索引点击「{idx_label}」按钮",
+                        observed=f"阶段描述：{excerpt or '无'}",
+                        next_action="按阶段要求继续点击「查询/搜索」或直接 done；"
+                        "如确需重置，请在阶段描述中明确包含「重置/清空/恢复默认」",
+                        include_in_memory=True,
+                    )
 
             # Forbid index-click on el-select dropdown surfaces (option li / table-in-select
             # rows / dropdown body). Agents otherwise record 点击元素 with concatenated
