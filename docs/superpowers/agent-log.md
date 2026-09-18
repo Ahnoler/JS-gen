@@ -1,6 +1,13 @@
 # Agent 协作日志
 
 
+## 2026-09-18 20:25 · OpenCode — 方案确认：进入实现阶段，分支勘误 uara_V2.0.1，idle-reaper 录制中回收纳入 failed(interrupted)
+
+- 用户确认：① 在 `uara_V2.0.1` 分支继续实施方案 A（原开工声明误写为 `uara_V2.0`）；② 所有非用户显式 `record/stop` 的资源释放，包括 idle-reaper 对录制中交易的 2h 空闲回收，一律标为 `failed` + `interrupted`（录制中断），后续如长流程误杀可再调整超时阈值；③ 前端 `recording` 不再自动 prepare、prepare 不再进入 `recording` 临时态的语义不变。
+- 进行中：开始修改源码/迁移/pin/api-docs/前端，范围待实现阶段声明后锁定。
+- 下一步：立即 `git pull` 拉取 `uara_V2.0.1` 远端最新，然后在合并后的集成态上实施并验收。
+- 禁入区：他线 worktree（`D:\dev\JS-gen-engine`、`D:\dev\JS-gen-contract`）；`scripts/prompts/**`；运行中 4097/执行机进程；`data/kb/req/product-mgmt/**`。
+
 ## 2026-09-18 18:00 · OpenCode — 开工：重构 record_status 语义，让 recording 真正表示「正在录制」
 
 - 进行中：按任务 §6 出第一阶段设计方案（现状梳理/状态机/方案对比/迁移/前端/回归/风险），用户确认后才进入实现；当前禁止修改源码/迁移/pin/api-docs/前端。
