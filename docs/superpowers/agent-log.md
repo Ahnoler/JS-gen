@@ -1,5 +1,62 @@
 # Agent 协作日志
 
+## 2026-09-18 17:27 · ZCode 引擎线 — 开工：B-6 fill_engine 局部 import 遮蔽 UnboundLocalError 修复（用户指示不合入 uara_V1.2、继续修复缺陷）
+
+- 进行中：接用户指令「不要合入 uara_V1.2，继续修复缺陷」，实施 wet6 新报 B-6（P1，`docs/superpowers/reports/2026-09-18-fill-engine-unboundlocal-bug.md`，traj #877 实证）：`fill_engine.py` 的 `fill_form_field` 内四处分支级 `from .result_protocol import …`（实测 :220 tssc / :232 tree-select / :334 与 :471 两处 field-disabled 旁路——比报告多一处）把 err_with/recommend_action_for_kind 绑定成函数局部名，field-disabled 路径未经过前两处 import 即调用 err_with → UnboundLocalError，agent 收不到 err-field-disabled 结构化指引（#877 实测单阶段试错硬耗 119 步）。修法=模块级 :37 统一导入 + 删四处局部 import；新 pin `characterize-fill-err-with-scope.py`（symtable 编译器级作用域断言：fill_form_field 内 err_with/recommend_action_for_kind 必须 GLOBAL 非 LOCAL——该谓词即 UnboundLocalError 充要条件 + 行为 needle 不回归）先 RED 后 GREEN。
+- 范围（可写集）：**worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918` @ 583b1ffd）内** `scripts/controller/actions/fill_engine.py`、新 pin `scripts/characterization/characterize-fill-err-with-scope.py`、`scripts/refactor/verify-all.sh`（登记一行）；主检出仅 agent-log 本条目与收工条目
+- 禁入区：合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918`（4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件与他线 WIP（`data/kb/req/product-mgmt/**`、`.cursor/`）；`scripts/prompts/**`；B1-B3 已交付文件（select_engine.py/runner 等）本单元不动；Cursor 在途 `tools/recording-coach/**`（17:30 开工，文件集不相交；verify-all.sh 双方各登记一行，push 时按协作约定并排解决）；运行中录制会话
+- 方式：主线程内联实施（单文件小修不派子智能体）；RED pin→最小修复→相关既有 pin 回归→全量 verify-all 基线比对（3 红）→合并后验收→代提交推送；不合入 uara_V1.2
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 17:30 · Cursor — 开工：recording-coach MVP 实现（回链 design/plan）
+
+- 进行中：按 `plans/2026-09-18-recording-coach-opencode.md` Tasks 1–6 落地 `tools/recording-coach/`（assert_steps、workflow、HTTP tools、OpenCode 会话、README、WET-CHECKLIST）；skill 已在 `tools/recording-coach/skill/`
+- 范围：`tools/recording-coach/**`；`scripts/characterization/cold/characterize-recording-coach-assert.mjs`；`scripts/refactor/verify-all.sh` 登记一行；本协作日志
+- 禁入区：控制面 `src/**` 产品主链；引擎/合约 worktree；运行中录制槽（本单元不做真机 wet Task 6 全链路除非执行机空闲）
+- 方式：主会话 Inline
+
+## 2026-09-18 17:25 · Cursor — 补记：ui-record-wet-test skill 迁入 recording-coach
+
+- 完成：`scripts/prompts/skills/ui-record-wet-test/SKILL.md` → **`tools/recording-coach/skill/SKILL.md`**（真源）；旧路径留跳转 stub；废除旁路 `brief.md` 设想；同步 design / plan / ui-record guide
+- 范围：skill 迁移 + 文档交叉链接；无 OpenCode 代码实现
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 17:15 · Cursor — 补记：录制陪跑设计增补双层会话与数据存放
+
+- 完成：修订 `docs/superpowers/specs/2026-09-18-recording-coach-opencode-design.md` §3/§5.1–§5.2/§9–§14——OpenCode Session≠Workflow；权威 `workflow.json` 落 `tmp/recording-coach-*/`；步骤仍在 MySQL；tool 推进相；Recording 互斥
+- 范围：仅该 design spec；无代码
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 17:12 · ZCode 引擎线 — 收工：B1-B3 实施批完成（回链 16:48 开工；分支已交付未合并，待用户审阅）
+
+- 完成：引擎分支 `engine/pipeline-20260918` 两个提交——`216b2688`（B1-B3 修复本体，11 文件 +639/−27）+ `583b1ffd`（合并 origin/uara_V1.2 集成态验收后推送）：
+  - **B-1（P1）** `select_engine.py`：store 缓存路由（reason∈target_kind/field_kind）被执行体 live 否认（no-tssc-multi-select）时落穿既有 el-select 路径（stderr `[tssc-route-conflict]`），live 探针路由保持原直接返回（cold pin needle `return await self.tssc_multi_select(` 保全）；自我循环文案改冲突指引（先 scan_form_fields 刷新、勿回退 fill_form_field、勿同参数重试）。断环机理：fill 侧原样未动，select 侧自行消化 store/live 分歧后 agent 只剩单一路径。
+  - **B-2（P2）** `[traj-recon]` 四挂点对账日志（零行为变更）：coalesce unmapped 映射（A2 判据）、remove requested/deleted/mismatch、phase rawRows/bizRows/copyBiz/maxStep/gaps（A1/B1 判据）、finalize 扩字段。下轮湿测读数判别表在 spec §2.3。
+  - **B-3（P2）** executor 同 uuid 僵尸双进程三残留缺口：ws-client close 4001 → exit(2)、`duplicate_node_uuid` 结构化信号双保险（registry payload + agent 识别）、401 连续 5 次 → exit(3)（网络错误重置连击，保持「网络重连/身份退出」语义）；锁移 `os.tmpdir()/js-gen-executor-<uuid8>.lock`（跨检出互斥、uuid 隔离保留，env 指定 uuid 语义不变）；`executor-ws.js` attach 校验前置于 DB upsert（被拒不再刷 DB 假活；同 pid 顶替与旧版 pid==null 路径不受影响）。
+- 验收（合并后集成态，spec §五清单逐项）：
+  - 3 新 pin 全部 RED 先行（未修源上跑红留证）→ GREEN，已登记 `scripts/refactor/verify-all.sh`：`characterize-tssc-route-conflict`（含行为冒烟：落穿成功+无自我循环句双向断言）/ `characterize-traj-recon-logging`（四挂点+单行格式+无挂点5）/ `characterize-executor-duplicate-uuid`（15 断言含 attach 先于 upsert 顺序）
+  - 全量 verify-all 逐行比对：**干净基线 → 修复态 → 合并集成态 三态失败集逐行一致**，恰为已知 3 红（step-highlight / layer-tree / confirm-notification），零新增；3 新 pin 合并态全绿
+  - 越界审查：`git diff --stat` 恰为授权 7 源文件 + 3 新 pin + verify-all.sh；`py_compile`/`node --check` 全过；eslint 0 errors、22 warnings 全既有零新增
+  - **合并后集成**：远端 uara_V1.2 新增他线 `79ee592c`（executor-connection policy + viewer tracking，触碰 runner :436 区域，与本线 ：595+ 区域不同段自动合并无冲突）；集成态重跑全量 verify-all 与修复态逐行一致 + 3 新 pin 复绿 + node --check/eslint 复过——他线改动未破坏本批修复、本批未破坏他线功能
+- 交付形态：**仅分支不合并**（沿用合约线先例），`engine/pipeline-20260918` @ `583b1ffd` 已推送；合并回 uara_V1.2 待用户拍板。spec §六 四决策点按推荐方案执行（B-1 方案 1 / B-2 只加日志 / B-3 401 五次退出+4001 即退+锁 tmpdir+attach 前置 / 专项只交地图），用户以「接手完成任务后待审阅」放行
+- 遗留移交：①**B-6（P1，wet6 新报）fill_engine 条件导入遮蔽 UnboundLocalError（traj 877）本批未动**——落在 fill_engine.py（B-1 明确禁改文件），建议下一单元优先；②B-1 方案 2/3（fill 侧 live 复核、三判定谓词统一）后置 hardening；③B-2 步号回补修法待下轮 `[traj-recon]` 读数后小步实施；④B-3 双进程手工冒烟（同 uuid 起第二实例应 exit 2）待下轮 wet-test 窗口执行（spec §3.3）；⑤挂账专项 stop 双实现+零步门禁三代本批未实施（收敛地图在 `reports/2026-09-18-stop-zero-gate-convergence-survey.md`）；⑥**Python 侧改动（select_engine.py）生效需控制面重启**——4097 正从合约 worktree 运行（禁入），重启时机须与用户协调；⑦三个实施子智能体报告中的 RED/GREEN 原始输出在其回执内，本条目未重复
+- 注：不维护 CHANGELOG；子智能体未 commit，全部改动由主线程验收后代提交（本收工条目仅含主检出 agent-log）
+
+## 2026-09-18 17:00 · Cursor — 收工：录制陪跑 OpenCode 设计定稿（回链 17:00 开工）
+
+- 完成：`docs/superpowers/specs/2026-09-18-recording-coach-opencode-design.md`（旁路 CLI、状态机、tools、`assert_steps` 规则验收、MVP/Phase2、与 standalone 并存）
+- 交叉链接：`scripts/prompts/skills/ui-record-wet-test/SKILL.md`、`docs/superpowers/guides/ui-record-through-line-agent-prompt.md`
+- 验收：设计文档 §1–§14 齐套；本单元无产品代码、无 OpenCode 接入实现
+- 遗留移交：实现计划 `plans/2026-09-18-recording-coach-opencode.md` 另开；`start` 同步/轮询与 SDK 版本在实现计划锁定
+- 注：不维护 CHANGELOG
+
+## 2026-09-18 17:00 · Cursor — 开工：录制陪跑 Agent（OpenCode + Skill）方案文档
+
+- 进行中：按已批 plan 撰写设计 spec + skill/guide 交叉链接；不实现 `tools/recording-coach/` 代码
+- 范围：`docs/superpowers/specs/2026-09-18-recording-coach-opencode-design.md`；skill 与 ui-record guide 各一行链接；本协作日志
+- 禁入区：引擎 worktree / 合约 worktree；`src/**` 产品主链；运行中 4097 录制会话；OpenCode SDK 依赖引入（本单元仅文档）
+- 方式：主会话 Inline 文档
+
 ## 2026-09-18 16:48 · ZCode 引擎线 — 开工（续接 16:45 移交）：B1-B3 实施批（用户指示「接手完成任务后待审阅」，视为 §六 四决策点按 spec 推荐方案放行）
 
 - 进行中：接手引擎线移交单元，按 spec `specs/2026-09-18-engine-pipeline-b123-fix-design.md` §五 剧本实施：**A（B-1）** `select_engine.py` tssc 落穿+冲突文案 + 新 pin `characterize-tssc-route-conflict.py`；**B（B-2）** `trajectory-recording-runner.js`/`trajectory-persist-service.js` 四挂点 `[traj-recon]` 对账日志（零行为变更）+ 新 pin `characterize-traj-recon-logging.mjs`；**C（B-3）** `executor/ws-client.js`（4001 即退 exit 2 / duplicate_node_uuid 识别 / 401 连续 5 次退 exit 3）+ `executor/config.js` 锁移 os.tmpdir() + `src/executor-registry.js`/`src/executor-ws.js` attach 校验前置 + 新 pin `characterize-executor-duplicate-uuid.mjs`。全部先 RED pin 后最小修复。
