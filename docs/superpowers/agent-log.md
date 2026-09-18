@@ -1,5 +1,27 @@
 # Agent 协作日志
 
+## 2026-09-18 16:48 · ZCode 引擎线 — 开工（续接 16:45 移交）：B1-B3 实施批（用户指示「接手完成任务后待审阅」，视为 §六 四决策点按 spec 推荐方案放行）
+
+- 进行中：接手引擎线移交单元，按 spec `specs/2026-09-18-engine-pipeline-b123-fix-design.md` §五 剧本实施：**A（B-1）** `select_engine.py` tssc 落穿+冲突文案 + 新 pin `characterize-tssc-route-conflict.py`；**B（B-2）** `trajectory-recording-runner.js`/`trajectory-persist-service.js` 四挂点 `[traj-recon]` 对账日志（零行为变更）+ 新 pin `characterize-traj-recon-logging.mjs`；**C（B-3）** `executor/ws-client.js`（4001 即退 exit 2 / duplicate_node_uuid 识别 / 401 连续 5 次退 exit 3）+ `executor/config.js` 锁移 os.tmpdir() + `src/executor-registry.js`/`src/executor-ws.js` attach 校验前置 + 新 pin `characterize-executor-duplicate-uuid.mjs`。全部先 RED pin 后最小修复。
+- 范围（可写集）：**worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918`）内** 上列 7 个源文件 + 3 个新 pin + `scripts/refactor/verify-all.sh`（主线程登记）+ 本 spec 修订；主检出仅 agent-log 本条目与收工条目
+- 禁入区：合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918`（4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件与他线 WIP（`data/kb/req/product-mgmt/**`、`.cursor/`）；`scripts/prompts/**`；fill_engine.py/fill_dispatch.py/select_dispatch.py/tssc_multi_select.py（B-1 明确不动）；runner 内 gate/stop 逻辑（B-2 只加日志）；心跳/重连既有语义（B-3）；运行中录制会话
+- 方式：主线程代 3 个 general-purpose 实施子智能体声明（文件集互不相交、一律不 commit，主线程回收验收：RED 证据/越界审查/py_compile·node --check/eslint/全量 verify-all 3 红基线零新增后代提交推送）
+- 注：合并回 uara_V1.2 待用户拍板；本条目声明同时覆盖三个子智能体的工作范围
+
+## 2026-09-18 16:45 · ZCode 引擎线 — 移交：会话移交下一引擎线会话（回链 16:23 开工；实施未开始，处于决策点待批中断态）
+
+- 交接背景：用户指示引擎管线专会话+独立工作树开发，本会话完成后移交另一会话继续。
+- **状态**：本单元未收工——处于「调研/spec/评审对照/证据补采全部完成，spec §六 四决策点待用户批准，实施未开始」中断态。开工条目 16:23 的「进行中」由接收会话闭环收工。
+- **已交付（分支 `engine/pipeline-20260918`，worktree `D:\dev\JS-gen-engine`，全部已推送）**：
+  - 调研+spec+专项地图：`32a73fc2`（spec `specs/2026-09-18-engine-pipeline-b123-fix-design.md` + 报告 `reports/2026-09-18-stop-zero-gate-convergence-survey.md`）
+  - 评审对照：`e52f8ab0`（spec §七，reviewer/QA 移交单逐条对照=全覆盖一致，含落点更正：B-1 真实修复落点 `select_engine.py`，`fill_dispatch.py` 不含 tssc 判定）
+  - 证据补采：`b9f40e51`（spec §六）——B-2 **DB 实测翻案**：#859「15 行 vs stepCount 13」=13 业务步+2 条 save_form_snapshot meta 步，**口径差非缺陷**；真缺陷仅 #858 空号 #8（假说 B1 实锤）；B-3 考古：现码 401=无限重连循环（`ws-client.js:104-114`），台账「401 后重试一次即退出」系 606277a 前 unref 时代形态，**记忆已勘误**（memory `server-deployment-mysql57.md`）
+  - 交接文档：`ab2f0ec5`（`reports/2026-09-18-engine-pipeline-handover.md`——环境配方/调研结论表/批准后执行剧本/禁入区红线/接收第一步清单）
+- **主检出本单元零代码改动**（agent-log 条目除外）；一切代码/文档在引擎 worktree，符合「引擎管线改动走独立工作树」用户指示。
+- 环境事实（接收会话直接用）：worktree 已建 `D:\dev\JS-gen-engine`（node_modules/python junction + .env 已复制 + tmp/ 已建）；只读取证脚本 `tmp/recon-evidence-859.mjs` 可复跑；**服务（4097+LMY）仍从合约 worktree 运行，禁入不重启**。
+- 遗留移交：①spec §六 四决策点等用户批准（B-1 方案 1/B-2 只加日志/B-3 401 五次退出/专项只交地图）；②批准后按 spec §五 派 3 个实施子智能体（文件集互不相交，不 commit，主线程回收验收）；③合并回 uara_V1.2 待用户拍板；④挂账专项（stop 双实现+零步门禁三代）本批不实施。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 16:45 · OpenCode — 收工：执行机资源连接策略 + 录制状态流转收口 + 后端观众统计（回链 16:45 补记开工）
 
 - 完成：**`79ee592c`（JS-gen）**——
