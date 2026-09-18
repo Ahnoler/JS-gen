@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-18 10:20 · ZCode 合约线 — 开工：阶段合约冲突普查三批修复（worktree 隔离）
+
+- 进行中：重置死循环（C1）同族普查完结，本单元实施三批修复——批A=classify.py 冲突家族 S1（硬排除缺新增/录入/维护）/S2（「查询条件字段展开」few-shot 文本）/S2b（导航含查询词）/S3（`_QUERY_EXCLUDE_RE` 缺维护/更新/变更）+ 动作子句轴；批B=令牌对称 S4（`_NEXT_BTN_RE` 扩上一步）/S5（click_button 接 `maybe_record_click_completion_evidence`）；批C=仲裁盲区补全（intent_contract.py:324 mode='other' 信 LLM 降级留痕）+ done 熔断（同 missing 集≥3 次→contract_suspect 放行+审计）+ boundary_contract.py:276 兜底收敛。LLM 置信评估结论=新增独立通道伪需求、补全既有 reviewer 仲裁接线为真（已与用户拍板）
+- 范围（可写集）：**worktree `D:\dev\JS-gen-contract`（分支 `fix/phase-contract-20260918`，基于 uara_V1.2）内** `scripts/controller/actions/phase/classify.py`、`phase/intent_contract.py`、`phase/boundary_contract.py`、`phase/boundary_gates.py`、`scripts/controller/actions/click_action_engine.py`、`scripts/agent/recorder_emitters.py`、pin `characterize-reset-phase-not-query.py`/`characterize-recorder-phase-reset.py`（同 commit 修订注明）/新 pin×2、`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`；**主检出仅 agent-log 本条目与后续收工条目**
+- 禁入区：主检出一切代码文件（全部改动在 worktree）；他线 WIP（`data/kb/req/product-mgmt/**`、Cursor STC 证据目录）；`scripts/prompts/**`；运行中控制面/执行机进程（重启时机另行协调）
+- 方式：主线程建 worktree+基线+报告；三个 general-purpose 子智能体并行实施（文件集不相交、均不 commit）；主线程回收验收（py_compile/越界/lint/全量 verify-all）后合并回 uara_V1.2 合并态终验
+
 ## 2026-09-18 09:35 · ZCode 引擎线 — 收工：重置排除精确化（回链 09:18 开工）
 
 - 完成：`2c94434b`——`classify.py` 新 `_QUERY_ACTION_RE`（点击查询/点击搜索/执行查询/执行搜索/查询按钮/搜索按钮），重置排除改条件生效（`and not` 一处）：纯重置/名词性「查询条件」阶段仍落 other 无令牌（本案修复不变）；含显式查询动作的复合阶段保留 query 合同（`query_clicked` 在其流程内可产出，消除「误入 maintain 合同→永不满足」的新死锁形态）；真查询合同零放松
