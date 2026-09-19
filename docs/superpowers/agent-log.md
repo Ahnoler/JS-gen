@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-19 19:20 · ZCode 合约线 — 开工：B3 解锁裁决重试单（#904，守门修复集成验收）
+
+- 进行中：引擎线已从真实控制台重启服务（V2.0 @ f709fdc3，health 200、执行机 LMY online inUse=0，运行代码含 _IDEMPOTENT_BTN_RE，KB 错位态配方在场——引擎线五项独立核验通过）。本单元开 **B3 重试单**（#904「wet9B3R 设置阶段到管控要素解锁重试-20260919」，阶段 2374-2381，fid 9000000740，acct 2）：8 阶段切片（裁决独立 P6），任务文本预埋两条对策门闩——①序号字段一律 `fill_form_field(label=序号)`（#903 real_click 三次未命中教训）②树重载错位态重搜配方 + 搜索图标可多次点击（守门修复已上线）。**本单同时是守门修复集成验收**：already-operated-this-phase 拒绝搜索图标二次点击签名应不再出现。
+- 范围（可写集）：`tmp/contract-wet9-20260919/`（b3r 证据子目录 + 报文 + 报告）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`（引擎工作树）、`scripts/controller/**`（引擎线地盘）、SUT 存量阶段/产品（只动 stamp：wet9阶段R/wet9B3R/wet9B3产品R-20260919）
+- 方式：主线程 analyze/create 已完成 → 派发录制操作员子智能体（prepare→CDP 预检→record/start→poll→detach→落库证据）→ 主线程独立落库验收（doneLogs+steps+守门签名核查）→ through-report-b3r → 收工条目；结果回传引擎线台账
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-19 12:55 · ZCode 合约线 — 收工：建议②落地（product_library 先查再点补错位态配方，回链 12:25 开工）
 
 - 完成：引擎线交付 wet9 幂等点击守门放行（81a17f22 → uara_V2.0 4db25cd8）的配套 KB 配方——`data/kb/flows/product_library.json`「先查再点」rule 追加（单行 diff）：**树重载（新增/保存节点自动刷新、【刷新产品树】、loadingTree()）会清 el-tree 过滤但搜索框关键字仍在（错位态：框里有词、树是全量，wet9 实证）——重载后须重填关键字并再次点击搜索图标再定位节点；搜索图标本阶段可能需多次点击（引擎已放行幂等动作重复点击）**。后续产品库任务门闩可直接引用该句预声明。
