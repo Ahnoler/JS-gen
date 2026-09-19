@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-19 20:20 · ZCode 合约线 — 收工：nav-reclick 修复并 V2.0 完成（fd30f4a7，回链 20:05 开工）
+
+- 完成：`engine/nav-reclick-gate-20260919` @ d2adf8e3（用户已批）+ 合约分支 agent-log 条目一并并入 `uara_V2.0`（两个合并提交：0c175ac5 引擎修复 + fd30f4a7 agent-log，已推 `5fd80248..fd30f4a7`）。agent-log 冲突按纪律双侧保留、严格时间序重排（285 条 = 278 + 引擎 4 + 合约 3，逐一在位校验；中间发现重排时 12:25 及更早尾部被截断，已从 f709fdc3 版本补回后 amend，无丢失）。
+- 合并态验收（D:\dev\JS-gen 主检出 ff 至 fd30f4a7 实跑）：`characterize-idempotent-click-gate` OK（nav-reclick 判定+预算+留痕+处方全绿）；`characterize-reset-button-guard` 全过；JS `characterize-flow-card-recall` 26/26；Python `characterize-kb-recall` ok（已知 py-divergence 噪声不变）。临时 worktree 已清理。
+- **生效条件知会（回引擎线遗留①）**：运行态仍是 81a17f22 守门（无导航重击限流）——下轮湿测前须引擎线真实控制台重启（切 V2.0→pull→restart-local.cmd，判据 `curl /api/health` 200）。
+- 下单预告：#905 B3 第二重试（任务文本两处修正：①点名每表单确切提交按钮=「保存」，移除「保 存/确 定兼容」措辞防 agent 误读任选；②预埋导航复位配方=卡死时导航元素可重点击 1 次，仍不行则 report 上报）。本单同时是 nav-reclick 限流集成验收（`[nav-reclick]` 留痕 + 预算耗尽处方文案取证）+ 解锁裁决第三试。
+- 注：合并协调轮次，合约侧零代码改动；不维护 CHANGELOG
+
 ## 2026-09-19 20:05 · ZCode 合约线 — 开工：nav-reclick 修复并 V2.0（d2adf8e3 + 合约分支 agent-log，用户已批）
 
 - 进行中：引擎线交付 wet9-B3r ③裁决修复（engine/nav-reclick-gate-20260919 @ d2adf8e3，导航类元素限流重点击：a/li/menu-class 判定 + 每元素每阶段 1 次重击预算 + [nav-reclick] 留痕 + 耗尽处方文案）。合约线只读复核通过（判定覆盖 #904 两实证元素、预算语义与裁决逐字对齐、__navreclick__ 命名空间随阶段清理归零、per-element 隔离有行为断言；搜索图标 a 标签空 text 落导航预算路径恰好覆盖错位态配方"重点一次"的量）。用户已批合并，按上轮分工执行。
