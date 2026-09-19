@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-19 19:37 · ZCode 引擎线 — 开工：③裁决=导航重击限流放行（新单元）+ B3 PASS 回执确认闭环 wet9 + 四项登记
+
+- **B3 回执确认（wet9 全链闭环）**：#904 f709fdc3 真机——守门修复集成验收 PASS（err-icon-label-miss 0 次、#902/#903 签名未复现、41 行 error 全 NULL）+ KB 错位态配方生产首秀全链走通。至此 wet9 缺陷全生命周期闭环：调研（合约线）→ 修复 `81a17f22` → 合并 `4db25cd8` → 重启激活（f709fdc3 运行态）→ 生产验收 PASS。
+- **新单元进行中（③裁决落地）**：裁决=**纳入菜单/链接类幂等导航重击，但不全量放开**——`click_element_by_index` 守门对导航类元素（tag a/li 或 class 含 menu/nav/breadcrumb）重复点击设**每元素每阶段 1 次额外重击预算**（第 1 次重击放行并 stderr `[nav-reclick]` 留痕，第 2 次重击拒绝且文案给处方「页面可能卡死，改走 report/换会话」）；预算计数存于 `_phase_ai_operations` 内 `__navreclick__` 前缀键（随 `_clear_phase_form_state` 换阶段自动清零，element_guard.py 记录模块仍零改动）。既恢复「页面卡死复位」自愈路径（#904 P6：菜单[33]/产品树[37]被拒），又封合约线警示的循环风险。非导航元素（按钮类）行为不变；`click_button` 文本路径不动（菜单点击走 index 路径）。
+- **四项登记（本单元不动，定性如下）**：①P5 零步完成（73s/0step/0doneLog 却 completed）——**正是挂账专项预测的 stop(success) 绕过零步门禁假成功形态**（`2026-09-18-stop-zero-gate-convergence-survey.md` 最大复活口的实证），建议下批优先立项该专项；②失败动作占步号不落库（缺号 25-30，#903 同款）——B-2 `[traj-recon]` gaps 观测家族，读数判据已备；③静默提交失败无 toast 采样（二连）——SUT 侧反馈缺失，登记归 SUT 改进项+doneLog probe（建议③族）；④failedReason 无阶段号——小改待排。①②③④均不影响本单元。
+- 分支：**`engine/nav-reclick-gate-20260919`（从 uara_V2.0 @ 20509136 切）**，交付分支不合并，收工条目「未合并待批」
+- 范围（可写集）：worktree 内 `scripts/controller/actions/click_action_engine.py`、pin `scripts/characterization/characterize-idempotent-click-gate.py`（同族扩展）；主检出仅 agent-log
+- 禁入区：运行中服务（控制面+LMY 正从本 worktree f709fdc3 运行——**只改文件不重启**，运行中进程已载入内存不受影响；新录制会话在实施完成前有小窗口载入 WIP 代码的风险，B3 已收口、暂无在途录制，风险接受并留痕）；element_guard.py（继续零改动）；合约 worktree；他线 WIP
+- 方式：主线程内联实施；RED（pin 扩展先跑红）→最小修复→回归→全量 verify-all→合并后验收→分支交付
+- 注：不维护 CHANGELOG
+
 ## 2026-09-19 18:54 · ZCode 引擎线 — 收工：重启完成确认，回执合约线开 B3 重试单（回链 18:49 就绪条目）
 
 - 完成：用户从真实控制台执行 `restart-local.cmd`，引擎线独立核验——①`curl http://127.0.0.1:4097/api/health` = **200**；②4097 LISTENING（pid 32472）；③`tmp/server-main.log` 确认控制面从**引擎 worktree（f709fdc3）**拉起（startup 序列 + batch recovery 正常）；④执行机 LMY 已注册 online（`executor-main.log` registered + `/api/v2/executors` connected=true，inUse=0）；⑤运行代码含 wet9 守门修复（`_IDEMPOTENT_BTN_RE` 在场）+ KB 错位态配方（f709fdc3 基线核实过）。
