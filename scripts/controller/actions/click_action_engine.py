@@ -46,6 +46,21 @@ _RESET_BTN_RE = re.compile(
 )
 _RESET_PHASE_RE = re.compile(r'重置|清空|清除|恢复默认')
 
+# wet9 (#902/#903): SUT 树重载会清掉 el-tree 过滤但保留搜索框关键字，自愈须
+# 再点一次搜索图标——幂等动作（搜索/查询/检索/刷新/翻页）天然需要同元素多次
+# 触发，already-operated-this-phase 拒绝会堵死该自愈路径（错位态锁死）。
+# 全锚定匹配：复合词（如「保存查询方案」含查询）不放行。
+_IDEMPOTENT_BTN_RE = re.compile(
+    r'^(搜索|查询|检索|刷新|重新加载|加载|翻页|下一页|上一页|末页|首页|'
+    r'(?:重新)?(?:搜索|查询|检索|刷新)(?:图标|按钮|产品树|列表|树|数据|页面|条件|结果)*|'
+    r'刷新[列表树数据页面]*|搜索图标|查询图标|刷新图标)$'
+)
+
+
+def _is_idempotent_click_label(text: str) -> bool:
+    t = re.sub(r'\s+', '', (text or '').strip())
+    return bool(t and _IDEMPOTENT_BTN_RE.match(t))
+
 
 def _is_reset_button_label(text: str) -> bool:
     t = re.sub(r'\s+', '', (text or '').strip())
@@ -177,14 +192,17 @@ class ClickEngine:
         button_identities = [f'button:{button_text.strip()}']
         if button_xpath:
             button_identities = [f'click:{button_xpath}']
-        duplicate = duplicate_phase_operation_any(
-            self.business_data_store, button_identities,
-        )
-        if duplicate:
-            return _ok(
-                f'already-operated-this-phase:button={button_text} via {duplicate}; '
-                'do not click the same button again; verify state and continue the phase'
+        # 幂等动作（搜索/查询/刷新/翻页）放行同元素重复点击：SUT 树/列表
+        # 重载后过滤失效须重触发（wet9 #902/#903）；记录仍照常写入。
+        if not _is_idempotent_click_label(button_text):
+            duplicate = duplicate_phase_operation_any(
+                self.business_data_store, button_identities,
             )
+            if duplicate:
+                return _ok(
+                    f'already-operated-this-phase:button={button_text} via {duplicate}; '
+                    'do not click the same button again; verify state and continue the phase'
+                )
         # G1 container-scope-first: if a visible drawer/dialog is open and a
         # matching button exists inside it, click the in-overlay one; only fall
         # back to the page-level JS_CLICK_ICON_BUTTON on miss (original
@@ -365,7 +383,12 @@ class ClickEngine:
                     }''', gate_xp))
                 except Exception:
                     date_panel_click = False
-            if not date_panel_click:
+            if not date_panel_click and not _is_idempotent_click_label(
+                str((element_info or {}).get('text') or elem_text or '')
+            ):
+                # 幂等动作（搜索/查询/刷新/翻页）同元素重复点击放行
+                # （wet9 #902/#903：树重载后过滤失效须再点搜索图标）；非幂等
+                # 维持 already-operated-this-phase 拒绝。
                 from .phase.element_guard import duplicate_phase_operation
                 duplicate = duplicate_phase_operation(self.business_data_store, click_identity)
                 button_text_identity = ''
