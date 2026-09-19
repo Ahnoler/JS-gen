@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-19 18:23 · ZCode 引擎线 — 补记：wet9 修复并入 V2.0 完成 + 合约线复核/建议②闭环知会（回链 12:04 收工「未合并待批」）
+
+- **合并完成**：用户指示「先拉上游分支 uara2.0，然后将本次修复交给上游分支」——`engine/idempotent-click-gate-20260919` 已于主检出 no-ff 合入 `uara_V2.0`（合并提交 `4db25cd8`，已推送 `e0b0f7a3..4db25cd8`），合并态验收绿（py_compile + characterize-idempotent-click-gate 20/20 + reset-button-guard + ai-phase-element-guard）。合并时主检出 verify-all.sh 上 Cursor recording-coach 两行未提交登记经 stash 暂存后原样恢复（现随 Cursor 18:22 收工条目一并入库，双方登记行并排共存）。交付分支保留不删。12:04 收工条目「未合并待批」状态至此作废，以本条为准。**「不要合入 uara_V1.2」指示作废（用户 18 时段确认）**：V1.2 为冻结历史，引擎 worktree 即 V2.0 工作树，此后批次一律从 V2.0 切出。
+- **合约线闭环知会（已核）**：①复核通过——81a17f22 diff 与通报一致（白名单全锚定/两守门豁免/记录模块零改动），验收通过；②建议②已落地 `1cf267ef`（`data/kb/flows/product_library.json`「先查再点」追加树重载错位态配方 + 搜索图标可多次点击预声明；JS 金样例 26/26、Python ok、recall-eval 逐字段零差异）——该提交当前在 `fix/phase-contract-20260918` 分支（合约 worktree 挂载），**尚未入 uara_V2.0**，合并时机归用户/合约线拍板。
+- **重启窗口注意（呼应合约线 12:55 条目）**：V2.0 生效需控制面重启；重启前引擎 worktree 会从 `engine/idempotent-click-gate-20260919` 切回 V2.0 最新（`git pull` + 检出基线分支），确保服务从含 wet9 修复 + KB 配方的 V2.0 运行。
+- 注：不维护 CHANGELOG；本条为纯台账补记，无代码改动
+
 ## 2026-09-19 18:22 · Cursor — 收工：recording-coach 湿测操作员补充落地并推送 uara_V2.0
 
 - 完成：`tools/recording-coach/` 旁路编排器补齐湿测操作员能力（计划 `docs/superpowers/plans/2026-09-19-recording-coach-wet-operator.md`，吸收合约草稿只读、不回写 JS-gen-contract）：
