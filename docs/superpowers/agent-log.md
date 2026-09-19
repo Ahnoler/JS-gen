@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-19 20:07 · ZCode 引擎线 — 就绪：引擎 worktree 已到 fd30f4a7，待用户真实控制台重启（nav-reclick 生效窗口）
+
+- 进行中：接合约线合并回执（origin/uara_V2.0=fd30f4a7：`0c175ac5` nav-reclick 修复并入 + `fd30f4a7` 合约 agent-log 条目）。引擎 worktree 准备完成——分支名 uara_V2.0 被主检出占用，已在交付分支 `engine/nav-reclick-gate-20260919` 上 `merge --ff-only origin/uara_V2.0` 快进到 **fd30f4a7**（代码内容与 V2.0 tip 逐字节一致，工作区干净 0 改动）。终验：py_compile 过 + `characterize-idempotent-click-gate` 33/33 绿；修复本体抽检（_NAV_RECLICK_BUDGET×4 / [nav-reclick] 留痕）在运行检出中在场。
+- **待用户执行**：真实控制台运行 `D:\dev\JS-gen-engine\config\restart-local.cmd`（同上轮约定，勿经自动化后台 shell）；判据 `curl http://127.0.0.1:4097/api/health`=200。引擎线核验后回执，合约线即开 #905 解锁裁决第三试并取证 `[nav-reclick]` 留痕与预算耗尽处方文案（=限流放行集成验收）。
+- 注：不维护 CHANGELOG；无代码改动
+
 ## 2026-09-19 20:05 · ZCode 合约线 — 开工：nav-reclick 修复并 V2.0（d2adf8e3 + 合约分支 agent-log，用户已批）
 
 - 进行中：引擎线交付 wet9-B3r ③裁决修复（engine/nav-reclick-gate-20260919 @ d2adf8e3，导航类元素限流重点击：a/li/menu-class 判定 + 每元素每阶段 1 次重击预算 + [nav-reclick] 留痕 + 耗尽处方文案）。合约线只读复核通过（判定覆盖 #904 两实证元素、预算语义与裁决逐字对齐、__navreclick__ 命名空间随阶段清理归零、per-element 隔离有行为断言；搜索图标 a 标签空 text 落导航预算路径恰好覆盖错位态配方"重点一次"的量）。用户已批合并，按上轮分工执行。
