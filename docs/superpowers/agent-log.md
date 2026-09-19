@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-19 19:42 · ZCode 引擎线 — 收工：③裁决落地——导航重击限流放行完成（回链 19:37 开工；分支 engine/nav-reclick-gate-20260919 交付「未合并待批」）
+
+- 完成：分支 `engine/nav-reclick-gate-20260919` 两提交（`805944f9` 开工 + `d2adf8e3` 修复本体，2 文件 +127/−4），已推送，**未合并 uara_V2.0 待批**：
+  - **裁决实现（回合约线 ④③裁决请求）**：纳入菜单/链接类导航重击但**限流**——`_is_navigation_click_element`（tag a/li 或 class 含 menu/nav/breadcrumb；普通 button/input 不放行）+ `_NAV_RECLICK_BUDGET=1` 每元素每阶段 1 次额外重击：duplicate 命中且导航形态时预算内放行并 `[nav-reclick]` stderr 留痕，耗尽即拒并给处方「页面可能已卡死：勿再重试本导航元素，改用 report 上报或结束会话重开」——恢复 #904 P6「卡死复位」自愈（菜单[33]/产品树[37]）同时封合约线警示的循环风险。预算存 `_phase_ai_operations` 的 `__navreclick__` 前缀键（换阶段自动清零，element_guard.py 继续零改动）；语义精确对齐：首次点击成功不耗预算，第 2 次点击（第 1 次重击）放行，第 3 次拒绝。click_button 文本路径不动。
+- 验收（合并后集成态）：pin `characterize-idempotent-click-gate.py` 同族扩展 +13 断言，RED（`_is_navigation_click_element` ImportError）→ GREEN 33/33；回归 4 守门族 pin 全绿（reset-button-guard / ai-phase-element-guard / search-then-click-guard / click-replay-engine）；全量 verify-all 失败集恰为已知 3 红零新增；py_compile 过；合并 origin/uara_V2.0（无增量）集成态复绿；越界恰为授权 2 文件。
+- **实施窗口风险披露**：控制面正从本 worktree f709fdc3 运行，实施期间工作区短暂存在 WIP 代码（运行中进程已载入内存不受影响）；B3 已收口、实施期间无在途录制，风险已留痕未发生。
+- 四项登记重申（19:37 条目）：①P5 零步完成=挂账专项（stop 绕过零步门禁）生产实证，建议下批优先；②失败动作占步号缺号 25-30=B-2 gaps 家族读数；③静默提交无 toast=SUT 改进+doneLog probe 族；④failedReason 无阶段号待排。
+- 遗留移交：①本分支合并 uara_V2.0 待用户拍板——**注意生效需再次重启**（当前运行态=81a17f22 守门，无导航重击限流；B3 类「卡死复位」场景在下轮湿测前须合并+重启才吃到本修复）；②解锁裁决叶维持 blocked，待本修复合并+重启后可再试或人工辅助采集；③四项登记见上，等点名排期。
+- 注：不维护 CHANGELOG；主线程内联实施未派子智能体
+
 ## 2026-09-19 19:37 · ZCode 引擎线 — 开工：③裁决=导航重击限流放行（新单元）+ B3 PASS 回执确认闭环 wet9 + 四项登记
 
 - **B3 回执确认（wet9 全链闭环）**：#904 f709fdc3 真机——守门修复集成验收 PASS（err-icon-label-miss 0 次、#902/#903 签名未复现、41 行 error 全 NULL）+ KB 错位态配方生产首秀全链走通。至此 wet9 缺陷全生命周期闭环：调研（合约线）→ 修复 `81a17f22` → 合并 `4db25cd8` → 重启激活（f709fdc3 运行态）→ 生产验收 PASS。
