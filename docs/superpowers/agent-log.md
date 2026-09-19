@@ -1,5 +1,18 @@
 # Agent 协作日志
 
+## 2026-09-19 23:27 · ZCode 引擎线 — 收工：Step 1 三代零步门禁收敛交付（行为等价，分支未合并待批，回链 23:16 开工）
+
+- 完成：调研地图 **Step 1** 交付——三代零步门禁判定逻辑收敛进 `phase-done-evidence-gate.js` 单模块，runner 只留 IO 复核 + CAS 写库 + broadcast。commit 2ba8d549，分支 `engine/stop-gate-step1-20260919`（feb9a658 = 2ba8d549 + e8666be5 合入，已 push）。**7 files changed +323/−74**。
+- 收敛内容（调研地图 §二 三代杂交 → 单模块）：
+  - gate 模块新增四纯函数：`evaluatePhaseOutcome`（v1 阶段级：0步自报成功→null 降级 + `[0步完成]` 前缀 + perRun 嫌疑登记位）、`evaluateFinalizeGate`（门闩双通道裁决：zeroStepGate=v2 按阶段/v1.5 total==0 兜底**互斥对**、perRunGate=v3 **独立**判定——旧内联控制流逐字等价）、`collectFailedPhases`（phase.id 判定报 phaseNumber，P2-#6）、`evaluateFinalVerdict`（显式失败/QUALITY FAIL/聚合三选一，quality_failed 优先取值）；
+  - runner 三处消费化：recordPhaseResult / 90s 门闩 / v3 同步终局；判定文案（`[0步完成]`/`zero_step_rejected:`/降级日志/`fake_success_detected` payload 字段）逐字不变；
+  - **v1.5 total==0 兜底保留不删**（重录掩蔽兜底）；**stop 通道语义零触碰**（Step 3 范围，Step 0 pin 27/27 全程护航未红）。
+- 过程要点：①发现并纠正一处判定序偏差——v1.5 兜底在旧代码是「无嫌疑才进入」的 else 语义，第一版 gate 签名会改变可见性，已加 `hasPhaseSuspects` 参数保真；②发现并清掉一次 Edit 残留（gateDecision 双调用）；③agent-llm-error pin 新红 = needle 指向旧内联三元，同步为 `finalVerdict.failKind` 转发断言（语义由 gate pin 3c/3d 承接）。
+- 验收证据：六 pin 合并态全绿（gate 28 断言含原 6、g3-runner-seam 9/9、record-phase-finalize 全过、quality 4/4、stop-semantics 27/27、agent-llm-error OK）；全量 verify-all 两轮（第二轮修完 llm-error needle）失败集=**3 已知红零新增**（step-highlight/layer-tree/confirm-notification）208 过；eslint 0 warning；合并后验收在 feb9a658 集成态重跑六 pin 全绿。
+- 状态：**未合并待批**——分支已推 origin；本批动了 `trajectory-recording-runner.js`（运行态承载文件），**合并后建议安排重启窗口**使收敛生效并顺带成为 Step 1 的湿测观察点（90s 门闩/零步降级/终局收官三条路径）。
+- 遗留移交：①Step 2（Python 双零步门收敛，`recorder_emitters.py` v1 vs G3）保护网未动，待批后可立项——建议与 Step 1 湿测同轮观察；②Step 3（stop 单点化 + 门禁覆盖 stop 通道）依赖本步+Step 2，湿测清单见调研地图 §四；③断言 5f 裁决项（stop recorded vs 自然 recorded）在 Step 3 落。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-19 23:16 · ZCode 引擎线 — 开工：Step 1 三代零步门禁收敛进 phase-done-evidence-gate.js 单模块
 
 - 进行中：接上条，调研地图 Step 1 立项。目标：把 trajectory-recording-runner.js 里杂交共存的 v1 阶段级内联降级（recordPhaseResult）/ v2 按阶段双源 / v3 per-run 真源 + v3 同步终局的**判定逻辑**收进 `phase-done-evidence-gate.js` 单模块（`evaluatePhaseOutcome` + `evaluateFinalizeGate` 两个纯函数），runner 只留 CAS 写库 + broadcast 副作用。**v1.5 total==0 兜底分支保留不删**（重录掩蔽兜底，调研地图明令）。stop 通道语义本次不动（Step 3 范围），但 Step 0 pin 已把现状钉死保护。
