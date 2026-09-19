@@ -42,6 +42,10 @@ import { phaseEventOwnership, waitForSessionEventOwned } from './run-event-owner
 import {
   aggregateTrajectorySuccessful,
   applyZeroStepFakeSuccessGate,
+  collectFailedPhases,
+  evaluateFinalVerdict,
+  evaluateFinalizeGate,
+  evaluatePhaseOutcome,
 } from './phase-done-evidence-gate.js';
 
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
@@ -879,10 +883,12 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       || donePayload?.success === false
       ? donePayload.success
       : null;
-    // 假成功防线（P6-0/T0.1）：0 落库步阶段不得自报成功（success=true 强制降级 unknown）
+    // 假成功防线（P6-0/T0.1）v1 阶段级：判定收敛在 evaluatePhaseOutcome（G3 模块），
+    // 此处只消费判定结果做副作用（嫌疑登记 + 降级留痕 + outcomes 写入）。
     const phaseStepCount = runtime.phaseStepCounts.get(phase.id) || 0;
-    const zeroStepPhase = phaseStepCount === 0;
-    if (zeroStepPhase && explicitSuccess === true) {
+    const phaseOutcome = evaluatePhaseOutcome({ explicitSuccess, phaseStepCount, donePayload });
+    const zeroStepPhase = phaseOutcome.zeroStepPhase;
+    if (phaseOutcome.registerPerRun) {
       console.warn(
         `[record] phase #${phase.phaseNumber} self-reported success with 0 persisted steps — downgraded to unknown`,
       );
@@ -900,18 +906,6 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         runtime.phaseBusinessCounts.set(phase.phaseNumber, countBusinessStepsByPhase(tid, phase.phaseNumber));
       }
     } catch {}
-    const textFromDone = String(donePayload?.text || donePayload?.summary || '').trim();
-    const phaseOutcome = {
-      // Only explicit true/false; missing success on phase_done → unknown (null).
-      success: zeroStepPhase && explicitSuccess === true ? null : explicitSuccess,
-      text: zeroStepPhase
-        ? `[0步完成] ${(textFromDone
-          || (explicitSuccess == null ? '见页面当前状态' : String(donePayload?.name || '').trim())
-          || '见页面当前状态')}`
-        : (textFromDone
-          || (explicitSuccess == null ? '见页面当前状态' : String(donePayload?.name || '').trim())
-          || '见页面当前状态'),
-    };
     runtime.phaseOutcomes[phase.id] = phaseOutcome;
     runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;
     const rawDoneText = String(donePayload?.text || '').trim();
@@ -1205,12 +1199,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       // 假成功防线 v2：快照为 0 业务步的阶段（关键写阶段假完成）→ 重取副本计数 + DB 复核，
       // 双源仍 0 → 整轨降级 failure。总数>0 但关键阶段 0 步（#612/#614：几步树点击
       // 掩盖写阶段 0 步）由该分支拦截，不再只卡全轨总数。
+      // 【Step 1 收敛】IO 复核（副本/DB 双源）留在 runner，裁决收敛在
+      // evaluateFinalizeGate（G3 模块）——判定序 zeroPhase → total → perRun 单点化。
       let zeroPhaseSuspects = [];
       try {
         zeroPhaseSuspects = [...(runtime.phaseBusinessCounts || new Map())]
           .filter(([, n]) => !n)
           .map(([pn]) => pn);
       } catch {}
+      let zeroPhaseBoth = [];
       if (zeroPhaseSuspects.length) {
         const zeroPhaseDb = [];
         try {
@@ -1227,34 +1224,53 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         }
         const zeroPhaseCopy = zeroPhaseSuspects.filter((pn) => countBusinessStepsByPhase(tid, pn) === 0);
         // 与总数门闩同语义：降级须双源一致（副本缺失时 copyCount 恒 0，此时以 DB 为准）
-        const zeroPhaseBoth = zeroPhaseSuspects.filter(
+        zeroPhaseBoth = zeroPhaseSuspects.filter(
           (pn) => zeroPhaseCopy.includes(pn) && zeroPhaseDb.includes(pn),
         );
         console.log(
           `[record] async gate per-phase traj=${tid}: suspects=[${zeroPhaseSuspects}] copy0=[${zeroPhaseCopy}] db0=[${zeroPhaseDb}]`,
         );
-        if (zeroPhaseBoth.length) {
-          try {
-            if (await casDegradeRecordedToFailed()) {
-              await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
-              await persistFailReason('zero_step');
-              broadcast('fake_success_detected', {
-                trajectoryDbId: tid,
-                zeroStepPhases: zeroPhaseBoth,
-              });
-              console.warn(
-                `[record] traj #${tid} downgraded recorded→failure: zero-step phases [${zeroPhaseBoth}] after finalization window`,
-              );
-            } else {
-              console.log(
-                `[record] async gate downgrade skipped for traj=${tid}: recordStatus no longer 'recorded' (zeroStepPhases=[${zeroPhaseBoth}])`,
-              );
-            }
-          } catch (err) {
-            console.warn('[record] async gate downgrade failed:', err?.message || err);
+      }
+      // 假成功防线 v3（per-run 真源）：本轮 0 落库步却自报 success=true 的阶段。
+      // 重录场景下上面两条累积口径（副本/DB）均被旧 run 步骤掩护，唯有
+      // phaseStepCounts 只计本轮；drain 后复读防迟到步误杀。
+      // G3：0 步却自报成功的阶段。计数取本轮真源 phaseStepCounts，且此时已
+      // await drain（v3 前提：迟到步不会再进来），故此处可安全地同步判定。
+      const perRunZeroPhases = (runtime.perRunZeroSuccessPhases || [])
+        .filter((p) => applyZeroStepFakeSuccessGate({
+          stepCount: runtime.phaseStepCounts?.get(p.id) || 0,
+          donePayload: { success: true },
+        }).rejectedZeroStep)
+        .map((p) => p.phaseNumber);
+      const { zeroStepGate, perRunGate } = evaluateFinalizeGate({
+        hasPhaseSuspects: zeroPhaseSuspects.length > 0,
+        totalCopySteps: copySteps,
+        totalDbSteps: dbSteps,
+        zeroPhaseBoth,
+        perRunZeroPhases,
+      });
+      if (zeroStepGate.verdict === 'downgrade' && zeroStepGate.kind === 'zeroPhase') {
+        const zeroStepPhases = zeroStepGate.phases;
+        try {
+          if (await casDegradeRecordedToFailed()) {
+            await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
+            await persistFailReason('zero_step');
+            broadcast('fake_success_detected', {
+              trajectoryDbId: tid,
+              zeroStepPhases,
+            });
+            console.warn(
+              `[record] traj #${tid} downgraded recorded→failure: zero-step phases [${zeroStepPhases}] after finalization window`,
+            );
+          } else {
+            console.log(
+              `[record] async gate downgrade skipped for traj=${tid}: recordStatus no longer 'recorded' (zeroStepPhases=[${zeroStepPhases}])`,
+            );
           }
+        } catch (err) {
+          console.warn('[record] async gate downgrade failed:', err?.message || err);
         }
-      } else if (copySteps === 0 && dbSteps === 0) {
+      } else if (zeroStepGate.verdict === 'downgrade' && zeroStepGate.kind === 'total') {
         try {
           if (await casDegradeRecordedToFailed()) {
             await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
@@ -1272,32 +1288,24 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
           console.warn('[record] async gate downgrade failed:', err?.message || err);
         }
       }
-      // 假成功防线 v3（per-run 真源）：本轮 0 落库步却自报 success=true 的阶段。
-      // 重录场景下上面两条累积口径（副本/DB）均被旧 run 步骤掩护，唯有
-      // phaseStepCounts 只计本轮；drain 后复读防迟到步误杀。
-      // G3：0 步却自报成功的阶段。计数取本轮真源 phaseStepCounts，且此时已
-      // await drain（v3 前提：迟到步不会再进来），故此处可安全地同步判定。
-      const perRunZeroPhases = (runtime.perRunZeroSuccessPhases || [])
-        .filter((p) => applyZeroStepFakeSuccessGate({
-          stepCount: runtime.phaseStepCounts?.get(p.id) || 0,
-          donePayload: { success: true },
-        }).rejectedZeroStep)
-        .map((p) => p.phaseNumber);
-      if (perRunZeroPhases.length) {
+      // v3 per-run 独立判定（旧控制流：不与上面互斥——zeroStepGate 已降级时仍会
+      // 尝试 CAS，失败仅打 skipped 日志，广播不再重复发）。
+      if (perRunGate) {
+        const perRunPhases = perRunGate.phases;
         try {
           if (await casDegradeRecordedToFailed()) {
             await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
             await persistFailReason('zero_step');
             broadcast('fake_success_detected', {
               trajectoryDbId: tid,
-              perRunZeroPhases,
+              perRunZeroPhases: perRunPhases,
             });
             console.warn(
-              `[record] traj #${tid} downgraded recorded→failure: phases with 0 steps THIS run [${perRunZeroPhases}] (cumulative copy/DB masked by previous runs)`,
+              `[record] traj #${tid} downgraded recorded→failure: phases with 0 steps THIS run [${perRunPhases}] (cumulative copy/DB masked by previous runs)`,
             );
           } else {
             console.log(
-              `[record] per-run zero downgrade skipped for traj=${tid}: recordStatus no longer 'recorded' (phases=[${perRunZeroPhases}])`,
+              `[record] per-run zero downgrade skipped for traj=${tid}: recordStatus no longer 'recorded' (phases=[${perRunPhases}])`,
             );
           }
         } catch (err) {
@@ -1313,24 +1321,21 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     // 显式 success=false，或 phase_end 上报 QUALITY FAIL（pending_fields /
     // missing_success_token 等），整轨按 failure 收官（宁误拒不假绿），不再无条件
     // recorded/isSuccessful=1。零步类假成功由上方异步门闩三路复核兜底。
+    // 【Step 1 收敛】failedPhases 收集（collectFailedPhases）与成败裁决
+    // （evaluateFinalVerdict）在 G3 模块；runner 只留终态写入 + broadcast。
     // P2-#6：failedPhases 统一报 phaseNumber——phaseOutcomes 以 phase.id /
-    // phaseNumber 双键同写同一对象，直接迭代 Object.entries 会把 DB id 混进
-    // 载荷误导前端诊断；改为遍历 phases 数组取失败项的 phaseNumber。
-    const failedOutcomeKeys = [];
-    for (const phase of phases) {
-      const outcome = runtime.phaseOutcomes?.[phase.id];
-      if (outcome?.success === false) {
-        failedOutcomeKeys.push(phase.phaseNumber);
-      }
-    }
+    // phaseNumber 双键同写同一对象，collectFailedPhases 按 phase.id 取判定、
+    // 报 phase.phaseNumber（避免把 DB id 混进载荷误导前端诊断）。
+    const failedOutcomeKeys = collectFailedPhases(runtime.phaseOutcomes, phases);
     const qualityFails = runtime.phaseQualityFails || [];
     // G3（PR #45）：整轨成败 = phaseOutcomes 聚合（任一显式 false → false）。
     // phaseOutcomes 以 phase.id / phaseNumber 双键同写同一对象，按引用去重判定。
     const trajSuccess = aggregateTrajectorySuccessful(runtime.phaseOutcomes);
-    if (failedOutcomeKeys.length || qualityFails.length || !trajSuccess) {
+    const finalVerdict = evaluateFinalVerdict({ failedPhases: failedOutcomeKeys, qualityFails, trajSuccess });
+    if (!finalVerdict.success) {
       finalStatus = await trajectoryDao.finishTransientRecording(tid, 'failure');
       await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
-      await persistFailReason(qualityFails.length ? 'quality_failed' : 'phase_failed');
+      await persistFailReason(finalVerdict.failKind);
       broadcast('fake_success_detected', {
         trajectoryDbId: tid,
         failedPhases: failedOutcomeKeys,

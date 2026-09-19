@@ -56,10 +56,16 @@ assert.ok(
   src.includes("appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' })"),
   'rawDoneText agent done-log append must stay',
 );
-// v2/v3 zero-step downgrade semantics stay wired in recordPhaseResult.
+// v2/v3 zero-step downgrade semantics stay wired in recordPhaseResult
+//（Step 1 收敛后：内联判定迁至 gate 模块 evaluatePhaseOutcome，runner 消费 outcome.success）
+const gateSrc = readFileSync(join(root, 'src/services/trajectory/phase-done-evidence-gate.js'), 'utf8');
 assert.ok(
-  src.includes('zeroStepPhase && explicitSuccess === true ? null : explicitSuccess'),
-  'zero-step success downgrade (success→null) must stay',
+  src.includes('const phaseOutcome = evaluatePhaseOutcome({ explicitSuccess, phaseStepCount, donePayload })'),
+  'recordPhaseResult consumes gate module evaluatePhaseOutcome',
+);
+assert.ok(
+  gateSrc.includes('success: downgraded ? null : explicitSuccess'),
+  'zero-step success downgrade (success→null) must stay (in gate module)',
 );
 assert.ok(
   src.includes('[0步完成]'),

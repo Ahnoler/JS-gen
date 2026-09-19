@@ -153,9 +153,11 @@ record('5c 门闩 90s 周期 + 三重活性守卫（runtime 替换/session 消�
 record('5d 门闩降级 CAS-only：仅 recorded 可降 failed（recording/draft/completed 不可）',
   count(GATE, "recordStatusIn: ['recorded']") === 2
   && GATE.includes("recordStatus: 'failed', persistentRecordStatus: 'failed'"));
-record('5e 门闩判定双源：副本计数 + DB 复核，total==0 为 v1.5 兜底分支',
+record('5e 门闩判定双源：副本计数 + DB 复核，total==0 为 v1.5 兜底分支（Step 1 收敛后判定在 gate 模块，runner 留 IO+消费）',
   GATE.includes('countBusinessSteps(tid)')
-  && GATE.includes('} else if (copySteps === 0 && dbSteps === 0) {'));
+  && GATE.includes('evaluateFinalizeGate({')
+  && GATE.includes('totalCopySteps: copySteps')
+  && GATE.includes('totalDbSteps: dbSteps'));
 record('5f 【未固化优先级】门闩无 userStop 感知：无法区分用户显式 recorded 与自然 recorded',
   !GATE.includes('userStop'),
   '门闩 CAS 会把 90s 内用户显式 stop(success) 落的 recorded 同样降级——收敛 Step 3 须裁决');
