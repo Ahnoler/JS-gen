@@ -46,6 +46,7 @@ run "characterize-runid-bridge" node scripts/characterization/characterize-runid
 run "characterize-owned-wait-shape" node scripts/characterization/characterize-owned-wait-shape.mjs
 run "characterize-quality-final-gate" node scripts/characterization/characterize-quality-final-gate.mjs
 run "characterize-record-phase-finalize" node scripts/characterization/characterize-record-phase-finalize.mjs
+run "characterize-stop-semantics" node scripts/characterization/characterize-stop-semantics.mjs
 # Static gates (2026-09-17): eslint no-undef catches merge-orphan references
 # (the 'gated' incident class) — pre-commit hooks do not run on merge commits
 # and text pins cannot see undefined identifiers. ruff F821 is the Python
