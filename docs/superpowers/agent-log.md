@@ -1960,3 +1960,9 @@
 - 前端：入口 index-DMDGH5NM.js → /data/app/front-dist/releases/20260917-1035 已上线，页面/API 200 验证过
 - 后端：预上传包（20260917-103602）已全部撤回（本地 dist + 服务器 /tmp 均清理）；/data/app/JS-gen 软链与 4097 未动（仍 20260916-212853，pid 3596493）；原因=发现 bug 需先修完再发
 - 后续：bug 修完重新 pack→上传→部署（部署前仍需确认无活跃录制）
+
+## 2026-09-19 09:05 · ZCode — 收工：后端发版 20260919-085907（回链 09-17 10:36 开工）
+- 后端：uara_V2.0 @ 2c22d312 → /data/app/JS-gen-releases/20260919-085907（batch 47 跑 1 个 migration）；api/docs 200、server.log 干净启动、local-server-proxy 秒级重连
+- 前端：维持 09-17 的 20260917-1035，经 nginx /api 200 验证
+- 执行机：LMY 三个注册节点（2f21bad1/08d34440/413bbddf）心跳在跳但采样时无活跃 WS，属执行机侧重连节奏，非发版事故
+- 回滚：ln -sfn /data/app/JS-gen-releases/20260917-205042 /data/app/JS-gen && 重启 node server.mjs
