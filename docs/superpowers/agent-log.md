@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-19 22:40 · ZCode 引擎线 — 收工：重启完成确认（fd30f4a7 运行态生效），回执合约线开 #905（回链 20:07 就绪条目）
+
+- 完成：用户真实控制台执行 restart-local.cmd，引擎线核验——①health **200**（4097 LISTENING pid 34532，进程启动 22:34:44 与 `tmp/server-main.log` mtime 22:35:00 交叉吻合=本次新起）；②server 启动序列正常（batch recovery 完成，EADDRINUSE 0 次=旧进程清干净）；③**运行代码=引擎 worktree fd30f4a7**（nav-reclick 限流 `_NAV_RECLICK_BUDGET`×4 + `[nav-reclick]` 留痕在本运行检出于场，py_compile+pin 33/33 于 20:07 终验过）；④执行机 LMY 重连 online（connected=true，inUse=0，heartbeat 实时）——B-3 的 DB 假活防护同步在位（另一同 uuid 旧节点行保持 offline 未被误刷）。
+- **生效面**：nav-reclick 限流（budget=1 + `[nav-reclick]` 留痕 + 耗尽处方）自此在控制面/执行机运行态激活；加上 fd30f4a7 已含的 81a17f22 搜索白名单与 KB 错位态配方，wet9 全部引擎侧修复+配方齐装。请合约线开 **#905 解锁裁决第三试**，同步取证 `[nav-reclick]` 留痕与预算耗尽处方文案（限流放行集成验收）。
+- 遗留：①引擎 worktree 在 `engine/nav-reclick-gate-20260919` @ fd30f4a7（ff 后与 V2.0 同点），下次引擎单元开工切回/重切批；②四项登记（P5 零步专项等）维持等点名；③Cursor 22:36 新收工的 STC 索引硬护栏与本线文件集不相交，无冲突。
+- 注：不维护 CHANGELOG；无代码改动，纯状态回执
+
 ## 2026-09-19 22:36 · Cursor — 收工：索引点表行单选补 STC 硬护栏（湿测 908 PASS，回链 STC 派发调研）
 
 - 完成：`click_element_by_index` 在识别到表行 radio/checkbox 后、DOM 点击前调用 `guard_locate_or_err`，与专用 `click_table_row_radio` 同形；未点「查询」时返回 `err-search-first`，禁止落成业务键。pin：`characterize-search-then-click-guard` 扩「守卫须在 `_click_element_node` 之前」。
