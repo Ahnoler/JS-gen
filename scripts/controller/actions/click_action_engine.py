@@ -62,6 +62,43 @@ def _is_idempotent_click_label(text: str) -> bool:
     return bool(t and _IDEMPOTENT_BTN_RE.match(t))
 
 
+# wet9-B3r (#904 P6) ③裁决：页面卡死时 agent 重击左侧菜单/树链接复位被
+# already-operated-this-phase 拒——「卡死复位」自愈路径仍被堵。纳入导航类
+# 元素（菜单/链接）的重击放行，但**限流**：每元素每阶段 1 次额外重击预算，
+# 预算耗尽即拒绝并给处方——既恢复自愈，又封「全量放开菜单重点击」的循环
+# 风险（合约线 wet9b3r 回执警示）。
+_NAV_RECLICK_BUDGET = 1
+
+
+def _is_navigation_click_element(element_info: dict, tag_name: str = '') -> bool:
+    """True when the click target is navigation-shaped (menu item / link)."""
+    tag = str((element_info or {}).get('tag_name') or tag_name or '').strip().lower()
+    attrs = (element_info or {}).get('attributes') or {}
+    raw_class = str(attrs.get('class') or '').lower()
+    if tag in ('a', 'li'):
+        return True
+    return any(k in raw_class for k in ('menu', 'nav', 'breadcrumb'))
+
+
+def _bump_nav_reclick(business_data_store: dict | None, identity: str) -> int:
+    """Consume one unit of the per-identity nav re-click budget; return the
+    1-based attempt number. Stored inside _phase_ai_operations under a
+    __navreclick__ namespace so phase cleanup clears it for free and the
+    guard dict schema stays untouched."""
+    if business_data_store is None:
+        return 0
+    touched = business_data_store.setdefault('_phase_ai_operations', {})
+    if not isinstance(touched, dict):
+        return 0
+    key = '__navreclick__' + str(identity or '').strip().lower()
+    try:
+        value = int(touched.get(key) or 0) + 1
+    except (TypeError, ValueError):
+        value = 1
+    touched[key] = value
+    return value
+
+
 def _is_reset_button_label(text: str) -> bool:
     t = re.sub(r'\s+', '', (text or '').strip())
     return bool(t and _RESET_BTN_RE.match(t))
@@ -413,10 +450,28 @@ class ClickEngine:
                                 self.business_data_store, button_text_identity,
                             )
                 if duplicate:
-                    return _ok(
-                        f'already-operated-this-phase:index={index} via {duplicate}; '
-                        'do not click the same element again; verify state and call done when complete'
-                    )
+                    # wet9-B3r ③：导航类元素（菜单/链接）的重复点击是「页面
+                    # 卡死复位」自愈路径——限流放行：每元素每阶段 1 次额外重击
+                    # 预算，预算内放行并留痕；耗尽即拒并给处方（封循环风险）。
+                    if _is_navigation_click_element(element_info, tag_name):
+                        used = _bump_nav_reclick(self.business_data_store, click_identity)
+                        if used <= _NAV_RECLICK_BUDGET:
+                            sys.stderr.write(
+                                f'[nav-reclick] budget used {used}/{_NAV_RECLICK_BUDGET} '
+                                f'index={index} identity={click_identity}\n'
+                            )
+                            sys.stderr.flush()
+                        else:
+                            return _ok(
+                                f'already-operated-this-phase:index={index} via {duplicate}; '
+                                f'nav re-click budget exhausted ({_NAV_RECLICK_BUDGET} extra allowed) — '
+                                '页面可能已卡死：勿再重试本导航元素，改用 report 上报或结束会话重开'
+                            )
+                    else:
+                        return _ok(
+                            f'already-operated-this-phase:index={index} via {duplicate}; '
+                            'do not click the same element again; verify state and call done when complete'
+                        )
             try:
                 dd_gate = await page.evaluate(
                     '''(xpath) => {

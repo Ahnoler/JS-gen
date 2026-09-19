@@ -115,6 +115,74 @@ def main() -> None:
         "idempotent keyword inventory complete (7 families)",
     )
 
+    # 7. wet9-B3r ③ ruling: navigation (menu/link) re-click allowance, bounded.
+    from scripts.controller.actions.click_action_engine import (  # noqa: E402
+        _is_navigation_click_element,
+        _NAV_RECLICK_BUDGET,
+    )
+    check(
+        _is_navigation_click_element({"tag_name": "a"}, "") is True,
+        "nav detection: <a> link is navigation (wet9b3r [37] 产品树)",
+    )
+    check(
+        _is_navigation_click_element({"tag_name": "li"}, "") is True,
+        "nav detection: <li> menu item is navigation (wet9b3r [33] 产品库管理)",
+    )
+    check(
+        _is_navigation_click_element(
+            {"tag_name": "button", "attributes": {"class": "el-menu-item"}}, ""
+        ) is True,
+        "nav detection: menu-classed button is navigation",
+    )
+    check(
+        _is_navigation_click_element(
+            {"tag_name": "button", "attributes": {"class": "el-button--primary"}}, ""
+        ) is False,
+        "nav detection: plain button is NOT navigation (mutation risk stays gated)",
+    )
+    check(
+        _is_navigation_click_element(
+            {"tag_name": "input", "attributes": {"class": "el-input__inner"}}, ""
+        ) is False,
+        "nav detection: form input is NOT navigation",
+    )
+    check(
+        _NAV_RECLICK_BUDGET == 1,
+        "nav re-click budget is exactly 1 extra attempt per element per phase",
+    )
+
+    # 8. bounded budget mechanics: index-path gate consumes a namespaced
+    #    counter inside _phase_ai_operations (cleared per phase for free).
+    check(
+        "__navreclick__" in src,
+        "nav re-click budget stored under __navreclick__ namespace "
+        "(auto-cleared with phase ops, guard dict schema untouched)",
+    )
+    check(
+        "_bump_nav_reclick(" in src and "_NAV_RECLICK_BUDGET" in src,
+        "budget bump helper + constant wired at the index gate",
+    )
+    check(
+        "[nav-reclick]" in src,
+        "allowed nav re-click leaves a single-line stderr trace",
+    )
+    check(
+        "页面可能已卡死" in src,
+        "budget-exhausted rejection carries the prescriptive page-frozen guidance",
+    )
+
+    # 9. behavioral: budget counter semantics (2 clicks allowed, 3rd blocked)
+    store2: dict = {}
+    from scripts.controller.actions.click_action_engine import (  # noqa: E402
+        _bump_nav_reclick,
+    )
+    first = _bump_nav_reclick(store2, "click://x/li[33]")
+    again = _bump_nav_reclick(store2, "click://x/li[33]")
+    third = _bump_nav_reclick(store2, "click://x/li[33]")
+    check(first == 1 and again == 2 and third == 3, "budget counter bumps 1,2,3")
+    other = _bump_nav_reclick(store2, "click://x/a[37]")
+    check(other == 1, "budget is per-element, not shared across identities")
+
     if failures:
         print(f"FAILED ({len(failures)})")
         return 1
