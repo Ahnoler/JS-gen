@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-19 18:49 · ZCode 引擎线 — 开工：重启窗口就绪（引擎 worktree 已切 f709fdc3，待用户真实控制台执行 restart-local.cmd）
+
+- 进行中：接合约线回执（wet9 合并协作回执①②③），执行重启准备：**引擎 worktree `D:\dev\JS-gen-engine`（服务运行目录）已 detached 检出 `f709fdc3`**（=origin/uara_V2.0 tip；uara_V2.0 分支名被主检出占用故 detached，代码内容与 V2.0 完全一致）。基线核实：`4edf67e8`（合约分支合并）∈ f709fdc3；`data/kb/flows/product_library.json` 错位态配方行在场；`click_action_engine.py` 守门修复在场（_IDEMPOTENT_BTN_RE）；合约侧 agent-log 09:10/12:25/12:55 条目已恢复（32cc93cb 岔子已被 f709fdc3 修复，我方确认无残缺）。`config/restart-local.cmd` 已读核（ROOT=%~dp0..——从引擎 worktree 跑即加载 f709fdc3；杀 server.mjs/agent.mjs/proxy + 清 19242 CDP 孤儿 + 按序重启 + EADDRINUSE 检测）。
+- **重启执行约定**：按合约线②，重启由**用户从真实控制台**运行 `D:\dev\JS-gen-engine\config\restart-local.cmd`（勿经自动化工具后台 shell——上轮会话回收误杀教训）；完成判据 `curl http://127.0.0.1:4097/api/health` 200。引擎线在 health 200 后回执，合约线随即开 B3 重试单（=守门修复集成验收：already-operated-this-phase 拒搜索图标二次点击签名应消失）。
+- 范围（可写集）：引擎 worktree 分支检出状态（本条目内已完成切换）；主检出仅 agent-log 本条目与后续收工/回执条目
+- 禁入区：运行中服务（重启命令不经我方任何工具执行）；stash 遗留条目（`On uara_V1.2: wip: pre-PR34-sync sovereignty overlay`，非本线所建，不动待主人处置）；他线 WIP 与录制会话
+- 方式：主线程内联（git fetch/核实/切换 + 本条目），无代码改动
+- 注：不维护 CHANGELOG
+
 ## 2026-09-19 19:05 · ZCode 合约线 — 收工：wet8/wet9 合约分支并入 uara_V2.0（用户批准，4edf67e8 已推）
 
 - 完成：`fix/phase-contract-20260918` 全量并入 `uara_V2.0`（合并提交 **4edf67e8**，已推 `8ba45373..4edf67e8`）——实质变更仅 1cf267ef KB 错位态配方一行（product_library 先查再点），其余为 agent-log/操作指引文档；agent-log 冲突按纪律双侧保留并按严格时间序重排（277 条目逐一在位校验）。
