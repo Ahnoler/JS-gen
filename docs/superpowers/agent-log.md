@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-19 23:15 · ZCode 引擎线 — Step 0 合并回执：pin 已并入 uara_V2.0（1ce43191，用户批"继续"），Step 1 随即开工（回链 22:49 收工）
+
+- 完成：用户批复"你继续吧"（对 22:49 收工条目"待批 ①并入 ②Step 1 立项"的直接回应）→ `engine/stop-gate-step0-20260919` (17e9c54e) 已 `--no-ff` 并入 uara_V2.0 = **1ce43191**，已 push。
+- 合并后验收（D:\dev\JS-gen 全 worktree 合并态）：characterize-stop-semantics **27/27** + 旁邻门禁家族 g3-runner-seam 9/9 + quality-final-gate 4/4 + record-phase-finalize 全过；合并差异仅 pin 文件 + verify-all.sh 一行登记，零代码面，**无需重启**。
+- 主检出工作区核验：仅他线 untracked 备份（.cursor/、data/kb/*.bak-*），与合并文件集不相交，未触碰。
+- 下一步：Step 1（三代零步门禁收敛进 phase-done-evidence-gate.js 单模块）随即开工，另见开工条目。
+- 注：不维护 CHANGELOG；无运行态影响
+
 ## 2026-09-19 22:49 · ZCode 引擎线 — 收工：Step 0 stop 语义 pin 交付（27/27 绿，分支未合并待批，回链 22:43 开工）
 
 - 完成：挂账专项「stop 双实现 / 零步门禁三代」调研地图 **Step 0** 交付——`scripts/characterization/characterize-stop-semantics.mjs`（**27 断言全绿**，纯 read_text needle + 源码切片，零 import 被测模块、零行为驱动），verify-all.sh 已登记（quality-final-gate 家族旁）。commit 35e012a3，交付分支 `engine/stop-gate-step0-20260919`（17e9c54e = 35e012a3 + 开工声明 0b690d41 合入，已 push）。
