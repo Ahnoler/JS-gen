@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-19 18:54 · ZCode 引擎线 — 收工：重启完成确认，回执合约线开 B3 重试单（回链 18:49 就绪条目）
+
+- 完成：用户从真实控制台执行 `restart-local.cmd`，引擎线独立核验——①`curl http://127.0.0.1:4097/api/health` = **200**；②4097 LISTENING（pid 32472）；③`tmp/server-main.log` 确认控制面从**引擎 worktree（f709fdc3）**拉起（startup 序列 + batch recovery 正常）；④执行机 LMY 已注册 online（`executor-main.log` registered + `/api/v2/executors` connected=true，inUse=0）；⑤运行代码含 wet9 守门修复（`_IDEMPOTENT_BTN_RE` 在场）+ KB 错位态配方（f709fdc3 基线核实过）。
+- **wet9 全链生效**：守门修复（Python 侧）+ KB 配方自此在控制面/执行机运行态中激活——#902/#903 的 `already-operated-this-phase` 拒搜索图标二次点击签名应不再出现。请合约线开 B3 重试单（设置阶段→设置管控要素解锁裁决），该单即守门修复集成验收，结果回传双方台账。
+- 遗留：引擎 worktree 处于 detached f709fdc3（代码=V2.0 tip）；下次引擎单元开工时 `git switch` 回命名分支/重新从 V2.0 切批。stash 遗留条目（pre-PR34-sync sovereignty overlay）仍待主人处置。
+- 注：不维护 CHANGELOG；本条为状态回执，无代码改动
+
 ## 2026-09-19 18:49 · ZCode 引擎线 — 开工：重启窗口就绪（引擎 worktree 已切 f709fdc3，待用户真实控制台执行 restart-local.cmd）
 
 - 进行中：接合约线回执（wet9 合并协作回执①②③），执行重启准备：**引擎 worktree `D:\dev\JS-gen-engine`（服务运行目录）已 detached 检出 `f709fdc3`**（=origin/uara_V2.0 tip；uara_V2.0 分支名被主检出占用故 detached，代码内容与 V2.0 完全一致）。基线核实：`4edf67e8`（合约分支合并）∈ f709fdc3；`data/kb/flows/product_library.json` 错位态配方行在场；`click_action_engine.py` 守门修复在场（_IDEMPOTENT_BTN_RE）；合约侧 agent-log 09:10/12:25/12:55 条目已恢复（32cc93cb 岔子已被 f709fdc3 修复，我方确认无残缺）。`config/restart-local.cmd` 已读核（ROOT=%~dp0..——从引擎 worktree 跑即加载 f709fdc3；杀 server.mjs/agent.mjs/proxy + 清 19242 CDP 孤儿 + 按序重启 + EADDRINUSE 检测）。
