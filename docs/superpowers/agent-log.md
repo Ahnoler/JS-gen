@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-19 11:58 · ZCode 引擎线 — 开工：wet9 幂等点击守门放行（搜索/查询/刷新/翻页类同元素重复点击，回应用户转发合约线移交）
+
+- 进行中：接用户转发 wet9 引擎缺陷（合约线 11:35 调研报告 `tmp/contract-wet9-20260919/tree-search-root-cause.md`，#902 P3/#903 P5 两单复现）：SUT 树重载清 filter 但搜索框保留关键字成错位态，自愈须再点搜索图标，被引擎 `already-operated-this-phase` 守门拒绝 → 锁死。修法（取合约线建议①收敛版）：`click_action_engine.py` 新增模块级幂等动作正则（搜索/查询/检索/刷新/翻页/下一页/上一页类文本），`click_button`（:180 duplicate 检查）与 `click_element_by_index`（:370-396 duplicate 检查）两处守门命中白名单时放行重复点击；非幂等（保存/新增/删除等）行为不变；element_guard.py 记录模块零改动。附带两小口径问题（#903 序号框 real_click 未命中、failedReason 不带阶段号）本单元不动，登记待后续单元。
+- 分支：**`engine/idempotent-click-gate-20260919`（从 uara_V2.0 @ 4ce572ee 切）**，交付分支不合并，收工条目「未合并待批」
+- 范围（可写集）：worktree `D:\dev\JS-gen-engine` 内 `scripts/controller/actions/click_action_engine.py`、新 pin `scripts/characterization/characterize-idempotent-click-gate.py`、`scripts/refactor/verify-all.sh`（登记一行）；主检出仅 agent-log 本条目与收工条目
+- 禁入区：`scripts/controller/actions/phase/element_guard.py`（记录模块不动）、合约 worktree `D:\dev\JS-gen-contract` 全部（wet9 证据在 tmp/，只读）、4097+LMY 运行中服务（本修复 Python 侧生效需随下轮重启）、主检出代码文件、`scripts/prompts/**`、他线 WIP（`data/kb/req/**`、`.cursor/`）、运行中录制会话
+- 方式：主线程内联实施（单文件小修不派子智能体）；RED pin→最小修复→相关 pin 回归（ai-phase-element-guard/reset-button-guard/search-then-click-guard/click-replay-engine）→全量 verify-all 基线比对（3 红）→合并后验收→分支交付
+- 注：不维护 CHANGELOG
+
 ## 2026-09-19 06:45 · ZCode 合约线 — 收工：合约修复分支并入 uara_V2.0（用户批准）
 
 - 完成：merge `cf8cbe06`——`fix/phase-contract-20260918`（tip `293f9f56`）合入 `uara_V2.0` 并推远端。带入：三批修复 `4902b3f4`（classify S1/S2/S2b/S3 + 令牌对称 S4/S5 + 前向仲裁 + done 熔断 + 276 收敛）与 A 类收尾 `3c4473ec`（反向仲裁 / save 通知正则 / probe 收口 doneLog / 熔断降噪）；冲突仅 agent-log.md（双方条目并排，合约 16:14 条目按时间序插入），verify-all.sh 自动合（双方 pin 注册全保留）
