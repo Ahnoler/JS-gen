@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-19 12:55 · ZCode 合约线 — 收工：建议②落地（product_library 先查再点补错位态配方，回链 12:25 开工）
+
+- 完成：引擎线交付 wet9 幂等点击守门放行（81a17f22 → uara_V2.0 4db25cd8）的配套 KB 配方——`data/kb/flows/product_library.json`「先查再点」rule 追加（单行 diff）：**树重载（新增/保存节点自动刷新、【刷新产品树】、loadingTree()）会清 el-tree 过滤但搜索框关键字仍在（错位态：框里有词、树是全量，wet9 实证）——重载后须重填关键字并再次点击搜索图标再定位节点；搜索图标本阶段可能需多次点击（引擎已放行幂等动作重复点击）**。后续产品库任务门闩可直接引用该句预声明。
+- 验收：跨语言契约双侧复跑——JS `characterize-flow-card-recall` 26/26、Python `characterize-kb-recall` ok（已知 py-divergence 噪声不变）；`recall-eval` 两跑逐字段零差异（Acc@1 0.74 / Recall@5 0.847 / MRR@5 0.784 / nDCG@5 0.798，仅 generatedAt 变化）——规则文案追加对召回零影响。
+- 引擎修复复核（本单元顺带，只读）：81a17f22 diff 与通报一致——`_IDEMPOTENT_BTN_RE` 全锚定白名单（复合词如「保存查询方案」不误放行）、click_button 与 click_element_by_index 两处守门豁免、element_guard 记录模块零改动；无需本线动作。
+- **重启窗口知会（用户协调时机）**：V2.0 @ 4db25cd8（含引擎修复+本 KB 配方）生效需控制面重启；引擎工作树 D:\dev\JS-gen-engine 当前停在 engine/idempotent-click-gate-20260919 分支，重启前须切回/重检出 uara_V2.0，重启后 wet9 锁死态（#902/#903 签名）与 KB 配方一并激活，可择机重跑 B3 解锁裁决。
+- 遗留：wet9 其余引擎移交项（#903「序号」框 real_click 未命中、failedReason 不带阶段号、doneLog probe 处方化=建议③）引擎线已登记待后续单元；B 类五项测试报告、转正手机验证入口仍挂起。
+- 注：纯 KB 数据+文档轮次，无代码改动；不维护 CHANGELOG
+
 ## 2026-09-19 12:25 · ZCode 合约线 — 开工：落引擎建议②（产品库 KB 卡「先查再点」补树重载过滤失效配方）
 
 - 进行中：引擎线已交付 wet9 幂等点击守门放行（81a17f22 → uara_V2.0 4db25cd8，pin 20/20+回归 6 绿，主线程已只读复核 diff 与通报一致）。本单元落地其通报中留给合约/KB 线的建议②：`data/kb/flows/product_library.json`「先查再点」规则追加「树重载（新增/保存节点自动刷新、【刷新产品树】）会清掉过滤但保留搜索框关键字——重载后须重填关键字并再次点击搜索图标再定位节点」，供后续任务门闩预声明引用。
