@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-19 23:16 · ZCode 引擎线 — 开工：Step 1 三代零步门禁收敛进 phase-done-evidence-gate.js 单模块
+
+- 进行中：接上条，调研地图 Step 1 立项。目标：把 trajectory-recording-runner.js 里杂交共存的 v1 阶段级内联降级（recordPhaseResult）/ v2 按阶段双源 / v3 per-run 真源 + v3 同步终局的**判定逻辑**收进 `phase-done-evidence-gate.js` 单模块（`evaluatePhaseOutcome` + `evaluateFinalizeGate` 两个纯函数），runner 只留 CAS 写库 + broadcast 副作用。**v1.5 total==0 兜底分支保留不删**（重录掩蔽兜底，调研地图明令）。stop 通道语义本次不动（Step 3 范围），但 Step 0 pin 已把现状钉死保护。
+- 上游：uara_V2.0（tip 9d3cea6c，含 Step 0 pin）。引擎 worktree 分支 `engine/stop-gate-step1-20260919` @ 9d3cea6c。
+- 范围（可写集）：`src/services/trajectory/phase-done-evidence-gate.js`（扩展）、`src/services/trajectory/trajectory-recording-runner.js`（判定抽离）、`scripts/characterization/characterize-phase-done-evidence-gate.mjs`（新）、既有三 pin needle 同步（characterize-record-phase-finalize.mjs / characterize-g3-runner-seam.mjs / characterize-quality-final-gate.mjs——抽取时逐字核对，只动被抽走的 needle）、`scripts/refactor/verify-all.sh`（登记新 pin）、主检出 agent-log 本条目+收工条目
+- 禁入区：`trajectory-record-lifecycle.js`/`trajectory-attach-service.js`（stop 语义 Step 3 才动）；`scripts/controller/**`（合约线湿测热区）；Cursor STC 文件集；运行态服务（本单元不重启，改动经分支交付+用户批合并后生效）
+- 方式：micro-step（每步跑 `bash scripts/refactor/verify-all.sh`）；判定行为等价为目标（phaseOutcomes 写序/降级文案/payload 字段逐字保持）；全量 verify-all 与基线比对（3 已知红零新增）；分支交付 push + 收工条目「未合并待批」
+- 注：子智能体不 commit；主会话验收后代提交
+
 ## 2026-09-19 23:15 · ZCode 引擎线 — Step 0 合并回执：pin 已并入 uara_V2.0（1ce43191，用户批"继续"），Step 1 随即开工（回链 22:49 收工）
 
 - 完成：用户批复"你继续吧"（对 22:49 收工条目"待批 ①并入 ②Step 1 立项"的直接回应）→ `engine/stop-gate-step0-20260919` (17e9c54e) 已 `--no-ff` 并入 uara_V2.0 = **1ce43191**，已 push。
