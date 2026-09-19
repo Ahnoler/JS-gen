@@ -1,5 +1,20 @@
 # Agent 协作日志
 
+## 2026-09-19 22:49 · ZCode 引擎线 — 收工：Step 0 stop 语义 pin 交付（27/27 绿，分支未合并待批，回链 22:43 开工）
+
+- 完成：挂账专项「stop 双实现 / 零步门禁三代」调研地图 **Step 0** 交付——`scripts/characterization/characterize-stop-semantics.mjs`（**27 断言全绿**，纯 read_text needle + 源码切片，零 import 被测模块、零行为驱动），verify-all.sh 已登记（quality-final-gate 家族旁）。commit 35e012a3，交付分支 `engine/stop-gate-step0-20260919`（17e9c54e = 35e012a3 + 开工声明 0b690d41 合入，已 push）。
+- 钉死内容（对应调研地图 §一/§二/§三）：
+  - **A 路由级联版**（lifecycle stopTrajectoryRecording）：cancel_step 无条件发、**终态无条件覆写**（无 CAS）、success 默认 true（函数签名+路由双默认）、失败记 user_marked_failed、**不消费任何零步门禁**（stop(success) 绕过口直证 1f+）；
+  - **C batch CAS-only**：仅 recording 态写终态、不降级持久态、success 默认 false、与 A 分叉点唯一（CAS 守卫 + capture off 缺席）；
+  - **D detach 硬停**：只置 abort 标志（userStop.success 恒 false）、不发 cancel_step、不写终态、杀全链（closeSession+槽位+runtime 删除）；
+  - **B runner 响应式状态机**：abort 检查点×2 置阶段终态后抛 'Recording aborted'、catch userStopPath 尊重 A 已写终态、finally 归属守卫（stale 不写库不砍新 run）+幂等补发 cancel_step；
+  - **承重钉（#904 P5 假成功结构性根因固化）**：finalizeGate 创建点在最后一个 abort 抛出点之后且在 try 块内——stop 路径 throw 即跳过门闩创建（断言 5a/5b 钉死该顺序）；另钉门闩三重活性守卫、CAS-only 降级（仅 recorded）、双源判定 v1.5 兜底、`fake_success_detected` 四广播点（v2/v1.5/v3 per-run/v3 同步终局）齐备映射。
+  - **裁决项入档（断言 5f）**：门闩 CAS 无 userStop 感知——90s 内用户显式 stop(success) 落的 recorded 与自然走完的 recorded 不可区分，门闩会同样降级；该优先级 Step 3 单点化时须裁决。
+- 验收证据：pin 单跑 27/27；全量 verify-all 失败集=**3 已知红零新增**（step-highlight/layer-tree/confirm-notification），208 项通过含 stop-semantics；合并后验收：ff 被拒（与 0b690d41 docs-only 平行）→ merge 合入后集成态重跑 27/27 绿，合并差异仅 agent-log 无代码面。
+- 状态：**未合并待批**——分支 `engine/stop-gate-step0-20260919` 已推 origin；uara_V2.0 并入由用户/合约线按例批（Step 0 为零行为 pin，不涉运行态，可不重启）。
+- 遗留移交：①Step 1（三代门禁收敛进 phase-done-evidence-gate.js 单模块）保护网已就位，可立项；②断言 5f 所记「stop recorded vs 自然 recorded 降级优先级」为 Step 3 裁决输入；③stash@{0} 为 Cursor STC 残迹保全（其已提交版 faa19c83 为准），留给 Cursor 处置。
+- 注：不维护 CHANGELOG；零行为改动，无重启需求
+
 ## 2026-09-19 22:43 · ZCode 引擎线 — 开工：挂账专项「stop 双实现 / 零步门禁三代」Step 0（stop 语义 pin）
 
 - 进行中：用户已点名 P5 零步专项优先立项（"好的，继续吧"）。本单元执行调研地图 `docs/superpowers/reports/2026-09-18-stop-zero-gate-convergence-survey.md` 的 **Step 0**：新增 `scripts/characterization/characterize-stop-semantics.mjs`——只读 characterization pin，钉 stop A（lifecycle 路由级联无条件覆写）/C（batch CAS-only）/D（detach 硬停不写终态）三者 cancel_step/终态写入差异，及「stop 路径不 arm 90s finalize 门闩」（=stop(success) 通道绕过全部零步门禁的现状固化）。零行为改动，为 Step 1（三代门禁收敛进 phase-done-evidence-gate.js 单模块）备好保护网。
