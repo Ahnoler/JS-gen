@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-19 21:05 · ZCode 合约线 — 开工：#905 解锁裁决第三试（traj #909，nav-reclick 限流集成验收，单变量窗口录制）
+
+- 进行中：引擎线核验**运行态=fd30f4a7**（health 200、22:34 起进程 pid 34532 未变、nav-reclick 生效中）；引擎线 Step 1（门禁收敛重构）待批未合并，本单须在其合并重启前录完=**nav-reclick 单变量取证窗口**。traj **#909**「wet9B3S 设置阶段到管控要素解锁第三试-20260919」已建（阶段 2397-2404，fid 9000000740，acct 2），任务文本三处修正：①点名每表单确切提交按钮=「保存」（#904「确 定」静默失败教训）②保存后落库核验门闩（树无节点=静默失败须重试/report）③导航复位配方预埋（导航元素可重点击 1 次，仍不行则 report）。
+- 范围（可写集）：`tmp/contract-wet9-20260919/`（b3s 证据子目录+报文+报告）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`、`scripts/controller/**`、SUT 存量阶段/产品（只动 stamp：wet9阶段S/wet9B3S/wet9B3产品S-20260919）
+- 方式：主线程 analyze/create 已完成 → 派发录制操作员（prepare→CDP 预检→start→poll→detach→落库证据）→ 主线程独立落库验收（doneLogs+steps+`[nav-reclick]`/处方文案取证）→ through-report-b3s → 收工条目。**风险预案（引擎线提示）**：若录制中途服务异常重启（旧进程崩溃后从引擎 worktree 载入 Step 1 Node 代码），收工条目显式标注，交引擎线核对加载版本。
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-19 20:20 · ZCode 合约线 — 收工：nav-reclick 修复并 V2.0 完成（fd30f4a7，回链 20:05 开工）
 
 - 完成：`engine/nav-reclick-gate-20260919` @ d2adf8e3（用户已批）+ 合约分支 agent-log 条目一并并入 `uara_V2.0`（两个合并提交：0c175ac5 引擎修复 + fd30f4a7 agent-log，已推 `5fd80248..fd30f4a7`）。agent-log 冲突按纪律双侧保留、严格时间序重排（285 条 = 278 + 引擎 4 + 合约 3，逐一在位校验；中间发现重排时 12:25 及更早尾部被截断，已从 f709fdc3 版本补回后 amend，无丢失）。
