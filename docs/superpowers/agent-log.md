@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-19 20:05 · ZCode 合约线 — 开工：nav-reclick 修复并 V2.0（d2adf8e3 + 合约分支 agent-log，用户已批）
+
+- 进行中：引擎线交付 wet9-B3r ③裁决修复（engine/nav-reclick-gate-20260919 @ d2adf8e3，导航类元素限流重点击：a/li/menu-class 判定 + 每元素每阶段 1 次重击预算 + [nav-reclick] 留痕 + 耗尽处方文案）。合约线只读复核通过（判定覆盖 #904 两实证元素、预算语义与裁决逐字对齐、__navreclick__ 命名空间随阶段清理归零、per-element 隔离有行为断言；搜索图标 a 标签空 text 落导航预算路径恰好覆盖错位态配方"重点一次"的量）。用户已批合并，按上轮分工执行。
+- 范围（可写集）：临时 worktree（合并操作）、`docs/superpowers/agent-log.md`（本条目+收工条目）、合并态 pin 验收在 D:\dev\JS-gen 全 worktree 跑
+- 禁入区：`D:\dev\JS-gen-engine`（引擎工作树，只读已毕）、`scripts/controller/**`（引擎线代码，本单元零改动）、SUT
+- 方式：临时 worktree 合并 d2adf8e3 + fix/phase-contract-20260918 → uara_V2.0（agent-log 冲突双方条目并排、严格时间序）→ 合并态 pin 验收（D:\dev\JS-gen 全 worktree：idempotent-click-gate + reset-button-guard + 双侧 KB 金样例）→ push → 回执引擎线重启 → #905 第二重试预备
+- 注：合并协调轮次，合约侧零代码改动
+
 ## 2026-09-19 19:45 · ZCode 合约线 — 收工：B3 重试单 #904（守门修复集成验收 PASS，裁决仍未取得，回链 19:20 开工）
 
 - 完成：#904 全管线收口（tmp/contract-wet9-20260919/wet9b3r/ + through-report-b3r.md，主线程独立落库复核）。**守门修复集成验收 PASS**：`err-icon-label-miss` 全程 0 次（#902/#903 阻断签名未复现）；KB 错位态配方生产首秀成功（P4 步 14-17 树重载后重填关键字→点搜索图标→树过滤→点中节点全链无拒绝）；err-icon-label-miss 专属签名消灭。精确口径：本单未出现同阶段二次点图标场景（首点即生效），白名单路径生产流量未直接命中，判定以零复发+配方全链+pin 套件三证为准。
