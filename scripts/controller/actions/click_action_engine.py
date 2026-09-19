@@ -541,9 +541,8 @@ class ClickEngine:
                         stc_satisfied,
                     )
                     is_tree_for_stc = await xpath_is_tree_node(page, gate_xp)
-                    # Tree: block click if STC gate not met. Table-radio index
-                    # clicks already happened — only need satisfied flag for
-                    # record-override (same MVP shape as tree first-leaf).
+                    # Tree nodes are blocked here. Table radios are blocked after
+                    # table_radio_info is known, still before the DOM click.
                     if is_tree_for_stc:
                         stc_err = await guard_locate_or_err(page, self.business_data_store)
                         if stc_err:
@@ -593,6 +592,17 @@ class ClickEngine:
                     }''', gate_xp) or {}
                 except Exception:
                     table_radio_info = {}
+
+            # Table-radio index clicks share the dedicated action's STC hard guard.
+            # Without this, click_element_by_index records a business-key row before 查询.
+            if (
+                table_radio_info.get('isRadio')
+                or str((element_info or {}).get('target_kind') or '') == 'table_row_radio'
+            ):
+                from .search_then_click_guard import guard_locate_or_err
+                stc_err = await guard_locate_or_err(page, self.business_data_store)
+                if stc_err:
+                    return _err(stc_err, include_in_memory=True)
 
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
             # select→修改→确认 loops after premature done() rejection.

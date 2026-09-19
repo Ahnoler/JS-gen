@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-19 22:36 · Cursor — 收工：索引点表行单选补 STC 硬护栏（湿测 908 PASS，回链 STC 派发调研）
+
+- 完成：`click_element_by_index` 在识别到表行 radio/checkbox 后、DOM 点击前调用 `guard_locate_or_err`，与专用 `click_table_row_radio` 同形；未点「查询」时返回 `err-search-first`，禁止落成业务键。pin：`characterize-search-then-click-guard` 扩「守卫须在 `_click_element_node` 之前」。
+- 背景：STC 湿测 905/907 代理主路径为索引点行；仅有落库改写、无硬拦 → 可跳过查询仍记客户号。派发对照 906 证伪「只改阶段文案」；同相文案 907 仍先点行后点查询。
+- 验收：pin OK；运行态 `JS-gen-engine` 已同步同文件（新录制子进程加载，未重启 Node）；湿测 traj **908** `CREATED_click_table_row_radio_first`（先查询再选行，`row_text=first` + 结构 xpath；证据 `tmp/recording-coach-2026-09-19T13-50-05`）。
+- 范围：`scripts/controller/actions/click_action_engine.py`、`scripts/characterization/cold/characterize-search-then-click-guard.py`、本条目
+- 遗留：①引擎 worktree 工作区若仍有未提交拷贝，pull 本提交后即可对齐；②908 未落「确认」步（STC 门闩未要求）；③换相仍清 STC 旗标（设计如此，本修不改）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-19 20:07 · ZCode 引擎线 — 就绪：引擎 worktree 已到 fd30f4a7，待用户真实控制台重启（nav-reclick 生效窗口）
 
 - 进行中：接合约线合并回执（origin/uara_V2.0=fd30f4a7：`0c175ac5` nav-reclick 修复并入 + `fd30f4a7` 合约 agent-log 条目）。引擎 worktree 准备完成——分支名 uara_V2.0 被主检出占用，已在交付分支 `engine/nav-reclick-gate-20260919` 上 `merge --ff-only origin/uara_V2.0` 快进到 **fd30f4a7**（代码内容与 V2.0 tip 逐字节一致，工作区干净 0 改动）。终验：py_compile 过 + `characterize-idempotent-click-gate` 33/33 绿；修复本体抽检（_NAV_RECLICK_BUDGET×4 / [nav-reclick] 留痕）在运行检出中在场。
