@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-19 22:43 · ZCode 引擎线 — 开工：挂账专项「stop 双实现 / 零步门禁三代」Step 0（stop 语义 pin）
+
+- 进行中：用户已点名 P5 零步专项优先立项（"好的，继续吧"）。本单元执行调研地图 `docs/superpowers/reports/2026-09-18-stop-zero-gate-convergence-survey.md` 的 **Step 0**：新增 `scripts/characterization/characterize-stop-semantics.mjs`——只读 characterization pin，钉 stop A（lifecycle 路由级联无条件覆写）/C（batch CAS-only）/D（detach 硬停不写终态）三者 cancel_step/终态写入差异，及「stop 路径不 arm 90s finalize 门闩」（=stop(success) 通道绕过全部零步门禁的现状固化）。零行为改动，为 Step 1（三代门禁收敛进 phase-done-evidence-gate.js 单模块）备好保护网。
+- 上游：uara_V2.0（tip ea9eee1c）。引擎 worktree 新分支 `engine/stop-gate-step0-20260919` @ ea9eee1c。
+- 范围（可写集）：`scripts/characterization/characterize-stop-semantics.mjs`（新）、`scripts/refactor/verify-all.sh`（登记）、`src/services/trajectory/*.js` 只读、主检出 agent-log 本条目+收工条目
+- 禁入区：运行态服务与 4097（本单元不重启）；`trajectory-record-lifecycle.js`/`trajectory-recording-runner.js`/`trajectory-attach-service.js` 源文件（Step 0 只读不动，Step 1 才改）；`scripts/controller/**`（合约线湿测热区）；Cursor STC 文件集（click_action_engine.py / characterize-search-then-click-guard.py，其 22:36 收工已毕但今日湿测联调仍在跑）
+- 方式：读源 → 写 pin（read_text needle + 必要 behavior smoke）→ verify-all 登记 → 全量 verify-all 与基线比对（3 已知红零新增）→ 分支交付 push + 收工条目「未合并待批」
+- 注：子智能体不 commit；主会话验收后代提交
+
 ## 2026-09-19 22:40 · ZCode 引擎线 — 收工：重启完成确认（fd30f4a7 运行态生效），回执合约线开 #905（回链 20:07 就绪条目）
 
 - 完成：用户真实控制台执行 restart-local.cmd，引擎线核验——①health **200**（4097 LISTENING pid 34532，进程启动 22:34:44 与 `tmp/server-main.log` mtime 22:35:00 交叉吻合=本次新起）；②server 启动序列正常（batch recovery 完成，EADDRINUSE 0 次=旧进程清干净）；③**运行代码=引擎 worktree fd30f4a7**（nav-reclick 限流 `_NAV_RECLICK_BUDGET`×4 + `[nav-reclick]` 留痕在本运行检出于场，py_compile+pin 33/33 于 20:07 终验过）；④执行机 LMY 重连 online（connected=true，inUse=0，heartbeat 实时）——B-3 的 DB 假活防护同步在位（另一同 uuid 旧节点行保持 offline 未被误刷）。
