@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-19 23:59 · ZCode 合约线 — 收工：#905 解锁裁决第三试 #909（nav-reclick 行为学 PASS，三连 NOT-ADJUDICATED，回链 21:05 开工）
+
+- 完成：#909 全管线收口（tmp/contract-wet9-20260919/wet9b3s/ + through-report-b3s.md，主线程独立落库复核）。**单变量窗口成立**：pid 34532 每拍核验未变，nav-reclick 单变量取证有效。
+- **nav-reclick 集成验收：行为学 PASS**——P4 步 17→26 同阶段二次点击搜索图标 a[40] 成功落库（ok-clicked-40），already-operated-this-phase / 拒绝文案 / 处方文案在 steps+doneLogs+事件流 0 次（旧守门必拒；预算耗尽场景本单未触发）。口径：[nav-reclick] stderr 留痕属进程级日志不落 DB，行为学证据（二次点击落库+0 拒绝）即验收信号；已移交引擎评估把 nav-reclick 放行事件写入事件流以便台账级取证。
+- **对策①点名「保存」首次生效**：分类落库成功（ok-save-success + 分类编号 PD00044278）——#904「确 定」静默失败断点突破（agent 步 14 仍惯性点「确 定」一次但自愈改「保存」）；**对策②落库核验门闩生效**：P4-P6 doneLog 明确区分已落库/未落库并如实 blocked 收口，无伪造。
+- **裁决 NOT-ADJUDICATED 三连**：产品序号再断 P4——新形态「值仅写入 Vue model、DOM 未同步」；**步序疑点：产品弹窗序号无任何 fill_form_field 步**（步 23/24 为点击），存在「fill 被去重拒绝（分类表单同 label+同值 identity 碰撞）」与「agent 未调」两解释，移交引擎甄别。终态口径新形态：failedKind=**quality_failed**（missing_success_token，P5 blocked 收口无 success token）——诚实 blocked 被标「质量未达标」有误导性，移交 Step 1 门禁收敛纳入 blocked 独立 reason。
+- 清理：阶段删净、产品未落库；**分类 PD00044278 残留**（任务文本清理清单漏列分类，本线自领模板修正；建议与 PD00044268-70 残留族一并业务清理）。remote_session 2068 closed、LMY inUse=0。
+- **移交引擎**：①产品序号 fill 无步甄别（去重作用域怀疑）②quality_failed 对 blocked 收口的语义区分③nav-reclick 事件流留痕建议④步号异常加重（38-42 缺号+步 45 双行+46 缺号）⑤failedReason 无阶段号（持续）。
+- 注：录制湿测轮次，无代码改动；不维护 CHANGELOG
+
 ## 2026-09-19 21:05 · ZCode 合约线 — 开工：#905 解锁裁决第三试（traj #909，nav-reclick 限流集成验收，单变量窗口录制）
 
 - 进行中：引擎线核验**运行态=fd30f4a7**（health 200、22:34 起进程 pid 34532 未变、nav-reclick 生效中）；引擎线 Step 1（门禁收敛重构）待批未合并，本单须在其合并重启前录完=**nav-reclick 单变量取证窗口**。traj **#909**「wet9B3S 设置阶段到管控要素解锁第三试-20260919」已建（阶段 2397-2404，fid 9000000740，acct 2），任务文本三处修正：①点名每表单确切提交按钮=「保存」（#904「确 定」静默失败教训）②保存后落库核验门闩（树无节点=静默失败须重试/report）③导航复位配方预埋（导航元素可重点击 1 次，仍不行则 report）。
