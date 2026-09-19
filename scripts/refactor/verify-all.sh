@@ -164,6 +164,7 @@ run "characterize-fill-dispatch" "$PY" scripts/characterization/cold/characteriz
 run "characterize-fill-err-with-scope" "$PY" scripts/characterization/characterize-fill-err-with-scope.py
 run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/characterize-search-then-click-guard.py
 run "characterize-search-then-click-prompts" "$PY" scripts/characterization/cold/characterize-search-then-click-prompts.py
+run "characterize-idempotent-click-gate" "$PY" scripts/characterization/characterize-idempotent-click-gate.py
 run "characterize-fill-replay-engine" "$PY" scripts/characterization/cold/characterize-fill-replay-engine.py
 run "characterize-select-dispatch" "$PY" scripts/characterization/cold/characterize-select-dispatch.py
 run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/characterize-select-replay-engine.py
