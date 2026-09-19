@@ -217,6 +217,8 @@ run "characterize-form-field-intra-slot" node scripts/characterization/cold/char
 run "characterize-form-structure-container" node scripts/characterization/cold/characterize-form-structure-container.mjs
 run "characterize-tree-node-text" node scripts/characterization/cold/characterize-tree-node-text.mjs
 run "characterize-tree-text-export" node scripts/characterization/cold/characterize-tree-text-export.mjs
+run "characterize-recording-coach-assert" node scripts/characterization/cold/characterize-recording-coach-assert.mjs
+run "characterize-recording-coach-operator" node scripts/characterization/cold/characterize-recording-coach-operator.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

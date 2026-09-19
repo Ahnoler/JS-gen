@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-19 18:22 · Cursor — 收工：recording-coach 湿测操作员补充落地并推送 uara_V2.0
+
+- 完成：`tools/recording-coach/` 旁路编排器补齐湿测操作员能力（计划 `docs/superpowers/plans/2026-09-19-recording-coach-wet-operator.md`，吸收合约草稿只读、不回写 JS-gen-contract）：
+  - 值守：`start_record` 每 60s 写完整 `poll-N.json`、进度含 done/doneLogs 摘要；默认超时 40 分钟，超时 `BLOCKED_录制超时` + detach；首次轮询失败不再未捕获拒绝
+  - 管线门闩：`prepare` 只认 `ready===true`；`phaseIds` 拒 UUID；`cdp_precheck`（四针、15s 超时）后才允许开录；重 prepare / retry 清 `cdpChecked`
+  - 编排门闩：五段式 `dispatch-brief.md` 与业务 `taskText` 分离；`preflight_readonly` / `accept_phases` 后才能 `create_trajectory {}`
+  - 验收：诚实失败默认 `honestReject` → `REJECTED_`；收尾工具写 `through-report.md` + `close.txt`（结论一行 + 报告路径 + 三条证据）
+- 验收：`characterize-recording-coach-assert` / `characterize-recording-coach-operator` 均 OK；已登记 `verify-all.sh`；STC traj 899 湿测 DONE 为前序证据（本笔为代码收编）
+- 遗留：①`assert_steps({criteria:{}})` 仍会盖掉 `w.inputs.assert`（预存）；②CDP open 超时后底层 WebSocket 未必立刻关闭；③真机全链路按新 12 步再跑一轮待用户点名；④不碰运行中 4097 / 他线轨迹
+- 注：不维护 CHANGELOG；本单元改动此前未 commit，随用户「推送」一并提交
+
 ## 2026-09-19 12:04 · ZCode 引擎线 — 收工：wet9 幂等点击守门放行完成（回链 11:58 开工；分支 engine/idempotent-click-gate-20260919 已交付「未合并待批」）
 
 - 完成：分支 `engine/idempotent-click-gate-20260919` 两提交——`d52e3626`（开工条目）+ `81a17f22`（修复本体，3 文件 +158/−8），已推送远端，**未合并 uara_V2.0 待用户审批**：
