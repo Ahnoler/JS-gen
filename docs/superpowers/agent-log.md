@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-19 19:05 · ZCode 合约线 — 收工：wet8/wet9 合约分支并入 uara_V2.0（用户批准，4edf67e8 已推）
+
+- 完成：`fix/phase-contract-20260918` 全量并入 `uara_V2.0`（合并提交 **4edf67e8**，已推 `8ba45373..4edf67e8`）——实质变更仅 1cf267ef KB 错位态配方一行（product_library 先查再点），其余为 agent-log/操作指引文档；agent-log 冲突按纪律双侧保留并按严格时间序重排（277 条目逐一在位校验）。
+- 合并态验收（JS-gen worktree 临时检出 4edf67e8 实跑）：JS `characterize-flow-card-recall` 26/26；Python `characterize-kb-recall` ok；`characterize-idempotent-click-gate` OK（引擎修复在合并态在场）；`characterize-reset-button-guard` 全过。
+- 分工回执：重启窗口=引擎线从**真实控制台**切 V2.0→pull→restart-local.cmd，完成判据=`curl /api/health` 200（上一轮脚本 [OK] 但进程随自动化 shell 会话被回收致服务未起，已双方知会沉淀口径）；重启后合约线开 B3 重试单做守门修复集成验收+解锁裁决。
+- 注：JS-gen worktree 中间临时检出已还原为 uara_V2.0 分支头；无代码改动（除 agent-log/todo-list/KB 配方）；不维护 CHANGELOG
+
 ## 2026-09-19 18:23 · ZCode 引擎线 — 补记：wet9 修复并入 V2.0 完成 + 合约线复核/建议②闭环知会（回链 12:04 收工「未合并待批」）
 
 - **合并完成**：用户指示「先拉上游分支 uara2.0，然后将本次修复交给上游分支」——`engine/idempotent-click-gate-20260919` 已于主检出 no-ff 合入 `uara_V2.0`（合并提交 `4db25cd8`，已推送 `e0b0f7a3..4db25cd8`），合并态验收绿（py_compile + characterize-idempotent-click-gate 20/20 + reset-button-guard + ai-phase-element-guard）。合并时主检出 verify-all.sh 上 Cursor recording-coach 两行未提交登记经 stash 暂存后原样恢复（现随 Cursor 18:22 收工条目一并入库，双方登记行并排共存）。交付分支保留不删。12:04 收工条目「未合并待批」状态至此作废，以本条为准。**「不要合入 uara_V1.2」指示作废（用户 18 时段确认）**：V1.2 为冻结历史，引擎 worktree 即 V2.0 工作树，此后批次一律从 V2.0 切出。
@@ -17,23 +24,6 @@
 - 验收：`characterize-recording-coach-assert` / `characterize-recording-coach-operator` 均 OK；已登记 `verify-all.sh`；STC traj 899 湿测 DONE 为前序证据（本笔为代码收编）
 - 遗留：①`assert_steps({criteria:{}})` 仍会盖掉 `w.inputs.assert`（预存）；②CDP open 超时后底层 WebSocket 未必立刻关闭；③真机全链路按新 12 步再跑一轮待用户点名；④不碰运行中 4097 / 他线轨迹
 - 注：不维护 CHANGELOG；本单元改动此前未 commit，随用户「推送」一并提交
-
-## 2026-09-19 12:55 · ZCode 合约线 — 收工：建议②落地（product_library 先查再点补错位态配方，回链 12:25 开工）
-
-- 完成：引擎线交付 wet9 幂等点击守门放行（81a17f22 → uara_V2.0 4db25cd8）的配套 KB 配方——`data/kb/flows/product_library.json`「先查再点」rule 追加（单行 diff）：**树重载（新增/保存节点自动刷新、【刷新产品树】、loadingTree()）会清 el-tree 过滤但搜索框关键字仍在（错位态：框里有词、树是全量，wet9 实证）——重载后须重填关键字并再次点击搜索图标再定位节点；搜索图标本阶段可能需多次点击（引擎已放行幂等动作重复点击）**。后续产品库任务门闩可直接引用该句预声明。
-- 验收：跨语言契约双侧复跑——JS `characterize-flow-card-recall` 26/26、Python `characterize-kb-recall` ok（已知 py-divergence 噪声不变）；`recall-eval` 两跑逐字段零差异（Acc@1 0.74 / Recall@5 0.847 / MRR@5 0.784 / nDCG@5 0.798，仅 generatedAt 变化）——规则文案追加对召回零影响。
-- 引擎修复复核（本单元顺带，只读）：81a17f22 diff 与通报一致——`_IDEMPOTENT_BTN_RE` 全锚定白名单（复合词如「保存查询方案」不误放行）、click_button 与 click_element_by_index 两处守门豁免、element_guard 记录模块零改动；无需本线动作。
-- **重启窗口知会（用户协调时机）**：V2.0 @ 4db25cd8（含引擎修复+本 KB 配方）生效需控制面重启；引擎工作树 D:\dev\JS-gen-engine 当前停在 engine/idempotent-click-gate-20260919 分支，重启前须切回/重检出 uara_V2.0，重启后 wet9 锁死态（#902/#903 签名）与 KB 配方一并激活，可择机重跑 B3 解锁裁决。
-- 遗留：wet9 其余引擎移交项（#903「序号」框 real_click 未命中、failedReason 不带阶段号、doneLog probe 处方化=建议③）引擎线已登记待后续单元；B 类五项测试报告、转正手机验证入口仍挂起。
-- 注：纯 KB 数据+文档轮次，无代码改动；不维护 CHANGELOG
-
-## 2026-09-19 12:25 · ZCode 合约线 — 开工：落引擎建议②（产品库 KB 卡「先查再点」补树重载过滤失效配方）
-
-- 进行中：引擎线已交付 wet9 幂等点击守门放行（81a17f22 → uara_V2.0 4db25cd8，pin 20/20+回归 6 绿，主线程已只读复核 diff 与通报一致）。本单元落地其通报中留给合约/KB 线的建议②：`data/kb/flows/product_library.json`「先查再点」规则追加「树重载（新增/保存节点自动刷新、【刷新产品树】）会清掉过滤但保留搜索框关键字——重载后须重填关键字并再次点击搜索图标再定位节点」，供后续任务门闩预声明引用。
-- 范围（可写集）：`data/kb/flows/product_library.json`（仅「先查再点」一条 rule 追加文案）、agent-log 本条目与收工条目
-- 禁入区：`D:\dev\JS-gen-engine`（引擎工作树在 engine/idempotent-click-gate-20260919 分支，不触碰）、`scripts/controller/**`（引擎线地盘）、`data/kb/req/**`、其他 KB 卡文件
-- 方式：改卡 → 双侧金样例 characterization（JS flow-card-recall + Python kb-recall）→ recall-eval --baseline diff → commit+push；**V2.0 合并交给重启窗口**（引擎工作树不在 V2.0 上，避免工作树争用；届时与引擎修复一并激活）
-- 注：纯 KB 数据+文档轮次，无代码改动
 
 ## 2026-09-19 12:04 · ZCode 引擎线 — 收工：wet9 幂等点击守门放行完成（回链 11:58 开工；分支 engine/idempotent-click-gate-20260919 已交付「未合并待批」）
 
@@ -55,80 +45,6 @@
 - 方式：主线程内联实施（单文件小修不派子智能体）；RED pin→最小修复→相关 pin 回归（ai-phase-element-guard/reset-button-guard/search-then-click-guard/click-replay-engine）→全量 verify-all 基线比对（3 红）→合并后验收→分支交付
 - 注：不维护 CHANGELOG
 
-## 2026-09-19 11:35 · ZCode 合约线 — 收工：树搜索「未过滤」错因调研（Playwright MCP 实机复现，修正 wet9 收工条目移交项①）
-
-- 完成：用户指示上页面调研复现 wet9 #902/#903「树搜索未过滤」签名。报告 `tmp/contract-wet9-20260919/tree-search-root-cause.md`。**结论修正：SUT 过滤功能无缺陷，wet9 收工条目引擎线移交项①「树搜索未过滤生效」措辞作废**——真因是三层叠加：
-  1. **SUT 状态错位（设计坑，非功能缺陷）**：产品树任何重载（新增/保存节点自动刷新、`刷新产品树`、`loadingTree()`）都会清掉 el-tree 的 filter，但搜索框 DOM 与 Vue data（`optionsShrink.input`）的关键字仍保留 → 「框里有词、树是全量」错位态。Playwright 实锤：filter『wet9』4 节点命中 → 调 loadingTree() → 38 节点全量且框仍显 'wet9'。
-  2. **过滤触发点在搜索图标 click**（`querySearch() → shrinkTree.filter(optionsShrink.input)`），不在 input 事件——框里有词不等于过滤生效，重载后必须再点一次图标。
-  3. **引擎守门放大**：再点图标被 `already-operated-this-phase` 拒（#902 P3 step15 已点过一次、#903 P5 同款）→ SUT 错位态的唯一自愈路径被堵死 → agent 所见即「填了但没过滤」，叙事忠实于表象，agent 无过错；每一步动作回放（fill→真点击图标）在 Playwright 全部复验通过（含 1 命中/4 命中/0 命中三情形）。
-- 引擎线修复建议（三条，详见报告）：①守门对查询/搜索/刷新类幂等动作放行重复点击（或按元素+参数去重）；②KB 卡「先查再点」规则补「保存/刷新树后过滤失效，需重填关键字再点搜索」+ 门闩预声明搜索图标可多次点击；③doneLog probe 复核错位特征给出处方。
-- 页面调研足迹：登录（测试环境验证码/短信不强制）、菜单导航进产品库管理页、只读 DOM/Vue 探测 + 试搜三次（已清理搜索框恢复原状）；未修代码未动业务数据。
-
-## 2026-09-19 10:40 · ZCode 合约线 — 收工：产品管理模块湿测（wet9 全链，回链 09:10 开工）
-
-- 完成：5 单全收口（tmp/contract-wet9-20260919/，fid 9000000740，acct 2，落库复核均主线程独立验证）：
-  - **#897 wet9a 主链前半 CREATED_TREE**：权限探针=701994 侧总行全功能（非总行条款未触发）；stamp 三节点真实落库——wet9分类=PD00044268 / 子分类=PD00044269 / 产品=PD00044270（未启用 V-0.0.1）；基本信息保存 select_option×5+「操作成功」toast，37 步 0 error。
-  - **#900 wet9b 主链后半 PARTIAL（诚实 failed）**：**「空壳产品能否启用」裁决=可启用**（pdSt 1→4，updateStauts 200+「状态更新成功」双证；禁用→再启用状态机 1→4→3→4→3 全通）；克隆副本 PD00044271 建成并删净；主产品删除被拒「产品不是未启用，不能删除」——**业务规则发现：删除仅限未启用，启用过（即使已禁用）不可删**，PD00044270 以禁用态残留（预期内残留，见移交①）。
-  - **#901 wet9B1 配置视图只读 OK（零落库）**：pdCfgVw 两区块结构取证完成；**偏差登记：区块1【配置】实为路由跳转 corePdMpng 非弹窗**（SUT/需求判据偏差，落点页结构已取证 420 条映射列表）。
-  - **#902 wet9B2 排序 PARTIAL**：stamp 三节点删净零污染；「wet9B2乙」因树搜索未过滤生效未建成→互换核验缺对象未取得；边界负例（首位上移）被引擎 phase 内守门拦截覆盖，SUT 规则未独立演示。
-  - **#903 wet9B3 解锁裁决未取得（诚实 failed）**：wet9阶段-20260919 建成+删净（零残留）；产品因「序号」err-pending-fields（real_click 三次未命中）+ 树搜索未生效未落库→【设置阶段】关联与【设置管控要素】核对级联未执行；09-06 blocked 假设既未证实也未证伪。
-- **引擎线移交（本链最重要产出）**：①**树搜索未过滤生效**签名两单复现（#902 P3 / #903 P5）——填入关键字点查询后树不过滤，叠加②**already-operated-this-phase 守门过紧**（搜索图标重试被拒）直接放大断点；③新增产品弹窗「序号」字段 real_click 三次未命中（err-pending-fields）；④traj 级 failedReason 仅「阶段执行失败」不含阶段号；⑤#901 P2/P4 doneLog token 判据与页面实际渲染偏差（probe force-close 与实际状态不符两例）；⑥step_count 口径差（900：traj 记 37 vs 落库 44）与 step_number 缺号 1 步。
-- 数据残留移交（用户可裁）：PD00044268/44269/44270（wet9 分类/子分类/产品，产品为禁用态）留存于产品树——启用过不可删是 SUT 硬规则，如需清理须业务侧介入；其余 stamp 全部自清。
-- 结论：产品库主链（建树→信息保存→启用/禁用/复活/克隆/删除）引擎全链走通，「空壳可启用」裁决落地（KB 卡疑点销案）；配置视图偏差与解锁假设两条登记在案。产品管理模块无客户池依赖，不受 wet8 资源局限影响。
-- 遗留：B3 裁决重试（改任务绕开树搜索依赖，如建后立即定位不搜树）待用户示意；引擎六项移交见上；B 类五项测试报告、转正手机验证入口仍挂起。
-- 注：纯录制+文档轮次，无代码 commit；analyze 首击偶发 500「terminated」重试即过（#901，LLM 超时）
-
-## 2026-09-19 09:35 · ZCode 合约线 — 收工：录制湿测派发经验落 SKILL 草稿（供 recording coach MVP 会话吸收）
-
-- 完成：`docs/superpowers/guides/2026-09-19-recording-coach-skill-draft.md`——wet4-wet8（traj 849-896）三十余单派发经验蒸馏：任务书五段式 / 管线七步含实测坑位（phaseIds 数字 id、create 端点无 /create、CDP 端口=19242+slotIndex、doneLogs 400 字符源头截断）/ 门闩与诚实失败语义 / **派发前自查清单**（前置数据只读核查优先，wet8 三单被拒的教训）/ 操作员三变体（录制员/只读核查员/取证员）/ 红线。
-- 面向：用户正开发 recording coach 内嵌智能体（另一会话在途 MVP）；本稿为中立参考草稿，MVP 会话可整体吸收或搬入其 skill 结构，不必保持本文件同步。
-- 注：docs-only 单文件提交，无代码改动，不涉他线文件。
-
-## 2026-09-19 09:10 · ZCode 合约线 — 开工：产品管理模块湿测（wet9，主链两单+三旁验单）+ 挂载纠错
-
-- 进行中：用户指示①核心产品映射下评级批量导入交易迁回正确功能点——**已完成**：T01-T21 共 21 笔（id 763-784，id 765 不存在）从 9000000812（核心产品映射）UPDATE 至 9000000011（对公客户评级），复核 812 现剩 6 笔全为映射本体（59/513/690/691/697/698）；②产品管理模块湿测：规划已定（规划要点=主链「建分类→建产品→信息保存→启用→禁用→再启用→克隆→清理」10 阶段拆两单 + B1 配置视图只读核对 + B2 上移下移排序 + B3 设置阶段→管控要素解锁裁决），任务文本已落 tmp/contract-wet9-20260919/task-{9a,9b,b1,b2,b3}.md，挂载叶全部按 KB 卡修正口径（产品库 9000000740）
-- 范围（可写集）：`tmp/contract-wet9-20260919/`（证据）、新建交易录制数据（API）、agent-log 本条目与收工条目；trajectory.function_id 数据修正（已完成部分见上）
-- 禁入区：`D:\dev\JS-gen-engine` / `D:\dev\JS-gen` 代码文件（服务从 engine worktree 运行，不重启不触碰）、他线在途录制槽、`data/kb/req/product-mgmt/**`（KB 卡只读使用）、`scripts/prompts/**`、存量产品数据（KB测产品/产品1/KB测克隆等一律不碰，只动 stamp 自造节点）
-- 风险预埋：①systemAccountId=2 总行权限未实证——9a 阶段1 即权限探针，缺按钮则诚实失败移交用户；②「空壳产品能否启用」为本轮裁决点之一（9b 阶段6）；③wet-test.md 5 个 blocked 叶（设置管控要素族）由 B3 裁决解锁条件；④删除仅限 stamp 自造产物
-- 方式：主线程逐单 analyze/create（fid 9000000740，B3 亦挂 740）→ 子智能体执行 prepare/CDP 预检/start（数字 phaseIds）/detach → 主线程落库独立复核 → 单间串行（wet9-1→wet9-2→B1→B2→B3），失败改任务换 stamp 新建交易不重录死磕；纯录制轮次不 commit 代码
-- 注：B3 涉及 stamp 阶段落库与产品-阶段关联（比 wet8 只录不动进一步，用户在规划确认中放行范围为「写任务文本→开工声明→逐单派发」，B3 门闩已含自造自清）
-
-## 2026-09-19 09:05 · ZCode — 收工：后端发版 20260919-085907（回链 09-17 10:36 开工）
-- 后端：uara_V2.0 @ 2c22d312 → /data/app/JS-gen-releases/20260919-085907（batch 47 跑 1 个 migration）；api/docs 200、server.log 干净启动、local-server-proxy 秒级重连
-- 前端：维持 09-17 的 20260917-1035，经 nginx /api 200 验证
-- 执行机：LMY 三个注册节点（2f21bad1/08d34440/413bbddf）心跳在跳但采样时无活跃 WS，属执行机侧重连节奏，非发版事故
-- 回滚：ln -sfn /data/app/JS-gen-releases/20260917-205042 /data/app/JS-gen && 重启 node server.mjs
-
-## 2026-09-19 08:30 · ZCode 合约线 — 收工：对公授信申请湿测链 DONE_WITH_CONCERNS（回链 07:35 开工；#892/#895/#896 三单）
-
-- 完成：用户批准授信链湿测 + 授权「前置数据缺则自行开单补录」，实跑三单（tmp/contract-wet8-20260919/，fid 9000001512/acct 2，10 阶段带硬门闩）：
-  - **#892（瑞云智联）REJECTED_评级未生效**：服务端硬拒「查询不到客户有效评级，客户编号：26081714051504629」——与开工前置摸底（reference.md 判断评级已生效）矛盾，触发查证。
-  - **查证两单（只读探针，诚实纠错）**：#893 评级列表检查——瑞云 0 条评级记录（开工判断错误，PJ20260907016009 不存在）；#894 授信池检查（traj 860 的 P7 doneLogs 400 字截断残尾反推）——**PJ20260907016009 实属贯通验证企业**（早前归因错误已纠正），瑞云 09-18 实录为 PJ20260918016020（#863）。可用候选池：贯通×3（在途评级排除）、MBP 26081315592971621、银嘉 26081314543575915（均 2027-08-07 到期，通过态）。
-  - **#895（MBP软件传媒）REJECTED_在途授信**：服务端 6+ 次硬拒「该客户已存在经办人为：701994，授信性质为：授信新增，授信编号为：DGSX20260817056014的在途授信申请流程！」，9 个全局流水号落库——KB 卡预警命中，DGSX 未创建（诚实失败）。
-  - **#896（银嘉传媒）REJECTED_在途授信**：拒绝原文同构（DGSX20260813056010，经办人 701994，授信新增），6 次硬拒 6 流水号落库（P5/P6/P8 doneLogs 完整保留）；主线程独立复核 10/10 phase completed、26 步、record_status=failed。**新知：DGSX20260813056010 列表态已是「打回」，引擎仍按在途硬拒**——在途判定不看列表状态，重测须有权人真正终结流程；另代理曾做 deleteApply 前端探针（返回 false 无网络请求，既有记录未动，合规但贴红线，后续禁删除类探针）。
-- 落库验收（不认 isSuccessful）：三单均诚实终局、无伪造成功、无新建授信数据；A4 probe force-close doneLog 在 #896 P1/P7/P9 复现（V2.0 代码面机制稳定）；doneLogs ~400 字符 executor 源头截断在 #894 池检查与 #896 P6/P10 双重复现（**引擎线移交候选：截断在源头，长 doneLog 尾部不可恢复**）。
-- 结论：**授信申请链的引擎执行本身验证通过**（向导/抽屉/fixed 列选行/风险阻断等待/查询核验全链无执行故障），三单拒绝全部为 SUT 业务硬前置（评级未生效/在途授信），非工具缺陷；客户池全域无「评级生效+无在途授信」的可录客户，授信链完整成功录制**阻塞于业务数据**，非代码。
-- 遗留移交：①授信链重录前置=需有权人终结 DGSX20260817056014（MBP）/DGSX20260813056010（银嘉，已打回但仍判在途）或新开「评级通过且无在途」客户——待用户/业务侧 ②doneLogs 400 字符源头截断移交引擎线（session_runner/executor 侧）③转正重走（手机验证入口）仍挂起 ④B 类五项移交测试报告待用户示意。
-- 注：纯录制轮次不 commit 代码；本条目+todo 更新为文档提交
-
-## 2026-09-19 07:35 · ZCode 合约线 — 开工：对公授信申请湿测（wet8，V2.0 全量代码面首跑授信链）
-
-- 进行中：用户批准授信申请为下一单并授权「前置数据缺则自行开单补录」。前置摸底完成（tmp/contract-wet8-20260919/reference.md）：目标客户瑞云智联（26081714051504629）评级已生效+旧授信终态，两硬前置应满足；分项额度明细=流程提交硬校验（#876 抓包实证）已预埋阶段7门闩；KB 卡配方（fixed 列遮蔽/品种树最深叶子/意见必填/流程选人 WN0001）全部进门闩文案。任务=10 阶段（列表→向导→选客户→风险阻断→确认创建→方案→分项→影像+复查→意见→提交→列表核验）
-- 范围（可写集）：`tmp/contract-wet8-20260919/`（本单证据）、新建交易录制数据（API）、agent-log 本条目与收工条目
-- 禁入区：`D:\dev\JS-gen-engine` / `D:\dev\JS-gen` 代码文件（服务从 engine worktree 运行，不重启不触碰）、他线在途录制槽、`data/kb/req/product-mgmt/**`、`scripts/prompts/**`
-- 方式：主线程 analyze/create（fid 9000001512/acct 2）→ 子智能体执行 prepare/CDP/start/detach（模板同 wet7）→ 主线程落库独立复核；若撞引擎缺口按纪律最小修复+pin 另行声明；失败改任务新建交易重录不死磕
-- 注：纯录制轮次不 commit 不写日志（沿用纪律）
-
-## 2026-09-19 07:10 · ZCode 合约线 — 收工：评级修改/删除草稿态湿测 DONE_WITH_CONCERNS（回链 06:32 开工）
-
-- 完成：traj **#891**（8 阶段，fid 9000000011/acct 2，tmp/contract-wet7-20260919/through-report.md）——**评级修改/删除（草稿态）链路验证成功 + 三项合约机制真机实证**；随单完成**服务切换**（4097+LMY 改从 engine worktree uara_V2.0 @ 3ae49fb8 启动，旧合约分支服务退役）
-- 落库证据（主线程独立复核，不认 recordStatus）：27 步落库（24 业务步）——select_option(待发起)→click_table_row_radio×3→click『修改』核实→『删除』→确认弹窗『确定』全链；**存量草稿 PJ20260612004056（曾3有限责任公司，待发起）修改可编辑核实 + 删除成功**（按业务编号复查「共 0 条」落库级判据达成）；8 phase 全 completed、doneLogs 全非空
-- 业务阻断（如实记录，非执行故障）：新建链被两道墙拦——「合约湿测CUST」湿测客户池空（P2 引入弹窗空态双证）+ 贯通验证企业在途评级（PJ20260910016010，P6 服务端原文+全局流水号落 doneLogs，无假绿）→ 整轨 failed 为诚实终态
-- **合约机制真机首证（V2.0 代码面）**：①A4 probe 收口 doneLog——P1/P2 doneLogs 出现 `probe force-close: …` 前缀合成条目（session_runner→record_probe_done_log 通路生效）；②done 熔断——P2 introduce_pick 查询空态令牌（picker_closed/dialog_confirmed/introduced_backfilled）不可满足连拒后 ✂ suspect 放行（log L113）；③反向仲裁——llm=navigate/rules=other 降级触发（log L49）
-- 引擎缺口移交（本单新增观察）：①P4 引入弹窗确认后 doneLogs 报 dialog_confirmed 类令牌不可满足属 introduce_pick 契约粒度问题（空态场景令牌不可产出，与 R 清单同族）②P7 翻页定位耗时较长（曾 3 连拒）属 STC/分页定位非本单范围 ③record/start phaseIds 契约为数字库 id 非 UUID（子智能体首试 400，属 API 使用口径）
-- 遗留移交：①评级客户可用池=空（瑞云/贯通在途 + 湿测客户未转正）——**转正重走仍是解锁新建链的正道**（待手机验证入口确认）；②新造草稿的路径已实证：向导【确定】→待发起（本单 P6 因在途拦截未走到，可在新可用客户上重验）；③#891 整轨 failed 留档作诚实失败样例
-- 注：不维护 CHANGELOG；纯录制+文档轮次仅 agent-log 提交
-
 ## 2026-09-19 06:45 · ZCode 合约线 — 收工：合约修复分支并入 uara_V2.0（用户批准）
 
 - 完成：merge `cf8cbe06`——`fix/phase-contract-20260918`（tip `293f9f56`）合入 `uara_V2.0` 并推远端。带入：三批修复 `4902b3f4`（classify S1/S2/S2b/S3 + 令牌对称 S4/S5 + 前向仲裁 + done 熔断 + 276 收敛）与 A 类收尾 `3c4473ec`（反向仲裁 / save 通知正则 / probe 收口 doneLog / 熔断降噪）；冲突仅 agent-log.md（双方条目并排，合约 16:14 条目按时间序插入），verify-all.sh 自动合（双方 pin 注册全保留）
@@ -136,14 +52,6 @@
 - 状态知会各线：**合约修复已在上游 V2.0**——后续新分支从 V2.0 切即含全部合约修复；`fix/phase-contract-20260918` 分支保留不删（ wet 证据链回溯用）；运行中的 4097+LMY 服务仍从 `D:\dev\JS-gen-contract` worktree 旧代码跑，**重启后才吃到 V2.0 合并态**（重启时机待用户协调）
 - 遗留移交：①B 类移交测试报告（五项）仍待用户示意另单元执行 ②R 清单假绿窗口专项 ③`characterize-click-evidence-symmetry` 在合约分支上未注册 verify-all（本笔随分支带入，维持原状未擅注册，列下批顺手项）
 - 注：不维护 CHANGELOG
-
-## 2026-09-19 06:32 · ZCode 合约线 — 开工：评级修改/删除（草稿态）湿测 + V2.0 服务切换（接手旧会话收尾测试）
-
-- 进行中：接手归档会话（合约树）收尾——转正湿测 #877 已被「法定代表人手机号码未验证」SUT 校验阻塞（等入口确认，维持挂起），本单元按用户指示执行**评级修改/删除（草稿态）**湿测。前置事实：#863 提交成在途审批单（PJ20260918016020/瑞云），#864/#865 提交被拦未落库——**无存量暂存草稿**，草稿从何而来（评级无「暂存」路径记载，或需 DB 摸底/退回态）为本单元先决问题；客户池维持耗尽（瑞云/贯通均在途）。已同步完成**服务切换**：4097+LMY 改从 engine worktree（uara_V2.0 @ 3ae49fb8）启动（旧合约分支服务退役），代码面=合约修复+引擎修复全量在跑
-- 范围（可写集）：`tmp/contract-wet7-20260919/`（本单证据）、新建交易录制数据（API）、agent-log 本条目与收工条目（在合约 worktree `D:\dev\JS-gen-contract` 分支 fix/phase-contract-20260918 上写）；若湿测撞引擎缺口且用户模板允许：最小修复+pin（另声明）
-- 禁入区：`D:\dev\JS-gen-engine` 与 `D:\dev\JS-gen` 代码文件（服务正从 engine worktree 运行，**不重启不触碰**；进程重启仅经 restart-local.cmd 由主线程执行）、他线在途录制槽（开工前已查 LMY inUse=0）、`data/kb/req/product-mgmt/**`、`scripts/prompts/**`
-- 方式：主线程按湿测模板编排（重启已完成→DB 摸底→锚定 #849/#851/#852/#863→带门闩任务→analyze/create→子智能体执行 prepare/CDP/start/detach→落库验收）；subagent 提示词以用户提供的「功能湿测录制」模板为基；验收以 DB 落库字段为准不认 recordStatus；失败改任务/经批准修代码后新建交易重录；证据目录 tmp/contract-wet7-20260919/
-- 注：纯录制轮次不 commit 不写日志（沿用旧会话纪律）；改代码轮次才另行声明
 
 ## 2026-09-19 06:14 · ZCode 合约线 — 收工：uara_V2.0 上游基线确立（吸收 V1.2 尾差）
 
@@ -218,6 +126,16 @@
 - 遗留移交：① 依赖控制面 `getLiveBindingByAgentSession(sessionId)` 解析 trajectoryId——若绑定缺失则 trajectoryId=null，前端按 id 过滤不会弹提示（录制中绑定通常存在，边界已知）；② 全量 `npx eslint .` 对 `.venv/tmp` 等越界目录报 3343 errors（既有基线问题，非本批引入；本批按文档口径 `src/ executor/ scripts/` 校验）；③ **push 网络不稳定**——本地提交完成，本收工条目提交后如仍 push 失败由网络恢复后补推。
 - 注：不维护 CHANGELOG；主线程内联实施，未派子智能体
 
+## 2026-09-18 17:34 · OpenCode 引擎/体验线 — 开工：AI 录制 LLM 失败（余额不足等）前端提示 + 后端日志
+
+- 背景：用户排查某交易「录制不出任何步骤」——执行机日志全量 `Error code: 402 - Insufficient Balance`（phase_reviewer + 每步 agent 调用），agent 零动作空跑结束后控制面前端仍提示「AI 录制结束」，误导为成功。要求：此类 LLM 失败在前端弹出提示（成功提示改失败），并在后端日志中明确体现。
+- 进行中：控制面识别执行机 `session.agent_stderr` 中的 LLM 网关错误（402 余额不足 / 401 鉴权 / 429 限流 / 5xx），命中时：① `console.error('[agent-llm-error] …')` 写控制面日志；② 往该 session 的 agent-stderr 日志追加一行中文标记；③ WS 广播新事件 `recording:llm_error`（带 trajectoryId/sessionId/kind/message/upstream，按 session+kind 去重）。前端 `ui-auto-recording-agent-vue/vue-project`：订阅该事件，`doStartAi` 结束时把「AI 录制结束」成功提示改为失败提示。
+- 范围（可写集，主检出）：`src/services/agent-llm-error.js`（新）、`src/executor-ws.js`、`src/dashboard/api-docs/groups/websocket.js`、`scripts/characterization/characterize-agent-llm-error.mjs`（新）、`scripts/refactor/verify-all.sh`、本协作日志；**前端另仓** `ui-auto-recording-agent-vue/vue-project`：`src/composables/useWsClient.ts`、`src/composables/useRecordingStudio.ts`
+- 禁入区：他线 worktree 与分支（`D:\dev\JS-gen-engine`/`engine/pipeline-20260918`、`D:\dev\JS-gen-contract`/`fix/phase-contract-20260918`）及其运行中服务；他线 WIP（前端 `src/views/ui-recording/index.vue` 未提交改动、`data/kb/req/product-mgmt/**`、Cursor 证据目录）；运行中控制面/执行机进程；`scripts/prompts/**`；Python 引擎录制链路（`scripts/**`，本轮不动，避免与 engine 线 B1-B3 冲突）
+- 风险声明：`src/executor-ws.js` 与 16:48 ZCode 引擎线 B-3 声明同名（其改动在 `D:\dev\JS-gen-engine` worktree、写明主检出代码不在其可写集），本线只改该文件 `session.agent_stderr` 分支，与该线 attach 校验前置区域不相交；合并冲突时以「双方区域并排保留」处理。
+- 方式：主线程内联实现；先写纯函数 + pin，再接线；验收 eslint + 新 pin + 全量 verify-all 基线比对；前端 `vue-tsc`/lint。**注意：本机到 github.com:443 不通，push 暂不可用**——先本地 commit，网络恢复后补 push（收工条目如实登记）。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 17:36 · ZCode 引擎线 — 收工：B-6 fill_engine import 遮蔽修复完成（回链 17:27 开工；分支续做未合并，待用户审阅）
 
 - 完成：引擎分支 `engine/pipeline-20260918` 两提交——`9c16e1a6`（B-6 修复本体，3 文件 +129/−5）+ `1b421bad`（合并 origin/uara_V1.2 增量后推送；该增量仅 agent-log 条目无代码改动，符合合并后验收约定）：
@@ -238,14 +156,12 @@
 - 遗留移交：①全链路 wet（create→prepare→start→assert）未跑——见 `tools/recording-coach/WET-CHECKLIST.md`；②design §13 代码 MVP 全勾待 wet PASS；③本批未 commit/push（等用户明示）；④`verify-all.sh` 与引擎线 B-6 各加一行——push 时并排保留
 - 注：不维护 CHANGELOG
 
-## 2026-09-18 17:34 · OpenCode 引擎/体验线 — 开工：AI 录制 LLM 失败（余额不足等）前端提示 + 后端日志
+## 2026-09-18 17:27 · ZCode 引擎线 — 开工：B-6 fill_engine 局部 import 遮蔽 UnboundLocalError 修复（用户指示不合入 uara_V1.2、继续修复缺陷）
 
-- 背景：用户排查某交易「录制不出任何步骤」——执行机日志全量 `Error code: 402 - Insufficient Balance`（phase_reviewer + 每步 agent 调用），agent 零动作空跑结束后控制面前端仍提示「AI 录制结束」，误导为成功。要求：此类 LLM 失败在前端弹出提示（成功提示改失败），并在后端日志中明确体现。
-- 进行中：控制面识别执行机 `session.agent_stderr` 中的 LLM 网关错误（402 余额不足 / 401 鉴权 / 429 限流 / 5xx），命中时：① `console.error('[agent-llm-error] …')` 写控制面日志；② 往该 session 的 agent-stderr 日志追加一行中文标记；③ WS 广播新事件 `recording:llm_error`（带 trajectoryId/sessionId/kind/message/upstream，按 session+kind 去重）。前端 `ui-auto-recording-agent-vue/vue-project`：订阅该事件，`doStartAi` 结束时把「AI 录制结束」成功提示改为失败提示。
-- 范围（可写集，主检出）：`src/services/agent-llm-error.js`（新）、`src/executor-ws.js`、`src/dashboard/api-docs/groups/websocket.js`、`scripts/characterization/characterize-agent-llm-error.mjs`（新）、`scripts/refactor/verify-all.sh`、本协作日志；**前端另仓** `ui-auto-recording-agent-vue/vue-project`：`src/composables/useWsClient.ts`、`src/composables/useRecordingStudio.ts`
-- 禁入区：他线 worktree 与分支（`D:\dev\JS-gen-engine`/`engine/pipeline-20260918`、`D:\dev\JS-gen-contract`/`fix/phase-contract-20260918`）及其运行中服务；他线 WIP（前端 `src/views/ui-recording/index.vue` 未提交改动、`data/kb/req/product-mgmt/**`、Cursor 证据目录）；运行中控制面/执行机进程；`scripts/prompts/**`；Python 引擎录制链路（`scripts/**`，本轮不动，避免与 engine 线 B1-B3 冲突）
-- 风险声明：`src/executor-ws.js` 与 16:48 ZCode 引擎线 B-3 声明同名（其改动在 `D:\dev\JS-gen-engine` worktree、写明主检出代码不在其可写集），本线只改该文件 `session.agent_stderr` 分支，与该线 attach 校验前置区域不相交；合并冲突时以「双方区域并排保留」处理。
-- 方式：主线程内联实现；先写纯函数 + pin，再接线；验收 eslint + 新 pin + 全量 verify-all 基线比对；前端 `vue-tsc`/lint。**注意：本机到 github.com:443 不通，push 暂不可用**——先本地 commit，网络恢复后补 push（收工条目如实登记）。
+- 进行中：接用户指令「不要合入 uara_V1.2，继续修复缺陷」，实施 wet6 新报 B-6（P1，`docs/superpowers/reports/2026-09-18-fill-engine-unboundlocal-bug.md`，traj #877 实证）：`fill_engine.py` 的 `fill_form_field` 内四处分支级 `from .result_protocol import …`（实测 :220 tssc / :232 tree-select / :334 与 :471 两处 field-disabled 旁路——比报告多一处）把 err_with/recommend_action_for_kind 绑定成函数局部名，field-disabled 路径未经过前两处 import 即调用 err_with → UnboundLocalError，agent 收不到 err-field-disabled 结构化指引（#877 实测单阶段试错硬耗 119 步）。修法=模块级 :37 统一导入 + 删四处局部 import；新 pin `characterize-fill-err-with-scope.py`（symtable 编译器级作用域断言：fill_form_field 内 err_with/recommend_action_for_kind 必须 GLOBAL 非 LOCAL——该谓词即 UnboundLocalError 充要条件 + 行为 needle 不回归）先 RED 后 GREEN。
+- 范围（可写集）：**worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918` @ 583b1ffd）内** `scripts/controller/actions/fill_engine.py`、新 pin `scripts/characterization/characterize-fill-err-with-scope.py`、`scripts/refactor/verify-all.sh`（登记一行）；主检出仅 agent-log 本条目与收工条目
+- 禁入区：合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918`（4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件与他线 WIP（`data/kb/req/product-mgmt/**`、`.cursor/`）；`scripts/prompts/**`；B1-B3 已交付文件（select_engine.py/runner 等）本单元不动；Cursor 在途 `tools/recording-coach/**`（17:30 开工，文件集不相交；verify-all.sh 双方各登记一行，push 时按协作约定并排解决）；运行中录制会话
+- 方式：主线程内联实施（单文件小修不派子智能体）；RED pin→最小修复→相关既有 pin 回归→全量 verify-all 基线比对（3 红）→合并后验收→代提交推送；不合入 uara_V1.2
 - 注：不维护 CHANGELOG
 
 ## 2026-09-18 17:30 · Cursor — 开工：recording-coach MVP 实现（回链 design/plan）
@@ -254,14 +170,6 @@
 - 范围：`tools/recording-coach/**`；`scripts/characterization/cold/characterize-recording-coach-assert.mjs`；`scripts/refactor/verify-all.sh` 登记一行；本协作日志
 - 禁入区：控制面 `src/**` 产品主链；引擎/合约 worktree；运行中录制槽（本单元不做真机 wet Task 6 全链路除非执行机空闲）
 - 方式：主会话 Inline
-
-## 2026-09-18 17:27 · ZCode 引擎线 — 开工：B-6 fill_engine 局部 import 遮蔽 UnboundLocalError 修复（用户指示不合入 uara_V1.2、继续修复缺陷）
-
-- 进行中：接用户指令「不要合入 uara_V1.2，继续修复缺陷」，实施 wet6 新报 B-6（P1，`docs/superpowers/reports/2026-09-18-fill-engine-unboundlocal-bug.md`，traj #877 实证）：`fill_engine.py` 的 `fill_form_field` 内四处分支级 `from .result_protocol import …`（实测 :220 tssc / :232 tree-select / :334 与 :471 两处 field-disabled 旁路——比报告多一处）把 err_with/recommend_action_for_kind 绑定成函数局部名，field-disabled 路径未经过前两处 import 即调用 err_with → UnboundLocalError，agent 收不到 err-field-disabled 结构化指引（#877 实测单阶段试错硬耗 119 步）。修法=模块级 :37 统一导入 + 删四处局部 import；新 pin `characterize-fill-err-with-scope.py`（symtable 编译器级作用域断言：fill_form_field 内 err_with/recommend_action_for_kind 必须 GLOBAL 非 LOCAL——该谓词即 UnboundLocalError 充要条件 + 行为 needle 不回归）先 RED 后 GREEN。
-- 范围（可写集）：**worktree `D:\dev\JS-gen-engine`（分支 `engine/pipeline-20260918` @ 583b1ffd）内** `scripts/controller/actions/fill_engine.py`、新 pin `scripts/characterization/characterize-fill-err-with-scope.py`、`scripts/refactor/verify-all.sh`（登记一行）；主检出仅 agent-log 本条目与收工条目
-- 禁入区：合约线 worktree `D:\dev\JS-gen-contract` 与分支 `fix/phase-contract-20260918`（4097+LMY 服务正从该 worktree 运行，不重启不触碰）；主检出代码文件与他线 WIP（`data/kb/req/product-mgmt/**`、`.cursor/`）；`scripts/prompts/**`；B1-B3 已交付文件（select_engine.py/runner 等）本单元不动；Cursor 在途 `tools/recording-coach/**`（17:30 开工，文件集不相交；verify-all.sh 双方各登记一行，push 时按协作约定并排解决）；运行中录制会话
-- 方式：主线程内联实施（单文件小修不派子智能体）；RED pin→最小修复→相关既有 pin 回归→全量 verify-all 基线比对（3 红）→合并后验收→代提交推送；不合入 uara_V1.2
-- 注：不维护 CHANGELOG
 
 ## 2026-09-18 17:25 · Cursor — 补记：ui-record-wet-test skill 迁入 recording-coach
 
@@ -385,15 +293,6 @@
 - 禁入区：`scripts/controller/actions/phase/classify.py` / `boundary_contract.py`（重置阶段分类已由 09-18 09:05/09:18 修复，本轮不动合约逻辑）、他线 WIP（data/kb/req/product-mgmt/**、Cursor STC 证据目录）、运行中录制会话、SPA 仓
 - 方式：主线程内联实现 + 新 pin 证伪；跑相关 phase/reset/click 门禁 + 全量 verify-all 基线比对后收工
 
-## 2026-09-18 11:40 · ZCode 合约线 — 收工：阶段合约冲突普查三批修复（回链 10:20 开工；按用户指示不合并）
-
-- 完成：**`4902b3f4`（分支 `fix/phase-contract-20260918`，worktree `D:\dev\JS-gen-contract` 内，未合并 uara_V1.2）**——三批修复：批A=classify.py S1（条件路径硬排除补 新增/录入/维护）/S2（动作子句轴：查询词仅在预期结果子句不判 query）/S2b（开页型动作排除）/S3（查询排除补 维护/更新/变更）+ 回归修复（全量 verify-all 抓到「查询工具栏填条件」因下拉框取值"新增"误落 form_fill/maintain，按矩阵③落 other 免令牌）；批B=令牌对称（`_NEXT_BTN_RE` 补 上一步/返回上一步；click_button 成功路径接 `maybe_record_click_completion_evidence`）；批C=仲裁盲区补全（intent_contract.py：LLM mode='other' 且规则签出 query/navigate 严格合同→降级 other/无令牌，stderr 留痕 `source='llm+arbitrated'`）+ done 熔断（同 missing 集连拒 ≥3 次→`contract_suspect` 放行、不改写 history、其余守卫不动）+ boundary_to_legacy_intent 空合同不再抬升默认令牌（276 收敛）。共 11 文件 +830/-7，三个子智能体并行实施（文件集不相交），主线程越界审查通过（diff 恰为授权文件）
-- **用户指示：不合并回 uara_V1.2**——曾 fast-forward 合并后已按用户指示外科手术式撤销（mixed reset + 定点 restore 8 文件 + 删 3 新文件；主检出现回到 `4fd0ef41`，KB 线 data/kb WIP 完好未触碰）；**合并态验收因此未执行**（AGENTS.md 合并后验收约定本次由用户指示豁免），验收基线=worktree 分支状态；worktree 与分支**保留**供用户审阅/后续合并拍板
-- 验收（均在 worktree 分支态）：全量 verify-all 与干净基线逐行一致（3 红=step-highlight/layer-tree/confirm-notification 零新增）；pin 全绿——`characterize-reset-phase-not-query`（扩至 S1/S2/S2b/S3/工具栏填条件 + 4 真查询反例）、新 `characterize-contract-arbitration-circuit-breaker`（26 checks：仲裁降级/事故端到端/熔断时序/276）、新 `characterize-click-evidence-symmetry`（11 checks 含真 Chromium 活体：click_button(查询)→query_clicked、上一步→nav_next_clicked）、`characterize-g3-done-gate-live` 11/11、`characterize-ai-phase-element-guard`（同步修订落点断言 query→other）+ boundary/runtime/case-data/recorder-phase-reset 回归绿 + ruff F821 零
-- 调研交付：`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`（冲突普查表 C1/S1-S5/R1-R5 + LLM 置信评估：新增独立 LLM 通道=伪需求，补全既有 reviewer 仲裁接线=真需求，已与用户拍板）
-- 遗留移交：①合并时机由用户拍板——合并后须控制面重启生效（先 server 后 executor）并真机复跑对公客户评级三阶段批次验证阶段 3 done 一次放行；②R1-R5 假绿窗口清单在报告 §2（放松向，非死循环）留后续专项；③LLM 判对但页面真无查询钮的 DOM 感知可产出性判定留观察（熔断 stderr `✂ contract suspect` 日志为观测点）；④熔断计数键 `_done_token_reject_streak` 有意不随阶段清理（同款不可满足合同跨阶段快速熔断属期望语义）；⑤修复分支已推送远端（仅分支，不动 uara_V1.2）
-- 注：不维护 CHANGELOG
-
 ## 2026-09-18 11:35 · ZCode 合约线 — 收工：worktree 分支真机湿测 DONE（traj 858，回链 11:00 开工）
 
 - 完成：traj **#858**（合约湿测-查询重置门闩-20260918-1100，fid 9000000011/acct 2，LMY slot0）一轮录制通过，5 阶段 8 步全落库（P5=click「查询」+click「重置」，重置步 paramsJson text=重置/ok-clicked-44，doneLog 含 check_field_value currentValue="" 真实核验）。**合约修复生效实证**：#831 事故门闩原文（「点击【重置】按钮，清空所有查询条件字段并恢复默认状态」）所在阶段 done **首次声明即接受**（phase outcome saved phase=5 success=True），Premature done 0 次——对照事故单 6 连拒+预算+42；全程仅 P2/P3/P4 各 1 次 query_clicked 证据拒绝、1 拒即补证据放行；仲裁降级与 `✂ contract suspect` 熔断均 0 触发（规则分类已正确，未走兜底路径）。报告+全量证据：`D:\dev\JS-gen-contract\tmp\contract-wet-20260918\through-report.md`
@@ -408,19 +307,21 @@
 - 禁入区：主检出代码与重启（他线状态保持）；他线在途录制槽（执行机槽位占用前先查 /api/v2/executors）
 - 方式：主线程起服务+派湿测子智能体（照 ui-record-through-line-agent-prompt 管线），验收落库字段不只看 recorded
 
+## 2026-09-18 11:40 · ZCode 合约线 — 收工：阶段合约冲突普查三批修复（回链 10:20 开工；按用户指示不合并）
+
+- 完成：**`4902b3f4`（分支 `fix/phase-contract-20260918`，worktree `D:\dev\JS-gen-contract` 内，未合并 uara_V1.2）**——三批修复：批A=classify.py S1（条件路径硬排除补 新增/录入/维护）/S2（动作子句轴：查询词仅在预期结果子句不判 query）/S2b（开页型动作排除）/S3（查询排除补 维护/更新/变更）+ 回归修复（全量 verify-all 抓到「查询工具栏填条件」因下拉框取值"新增"误落 form_fill/maintain，按矩阵③落 other 免令牌）；批B=令牌对称（`_NEXT_BTN_RE` 补 上一步/返回上一步；click_button 成功路径接 `maybe_record_click_completion_evidence`）；批C=仲裁盲区补全（intent_contract.py：LLM mode='other' 且规则签出 query/navigate 严格合同→降级 other/无令牌，stderr 留痕 `source='llm+arbitrated'`）+ done 熔断（同 missing 集连拒 ≥3 次→`contract_suspect` 放行、不改写 history、其余守卫不动）+ boundary_to_legacy_intent 空合同不再抬升默认令牌（276 收敛）。共 11 文件 +830/-7，三个子智能体并行实施（文件集不相交），主线程越界审查通过（diff 恰为授权文件）
+- **用户指示：不合并回 uara_V1.2**——曾 fast-forward 合并后已按用户指示外科手术式撤销（mixed reset + 定点 restore 8 文件 + 删 3 新文件；主检出现回到 `4fd0ef41`，KB 线 data/kb WIP 完好未触碰）；**合并态验收因此未执行**（AGENTS.md 合并后验收约定本次由用户指示豁免），验收基线=worktree 分支状态；worktree 与分支**保留**供用户审阅/后续合并拍板
+- 验收（均在 worktree 分支态）：全量 verify-all 与干净基线逐行一致（3 红=step-highlight/layer-tree/confirm-notification 零新增）；pin 全绿——`characterize-reset-phase-not-query`（扩至 S1/S2/S2b/S3/工具栏填条件 + 4 真查询反例）、新 `characterize-contract-arbitration-circuit-breaker`（26 checks：仲裁降级/事故端到端/熔断时序/276）、新 `characterize-click-evidence-symmetry`（11 checks 含真 Chromium 活体：click_button(查询)→query_clicked、上一步→nav_next_clicked）、`characterize-g3-done-gate-live` 11/11、`characterize-ai-phase-element-guard`（同步修订落点断言 query→other）+ boundary/runtime/case-data/recorder-phase-reset 回归绿 + ruff F821 零
+- 调研交付：`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`（冲突普查表 C1/S1-S5/R1-R5 + LLM 置信评估：新增独立 LLM 通道=伪需求，补全既有 reviewer 仲裁接线=真需求，已与用户拍板）
+- 遗留移交：①合并时机由用户拍板——合并后须控制面重启生效（先 server 后 executor）并真机复跑对公客户评级三阶段批次验证阶段 3 done 一次放行；②R1-R5 假绿窗口清单在报告 §2（放松向，非死循环）留后续专项；③LLM 判对但页面真无查询钮的 DOM 感知可产出性判定留观察（熔断 stderr `✂ contract suspect` 日志为观测点）；④熔断计数键 `_done_token_reject_streak` 有意不随阶段清理（同款不可满足合同跨阶段快速熔断属期望语义）；⑤修复分支已推送远端（仅分支，不动 uara_V1.2）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-18 10:20 · ZCode 合约线 — 开工：阶段合约冲突普查三批修复（worktree 隔离）
 
 - 进行中：重置死循环（C1）同族普查完结，本单元实施三批修复——批A=classify.py 冲突家族 S1（硬排除缺新增/录入/维护）/S2（「查询条件字段展开」few-shot 文本）/S2b（导航含查询词）/S3（`_QUERY_EXCLUDE_RE` 缺维护/更新/变更）+ 动作子句轴；批B=令牌对称 S4（`_NEXT_BTN_RE` 扩上一步）/S5（click_button 接 `maybe_record_click_completion_evidence`）；批C=仲裁盲区补全（intent_contract.py:324 mode='other' 信 LLM 降级留痕）+ done 熔断（同 missing 集≥3 次→contract_suspect 放行+审计）+ boundary_contract.py:276 兜底收敛。LLM 置信评估结论=新增独立通道伪需求、补全既有 reviewer 仲裁接线为真（已与用户拍板）
 - 范围（可写集）：**worktree `D:\dev\JS-gen-contract`（分支 `fix/phase-contract-20260918`，基于 uara_V1.2）内** `scripts/controller/actions/phase/classify.py`、`phase/intent_contract.py`、`phase/boundary_contract.py`、`phase/boundary_gates.py`、`scripts/controller/actions/click_action_engine.py`、`scripts/agent/recorder_emitters.py`、pin `characterize-reset-phase-not-query.py`/`characterize-recorder-phase-reset.py`（同 commit 修订注明）/新 pin×2、`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`；**主检出仅 agent-log 本条目与后续收工条目**
 - 禁入区：主检出一切代码文件（全部改动在 worktree）；他线 WIP（`data/kb/req/product-mgmt/**`、Cursor STC 证据目录）；`scripts/prompts/**`；运行中控制面/执行机进程（重启时机另行协调）
 - 方式：主线程建 worktree+基线+报告；三个 general-purpose 子智能体并行实施（文件集不相交、均不 commit）；主线程回收验收（py_compile/越界/lint/全量 verify-all）后合并回 uara_V1.2 合并态终验
-
-## 2026-09-18 09:40 · ZCode 引擎线 — 收工：重置类阶段误签 query 合同最小修法（回链 09:05 开工）
-
-- 完成：`c14d1c1f`——`classify.py is_query_task` 对含 `重置|清空|恢复默认` 语义的文本早返回 False（新 `_RESET_PHASE_RE`，仅 +5 行），重置类阶段落回 `role='other'`、`success_when=[]`，done 正常放行；真查询阶段的 `query_clicked` 硬合同原样保留（G3 无放松）
-- 验收：新 pin `characterize-reset-phase-not-query`（本案真实文本/预期结果片段/#831 式标题三路钉死 + 真查询两例反例防过度排除 + query_clicked 合同保留断言）先 RED（案件断言即红）后 GREEN；boundary/runtime/g3-done-gate-live/section-scope 四个既有 pin 复跑绿；ruff F821 归零；已注册 verify-all；合并态全量 verify-all = 3 红基线一致（step-highlight/layer-tree/confirm-notification）零新增
-- 生效说明：**控制面重启后生效**（classify 属 Python 引擎侧，执行机进程加载）；重跑对公客户评级三阶段批次即可验证阶段 3 done 一次放行
-- 遗留移交：①`reset_clicked` 专属证据令牌（重置按钮点击证据 + role='reset' 合同分支）作为后续合约加固项，顺带覆盖 wizard「下一步」等靠 `or` 兜底的角色 ②`boundary_contract.py:276` 的 `or ['query_clicked']` 兜底仍是把空合同抬升为 query 合同的隐患点（本案非其直接肇因，role=query 时才触达），列结构收敛专项一并处理 ③不维护 CHANGELOG
 
 ## 2026-09-18 09:35 · ZCode 引擎线 — 收工：重置排除精确化（回链 09:18 开工）
 
@@ -436,12 +337,26 @@
 - 禁入区：同 09:05 开工条目（phase 其他模块、他线 WIP、prompts、config、SPA）
 - 方式：主线程内联，先扩 pin 跑 RED（两复合用例当前为 False 即红）再一行条件修正；回归=该 pin 全量 + boundary/runtime/g3-done-gate 四 pin + ruff；全量 verify-all 后收工
 
+## 2026-09-18 09:40 · ZCode 引擎线 — 收工：重置类阶段误签 query 合同最小修法（回链 09:05 开工）
+
+- 完成：`c14d1c1f`——`classify.py is_query_task` 对含 `重置|清空|恢复默认` 语义的文本早返回 False（新 `_RESET_PHASE_RE`，仅 +5 行），重置类阶段落回 `role='other'`、`success_when=[]`，done 正常放行；真查询阶段的 `query_clicked` 硬合同原样保留（G3 无放松）
+- 验收：新 pin `characterize-reset-phase-not-query`（本案真实文本/预期结果片段/#831 式标题三路钉死 + 真查询两例反例防过度排除 + query_clicked 合同保留断言）先 RED（案件断言即红）后 GREEN；boundary/runtime/g3-done-gate-live/section-scope 四个既有 pin 复跑绿；ruff F821 归零；已注册 verify-all；合并态全量 verify-all = 3 红基线一致（step-highlight/layer-tree/confirm-notification）零新增
+- 生效说明：**控制面重启后生效**（classify 属 Python 引擎侧，执行机进程加载）；重跑对公客户评级三阶段批次即可验证阶段 3 done 一次放行
+- 遗留移交：①`reset_clicked` 专属证据令牌（重置按钮点击证据 + role='reset' 合同分支）作为后续合约加固项，顺带覆盖 wizard「下一步」等靠 `or` 兜底的角色 ②`boundary_contract.py:276` 的 `or ['query_clicked']` 兜底仍是把空合同抬升为 query 合同的隐患点（本案非其直接肇因，role=query 时才触达），列结构收敛专项一并处理 ③不维护 CHANGELOG
+
 ## 2026-09-18 09:05 · ZCode 引擎线 — 开工：重置类阶段被误签 query 合同致 done 死循环（最小修法）
 
 - 进行中：真机日志（对公客户评级三阶段，桌面 log.txt）——阶段 3「点击【重置】按钮，清空所有**查询**条件字段」done 被拒 6 次 + 预算 +42 死循环。根因已实测复现：`classify.py is_query_task` 关键词误伤——「查询条件」里的「查询」命中 `_QUERY_TASK_RE`+`_QUERY_CONDITION_RE` 且无排除 → 编译出 `role='query', success_when=['query_clicked']`，而重置动作永远产不出该令牌（仅点「查询/搜索」按钮记录），reviewer（mode=other, kinds=[]）与规则编译器打架、门禁听编译器。用户拍板最小修法（A）：`is_query_task` 对含 `重置/清空/恢复默认` 语义的文本早返回 False → role 落回 other、success_when=[]，done 正常放行；**接受小放松**（重置类阶段暂无正向证据校验，与其它 other 类阶段同级），`reset_clicked` 专属令牌列后续加固项
 - 范围（可写集）：`scripts/controller/actions/phase/classify.py`、新 pin `scripts/characterization/characterize-reset-phase-not-query.py`、`scripts/refactor/verify-all.sh`（仅主线程注册）、本协作日志；若既有 pin 钉了受影响分类行为，同 commit 修订并注明
 - 禁入区：`boundary_contract.py`/`recorder_emitters.py`/其他 phase 模块（本轮不动）、他线 WIP（`characterize-phase-done-validate.py` 等）、`scripts/prompts/**`、`config/`、SPA
 - 方式：主线程内联，先 RED pin（本案真实文本 + 真查询反例防过度排除）再一行分类修正；回归=classify/boundary 既有 pin 全跑 + ruff F821 + py_compile；全量 verify-all 基线比对（3 红基线）后收工
+
+## 2026-09-17 20:50 · ZCode 引擎线 — 复审补充：三雷+门禁改动影响面复审结论（回链 19:15 收工）
+
+- 复审范围：`39434171`/`3bcdc2d3`/`94f3b9f7`/`3c599e5a`。结论：**无回滚项**——四处改动均为复活休眠路径、恢复设计内行为，且有既有机制兜底：①`sync_tasks_from_errors` 属 META 步（`meta-step-actions.js:16`）不进业务步计数，heal 流程明令禁用（`heal-instruction.js:36`），滚动副作用仅在有字段被修复重试时触发；②`_TRAJECTORY_URL` 修复写的 `scripts.controller` 槽位本有 `agent_utils.py:130` 活写入方，读取方仅本地辅助快照文件（产品真相在 MySQL），无 src 消费者；③组图 upsert 按 phase×stateGroup 唯一（api-docs 契约）不产生重复行，`groupShotId` 消费方仅 query-service 透出可选字段，采集函数与 ensurePhaseGroup 共享、有生产运行背书
+- **知情项知会各线**：①**组图行数回升**——click_save 提交前截图在故障 3 天间未落库，修复后恢复设计增速，每阶段有 cap 封顶，非异常；②**本地辅助快照 `scripts/action_*.json`/`log_*.txt` 的 `url` 字段从 `http://unknown` 占位变真实页面地址**——有脚本解析这批文件且依赖旧占位值者需注意；③**eslint `no-undef` 已 error 级生效并入 verify-all**——所有线新代码引用未定义标识符将被 pre-commit/verify-all 拦截（报错 `'XXX' is not defined`；确属合法全局在 `eslint.config.js` globals 补映射）。最终 HEAD（含 Cursor STC `ffed27bd`/`347f61f5`）实测全仓 0 error，在飞线不受阻
+- 验收补充：合并态（含 STC 两笔）重跑三 pin + ruff F821 + eslint 全绿；verify-all 3 红基线一致零新增
+- 遗留：无新增（结构收敛专项、P2 清理清单、engines pin、ClickEngine 形状 pin 四项见 19:15 收工条目）
 
 ## 2026-09-17 21:05 · Cursor — 收工：STC 湿测 + 索引点选行 first 归一（回链 20:40 / 20:55）
 
@@ -457,13 +372,6 @@
 - 范围：`scripts/controller/actions/click_action_engine.py`；`scripts/characterization/cold/characterize-search-then-click-guard.py`；证据续写 `tmp/stc-first-row-wet/`；本协作日志
 - 禁入区：`_table.py` / `search_then_click_guard.py`（已合入）；他线录制槽；`data/kb/req/product-mgmt/**`
 - 方式：主会话 Inline 最小修复 + 重启执行机 Python 会话 + 重录
-
-## 2026-09-17 20:50 · ZCode 引擎线 — 复审补充：三雷+门禁改动影响面复审结论（回链 19:15 收工）
-
-- 复审范围：`39434171`/`3bcdc2d3`/`94f3b9f7`/`3c599e5a`。结论：**无回滚项**——四处改动均为复活休眠路径、恢复设计内行为，且有既有机制兜底：①`sync_tasks_from_errors` 属 META 步（`meta-step-actions.js:16`）不进业务步计数，heal 流程明令禁用（`heal-instruction.js:36`），滚动副作用仅在有字段被修复重试时触发；②`_TRAJECTORY_URL` 修复写的 `scripts.controller` 槽位本有 `agent_utils.py:130` 活写入方，读取方仅本地辅助快照文件（产品真相在 MySQL），无 src 消费者；③组图 upsert 按 phase×stateGroup 唯一（api-docs 契约）不产生重复行，`groupShotId` 消费方仅 query-service 透出可选字段，采集函数与 ensurePhaseGroup 共享、有生产运行背书
-- **知情项知会各线**：①**组图行数回升**——click_save 提交前截图在故障 3 天间未落库，修复后恢复设计增速，每阶段有 cap 封顶，非异常；②**本地辅助快照 `scripts/action_*.json`/`log_*.txt` 的 `url` 字段从 `http://unknown` 占位变真实页面地址**——有脚本解析这批文件且依赖旧占位值者需注意；③**eslint `no-undef` 已 error 级生效并入 verify-all**——所有线新代码引用未定义标识符将被 pre-commit/verify-all 拦截（报错 `'XXX' is not defined`；确属合法全局在 `eslint.config.js` globals 补映射）。最终 HEAD（含 Cursor STC `ffed27bd`/`347f61f5`）实测全仓 0 error，在飞线不受阻
-- 验收补充：合并态（含 STC 两笔）重跑三 pin + ruff F821 + eslint 全绿；verify-all 3 红基线一致零新增
-- 遗留：无新增（结构收敛专项、P2 清理清单、engines pin、ClickEngine 形状 pin 四项见 19:15 收工条目）
 
 ## 2026-09-17 20:40 · Cursor — 开工：重启控制面/执行机 + STC 首行湿测录制
 
@@ -483,6 +391,13 @@
 - 遗留移交：①结构专项——lifecycle stop 状态机双实现（非 Safe 版可把 completed 降级 failed）与零步门禁 v1/v2/v3 三代杂交 + 四种业务步计数口径，建议立「单一真相源」专项收敛（本线已按用户口径不含此批）②P2 清理存量子弹：11 条 unused import（`src/cdp/inspect.js:4`、`src/routes/browser-session/register.js:31` 最可疑）、~138 条 py 拆分残留 F401、170 条死导出、`session_runner.py` 的 `shutdown_memory_writer` 导入后无调用（疑似丢退出清理）③`package.json` 无 engines/`.nvmrc`（代码依赖 Node 18+/21+ 全局）④普查报告建议：对 `_misc.py`→`click_action_engine.py` 的 G3 手工移植块补源码形状 pin（防未来反向合并静默丢弃）
 - 注：不维护 CHANGELOG
 
+## 2026-09-17 18:22 · ZCode 引擎线 — 开工：同族缺陷三雷修复 + 门禁加固（no-undef / ruff F821）
+
+- 进行中：接上午「多阶段录制 gated 孤儿」事故的四路同族普查结论，带队修复三颗同族真雷并堵门禁缺口：**①P0** `form_scan_actions.py` `sync_tasks_from_errors_impl` 搬运断尾（L563-586 孤儿尾段引用未定义 `retried`/`intervene`，动作返回 None 行为回归；考古锚点 0a7c06a9 完整版 / 0fa6a8ee 搬运）——复位 return 半段并清孤儿块；**②P1** `agent/recorder_emitters.py:235` `_capture_step_url` 漏 `ctrl_mod` 导入、NameError 被 `except:pass` 静默吞（轨迹 URL 捕获整体失效）——按本模块「函数级 lazy import」惯例补 `from .. import controller as ctrl_mod`（先例 agent_utils.py:128-130）；**③P1** `trajectory-recording-runner.js:549` `captureAndPersistPhaseGroupShot` 全仓零定义（定义于 577d322a 删除，调用残留，click_save 提交前组图采集静默失败）——考古后接线现存等价实现或恢复原实现；**④门禁加固（主线程，回收后落地在干净树上）**：eslint 启用 `no-undef: error`（补 Node/browser globals，api-docs 分 browser override），verify-all 新增 eslint 与 `ruff --select F821` 条目（command -v 守卫，缺工具跳过并注明）
+- 范围（可写集）：`scripts/controller/actions/form_scan_actions.py`（+罩它的 pin 同 commit 修订）、`scripts/agent/recorder_emitters.py`（+pin）、`src/services/trajectory/trajectory-recording-runner.js`、`scripts/characterization/characterize-record-phase-finalize.mjs`（③可扩充）、`eslint.config.js`、`scripts/refactor/verify-all.sh`（仅主线程）、本协作日志
+- 禁入区：Cursor 在途 18:20 行（`search_then_click_guard.py`/`_table.py`/`click_action_engine.py`/`replay_table.py`/`src/cdp/locator-builders/controls.js`/`scripts/prompts/**`）——`verify-all.sh` 双方可能各自增行，若遇冲突保双方条目；他线 WIP `scripts/characterization/characterize-phase-done-validate.py`；`phase-done-evidence-gate.js`；SPA 仓；`src/**` 其余文件；`config/`
+- 方式：①②③ 派 3 个后台子智能体并行（文件集互不相交，子智能体不 commit 不写 log，主会话回收核验 diff/语法/pin 后代提交）；④ 主线程收尾落地；全部完成后合并后验收（git pull 重跑关键验证 + 全量 verify-all 与 3 红基线比对）再收工
+
 ## 2026-09-17 18:55 · Cursor — 收工：STC 后选首行/首叶 + 结构 xpath（回链 18:20 开工）
 
 - 完成（SDD Tasks 1–7）：`318c44d7` `stc_satisfied` → `8dd77b8d` first-row/first-leaf builders → `f6a05ea6` 表 STC 强制首行+结构 xpath 落库 → `2fca7e4d` 回放 xpath-first → `347f61f5` 提示词 → `ffed27bd` 树 index-click **录制归一 MVP**（物理点击未改道首叶）
@@ -490,13 +405,6 @@
 - 验收：`characterize-search-then-click-guard` / `prompts` / `locator-candidates` 全绿；verify-all 仅既有基线 4 红（step-highlight/layer-tree/confirm-notification/network-capture），零新增；终审 Approve ship-with-handoff
 - 遗留移交：①树完整「点到首叶」evaluate + `select_tree_option`/`tree_engine` STC 接线；②§7.1 查询锚容器仅 TODO（湿测撞错表再做）；③§11 湿测（弹窗查询→首行；换查询条件回放仍首行；旧业务键轨迹不变）；④次要：同名行消歧文案与 STC-first 交叉说明、`_replay.py` 旧注释
 - 注：不维护 CHANGELOG
-
-## 2026-09-17 18:22 · ZCode 引擎线 — 开工：同族缺陷三雷修复 + 门禁加固（no-undef / ruff F821）
-
-- 进行中：接上午「多阶段录制 gated 孤儿」事故的四路同族普查结论，带队修复三颗同族真雷并堵门禁缺口：**①P0** `form_scan_actions.py` `sync_tasks_from_errors_impl` 搬运断尾（L563-586 孤儿尾段引用未定义 `retried`/`intervene`，动作返回 None 行为回归；考古锚点 0a7c06a9 完整版 / 0fa6a8ee 搬运）——复位 return 半段并清孤儿块；**②P1** `agent/recorder_emitters.py:235` `_capture_step_url` 漏 `ctrl_mod` 导入、NameError 被 `except:pass` 静默吞（轨迹 URL 捕获整体失效）——按本模块「函数级 lazy import」惯例补 `from .. import controller as ctrl_mod`（先例 agent_utils.py:128-130）；**③P1** `trajectory-recording-runner.js:549` `captureAndPersistPhaseGroupShot` 全仓零定义（定义于 577d322a 删除，调用残留，click_save 提交前组图采集静默失败）——考古后接线现存等价实现或恢复原实现；**④门禁加固（主线程，回收后落地在干净树上）**：eslint 启用 `no-undef: error`（补 Node/browser globals，api-docs 分 browser override），verify-all 新增 eslint 与 `ruff --select F821` 条目（command -v 守卫，缺工具跳过并注明）
-- 范围（可写集）：`scripts/controller/actions/form_scan_actions.py`（+罩它的 pin 同 commit 修订）、`scripts/agent/recorder_emitters.py`（+pin）、`src/services/trajectory/trajectory-recording-runner.js`、`scripts/characterization/characterize-record-phase-finalize.mjs`（③可扩充）、`eslint.config.js`、`scripts/refactor/verify-all.sh`（仅主线程）、本协作日志
-- 禁入区：Cursor 在途 18:20 行（`search_then_click_guard.py`/`_table.py`/`click_action_engine.py`/`replay_table.py`/`src/cdp/locator-builders/controls.js`/`scripts/prompts/**`）——`verify-all.sh` 双方可能各自增行，若遇冲突保双方条目；他线 WIP `scripts/characterization/characterize-phase-done-validate.py`；`phase-done-evidence-gate.js`；SPA 仓；`src/**` 其余文件；`config/`
-- 方式：①②③ 派 3 个后台子智能体并行（文件集互不相交，子智能体不 commit 不写 log，主会话回收核验 diff/语法/pin 后代提交）；④ 主线程收尾落地；全部完成后合并后验收（git pull 重跑关键验证 + 全量 verify-all 与 3 红基线比对）再收工
 
 ## 2026-09-17 18:20 · Cursor — 开工：STC 后选首行/首叶 + 结构 xpath（SDD）
 
@@ -521,6 +429,14 @@
 - 偏差自报：`bash scripts/refactor/verify-all.sh` 全量门闩因本机未安装 bash/WSL 未能执行；上述 phase/G3/recorder 核心回归与相关相邻门禁已覆盖本次改动面。建议在部署环境/CI 补跑全量 verify-all。
 - 遗留移交：①用户需重启控制面 4097 + 执行机加载 `d61fa3d0` 后复测对公客户评级查询流程；②`config/.db-whitelist-seen` 在运行期被自动改写，与本任务无关，未提交。
 - 注：不维护 CHANGELOG
+
+## 2026-09-17 15:50 · OpenCode — 开工：修复 query 阶段 LLM mode 与规则 boundary 不匹配导致 success_when 错位
+
+- 进行中：用户录制的对公客户评级查询流程在 Phase 2（业务编号输入）异常结束。根因是 `af1d1cc0` 传入 `boundary_override` 后，规则编译按字面关键词把阶段判为 form_fill（success_when=['toast_ok','url_change','saved_navigation']），而 LLM 根据上下文判为 query。recorder 使用规则 boundary 的 token 集合，与 query_clicked 证据不匹配，done() 被无限拦截。
+- 修向：`apply_phase_contract` 在 query/navigate 分支中检测规则 boundary 的 role 与 LLM mode 是否一致；不一致时信任 LLM mode 重置 role/goals/success_when，避免 mode 与 token 集合错位。
+- 范围（可写集）：`scripts/controller/actions/phase/intent_contract.py`、本协作日志。
+- 禁入区：`scripts/agent/service.py`（`af1d1cc0` 本体不动）、`scripts/controller/actions/phase/boundary_contract.py`（规则编译逻辑不动）、他线 WIP、活跃录制会话。
+- 方式：主会话 Inline；跑 `characterize-phase-runtime`、`characterize-phase-reviewer*`、`characterize-g3-done-gate-live`、`characterize-recorder-phase-reset` 及 `bash scripts/refactor/verify-all.sh` 回归。
 
 ## 2026-09-17 17:18 · Cursor — 补钉：cohesion v11 边界 pin（回链 17:10 收工）
 
@@ -564,14 +480,6 @@
 - 方式：主会话定稿逐字文案（子智能体只做精确替换，不自拟措辞）→ 并行 A/B → 主会话回收核对（含 grep 确认合法 real_click 用法未被误伤）→ 扩 pin 并**逐条证伪**（改回旧措辞必红）→ verify-all 基线比对
 - 交付边界：**只交付指引改动+门禁**；840 重录验证另开窗口（需重启 4097+执行机，避开他线在途录制）
 
-## 2026-09-17 15:50 · OpenCode — 开工：修复 query 阶段 LLM mode 与规则 boundary 不匹配导致 success_when 错位
-
-- 进行中：用户录制的对公客户评级查询流程在 Phase 2（业务编号输入）异常结束。根因是 `af1d1cc0` 传入 `boundary_override` 后，规则编译按字面关键词把阶段判为 form_fill（success_when=['toast_ok','url_change','saved_navigation']），而 LLM 根据上下文判为 query。recorder 使用规则 boundary 的 token 集合，与 query_clicked 证据不匹配，done() 被无限拦截。
-- 修向：`apply_phase_contract` 在 query/navigate 分支中检测规则 boundary 的 role 与 LLM mode 是否一致；不一致时信任 LLM mode 重置 role/goals/success_when，避免 mode 与 token 集合错位。
-- 范围（可写集）：`scripts/controller/actions/phase/intent_contract.py`、本协作日志。
-- 禁入区：`scripts/agent/service.py`（`af1d1cc0` 本体不动）、`scripts/controller/actions/phase/boundary_contract.py`（规则编译逻辑不动）、他线 WIP、活跃录制会话。
-- 方式：主会话 Inline；跑 `characterize-phase-runtime`、`characterize-phase-reviewer*`、`characterize-g3-done-gate-live`、`characterize-recorder-phase-reset` 及 `bash scripts/refactor/verify-all.sh` 回归。
-
 ## 2026-09-17 15:35 · ZCode 引擎线 — 收工：纠正过拟合（撤回跨族分类器，guard 只报组件类型）
 
 - **更正前一条**：`598d8a75` 收工条目把「real_click 载体分类器 + 处方」记为已交付成果——**是过拟合，已撤回**，该条目的成果描述作废，以本条为准
@@ -606,6 +514,13 @@
 - 验收（合并后集成态复跑）：`characterize-icon-buttons` OK（未展开点击 ✓ / 已展开不点 ✓ / aria-label 纯图标 ✓ / 多候选歧义 ✓ / 无候选保持 miss ✓）；`characterize-case-data` OK（query 与纯「筛选」描述带提示、导航/向导不带）；`characterize-click-scope-picker-login` OK；全量 verify-all = **既有 4 条基线红**（step-highlight/layer-tree/confirm-notification/network-capture），零新增红。
 - 遗留移交：①本会话未单独提交开工声明（内联完成，范围即上列文件），以本条补记闭环；②`06fbf86d` 顺带带入 `config/.db-whitelist-seen`（运行期自动重写，与本任务无关），如需可单独 revert；③prompt 与 JS 识别均为「尽力尝试」，湿测若遇非常规「更多」表示（非 `more-btn`、非 caret）请回传 DOM 再扩识别式。不维护 CHANGELOG。
 
+## 2026-09-17 12:30 · ZCode 引擎线 — 开工：按组件类型推荐动作（重构 840 opHint 硬编码，用户定调）
+
+- 进行中：用户反馈 9e35b942 的 opHint 太死板（硬编码 下一步/发起节点）。改为**按目标文本的载体组件类型给推荐**：按钮→click，下拉选项→select。落点=「按文本找目标」的唯一动作 `real_click` 的解析器内：①命中载体是 `.el-select-dropdown__item` → 不信任点击，返回 `err-real-click-select-option` + 处方 `select_option(label_text=<展开中的下拉字段名,取 aria-expanded/activeElement 归属 form-item>, option_text=X)`；②命中载体是禁用按钮（native disabled/aria-disabled）→ `err-real-click-disabled-button` + 处方（点亦无效，找替代）；③目标无可见载体 → 处方点破「下拉选项弹层未展开时不在 DOM 里，对该字段 select_option；是按钮则先确认步骤」；④启用按钮 → 行为不变（点击）。guard opHint 去硬编码：只按字段类型表述（opOptions=[] 语义 + select_option(label_text=opLabel, option_text=<选项原文>)），删除「下一步/发起节点」字面量；`_todo.py` 提示词同步改类型制表述
+- 范围（可写集）：`scripts/controller/actions/js_snippets/real_click.py`、`scripts/controller/actions/_workspace.py`（prescription 透出）、`scripts/controller/actions/js_snippets/todo_cards.py`、`scripts/controller/actions/_todo.py`、pin `characterize-wf-submit-guard-hint.py`（改 needle+扩 real_click 接线）、`scripts/refactor/verify-all.sh`（如需）、本协作日志
+- 禁入区：`click_element_by_index` 的 use-select-option 栅栏（已存在，不动）；`select_engine`（分发与拾取不动）；29242 页面只做受控验证（开弹层→解析→RESET 收尾，不点选项不点提交）；他线 `data/kb/req/product-mgmt/**` WIP
+- 方式：主会话 Inline；活页面+fixture 双验（真页面：开弹层后 real_click 解析应带 `select_option(label_text='流程操作', option_text='下一步')` 处方——label 从 DOM 现场推导，非硬编码）；pin 先行更新并证伪；verify-all 基线比对
+
 ## 2026-09-17 12:40 · Cursor — 收工：capability-cohesion word-bleed FP（回链 12:22 开工）
 
 - 完成：`4c727358` word-bleed 闸 + cache **v10**；`729fb399` 收窄 `添加` 为名词 lookaround（`添加一条记录` 仍 create）。PR **#52** → `uara_V1.2`。
@@ -616,13 +531,6 @@
   - `characterize-req-draft-traj.mjs` **OK 76**（cache **10**）
   - `npx eslint` 改动 src **0**
 - 遗留移交：LMY 须 **POST** `…/product-mgmt/draft-traj/propose`（cache **v10**）；仅重启不够。long 设置产品管控要素 仍 `multi_persist`（picker【确定】+【保存】）属 persist 闸，非本轮 cohesion miss。2026-09-16 spec 仍写 `填写`/`录入`∈maintain，未改 spec（原计划锁文件）；parse / atomize prompt / UI 未动。不维护 CHANGELOG。
-
-## 2026-09-17 12:30 · ZCode 引擎线 — 开工：按组件类型推荐动作（重构 840 opHint 硬编码，用户定调）
-
-- 进行中：用户反馈 9e35b942 的 opHint 太死板（硬编码 下一步/发起节点）。改为**按目标文本的载体组件类型给推荐**：按钮→click，下拉选项→select。落点=「按文本找目标」的唯一动作 `real_click` 的解析器内：①命中载体是 `.el-select-dropdown__item` → 不信任点击，返回 `err-real-click-select-option` + 处方 `select_option(label_text=<展开中的下拉字段名,取 aria-expanded/activeElement 归属 form-item>, option_text=X)`；②命中载体是禁用按钮（native disabled/aria-disabled）→ `err-real-click-disabled-button` + 处方（点亦无效，找替代）；③目标无可见载体 → 处方点破「下拉选项弹层未展开时不在 DOM 里，对该字段 select_option；是按钮则先确认步骤」；④启用按钮 → 行为不变（点击）。guard opHint 去硬编码：只按字段类型表述（opOptions=[] 语义 + select_option(label_text=opLabel, option_text=<选项原文>)），删除「下一步/发起节点」字面量；`_todo.py` 提示词同步改类型制表述
-- 范围（可写集）：`scripts/controller/actions/js_snippets/real_click.py`、`scripts/controller/actions/_workspace.py`（prescription 透出）、`scripts/controller/actions/js_snippets/todo_cards.py`、`scripts/controller/actions/_todo.py`、pin `characterize-wf-submit-guard-hint.py`（改 needle+扩 real_click 接线）、`scripts/refactor/verify-all.sh`（如需）、本协作日志
-- 禁入区：`click_element_by_index` 的 use-select-option 栅栏（已存在，不动）；`select_engine`（分发与拾取不动）；29242 页面只做受控验证（开弹层→解析→RESET 收尾，不点选项不点提交）；他线 `data/kb/req/product-mgmt/**` WIP
-- 方式：主会话 Inline；活页面+fixture 双验（真页面：开弹层后 real_click 解析应带 `select_option(label_text='流程操作', option_text='下一步')` 处方——label 从 DOM 现场推导，非硬编码）；pin 先行更新并证伪；verify-all 基线比对
 
 ## 2026-09-17 12:22 · Cursor — 开工：capability-cohesion create-draft word-bleed FP（cache v9→10）
 
@@ -663,6 +571,20 @@
 - 禁入区：**工作区他线 WIP `data/kb/req/product-mgmt/**`（pull 后工作区出现的删改，勿 touch 勿混提交）**；会话 1917（traj 832 正在 node 7 录制）与 1915（840 node 8）的浏览器只做只读 evaluate；`origin/master`；他线 phase/navigate 证据线（af1d1cc0 刚收工）
 - 方式：主会话 Inline；改完在活页面只读评估新 guard JS（guard 本身零点击）+ fixture 验空值分支 + 新 pin 入 verify-all
 
+## 2026-09-17 11:30 · OpenCode — 收工：LLM 合约路径对齐规则边界，navigate 阶段证据可录（回链 11:15 开工）
+
+- 完成：**`af1d1cc0`** + pin **`42cb41a`**（4 文件 / +72）。用户复测 sid 64c9044b 时 phase 1 仍 `observed=[]`、phase 3 有 `nav_next_clicked` 但门闩只要 `url_change|page_opened`——根因是 `service.py` 里 LLM reviewer 路径 `apply_phase_contract(business_data_ref, reviewed)` 未传 `boundary_override`，边界 `goals`/`success_when` 全由 LLM 自然语言 `in_scope`/`success.kinds` 决定，丢失 `open_page`/`click_next`/`nav_next_clicked` 等可录制证据标签。
+- 修复：①`scripts/agent/service.py` 在 LLM 合约路径传入 `compile_boundary(phase_core)` 作为 `boundary_override`，使 gate 使用任务文本导出的规则边界（phase 1 含 `open_page`、phase 3 含 `click_next`+`nav_next_clicked`）；②`scripts/controller/actions/phase/classify.py` 把 `向导页` 加入 open_page 识别正则，使「打开…向导页」被归类为 open_page，触发 recorder_emitters 的 overlay/入口点击兜底；③`scripts/characterization/characterize-phase-runtime.py` 新增 pin，断言 LLM navigate 合约经 `boundary_override` 后 phase 1 边界 goals 含 `open_page`、phase 3 `success_when` 含 `nav_next_clicked`。
+- 验收：`characterize-phase-runtime`、`characterize-phase-reviewer`、`characterize-phase-reviewer-flow`、`characterize-recorder-phase-reset`（39 checks）、`characterize-g3-done-gate-live`（11 checks）、`characterize-phase-save-cue-promote`、`characterize-phase-intent` 全绿；**verify-all = 既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。
+- 遗留移交：①用户已停掉执行机，请拉取本提交后重启控制面 + 执行机，再复测 sid 64c9044b 的 phase 1/3；②若仍失败，请贴 `[recorder] open-page evidence check:` 与 `[click] G3 evidence recorded` 两行；③不维护 CHANGELOG。
+
+## 2026-09-17 11:15 · OpenCode — 开工：LLM 合约路径未用规则边界，导致 navigate 阶段证据不可录（phase 1/3）
+
+- 进行中：用户复测 sid 64c9044b，phase 1 仍 `observed=[]` 失败，phase 3 有 `nav_next_clicked` 但门闩只要 `url_change|page_opened`。根因：LLM reviewer 路径 `service.py:apply_phase_contract(business_data_ref, reviewed)` 未传 `boundary_override`，边界 `goals`/`success_when` 全由 LLM 的 `in_scope`/`success.kinds` 决定，导致 `open_page`/`click_next`/`nav_next_clicked` 等可录制证据标签丢失；`classify.py` 也未把 `向导页` 识别为 open_page。
+- 范围（可写集）：`scripts/agent/service.py`、`scripts/controller/actions/phase/classify.py`、`scripts/characterization/characterize-phase-runtime.py`（补 pin）、`docs/superpowers/agent-log.md`。
+- 禁入区：`scripts/agent/recorder_emitters.py` 本体已由 `ad817a95` 修复，本次不动；`scripts/controller/actions/phase/reviewer.py` prompt 不动（规则已在）。
+- 方式：主会话 Inline；让 LLM 合约沿用规则编译出的 `boundary_override`，使 gate 证据与实际动作对齐。
+
 ## 2026-09-17 11:36 · Cursor — 收工：merge origin/uara_V1.2 into PR #51（回链本条）
 
 - 完成：`cursor/draft-traj-propose-gate-fp-be06` 合入最新 `origin/uara_V1.2`（`549e7a5c` executor LB spec 证据报告）。冲突仅本文件，按时刻交错保留双方条目。产品代码无冲突：gate FP 修复 / cache **v9** / persist-boundary·cohesion pins 全保留；他线 `docs/superpowers/reports/2026-09-17-executor-lb-spec-evidence.md` 一并带入。
@@ -680,26 +602,12 @@
   - `npx eslint` 改动 src **0**
 - 遗留移交：LMY 湿测须 **POST** `…/product-mgmt/draft-traj/propose`（cache v9）；仅重启不够。parse / atomize prompt / UI 未动。不维护 CHANGELOG。
 
-## 2026-09-17 11:30 · OpenCode — 收工：LLM 合约路径对齐规则边界，navigate 阶段证据可录（回链 11:15 开工）
-
-- 完成：**`af1d1cc0`** + pin **`42cb41a`**（4 文件 / +72）。用户复测 sid 64c9044b 时 phase 1 仍 `observed=[]`、phase 3 有 `nav_next_clicked` 但门闩只要 `url_change|page_opened`——根因是 `service.py` 里 LLM reviewer 路径 `apply_phase_contract(business_data_ref, reviewed)` 未传 `boundary_override`，边界 `goals`/`success_when` 全由 LLM 自然语言 `in_scope`/`success.kinds` 决定，丢失 `open_page`/`click_next`/`nav_next_clicked` 等可录制证据标签。
-- 修复：①`scripts/agent/service.py` 在 LLM 合约路径传入 `compile_boundary(phase_core)` 作为 `boundary_override`，使 gate 使用任务文本导出的规则边界（phase 1 含 `open_page`、phase 3 含 `click_next`+`nav_next_clicked`）；②`scripts/controller/actions/phase/classify.py` 把 `向导页` 加入 open_page 识别正则，使「打开…向导页」被归类为 open_page，触发 recorder_emitters 的 overlay/入口点击兜底；③`scripts/characterization/characterize-phase-runtime.py` 新增 pin，断言 LLM navigate 合约经 `boundary_override` 后 phase 1 边界 goals 含 `open_page`、phase 3 `success_when` 含 `nav_next_clicked`。
-- 验收：`characterize-phase-runtime`、`characterize-phase-reviewer`、`characterize-phase-reviewer-flow`、`characterize-recorder-phase-reset`（39 checks）、`characterize-g3-done-gate-live`（11 checks）、`characterize-phase-save-cue-promote`、`characterize-phase-intent` 全绿；**verify-all = 既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。
-- 遗留移交：①用户已停掉执行机，请拉取本提交后重启控制面 + 执行机，再复测 sid 64c9044b 的 phase 1/3；②若仍失败，请贴 `[recorder] open-page evidence check:` 与 `[click] G3 evidence recorded` 两行；③不维护 CHANGELOG。
-
 ## 2026-09-17 11:21 · Cursor — 开工：draft-traj propose 闸 false positive（禁用/克隆 persist 计数 + 新增 cohesion）
 
 - 进行中：修 LMY 湿测 product-mgmt propose 闸误杀（parse 14 笔好稿 accepted 0/14）。根因 1：`countPersistConfirms` 把叙事里的 禁用/克隆/删除/启用 当落库确认；根因 2：`assertCapabilityCohesion` 把 locate-prep + 单次新增/维护 + 一次 closer 判成 `multi_capability_task_draft`。TDD 先行：A 新增产品要素分组 / B 新增产品 / C 禁用产品 / D 产品克隆 必须 cohesion ok 且 persistConfirms===1；maintain+sort 与两次【保存】/【确定】闭环仍拒。
 - 范围（可写集）：`src/services/req-draft-traj/flow-card-guide.js`、`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` 8→9）、`scripts/characterization/characterize-persist-boundary.mjs`、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin）、本协作日志
 - 禁入区：parse API、atomize prompt、Vue SPA、`propose.js` 接线顺序以外的解析/切片、executor-lb spec、recorder/phase、`origin/master`、活跃录制会话；他线在途文件无交集（capability-cohesion / flow-card-guide 无在途声明）
 - 方式：主会话 Inline TDD；基线 `uara_V1.2`；新分支 `cursor/draft-traj-propose-gate-fp-be06` → PR `uara_V1.2`
-
-## 2026-09-17 11:15 · OpenCode — 开工：LLM 合约路径未用规则边界，导致 navigate 阶段证据不可录（phase 1/3）
-
-- 进行中：用户复测 sid 64c9044b，phase 1 仍 `observed=[]` 失败，phase 3 有 `nav_next_clicked` 但门闩只要 `url_change|page_opened`。根因：LLM reviewer 路径 `service.py:apply_phase_contract(business_data_ref, reviewed)` 未传 `boundary_override`，边界 `goals`/`success_when` 全由 LLM 的 `in_scope`/`success.kinds` 决定，导致 `open_page`/`click_next`/`nav_next_clicked` 等可录制证据标签丢失；`classify.py` 也未把 `向导页` 识别为 open_page。
-- 范围（可写集）：`scripts/agent/service.py`、`scripts/controller/actions/phase/classify.py`、`scripts/characterization/characterize-phase-runtime.py`（补 pin）、`docs/superpowers/agent-log.md`。
-- 禁入区：`scripts/agent/recorder_emitters.py` 本体已由 `ad817a95` 修复，本次不动；`scripts/controller/actions/phase/reviewer.py` prompt 不动（规则已在）。
-- 方式：主会话 Inline；让 LLM 合约沿用规则编译出的 `boundary_override`，使 gate 证据与实际动作对齐。
 
 ## 2026-09-17 11:15 · OpenCode — 开工：LLM 合约路径未用规则边界，导致 navigate 阶段证据不可录（phase 1/3）
 
@@ -739,11 +647,6 @@
   - `characterize-kb-req-modules-list.mjs` **OK 3**
   - `npx eslint` 改动 src **0**
 - 遗留移交：LMY 湿测顺序 **upload → parse → propose**；parse 同步 LLM 可能 1–3+ 分钟（超时 300s），须重启 4097 且客户端放宽超时。不维护 CHANGELOG。未跑真 LLM / 真 docx 湿抽。
-
-## 2026-09-17 10:56 · ZCode — 更新：前端已发 20260917-1035，后端发版撤回（先修 bug）
-- 前端：入口 index-DMDGH5NM.js → /data/app/front-dist/releases/20260917-1035 已上线，页面/API 200 验证过
-- 后端：预上传包（20260917-103602）已全部撤回（本地 dist + 服务器 /tmp 均清理）；/data/app/JS-gen 软链与 4097 未动（仍 20260916-212853，pid 3596493）；原因=发现 bug 需先修完再发
-- 后续：bug 修完重新 pack→上传→部署（部署前仍需确认无活跃录制）
 
 ## 2026-09-17 10:50 · Cursor — 开工：sync req-module parse API MVP
 
@@ -855,40 +758,6 @@
 - 验收：`characterize-g3-done-gate-live` 默认环境下 **OK (11 checks)**；**verify-all 全跑 = 既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。
 - 遗留移交：①生产须重启执行机侧 Python agent 进程生效（本线两处修复 `6367f55`/`c84f10c8`）；②`53dec0e9` 自述「未覆盖完整 record/prepare→start 周期（需重启控制面，且有他线在途录制 1908/832）」；③不维护 CHANGELOG。
 
-## 2026-09-17 09:40 · Cursor — 收工：湿测 haystack 假绿（回链 09:10 开工）
-
-- 完成：分类 haystack 改为整组正文（步骤描述 + 操作块，仍剥编号/`操作：`/来源/关键数据）。湿测「排序 + 维护…操作：【保存】」现拒 `multi_capability_task_draft`。`新增…主页` 页名不当 create（同 `编辑页` 复合词口径），open-drawer fold 仍内聚。`PROPOSE_CACHE_VERSION` 5→6。开工 `b0451600`。
-- 提交：`57f57627` wet/cache-v6 RED pins → `2c1456be` full-body haystack + cache v6 + spec §4.1 → `8eb0a873` open-drawer page-title RED pins → `e522f1a8` 新增…主页 非 create。本条收工。
-- 验收（本机）：
-  - RED：wet group2 haystack=`【保存】`；`assertCapabilityCohesion` `ok:true`；cache pin `5 !== 6`；open-drawer `role=other/create`
-  - GREEN：`characterize-capability-cohesion.mjs` **all passed**（含 C2/C6 + wet reject + 新增…主页 persist）
-  - `characterize-req-draft-traj.mjs` **OK 63**（`PROPOSE_CACHE_VERSION is 6` + open-drawer fold）
-  - `characterize-persist-boundary.mjs` **11 passed**
-  - `characterize-atom-depend.mjs` **16 passed**
-  - `npx eslint` capability-cohesion.js / propose-cache.js **0**
-- 遗留移交：湿测 product-mgmt 须 cache v6 后重新 propose，勿复用 v5。Follow-up PR #47 → #46 分支。不 merge。无场景黑名单。
-
-## 2026-09-17 09:10 · Cursor — 开工：湿测 haystack 假绿（操作：后丢失维护）
-
-- 进行中：修 PR #46 湿测假 PASS——`extractHaystack` 只取 `操作：` 之后，导致「排序 + 维护…操作：【保存】」被当成 other→closer-only persist。TDD：先加 wet pin RED，再改分类 haystack 为**整组正文**（步骤描述 + 操作块），`PROPOSE_CACHE_VERSION` 5→6。
-- 范围（可写集）：`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin 5→6）、本协作日志；必要时规格 §4.1 haystack 一句（防再次按旧口径回退）
-- 禁入区：`propose.js` 接线、`atom-depend.js`、`flow-card-guide.js`、prompt/samples/api-docs、场景黑名单、他线 WIP、不 merge
-- 方式：主会话 Inline TDD；C2/C6 必须保持绿；不跑 product-mgmt 湿测 propose
-
-## 2026-09-16 22:27 · OpenCode — 收工：修复 navigate 开放页证据门闩卡死录制（回链本会话 21:35 线；附排查结论）
-
-- 完成：**`c84f10c8`**（2 文件 / +142 -1）。用户报「录制在第二步报错中断」，并问是否上次改动所致。**结论：非上次改动（`6367f55`）所致**——该 run（sid 3718d161）阶段1 被 LLM 评审判为 `mode=navigate success.kinds=['url_change','page_opened']`（来自 ZCode 21:03 合入的 PR #45 G3 门闩，`navigate` 以前 `success_when=[]` 不受门闩约束）。点击【评级申请】(index 48) 打开的向导是**抽屉**：URL 不变、且 click 埋点的 overlay 标题在抽屉异步渲染前就采样 → `observed=[]` → `done(success=true)` 每步都被拒（step 3/5/6）→ `chosen=5` 步耗尽、录制中断。
-- 两处修复（`scripts/agent/recorder_emitters.py`）：①新增 `_guard_done_record_open_page_evidence`——navigate 且 `goals` 含 `open_page` 时，done() 时**可见的目标 overlay 本身即 `page_opened` 证据**（click 埋点漏采的兜底；零业务动作守卫仍要求本阶段确有真实点击）；②新增 `_guard_done_nav_evidence_ok`——navigate 阶段自身 `success_when` 已满足时，可见 overlay 就是目标页/下一步，`_guard_done_reject_overlay` 不再误拒（保留 introduce_ok/save_ok/navigated_ok 豁免；错误门闩 `_guard_done_reject_errors` 未动，可见错误通知仍拦）。
-- 验收证据：pin 追加到**已注册**的 `characterize-phase-runtime`（新 `test_open_page_overlay_evidence_and_overlay_gate`：open_page 无证据→门关；打 overlay→`page_opened` 记录→门开；overlay 门从拒到放行；wizard `click_next` 无 open_page 不吃 stray overlay）；**verify-all 全跑 = 与既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。期间 `characterize-recorder-phase-reset` 曾因 pin 正则 `_guard_done_reject_\w+\([^)]*\)` 不容嵌套括号而红——改为先把 `nav_evidence_ok` 落变量再传参（**未改 pin**），复跑 39 checks OK。
-- 遗留移交：①**真机复测**建议：对公客户评级「点击评级申请→向导抽屉」应一次 done 通过；②生产须重启执行机侧 Python agent 进程生效；③回退点=本提交；④不维护 CHANGELOG。
-
-## 2026-09-16 22:25 · Cursor — 收工：能力内聚结构硬闸 Task 4（回链 22:10 开工）
-
-- 完成：`characterize-req-draft-traj.mjs` pin 改为 `PROPOSE_CACHE_VERSION === 5`；`propose-cache.js` 4→5（注释 v5 = capability-cohesion + title-as-key reject）；`verify-all.sh` 在 `characterize-persist-boundary` 后注册 `characterize-capability-cohesion`。chore **`433f0b2c`**。开工声明 `3926a134`。
-- 验收：RED=`PROPOSE_CACHE_VERSION is 5` actual `4 !== 5`（未 bump 时）。GREEN：version pin ✓；`characterize-capability-cohesion.mjs` **all passed**（25 pins）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**；eslint 三 src 文件 0 warning。
-- **未全绿**：`characterize-req-draft-traj.mjs` 在 version pin 通过后于 `propose merges same-loop steps when LLM returns flowRef` 失败（`atoms.length` `0 !== 1`）。诊断：`进入编辑页` 因 maintain 族子串 `编辑` 被标 `other`，与 `维护概况` 构成两个 `other` → `multi_capability_task_draft`；fallback 同稿同样被拒。未改 `capability-cohesion.js` / `propose.js`（Task 4 禁入）。未改 prompt / samples / api-docs。
-- 遗留移交：Task 5+（prompt 一句 / samples / api-docs）前需处理该既有 flowRef 闭环节 pin 与 `编辑页` 假阳性；湿测 W1–W4 仍只在本地 LMY。不维护 CHANGELOG
-
 ## 2026-09-16 22:24 · ZCode 引擎线 — 收工：G3 证据门闩湿测 + 护栏固化（回链 22:16 开工）
 
 - 完成：`53dec0e9`（2 支新门禁 + verify-all 注册）。**湿测做了两半**：①**引擎侧活体** `characterize-g3-done-gate-live.py`（11 checks）——真 Chromium + 真 `compile_boundary`/`apply_phase_intent` 产出的 phase boundary + 真合并后 `_guard_done_on_step_end` 本体（仅 agent 用忠实 shim：守卫只读 browser_context/_message_manager/state，grep 实证）；②**runner 接缝** `characterize-g3-runner-seam.mjs`（9 checks）——把我合并时改写的那两处表达式（整轨聚合 + per-run 零步过滤）**从合并后源码逐字抽取后 eval**，不另抄一份，避免镜像漂移
@@ -909,12 +778,12 @@
 - 方式：主会话 Inline；临时脚本在 `tmp/wet-g3/`（gitignore），只把可确定复现、不依赖 SUT/MySQL 的两支固化为门禁（证伪用的"临时改写源码再还原"不入门禁——硬杀可能留下已改文件；该形状已由 `characterize-recorder-phase-reset` 的"每个拒绝分支必须 return True"钉住）
 - 遗留：全链 `record/prepare → record/start` 湿测**待具备条件**（需 4097 重启加载合并 JS + 他线录制结束 + SUT 登录授权）
 
-## 2026-09-16 22:10 · Cursor — 开工：能力内聚结构硬闸 Task 4（cache v5 + verify-all）
+## 2026-09-16 22:27 · OpenCode — 收工：修复 navigate 开放页证据门闩卡死录制（回链本会话 21:35 线；附排查结论）
 
-- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 4**（TDD：先改 `characterize-req-draft-traj.mjs` pin `PROPOSE_CACHE_VERSION === 5` RED actual 4 → bump `propose-cache.js` 4→5 GREEN → `verify-all.sh` 注册 `characterize-capability-cohesion`）。不改 prompt / samples / api-docs（Task 5+）。
-- 范围（可写集）：`scripts/characterization/characterize-req-draft-traj.mjs`（version pin 4→5）、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` + 注释）、`scripts/refactor/verify-all.sh`（persist-boundary 后注册 cohesion pin）、本协作日志
-- 禁入区：`capability-cohesion.js` / `propose.js` 逻辑；`atom-depend.js`；`flow-card-guide.js`；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 5+ prompt / samples / api-docs / 湿测 W1–W4
-- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+- 完成：**`c84f10c8`**（2 文件 / +142 -1）。用户报「录制在第二步报错中断」，并问是否上次改动所致。**结论：非上次改动（`6367f55`）所致**——该 run（sid 3718d161）阶段1 被 LLM 评审判为 `mode=navigate success.kinds=['url_change','page_opened']`（来自 ZCode 21:03 合入的 PR #45 G3 门闩，`navigate` 以前 `success_when=[]` 不受门闩约束）。点击【评级申请】(index 48) 打开的向导是**抽屉**：URL 不变、且 click 埋点的 overlay 标题在抽屉异步渲染前就采样 → `observed=[]` → `done(success=true)` 每步都被拒（step 3/5/6）→ `chosen=5` 步耗尽、录制中断。
+- 两处修复（`scripts/agent/recorder_emitters.py`）：①新增 `_guard_done_record_open_page_evidence`——navigate 且 `goals` 含 `open_page` 时，done() 时**可见的目标 overlay 本身即 `page_opened` 证据**（click 埋点漏采的兜底；零业务动作守卫仍要求本阶段确有真实点击）；②新增 `_guard_done_nav_evidence_ok`——navigate 阶段自身 `success_when` 已满足时，可见 overlay 就是目标页/下一步，`_guard_done_reject_overlay` 不再误拒（保留 introduce_ok/save_ok/navigated_ok 豁免；错误门闩 `_guard_done_reject_errors` 未动，可见错误通知仍拦）。
+- 验收证据：pin 追加到**已注册**的 `characterize-phase-runtime`（新 `test_open_page_overlay_evidence_and_overlay_gate`：open_page 无证据→门关；打 overlay→`page_opened` 记录→门开；overlay 门从拒到放行；wizard `click_next` 无 open_page 不吃 stray overlay）；**verify-all 全跑 = 与既有基线同 4 红**（step-highlight / layer-tree / confirm-notification / network-capture），无新增红。期间 `characterize-recorder-phase-reset` 曾因 pin 正则 `_guard_done_reject_\w+\([^)]*\)` 不容嵌套括号而红——改为先把 `nav_evidence_ok` 落变量再传参（**未改 pin**），复跑 39 checks OK。
+- 遗留移交：①**真机复测**建议：对公客户评级「点击评级申请→向导抽屉」应一次 done 通过；②生产须重启执行机侧 Python agent 进程生效；③回退点=本提交；④不维护 CHANGELOG。
 
 ## 2026-09-16 21:59 · OpenCode — 收工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（回链 21:35 开工）
 
@@ -925,92 +794,12 @@
 - 未改（防误伤）：`click_save` 引擎不加「非提交阶段一律拒点」硬闸——无匹配按钮时引擎本就 `save-button-not-found` 且不落步，故**消除「被指示去点确定」的处方即消除虚拟步**。
 - 遗留移交：①生产须重启执行机侧 Python agent 进程生效（LLM 评审器下次会话生效）；②若后续发现导航/查询阶段因 `other` 无证据门而过度宽松（过早 done），回退点=本提交；③不维护 CHANGELOG。
 
-## 2026-09-16 21:55 · Cursor — 收工：能力内聚结构硬闸 Task 3（回链 21:40 开工）
-
-- 完成：`materializeLlmAtom` 在 `normalizeProduces`/`normalizeDataDependsOn` 之后、`assertAtomProvenance` 之前调用 `assertCapabilityCohesion`；`!ok` → `rejected: { atomKey, reason: cohesion.reason }`。`countPersistConfirms(cleanedDraft) > 1` 仍为 sanitize 后第一拒绝。未改 `validateAtomDependGraph`。feat **`2f223e6b`**。开工声明 `cdd5b8ce`。
-- 验收：RED=`C1 propose` atoms length `1 !== 0`（merged 仍入 atoms）+ `C4 propose` `1 !== 0`（title-as-key 仍入 atoms）；helper 全 ok；`C3 propose` 已 ok（`multi_persist_task_draft`）。GREEN：`characterize-capability-cohesion.mjs` **all passed**（25 pins：helper 21 + C1/C3/C4/C2 propose）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**。`npx eslint src/services/req-draft-traj/propose.js` 0 warning。未 bump cache、未改 prompt。
-- 遗留移交：Task 4+（cache 4→5 + verify-all / prompt 一句 / api-docs / 湿测 W1–W4）。不维护 CHANGELOG
-
-## 2026-09-16 21:50 · Cursor — 收工：能力内聚结构硬闸 Task 5（回链 21:35 开工）
-
-- 完成：atomize prompt item-9 准备步骤改为「仅限定位类（查询/搜索/过滤/选中/点行或节点/打开或进入目标/展开/切换页签）」；`atom-depend-split-samples.md` B1 交叉引用结构闸 `multi_capability_task_draft`（多次【确定】仍 `multi_persist_task_draft`）；`kb.js` propose `notes[]` 一行列出两新 reason。pin `atomize prompt locates prep to locate-class only`。开工声明 `15e5422d`。本提交即 Task 5 产品提交。
-- 前序：helper+pins `da1ed8f1`；C4+fallback `d2c6bfbb`；materialize 接线 `2f223e6b`；cache v5 `433f0b2c`；编辑页假阳性 `8a599873` / `a6d5e02e`。
-- 验收：RED=`atomize prompt locates prep to locate-class only` `仅限定位类` missing。GREEN：`node scripts/characterization/characterize-capability-cohesion.mjs` **all passed**（含 C1–C6 + prompt pin）；`npx eslint src/dashboard/api-docs/groups/kb.js` 0 warning。未改 helper 逻辑、无场景黑名单、无 `不得出现上移`、未跑湿测。
-- 遗留移交：Task 6 湿测 W1–W4 只在本地 LMY。不维护 CHANGELOG
-
-## 2026-09-16 21:40 · Cursor — 开工：能力内聚结构硬闸 Task 3（materializeLlmAtom 接线 + C3）
-
-- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 3**（TDD：propose-level C1/C3/C4/C2 pins RED → `materializeLlmAtom` 在 `normalizeProduces` 之后、`assertAtomProvenance` 之前调用 `assertCapabilityCohesion` GREEN）。`countPersistConfirms > 1` 保持 sanitize 后第一拒绝；不把 cohesion 放进 `validateAtomDependGraph`。
-- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 propose-level pins）、`src/services/req-draft-traj/propose.js`（import `assertCapabilityCohesion` + `materializeLlmAtom` 接线）、本协作日志
-- 禁入区：`propose-cache.js`（Task 4 cache 4→5）；`atom-depend.js`；`flow-card-guide.js`；`scripts/prompts/**`；`verify-all.sh`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 4+ prompt / api-docs / samples
-- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
-
 ## 2026-09-16 21:35 · OpenCode — 开工：修复 AI 录制阶段收口被强行注入「点击确定」虚拟步骤（sid 4460cf2a 阶段3）
 
 - 进行中：真机日志显示阶段3 点击【下一步】后 `done(success=true)` 被反复拒绝（`success_when=['step_change'] observed=['nav_next_clicked']`），随后 agent 被引去 `click_save(button_text='确定')` 并触发服务端业务异常；用户要求查清并修好「当前页面区域没有确定按钮时不应强行加入点击确定步骤」。已离线定位：唯一注入源是 done 被拒后的 `recovery_prescription_message`（LLM 合约无 `recovery` 键 → 兜底 `'click_save()'`）。
 - 范围（可写集）：`scripts/controller/actions/phase/reviewer.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/phase/intent_gates.py`、`scripts/prompts/phase-reviewer-prompt.md`、`scripts/characterization/characterize-phase-reviewer.py`、本协作日志
 - 禁入区：`scripts/refactor/verify-all.sh`（他线在途 WIP，不新增注册项）、生成链 `_locator_helpers_js.py` / `src/cdp/page-locator-helpers.js`、SPA 仓、`config/`（含会话前既有 `config/.db-whitelist-seen` 运行态改动，未纳入本次提交）、线上数据库/执行机运行态
 - 方式：主会话 Inline；先离线复现（构造 `mode=other + success.kinds=['step_change']` 合约）确认 `phase_done_ok=False` 且恢复处方为 `click_save()`，再最小实现；pin 落已注册文件、不新增 verify-all 注册项；跑 verify-all 与既有基线比对；不维护 CHANGELOG
-
-## 2026-09-16 21:35 · Cursor — 开工：能力内聚结构硬闸 Task 5（prompt 一句 + samples + api-docs）
-
-- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 5**（TDD：pin `atomize prompt locates prep to locate-class only` RED → item-9 准备步骤仅限定位类 GREEN → samples 交叉引用 + api-docs notes）。不跑 Task 6 湿测 W1–W4。
-- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 prompt pin）、`scripts/prompts/req-draft-traj-atomize-prompt.md`（item-9 一句）、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`（B1 交叉引用）、`src/dashboard/api-docs/groups/kb.js`（propose notes 一行）、本协作日志
-- 禁入区：`capability-cohesion.js` / `propose.js` / `propose-cache.js` 逻辑；`atom-depend.js`；`flow-card-guide.js`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 6 湿测
-- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
-
-## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 6 unit/falsify（回链 21:19 开工）
-
-- 完成：Task 6 冷测自检 + C1 证伪 + `src/` 无 `missing_locate_prep` + 计划 Tasks 1–5 勾选 + PR #46 ready-for-review。**未跑** product-mgmt 湿测 propose。开工声明 `274188c8`。
-- 验收：
-  - `characterize-capability-cohesion.mjs` **31 passed**（C1–C6 + 编辑页 pins + prompt pin）
-  - `characterize-persist-boundary.mjs` **11 passed**
-  - `characterize-atom-depend.mjs` **16 passed**
-  - `characterize-req-draft-traj.mjs` **OK 63**（含 `PROPOSE_CACHE_VERSION is 5`）
-  - `npx eslint` 四文件 **0 warning**
-  - C1 证伪：clean tree 上 `git stash push` 对已提交 helper 无效果；等价隐藏 `git rm capability-cohesion.js` → `ERR_MODULE_NOT_FOUND` exit 1（C1 无法绿）；`git checkout HEAD --` 恢复 → **31 passed**
-  - grep `missing_locate_prep`：`src/` **0 hits**（仅 spec/plan/agent-log 文档出现）
-- 遗留移交：湿测 W1–W4 只在本地 LMY（控制面须 cache v5 + 重新 propose，勿复用 v4 缓存）。不 merge。不维护 CHANGELOG
-
-## 2026-09-16 21:25 · Cursor — 收工：BLOCKER 编辑页误判 maintain（回链 21:06 开工）
-
-- 完成：maintain `编辑` 不匹配导航复合 `编辑页/编辑页面/编辑界面`；真维护（`编辑字段`/`编辑基本信息`）仍计。闭环尾允许 other 后夹 locate/neutral。fill-step `保存概况` 不当 closer（对齐 `countPersistConfirms`）。未 bump cache，未改 Task 5 prompt。
-- 提交：`8a599873` 编辑页 maintain 假阳性 + pins；`8588f04d` 曾改 haystack（回退）；`a6d5e02e` 恢复 spec haystack + `保存(?!概况)` closer。开工 `8e203550`。
-- 验收：`characterize-capability-cohesion.mjs` **all passed**；`characterize-req-draft-traj.mjs` **OK 63**（含 `propose merges same-loop steps when LLM returns flowRef` 与 card-guided fallback）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**；eslint `capability-cohesion.js` 0 warning。
-- 遗留移交：Task 5+ prompt 一句 / samples / api-docs / 湿测 W1–W4。不维护 CHANGELOG
-
-## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 2（回链 21:15 开工）
-
-- 完成：`synthesizeFallbackProduceKey`（空/`'  '`→`atom_output`，否则 `` `${trim}产物` ``）+ `assertCapabilityCohesion` 序列通过后 title-as-key（`length===1` 且 `produces[0]===trim(title)` → `produces_eq_title`；空 produces / title+另一 key 仍 ok）+ `propose.js` `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`（未豁免 fallback、未保留 `produces:[title]`）。feat **`d2c6bfbb`**。开工声明 `2dce38a0`。
-- 验收：RED=`C4 helper: produces exact title` `true !== false` + `synthesizeFallbackProduceKey` `undefined`≠`function`；C1/C2/C5/C6 仍 ok。GREEN：`characterize-capability-cohesion.mjs` **all passed**（21 pins）；`characterize-persist-boundary.mjs` **all passed**（含 fallback 三分写 + `multi_persist_task_draft`）；`characterize-atom-depend.mjs` **all passed**。`npx eslint` 两 src 文件 0 warning。未接线 `materializeLlmAtom`、未 bump cache、未改 prompt。
-- 遗留移交：Task 3+（`materializeLlmAtom` 顺序+C3 / cache 4→5 / prompt 一句 / verify-all / 湿测 W1–W4）。不维护 CHANGELOG
-
-## 2026-09-16 21:19 · Cursor — 开工：能力内聚结构硬闸 Task 6（unit/falsify，不跑湿测）
-
-- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 6** 的 unit/falsify（表征全绿、stash C1 证伪、grep `missing_locate_prep` 不得出现在 `src/`、PR #46 ready-for-review + W1–W4 未勾清单）。**不跑** product-mgmt 湿测 propose。
-- 范围（可写集）：`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（Tasks 1–5 勾选；Task 6 仅勾 unit/falsify 步，W1–W4 保持未勾）、本协作日志、PR #46 描述
-- 禁入区：`src/services/req-draft-traj/**` 产品逻辑；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；湿测 W1–W4 / product-mgmt wet propose
-- 方式：主会话 Inline 自检+证伪；不 merge
-
-## 2026-09-16 21:15 · Cursor — 开工：能力内聚结构硬闸 Task 2（C4 produces_eq_title + fallback synthesizer）
-
-- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 2**（TDD：C4/synthesizer pins RED → `synthesizeFallbackProduceKey` + title-as-key 闸 GREEN → `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`）。不接线 `materializeLlmAtom` 硬闸、不 bump cache、不改 prompt。
-- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 C4+synthesizer pins）、`src/services/req-draft-traj/capability-cohesion.js`（synthesizer + `assertCapabilityCohesion` title-as-key）、`src/services/req-draft-traj/propose.js`（import + `fallbackDependFields` 仅改 produce key）、本协作日志
-- 禁入区：`propose-cache.js`；`atom-depend.js`；`flow-card-guide.js`；`materializeLlmAtom` 闸接线（Task 3）；`scripts/prompts/**`；`verify-all.sh`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 3+ cache bump / prompt / api-docs
-- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
-
-## 2026-09-16 21:06 · Cursor — 开工：BLOCKER 编辑页误判 maintain
-
-- 进行中：`capability-cohesion.js` `detectOtherFamilies` / maintain 匹配不把导航复合「编辑页 / 编辑页面 / 编辑界面」计为 maintain（真维护如「编辑字段」仍计）；`characterize-capability-cohesion.mjs` 加 pin；`propose merges same-loop steps when LLM returns flowRef` 转绿。不 bump cache，不做 Task 5 prompt。
-- 范围：`src/services/req-draft-traj/capability-cohesion.js`、`scripts/characterization/characterize-capability-cohesion.mjs`、本协作日志
-- 禁入：`propose-cache.js`；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 5+
-- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
-
-## 2026-09-16 21:05 · Cursor — 收工：能力内聚结构硬闸 Task 1（回链 20:55 开工）
-
-- 完成：helper `src/services/req-draft-traj/capability-cohesion.js`（parse / inspect / classify / sequence-only `assertCapabilityCohesion`）+ pins `scripts/characterization/characterize-capability-cohesion.mjs`。feat **`da1ed8f1`**。开工声明 `ff456d8b`。
-- 验收：`node scripts/characterization/characterize-capability-cohesion.mjs` **all passed**（17 pins：parse×3、C5 classify、classify×4、C1/C5 reject、C2/C6 pass、sequence×4、no scene literals）。RED 先为 `ERR_MODULE_NOT_FOUND`。`npx eslint src/services/req-draft-traj/capability-cohesion.js` 0 warning。reason 仅 `multi_capability_task_draft`；无 `synthesizeFallbackProduceKey`；无场景黑名单字面量。
-- 遗留移交：Task 2+（`produces_eq_title` / fallback `${title}产物` / propose 接线 / cache 4→5 / prompt / verify-all）。湿测 W1–W4 仍只在本地 LMY。不维护 CHANGELOG
 
 ## 2026-09-16 21:03 · ZCode 引擎线 — 收工：本地合入 PR #45（G3 phase_done 证据门闩，回链 20:49 开工）
 
@@ -1032,13 +821,6 @@
 - 部署：原执行机 PID 33548 / 控制面 PID 12924 已停止，新进程执行机 **25860**、控制面 **32668**（日志 `logs/executor.*.log`、`logs/server.*.log`）。启动对账日志 `[executor-ws] reconciled … { kept: 0, crashed: 2, bibReattached: 0 }`——执行机重启令 834 的 1893 与 839 的 1897 Python 进程消失，按新对账逻辑正确判 crashed（符合预期，二者需重新 prepare）。
 - 遗留移交：①SPA 仍以「frameId 变化」判定 streaming（既有契约），本次令后端满足之，未改 SPA 仓；②执行机进程内序号在进程重启后从 0 重来，已由 `session.bib_ready` 清缓存兜住基线倒挂；③控制面本地 `src/cdp/remote-bridge/screencast.js` 的同名写 `sessionId` 路径为已移除的本地 BiB 挂载（dead code），未改；④不维护 CHANGELOG。
 
-## 2026-09-16 20:55 · Cursor — 开工：能力内聚结构硬闸 Task 1（helper + C1/C5/C2/C6 pins）
-
-- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 1**（TDD：characterization RED → helper GREEN）。`assertCapabilityCohesion` 本任务只做序列闸；`produces_eq_title` / `synthesizeFallbackProduceKey` 留给 Task 2。
-- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（新建）、`src/services/req-draft-traj/capability-cohesion.js`（新建）、本协作日志
-- 禁入区：`propose.js` / `propose-cache.js` / `atom-depend.js` / `flow-card-guide.js`（只 import `isPersistBoundaryAction`）；`scripts/prompts/**`；`verify-all.sh`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 2+ 接线与 cache bump
-- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
-
 ## 2026-09-16 20:49 · ZCode 引擎线 — 开工：本地合入 PR #45（G3 phase_done 证据门闩）
 
 - 进行中：把 `origin/cursor/g3-phase-done-evidence-gate-3b92`（7 提交 `539c8e76`→`9391f09c`，作者 Cursor Cloud，12:22–12:41）合入**本地主线 `uara_V1.2`**（该 PR 原提 master，用户明确不动 master）。内容=query/navigate `success_when` 证据 + click 证据埋点 + recorder `needs_token` 双条件 + 控制面 0 步 `phase_done` 拒收 + verify-all 接入 2 pin + prompts 对齐
@@ -1048,18 +830,146 @@
 - 方式：主会话 Inline；`git merge --no-ff` + 逐处解冲突 + 复跑 PR 自带 3 个 pin 与 verify-all 基线比对；子智能体仅用于只读定位（如需）
 - 声明修正：本条为**新工作单元**（前序「字段 label 解析同族收敛」已于 19:20 收工，见下方条目）
 
-## 2026-09-16 20:48 · Cursor — 收工：能力内聚结构硬闸实现计划（回链 20:40 开工）
-
-- 完成：计划 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（T1 helper+C1/C5/C2/C6 → T2 C4+fallback `${title}产物` → T3 `materializeLlmAtom` 顺序+C3 → T4 cache 4→5 + verify-all → T5 prompt 一句/samples/api-docs → T6 自检+C1 证伪+湿测 W1–W4 清单）。**未实现闸、未 bump cache、未改 src/prompt。**
-- 验收证据：计划覆盖 spec §4.1–§4.5 / §5 / §6 / §7.2–§7.4 / §8 C1–C6；reason 锁死 `multi_capability_task_draft` / `produces_eq_title`；`multi_persist_task_draft` 保持第一；无场景黑名单；无 TBD。开工声明 `9ac7c1fb`。
-- 遗留移交：下一会话按该计划 Subagent-Driven 或 Inline 实现；湿测 W1–W4 只在本地 LMY；勿与 OpenCode 20:03 轨迹提示词线文件集相交。不维护 CHANGELOG
-
 ## 2026-09-16 20:45 · OpenCode — 开工：修复 RSCF frameId 恒定导致的画面反复附着/自动重连死循环
 
 - 现场实证：CDP `Page.screencastFrame.sessionId` **在单个 screencast 会话内恒定**（自建 headless Chrome 实测 298 帧全为 `sessionId=1`，`b64len` 各异＝确为不同帧），而 `executor/bib-bridge.js` 直接把它写进 RSCF 头 `frameId`（`_onScreencastFrame`）。前端（SPA 仓 63d6a53）以「收到**新**帧序号」判定 streaming、8s 无新帧即自动重连 → 序号永不变 → 无限「正在附着画面… / 画面已断开，系统正在自动重连…」，并每轮 `detach`+重新 prepare 生成新 remote_session（实测 1894→1895→1896→1897 链，839 被反复重置为 draft）。
 - 范围（可写集）：`executor/bib-bridge.js`（RSCF 序号改进程内单调递增；`ack` 仍回真实 CDP sessionId）、`src/executor-ws.js`（`session.bib_ready` 时清该 uuid 的 RSCF 帧缓存，避免重挂后基线倒挂）、`scripts/characterization/cold/characterize-bib-navigate-input.mjs`（追加已注册的行为 pin）、本协作日志；`tmp/` 下诊断脚本。
 - 禁入区：`scripts/refactor/verify-all.sh`（他线在途 WIP，不新增注册项）、`scripts/controller/actions/**`、`scripts/prompts/**`、生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`、SPA 仓、`config/`、线上数据库/执行机运行态、`config/.db-whitelist-seen`。
 - 方式：先落 pin（复用已注册的 bib navigate 冷 pin 文件）再最小实现；`node --check` + 定向 characterization + 真机 WS 订阅探针（`tmp/ws-frame-probe.mjs`）复验序号递增；不改 SPA 契约（令后端满足既有「递增 frameId」契约）。
+
+## 2026-09-16 20:10 · ZCode 引擎线 — 开工：actions 层改动盘点 → 同事引擎同步清单 → agent team 移植
+
+- 进行中：2026-09-16 20:10；验收=①产出「JS-gen actions 层改动 vs tansun_ui_engine 现状」同步清单（逐项：语义/来源 commit/引擎是否已有/是否需要同步）②清单中确认需同步且引擎侧适用的条目移植完成并提交
+- 范围：只读调研=JS-gen `docs/superpowers/agent-log.md`（991 行）+ engine 仓 `ui_execute/engine/actions/**` 现状盘点；实现=engine 仓 `ui_execute/engine/actions/**`（具体文件集待清单确定后在本条目追加）+ 本地测试件（不提交）+ 本文件
+- 禁入区：JS-gen 源码（只读）、engine 仓 config.py、push、SUT 真实数据变更；他线 WIP（`scripts/refactor/verify-all.sh` 等在途件不碰）
+- 方式：lead 设计；调研双子智能体并行（R1=挖 log、R2=引擎盘点，均只读不 commit）；实现子智能体按清单文件集不相交派发；主会话复核+验证后代提交
+
+## 2026-09-17 09:40 · Cursor — 收工：湿测 haystack 假绿（回链 09:10 开工）
+
+- 完成：分类 haystack 改为整组正文（步骤描述 + 操作块，仍剥编号/`操作：`/来源/关键数据）。湿测「排序 + 维护…操作：【保存】」现拒 `multi_capability_task_draft`。`新增…主页` 页名不当 create（同 `编辑页` 复合词口径），open-drawer fold 仍内聚。`PROPOSE_CACHE_VERSION` 5→6。开工 `b0451600`。
+- 提交：`57f57627` wet/cache-v6 RED pins → `2c1456be` full-body haystack + cache v6 + spec §4.1 → `8eb0a873` open-drawer page-title RED pins → `e522f1a8` 新增…主页 非 create。本条收工。
+- 验收（本机）：
+  - RED：wet group2 haystack=`【保存】`；`assertCapabilityCohesion` `ok:true`；cache pin `5 !== 6`；open-drawer `role=other/create`
+  - GREEN：`characterize-capability-cohesion.mjs` **all passed**（含 C2/C6 + wet reject + 新增…主页 persist）
+  - `characterize-req-draft-traj.mjs` **OK 63**（`PROPOSE_CACHE_VERSION is 6` + open-drawer fold）
+  - `characterize-persist-boundary.mjs` **11 passed**
+  - `characterize-atom-depend.mjs` **16 passed**
+  - `npx eslint` capability-cohesion.js / propose-cache.js **0**
+- 遗留移交：湿测 product-mgmt 须 cache v6 后重新 propose，勿复用 v5。Follow-up PR #47 → #46 分支。不 merge。无场景黑名单。
+
+## 2026-09-17 09:10 · Cursor — 开工：湿测 haystack 假绿（操作：后丢失维护）
+
+- 进行中：修 PR #46 湿测假 PASS——`extractHaystack` 只取 `操作：` 之后，导致「排序 + 维护…操作：【保存】」被当成 other→closer-only persist。TDD：先加 wet pin RED，再改分类 haystack 为**整组正文**（步骤描述 + 操作块），`PROPOSE_CACHE_VERSION` 5→6。
+- 范围（可写集）：`src/services/req-draft-traj/capability-cohesion.js`、`src/services/req-draft-traj/propose-cache.js`、`scripts/characterization/characterize-capability-cohesion.mjs`、`scripts/characterization/characterize-req-draft-traj.mjs`（version pin 5→6）、本协作日志；必要时规格 §4.1 haystack 一句（防再次按旧口径回退）
+- 禁入区：`propose.js` 接线、`atom-depend.js`、`flow-card-guide.js`、prompt/samples/api-docs、场景黑名单、他线 WIP、不 merge
+- 方式：主会话 Inline TDD；C2/C6 必须保持绿；不跑 product-mgmt 湿测 propose
+
+## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 6 unit/falsify（回链 21:19 开工）
+
+- 完成：Task 6 冷测自检 + C1 证伪 + `src/` 无 `missing_locate_prep` + 计划 Tasks 1–5 勾选 + PR #46 ready-for-review。**未跑** product-mgmt 湿测 propose。开工声明 `274188c8`。
+- 验收：
+  - `characterize-capability-cohesion.mjs` **31 passed**（C1–C6 + 编辑页 pins + prompt pin）
+  - `characterize-persist-boundary.mjs` **11 passed**
+  - `characterize-atom-depend.mjs` **16 passed**
+  - `characterize-req-draft-traj.mjs` **OK 63**（含 `PROPOSE_CACHE_VERSION is 5`）
+  - `npx eslint` 四文件 **0 warning**
+  - C1 证伪：clean tree 上 `git stash push` 对已提交 helper 无效果；等价隐藏 `git rm capability-cohesion.js` → `ERR_MODULE_NOT_FOUND` exit 1（C1 无法绿）；`git checkout HEAD --` 恢复 → **31 passed**
+  - grep `missing_locate_prep`：`src/` **0 hits**（仅 spec/plan/agent-log 文档出现）
+- 遗留移交：湿测 W1–W4 只在本地 LMY（控制面须 cache v5 + 重新 propose，勿复用 v4 缓存）。不 merge。不维护 CHANGELOG
+
+## 2026-09-16 21:19 · Cursor — 开工：能力内聚结构硬闸 Task 6（unit/falsify，不跑湿测）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 6** 的 unit/falsify（表征全绿、stash C1 证伪、grep `missing_locate_prep` 不得出现在 `src/`、PR #46 ready-for-review + W1–W4 未勾清单）。**不跑** product-mgmt 湿测 propose。
+- 范围（可写集）：`docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（Tasks 1–5 勾选；Task 6 仅勾 unit/falsify 步，W1–W4 保持未勾）、本协作日志、PR #46 描述
+- 禁入区：`src/services/req-draft-traj/**` 产品逻辑；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；湿测 W1–W4 / product-mgmt wet propose
+- 方式：主会话 Inline 自检+证伪；不 merge
+
+## 2026-09-16 21:50 · Cursor — 收工：能力内聚结构硬闸 Task 5（回链 21:35 开工）
+
+- 完成：atomize prompt item-9 准备步骤改为「仅限定位类（查询/搜索/过滤/选中/点行或节点/打开或进入目标/展开/切换页签）」；`atom-depend-split-samples.md` B1 交叉引用结构闸 `multi_capability_task_draft`（多次【确定】仍 `multi_persist_task_draft`）；`kb.js` propose `notes[]` 一行列出两新 reason。pin `atomize prompt locates prep to locate-class only`。开工声明 `15e5422d`。本提交即 Task 5 产品提交。
+- 前序：helper+pins `da1ed8f1`；C4+fallback `d2c6bfbb`；materialize 接线 `2f223e6b`；cache v5 `433f0b2c`；编辑页假阳性 `8a599873` / `a6d5e02e`。
+- 验收：RED=`atomize prompt locates prep to locate-class only` `仅限定位类` missing。GREEN：`node scripts/characterization/characterize-capability-cohesion.mjs` **all passed**（含 C1–C6 + prompt pin）；`npx eslint src/dashboard/api-docs/groups/kb.js` 0 warning。未改 helper 逻辑、无场景黑名单、无 `不得出现上移`、未跑湿测。
+- 遗留移交：Task 6 湿测 W1–W4 只在本地 LMY。不维护 CHANGELOG
+
+## 2026-09-16 21:35 · Cursor — 开工：能力内聚结构硬闸 Task 5（prompt 一句 + samples + api-docs）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 5**（TDD：pin `atomize prompt locates prep to locate-class only` RED → item-9 准备步骤仅限定位类 GREEN → samples 交叉引用 + api-docs notes）。不跑 Task 6 湿测 W1–W4。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 prompt pin）、`scripts/prompts/req-draft-traj-atomize-prompt.md`（item-9 一句）、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`（B1 交叉引用）、`src/dashboard/api-docs/groups/kb.js`（propose notes 一行）、本协作日志
+- 禁入区：`capability-cohesion.js` / `propose.js` / `propose-cache.js` 逻辑；`atom-depend.js`；`flow-card-guide.js`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 6 湿测
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 21:25 · Cursor — 收工：BLOCKER 编辑页误判 maintain（回链 21:06 开工）
+
+- 完成：maintain `编辑` 不匹配导航复合 `编辑页/编辑页面/编辑界面`；真维护（`编辑字段`/`编辑基本信息`）仍计。闭环尾允许 other 后夹 locate/neutral。fill-step `保存概况` 不当 closer（对齐 `countPersistConfirms`）。未 bump cache，未改 Task 5 prompt。
+- 提交：`8a599873` 编辑页 maintain 假阳性 + pins；`8588f04d` 曾改 haystack（回退）；`a6d5e02e` 恢复 spec haystack + `保存(?!概况)` closer。开工 `8e203550`。
+- 验收：`characterize-capability-cohesion.mjs` **all passed**；`characterize-req-draft-traj.mjs` **OK 63**（含 `propose merges same-loop steps when LLM returns flowRef` 与 card-guided fallback）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**；eslint `capability-cohesion.js` 0 warning。
+- 遗留移交：Task 5+ prompt 一句 / samples / api-docs / 湿测 W1–W4。不维护 CHANGELOG
+
+## 2026-09-16 21:06 · Cursor — 开工：BLOCKER 编辑页误判 maintain
+
+- 进行中：`capability-cohesion.js` `detectOtherFamilies` / maintain 匹配不把导航复合「编辑页 / 编辑页面 / 编辑界面」计为 maintain（真维护如「编辑字段」仍计）；`characterize-capability-cohesion.mjs` 加 pin；`propose merges same-loop steps when LLM returns flowRef` 转绿。不 bump cache，不做 Task 5 prompt。
+- 范围：`src/services/req-draft-traj/capability-cohesion.js`、`scripts/characterization/characterize-capability-cohesion.mjs`、本协作日志
+- 禁入：`propose-cache.js`；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 5+
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 22:25 · Cursor — 收工：能力内聚结构硬闸 Task 4（回链 22:10 开工）
+
+- 完成：`characterize-req-draft-traj.mjs` pin 改为 `PROPOSE_CACHE_VERSION === 5`；`propose-cache.js` 4→5（注释 v5 = capability-cohesion + title-as-key reject）；`verify-all.sh` 在 `characterize-persist-boundary` 后注册 `characterize-capability-cohesion`。chore **`433f0b2c`**。开工声明 `3926a134`。
+- 验收：RED=`PROPOSE_CACHE_VERSION is 5` actual `4 !== 5`（未 bump 时）。GREEN：version pin ✓；`characterize-capability-cohesion.mjs` **all passed**（25 pins）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**；eslint 三 src 文件 0 warning。
+- **未全绿**：`characterize-req-draft-traj.mjs` 在 version pin 通过后于 `propose merges same-loop steps when LLM returns flowRef` 失败（`atoms.length` `0 !== 1`）。诊断：`进入编辑页` 因 maintain 族子串 `编辑` 被标 `other`，与 `维护概况` 构成两个 `other` → `multi_capability_task_draft`；fallback 同稿同样被拒。未改 `capability-cohesion.js` / `propose.js`（Task 4 禁入）。未改 prompt / samples / api-docs。
+- 遗留移交：Task 5+（prompt 一句 / samples / api-docs）前需处理该既有 flowRef 闭环节 pin 与 `编辑页` 假阳性；湿测 W1–W4 仍只在本地 LMY。不维护 CHANGELOG
+
+## 2026-09-16 22:10 · Cursor — 开工：能力内聚结构硬闸 Task 4（cache v5 + verify-all）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 4**（TDD：先改 `characterize-req-draft-traj.mjs` pin `PROPOSE_CACHE_VERSION === 5` RED actual 4 → bump `propose-cache.js` 4→5 GREEN → `verify-all.sh` 注册 `characterize-capability-cohesion`）。不改 prompt / samples / api-docs（Task 5+）。
+- 范围（可写集）：`scripts/characterization/characterize-req-draft-traj.mjs`（version pin 4→5）、`src/services/req-draft-traj/propose-cache.js`（`PROPOSE_CACHE_VERSION` + 注释）、`scripts/refactor/verify-all.sh`（persist-boundary 后注册 cohesion pin）、本协作日志
+- 禁入区：`capability-cohesion.js` / `propose.js` 逻辑；`atom-depend.js`；`flow-card-guide.js`；`scripts/prompts/**`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 5+ prompt / samples / api-docs / 湿测 W1–W4
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 21:55 · Cursor — 收工：能力内聚结构硬闸 Task 3（回链 21:40 开工）
+
+- 完成：`materializeLlmAtom` 在 `normalizeProduces`/`normalizeDataDependsOn` 之后、`assertAtomProvenance` 之前调用 `assertCapabilityCohesion`；`!ok` → `rejected: { atomKey, reason: cohesion.reason }`。`countPersistConfirms(cleanedDraft) > 1` 仍为 sanitize 后第一拒绝。未改 `validateAtomDependGraph`。feat **`2f223e6b`**。开工声明 `cdd5b8ce`。
+- 验收：RED=`C1 propose` atoms length `1 !== 0`（merged 仍入 atoms）+ `C4 propose` `1 !== 0`（title-as-key 仍入 atoms）；helper 全 ok；`C3 propose` 已 ok（`multi_persist_task_draft`）。GREEN：`characterize-capability-cohesion.mjs` **all passed**（25 pins：helper 21 + C1/C3/C4/C2 propose）；`characterize-persist-boundary.mjs` **all passed**；`characterize-atom-depend.mjs` **all passed**。`npx eslint src/services/req-draft-traj/propose.js` 0 warning。未 bump cache、未改 prompt。
+- 遗留移交：Task 4+（cache 4→5 + verify-all / prompt 一句 / api-docs / 湿测 W1–W4）。不维护 CHANGELOG
+
+## 2026-09-16 21:40 · Cursor — 开工：能力内聚结构硬闸 Task 3（materializeLlmAtom 接线 + C3）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 3**（TDD：propose-level C1/C3/C4/C2 pins RED → `materializeLlmAtom` 在 `normalizeProduces` 之后、`assertAtomProvenance` 之前调用 `assertCapabilityCohesion` GREEN）。`countPersistConfirms > 1` 保持 sanitize 后第一拒绝；不把 cohesion 放进 `validateAtomDependGraph`。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 propose-level pins）、`src/services/req-draft-traj/propose.js`（import `assertCapabilityCohesion` + `materializeLlmAtom` 接线）、本协作日志
+- 禁入区：`propose-cache.js`（Task 4 cache 4→5）；`atom-depend.js`；`flow-card-guide.js`；`scripts/prompts/**`；`verify-all.sh`；`src/dashboard/api-docs/**`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 4+ prompt / api-docs / samples
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 21:25 · Cursor — 收工：能力内聚结构硬闸 Task 2（回链 21:15 开工）
+
+- 完成：`synthesizeFallbackProduceKey`（空/`'  '`→`atom_output`，否则 `` `${trim}产物` ``）+ `assertCapabilityCohesion` 序列通过后 title-as-key（`length===1` 且 `produces[0]===trim(title)` → `produces_eq_title`；空 produces / title+另一 key 仍 ok）+ `propose.js` `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`（未豁免 fallback、未保留 `produces:[title]`）。feat **`d2c6bfbb`**。开工声明 `2dce38a0`。
+- 验收：RED=`C4 helper: produces exact title` `true !== false` + `synthesizeFallbackProduceKey` `undefined`≠`function`；C1/C2/C5/C6 仍 ok。GREEN：`characterize-capability-cohesion.mjs` **all passed**（21 pins）；`characterize-persist-boundary.mjs` **all passed**（含 fallback 三分写 + `multi_persist_task_draft`）；`characterize-atom-depend.mjs` **all passed**。`npx eslint` 两 src 文件 0 warning。未接线 `materializeLlmAtom`、未 bump cache、未改 prompt。
+- 遗留移交：Task 3+（`materializeLlmAtom` 顺序+C3 / cache 4→5 / prompt 一句 / verify-all / 湿测 W1–W4）。不维护 CHANGELOG
+
+## 2026-09-16 21:15 · Cursor — 开工：能力内聚结构硬闸 Task 2（C4 produces_eq_title + fallback synthesizer）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 2**（TDD：C4/synthesizer pins RED → `synthesizeFallbackProduceKey` + title-as-key 闸 GREEN → `fallbackDependFields` 改 `produces: [synthesizeFallbackProduceKey(title)]`）。不接线 `materializeLlmAtom` 硬闸、不 bump cache、不改 prompt。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（追加 C4+synthesizer pins）、`src/services/req-draft-traj/capability-cohesion.js`（synthesizer + `assertCapabilityCohesion` title-as-key）、`src/services/req-draft-traj/propose.js`（import + `fallbackDependFields` 仅改 produce key）、本协作日志
+- 禁入区：`propose-cache.js`；`atom-depend.js`；`flow-card-guide.js`；`materializeLlmAtom` 闸接线（Task 3）；`scripts/prompts/**`；`verify-all.sh`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 3+ cache bump / prompt / api-docs
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 21:05 · Cursor — 收工：能力内聚结构硬闸 Task 1（回链 20:55 开工）
+
+- 完成：helper `src/services/req-draft-traj/capability-cohesion.js`（parse / inspect / classify / sequence-only `assertCapabilityCohesion`）+ pins `scripts/characterization/characterize-capability-cohesion.mjs`。feat **`da1ed8f1`**。开工声明 `ff456d8b`。
+- 验收：`node scripts/characterization/characterize-capability-cohesion.mjs` **all passed**（17 pins：parse×3、C5 classify、classify×4、C1/C5 reject、C2/C6 pass、sequence×4、no scene literals）。RED 先为 `ERR_MODULE_NOT_FOUND`。`npx eslint src/services/req-draft-traj/capability-cohesion.js` 0 warning。reason 仅 `multi_capability_task_draft`；无 `synthesizeFallbackProduceKey`；无场景黑名单字面量。
+- 遗留移交：Task 2+（`produces_eq_title` / fallback `${title}产物` / propose 接线 / cache 4→5 / prompt / verify-all）。湿测 W1–W4 仍只在本地 LMY。不维护 CHANGELOG
+
+## 2026-09-16 20:55 · Cursor — 开工：能力内聚结构硬闸 Task 1（helper + C1/C5/C2/C6 pins）
+
+- 进行中：仅执行 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md` **Task 1**（TDD：characterization RED → helper GREEN）。`assertCapabilityCohesion` 本任务只做序列闸；`produces_eq_title` / `synthesizeFallbackProduceKey` 留给 Task 2。
+- 范围（可写集）：`scripts/characterization/characterize-capability-cohesion.mjs`（新建）、`src/services/req-draft-traj/capability-cohesion.js`（新建）、本协作日志
+- 禁入区：`propose.js` / `propose-cache.js` / `atom-depend.js` / `flow-card-guide.js`（只 import `isPersistBoundaryAction`）；`scripts/prompts/**`；`verify-all.sh`；规格正文；他线 OpenCode 20:03（`trajectory-meta-service.js` / `trajectory-text-extract.js`）；Task 2+ 接线与 cache bump
+- 方式：主会话 Inline TDD；子智能体不写本文件、不 commit
+
+## 2026-09-16 20:48 · Cursor — 收工：能力内聚结构硬闸实现计划（回链 20:40 开工）
+
+- 完成：计划 `docs/superpowers/plans/2026-09-16-capability-cohesion-structural-gate.md`（T1 helper+C1/C5/C2/C6 → T2 C4+fallback `${title}产物` → T3 `materializeLlmAtom` 顺序+C3 → T4 cache 4→5 + verify-all → T5 prompt 一句/samples/api-docs → T6 自检+C1 证伪+湿测 W1–W4 清单）。**未实现闸、未 bump cache、未改 src/prompt。**
+- 验收证据：计划覆盖 spec §4.1–§4.5 / §5 / §6 / §7.2–§7.4 / §8 C1–C6；reason 锁死 `multi_capability_task_draft` / `produces_eq_title`；`multi_persist_task_draft` 保持第一；无场景黑名单；无 TBD。开工声明 `9ac7c1fb`。
+- 遗留移交：下一会话按该计划 Subagent-Driven 或 Inline 实现；湿测 W1–W4 只在本地 LMY；勿与 OpenCode 20:03 轨迹提示词线文件集相交。不维护 CHANGELOG
 
 ## 2026-09-16 20:40 · Cursor — 开工：能力内聚结构硬闸实现计划（writing-plans）
 
@@ -1081,24 +991,6 @@
 - 禁入区：`src/**`（含 `req-draft-traj/**` / `flow-card-guide.js` / `propose.js` / `atom-depend.js` / `propose-cache.js`）；`scripts/prompts/**`；characterization；`scripts/refactor/verify-all.sh`；他线 OpenCode 20:03 在途（`trajectory-meta-service.js` / `trajectory-text-extract.js` / analyze-case-data pin）；生成链；SPA；`config/`
 - 方式：主会话 Inline；分支 `cursor/capability-cohesion-structural-gate-design-bb60` 从 `uara_V1.2` 起；不 bump cache、不改代码
 
-## 2026-09-16 20:10 · ZCode 引擎线 — 开工：actions 层改动盘点 → 同事引擎同步清单 → agent team 移植
-
-- 进行中：2026-09-16 20:10；验收=①产出「JS-gen actions 层改动 vs tansun_ui_engine 现状」同步清单（逐项：语义/来源 commit/引擎是否已有/是否需要同步）②清单中确认需同步且引擎侧适用的条目移植完成并提交
-- 范围：只读调研=JS-gen `docs/superpowers/agent-log.md`（991 行）+ engine 仓 `ui_execute/engine/actions/**` 现状盘点；实现=engine 仓 `ui_execute/engine/actions/**`（具体文件集待清单确定后在本条目追加）+ 本地测试件（不提交）+ 本文件
-- 禁入区：JS-gen 源码（只读）、engine 仓 config.py、push、SUT 真实数据变更；他线 WIP（`scripts/refactor/verify-all.sh` 等在途件不碰）
-- 方式：lead 设计；调研双子智能体并行（R1=挖 log、R2=引擎盘点，均只读不 commit）；实现子智能体按清单文件集不相交派发；主会话复核+验证后代提交
-
-## 2026-09-16 20:05 · ZCode 引擎线 — 收工：真机失败日志复盘四病灶最小修复（回链 18:45 开工）
-
-- 完成（4 commits，全为「先 RED pin 再最小实现」）：
-  - **D1** `3c1fc8ff`：`autofill_round.py` tssc 分支内嵌 `select_option` 结果过 `_unwrap_action_result`——根治 `run_form_assistant` 报 `Object of type ActionResult is not JSON serializable`（真机 4 次），顺带根治同因的级联不收敛（`_is_ok_result` 不认成功 → 已填 tssc 字段留 `still_empty` 反复重选 work=10/10、7/7）
-  - **D2** `711f9065`：`boundary_gates.maybe_record_picker_closed` 补 `clear_phase_section`——弹窗关闭即清被 stale 重试固化的弹窗瞬态区域（`客户放大镜选择器`），根治后续裸调 `click_save` 「from memory」在死区域找保存 → `err-save-button-not-found`；覆盖 4 个关闭出口，4 处 cue 消费者泄漏面一次收净
-  - **D3** `b00ec873`：`agent/service.py` 收尾门禁首次不过时按 ghost-prune 范式 DOM 实读纠正 task_list 后重跑 gate（新 helper `phase/pending_refresh.py`，只认「currentValue 非空」硬判据，空值/查无不动）+ 粘滞 `pending_fields:*` reason 按刷新后集合重生成（先于任何输出）——根治引入回填已生效仍被判过期 pending 的误判；`missing_success_token`/gate 本体一字未动（宁误拒不假绿不放宽）
-  - **D4** `b72e1150`：`base.py` 新增 `JS_FIELD_ITEM_PICK`（可见精确→隐藏精确→唯一包含→歧义标记，作用域 JS_GET_CONTAINER+可见 dialog/drawer 补扫，与动作体 `findFieldItem` 同源），`fill_engine.py` 两处探针与 `select_dispatch._JS_LIVE_TSSC` 换用——根治同一字段 fill 判「是 tssc」/select 判「不是」双判矛盾（探针 `[0]` 盲取落隐藏同名 tssc 节点的假阳性）；`tssc_multi_select.py` 未动
-- 验收：四个新/修订 pin 全部 RED 实证（D4 旧代码下 26 条断言失败）后 GREEN；复跑关联 pin 13 个（cascade/form-assistant/select-option-verify/phase-runtime/save-retry-scope/introduce-dialog-close/dual-save-section/ghost-pending-prune/budget-extend/fill-dispatch/fill-replay-engine/tssc-multi-select/form-engine-wiring）全绿；**全量 verify-all = 3 红（step-highlight/layer-tree/confirm-notification）与 19:20 条目基线完全一致，零新增红**；3 个新门禁已注册 verify-all。改动文件 py_compile 全过；D4 探针 JS 经 node --check 验语法（临时文件已删）
-- 方式与偏差声明：D3/D4 由 2 个子智能体并行实施（文件集互不相交、不 commit），主会话回收审查 diff/复跑 pin 后代提交；D4 偏差自报：`_js_snippets.py` 追加 1 行 barrel re-export（模块自述 re-exports every constant，沿 13cc5404 先例）
-- 遗留移交：①`select_tree.py` 尚有 3 处 `candidatesOf(...)[0]`（radio/tree 路径，本轮范围外；若同类假阳性复现可直接复用 `JS_FIELD_ITEM_PICK`）②budget extend（`service.py`）同用过期 pending 计步，本轮未动（`refresh_pending_from_dom` 可直接复用）③premature done 警告（`recorder_emitters.py`）仍按打开弹窗时的快照写——警告本身合理保留，粘滞由收尾 regen 清除 ④真机复验未做（四修均为离线修复+门禁；对公客户转正重跑需测试环境与数据，建议下次真机回归覆盖该流程）⑤不维护 CHANGELOG
-
 ## 2026-09-16 20:03 · OpenCode — 开工：阶段拆分提示词加固 + JS 侧业务数据判定对齐（承接 18:59/19:27 线）
 
 - 进行中：用户手动调整的提示词示例经核查**已丢失**（工作区 hash 与 HEAD 一致，VS Code 本地历史仅 `undoRedo` 条目）→ 由本次统一补做。六项：
@@ -1112,26 +1004,18 @@
 - 禁入区：`scripts/controller/actions/**`（含他线已收工的 `phase/classify.py`，本轮只读不改）、生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`、`scripts/prompts/**`、`scripts/refactor/verify-all.sh`（本轮不新增注册项，pin 落已有 cold 文件）、SPA 仓、`config/`
 - 方式：主会话 Inline；先补 RED pin 再最小实现；pin 覆盖必须保留的既有子串（`先搜索/查询再点击`、`不要为了凑数量而拆分`、`必须原样保留`、`禁止把具体名抹成`、`状态边界原则`、`禁止让下一阶段承担上一阶段未完成的动作`）；跑 verify-all 比对基线；不维护 CHANGELOG
 
-## 2026-09-16 19:34 · OpenCode — 合并处置声明：park 他线 ZCode 陈旧工作区 WIP 以解阻塞
-
-- 背景：`git push` 被拒（non-fast-forward）→ `git pull`/`git merge origin/uara_V1.2` 前发现工作区存在他线 ZCode 的**未提交**改动：一整份 `13cc5404`（字段 label 解析同族收敛）的**回滚**（含 `_js_snippets.py`、`fill_engine.py`、`js_snippets/{base,fill_core,scan_form,select_tree,misc}.py`、`select_dispatch.py`、`scripts/refactor/verify-all.sh`、删除 `characterize-field-label-resolution.py`）+ `config/.db-whitelist-seen` 运行态改动。
-- 判定：该回滚为**陈旧态**——origin 上 ZCode 自己的 5 个提交（`3c1fc8ff`→`06b758af`，18:53–19:01）建立在 `13cc5404` **未回滚**的基础上并继续扩展它（`b72e1150` 用 `JS_FIELD_ITEM_PICK` 替换旧探针、`characterize-field-label-resolution.py` +130 行），即工作区回滚从未进入任何提交且已被其推送态覆盖。
-- 处置：`git stash push -m "ZCode stale WIP: working-tree revert of 13cc5404 ..."` **完整保存**（`stash@{0}`，可 `git stash show -p` 查看/`git stash branch` 恢复），未删除、未 force；随后合并 origin，仅 `agent-log.md` 冲突，按「保留双方条目并排」解决（本条与 OpenCode 19:27/18:59 两条 + ZCode 20:05/18:45 及更早条目全部保留）。他线已提交代码文件一律以 origin 为准（`--theirs` 语义），未手改其内容。
-- 请 ZCode/Lead 复核：若该工作区回滚**并非**陈旧（另有意图），请从 `stash@{0}` 取回后再行合并。
-
 ## 2026-09-16 19:27 · OpenCode — 收工：录制两病灶修复（回链 18:59 开工）
 
 - 完成：**`953c4be4`**（4 文件 / +106 -22）——①`click_action_engine.click_element_by_index` 新增 `select_trigger_click`：dd_gate 对 `.el-select` 触发框返回 `kind:'trigger'`（排除 `.el-select-dropdown`/`.el-tree`/`.el-tree-node`/`.tree-popover`/`.el-tree-select__popper`/`.el-cascader__dropdown`/`.el-popover` 内的 popper 内容），并补 `target_kind=='form_select'` 兜底；命中即**点击照做但不录制、不 `remember_phase_operation_aliases`、不 `remember_trigger_button`**，返回 `transient-select-open` 提示；option/table-row/dropdown 仍原样硬拒 `use-select-option`。②索引点击「查询」时按 `re.sub(r'\s+','',btn_label)=='查询'` 调 `mark_query_clicked`（与 `click_button` 及回放侧 `mark_stc_flags_on_replay_ok` 对齐，消除录放不对称）。③`trajectory-meta-service.js` 阶段拆分提示词新增硬规则 `3.1 状态边界原则`（预期结果为「打开确认弹窗」的阶段必须含全部开窗动作；弹窗内按钮只归下一阶段；禁止下一阶段承担上一阶段未完成动作；不确定可达时「触发→确认」合并）。
 - 验收证据：① `characterize-search-then-click-guard`（**已在 verify-all 注册**）扩 pin：索引点击「查询」标记（含 `btn_label` 归一化字面量）+ 触发框分类/跳过录制/跳过记忆/`transient-select-open`/popper 排除 + dropdown 三 kind 仍拦；② `characterize-analyze-case-data.mjs` 加 `状态边界原则` + `禁止让下一阶段承担上一阶段未完成的动作` 两条 pin；**两者均 RED→GREEN**（`git stash push` 还原源码跑红、pop 后跑绿，实测输出已留档）；③ `verify-all` 全跑 = **4 红，与既有基线一致**（step-highlight / layer-tree / confirm-notification / network-capture；四者均不读本次改动文件——confirm-notification 读 `_misc.py`（HEAD 即红），network-capture 为便携 python 环境缺失）；④ `npx eslint src/services/trajectory/trajectory-meta-service.js` 0；pre-commit hook eslint 通过。
 - 遗留移交：①**`already-operated-this-phase` 仍会拦「填完筛选字段后再点查询」**（本次真机日志 step 11）——未放宽：放宽会引入重复「点击元素-查询」步，取舍留待 Lead；本次该 run 首行即目标行，且死锁解除后阶段 1 可自行走完。②**索引点击按表行选中仍不受 STC 守卫约束**（`click_element_by_index` 只在 tree node 上过守卫，`click_table_row_radio` 才无条件过）——语义路径被绕过时仍可记 `click_table_row_radio`，本次未改（避免误伤既有流）。③**pin 落位偏差**：新 characterization 按 cold/README 政策应放上级目录并注册 verify-all，但 `scripts/refactor/verify-all.sh` 属他线在途 WIP，故把 pin 并入**已注册**的 `cold/characterize-search-then-click-guard.py` 与既有 `cold/characterize-analyze-case-data.mjs`，未新增注册项。④生产须重启执行机侧 Python agent 进程生效（控制面 `trajectory-meta-service.js` 仅下次 analyze 生效）。⑤**合并处置**：push 被拒（远端已有 ZCode 06b758af 等 5 提交）→ 按 AGENTS.md 先 park 工作区他线 WIP 再合并（见下行），本条目与代码提交随合并提交一并推送。⑥不维护 CHANGELOG。
 
-## 2026-09-16 19:20 · ZCode 引擎线 — 收工：字段 label 解析同族收敛（回链 18:03 开工）
+## 2026-09-16 19:34 · OpenCode — 合并处置声明：park 他线 ZCode 陈旧工作区 WIP 以解阻塞
 
-- 完成：`13cc5404`（10 文件，+95/-71 级）。**单一来源** `js_snippets/base.py` 新增 `JS_FIELD_LABEL_NORM`（折叠空白/剥尾 `：:*`/剥首 `*`）与 `JS_FIELD_ITEM_CANDIDATES`（`(root,label,allowReverse) => el[]`，按 精确→包含→反向包含 排序返回）。**接线 7 个消费方**：`base.JS_LOCATOR`/`JS_SMART_LOCATOR`（录制 xpath 与 locator snap；可见性退化为对有序候选的过滤）、`select_tree.JS_CLICK_RADIO` 与 `JS_SELECT_TREE_OPTION`（两处循环）、`fill_core` Pass1/Pass2/scope 归一化 + `JS_CLEAR_FIELD_VALUE`（Pass2 仍跳精确项，只放宽不重试）、`scan_form.JS_CHECK_SINGLE_FIELD` 两遍、`misc.JS_CLICK_VERIFY_BUTTON`、`select_dispatch._JS_LIVE_TSSC` 与 `fill_engine` 两处 kind probe（精确优先使判定描述"真正会被操作的字段"，消除前缀兄弟无控件即短路的假阴性→select 走错分发）。**刻意不动**：按文案匹配选项/按钮/菜单/单元格（`replay_js` 菜单项、`fill_date` 面板项、`table_cell`、`icons`、`_misc`）；`scripts/prompts/**` 未改（本轮为行为对齐，非新语义）
-- 验收（四层）：①**生成物真机**——7 个 snippet `node --check` 全过；Playwright 活页面证 5 层级（候选序、`JS_LOCATOR`/`JS_SMART_LOCATOR` 落在 `*要素名称` 而非前缀兄弟、正向包含兜底、反向包含仅 opt-in、radio 点中精确组、验证按钮点中精确项）②**新门禁** `characterize-field-label-resolution.py`（源码 pin 全消费方 + 禁旧式字面量 + 活页面 5 断言），**双向证伪**：还原旧 `includes` 首中文面量→红、只变异标签取值来源（源码 pin 不覆盖）→活页面断言红，还原即绿 ③**verify-all**：3 红 = step-highlight / layer-tree / confirm-notification，**已用"源码还原到 HEAD + md5 守卫还原"对跑复现同形**（`FAILED (3)` / `1 FAILURE(S)` / `all markers present`）→ 非回归；network-capture 本轮由红转绿（环境）④同时把此前**未注册**的两个 cold 门禁 `characterize-prefix-label-{select,xpath}` 拉回门禁（verify-all 141 项）
-- 偏差声明（超出 18:03 开工声明文件集，事后自报）：①`_js_snippets.py` 仅补 barrel re-export（该模块自述"re-exports every constant"）②`js_snippets/misc.py` 的 `JS_CLICK_VERIFY_BUTTON` 亦属同族（按 label 定位字段→点按钮），在回收阶段发现并一并收敛
-- 遗留移交：①`characterization/cold/characterize-live-xpath-e2e.mjs` 内嵌 **JS_SMART_LOCATOR 手抄镜像**（未注册门禁，且其 pickControl 清单早已与实现漂移）——本轮未动，若复活该 fixture 须同步镜像 ②`scripts/smoke/result-protocol-live.py:89` 自带内联 kind 探测副本（smoke 豁免区）同样未同步 ③`base.py:157` placeholder 兜底仍为 `ph.includes(label) || normalizeFormLabel(ph) === want` 单次判断（末级兜底，未纳入本轮）④eslint 存量 25 warning 全在 .js（本次零 .js 改动，非本线引入）
-- 注：不维护 CHANGELOG
+- 背景：`git push` 被拒（non-fast-forward）→ `git pull`/`git merge origin/uara_V1.2` 前发现工作区存在他线 ZCode 的**未提交**改动：一整份 `13cc5404`（字段 label 解析同族收敛）的**回滚**（含 `_js_snippets.py`、`fill_engine.py`、`js_snippets/{base,fill_core,scan_form,select_tree,misc}.py`、`select_dispatch.py`、`scripts/refactor/verify-all.sh`、删除 `characterize-field-label-resolution.py`）+ `config/.db-whitelist-seen` 运行态改动。
+- 判定：该回滚为**陈旧态**——origin 上 ZCode 自己的 5 个提交（`3c1fc8ff`→`06b758af`，18:53–19:01）建立在 `13cc5404` **未回滚**的基础上并继续扩展它（`b72e1150` 用 `JS_FIELD_ITEM_PICK` 替换旧探针、`characterize-field-label-resolution.py` +130 行），即工作区回滚从未进入任何提交且已被其推送态覆盖。
+- 处置：`git stash push -m "ZCode stale WIP: working-tree revert of 13cc5404 ..."` **完整保存**（`stash@{0}`，可 `git stash show -p` 查看/`git stash branch` 恢复），未删除、未 force；随后合并 origin，仅 `agent-log.md` 冲突，按「保留双方条目并排」解决（本条与 OpenCode 19:27/18:59 两条 + ZCode 20:05/18:45 及更早条目全部保留）。他线已提交代码文件一律以 origin 为准（`--theirs` 语义），未手改其内容。
+- 请 ZCode/Lead 复核：若该工作区回滚**并非**陈旧（另有意图），请从 `stash@{0}` 取回后再行合并。
 
 ## 2026-09-16 18:59 · OpenCode — 开工：录制两病灶（el-select 触发点击落垃圾步 / 查询按钮未标记致 STC 死锁跨阶段串步）
 
@@ -1142,6 +1026,17 @@
 - 禁入区：他线 ZCode 在途 WIP（`scripts/controller/actions/_js_snippets.py`、`fill_engine.py`、`js_snippets/{base,fill_core,scan_form,select_tree,misc}.py`、`select_dispatch.py`、`scripts/refactor/verify-all.sh`、`scripts/characterization/characterize-field-label-resolution.py`、`config/`）；生成链 `_locator_helpers_js.py` / `src/cdp/page-locator-helpers.js`；`scripts/prompts/**`；SPA 仓
 - 方式：主会话 Inline；先补 RED cold pin 再最小实现；跑 verify-all 与既有基线比对；**不新增 verify-all 注册项**（把 pin 落在已注册的 cold 文件里，避免与他线 `verify-all.sh` WIP 相交）
 
+## 2026-09-16 20:05 · ZCode 引擎线 — 收工：真机失败日志复盘四病灶最小修复（回链 18:45 开工）
+
+- 完成（4 commits，全为「先 RED pin 再最小实现」）：
+  - **D1** `3c1fc8ff`：`autofill_round.py` tssc 分支内嵌 `select_option` 结果过 `_unwrap_action_result`——根治 `run_form_assistant` 报 `Object of type ActionResult is not JSON serializable`（真机 4 次），顺带根治同因的级联不收敛（`_is_ok_result` 不认成功 → 已填 tssc 字段留 `still_empty` 反复重选 work=10/10、7/7）
+  - **D2** `711f9065`：`boundary_gates.maybe_record_picker_closed` 补 `clear_phase_section`——弹窗关闭即清被 stale 重试固化的弹窗瞬态区域（`客户放大镜选择器`），根治后续裸调 `click_save` 「from memory」在死区域找保存 → `err-save-button-not-found`；覆盖 4 个关闭出口，4 处 cue 消费者泄漏面一次收净
+  - **D3** `b00ec873`：`agent/service.py` 收尾门禁首次不过时按 ghost-prune 范式 DOM 实读纠正 task_list 后重跑 gate（新 helper `phase/pending_refresh.py`，只认「currentValue 非空」硬判据，空值/查无不动）+ 粘滞 `pending_fields:*` reason 按刷新后集合重生成（先于任何输出）——根治引入回填已生效仍被判过期 pending 的误判；`missing_success_token`/gate 本体一字未动（宁误拒不假绿不放宽）
+  - **D4** `b72e1150`：`base.py` 新增 `JS_FIELD_ITEM_PICK`（可见精确→隐藏精确→唯一包含→歧义标记，作用域 JS_GET_CONTAINER+可见 dialog/drawer 补扫，与动作体 `findFieldItem` 同源），`fill_engine.py` 两处探针与 `select_dispatch._JS_LIVE_TSSC` 换用——根治同一字段 fill 判「是 tssc」/select 判「不是」双判矛盾（探针 `[0]` 盲取落隐藏同名 tssc 节点的假阳性）；`tssc_multi_select.py` 未动
+- 验收：四个新/修订 pin 全部 RED 实证（D4 旧代码下 26 条断言失败）后 GREEN；复跑关联 pin 13 个（cascade/form-assistant/select-option-verify/phase-runtime/save-retry-scope/introduce-dialog-close/dual-save-section/ghost-pending-prune/budget-extend/fill-dispatch/fill-replay-engine/tssc-multi-select/form-engine-wiring）全绿；**全量 verify-all = 3 红（step-highlight/layer-tree/confirm-notification）与 19:20 条目基线完全一致，零新增红**；3 个新门禁已注册 verify-all。改动文件 py_compile 全过；D4 探针 JS 经 node --check 验语法（临时文件已删）
+- 方式与偏差声明：D3/D4 由 2 个子智能体并行实施（文件集互不相交、不 commit），主会话回收审查 diff/复跑 pin 后代提交；D4 偏差自报：`_js_snippets.py` 追加 1 行 barrel re-export（模块自述 re-exports every constant，沿 13cc5404 先例）
+- 遗留移交：①`select_tree.py` 尚有 3 处 `candidatesOf(...)[0]`（radio/tree 路径，本轮范围外；若同类假阳性复现可直接复用 `JS_FIELD_ITEM_PICK`）②budget extend（`service.py`）同用过期 pending 计步，本轮未动（`refresh_pending_from_dom` 可直接复用）③premature done 警告（`recorder_emitters.py`）仍按打开弹窗时的快照写——警告本身合理保留，粘滞由收尾 regen 清除 ④真机复验未做（四修均为离线修复+门禁；对公客户转正重跑需测试环境与数据，建议下次真机回归覆盖该流程）⑤不维护 CHANGELOG
+
 ## 2026-09-16 18:45 · ZCode 引擎线 — 开工：真机失败日志复盘四病灶最小修复（序列化炸/作用域污染/过期pending/tssc探针矛盾）
 
 - 进行中：真机失败日志（对公客户转正，桌面 log.txt 574 行）四路根因已定位，按最小修复实施：**D1** `autofill_round.py` tssc 分支内嵌 `select_option` 成功返回 `ActionResult` 未 unwrap → `autofill_pending.py` `json.dumps` 炸（4 次）+ `_is_ok_result` 不认成功致级联同批 tssc 反复重选不收敛；修=结果过 `_unwrap_action_result`（2 行）。**D2** `phase/boundary_gates.py` `maybe_record_picker_closed` 弹窗关闭不清 `_phase_section` 粘性记忆，stale 重试（`form_save.py:233`）把弹窗瞬态区域固化 → 弹窗关后裸调 `click_save` 在死区域找「保存」not-found；修=关闭钩子补 `clear_phase_section`（1 行）。**D4** `base.py`/`fill_engine.py` ×2/`select_dispatch.py` 三处 kind 探针 `candidatesOf(...)[0]` 盲取（无可见性偏好）与动作侧 `tssc_multi_select.findFieldItem` 可见分桶解析不一致 → 同一字段 fill 判「是 tssc」/select 判「不是」互相矛盾；修=抽共享可见分桶 pick 替换三处 `[0]`（解析失败/歧义=未知走正常流程），`characterize-field-label-resolution.py` 的 `[0]` 字面量 pin 同 commit 修订。**D3** `agent/service.py` 收尾门禁纯内存读 task_list、引入回填只记 evidence 不 `mark_done`、quality reason 粘滞只增 → 过期 pending 误判 QUALITY FAIL；修=门禁不过时按 `JS_CHECK_SINGLE_FIELD` DOM 实读纠正 task_list 再重跑 gate（复用已 pin 的 ghost-prune 范式）+ 粘滞 `pending_fields:` reason 按刷新后集合重生成；`missing_success_token` 判定不动（宁误拒不假绿不放宽）
@@ -1149,19 +1044,13 @@
 - 禁入区：`js_snippets/tssc_multi_select.py`（b3339e2a 已验动作语义，D4 不改它）；`phase/intent_gates.py`/`section_scope.py`/`form_save.py`/`models/task.py`/`fill_dispatch.py`/`select_engine.py`（只 import 不改）；未跟踪他线 WIP `scripts/characterization/characterize-phase-done-validate.py`；生成链 `_locator_helpers_js.py`/`src/cdp/page-locator-helpers.js`；`scripts/prompts/**`；`src/**`；SPA 仓；`config/`
 - 方式：主线程内联 D1/D2（先 RED pin 再最小实现）；D4/D3 派 2 个子智能体并行（文件集互不相交，子智能体不 commit 不写 log，主会话代声明、回收核验语法/pin/越界后代提交）；新 pin 由主线程注册 verify-all；终验全量 verify-all 与基线比对（基线=HEAD 3 红：step-highlight/layer-tree/confirm-notification，见 19:20 收工条目）
 
-## 2026-09-16 18:20 · Cursor — 收工：产品树脏后缀 SDD Task 1–5（回链 17:12 开工）
+## 2026-09-16 19:20 · ZCode 引擎线 — 收工：字段 label 解析同族收敛（回链 18:03 开工）
 
-- 完成：`55f3a622` 清洗函数保留 `[V-…]`、剥 `(N)`/尾部装饰 `-` + DOM 内层 span；`550a643b` 录制 snap/manual/AI/CDP 落库净文本；`7c13b820` 回放 `stripVolatile` + select_tree/tree_picker 双侧 strip；`a1e00c22`+`1ced5870` 推送 `buildBusinessObjectName` 门控清洗 + JSDoc
-- 验收：`characterize-tree-node-text` / `characterize-tree-text-export` / `characterize-replay-click-fuzzy-nav` OK；Tasks 1–4 子审均 Approved；Task 5 真机湿测 deferred（Playwright 仅 about:blank），冷 fixture 覆盖 Spec §5
-- 遗留移交：有登录态产品树页时做一次最小 evaluate 湿测（勿整包注入 helpers）；不 migrate 历史 DB；不维护 CHANGELOG
-
-## 2026-09-16 18:03 · ZCode 引擎线 — 开工：字段 label 解析同族收敛（归一化 + 精确优先）
-
-- 进行中：接 10:52 收工的 tssc 病灶（`b3339e2a`），把**同族**的「按 label 定位字段」一并对齐到仓库既有规范——`select_trigger._tryItems` 与 `characterize-prefix-label-select`/`characterize-prefix-label-xpath` 已确立的「归一化（折叠空白/剥尾 `：:*`/剥首 `*`）→ 精确优先 → 首个 `includes` 兜底」。现存不合规点：`select_tree.py`（radio 与 tree select 仍用 `l === label || l.includes(label)` 首中即返）、`base.py`（`JS_LOCATOR` 首个 includes 且未归一化；`JS_SMART_LOCATOR` 部分匹配 last-wins）、`fill_core.py`（Pass1/Pass2/scope/clear 未归一化）、`scan_form.py`（pass1 裸等值）、`select_dispatch.py`（`_JS_LIVE_TSSC` 首中即返 → 同族字段非 tssc 时假阴性）、`fill_engine.py`（两处重复 kind probe 同形，假阴性致 select 走错分发）。**只治「按 label 定位字段」；不动按文案匹配选项/按钮/菜单/单元格的路径**
-- 范围（可写集）：`scripts/controller/actions/js_snippets/{base,select_tree,fill_core,scan_form}.py`、`scripts/controller/actions/{select_dispatch,fill_engine}.py`、新 `scripts/characterization/characterize-field-label-resolution.py`、`scripts/refactor/verify-all.sh`、本协作日志
-- 禁入区：`scripts/controller/actions/js_snippets/_locator_helpers_js.py` 与 `src/cdp/page-locator-helpers.js`（生成链，勿手改）；`js_snippets/tssc_multi_select.py`（已收工）；`scripts/prompts/**`（本轮纯对齐，不改提示词）；他线 `replay-batch-runner.js`/`trajectory-session-replay.js`（OpenCode 17:52 在途）、`src/services/req-draft-traj/**`、`src/services/trajectory/form-structure-heal.js`、`product_library.json`、`config/` WIP、SPA 仓
-- 方式：主会话先落共享片段 `JS_FIELD_ITEM_PICK`（单一写者，避免并行冲突）→ 3 个子智能体并行改**互不相交**文件集（子智能体不 commit、不写 agent-log，主会话代声明代提交）→ 主会话回收核对语法/lint/越界 + 新增 characterization + verify-all 基线比对
-- 说明：本轮为**行为对齐**（精确命中即调用方本意），不引入新的报错语义
+- 完成：`13cc5404`（10 文件，+95/-71 级）。**单一来源** `js_snippets/base.py` 新增 `JS_FIELD_LABEL_NORM`（折叠空白/剥尾 `：:*`/剥首 `*`）与 `JS_FIELD_ITEM_CANDIDATES`（`(root,label,allowReverse) => el[]`，按 精确→包含→反向包含 排序返回）。**接线 7 个消费方**：`base.JS_LOCATOR`/`JS_SMART_LOCATOR`（录制 xpath 与 locator snap；可见性退化为对有序候选的过滤）、`select_tree.JS_CLICK_RADIO` 与 `JS_SELECT_TREE_OPTION`（两处循环）、`fill_core` Pass1/Pass2/scope 归一化 + `JS_CLEAR_FIELD_VALUE`（Pass2 仍跳精确项，只放宽不重试）、`scan_form.JS_CHECK_SINGLE_FIELD` 两遍、`misc.JS_CLICK_VERIFY_BUTTON`、`select_dispatch._JS_LIVE_TSSC` 与 `fill_engine` 两处 kind probe（精确优先使判定描述"真正会被操作的字段"，消除前缀兄弟无控件即短路的假阴性→select 走错分发）。**刻意不动**：按文案匹配选项/按钮/菜单/单元格（`replay_js` 菜单项、`fill_date` 面板项、`table_cell`、`icons`、`_misc`）；`scripts/prompts/**` 未改（本轮为行为对齐，非新语义）
+- 验收（四层）：①**生成物真机**——7 个 snippet `node --check` 全过；Playwright 活页面证 5 层级（候选序、`JS_LOCATOR`/`JS_SMART_LOCATOR` 落在 `*要素名称` 而非前缀兄弟、正向包含兜底、反向包含仅 opt-in、radio 点中精确组、验证按钮点中精确项）②**新门禁** `characterize-field-label-resolution.py`（源码 pin 全消费方 + 禁旧式字面量 + 活页面 5 断言），**双向证伪**：还原旧 `includes` 首中文面量→红、只变异标签取值来源（源码 pin 不覆盖）→活页面断言红，还原即绿 ③**verify-all**：3 红 = step-highlight / layer-tree / confirm-notification，**已用"源码还原到 HEAD + md5 守卫还原"对跑复现同形**（`FAILED (3)` / `1 FAILURE(S)` / `all markers present`）→ 非回归；network-capture 本轮由红转绿（环境）④同时把此前**未注册**的两个 cold 门禁 `characterize-prefix-label-{select,xpath}` 拉回门禁（verify-all 141 项）
+- 偏差声明（超出 18:03 开工声明文件集，事后自报）：①`_js_snippets.py` 仅补 barrel re-export（该模块自述"re-exports every constant"）②`js_snippets/misc.py` 的 `JS_CLICK_VERIFY_BUTTON` 亦属同族（按 label 定位字段→点按钮），在回收阶段发现并一并收敛
+- 遗留移交：①`characterization/cold/characterize-live-xpath-e2e.mjs` 内嵌 **JS_SMART_LOCATOR 手抄镜像**（未注册门禁，且其 pickControl 清单早已与实现漂移）——本轮未动，若复活该 fixture 须同步镜像 ②`scripts/smoke/result-protocol-live.py:89` 自带内联 kind 探测副本（smoke 豁免区）同样未同步 ③`base.py:157` placeholder 兜底仍为 `ph.includes(label) || normalizeFormLabel(ph) === want` 单次判断（末级兜底，未纳入本轮）④eslint 存量 25 warning 全在 .js（本次零 .js 改动，非本线引入）
+- 注：不维护 CHANGELOG
 
 ## 2026-09-16 17:59 · OpenCode — 收工：回放汇总步数把自动注入的 meta 检查点也计入（回链 17:52 开工）
 
@@ -1171,12 +1060,26 @@
 - 用户口径确认：前端「失败步保持勾选 / 成功步取消勾选」为预期形态——本改纯后端计数，不动 `replay:step`，勾选逻辑不受影响；meta 检查点成功后不再让提示多 1 步，失败时仍会「成功4，失败1」提示（用户已确认接受）
 - 遗留移交：本地后端（交易 830 所属）重启后生效；未改 SPA 仓；未改 Type B 安全性策略；不维护 CHANGELOG
 
+## 2026-09-16 18:03 · ZCode 引擎线 — 开工：字段 label 解析同族收敛（归一化 + 精确优先）
+
+- 进行中：接 10:52 收工的 tssc 病灶（`b3339e2a`），把**同族**的「按 label 定位字段」一并对齐到仓库既有规范——`select_trigger._tryItems` 与 `characterize-prefix-label-select`/`characterize-prefix-label-xpath` 已确立的「归一化（折叠空白/剥尾 `：:*`/剥首 `*`）→ 精确优先 → 首个 `includes` 兜底」。现存不合规点：`select_tree.py`（radio 与 tree select 仍用 `l === label || l.includes(label)` 首中即返）、`base.py`（`JS_LOCATOR` 首个 includes 且未归一化；`JS_SMART_LOCATOR` 部分匹配 last-wins）、`fill_core.py`（Pass1/Pass2/scope/clear 未归一化）、`scan_form.py`（pass1 裸等值）、`select_dispatch.py`（`_JS_LIVE_TSSC` 首中即返 → 同族字段非 tssc 时假阴性）、`fill_engine.py`（两处重复 kind probe 同形，假阴性致 select 走错分发）。**只治「按 label 定位字段」；不动按文案匹配选项/按钮/菜单/单元格的路径**
+- 范围（可写集）：`scripts/controller/actions/js_snippets/{base,select_tree,fill_core,scan_form}.py`、`scripts/controller/actions/{select_dispatch,fill_engine}.py`、新 `scripts/characterization/characterize-field-label-resolution.py`、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：`scripts/controller/actions/js_snippets/_locator_helpers_js.py` 与 `src/cdp/page-locator-helpers.js`（生成链，勿手改）；`js_snippets/tssc_multi_select.py`（已收工）；`scripts/prompts/**`（本轮纯对齐，不改提示词）；他线 `replay-batch-runner.js`/`trajectory-session-replay.js`（OpenCode 17:52 在途）、`src/services/req-draft-traj/**`、`src/services/trajectory/form-structure-heal.js`、`product_library.json`、`config/` WIP、SPA 仓
+- 方式：主会话先落共享片段 `JS_FIELD_ITEM_PICK`（单一写者，避免并行冲突）→ 3 个子智能体并行改**互不相交**文件集（子智能体不 commit、不写 agent-log，主会话代声明代提交）→ 主会话回收核对语法/lint/越界 + 新增 characterization + verify-all 基线比对
+- 说明：本轮为**行为对齐**（精确命中即调用方本意），不引入新的报错语义
+
 ## 2026-09-16 17:52 · OpenCode — 开工：回放汇总步数把自动注入的 meta 检查点也计入
 
 - 进行中：只勾选 4 步却提示「回放完成 5 步」——根因=`prepareReplayBatch` 自动补入选中区间内的 meta 检查点（`save_form_snapshot`）进 `actions`/`orderedStepIds`，`runReplayBatch` 的 `if (typeB.ok) successCount += 1` 与 `buildPayload` 的 `count/ok/failed` 把它算作业务步；FE 用 WS `replay:finished.successCount` 显示「回放完成 N 步」（`useRecordingStudio.ts:726-741`）。修向=汇总只计业务步（与 `trajectory.js` 文档「stepCount 亦只计业务步骤」一致），meta 检查点的成功/失败不计入用户面计数
 - 范围：`src/services/trajectory/replay-batch-runner.js`、`src/services/trajectory/trajectory-session-replay.js`（如 202 步清单需对齐）、characterization pin、本协作日志
 - 禁入区：SPA 仓（`ui-auto-recording-agent-vue`）；他线 atom-depend/propose、cdp locator text、tree-node-dirty-suffix；`config/` WIP；不改 Type B 安全性策略与 `assessFormStructureDiffSafety`
 - 方式：主会话 Inline（先 RED pin 再最小实现）；跑 verify-all；分支 `uara_V1.2`
+
+## 2026-09-16 18:20 · Cursor — 收工：产品树脏后缀 SDD Task 1–5（回链 17:12 开工）
+
+- 完成：`55f3a622` 清洗函数保留 `[V-…]`、剥 `(N)`/尾部装饰 `-` + DOM 内层 span；`550a643b` 录制 snap/manual/AI/CDP 落库净文本；`7c13b820` 回放 `stripVolatile` + select_tree/tree_picker 双侧 strip；`a1e00c22`+`1ced5870` 推送 `buildBusinessObjectName` 门控清洗 + JSDoc
+- 验收：`characterize-tree-node-text` / `characterize-tree-text-export` / `characterize-replay-click-fuzzy-nav` OK；Tasks 1–4 子审均 Approved；Task 5 真机湿测 deferred（Playwright 仅 about:blank），冷 fixture 覆盖 Spec §5
+- 遗留移交：有登录态产品树页时做一次最小 evaluate 湿测（勿整包注入 helpers）；不 migrate 历史 DB；不维护 CHANGELOG
 
 ## 2026-09-16 17:45 · Cursor — 收工：atomize XML 合同 + missing_depend_fields 硬拒（回链 17:29 开工）
 
@@ -1286,6 +1189,86 @@
 - 禁入区：SPA 仓；他线 atom-depend / rect_norm；不手改 `_locator_helpers_js.py`（若改 helpers 源则走 gen）；`config/` WIP
 - 方式：SDD 终审 fix 子代理；主会话验收后 commit + push
 
+## 2026-09-16 12:32 · Cursor — 收工：Task 4 spec 交叉引用；原子拆分边界计划 T1–T4 完成（回链 12:31 开工）
+
+- 完成：2026-09-07 §3 与 2026-09-09 单卡闭环交叉引用；2026-09-15 状态 → `已审阅；实现按 2026-09-16 plan（PR #37）`
+- 验收：`characterize-atom-depend` **8/8 all passed**；`characterize-atom-keydata` **all passed**
+- 计划：`2026-09-16-atomic-draft-tx-split-boundary.md` Task 1–4 均已落地（helper / propose 接线 / prompt+样例 / spec 交叉引用），PR #37
+- 遗留移交：无本计划内项；不维护 CHANGELOG
+
+## 2026-09-16 12:31 · Cursor — 开工：Task 4 spec 交叉引用 + 计划收口
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 4**（2026-09-07 §3 / 2026-09-09 单卡闭环交叉引用；2026-09-15 状态翻为已审阅/实现中；characterize 复核）
+- 范围：`docs/superpowers/specs/2026-09-07-req-to-draft-traj-design.md`、`docs/superpowers/specs/2026-09-09-flow-card-guided-propose-design.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`、本协作日志
+- 禁入区：`src/**`、atomize prompt、产品树强制拆、one-confirm-per-atom 硬闸、他线 field_slot xpath、`config/` WIP
+- 方式：主会话；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37；本任务为计划末项
+
+## 2026-09-16 12:29 · Cursor — 收工：Task 3 atomize prompt 拆分边界 + 样例（回链 12:28 开工）
+
+- 完成：commit **`a334499a`** `docs(prompt): atomize split by produces/dataDependsOn bounds`
+- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`
+- 验收：JSON 例含 `produces`/`dataDependsOn`；「拆分边界」十条入 prompt；flowCards 改为参考且依赖规则优先；禁止 #504 造上游与场景清单；样例写明依赖图≠树层教条。原 prompt 无「产品树每层必拆」专项，无需删除。
+- 遗留移交：Task 4 spec 交叉引用未做
+
+## 2026-09-16 12:28 · Cursor — 开工：Task 3 atomize prompt 拆分边界 + 样例
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 3 only**（prompt 加 `produces`/`dataDependsOn` +「拆分边界」十条；样例抽象 #675/#676/#678 与 #504 反例）
+- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、本协作日志
+- 禁入区：Task 4 spec 交叉引用；`propose.js` / `atom-depend.js`；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37
+
+## 2026-09-16 12:30 · Cursor — 收工：Task 2 propose.js 接线 produces/dataDependsOn（回链 12:26 开工）
+
+- 完成：commit **`fd18fc6a`** `feat(propose): attach produces/dataDependsOn and hard-gate depend graph`
+- 范围：`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`（cache 写入 `warnings`）、`scripts/characterization/characterize-atom-depend.mjs` 源码 pin
+- 验收：characterize-atom-depend **8/8 ok / all passed**（pin 先 RED 缺 import，后 GREEN）；characterize-atom-keydata all passed；characterize-req-draft-traj **OK 63**（含 `multi_write_atom`）；eslint 三文件 0
+- 遗留移交：Task 3–4（atomize prompt、samples、spec 交叉引用）未做
+
+## 2026-09-16 12:26 · Cursor — 开工：Task 2 propose.js 接线 produces/dataDependsOn
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 2 only**（TDD：characterize 源码 pin → `propose.js` 接线 → cache/return `warnings`）
+- 范围：`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`（warnings 写入 cache 所需）、`scripts/characterization/characterize-atom-depend.mjs`、本协作日志
+- 禁入区：atomize prompt / Task 3–4 / spec 交叉引用；产品树关键词强制拆；one-confirm-per-atom 硬闸；不改 `multi_write_atom` / flow-card 闭环；他线 field_slot xpath；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话 Inline TDD；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37
+
+## 2026-09-16 12:25 · Cursor — 收工：Task 1 atom-depend 图校验（回链 12:20 开工）
+
+- 完成：commit **`4b782ff6`** `feat(req-draft-traj): validate atom produces/dataDependsOn graph`
+- 范围：`src/services/req-draft-traj/atom-depend.js`、`scripts/characterization/characterize-atom-depend.mjs`、`scripts/refactor/verify-all.sh`（紧随 `characterize-atom-keydata`）
+- 验收：characterize-atom-depend **7/7 ok / all passed**（先 RED `ERR_MODULE_NOT_FOUND`，后 GREEN）；硬拒 `self_produce_depend` / `dangling_data_depend`；警告 `missing_depend_fields`；被拒 atom 不贡献 produces
+- 遗留移交：Task 2–4（`propose.js` 接线、atomize prompt、spec 交叉引用）未做，按计划下一切
+
+## 2026-09-16 12:20 · Cursor — 开工：Task 1 atom-depend 图校验（纯 helper）
+
+- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 1 only**（TDD：characterize → `atom-depend.js` → 接入 verify-all）
+- 范围：`scripts/characterization/characterize-atom-depend.mjs`、`src/services/req-draft-traj/atom-depend.js`、`scripts/refactor/verify-all.sh`、本协作日志
+- 禁入区：`propose.js` / atomize prompt / Task 2–4；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath（`src/cdp/page-locator-helpers.js` / locator-builders / `scripts/manual_recorder/**`）；白名单/发版 `tmp/cmds`；`config/` WIP
+- 方式：主会话 Inline TDD；子智能体不 commit
+
+> **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
+
+## 2026-09-16 14:xx · OpenCode — 收工：修复 tmp/cmds 后端发版 CMD 闪退（回链本次开工）
+
+- 根因：CMD 的 Git Bash 缺失提示放在括号块内，文本中的未转义 `1)`/`2)` 会被 CMD 预解析为语法错误；即使当前 `D:\Software\Git\bin\bash.exe` 存在且路径已解析，脚本仍在上传前闪退。
+- 完成：本机 `tmp/cmds/release-backend.cmd` 改为从 `git --exec-path` 推导非标准 Git for Windows 安装根目录，并用跳转式错误提示规避括号块预解析；启动时显示仓库根目录与实际 Bash 路径。
+- 验收：真实 `release-backend.cmd check` 已通过 Git Bash 探测，打印 `D:\Software\Git\bin\bash.exe`，以 `20260916-140054` 成功完成打包并生成 `dist/JS-gen-control-plane-20260916-140054.tar.gz`（370 项）；`check` 模式按设计跳过 SCP/SSH，未改服务器。
+- 使用：双击 `tmp/cmds/release-backend.cmd` 即执行完整发版；仅需本地验证时从 CMD 运行 `tmp\cmds\release-backend.cmd check`。本机忽略工具不入库；既有 `config/.db-whitelist-seen` 未触碰。
+
+## 2026-09-16 11:xx · OpenCode — 开工：修复 tmp/cmds 后端发版 CMD 闪退
+
+- 进行中：排查 `tmp/cmds/release-backend.cmd` 双击后窗口闪退且未上传部署的问题，复现 CMD 执行并修复新位置的启动/路径/依赖检测。
+- 范围：仅本机忽略文件 `tmp/cmds/release-backend.cmd`、本协作日志；只读参考仓库根目录共享 `pack-control-plane.sh` 与 `release-backend-remote.sh`。
+- 禁入区：共享发布 shell 脚本、`src/`、`config/`、`migrations/`、线上发布目录和其他会话 WIP；不执行真实上传、迁移、重启或回滚。
+- 方式：以 CMD 包装运行捕获错误，验证根目录与 Git Bash 发现逻辑；修复后运行到安全的打包前确认边界，确保失败窗口保留并输出可诊断错误。
+
+## 2026-09-16 14:21 · ZCode — 收工：推送坐标归一化修复三件套落地（回链 14:11 开工）
+
+- 完成：**修复 1**（录制侧根治，`7f49d186`）state.py 加 `_CURRENT_PAGE_DIMS` 直通 + service.py wrapper 动作前注入 before_dims + `_stamp_rect_norm` 页面路径先读直通再回落注册表 + after-action 注册 meta 补 contentWidth/Height——三路径行为证明（直通/注册表/跳过）全过。**修复 2+3**（导出侧补救存量，`fba8084f`）截图条目带 `_shotW/_shotH`（page=meta contentWidth/Height、popup=meta 或 rect 宽高、旧链路弹窗=rect 宽高）+ properties 像素回退除以分母归一化（计 normalizedRects）+ 内部字段 dry-run/wire 双剥除 + 两 pin 期望更新
+- 验收：**verify-all 基线 4 红→3 红**（export-v3 存量红真因=traj 33 已从库删除 rows=0，pin 加 SKIP 守卫转绿；余 3 红均他线数据漂移已登记）；**真数据审计**（`tmp/rect-audit-post.mjs`，30 条可推轨迹全量走路由等价数据流）：337 ele props 归一化 156 / 空 113 / **仍像素 68——全部落在 823/824/829/835 这批无任何 screenshot 行的轨迹**（legacy 兜底链无分母，按守卫设计保留像素，除法会造假数据）；828（有截图）实证 normalizedRects=4 全绿
+- 事故与处置：中途 `git stash pop "stash@{1}"` 误弹他线 sovereignty WIP——**因冲突 pop 未消费、stash 条目保留无损**；已将误入工作区的 15 个他线文件精确还原 HEAD（内容仍在 stash@{0}，未丢未改），自己 7 文件按名弹回。教训再证：stash 必须带 message、pop 必须指名核对条目归属
+- 遗留移交：68 步像素=「轨迹无截图行」历史数据（录于 page_level 事件链上线前），要归一化需重录或回填截图行——建议不做（像素语义正确）；**生产 4097 重启后生效**（录制侧+导出侧都要）；伙伴侧无需改（收到的坐标将统一为 0~1）
+- 提交本文件顺带携带他线条目：无（14:30/14:33 归档条目为并行会话独立提交）
+
 ## 2026-09-16 14:33 · ZCode — 收工：同目录旧归档移除完成（回链 14:30 开工）
 
 - 完成：`docs/superpowers/` 下 09-05/09-06 两份归档原件已 `git rm`，`archive/logs/` 副本入库——git 识别为 100% 纯改名（`3d89dc67`，零内容改动），历史保留；同目录现无散置归档文件，三批归档（05/06/11）全部集中于 `docs/superpowers/archive/logs/`
@@ -1306,14 +1289,6 @@
 - 事件说明（并行会话请知悉）：14:16 我提交开工声明后、执行切分前，工作区 agent-log.md 被某并行会话写入**带 git 冲突标记的中间态**（裸 `=======`、合约主权 Task 1-7 块重复、2 条目被顶掉）；我的首次 sed 提取受其污染。已从干净基准 `28535be4` 确定性重建两个文件（脏提取物整份丢弃，未采用其任何内容），核验=条目守恒 103+272=375、日期分布边界正确（主 09-12~16 / 档 ≤09-11）、冲突标记 0、被顶掉的「15:25 开工 remove local BiB mount」「Subagent 收工 挂载功能列」两条已找回。**若他线仍持有该中间态未保存的编辑，请丢弃勿再写回**；如系他线有意合并结果，请以收工条目声明并基于 `caaa8346` 重做
 - 核验：六项检查全绿（条目守恒/日期边界/标记清零/丢失找回/尾部一致/重复头唯一）；主文件 705 行、归档 1864 行
 - 遗留：无（本任务单元）；归档区中部剔除了一处历史遗留重复文件头（`# Agent 协作日志`，09-10 条目区），内容零改动
-
-## 2026-09-16 14:21 · ZCode — 收工：推送坐标归一化修复三件套落地（回链 14:11 开工）
-
-- 完成：**修复 1**（录制侧根治，`7f49d186`）state.py 加 `_CURRENT_PAGE_DIMS` 直通 + service.py wrapper 动作前注入 before_dims + `_stamp_rect_norm` 页面路径先读直通再回落注册表 + after-action 注册 meta 补 contentWidth/Height——三路径行为证明（直通/注册表/跳过）全过。**修复 2+3**（导出侧补救存量，`fba8084f`）截图条目带 `_shotW/_shotH`（page=meta contentWidth/Height、popup=meta 或 rect 宽高、旧链路弹窗=rect 宽高）+ properties 像素回退除以分母归一化（计 normalizedRects）+ 内部字段 dry-run/wire 双剥除 + 两 pin 期望更新
-- 验收：**verify-all 基线 4 红→3 红**（export-v3 存量红真因=traj 33 已从库删除 rows=0，pin 加 SKIP 守卫转绿；余 3 红均他线数据漂移已登记）；**真数据审计**（`tmp/rect-audit-post.mjs`，30 条可推轨迹全量走路由等价数据流）：337 ele props 归一化 156 / 空 113 / **仍像素 68——全部落在 823/824/829/835 这批无任何 screenshot 行的轨迹**（legacy 兜底链无分母，按守卫设计保留像素，除法会造假数据）；828（有截图）实证 normalizedRects=4 全绿
-- 事故与处置：中途 `git stash pop "stash@{1}"` 误弹他线 sovereignty WIP——**因冲突 pop 未消费、stash 条目保留无损**；已将误入工作区的 15 个他线文件精确还原 HEAD（内容仍在 stash@{0}，未丢未改），自己 7 文件按名弹回。教训再证：stash 必须带 message、pop 必须指名核对条目归属
-- 遗留移交：68 步像素=「轨迹无截图行」历史数据（录于 page_level 事件链上线前），要归一化需重录或回填截图行——建议不做（像素语义正确）；**生产 4097 重启后生效**（录制侧+导出侧都要）；伙伴侧无需改（收到的坐标将统一为 0~1）
-- 提交本文件顺带携带他线条目：无（14:30/14:33 归档条目为并行会话独立提交）
 
 ## 2026-09-16 14:15 · ZCode — 开工：agent-log 归档（09-11 及更早 → archive/logs/）
 
@@ -1341,445 +1316,6 @@
 - 完成：方案 A 落地。`formFieldXpathSmartOf` 改 class-token leaf + 同族 `(item//leaf)[n]`；snap 写 `field_slot`/`display_label`；人工/AI 透传；SPA `pickParamText` 拼 `保证金比例-A`。计划 `docs/superpowers/plans/2026-09-16-form-field-intra-slot-xpath.md`。
 - 验收：`characterize-locator-candidates` / `characterize-locator-parity` / **`characterize-form-field-intra-slot` OK**（双 select/双 input 唯一 + 单字段无 slot）。SUT 浏览器会话已关，保证金比例真机湿测未复跑（离线 fixture 复现同构）。
 - 遗留移交：前端仓 `ui-auto-recording-agent-vue-master/vue-project` 同步改了 trajectory-tree / step-detail / ElementJson（勿提交该仓 `vite.config.ts` WIP）；产品库页人工/AI 录一笔「保证金比例」确认列表标题与回放。
-
-## 2026-09-16 13:10 · Cursor Cloud — 收工：G3 phase_done 证据门闩（回链 12:22 开工）
-- 完成：Tasks 0–7 — query/navigate `success_when` + click 证据埋点 + recorder `needs_token` 双条件 + 控制面 0 步拒收 + verify-all 接入 pin + prompts 对齐
-- 提交链：`539c8e76` → `1d1afc3f` → `bb16b5e7` → `dd8d2f58` → `8c07eff9` → `0b65742a`（+本收工）
-- PR：https://github.com/Ahnoler/JS-gen/pull/45 （draft → master）
-- 验收：`characterize-phase-boundary` OK；`characterize-phase-runtime` PASS；`characterize-phase-done-evidence-gate` OK；eslint 触及 JS 0 warning；`verify-all` 中 G3 相关全绿
-- 注意：本云环境无 MySQL（3306 ECONNREFUSED）→ `characterize-step-highlight` / `layer-tree` / `export-v3` 仍红（与本刀无关）；湿测未跑
-- 遗留移交：对公建档/查询多阶段湿测确认 P3/P4 不再 0 步假成功；有 DB 的环境再跑全量 `verify-all`
-
-## 2026-09-16 12:32 · Cursor — 收工：Task 4 spec 交叉引用；原子拆分边界计划 T1–T4 完成（回链 12:31 开工）
-
-- 完成：2026-09-07 §3 与 2026-09-09 单卡闭环交叉引用；2026-09-15 状态 → `已审阅；实现按 2026-09-16 plan（PR #37）`
-- 验收：`characterize-atom-depend` **8/8 all passed**；`characterize-atom-keydata` **all passed**
-- 计划：`2026-09-16-atomic-draft-tx-split-boundary.md` Task 1–4 均已落地（helper / propose 接线 / prompt+样例 / spec 交叉引用），PR #37
-- 遗留移交：无本计划内项；不维护 CHANGELOG
-
-## 2026-09-16 12:31 · Cursor — 开工：Task 4 spec 交叉引用 + 计划收口
-
-- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 4**（2026-09-07 §3 / 2026-09-09 单卡闭环交叉引用；2026-09-15 状态翻为已审阅/实现中；characterize 复核）
-- 范围：`docs/superpowers/specs/2026-09-07-req-to-draft-traj-design.md`、`docs/superpowers/specs/2026-09-09-flow-card-guided-propose-design.md`、`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`、本协作日志
-- 禁入区：`src/**`、atomize prompt、产品树强制拆、one-confirm-per-atom 硬闸、他线 field_slot xpath、`config/` WIP
-- 方式：主会话；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37；本任务为计划末项
-
-## 2026-09-16 12:30 · Cursor — 收工：Task 2 propose.js 接线 produces/dataDependsOn（回链 12:26 开工）
-
-- 完成：commit **`fd18fc6a`** `feat(propose): attach produces/dataDependsOn and hard-gate depend graph`
-- 范围：`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`（cache 写入 `warnings`）、`scripts/characterization/characterize-atom-depend.mjs` 源码 pin
-- 验收：characterize-atom-depend **8/8 ok / all passed**（pin 先 RED 缺 import，后 GREEN）；characterize-atom-keydata all passed；characterize-req-draft-traj **OK 63**（含 `multi_write_atom`）；eslint 三文件 0
-- 遗留移交：Task 3–4（atomize prompt、samples、spec 交叉引用）未做
-
-## 2026-09-16 12:29 · Cursor — 收工：Task 3 atomize prompt 拆分边界 + 样例（回链 12:28 开工）
-
-- 完成：commit **`a334499a`** `docs(prompt): atomize split by produces/dataDependsOn bounds`
-- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`
-- 验收：JSON 例含 `produces`/`dataDependsOn`；「拆分边界」十条入 prompt；flowCards 改为参考且依赖规则优先；禁止 #504 造上游与场景清单；样例写明依赖图≠树层教条。原 prompt 无「产品树每层必拆」专项，无需删除。
-- 遗留移交：Task 4 spec 交叉引用未做
-
-## 2026-09-16 12:28 · Cursor — 开工：Task 3 atomize prompt 拆分边界 + 样例
-
-- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 3 only**（prompt 加 `produces`/`dataDependsOn` +「拆分边界」十条；样例抽象 #675/#676/#678 与 #504 反例）
-- 范围：`scripts/prompts/req-draft-traj-atomize-prompt.md`、`docs/superpowers/prompt-engineering/atom-depend-split-samples.md`、本协作日志
-- 禁入区：Task 4 spec 交叉引用；`propose.js` / `atom-depend.js`；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath；白名单/发版 `tmp/cmds`；`config/` WIP
-- 方式：主会话；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37
-
-## 2026-09-16 12:26 · Cursor — 开工：Task 2 propose.js 接线 produces/dataDependsOn
-
-- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 2 only**（TDD：characterize 源码 pin → `propose.js` 接线 → cache/return `warnings`）
-- 范围：`src/services/req-draft-traj/propose.js`、`src/services/req-draft-traj/propose-cache.js`（warnings 写入 cache 所需）、`scripts/characterization/characterize-atom-depend.mjs`、本协作日志
-- 禁入区：atomize prompt / Task 3–4 / spec 交叉引用；产品树关键词强制拆；one-confirm-per-atom 硬闸；不改 `multi_write_atom` / flow-card 闭环；他线 field_slot xpath；白名单/发版 `tmp/cmds`；`config/` WIP
-- 方式：主会话 Inline TDD；同一分支 `cursor/atom-depend-graph-b1f2` 更新 PR #37
-
-## 2026-09-16 12:25 · Cursor — 收工：Task 1 atom-depend 图校验（回链 12:20 开工）
-
-- 完成：commit **`4b782ff6`** `feat(req-draft-traj): validate atom produces/dataDependsOn graph`
-- 范围：`src/services/req-draft-traj/atom-depend.js`、`scripts/characterization/characterize-atom-depend.mjs`、`scripts/refactor/verify-all.sh`（紧随 `characterize-atom-keydata`）
-- 验收：characterize-atom-depend **7/7 ok / all passed**（先 RED `ERR_MODULE_NOT_FOUND`，后 GREEN）；硬拒 `self_produce_depend` / `dangling_data_depend`；警告 `missing_depend_fields`；被拒 atom 不贡献 produces
-- 遗留移交：Task 2–4（`propose.js` 接线、atomize prompt、spec 交叉引用）未做，按计划下一切
-
-## 2026-09-16 12:22 · Cursor Cloud — 开工声明：G3 phase_done 证据门闩
-- 开工：12:22 UTC。执行 Project store `docs/g3-phase-done-plan.md` Tasks 0–7
-- 范围：`scripts/controller/actions/phase/boundary_contract.py`、`boundary_gates.py`、`intent_contract.py`、`intent_gates.py`、`prompts.py`、`scripts/agent/recorder_emitters.py`、点击/导航证据埋点相关（`_misc` / form click 路径按需）、`scripts/characterization/characterize-phase-boundary.py`、`characterize-phase-runtime.py`（若触 needs_token）、`scripts/refactor/verify-all.sh`、`src/services/trajectory/trajectory-recording-runner.js`（及本阶段业务步数小 helper）、本文件
-- 禁入：G1 报文捞取、G2 运维、G4 真上传 / KB 湿测主责、文件上传·SUT、`save_section.py`（禁止恢复）、他线 WIP（`scripts/agent/service.py` 未声明改动、`data/kb/flows/**` 湿测主链、req-upload）
-- 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
-- 分支：`cursor/g3-phase-done-evidence-gate-3b92`
-
-## 2026-09-16 12:20 · Cursor — 开工：Task 1 atom-depend 图校验（纯 helper）
-
-- 进行中：执行 `docs/superpowers/plans/2026-09-16-atomic-draft-tx-split-boundary.md` **Task 1 only**（TDD：characterize → `atom-depend.js` → 接入 verify-all）
-- 范围：`scripts/characterization/characterize-atom-depend.mjs`、`src/services/req-draft-traj/atom-depend.js`、`scripts/refactor/verify-all.sh`、本协作日志
-- 禁入区：`propose.js` / atomize prompt / Task 2–4；产品树关键词强制拆；one-confirm-per-atom 硬闸；他线 field_slot xpath（`src/cdp/page-locator-helpers.js` / locator-builders / `scripts/manual_recorder/**`）；白名单/发版 `tmp/cmds`；`config/` WIP
-- 方式：主会话 Inline TDD；子智能体不 commit
-
-> **归档指引**：2026-09-11（含）及更早条目已归档至 `archive/logs/agent-log-archive-2026-09-11.md`；更早批次见同目录 `agent-log-archive-2026-09-06.md` / `agent-log-archive-2026-09-05.md`。本文件只保留最近数日条目。
-
-## 2026-09-16 12:15 · Cursor — 开工：表单字段内同族控件 xpath 消歧（field_slot）
-
-- 进行中：真机调研「保证金比例」复合字段 → 方案 A 已定；写 design spec，待用户审阅后写 plan 再改代码。
-- 范围：`src/cdp/page-locator-helpers.js`（及 `_gen_locator_helpers_py` 生成物）、`src/models/element.js`、`src/cdp/locator-builders/controls.js`（若需对齐）、`scripts/manual_recorder/**`、characterization、本仓 `docs/superpowers/specs|plans`、本协作日志；前端仓 `D:\dev\ui-auto-recording-agent-vue-master\vue-project`（`trajectory-tree.ts` / step 标题路径）。
-- 禁入区：他线 WIP（白名单/发版 tmp/cmds、atomic-draft 计划线）；不改 `label_text` 语义；不回填历史轨迹；agent-log 他人条目只读。
-- 方式：主线程；先 spec→plan→实现；验证=characterization + 本页湿测。
-
-## 2026-09-16 10:55 · ZCode — 开工：协作协议补条（push 冲突处理规则）
-
-- 用户指令：push 遇到冲突时须处理冲突、合并后再 push。补进 AGENTS.md「跨 Agent 协作」区段
-- 范围：仅 `AGENTS.md`（协作区段）+ 本日志条目；仓库外记忆文件同步
-- 禁入区：其余文件不动；agent-log 他人条目只读
-- 方式：主线程；纯文档改动。现场注记：pull 时 SSH 22 端口间歇被 reset，改走 ssh.github.com:443 通道完成（认证正常）
-
-## 2026-09-16 10:52 · ZCode — 开工：协作协议再升级固化（开工前 pull / log 条目 commit+push）
-
-- 用户指令：开工声明之前先 `git pull`；写完 agent log 后一律 commit 并 push（原约定只 commit）。今日将其固化进 AGENTS.md「跨 Agent 协作」区段
-- 范围：仅 `AGENTS.md`（协作区段）+ 本日志条目；仓库外记忆文件同步
-- 禁入区：其余文件不动；agent-log 他人条目只读
-- 方式：主线程；纯文档改动，pull 已先行完成
-
-## 2026-09-16 10:52 · ZCode 引擎线 — 收工：select_option 字段解析错位修复湿测 PASS（回链 10:28 开工）
-
-- 完成：commit **b3339e2a**（4 文件 +105/-8）：tssc_multi_select 字段查找改 findFieldItem（精确优先→包含唯一兜底→多命中 ambiguous-label）、prompts 同步歧义错误码、新增 characterize-tssc-field-resolution.py 入 verify-all。
-- 验收（19242 活页面，选择要素弹窗）：修复版 finder 逐 label 实测——要素名称→DOM9 本体✓（修复前命中组件要素名称 DOM7）、要素编码→DOM10✓（修复前命中组件要素编码 DOM6）、所属列表要素编码→DOM11✓、组件要素编码→DOM6✓（精确查自身名仍正常）；模糊「要素」→正确返回 6 候选歧义。离线=py_compile+SYNTAX+新 pin+finder 假 DOM 单测（精确优先/唯一包含/歧义）+verify-all 基线 4 红零新增。
-- 遗留移交：①**同族 finder 排查**——`l === label || l.includes(label)` 模式还在 select_tree.py 等处、`_resolve_control`（Python 侧）同形风险，建议单独一批改精确优先（本次按批准范围只治 tssc 病灶）；②所属列表要素编码 下拉「暂无数据」是 SUT 侧级联/数据现状（真无数据，非引擎 bug），该新增可选字段在自愈里「填不了即跳过」的策略改进仍待裁决（见 09-16 早前分析）。
-
-## 2026-09-16 10:28 · ZCode 引擎线 — 开工：select_option 字段解析错位修复（要素名称→组件要素名称，includes 包含匹配错位）
-
-- 现场实证（19242 活页面 + 引擎原版匹配逻辑）：选择要素弹窗 DOM 序含「组件要素编码(6)/组件要素名称(7)」前缀查询字段，`l === label || l.includes(label)` 首个命中被它们抢占——找「要素名称」命中「组件要素名称」、找「要素编码」命中「组件要素编码」（均为错字段）。回放 err-no-options 是对错字段弹层（所属列表要素编码，暂无数据）做出的误判。
-- 范围：仅 `scripts/controller/actions/js_snippets/tssc_multi_select.py` 字段查找两处（L27-29 主循环、L35-37 dialog 兜底）改「精确优先 → 包含唯一才用 → 多命中报 ambiguous-label」；同族 finder（select_tree.py、_resolve_control 等）本次不动、只列清单
-- 禁入区：`config/`、他线 WIP、agent-log 他人条目只读
-- 方式：主线程；验证=py_compile+模块级 import+新行为 pin（source 钉精确优先/唯一/歧义）+相关旧 pin+verify-all 对照基线 4 红+19242 活页面用更新后 snippet 实测解析落点
-
-## 2026-09-15 22:40 · OpenCode — 收工：统一 AI click_element/click_button 同按钮去重（回链 22:25 开工）
-
-- 完成：提交 **23f58d0d**；`click_element_by_index` 与 `click_button` 共用阶段级按钮 identity，优先使用点击前解析出的稳定 xpath，缺少 xpath 时才使用按钮文本兜底；同阶段第二次命中返回 `already-operated-this-phase`，不再执行浏览器点击或写入第二条步骤。
-- 保留：人工录制 mapper/CDP 行为未修改；`click_save` 未改；表格 radio 仍走 `click_table_row_radio`；日期面板日格点击仍允许重复（同日区间需要两次点击）。
-- 验收：`characterize-ai-phase-element-guard.py`、picker 原子录制、manual table radio、tree picker、date range、click replay engine、Python 编译、`git diff --check` 全通过。
-- 遗留移交：部署/重启执行机后复测“客户名称引入”阶段，确认先后调用 `click_element_by_index(40)` 与 `click_button("选择客户")` 时只保留一条按钮步骤；`memory_writer` timeout 仍为独立基础设施告警。
-
-## 2026-09-15 22:25 · OpenCode — 开工：统一 AI click_element/click_button 同按钮去重
-
-- 进行中：修复同一 AI 阶段内同一按钮先后被 `click_element_by_index` 与 `click_button` 各录制一条的问题；共享稳定元素身份，第二次调用不再执行/落库。
-- 范围：`scripts/controller/actions/click_action_engine.py`、`scripts/controller/actions/phase/element_guard.py`、相关 characterization、本协作日志；只读参考 `scripts/state.py` 的动作落库 coalesce 与现有 picker/date 点击例外。
-- 禁入区：人工录制 mapper/CDP 采集、前端仓、`src/services/trajectory/trajectory-meta-service.js`、线上数据及其他会话 WIP；不改变 `click_save`、表格 radio、日期面板重复选日语义。
-- 方式：先在当前无未提交改动状态写入并提交声明，再补 click_button 与 click_element 的跨动作 identity 共享，验证 picker/按钮/日期相关 characterization、编译与 diff 后提交。
-
-## 2026-09-15 22:15 · OpenCode — 收工：修复第四阶段重复执行与日期范围异常（回链 21:55 开工）
-
-- 完成：提交 **022f65a2**；“填写查询/筛选条件”规则回退归类为 query，运行时 query toolbar 可纠偏误判的 create/modify pending/success 门禁；AI 同阶段成功字段写入/选择及普通索引点击再次命中时直接返回 `already-operated-this-phase`，失败动作可重试、日期面板日格点击豁免、新阶段自动清空，人工录制不经过该保护。
-- 日期修复：日期范围字段必须一次传入完整起止值；label 与 xpath 填充路径均对两个 input 写值并向 Vue model 提交数组，单日期写入范围控件返回 `err-date-range-value-required`，不再产生字符串 model 后继续查询。
-- 验收：新增 `characterize-ai-phase-element-guard.py` 并注册 verify-all；日期范围、phase intent/boundary/runtime/reviewer、form assistant、xpath fill/select、picker 原子录制、table radio、tree picker、action-log sync 等 13 项定向 characterization、Python 编译、`git diff --check` 全通过；`npm run lint` 0 error（154 warning 均为 `.venv`/既有文件）。完整 `verify-all.sh` 因本机无 `bash` 未能启动。
-- 遗留移交：部署/重启执行机后用同一五阶段场景湿测；第四阶段预期首次 `done(success=true)` 直接结束，不再重填或提前点击第五阶段【查询】；日期步骤应落库完整 `开始日期 - 结束日期`。`memory_writer` timeout 属独立基础设施告警，未修改。
-
-## 2026-09-15 21:55 · OpenCode — 开工：修复第四阶段重复执行与日期范围异常
-
-- 进行中：修复查询条件填写阶段被误套维护表单完成门禁，导致 `done()` 被 pending fields 拒绝、同阶段字段重复执行并越界点击下一阶段【查询】；同时修复 AI 通过 `fill_form_field` 写日期范围时退化为单日期字符串的问题。
-- 范围：`scripts/agent/recorder_emitters.py`、`scripts/controller/actions/phase/intent_gates.py`、AI 控制器动作分发/去重辅助、`scripts/controller/actions/js_snippets/fill_core.py`、`fill_date.py`、对应 characterization、本协作日志；不修改人工录制 mapper/CDP 采集语义和线上轨迹数据。
-- 禁入区：前端仓、`src/services/trajectory/trajectory-meta-service.js`、其他会话 WIP；不改变日期范围录制产物格式，沿用完整起止日期契约。
-- 方式：以 sid `58d8036c` 第四阶段日志为表征，先修运行时 query UI 完成门禁，再补日期范围单值拒绝/区间提交，最后仅在 AI 动作执行入口阻止同阶段同元素成功写操作重复执行；运行定向 characterization、Python 编译和综合门禁后提交。
-
-## 2026-09-15 15:26 · Cursor Lead — 收工：人工确认去掉状态闸（回链 15:13 / 14:49）
-
-- 完成：`confirmTrajectory` 用户确认路径不再校验状态，`setPersistentRecordStatus(completed)` 双字段直写；取消确认闸保留；pin + api-docs 同步
-- 验收：`node scripts/characterization/characterize-record-status.mjs` OK
-- 遗留：控制面需部署重启后 829 湿测；本提交不含菜单扫描 WIP
-
-## 2026-09-15 15:13 · Cursor Lead — 开工续：人工确认去掉状态闸（用户触发直接 completed）
-
-- 进行中：15:13；用户改要求——confirm 不再校验状态，直接置已确认（已由 15:26 收工闭环）
-- 范围：同 14:49（`trajectory-meta-service.js` / `characterize-record-status.mjs` / api-docs recording.js）
-- 禁入区：菜单扫描未提交改动、`config/`、`.cursor/`、取消确认路径语义不扩
-- 方式：红 pin（无确认闸 + want 无条件 setPersistentRecordStatus completed）→ 最小实现
-
-## 2026-09-15 15:00 · OpenCode — 开工：AI 录制阶段续跑与日期查询可靠性优化
-
-- 进行中：修复阶段 `done()` 已接受后仍因后续阶段引入字段触发预算续跑；增强日期范围逗号格式、双端输入与回读；修复网络捕获异步响应头未 await 告警。
-- 范围：`scripts/agent/service.py`、`scripts/controller/actions/network_capture.py`、`scripts/controller/actions/js_snippets/fill_date.py`、`fill_core.py`、日期字段回读相关 snippet、对应 characterization、`scripts/refactor/verify-all.sh`、本协作日志。
-- 禁入区：线上轨迹与 SUT 数据、`src/services/trajectory/trajectory-meta-service.js`、CDP/手工录制日期范围已提交链及其他会话 WIP；不猜测或修改 SUT 接口契约。
-- 方式：以用户执行日志为表征，先锁定 done 后不续跑，再统一范围值解析/双 input 写入及回读，最后异步化 network capture 过滤；运行定向 characterization、编译/语法检查、lint 与综合门禁后分步提交。
-
-## 2026-09-15 14:49 · Cursor Lead — 开工：人工确认双字段闸（record_status OR persistent_record_status）
-
-- 进行中：14:49；已被 15:13 续条覆盖（不再做双字段闸，改为去闸直写 completed）
-
-## 2026-09-15 14:00 · Cursor Lead — 收工：菜单同 xpath 孪生清理（回链 13:44 开工）
-
-- 完成：`buildScanApplyPlan` 同 pass 按 parent+data-id / parent+xpath 去重 create；pin 2 条绿；`prune-same-xpath-menu-twins.mjs` 已对 systemId=1 `--apply`（drop 0362/0363/0461）；复跑 dry-run 无孪生
-- 验收：`node scripts/characterization/characterize-menu-scan.mjs` OK；合同管理现余异 RES 同名对（1540↔0360、1541↔0361）属 B，未动
-- 遗留：B 讨论（同名不同 data-id 是否合并/展示）；代码与本条目待用户确认后 commit
-
-## 2026-09-15 13:44 · Cursor Lead — 开工：菜单同 xpath 孪生清理（合同管理 A）
-
-- 进行中：13:44；用户选 A（清同 xpath 孪生 + 堵住 plan 内重复 create）；B 同名不同 RES 另议
-- 范围：`src/services/menu-scan-service.js`（`buildScanApplyPlan`）、`scripts/characterization/characterize-menu-scan.mjs`、`scripts/maintenance/prune-same-xpath-menu-twins.mjs`、本文件；MySQL systemId=1 孪生消重（--apply）
-- 禁入区：同名不同 data-id 合并策略（B）；radio/search-then-click/KB 他线；`.cursor/`
-- 方式：红 pin → 修 plan 去重 → 维护脚本 dry-run/apply；不自动合并异 RES 同名叶
-
-## 2026-09-15 00:55 · ZCode 引擎线 — 收工：tooltip 泡泡框误采修复湿测 PASS 全链闭环（回链 00:23 开工）
-
-- 完成：commit **67cb3286**（`src/cdp/page-locator-helpers.js` normalizeHost 头部 popper→触发器重映射 + 生成链再生成 `_locator_helpers_js.py`）。
-- 验收（MCP 接管浏览器、产品阶段管理活页面、真实悬停触发 tooltip）：把**活的 popper**（`el-tooltip-6393`，注意 id 与昨日 `4652` 不同——动态 id 实锤）喂给 `buildLocatorSnap` → 产出 `//a[contains(@class,'el-icon-folder-add')]`，strategy=xpath_smart、**verified=true**，解析回真实图标 `<a>`（`inTooltipPopper:false`）；图标本体 snap 行为不变；库存按泡泡框文案过滤 0 命中（证明泡泡框从未入库，缺陷入口在事件/文本采集层，normalizeHost 公共入口重映射即全覆盖）；三源 pin PASS；verify-all 基线 4 红零新增。
-- 工程坑（已留痕）：helpers 文本住在模板字面量里——注释中**反引号与插值序列**都会终止模板（本次两次 SyntaxError 来源），已在修复处注释告警。
-- 遗留：无。MCP 浏览器 window.__H 残留 80KB 文本（测试浏览器，无需清理）；`tmp/mcp-chunk-*.js`/`tmp/mcp-wet-tooltip.js` 留档。
-
-## 2026-09-15 00:23 · ZCode 引擎线 — 开工：AI 录制图标点击采到 tooltip 泡泡框的修复（JS-gen 侧定位链）
-
-- 现场实证（MCP 接管浏览器 + 注入录制侧同款 PAGE_LOCATOR_HELPERS 普查）：产品阶段管理图标（`a.el-tooltip.el-icon-folder-add`）无文本，唯一可见文本是 tooltip popper（`div.el-tooltip__popper.is-dark`，动态 id `el-tooltip-4652`）；文本/事件目标采到 popper 时 `buildLocatorSnap(popper)` 产出 `//div[@id='el-tooltip-4652']`（动态 id 入 xpath）→ 回放即失效。popper **不带 `.el-popper` 类**，现有枚举黑名单拦不住。
-- 范围：`src/cdp/page-locator-helpers.js`（normalizeHost 头部加 popper→触发器重映射，经 aria-describedby 反查）+ `node scripts/_gen_locator_helpers_py.mjs` 再生成 `scripts/controller/actions/js_snippets/_locator_helpers_js.py`（禁手改，走生成链）
-- 禁入区：`config/`、他线未提交改动、`scripts/controller/actions/fill_engine.py`（我刚提交的守卫，本次不动）、agent-log 他人条目只读
-- 方式：主线程实施；验证=三源一致 pin（characterize-xpath-three-sources 等）+verify-all 对照基线 4 红+MCP 活页面复测（popper→图标 xpath verified）
-
-## 2026-09-14 22:25 · ZCode 引擎线 — 收工：图标按钮点击可靠性修复（他仓 commit 41992f0，回链 22:05 开工）
-
-- 完成：tansun_ui_engine（TUE_1.0.1_LMY）**41992f0**，单文件 click.py +57/−4——① `JS_CLICK_ICON_BUTTON` 图标段由「DOM 顺序首个即点」改为「收集全部命中 → 排除页头（.headerbox/.navbar/.header__action-item，滤空回退全量）→ 恰剩一个才点（`ok-icon:<label>`）→ 多个显式 `err-icon-label-ambiguous:<candidates JSON>`」；② 新增 `icon_button` 子路由接线 `_DATA_NAME_SUBROUTES`（「图标：X」专属路径，歧义=该步最终 error 不落回，miss 才回通用链；函数放 click.py 因复用本模块 JS 避免循环导入）；③ `_click_by_button_text` 歧义短路（容器级判歧义后不再让页面级图标 JS 兜底）。lead 设计、双子智能体并行实现（文件集不相交，均未 commit），主会话复核 diff+传播路径后代提交
-- 验收：ruff 全过；JS node --check 过；本地测试 **46 passed**（40 旧全绿 + 6 新 pin：接线/JS 消歧契约/ok 路径/歧义不落回/miss/空 hint）；`err-icon-label-ambiguous` 传播路径人工复核（→ status=error，无误点兜底）。**真机 dry-run 未完成**：MCP 会话在探测时过期跳登录页（凭据不过 ZCode）；结论不受影响——上轮真机已实采该页「上移」双候选现场（页头 span 在前/工具栏 a 在后），新逻辑输出确定为「滤页头 → 恰剩工具栏一个 → 点它」；登录后跑一次 `图标：上移` 预期日志 `图标按钮点击完成 … result=ok-icon:上移` 即终验
-- 同批在库（TUE_1.0.1_LMY，均未 push）：0db22e0（合并上游 a6617f6：date 闸门去重取 pkgutil 版+树节点点击加强）、1cd1533（select:tree 叶模式）、f4c1345（date 三闸门+菜单导航）
-
-## 2026-09-14 22:05 · ZCode 引擎线 — 开工：引擎图标按钮点击可靠性修复（lead + 2 子智能体）
-
-- 进行中：2026-09-14 22:05；验收=「上移」类歧义名称不再静默点错（多候选优先非页头、仍歧义显式 err-icon-label-ambiguous）+ `图标：` 前缀接线可按图标标签点击
-- 范围：tansun_ui_engine（TUE_1.0.1_LMY，已含合并 0db22e0）`ui_execute/engine/actions/click.py`（JS_CLICK_ICON_BUTTON 歧义守卫 + icon_button 子路由 + 路由表接线）与 `tests/test_click_subroutes.py`（**本地件不提交**，pin 更新）；JS-gen 侧仅本文件
-- 禁入区：引擎仓其余文件（含 tests/test_date_action.py、config.py）、JS-gen 源码、push、SUT 真实数据变更（真机只做 dry-run 解析验证不点击）
-- 方式：主会话设计并代子智能体声明；子智能体 A=click.py 实现、B=本地测试 pin（文件集不相交），均不 commit；主会话复核 + node --check + ruff + pytest + 真机 dry-run 后代提交
-
-## 2026-09-14 21:52 · ZCode 引擎线 — 收工：pull 引入的 2 个 characterization 红项已修（回链 21:44 开工）
-
-- 完成：commit **0f3f2f55**（2 文件 +23/-6，只改判据、不动同事源码）。
-  ① `cold/characterize-search-then-click-prompts.py`：needle「不要为此增删 phase 条数」随 78c89d77 提示词重写被删，纪律由规则 9 承接 → 更新为「不要为了凑数量而拆分」，并存沿革注释；其余 3 针保留。
-  ② `characterize-select-option-stamp.py`：400 字字符窗口判据改为**同一缩进分支块**内断言（3763893d 的纯新增行把距离 365→454 即误红）。
-- 验收：两 pin 单跑 PASS；**变异测试证明强度未降**（删该分支打点行→红、分支内改名→红）；verify-all 回到基线 4 红，零新增。
-- 遗留：无（活页面湿测那条仍属上一条 21:41 条目的待补项，非本条范围）。
-
-## 2026-09-14 21:44 · ZCode 引擎线 — 开工：修复 pull 引入的 2 个 characterization 红项
-
-- 范围：`scripts/characterization/cold/characterize-search-then-click-prompts.py`（needle 按新提示词更新）、`scripts/characterization/characterize-select-option-stamp.py`（400 字窗口判据改结构化）
-- 判据前提（已核）：两红均非本次改动引入，且**源码属性仍成立**——① 提示词规则 9「不要为了凑数量而拆分本应合并的操作」承接原「不要为此增删 phase 条数」的数量纪律（措辞变、意图在）；② select_engine no-items 分支仍 `stamped = resolve_recorded_option_text(...)` → `params['option_text'] = stamped`，只是被 3763893d 新增一行把距离从 365 推到 454 越窗。
-- 禁入区：不动 `src/services/trajectory/trajectory-meta-service.js` 与 `select_engine.py` 源码（同事线，只改判据）；agent-log 他人条目只读
-- 方式：主线程；验证=两 pin 单跑 PASS + verify-all 回到基线 4 红
-
-## 2026-09-14 21:41 · ZCode 引擎线 — 收工：fill_form_field 同值重填守卫（回链 21:34 开工；活页面湿测待补）
-
-- 完成：commit **63209340**（4 文件 +99/-1）：`fill_engine.py` 录制态同值跳过守卫、`agent-tools-form.md` 终检纪律（先比对再重填）、新增 `characterize-fill-already-filled.py` 入 verify-all。
-- 验收（离线）：py_compile+模块级 import PASS；**行为单测三路径 PASS**（同值→`already-filled` 且不执行真实填充；异值→放行；探测异常→fail-open）；form-engine-scope-audit PASS；verify-all 经逐项比对确认本次改动零新增红。
-- 坑（值得记）：函数体后段一处同名**局部 import** 使 `field_values_equivalent` 在整函数作用域退化为局部名，守卫在其之前引用即 UnboundLocalError —— **AST 未解析名守卫查不出「已解析但晚绑定」，行为测试才抓到**；已固定（局部别名 `_fve`）并入 pin。
-- 遗留移交（**非本次改动引入，属同事入站提交**，已用 8e1403c9 vs HEAD 逐项量化证实，建议转告）：
-  ① `characterize-search-then-click-prompts` 红 —— `src/services/trajectory/trajectory-meta-service.js` 因提示词重写（78c89d77）丢失旧针 `不要为此增删 phase 条数`，需同 commit 更新 pin；
-  ② `characterize-select-option-stamp` 红 —— 3763893d 在 helper 调用与 `no-items-skip` 之间插入 `_mark_picker_selection_success(...)`，把距离从 365 推到 454，越出该 pin 的 400 字窗口（判据本身过脆，建议同时放宽或改为结构化断言）。
-- 待补：19242 活页面双场景湿测（同值→跳过不记录；异值→覆盖并记录）。当前测试浏览器（19242）与控制面（4097）均未运行，无法执行；`tmp/fill-guard-behavior-test.py` 已就绪可复用。
-
-## 2026-09-14 21:34 · ZCode 引擎线 — 开工：fill_form_field 同值重填守卫（助手填完主 Agent 再填=重复步骤）
-
-- 范围：`scripts/controller/actions/fill_engine.py`（录制态同值跳过，约 +25 行）、`scripts/prompts/agent-tools-form.md`（终检纪律改为先比对再重填）、新增 `scripts/characterization/characterize-fill-already-filled.py` + `scripts/refactor/verify-all.sh` 注册一行
-- 禁入区：`config/`（他线未提交 update-db-whitelist.ps1）、`src/services/trajectory/trajectory-recording-runner.js` 与 `src/routes/browser-session/executor-events.js`（同事刚修完的重复落库链，只读不碰）、agent-log 他人条目只读不删
-- 方式：主线程实施；只插入代码不改既有行（AGENTS.md 硬约束）；验证=py_compile+模块级 import+form-engine-scope-audit（AST 未解析名守卫）+新 pin+verify-all 对照已知 4 存量红；19242 活页面双场景湿测（同值→不记录；异值→覆盖并记录）
-
-## 2026-09-14 18:05 · Cursor Automation — 收工：2026-09-13 北京时间工作日报归档
-
-- 完成：`docs/report/2026-09-13.md` + `docs/report/README.md` 索引行；统计窗口 09-13 00:00–24:00，4 条提交（叶模式 DFS 兜底 + 他仓 select:tree 对齐）
-- 验收：git log 四笔与 agent-log 09-13 三条收工/开工条目交叉核对；前日 09-12 无独立日报，遗留对照 09-11 + 09-12 agent-log
-- 遗留移交：09-12 日报仍缺归档；引擎 select:tree 真机复验、主链 R6/R7 等见日报遗留表
-
-## 2026-09-14 18:03 · Cursor Automation — 开工：2026-09-13 北京时间 cron 日报生成
-
-- 范围：仅 `docs/report/2026-09-13.md`、`docs/report/README.md`、`docs/superpowers/agent-log.md`（本条目）
-- 禁入区：`src/`、`scripts/` 业务代码、他线 WIP；不做 Hermes/memory 大扫除
-- 方式：git log + agent-log + 09-12 湿测报告归纳；cron 触发 2026-09-14T10:03Z（北京 18:03）
-## 2026-09-13 01:10 · ZCode 引擎线 — 收工：tansun 引擎 select:tree 对齐叶模式策略（他仓 commit 1cd1533，回链 00:40 线）
-
-- 触发：同事（经用户转达）建议引擎仓 select:tree 同步 JS-gen 叶模式三级策略（协议不动，只改内部实现）
-- 完成：tansun_ui_engine（TUE_1.0.1_LMY）**1cd1533**，单文件 `ui_execute/engine/actions/select_tree.py` +235/−4——复用本仓移植过去的 `_real_click`/`JS_REAL_CLICK_ECHO`/`_popover_has`/`_click_path`，新增 `JS_TREE_SEARCH_FILL/SEARCH_MATCHES/DFS_PATH`（逐字移植）+ `_real_click_at`（坐标 CDP 真点）+ `_tree_search_clear` + `_tree_click_leaf_search` 编排；接线 `select:tree` 与 `tree_picker_click` 支持单叶子名（路径数组模式不变）
-- 设计取舍（已提请用户与同事确认）：叶子名直达失败仅**结构性**错误（弹层没开/触发器找不到/树数据不可达）才回落合成 JS；**歧义与数据无此叶不回退**——合成注入在该 SUT 会假成功，宁明确失败不假 ok
-- 验收：ruff 全过、3 个 JS 片段 node --check 过、引擎仓本地测试 40 passed；**真机复验未做**（MCP 会话过期被踢到登录页），验收用例照抄 00:40 条目两条即可（对公流贷=直达 / KB测子类-…=DFS），预期日志 `ok:via=search-real-click` / `ok:via=data-dfs-path`
-- 同批在库：f4c1345（date 三闸门+菜单按名点击/直达路由+导航与页面就绪门闩），均已 commit 未 push
-
-## 2026-09-13 00:40 · ZCode 引擎线 — 收工：叶模式兜底二段湿测 PASS，全链闭环（回链 00:14 开工）
-
-- 完成：兜底实施 commit **c60309e4**（JS_TREE_PICKER_DFS_PATH + 导出 + 叶模式无果分支 + _tree_picker_walk_path + prompt 同步）。
-- 验收（19242 活页面，产品目录字段，未保存零净变更）：带连字符叶子 `KB测子类-20260907-1835` 搜索必败 → 自动兜底 DFS 解析路径 `[KB测一级-20260907-1835, KB测子类-20260907-1835]` → 逐级 CDP 真点 → 回显校验 `ok, via=data-dfs-path`，8.1s，弹层自关，字段值=叶子；DFS 抽检 `对公流贷`→恰好 1 条 `[贷款,对公,对公流贷]`；离线=compile+import+pin+verify-all（同 4 存量红）+DFS Node 逻辑测试（唯一/同父同名去重/跨父歧义/不存在）+Python 去重单测全过。
-- 至此叶模式三级递进全链实测闭环：搜索直达（昨夜 PASS）→ DFS 寻路真点（本次 PASS）→ 歧义交还 path。遗留：SUT 搜索剥特殊字符属门户自身行为（已绕过不必修）；湿测脚本 tmp/wet-tree-dfs-fallback.py、tmp/dfs-path.test.cjs 留档。
-
-## 2026-09-13 00:14 · ZCode 引擎线 — 开工：tree_picker_click 叶模式兜底二段（搜索无果→数据侧 DFS 寻路真点）
-
-- 范围：`scripts/controller/actions/js_snippets/tree_picker.py`（+JS_TREE_PICKER_DFS_PATH）、`_js_snippets.py`（导出）、`_tree.py`（叶模式无果分支+`_tree_picker_walk_path`）、`scripts/prompts/agent-tools-tree.md`（兜底说明）
-- 禁入区：`config/`、`scripts/session_runner.py` 等他线 WIP；agent-log 他人条目只读不删
-- 方式：主线程实施；验证=compile+import+pin+verify-all 对照已知 4 存量红+19242 活页面湿测（带连字符叶子搜索必败→兜底路径真点，字段现值即该叶子=同值重选零风险）
-
-## 2026-09-12 22:40 · ZCode 引擎线 — 收工：tree_picker_click 叶子名直达双模式湿测闭环（回链 21:42 开工）
-
-- 完成：实施 commit **6fd303a9**（7 文件：搜索直达片段×2、签名可选化+叶子分支、_normalize_params 别名、event_dispatch 白名单、prompt 双模式、cold pin 针同步）+ 守卫补丁 **5e6d51fc**（弹层已开不重复开）。
-- 验收（19242 活页面，产品目录字段，全程未保存、零净变更）：①叶子名模式真选「对公流贷」→ `ok, echo=对公流贷, via=search-real-click`，1.5s，弹层自关；②path 模式真点 KB测一级→KB测子类 把值还原 → echo=KB测子类-20260907-1835；③对照实验实证 SUT 树搜索自身剥连字符（`KB测子类-…`→0 结果、`对公流贷`→精确 3 节点），带 `-` 等特殊字符的叶子名搜索直达不可用、path 模式不受影响；④离线=compile+import+单测+6 pin+verify-all（同 4 存量红，无新增）。
-- 遗留移交：①SUT 树搜索剥特殊字符是门户自身行为，如需支持带 `-` 叶子名可在叶模式加「搜索无果→按前缀逐级展开」兜底（未做，待裁决）；②分类目录（新增分类弹窗）字段第一次探测报 popover-not-open，未二查（用户改指产品目录）；③/tmp 湿测脚本 wet-tree-leaf-search*.py 留档。
-
-## 2026-09-12 21:42 · ZCode 引擎线 — 开工：tree_picker_click 叶子名直达（path 可选化）+ 老参数兼容
-
-- 范围：`scripts/controller/actions/js_snippets/tree_picker.py`（新增搜索直达片段）、`_js_snippets.py`（re-export）、`_tree.py`（签名可选化+叶子分支）、`_replay.py`（_normalize_params 别名）、`scripts/event_dispatch.py`（签名白名单补登）、`scripts/prompts/`（若提及该动作则同步）
-- 禁入区：`config/`、`scripts/session_runner.py` 等他线 WIP；agent-log 他人条目只读不删
-- 方式：主线程实施；验证=py_compile+模块级 import+characterization pin（含更新若钉住签名）+verify-all 对照已知 4 存量红；19242 活页面 replay API 单步湿测（真选叶子「对公流贷」，用户已批准）
-
-## 2026-09-12 17:40 · ZCode 引擎线 — 收工：回放误触发表单结构自愈修复（回链 17:24 开工）
-
-- 完成：`scripts/controller/actions/js_snippets/misc.py` JS_VERIFY_FORM_STRUCTURE 的 expectedLabels 表达式一处（`f.label || f` → `(f&&typeof f==='object')?(f.label??''):f`），commit **48c99419**。根因=空 label 布尔坑把 tssc 按钮行 form-item（label=''）误判为新增可选字段，恒产 `added_optional:['']` 误入 Phase2 结构自愈。
-- 验收：py_compile+模块级真实 import PASS；渲染后片段 Node 行为测试双对照 PASS（修复=零差异；旧式=精确复现线上 `added_optional:['']`，tmp/verify-form-structure-empty-label.test.cjs）；verify-all 4 红经 HEAD 基线复跑比对确认为存量/环境（step-highlight、export-v3=无 VPN 断库取不到真数据；layer-tree=traj33 数据漂移；confirm-notification=读 `_misc.py` 通知 marker 漂移），**与本改动无关，零新增红**。
-- 遗留移交：①录制侧快照口径排除无输入控件的按钮 form-item（动静大，待裁决）；②上述 4 项存量红归各自线（库依赖项 VPN 恢复后自愈、_misc.py marker 漂移归引擎线复核）；③`memory_writer flush timed out`（无 VPN 机器网络层现象，未深查）。
-
-## 2026-09-12 17:24 · ZCode 引擎线 — 开工：回放误触发表单结构自愈修复（misc.py 一行）
-
-- 范围：仅 `scripts/controller/actions/js_snippets/misc.py`（回放比对 expectedLabels 表达式一处，约 304 行）
-- 禁入区：`scripts/session_runner.py`、`config/`（他线有未提交改动：update-db-whitelist.ps1 / start-tansun-engine.ps1）、agent-log 他人条目只读不删
-- 方式：主线程单点 Edit；验证=py_compile+模块级真实 import+Node 端行为测试（空 label 期望对象复现 added_optional 消失）+verify-all；不派子智能体
-
-## 2026-09-12 11:35 · ZCode 引擎线 — 开工+收工：同事引擎 mega 菜单不收起修复（他仓 commit 8356af4）
-
-- 触发：用户报告引擎执行实际任务时子菜单无法关闭（截图：产品管理面板残留盖住页面）
-- 根因（真机实证）：本 SUT mega 菜单只认面板外 **trusted mousedown**；引擎 `菜单：` 只发合成 `el.click()`，通用链 mousedown 也是 `dispatchEvent`（isTrusted=false）、Escape 亦无效 → 面板残留。用户失败链的菜单步是 `[click] 菜单切换-1/2`（走通用链，非 `菜单：` 子路由）
-- 修复（**他仓** `D:/dev/tansun_ui_engine` compat/js-gen-operations，commit **8356af4**，3 文件）：移植 JS-gen `page_id.py:190` 选点 + `_replay.py:204` 真实鼠标 down/up → `dismiss_mega_menu()`；`menu_item()` 与「菜单切换」前缀两条成功路径挂钩；5 条 pin（含禁止简化成合成 click 的防再犯断言）
-- 验收：冷测 28 passed；**真机同调用对照** 开面板 8 项 → 合成 mousedown 仍 8 项 → 真实 move/down/up 后 **0** 项，800ms 复查仍 0；证据 `tmp/tansun-wet/22-menu-panel-dismiss.json`
-- 遗留：① 引擎进程级整合复跑待用户执行（运行中实例 PID 30472 早于修复、不热加载；且该链含凭据）；② **合并波及备案**：用户 11:02 合入上游（b67a605）带来 `.gitignore tests/` 并删 20 个测试文件（281→70 用例），`test_select_click_rowselect.py` import 断裂致全量唯一 1 failed，与本修复无关；③ 「菜单切换」父级分支未挂载问题（WET-2026-0912-MENUBRANCH）仍未修
-
-## 2026-09-12 11:00 · ZCode 引擎线 — 补记：WET-2026-0912-DATEPANEL 缺陷双侧修复（回链 09:12 / 10:45）
-
-- 触发：用户复看第 20 项截图追问「daterange 不会自动关闭日期弹框吗」——属实，面板残留盖住表格
-- 根因（实证）：`closePanels()` 只改 DOM 样式，组件 `vm.pickerVisible` 仍 true，Element popper 按自身状态重绘把压制覆盖回去；样式压制对 Vue 重渲染无效。单日期路径同病根（第 05 项 `knownCosmetic` 已记录同一残留）
-- 修复：`closePickerVm()` 状态级关闭（=`pickerVisible=false`，回落 `handleClose()`），两分支 blur 后调用，样式压制留作兜底
-  - 引擎 `ui_execute/engine/actions/date_action.py` + pin test — commit **013a67d**（pytest 281 passed）
-  - JS-gen 源头 `scripts/controller/actions/js_snippets/fill_date.py` — commit **b9694d1b**（**禁入区第二次解禁说明**：用户追问即授权修此缺陷；同目录同病根，已单独 commit 可审计）
-- 真机复验：修复后集成 JS 返回 `ok-date-range`，t0/500ms/2000ms 面板均关闭不被重新拉起，三层值一致；证据 `tmp/tansun-wet/20b-daterange-panel-closed-fix.png`
-- 边界：JS-gen 单日期路径的独立真机复验待做（当页无单日期控件；逻辑与引擎修复同源，关闭机制已同 SUT 真机证明）——下次落到带单日期页面顺手复验
-- 报告已同步：`docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md` §三·补
-
-## 2026-09-12 10:55 · Cursor Lead — 收工：合约主权收口（回链 10:50）
-
-- 完成：① `todo-list` `contract-sovereignty-wet` → **P3 已闭**（754/758/762）；② `_DONE_AS_INSTRUCTION_RE` 收紧 `(?<![A-Za-z_])done\s*\(` + pin（`task_done` 不误伤）；`planner_advice_discarded` 转发已在 `session-message.js` / recording-runner（r4 events=0 系 start 中断非缺接线）；④ CP `339435`/executor `339431` 已停
-- 验收：`characterize-planner-advisory-filter: OK`；报告注记已更
-- 遗留：Premature vs gate 文档、out_of_scope 触碰丢弃、push/PR 仍待用户授权
-
-## 2026-09-12 10:50 · Cursor Lead — 开工：合约主权收口（台账 + done 正则 + 停服务）
-
-- 进行中：2026-09-12 10:50；验收=todo-list 闭线、`task_done` 不误 discard、CP/executor 已停
-- 范围：`docs/superpowers/todo-list.md`、`scripts/agent_utils.py`、`characterize-planner-advisory-filter.py`、报告注记、本文件；停 4097/LMY
-- 禁入区：他线 WIP、classify.py、合约门闩语义大改、push/PR（未授权）
-- 方式：收紧 `_DONE_AS_INSTRUCTION_RE` + pin；核对 `planner_advice_discarded` 转发；停服务
-
-## 2026-09-12 10:45 · ZCode 引擎线 — 收工：§9.4 人机分工湿测 20/20 全 PASS（回链 09:12）
-
-- 完成：**20 项全 PASS**（六 type 全覆盖+click 八子路径全命中：radio表格/input×2/date单日期/select:click字典/select:tree/页签/邻钮/弹窗查询/行选/确认回填/关闭弹窗/tssc两形态/表格行按钮/表单radio/展开树/菜单：/daterange）；收官报告 `docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md`；证据 JSON+截图 `tmp/tansun-wet/`（gitignore 本地，Temp 同步副本）
-- 湿测产出修复（均用户授权/指令）：① WET-2026-0912-CLOSEBTN 带空格按钮「取 消」匹配失败落「确 定」变保存——双侧修复 engine `873d534`（含 pin test，280 passed）+ JS-gen 源头 `b4b832e0`；② expand_all_el_tree 移出 META_STEP_ACTIONS 前端可见 `4adcf94e`（三消费点语义核验+verify-all 3 红经 stash 对照=存量红）
-- **禁入区解禁说明**：开工条目声明「不改 src/ 与 scripts/ 代码」，会话中经用户两条明确指令（「JS-gen 源头的缺陷，你也修复吧」「既然是推送步骤的话，请你还是在前端展示吧」）解禁，仅动 `scripts/controller/actions/js_snippets/close_dialog.py` 与 `src/models/meta-step-actions.js` 两文件，均单独 commit 可审计
-- 验收：逐项业务证据回读（含 SUT 业务校验拦截/隐私保护两处用户判读）；pytest 280 passed；eslint pre-commit 全过
-- 遗留移交：expand_all_el_tree 录制步骤 locator=null 推送侧硬校验拒（payload.py:333-334）→推送链元素抓取随引擎联调窗口排期；L2 端到端全链湿测 L1 收官后安排；两分支待用户+同事评审后推送/合并
-
-## 2026-09-12 10:25 · Cursor Lead — 收工：planner discard 湿测 r4（回链 10:15）
-
-- 完成：traj **762** session `72a4e367`；字面 `[planner] discard reason=next_steps_instruct_done`（stderr）；多次 kept 后命中；证据 `tmp/.../planner-discard-r4/`；报告已记
-- 验收：live filter 湿 discard ✅；触发串含 `task_done(`（regex `done\s*\(`）；`events[]` 因 start 请求中断为 0
-- 遗留：可选收紧 `_DONE_AS_INSTRUCTION_RE` 避免误伤 `task_done`；`planner_advice_discarded` 事件面未在本跑收到
-
-## 2026-09-12 10:15 · Cursor Lead — 开工：planner discard 湿测 r4（中途 done(true) 拒后再拖延）
-
-- 进行中：2026-09-12 10:15；验收=stderr `[planner] discard` 或 `events[]` 含 `planner_advice_discarded`
-- 范围：录制 API、`tmp/.../planner-discard-r4/`、报告增补、本文件；不改运行时代码
-- 禁入区：他线 WIP、合约门闩回改、classify.py
-- 方式：填名后 ≥8 次观察 → 强制一次 done(success=true) 吃 gate 拒 → 再 ≥6 次观察 → done(false)；诱导 next_steps done 口气
-
-## 2026-09-12 10:00 · Cursor Lead — 收工：planner discard 湿测 r3（回链 09:50）
-
-- 完成：traj **761** session `29f68d19`；≥3 次 `[planner] kept compatible_with_contract=true`；**无** `[planner] discard`；证据 `tmp/.../planner-discard-r3/`；报告已记
-- 验收：live filter 解析 JSON 并放行合约内建议（modify+toast 路径）✅；字面 discard 湿样本仍缺（LLM 未出 false/done 口气）
-- 遗留：若要坚持字面 discard 湿钉，需 out_of_scope 冲突探针或扩展 filter 对 out_of_scope 触碰的丢弃（规格已写、实现未全）
-
-## 2026-09-12 09:50 · Cursor Lead — 开工：planner discard 湿测 r3（加长拖延诱导 done 口气）
-
-- 进行中：2026-09-12 09:50；验收=stderr `[planner] discard`（优先 `next_steps_instruct_done`）或 `events[]` 含 `planner_advice_discarded`
-- 范围：录制 API、`tmp/.../planner-discard-r3/`、报告增补、本文件；不改运行时代码
-- 禁入区：他线 WIP、合约门闩回改
-- 方式：阶段2 填名后 ≥12 次 get_page_state 再 done(success=false)
-
-## 2026-09-12 09:45 · Cursor Lead — 收工：planner advisory discard 接线 + 湿测（回链 09:20）
-
-- 完成：`patch_planner_advice_filter` 挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard` + 事件 `planner_advice_discarded`；pin 扩 fence/kept/接线钉；湿测 traj 759/760；报告增补；提交 `49f18c0f`
-- 验收：冷 pin OK；湿测 **接线** `[planner] run`（760 / `547c35ee`）；字面 discard 湿样本未拿到（LLM 未出 incompatible）— filter 行为以冷测为准
-- 遗留：可选更长探针再诱导 `compatible_with_contract=false`；服务仍运行
-
-## 2026-09-12 09:20 · Cursor Lead — 开工：planner advisory discard 接线 + 湿测
-
-- 进行中：2026-09-12 09:20；验收=`Agent._run_planner` 经 `filter_planner_advice`；丢弃时 stderr `[planner] discard`；湿测至少一条 discard 证据
-- 范围：`scripts/agent_utils.py`、`scripts/session_runner.py`、`scripts/agent/service.py`、`characterize-planner-advisory-filter.py`、湿测 tmp/报告、本文件
-- 禁入区：改 validate_done、tansun 他线、整改 browser_use 上游包
-- 方式：猴子补丁接线 → 冷 pin → 诱导冲突的 planner 湿测
-
-## 2026-09-12 09:12 · ZCode 引擎线 — 开工：报文转换链路文档 + §9.4 人机分工湿测（续）
-
-- 进行中：09:12；湿测已 PASS 1 项（radio 表格单选，证据 tmp/tansun-wet/01-radio-table-row.json）；本任务单元=新增报文转换链路参考文档 + 继续 §9.4 清单（下一项=修改按钮点击）
-- 范围：docs/superpowers/reports/2026-09-12-payload-conversion-chain.md（新建）、docs/superpowers/agent-log.md、tmp/tansun-wet/（gitignore 本地证据）
-- 禁入区：Cursor done_rejected 湿复验线（其录制/服务启停轨迹、classify.py、合约门闩语义）、一切 src/ 与 scripts/ 代码改动、tansun_ui_engine 仓（湿测只读抽 JS 不改）、他线 WIP
-- 方式：主会话亲自写文档（file:line 带证，事实均已本会话复核）；湿测=Playwright MCP 有头浏览器 snapshot→派发同事 handler JS 原样（或等价协议级 click）→业务判据验证，用户导航，副作用操作先授权
-
-## 2026-09-12 09:10 · Cursor Lead — 收工：done_rejected 默认可观测湿复验（回链 09:05）
-
-- 完成：重启 CP+LMY executor；traj **758** session `35bee0ee-…`；stderr `[phase_done] done_rejected authority=gate … missing_evidence=['toast_ok','url_change']`；`record/start` events[] 含 `type=done_rejected`；报告 r4 节；证据 `tmp/.../done-rejected-r4/`
-- 验收：harness `PASS=true`（stderr_obs + events_obs）；无 sniff
-- 遗留：planner advisory discard 湿测样本仍缺（非本复验范围）；服务保持运行
-
-## 2026-09-12 09:05 · Cursor Lead — 开工：done_rejected 默认可观测湿复验
-
-- 进行中：2026-09-12 09:05；验收=重启服务后专项录制；agent-stderr / executor 出现 `[phase_done] done_rejected authority=gate`；可选 `events[]` 含 `done_rejected`（无临时 sniff）
-- 范围：启停服务、录制 API、`tmp/contract-sovereignty-wet/done-rejected-r4/`、报告增补、本文件；**不改**运行时代码
-- 禁入区：他线 WIP（tansun）、`classify.py`、合约门闩语义回改
-- 方式：重启 CP+executor → 对公客户管理探针 → 盯 stderr / 终态 events
-
-## 2026-09-12 02:40 · ZCode 引擎线 — 收工：tansun 兼容实装五批落地（回链 02:05 开工）
-
-- 完成（tansun_ui_engine 分支 compat/js-gen-operations，4 笔 commit）：**cb30ef8** 批1=data_name 前缀解析 helper+input 值 objectValue 优先+radio/select_tree/replay_adapter 三路 hint 剥前缀；**e0e87a9** 批2=click 七前缀子路径（关闭弹窗/展开树/页签/表格行按钮/树选/邻钮/菜单，click_subroutes.py 前置路由，miss 落回同事兜底链，裸路由 miss=skip，按钮文本剥前缀）；**eb564e3** 批4a=date event 六处清单（单日期移植 fill_date.py+daterange 双 input $emit('input',[s,e])，JS-gen 无 daterange 参考实现为按规格新写）；**75bd130** 批4b=select_click「弹窗选择」表格行选+tssc 远程表格分支（16×250ms 静置轮询防残留首行误点，字典路径 10s→3s 短等不变行为）
-- 验收：全量 pytest **279 passed**（基线 216+新增 63 用例，test_agent_e2e 4 errors=本机缺 %ComSpec% 存量环境问题）；diff 审查 10 改+8 新文件全在允许清单；**批 5 离线打样 ALL PASS**——14 步真实形态 V3 payloadJson 全链转换，断言全中（select:tree 别名归一→select_tree_option/date 过白名单单+区间/tree path JSON 数组保真/objectValue 与 val 双写无损/前缀 dataName 透传）；打样脚本=AppData\Local\Temp\tansun-wet\offline-payload-check.py
-- 子智能体四路并行（A 批1/B 批2/C1 批4a/C2 批4b）文件集互不相交，由本会话代声明代提交，无越界改动；有价值偏离已复核接受（close_dialog 补 ESC 兜底层、tree_picker 去 form-label 谓词、菜单 textContent 匹配隐藏项、daterange 新写）
-- 遗留移交：①§9.4 人机分工湿测待用户参与（chromium 后台安装中，用户导航+本会话验证 18 操作）；②SUT 待用户定（test.creditv5p2 或同事系统）；③分支未推送，用户/同事验收后合并；④V3 空元素步骤整单拒已实证（样例空 xpath 步骤被 primaryLocator 校验拦下）——推送侧 P3/P4 硬前提再确认
-- 注意：JS-gen 本单元只提交 agent-log 一文件；他线 WIP（Cursor done_rejected 线）未触碰未携带
-
-## 2026-09-12 02:05 · ZCode 引擎线 — 开工：tansun 兼容实装周末连续执行（回链 09-11 §8.3 计划+§9.4 湿测契约，用户发令）
-
-- 工作范围：D:\dev\tansun_ui_engine 分支 compat/js-gen-operations（自 TY_UI_ENGINE_1.0.0=5e12ff1 建）——ui_execute/engine/data_name.py(新)/actions/{input_action.py,radio.py,select_tree.py,replay_adapter.py,click.py,click_subroutes.py(新),date_action.py(新),select_click.py}/action_registry.py、ui_execute/models/{enums.py,payload.py}、docs/EXECUTION_PAYLOAD_MIGRATION.md、tests/{test_data_name.py,test_input_prefix.py,test_click_subroutes.py,test_date_action.py,test_select_click_rowselect.py}(新)；JS-gen 仓仅 agent-log；tmp/tansun-wet/（湿测产物）
-- 禁入区：tansun 仓其余全部（scheduler/executor/locator/config.py——5e12ff1 同事环境配置勿动）、tests 存量 16 件（只跑不改）；JS-gen 主仓 src/scripts（他线 WIP）
-- 执行方式：主会话批 0（分支+216 passed 基线+chromium 后台装）→ 写 data_name 前缀 helper → 4 并行子智能体（A=input/radio/select_tree 前缀接线+replay_adapter hint 归一+input 值字段；B=click 前缀剥离+七子路径 click_subroutes.py 前置路由；C1=date event 六处清单；C2=select_click 弹窗行选+tssc 表格分支）——子智能体不 commit 不写本文件，主会话全量 pytest+diff 审查后分批代提交；收尾 §9.4 人机分工湿测（用户导航）
-- 计划依据：报告 2026-09-10-tansun-engine-18-action-mapping-audit.md §7/§7.1/§8/§9 为唯一蓝图
-
-## 2026-09-12 02:05 · Cursor Lead — 收工：done_rejected 默认可观测（回链 01:58）
-
-- 完成：`evaluate_phase_done` 拒答 stderr `[phase_done] done_rejected authority=gate …`；`session-message` 转发 `done_rejected`；recording runner `events[]` 收录；api-docs recording 备注；pin `characterize-phase-done-validate` 扩 stderr + 源码钉
-- 验收：`characterize-phase-done-validate` OK；`characterize-contract-sovereignty` Task1/2/3/6 OK
-- 遗留：未改 recorder Premature 与 gate 双层语义合并；planner advisory 湿测样本仍缺
-
-## 2026-09-12 01:58 · Cursor Lead — 开工：done_rejected 默认可观测
-
-- 进行中：2026-09-12 01:58；验收=拒答时 stderr 含 `done_rejected authority=gate`；`session-message` 转发 `done_rejected`；录制 `events[]` 可含该类型；冷 pin 绿
-- 范围：`scripts/controller/actions/phase/intent_gates.py`、`src/routes/browser-session/session-message.js`、`src/services/trajectory/trajectory-recording-runner.js`、相关 characterization / api-docs 备注、本文件
-- 禁入区：改 validate_done 门闩语义、合并 recorder Premature、他线 WIP
-- 方式：TDD 扩 pin → stderr echo + WS/录制观测转发 → 跑 pin
-
-## 2026-09-12 01:35 · Cursor Lead — 收工：done_rejected 事件嗅探 r3（回链 01:25）
-
-- 完成：traj **757** session `9c17ae3f-…`；临时 relay tee 落盘 `tmp/contract-sovereignty-wet/done-rejected-r3/events.jsonl`；报告专项节已更新；嗅探补丁已 `git checkout` 回滚
-- 验收：字面事件 `done_rejected` · `authority=gate` · `reasons=[submit_required,success_unmet]` · `missing_evidence=[toast_ok,url_change]` · `contract_version=1`
-- 遗留：可选重启 executor 清掉内存中 tee；产品路径仍不写 stderr（仅 sniff 捕获）
-
-## 2026-09-12 01:25 · Cursor Lead — 开工：done_rejected 事件嗅探湿测 r3
-
-- 进行中：2026-09-12 01:25；验收=`events.jsonl` / executor 日志出现字面 `{"event":"done_rejected"...}` 且含 `missing_evidence`（期望 `toast_ok`）
-- 范围：临时嗅探 `executor/session-handler.js`（relay tee）、`tmp/contract-sovereignty-wet/done-rejected-r3/`、报告增补、本文件；跑完后**回滚嗅探补丁**
-- 禁入区：合约主权实现回改、`classify.py`、他线 WIP
-- 方式：重启 executor 加载嗅探 → 对公客户管理手写 2 阶段；探针 `done(success=false)` 不保存 → 收盘 events.jsonl
-
-## 2026-09-16 14:xx · OpenCode — 收工：修复 tmp/cmds 后端发版 CMD 闪退（回链本次开工）
-
-- 根因：CMD 的 Git Bash 缺失提示放在括号块内，文本中的未转义 `1)`/`2)` 会被 CMD 预解析为语法错误；即使当前 `D:\Software\Git\bin\bash.exe` 存在且路径已解析，脚本仍在上传前闪退。
-- 完成：本机 `tmp/cmds/release-backend.cmd` 改为从 `git --exec-path` 推导非标准 Git for Windows 安装根目录，并用跳转式错误提示规避括号块预解析；启动时显示仓库根目录与实际 Bash 路径。
-- 验收：真实 `release-backend.cmd check` 已通过 Git Bash 探测，打印 `D:\Software\Git\bin\bash.exe`，以 `20260916-140054` 成功完成打包并生成 `dist/JS-gen-control-plane-20260916-140054.tar.gz`（370 项）；`check` 模式按设计跳过 SCP/SSH，未改服务器。
-- 使用：双击 `tmp/cmds/release-backend.cmd` 即执行完整发版；仅需本地验证时从 CMD 运行 `tmp\cmds\release-backend.cmd check`。本机忽略工具不入库；既有 `config/.db-whitelist-seen` 未触碰。
-
-## 2026-09-16 11:xx · OpenCode — 开工：修复 tmp/cmds 后端发版 CMD 闪退
-
-- 进行中：排查 `tmp/cmds/release-backend.cmd` 双击后窗口闪退且未上传部署的问题，复现 CMD 执行并修复新位置的启动/路径/依赖检测。
-- 范围：仅本机忽略文件 `tmp/cmds/release-backend.cmd`、本协作日志；只读参考仓库根目录共享 `pack-control-plane.sh` 与 `release-backend-remote.sh`。
-- 禁入区：共享发布 shell 脚本、`src/`、`config/`、`migrations/`、线上发布目录和其他会话 WIP；不执行真实上传、迁移、重启或回滚。
-- 方式：以 CMD 包装运行捕获错误，验证根目录与 Git Bash 发现逻辑；修复后运行到安全的打包前确认边界，确保失败窗口保留并输出可诊断错误。
 
 ## 2026-09-16 11:xx · OpenCode — 开工：修复 tmp/cmds 后端发版 CMD 闪退
 
@@ -1819,6 +1355,13 @@
 - 范围：`src/` 控制面路由与 session/recording/stream 服务、`scripts/` 执行机生命周期与推流相关代码、数据库迁移/查询定义、相关文档与 characterization；本协作日志。
 - 禁入区：前端仓、线上数据库/执行机运行态、既有未提交 `config/.db-whitelist-seen`、其他会话工作区 WIP；不改变任何线上交易或会话状态。
 - 方式：先完成 `git pull` 尝试（因 GitHub 连接重置未成功），再以静态代码、迁移和测试证据追踪异常关闭后的 orphan session、重连和推流恢复路径，最后给出带文件/行号的根因与修复建议。
+
+## 2026-09-16 12:15 · Cursor — 开工：表单字段内同族控件 xpath 消歧（field_slot）
+
+- 进行中：真机调研「保证金比例」复合字段 → 方案 A 已定；写 design spec，待用户审阅后写 plan 再改代码。
+- 范围：`src/cdp/page-locator-helpers.js`（及 `_gen_locator_helpers_py` 生成物）、`src/models/element.js`、`src/cdp/locator-builders/controls.js`（若需对齐）、`scripts/manual_recorder/**`、characterization、本仓 `docs/superpowers/specs|plans`、本协作日志；前端仓 `D:\dev\ui-auto-recording-agent-vue-master\vue-project`（`trajectory-tree.ts` / step 标题路径）。
+- 禁入区：他线 WIP（白名单/发版 tmp/cmds、atomic-draft 计划线）；不改 `label_text` 语义；不回填历史轨迹；agent-log 他人条目只读。
+- 方式：主线程；先 spec→plan→实现；验证=characterization + 本页湿测。
 
 ## 2026-09-16 · Zcode Lead — AI 录制管线讲解材料产出（培训交接用）
 - 完成：`docs/superpowers/research/2026-09-16-ai-recording-pipeline-handover.md`——三路并行调研（Node 生命周期 / Python 引擎 / 数据落库）汇总成文，与回放材料（2026-09-01）配套；含 prepare 四阶段、phase 循环+假成功门闩、四 LLM 角色、cue 纠偏体系、一个点击的落库旅程、9 条易混淆点；全部带 file:line
@@ -1865,6 +1408,13 @@
 - 验收：Git Bash `bash -n pack-control-plane.sh` 通过；固定时间戳 `20991231-235959` 打包、产物存在和 `tar -tzf` 校验通过；无参打包与产物完整性校验通过；`git diff --check` 通过。
 - 遗留移交：无；本次未连接或变更线上服务器，首次点击发布可直接按现有流程执行。
 
+## 2026-09-16 10:55 · ZCode — 开工：协作协议补条（push 冲突处理规则）
+
+- 用户指令：push 遇到冲突时须处理冲突、合并后再 push。补进 AGENTS.md「跨 Agent 协作」区段
+- 范围：仅 `AGENTS.md`（协作区段）+ 本日志条目；仓库外记忆文件同步
+- 禁入区：其余文件不动；agent-log 他人条目只读
+- 方式：主线程；纯文档改动。现场注记：pull 时 SSH 22 端口间歇被 reset，改走 ssh.github.com:443 通道完成（认证正常）
+
 ## 2026-09-16 11:xx · OpenCode — 开工：修复后端一键发布脚本跨秒误拒绝
 
 - 进行中：修复 `release-backend.cmd` 先生成秒级时间戳、`pack-control-plane.sh` 稍后重新取时间导致跨秒时成功打包仍被拒绝上传的问题。
@@ -1872,11 +1422,59 @@
 - 禁入区：`src/`、`config/`、`migrations/`、`scripts/`、线上服务器及其他会话工作区 WIP。
 - 方式：CMD 将已生成时间戳显式传给打包脚本；Bash 脚本可选接收该时间戳，无参调用仍自行生成；本地验证产物命名、Shell/批处理语法与差异。
 
+## 2026-09-16 10:52 · ZCode — 开工：协作协议再升级固化（开工前 pull / log 条目 commit+push）
+
+- 用户指令：开工声明之前先 `git pull`；写完 agent log 后一律 commit 并 push（原约定只 commit）。今日将其固化进 AGENTS.md「跨 Agent 协作」区段
+- 范围：仅 `AGENTS.md`（协作区段）+ 本日志条目；仓库外记忆文件同步
+- 禁入区：其余文件不动；agent-log 他人条目只读
+- 方式：主线程；纯文档改动，pull 已先行完成
+
+## 2026-09-16 10:52 · ZCode 引擎线 — 收工：select_option 字段解析错位修复湿测 PASS（回链 10:28 开工）
+
+- 完成：commit **b3339e2a**（4 文件 +105/-8）：tssc_multi_select 字段查找改 findFieldItem（精确优先→包含唯一兜底→多命中 ambiguous-label）、prompts 同步歧义错误码、新增 characterize-tssc-field-resolution.py 入 verify-all。
+- 验收（19242 活页面，选择要素弹窗）：修复版 finder 逐 label 实测——要素名称→DOM9 本体✓（修复前命中组件要素名称 DOM7）、要素编码→DOM10✓（修复前命中组件要素编码 DOM6）、所属列表要素编码→DOM11✓、组件要素编码→DOM6✓（精确查自身名仍正常）；模糊「要素」→正确返回 6 候选歧义。离线=py_compile+SYNTAX+新 pin+finder 假 DOM 单测（精确优先/唯一包含/歧义）+verify-all 基线 4 红零新增。
+- 遗留移交：①**同族 finder 排查**——`l === label || l.includes(label)` 模式还在 select_tree.py 等处、`_resolve_control`（Python 侧）同形风险，建议单独一批改精确优先（本次按批准范围只治 tssc 病灶）；②所属列表要素编码 下拉「暂无数据」是 SUT 侧级联/数据现状（真无数据，非引擎 bug），该新增可选字段在自愈里「填不了即跳过」的策略改进仍待裁决（见 09-16 早前分析）。
+
+## 2026-09-16 10:28 · ZCode 引擎线 — 开工：select_option 字段解析错位修复（要素名称→组件要素名称，includes 包含匹配错位）
+
+- 现场实证（19242 活页面 + 引擎原版匹配逻辑）：选择要素弹窗 DOM 序含「组件要素编码(6)/组件要素名称(7)」前缀查询字段，`l === label || l.includes(label)` 首个命中被它们抢占——找「要素名称」命中「组件要素名称」、找「要素编码」命中「组件要素编码」（均为错字段）。回放 err-no-options 是对错字段弹层（所属列表要素编码，暂无数据）做出的误判。
+- 范围：仅 `scripts/controller/actions/js_snippets/tssc_multi_select.py` 字段查找两处（L27-29 主循环、L35-37 dialog 兜底）改「精确优先 → 包含唯一才用 → 多命中报 ambiguous-label」；同族 finder（select_tree.py、_resolve_control 等）本次不动、只列清单
+- 禁入区：`config/`、他线 WIP、agent-log 他人条目只读
+- 方式：主线程；验证=py_compile+模块级 import+新行为 pin（source 钉精确优先/唯一/歧义）+相关旧 pin+verify-all 对照基线 4 红+19242 活页面用更新后 snippet 实测解析落点
+
 ## 2026-09-16 · Grok Bot · 原子草稿拆分边界设计 spec
 
 - 方案 B：`produces` / `dataDependsOn`；对照 #675/#676/#678/#504
 - 路径：`docs/superpowers/specs/2026-09-15-atomic-draft-tx-split-boundary-design.md`
 - 待用户审阅 spec 后再写实现计划
+
+## 2026-09-15 22:40 · OpenCode — 收工：统一 AI click_element/click_button 同按钮去重（回链 22:25 开工）
+
+- 完成：提交 **23f58d0d**；`click_element_by_index` 与 `click_button` 共用阶段级按钮 identity，优先使用点击前解析出的稳定 xpath，缺少 xpath 时才使用按钮文本兜底；同阶段第二次命中返回 `already-operated-this-phase`，不再执行浏览器点击或写入第二条步骤。
+- 保留：人工录制 mapper/CDP 行为未修改；`click_save` 未改；表格 radio 仍走 `click_table_row_radio`；日期面板日格点击仍允许重复（同日区间需要两次点击）。
+- 验收：`characterize-ai-phase-element-guard.py`、picker 原子录制、manual table radio、tree picker、date range、click replay engine、Python 编译、`git diff --check` 全通过。
+- 遗留移交：部署/重启执行机后复测“客户名称引入”阶段，确认先后调用 `click_element_by_index(40)` 与 `click_button("选择客户")` 时只保留一条按钮步骤；`memory_writer` timeout 仍为独立基础设施告警。
+
+## 2026-09-15 22:25 · OpenCode — 开工：统一 AI click_element/click_button 同按钮去重
+
+- 进行中：修复同一 AI 阶段内同一按钮先后被 `click_element_by_index` 与 `click_button` 各录制一条的问题；共享稳定元素身份，第二次调用不再执行/落库。
+- 范围：`scripts/controller/actions/click_action_engine.py`、`scripts/controller/actions/phase/element_guard.py`、相关 characterization、本协作日志；只读参考 `scripts/state.py` 的动作落库 coalesce 与现有 picker/date 点击例外。
+- 禁入区：人工录制 mapper/CDP 采集、前端仓、`src/services/trajectory/trajectory-meta-service.js`、线上数据及其他会话 WIP；不改变 `click_save`、表格 radio、日期面板重复选日语义。
+- 方式：先在当前无未提交改动状态写入并提交声明，再补 click_button 与 click_element 的跨动作 identity 共享，验证 picker/按钮/日期相关 characterization、编译与 diff 后提交。
+
+## 2026-09-15 22:15 · OpenCode — 收工：修复第四阶段重复执行与日期范围异常（回链 21:55 开工）
+
+- 完成：提交 **022f65a2**；“填写查询/筛选条件”规则回退归类为 query，运行时 query toolbar 可纠偏误判的 create/modify pending/success 门禁；AI 同阶段成功字段写入/选择及普通索引点击再次命中时直接返回 `already-operated-this-phase`，失败动作可重试、日期面板日格点击豁免、新阶段自动清空，人工录制不经过该保护。
+- 日期修复：日期范围字段必须一次传入完整起止值；label 与 xpath 填充路径均对两个 input 写值并向 Vue model 提交数组，单日期写入范围控件返回 `err-date-range-value-required`，不再产生字符串 model 后继续查询。
+- 验收：新增 `characterize-ai-phase-element-guard.py` 并注册 verify-all；日期范围、phase intent/boundary/runtime/reviewer、form assistant、xpath fill/select、picker 原子录制、table radio、tree picker、action-log sync 等 13 项定向 characterization、Python 编译、`git diff --check` 全通过；`npm run lint` 0 error（154 warning 均为 `.venv`/既有文件）。完整 `verify-all.sh` 因本机无 `bash` 未能启动。
+- 遗留移交：部署/重启执行机后用同一五阶段场景湿测；第四阶段预期首次 `done(success=true)` 直接结束，不再重填或提前点击第五阶段【查询】；日期步骤应落库完整 `开始日期 - 结束日期`。`memory_writer` timeout 属独立基础设施告警，未修改。
+
+## 2026-09-15 21:55 · OpenCode — 开工：修复第四阶段重复执行与日期范围异常
+
+- 进行中：修复查询条件填写阶段被误套维护表单完成门禁，导致 `done()` 被 pending fields 拒绝、同阶段字段重复执行并越界点击下一阶段【查询】；同时修复 AI 通过 `fill_form_field` 写日期范围时退化为单日期字符串的问题。
+- 范围：`scripts/agent/recorder_emitters.py`、`scripts/controller/actions/phase/intent_gates.py`、AI 控制器动作分发/去重辅助、`scripts/controller/actions/js_snippets/fill_core.py`、`fill_date.py`、对应 characterization、本协作日志；不修改人工录制 mapper/CDP 采集语义和线上轨迹数据。
+- 禁入区：前端仓、`src/services/trajectory/trajectory-meta-service.js`、其他会话 WIP；不改变日期范围录制产物格式，沿用完整起止日期契约。
+- 方式：以 sid `58d8036c` 第四阶段日志为表征，先修运行时 query UI 完成门禁，再补日期范围单值拒绝/区间提交，最后仅在 AI 动作执行入口阻止同阶段同元素成功写操作重复执行；运行定向 characterization、Python 编译和综合门禁后提交。
 
 ## 2026-09-15 · OpenCode — 收工：恢复 picker 表格选行录制语义（回链本次开工条目）
 
@@ -1981,6 +1579,13 @@
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js`、线上轨迹/数据库、其他会话 WIP；不放宽失败轨迹的人工确认状态机。
 - 方式：移除函数体内重复 import，补充静态/行为回归断言，运行定向 Python characterization、编译检查与 diff 检查后提交。
 
+## 2026-09-15 15:00 · OpenCode — 开工：AI 录制阶段续跑与日期查询可靠性优化
+
+- 进行中：修复阶段 `done()` 已接受后仍因后续阶段引入字段触发预算续跑；增强日期范围逗号格式、双端输入与回读；修复网络捕获异步响应头未 await 告警。
+- 范围：`scripts/agent/service.py`、`scripts/controller/actions/network_capture.py`、`scripts/controller/actions/js_snippets/fill_date.py`、`fill_core.py`、日期字段回读相关 snippet、对应 characterization、`scripts/refactor/verify-all.sh`、本协作日志。
+- 禁入区：线上轨迹与 SUT 数据、`src/services/trajectory/trajectory-meta-service.js`、CDP/手工录制日期范围已提交链及其他会话 WIP；不猜测或修改 SUT 接口契约。
+- 方式：以用户执行日志为表征，先锁定 done 后不续跑，再统一范围值解析/双 input 写入及回读，最后异步化 network capture 过滤；运行定向 characterization、编译/语法检查、lint 与综合门禁后分步提交。
+
 ## 2026-09-15 · OpenCode — 收工：日期范围字段录制优化（回链本次开工条目）
 
 - 完成：日期编辑器快照与手工录制 blur/change 均读取全部 input，日期范围最终写成完整 `开始日期 - 结束日期` 的 `fill_date`；CDP 日期点击确认按范围值归属；日期回放解析范围并向 Vue model/两个 input 提交数组与双值。
@@ -1993,6 +1598,36 @@
 - 范围：`src/cdp/inspect.js`、`src/cdp/inspect-payload-script.js`、`src/cdp/remote-bridge/cdp-input.js`、`scripts/manual_recorder/js_parts/a.py`、`scripts/manual_recorder/js_parts/b.py`、相关 characterization、本协作日志；不修改回放动作名及线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动、其他会话 WIP、引擎仓；不处理日期面板关闭之外的基础设施告警。
 - 方式：沿日期点击确认链路扩展 editor 双 input 快照与范围值归并，保留单日期行为，补充离线 pin/语法检查后提交。
+
+## 2026-09-15 15:26 · Cursor Lead — 收工：人工确认去掉状态闸（回链 15:13 / 14:49）
+
+- 完成：`confirmTrajectory` 用户确认路径不再校验状态，`setPersistentRecordStatus(completed)` 双字段直写；取消确认闸保留；pin + api-docs 同步
+- 验收：`node scripts/characterization/characterize-record-status.mjs` OK
+- 遗留：控制面需部署重启后 829 湿测；本提交不含菜单扫描 WIP
+
+## 2026-09-15 15:13 · Cursor Lead — 开工续：人工确认去掉状态闸（用户触发直接 completed）
+
+- 进行中：15:13；用户改要求——confirm 不再校验状态，直接置已确认（已由 15:26 收工闭环）
+- 范围：同 14:49（`trajectory-meta-service.js` / `characterize-record-status.mjs` / api-docs recording.js）
+- 禁入区：菜单扫描未提交改动、`config/`、`.cursor/`、取消确认路径语义不扩
+- 方式：红 pin（无确认闸 + want 无条件 setPersistentRecordStatus completed）→ 最小实现
+
+## 2026-09-15 14:49 · Cursor Lead — 开工：人工确认双字段闸（record_status OR persistent_record_status）
+
+- 进行中：14:49；已被 15:13 续条覆盖（不再做双字段闸，改为去闸直写 completed）
+
+## 2026-09-15 14:00 · Cursor Lead — 收工：菜单同 xpath 孪生清理（回链 13:44 开工）
+
+- 完成：`buildScanApplyPlan` 同 pass 按 parent+data-id / parent+xpath 去重 create；pin 2 条绿；`prune-same-xpath-menu-twins.mjs` 已对 systemId=1 `--apply`（drop 0362/0363/0461）；复跑 dry-run 无孪生
+- 验收：`node scripts/characterization/characterize-menu-scan.mjs` OK；合同管理现余异 RES 同名对（1540↔0360、1541↔0361）属 B，未动
+- 遗留：B 讨论（同名不同 data-id 是否合并/展示）；代码与本条目待用户确认后 commit
+
+## 2026-09-15 13:44 · Cursor Lead — 开工：菜单同 xpath 孪生清理（合同管理 A）
+
+- 进行中：13:44；用户选 A（清同 xpath 孪生 + 堵住 plan 内重复 create）；B 同名不同 RES 另议
+- 范围：`src/services/menu-scan-service.js`（`buildScanApplyPlan`）、`scripts/characterization/characterize-menu-scan.mjs`、`scripts/maintenance/prune-same-xpath-menu-twins.mjs`、本文件；MySQL systemId=1 孪生消重（--apply）
+- 禁入区：同名不同 data-id 合并策略（B）；radio/search-then-click/KB 他线；`.cursor/`
+- 方式：红 pin → 修 plan 去重 → 维护脚本 dry-run/apply；不自动合并异 RES 同名叶
 
 ## 2026-09-15 · OpenCode — 收工：AI 录制 picker 阶段完成判定修复（回链本次开工条目）
 
@@ -2007,6 +1642,64 @@
 - 范围：`scripts/controller/actions/_workspace.py`、`scripts/controller/service.py`、`scripts/characterization/cold/characterize-introduce-dialog-close.py`、本协作日志；不修改线上轨迹数据。
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户改动及其他会话 WIP；不处理日志中的 `network_capture`/`memory_writer` 基础设施告警。
 - 方式：沿 `picker_dialog_select → phase_done_ok` 链路做最小修复，运行定向 characterization、Python 编译和 diff 检查后提交。
+## 2026-09-15 00:55 · ZCode 引擎线 — 收工：tooltip 泡泡框误采修复湿测 PASS 全链闭环（回链 00:23 开工）
+
+- 完成：commit **67cb3286**（`src/cdp/page-locator-helpers.js` normalizeHost 头部 popper→触发器重映射 + 生成链再生成 `_locator_helpers_js.py`）。
+- 验收（MCP 接管浏览器、产品阶段管理活页面、真实悬停触发 tooltip）：把**活的 popper**（`el-tooltip-6393`，注意 id 与昨日 `4652` 不同——动态 id 实锤）喂给 `buildLocatorSnap` → 产出 `//a[contains(@class,'el-icon-folder-add')]`，strategy=xpath_smart、**verified=true**，解析回真实图标 `<a>`（`inTooltipPopper:false`）；图标本体 snap 行为不变；库存按泡泡框文案过滤 0 命中（证明泡泡框从未入库，缺陷入口在事件/文本采集层，normalizeHost 公共入口重映射即全覆盖）；三源 pin PASS；verify-all 基线 4 红零新增。
+- 工程坑（已留痕）：helpers 文本住在模板字面量里——注释中**反引号与插值序列**都会终止模板（本次两次 SyntaxError 来源），已在修复处注释告警。
+- 遗留：无。MCP 浏览器 window.__H 残留 80KB 文本（测试浏览器，无需清理）；`tmp/mcp-chunk-*.js`/`tmp/mcp-wet-tooltip.js` 留档。
+
+## 2026-09-15 00:23 · ZCode 引擎线 — 开工：AI 录制图标点击采到 tooltip 泡泡框的修复（JS-gen 侧定位链）
+
+- 现场实证（MCP 接管浏览器 + 注入录制侧同款 PAGE_LOCATOR_HELPERS 普查）：产品阶段管理图标（`a.el-tooltip.el-icon-folder-add`）无文本，唯一可见文本是 tooltip popper（`div.el-tooltip__popper.is-dark`，动态 id `el-tooltip-4652`）；文本/事件目标采到 popper 时 `buildLocatorSnap(popper)` 产出 `//div[@id='el-tooltip-4652']`（动态 id 入 xpath）→ 回放即失效。popper **不带 `.el-popper` 类**，现有枚举黑名单拦不住。
+- 范围：`src/cdp/page-locator-helpers.js`（normalizeHost 头部加 popper→触发器重映射，经 aria-describedby 反查）+ `node scripts/_gen_locator_helpers_py.mjs` 再生成 `scripts/controller/actions/js_snippets/_locator_helpers_js.py`（禁手改，走生成链）
+- 禁入区：`config/`、他线未提交改动、`scripts/controller/actions/fill_engine.py`（我刚提交的守卫，本次不动）、agent-log 他人条目只读
+- 方式：主线程实施；验证=三源一致 pin（characterize-xpath-three-sources 等）+verify-all 对照基线 4 红+MCP 活页面复测（popper→图标 xpath verified）
+
+## 2026-09-14 22:25 · ZCode 引擎线 — 收工：图标按钮点击可靠性修复（他仓 commit 41992f0，回链 22:05 开工）
+
+- 完成：tansun_ui_engine（TUE_1.0.1_LMY）**41992f0**，单文件 click.py +57/−4——① `JS_CLICK_ICON_BUTTON` 图标段由「DOM 顺序首个即点」改为「收集全部命中 → 排除页头（.headerbox/.navbar/.header__action-item，滤空回退全量）→ 恰剩一个才点（`ok-icon:<label>`）→ 多个显式 `err-icon-label-ambiguous:<candidates JSON>`」；② 新增 `icon_button` 子路由接线 `_DATA_NAME_SUBROUTES`（「图标：X」专属路径，歧义=该步最终 error 不落回，miss 才回通用链；函数放 click.py 因复用本模块 JS 避免循环导入）；③ `_click_by_button_text` 歧义短路（容器级判歧义后不再让页面级图标 JS 兜底）。lead 设计、双子智能体并行实现（文件集不相交，均未 commit），主会话复核 diff+传播路径后代提交
+- 验收：ruff 全过；JS node --check 过；本地测试 **46 passed**（40 旧全绿 + 6 新 pin：接线/JS 消歧契约/ok 路径/歧义不落回/miss/空 hint）；`err-icon-label-ambiguous` 传播路径人工复核（→ status=error，无误点兜底）。**真机 dry-run 未完成**：MCP 会话在探测时过期跳登录页（凭据不过 ZCode）；结论不受影响——上轮真机已实采该页「上移」双候选现场（页头 span 在前/工具栏 a 在后），新逻辑输出确定为「滤页头 → 恰剩工具栏一个 → 点它」；登录后跑一次 `图标：上移` 预期日志 `图标按钮点击完成 … result=ok-icon:上移` 即终验
+- 同批在库（TUE_1.0.1_LMY，均未 push）：0db22e0（合并上游 a6617f6：date 闸门去重取 pkgutil 版+树节点点击加强）、1cd1533（select:tree 叶模式）、f4c1345（date 三闸门+菜单导航）
+
+## 2026-09-14 22:05 · ZCode 引擎线 — 开工：引擎图标按钮点击可靠性修复（lead + 2 子智能体）
+
+- 进行中：2026-09-14 22:05；验收=「上移」类歧义名称不再静默点错（多候选优先非页头、仍歧义显式 err-icon-label-ambiguous）+ `图标：` 前缀接线可按图标标签点击
+- 范围：tansun_ui_engine（TUE_1.0.1_LMY，已含合并 0db22e0）`ui_execute/engine/actions/click.py`（JS_CLICK_ICON_BUTTON 歧义守卫 + icon_button 子路由 + 路由表接线）与 `tests/test_click_subroutes.py`（**本地件不提交**，pin 更新）；JS-gen 侧仅本文件
+- 禁入区：引擎仓其余文件（含 tests/test_date_action.py、config.py）、JS-gen 源码、push、SUT 真实数据变更（真机只做 dry-run 解析验证不点击）
+- 方式：主会话设计并代子智能体声明；子智能体 A=click.py 实现、B=本地测试 pin（文件集不相交），均不 commit；主会话复核 + node --check + ruff + pytest + 真机 dry-run 后代提交
+
+## 2026-09-14 21:52 · ZCode 引擎线 — 收工：pull 引入的 2 个 characterization 红项已修（回链 21:44 开工）
+
+- 完成：commit **0f3f2f55**（2 文件 +23/-6，只改判据、不动同事源码）。
+  ① `cold/characterize-search-then-click-prompts.py`：needle「不要为此增删 phase 条数」随 78c89d77 提示词重写被删，纪律由规则 9 承接 → 更新为「不要为了凑数量而拆分」，并存沿革注释；其余 3 针保留。
+  ② `characterize-select-option-stamp.py`：400 字字符窗口判据改为**同一缩进分支块**内断言（3763893d 的纯新增行把距离 365→454 即误红）。
+- 验收：两 pin 单跑 PASS；**变异测试证明强度未降**（删该分支打点行→红、分支内改名→红）；verify-all 回到基线 4 红，零新增。
+- 遗留：无（活页面湿测那条仍属上一条 21:41 条目的待补项，非本条范围）。
+
+## 2026-09-14 21:44 · ZCode 引擎线 — 开工：修复 pull 引入的 2 个 characterization 红项
+
+- 范围：`scripts/characterization/cold/characterize-search-then-click-prompts.py`（needle 按新提示词更新）、`scripts/characterization/characterize-select-option-stamp.py`（400 字窗口判据改结构化）
+- 判据前提（已核）：两红均非本次改动引入，且**源码属性仍成立**——① 提示词规则 9「不要为了凑数量而拆分本应合并的操作」承接原「不要为此增删 phase 条数」的数量纪律（措辞变、意图在）；② select_engine no-items 分支仍 `stamped = resolve_recorded_option_text(...)` → `params['option_text'] = stamped`，只是被 3763893d 新增一行把距离从 365 推到 454 越窗。
+- 禁入区：不动 `src/services/trajectory/trajectory-meta-service.js` 与 `select_engine.py` 源码（同事线，只改判据）；agent-log 他人条目只读
+- 方式：主线程；验证=两 pin 单跑 PASS + verify-all 回到基线 4 红
+
+## 2026-09-14 21:41 · ZCode 引擎线 — 收工：fill_form_field 同值重填守卫（回链 21:34 开工；活页面湿测待补）
+
+- 完成：commit **63209340**（4 文件 +99/-1）：`fill_engine.py` 录制态同值跳过守卫、`agent-tools-form.md` 终检纪律（先比对再重填）、新增 `characterize-fill-already-filled.py` 入 verify-all。
+- 验收（离线）：py_compile+模块级 import PASS；**行为单测三路径 PASS**（同值→`already-filled` 且不执行真实填充；异值→放行；探测异常→fail-open）；form-engine-scope-audit PASS；verify-all 经逐项比对确认本次改动零新增红。
+- 坑（值得记）：函数体后段一处同名**局部 import** 使 `field_values_equivalent` 在整函数作用域退化为局部名，守卫在其之前引用即 UnboundLocalError —— **AST 未解析名守卫查不出「已解析但晚绑定」，行为测试才抓到**；已固定（局部别名 `_fve`）并入 pin。
+- 遗留移交（**非本次改动引入，属同事入站提交**，已用 8e1403c9 vs HEAD 逐项量化证实，建议转告）：
+  ① `characterize-search-then-click-prompts` 红 —— `src/services/trajectory/trajectory-meta-service.js` 因提示词重写（78c89d77）丢失旧针 `不要为此增删 phase 条数`，需同 commit 更新 pin；
+  ② `characterize-select-option-stamp` 红 —— 3763893d 在 helper 调用与 `no-items-skip` 之间插入 `_mark_picker_selection_success(...)`，把距离从 365 推到 454，越出该 pin 的 400 字窗口（判据本身过脆，建议同时放宽或改为结构化断言）。
+- 待补：19242 活页面双场景湿测（同值→跳过不记录；异值→覆盖并记录）。当前测试浏览器（19242）与控制面（4097）均未运行，无法执行；`tmp/fill-guard-behavior-test.py` 已就绪可复用。
+
+## 2026-09-14 21:34 · ZCode 引擎线 — 开工：fill_form_field 同值重填守卫（助手填完主 Agent 再填=重复步骤）
+
+- 范围：`scripts/controller/actions/fill_engine.py`（录制态同值跳过，约 +25 行）、`scripts/prompts/agent-tools-form.md`（终检纪律改为先比对再重填）、新增 `scripts/characterization/characterize-fill-already-filled.py` + `scripts/refactor/verify-all.sh` 注册一行
+- 禁入区：`config/`（他线未提交 update-db-whitelist.ps1）、`src/services/trajectory/trajectory-recording-runner.js` 与 `src/routes/browser-session/executor-events.js`（同事刚修完的重复落库链，只读不碰）、agent-log 他人条目只读不删
+- 方式：主线程实施；只插入代码不改既有行（AGENTS.md 硬约束）；验证=py_compile+模块级 import+form-engine-scope-audit（AST 未解析名守卫）+新 pin+verify-all 对照已知 4 存量红；19242 活页面双场景湿测（同值→不记录；异值→覆盖并记录）
+
 ## 2026-09-14 · OpenCode — 收工：trajectory 828/remoteSession 1660 阶段弹窗误关闭修复（回链本次开工条目）
 
 - 完成：提交 **3763893d**；`select_option` 各成功路径记录 `picker_closed` 选择器完成证据，但不关闭父级业务 drawer；阶段 done 守卫据此不再因父 drawer 可见而注入多余 `close_dialog`，下一阶段可继续点击同一 drawer 内的【下一步】。
@@ -2035,6 +1728,17 @@
 - 禁入区：`src/services/trajectory/trajectory-meta-service.js` 用户既有改动及其他会话 WIP；不修改线上 trajectory 827/remoteSession 1656 数据。
 - 方式：先确认日志与录制/落库链路，再做最小 listener 边界修复，运行定向 Node 检查/characterization，提交后回报部署与复测要求。
 
+## 2026-09-14 18:05 · Cursor Automation — 收工：2026-09-13 北京时间工作日报归档
+
+- 完成：`docs/report/2026-09-13.md` + `docs/report/README.md` 索引行；统计窗口 09-13 00:00–24:00，4 条提交（叶模式 DFS 兜底 + 他仓 select:tree 对齐）
+- 验收：git log 四笔与 agent-log 09-13 三条收工/开工条目交叉核对；前日 09-12 无独立日报，遗留对照 09-11 + 09-12 agent-log
+- 遗留移交：09-12 日报仍缺归档；引擎 select:tree 真机复验、主链 R6/R7 等见日报遗留表
+
+## 2026-09-14 18:03 · Cursor Automation — 开工：2026-09-13 北京时间 cron 日报生成
+
+- 范围：仅 `docs/report/2026-09-13.md`、`docs/report/README.md`、`docs/superpowers/agent-log.md`（本条目）
+- 禁入区：`src/`、`scripts/` 业务代码、他线 WIP；不做 Hermes/memory 大扫除
+- 方式：git log + agent-log + 09-12 湿测报告归纳；cron 触发 2026-09-14T10:03Z（北京 18:03）
 ## 2026-09-14 · OpenCode — 收工：trajectory 785 日志复核与截图采集时序修复（回链本次开工条目）
 
 - 完成：提交 **577d322a**；状态组截图改为“先捕获浏览器画面，再异步进入上传/落库队列”，MinIO 超时不再阻塞后续状态捕获；保留步骤与截图的 entryId 绑定。
@@ -2062,6 +1766,50 @@
 - 范围：`src/services/trajectory/trajectory-recording-runner.js`、`src/services/trajectory/recording-runner-step-context.js`、`src/services/trajectory/recording-page-bind.js`、相关 trajectory/screenshot DAO 与 routes、`scripts/recorder.py`、`scripts/agent/recorder_emitters.py`、`scripts/controller/actions` 中 `read_business_date` 相关实现/提示词、针对性 characterization。
 - 禁入区：当前工作区已有 `src/services/trajectory/trajectory-meta-service.js` 改动；其他会话在途文件及未明确相关的引擎/KB 线。
 - 方式：先用 git 历史和静态链路确认根因，再按现有事件归属/去重契约做最小改动；验证以 characterization、Python/Node 静态检查及必要的录制接口冒烟为准。
+
+## 2026-09-13 01:10 · ZCode 引擎线 — 收工：tansun 引擎 select:tree 对齐叶模式策略（他仓 commit 1cd1533，回链 00:40 线）
+
+- 触发：同事（经用户转达）建议引擎仓 select:tree 同步 JS-gen 叶模式三级策略（协议不动，只改内部实现）
+- 完成：tansun_ui_engine（TUE_1.0.1_LMY）**1cd1533**，单文件 `ui_execute/engine/actions/select_tree.py` +235/−4——复用本仓移植过去的 `_real_click`/`JS_REAL_CLICK_ECHO`/`_popover_has`/`_click_path`，新增 `JS_TREE_SEARCH_FILL/SEARCH_MATCHES/DFS_PATH`（逐字移植）+ `_real_click_at`（坐标 CDP 真点）+ `_tree_search_clear` + `_tree_click_leaf_search` 编排；接线 `select:tree` 与 `tree_picker_click` 支持单叶子名（路径数组模式不变）
+- 设计取舍（已提请用户与同事确认）：叶子名直达失败仅**结构性**错误（弹层没开/触发器找不到/树数据不可达）才回落合成 JS；**歧义与数据无此叶不回退**——合成注入在该 SUT 会假成功，宁明确失败不假 ok
+- 验收：ruff 全过、3 个 JS 片段 node --check 过、引擎仓本地测试 40 passed；**真机复验未做**（MCP 会话过期被踢到登录页），验收用例照抄 00:40 条目两条即可（对公流贷=直达 / KB测子类-…=DFS），预期日志 `ok:via=search-real-click` / `ok:via=data-dfs-path`
+- 同批在库：f4c1345（date 三闸门+菜单按名点击/直达路由+导航与页面就绪门闩），均已 commit 未 push
+
+## 2026-09-13 00:40 · ZCode 引擎线 — 收工：叶模式兜底二段湿测 PASS，全链闭环（回链 00:14 开工）
+
+- 完成：兜底实施 commit **c60309e4**（JS_TREE_PICKER_DFS_PATH + 导出 + 叶模式无果分支 + _tree_picker_walk_path + prompt 同步）。
+- 验收（19242 活页面，产品目录字段，未保存零净变更）：带连字符叶子 `KB测子类-20260907-1835` 搜索必败 → 自动兜底 DFS 解析路径 `[KB测一级-20260907-1835, KB测子类-20260907-1835]` → 逐级 CDP 真点 → 回显校验 `ok, via=data-dfs-path`，8.1s，弹层自关，字段值=叶子；DFS 抽检 `对公流贷`→恰好 1 条 `[贷款,对公,对公流贷]`；离线=compile+import+pin+verify-all（同 4 存量红）+DFS Node 逻辑测试（唯一/同父同名去重/跨父歧义/不存在）+Python 去重单测全过。
+- 至此叶模式三级递进全链实测闭环：搜索直达（昨夜 PASS）→ DFS 寻路真点（本次 PASS）→ 歧义交还 path。遗留：SUT 搜索剥特殊字符属门户自身行为（已绕过不必修）；湿测脚本 tmp/wet-tree-dfs-fallback.py、tmp/dfs-path.test.cjs 留档。
+
+## 2026-09-13 00:14 · ZCode 引擎线 — 开工：tree_picker_click 叶模式兜底二段（搜索无果→数据侧 DFS 寻路真点）
+
+- 范围：`scripts/controller/actions/js_snippets/tree_picker.py`（+JS_TREE_PICKER_DFS_PATH）、`_js_snippets.py`（导出）、`_tree.py`（叶模式无果分支+`_tree_picker_walk_path`）、`scripts/prompts/agent-tools-tree.md`（兜底说明）
+- 禁入区：`config/`、`scripts/session_runner.py` 等他线 WIP；agent-log 他人条目只读不删
+- 方式：主线程实施；验证=compile+import+pin+verify-all 对照已知 4 存量红+19242 活页面湿测（带连字符叶子搜索必败→兜底路径真点，字段现值即该叶子=同值重选零风险）
+
+## 2026-09-12 22:40 · ZCode 引擎线 — 收工：tree_picker_click 叶子名直达双模式湿测闭环（回链 21:42 开工）
+
+- 完成：实施 commit **6fd303a9**（7 文件：搜索直达片段×2、签名可选化+叶子分支、_normalize_params 别名、event_dispatch 白名单、prompt 双模式、cold pin 针同步）+ 守卫补丁 **5e6d51fc**（弹层已开不重复开）。
+- 验收（19242 活页面，产品目录字段，全程未保存、零净变更）：①叶子名模式真选「对公流贷」→ `ok, echo=对公流贷, via=search-real-click`，1.5s，弹层自关；②path 模式真点 KB测一级→KB测子类 把值还原 → echo=KB测子类-20260907-1835；③对照实验实证 SUT 树搜索自身剥连字符（`KB测子类-…`→0 结果、`对公流贷`→精确 3 节点），带 `-` 等特殊字符的叶子名搜索直达不可用、path 模式不受影响；④离线=compile+import+单测+6 pin+verify-all（同 4 存量红，无新增）。
+- 遗留移交：①SUT 树搜索剥特殊字符是门户自身行为，如需支持带 `-` 叶子名可在叶模式加「搜索无果→按前缀逐级展开」兜底（未做，待裁决）；②分类目录（新增分类弹窗）字段第一次探测报 popover-not-open，未二查（用户改指产品目录）；③/tmp 湿测脚本 wet-tree-leaf-search*.py 留档。
+
+## 2026-09-12 21:42 · ZCode 引擎线 — 开工：tree_picker_click 叶子名直达（path 可选化）+ 老参数兼容
+
+- 范围：`scripts/controller/actions/js_snippets/tree_picker.py`（新增搜索直达片段）、`_js_snippets.py`（re-export）、`_tree.py`（签名可选化+叶子分支）、`_replay.py`（_normalize_params 别名）、`scripts/event_dispatch.py`（签名白名单补登）、`scripts/prompts/`（若提及该动作则同步）
+- 禁入区：`config/`、`scripts/session_runner.py` 等他线 WIP；agent-log 他人条目只读不删
+- 方式：主线程实施；验证=py_compile+模块级 import+characterization pin（含更新若钉住签名）+verify-all 对照已知 4 存量红；19242 活页面 replay API 单步湿测（真选叶子「对公流贷」，用户已批准）
+
+## 2026-09-12 17:40 · ZCode 引擎线 — 收工：回放误触发表单结构自愈修复（回链 17:24 开工）
+
+- 完成：`scripts/controller/actions/js_snippets/misc.py` JS_VERIFY_FORM_STRUCTURE 的 expectedLabels 表达式一处（`f.label || f` → `(f&&typeof f==='object')?(f.label??''):f`），commit **48c99419**。根因=空 label 布尔坑把 tssc 按钮行 form-item（label=''）误判为新增可选字段，恒产 `added_optional:['']` 误入 Phase2 结构自愈。
+- 验收：py_compile+模块级真实 import PASS；渲染后片段 Node 行为测试双对照 PASS（修复=零差异；旧式=精确复现线上 `added_optional:['']`，tmp/verify-form-structure-empty-label.test.cjs）；verify-all 4 红经 HEAD 基线复跑比对确认为存量/环境（step-highlight、export-v3=无 VPN 断库取不到真数据；layer-tree=traj33 数据漂移；confirm-notification=读 `_misc.py` 通知 marker 漂移），**与本改动无关，零新增红**。
+- 遗留移交：①录制侧快照口径排除无输入控件的按钮 form-item（动静大，待裁决）；②上述 4 项存量红归各自线（库依赖项 VPN 恢复后自愈、_misc.py marker 漂移归引擎线复核）；③`memory_writer flush timed out`（无 VPN 机器网络层现象，未深查）。
+
+## 2026-09-12 17:24 · ZCode 引擎线 — 开工：回放误触发表单结构自愈修复（misc.py 一行）
+
+- 范围：仅 `scripts/controller/actions/js_snippets/misc.py`（回放比对 expectedLabels 表达式一处，约 304 行）
+- 禁入区：`scripts/session_runner.py`、`config/`（他线有未提交改动：update-db-whitelist.ps1 / start-tansun-engine.ps1）、agent-log 他人条目只读不删
+- 方式：主线程单点 Edit；验证=py_compile+模块级真实 import+Node 端行为测试（空 label 期望对象复现 added_optional 消失）+verify-all；不派子智能体
 
 ## 2026-09-12 · OpenCode — 收工：本地启动 MySQL 连接超时修复（回链本条开工）
 
@@ -2091,9 +1839,175 @@
 - 禁入区：服务模块的在途实现逻辑、`src/services/` 外所有文件及当前工作区的其他改动；提交时只暂存本次注释与本文件。
 - 方式：按互不重叠目录翻译并进行静态检查，复核仅注释差异和 lint 后提交。
 
+## 2026-09-12 11:35 · ZCode 引擎线 — 开工+收工：同事引擎 mega 菜单不收起修复（他仓 commit 8356af4）
+
+- 触发：用户报告引擎执行实际任务时子菜单无法关闭（截图：产品管理面板残留盖住页面）
+- 根因（真机实证）：本 SUT mega 菜单只认面板外 **trusted mousedown**；引擎 `菜单：` 只发合成 `el.click()`，通用链 mousedown 也是 `dispatchEvent`（isTrusted=false）、Escape 亦无效 → 面板残留。用户失败链的菜单步是 `[click] 菜单切换-1/2`（走通用链，非 `菜单：` 子路由）
+- 修复（**他仓** `D:/dev/tansun_ui_engine` compat/js-gen-operations，commit **8356af4**，3 文件）：移植 JS-gen `page_id.py:190` 选点 + `_replay.py:204` 真实鼠标 down/up → `dismiss_mega_menu()`；`menu_item()` 与「菜单切换」前缀两条成功路径挂钩；5 条 pin（含禁止简化成合成 click 的防再犯断言）
+- 验收：冷测 28 passed；**真机同调用对照** 开面板 8 项 → 合成 mousedown 仍 8 项 → 真实 move/down/up 后 **0** 项，800ms 复查仍 0；证据 `tmp/tansun-wet/22-menu-panel-dismiss.json`
+- 遗留：① 引擎进程级整合复跑待用户执行（运行中实例 PID 30472 早于修复、不热加载；且该链含凭据）；② **合并波及备案**：用户 11:02 合入上游（b67a605）带来 `.gitignore tests/` 并删 20 个测试文件（281→70 用例），`test_select_click_rowselect.py` import 断裂致全量唯一 1 failed，与本修复无关；③ 「菜单切换」父级分支未挂载问题（WET-2026-0912-MENUBRANCH）仍未修
+
+## 2026-09-12 10:55 · Cursor Lead — 收工：合约主权收口（回链 10:50）
+
+- 完成：① `todo-list` `contract-sovereignty-wet` → **P3 已闭**（754/758/762）；② `_DONE_AS_INSTRUCTION_RE` 收紧 `(?<![A-Za-z_])done\s*\(` + pin（`task_done` 不误伤）；`planner_advice_discarded` 转发已在 `session-message.js` / recording-runner（r4 events=0 系 start 中断非缺接线）；④ CP `339435`/executor `339431` 已停
+- 验收：`characterize-planner-advisory-filter: OK`；报告注记已更
+- 遗留：Premature vs gate 文档、out_of_scope 触碰丢弃、push/PR 仍待用户授权
+
+## 2026-09-12 10:50 · Cursor Lead — 开工：合约主权收口（台账 + done 正则 + 停服务）
+
+- 进行中：2026-09-12 10:50；验收=todo-list 闭线、`task_done` 不误 discard、CP/executor 已停
+- 范围：`docs/superpowers/todo-list.md`、`scripts/agent_utils.py`、`characterize-planner-advisory-filter.py`、报告注记、本文件；停 4097/LMY
+- 禁入区：他线 WIP、classify.py、合约门闩语义大改、push/PR（未授权）
+- 方式：收紧 `_DONE_AS_INSTRUCTION_RE` + pin；核对 `planner_advice_discarded` 转发；停服务
+
+## 2026-09-12 11:00 · ZCode 引擎线 — 补记：WET-2026-0912-DATEPANEL 缺陷双侧修复（回链 09:12 / 10:45）
+
+- 触发：用户复看第 20 项截图追问「daterange 不会自动关闭日期弹框吗」——属实，面板残留盖住表格
+- 根因（实证）：`closePanels()` 只改 DOM 样式，组件 `vm.pickerVisible` 仍 true，Element popper 按自身状态重绘把压制覆盖回去；样式压制对 Vue 重渲染无效。单日期路径同病根（第 05 项 `knownCosmetic` 已记录同一残留）
+- 修复：`closePickerVm()` 状态级关闭（=`pickerVisible=false`，回落 `handleClose()`），两分支 blur 后调用，样式压制留作兜底
+  - 引擎 `ui_execute/engine/actions/date_action.py` + pin test — commit **013a67d**（pytest 281 passed）
+  - JS-gen 源头 `scripts/controller/actions/js_snippets/fill_date.py` — commit **b9694d1b**（**禁入区第二次解禁说明**：用户追问即授权修此缺陷；同目录同病根，已单独 commit 可审计）
+- 真机复验：修复后集成 JS 返回 `ok-date-range`，t0/500ms/2000ms 面板均关闭不被重新拉起，三层值一致；证据 `tmp/tansun-wet/20b-daterange-panel-closed-fix.png`
+- 边界：JS-gen 单日期路径的独立真机复验待做（当页无单日期控件；逻辑与引擎修复同源，关闭机制已同 SUT 真机证明）——下次落到带单日期页面顺手复验
+- 报告已同步：`docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md` §三·补
+
+## 2026-09-12 10:45 · ZCode 引擎线 — 收工：§9.4 人机分工湿测 20/20 全 PASS（回链 09:12）
+
+- 完成：**20 项全 PASS**（六 type 全覆盖+click 八子路径全命中：radio表格/input×2/date单日期/select:click字典/select:tree/页签/邻钮/弹窗查询/行选/确认回填/关闭弹窗/tssc两形态/表格行按钮/表单radio/展开树/菜单：/daterange）；收官报告 `docs/superpowers/reports/2026-09-12-tansun-engine-wettest-94.md`；证据 JSON+截图 `tmp/tansun-wet/`（gitignore 本地，Temp 同步副本）
+- 湿测产出修复（均用户授权/指令）：① WET-2026-0912-CLOSEBTN 带空格按钮「取 消」匹配失败落「确 定」变保存——双侧修复 engine `873d534`（含 pin test，280 passed）+ JS-gen 源头 `b4b832e0`；② expand_all_el_tree 移出 META_STEP_ACTIONS 前端可见 `4adcf94e`（三消费点语义核验+verify-all 3 红经 stash 对照=存量红）
+- **禁入区解禁说明**：开工条目声明「不改 src/ 与 scripts/ 代码」，会话中经用户两条明确指令（「JS-gen 源头的缺陷，你也修复吧」「既然是推送步骤的话，请你还是在前端展示吧」）解禁，仅动 `scripts/controller/actions/js_snippets/close_dialog.py` 与 `src/models/meta-step-actions.js` 两文件，均单独 commit 可审计
+- 验收：逐项业务证据回读（含 SUT 业务校验拦截/隐私保护两处用户判读）；pytest 280 passed；eslint pre-commit 全过
+- 遗留移交：expand_all_el_tree 录制步骤 locator=null 推送侧硬校验拒（payload.py:333-334）→推送链元素抓取随引擎联调窗口排期；L2 端到端全链湿测 L1 收官后安排；两分支待用户+同事评审后推送/合并
+
+## 2026-09-12 10:25 · Cursor Lead — 收工：planner discard 湿测 r4（回链 10:15）
+
+- 完成：traj **762** session `72a4e367`；字面 `[planner] discard reason=next_steps_instruct_done`（stderr）；多次 kept 后命中；证据 `tmp/.../planner-discard-r4/`；报告已记
+- 验收：live filter 湿 discard ✅；触发串含 `task_done(`（regex `done\s*\(`）；`events[]` 因 start 请求中断为 0
+- 遗留：可选收紧 `_DONE_AS_INSTRUCTION_RE` 避免误伤 `task_done`；`planner_advice_discarded` 事件面未在本跑收到
+
+## 2026-09-12 10:15 · Cursor Lead — 开工：planner discard 湿测 r4（中途 done(true) 拒后再拖延）
+
+- 进行中：2026-09-12 10:15；验收=stderr `[planner] discard` 或 `events[]` 含 `planner_advice_discarded`
+- 范围：录制 API、`tmp/.../planner-discard-r4/`、报告增补、本文件；不改运行时代码
+- 禁入区：他线 WIP、合约门闩回改、classify.py
+- 方式：填名后 ≥8 次观察 → 强制一次 done(success=true) 吃 gate 拒 → 再 ≥6 次观察 → done(false)；诱导 next_steps done 口气
+
+## 2026-09-12 10:00 · Cursor Lead — 收工：planner discard 湿测 r3（回链 09:50）
+
+- 完成：traj **761** session `29f68d19`；≥3 次 `[planner] kept compatible_with_contract=true`；**无** `[planner] discard`；证据 `tmp/.../planner-discard-r3/`；报告已记
+- 验收：live filter 解析 JSON 并放行合约内建议（modify+toast 路径）✅；字面 discard 湿样本仍缺（LLM 未出 false/done 口气）
+- 遗留：若要坚持字面 discard 湿钉，需 out_of_scope 冲突探针或扩展 filter 对 out_of_scope 触碰的丢弃（规格已写、实现未全）
+
+## 2026-09-12 09:50 · Cursor Lead — 开工：planner discard 湿测 r3（加长拖延诱导 done 口气）
+
+- 进行中：2026-09-12 09:50；验收=stderr `[planner] discard`（优先 `next_steps_instruct_done`）或 `events[]` 含 `planner_advice_discarded`
+- 范围：录制 API、`tmp/.../planner-discard-r3/`、报告增补、本文件；不改运行时代码
+- 禁入区：他线 WIP、合约门闩回改
+- 方式：阶段2 填名后 ≥12 次 get_page_state 再 done(success=false)
+
 ## 2026-09-12 · Grok Bot · 开场+收工：落地 atomize prompt 修订（Opencode 对齐）
 
 - 范围：覆盖 scripts/prompts/req-draft-traj-atomize-prompt.md；样板保留 docs/superpowers/prompt-engineering/product-element-taskdraft-samples.md；**不改** propose.js（可选字段 preconditions/dataDependsOn 暂写在 taskDraft 文首亦可）
 - 增量：一功能一交易；禁止菜单导航步；taskDraft 可执行性规范；可选 layoutHints/preconditions/dataDependsOn；保留 JSON-only / 出处占位 / flowCards
 - 方式：用户审过 REVISION 后覆盖线上；他线 WIP 未携带
 - 验证：Cursor 侧测试接管；本刀仅 prompt 文本
+
+## 2026-09-12 09:45 · Cursor Lead — 收工：planner advisory discard 接线 + 湿测（回链 09:20）
+
+- 完成：`patch_planner_advice_filter` 挂入 `Agent._run_planner`；stderr `[planner] run|kept|discard` + 事件 `planner_advice_discarded`；pin 扩 fence/kept/接线钉；湿测 traj 759/760；报告增补；提交 `49f18c0f`
+- 验收：冷 pin OK；湿测 **接线** `[planner] run`（760 / `547c35ee`）；字面 discard 湿样本未拿到（LLM 未出 incompatible）— filter 行为以冷测为准
+- 遗留：可选更长探针再诱导 `compatible_with_contract=false`；服务仍运行
+
+## 2026-09-12 09:20 · Cursor Lead — 开工：planner advisory discard 接线 + 湿测
+
+- 进行中：2026-09-12 09:20；验收=`Agent._run_planner` 经 `filter_planner_advice`；丢弃时 stderr `[planner] discard`；湿测至少一条 discard 证据
+- 范围：`scripts/agent_utils.py`、`scripts/session_runner.py`、`scripts/agent/service.py`、`characterize-planner-advisory-filter.py`、湿测 tmp/报告、本文件
+- 禁入区：改 validate_done、tansun 他线、整改 browser_use 上游包
+- 方式：猴子补丁接线 → 冷 pin → 诱导冲突的 planner 湿测
+
+## 2026-09-12 09:12 · ZCode 引擎线 — 开工：报文转换链路文档 + §9.4 人机分工湿测（续）
+
+- 进行中：09:12；湿测已 PASS 1 项（radio 表格单选，证据 tmp/tansun-wet/01-radio-table-row.json）；本任务单元=新增报文转换链路参考文档 + 继续 §9.4 清单（下一项=修改按钮点击）
+- 范围：docs/superpowers/reports/2026-09-12-payload-conversion-chain.md（新建）、docs/superpowers/agent-log.md、tmp/tansun-wet/（gitignore 本地证据）
+- 禁入区：Cursor done_rejected 湿复验线（其录制/服务启停轨迹、classify.py、合约门闩语义）、一切 src/ 与 scripts/ 代码改动、tansun_ui_engine 仓（湿测只读抽 JS 不改）、他线 WIP
+- 方式：主会话亲自写文档（file:line 带证，事实均已本会话复核）；湿测=Playwright MCP 有头浏览器 snapshot→派发同事 handler JS 原样（或等价协议级 click）→业务判据验证，用户导航，副作用操作先授权
+
+## 2026-09-12 09:10 · Cursor Lead — 收工：done_rejected 默认可观测湿复验（回链 09:05）
+
+- 完成：重启 CP+LMY executor；traj **758** session `35bee0ee-…`；stderr `[phase_done] done_rejected authority=gate … missing_evidence=['toast_ok','url_change']`；`record/start` events[] 含 `type=done_rejected`；报告 r4 节；证据 `tmp/.../done-rejected-r4/`
+- 验收：harness `PASS=true`（stderr_obs + events_obs）；无 sniff
+- 遗留：planner advisory discard 湿测样本仍缺（非本复验范围）；服务保持运行
+
+## 2026-09-12 09:05 · Cursor Lead — 开工：done_rejected 默认可观测湿复验
+
+- 进行中：2026-09-12 09:05；验收=重启服务后专项录制；agent-stderr / executor 出现 `[phase_done] done_rejected authority=gate`；可选 `events[]` 含 `done_rejected`（无临时 sniff）
+- 范围：启停服务、录制 API、`tmp/contract-sovereignty-wet/done-rejected-r4/`、报告增补、本文件；**不改**运行时代码
+- 禁入区：他线 WIP（tansun）、`classify.py`、合约门闩语义回改
+- 方式：重启 CP+executor → 对公客户管理探针 → 盯 stderr / 终态 events
+
+## 2026-09-12 02:40 · ZCode 引擎线 — 收工：tansun 兼容实装五批落地（回链 02:05 开工）
+
+- 完成（tansun_ui_engine 分支 compat/js-gen-operations，4 笔 commit）：**cb30ef8** 批1=data_name 前缀解析 helper+input 值 objectValue 优先+radio/select_tree/replay_adapter 三路 hint 剥前缀；**e0e87a9** 批2=click 七前缀子路径（关闭弹窗/展开树/页签/表格行按钮/树选/邻钮/菜单，click_subroutes.py 前置路由，miss 落回同事兜底链，裸路由 miss=skip，按钮文本剥前缀）；**eb564e3** 批4a=date event 六处清单（单日期移植 fill_date.py+daterange 双 input $emit('input',[s,e])，JS-gen 无 daterange 参考实现为按规格新写）；**75bd130** 批4b=select_click「弹窗选择」表格行选+tssc 远程表格分支（16×250ms 静置轮询防残留首行误点，字典路径 10s→3s 短等不变行为）
+- 验收：全量 pytest **279 passed**（基线 216+新增 63 用例，test_agent_e2e 4 errors=本机缺 %ComSpec% 存量环境问题）；diff 审查 10 改+8 新文件全在允许清单；**批 5 离线打样 ALL PASS**——14 步真实形态 V3 payloadJson 全链转换，断言全中（select:tree 别名归一→select_tree_option/date 过白名单单+区间/tree path JSON 数组保真/objectValue 与 val 双写无损/前缀 dataName 透传）；打样脚本=AppData\Local\Temp\tansun-wet\offline-payload-check.py
+- 子智能体四路并行（A 批1/B 批2/C1 批4a/C2 批4b）文件集互不相交，由本会话代声明代提交，无越界改动；有价值偏离已复核接受（close_dialog 补 ESC 兜底层、tree_picker 去 form-label 谓词、菜单 textContent 匹配隐藏项、daterange 新写）
+- 遗留移交：①§9.4 人机分工湿测待用户参与（chromium 后台安装中，用户导航+本会话验证 18 操作）；②SUT 待用户定（test.creditv5p2 或同事系统）；③分支未推送，用户/同事验收后合并；④V3 空元素步骤整单拒已实证（样例空 xpath 步骤被 primaryLocator 校验拦下）——推送侧 P3/P4 硬前提再确认
+- 注意：JS-gen 本单元只提交 agent-log 一文件；他线 WIP（Cursor done_rejected 线）未触碰未携带
+
+## 2026-09-12 02:05 · ZCode 引擎线 — 开工：tansun 兼容实装周末连续执行（回链 09-11 §8.3 计划+§9.4 湿测契约，用户发令）
+
+- 工作范围：D:\dev\tansun_ui_engine 分支 compat/js-gen-operations（自 TY_UI_ENGINE_1.0.0=5e12ff1 建）——ui_execute/engine/data_name.py(新)/actions/{input_action.py,radio.py,select_tree.py,replay_adapter.py,click.py,click_subroutes.py(新),date_action.py(新),select_click.py}/action_registry.py、ui_execute/models/{enums.py,payload.py}、docs/EXECUTION_PAYLOAD_MIGRATION.md、tests/{test_data_name.py,test_input_prefix.py,test_click_subroutes.py,test_date_action.py,test_select_click_rowselect.py}(新)；JS-gen 仓仅 agent-log；tmp/tansun-wet/（湿测产物）
+- 禁入区：tansun 仓其余全部（scheduler/executor/locator/config.py——5e12ff1 同事环境配置勿动）、tests 存量 16 件（只跑不改）；JS-gen 主仓 src/scripts（他线 WIP）
+- 执行方式：主会话批 0（分支+216 passed 基线+chromium 后台装）→ 写 data_name 前缀 helper → 4 并行子智能体（A=input/radio/select_tree 前缀接线+replay_adapter hint 归一+input 值字段；B=click 前缀剥离+七子路径 click_subroutes.py 前置路由；C1=date event 六处清单；C2=select_click 弹窗行选+tssc 表格分支）——子智能体不 commit 不写本文件，主会话全量 pytest+diff 审查后分批代提交；收尾 §9.4 人机分工湿测（用户导航）
+- 计划依据：报告 2026-09-10-tansun-engine-18-action-mapping-audit.md §7/§7.1/§8/§9 为唯一蓝图
+
+## 2026-09-12 02:05 · Cursor Lead — 收工：done_rejected 默认可观测（回链 01:58）
+
+- 完成：`evaluate_phase_done` 拒答 stderr `[phase_done] done_rejected authority=gate …`；`session-message` 转发 `done_rejected`；recording runner `events[]` 收录；api-docs recording 备注；pin `characterize-phase-done-validate` 扩 stderr + 源码钉
+- 验收：`characterize-phase-done-validate` OK；`characterize-contract-sovereignty` Task1/2/3/6 OK
+- 遗留：未改 recorder Premature 与 gate 双层语义合并；planner advisory 湿测样本仍缺
+
+## 2026-09-12 01:58 · Cursor Lead — 开工：done_rejected 默认可观测
+
+- 进行中：2026-09-12 01:58；验收=拒答时 stderr 含 `done_rejected authority=gate`；`session-message` 转发 `done_rejected`；录制 `events[]` 可含该类型；冷 pin 绿
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`src/routes/browser-session/session-message.js`、`src/services/trajectory/trajectory-recording-runner.js`、相关 characterization / api-docs 备注、本文件
+- 禁入区：改 validate_done 门闩语义、合并 recorder Premature、他线 WIP
+- 方式：TDD 扩 pin → stderr echo + WS/录制观测转发 → 跑 pin
+
+## 2026-09-12 01:35 · Cursor Lead — 收工：done_rejected 事件嗅探 r3（回链 01:25）
+
+- 完成：traj **757** session `9c17ae3f-…`；临时 relay tee 落盘 `tmp/contract-sovereignty-wet/done-rejected-r3/events.jsonl`；报告专项节已更新；嗅探补丁已 `git checkout` 回滚
+- 验收：字面事件 `done_rejected` · `authority=gate` · `reasons=[submit_required,success_unmet]` · `missing_evidence=[toast_ok,url_change]` · `contract_version=1`
+- 遗留：可选重启 executor 清掉内存中 tee；产品路径仍不写 stderr（仅 sniff 捕获）
+
+## 2026-09-12 01:25 · Cursor Lead — 开工：done_rejected 事件嗅探湿测 r3
+
+- 进行中：2026-09-12 01:25；验收=`events.jsonl` / executor 日志出现字面 `{"event":"done_rejected"...}` 且含 `missing_evidence`（期望 `toast_ok`）
+- 范围：临时嗅探 `executor/session-handler.js`（relay tee）、`tmp/contract-sovereignty-wet/done-rejected-r3/`、报告增补、本文件；跑完后**回滚嗅探补丁**
+- 禁入区：合约主权实现回改、`classify.py`、他线 WIP
+- 方式：重启 executor 加载嗅探 → 对公客户管理手写 2 阶段；探针 `done(success=false)` 不保存 → 收盘 events.jsonl
+
+## 2026-09-16 13:10 · Cursor Cloud — 收工：G3 phase_done 证据门闩（回链 12:22 开工）
+- 完成：Tasks 0–7 — query/navigate `success_when` + click 证据埋点 + recorder `needs_token` 双条件 + 控制面 0 步拒收 + verify-all 接入 pin + prompts 对齐
+- 提交链：`539c8e76` → `1d1afc3f` → `bb16b5e7` → `dd8d2f58` → `8c07eff9` → `0b65742a`（+本收工）
+- PR：https://github.com/Ahnoler/JS-gen/pull/45 （draft → master）
+- 验收：`characterize-phase-boundary` OK；`characterize-phase-runtime` PASS；`characterize-phase-done-evidence-gate` OK；eslint 触及 JS 0 warning；`verify-all` 中 G3 相关全绿
+- 注意：本云环境无 MySQL（3306 ECONNREFUSED）→ `characterize-step-highlight` / `layer-tree` / `export-v3` 仍红（与本刀无关）；湿测未跑
+- 遗留移交：对公建档/查询多阶段湿测确认 P3/P4 不再 0 步假成功；有 DB 的环境再跑全量 `verify-all`
+
+## 2026-09-16 12:22 · Cursor Cloud — 开工声明：G3 phase_done 证据门闩
+- 开工：12:22 UTC。执行 Project store `docs/g3-phase-done-plan.md` Tasks 0–7
+- 范围：`scripts/controller/actions/phase/boundary_contract.py`、`boundary_gates.py`、`intent_contract.py`、`intent_gates.py`、`prompts.py`、`scripts/agent/recorder_emitters.py`、点击/导航证据埋点相关（`_misc` / form click 路径按需）、`scripts/characterization/characterize-phase-boundary.py`、`characterize-phase-runtime.py`（若触 needs_token）、`scripts/refactor/verify-all.sh`、`src/services/trajectory/trajectory-recording-runner.js`（及本阶段业务步数小 helper）、本文件
+- 禁入：G1 报文捞取、G2 运维、G4 真上传 / KB 湿测主责、文件上传·SUT、`save_section.py`（禁止恢复）、他线 WIP（`scripts/agent/service.py` 未声明改动、`data/kb/flows/**` 湿测主链、req-upload）
+- 方式：主会话按 plan 顺序执行；默认 login 空 success_when / 整轨 fail→isSuccessful:false / 双闸 / kind=`query_clicked`
+- 分支：`cursor/g3-phase-done-evidence-gate-3b92`
+
+## 2026-09-17 10:56 · ZCode — 更新：前端已发 20260917-1035，后端发版撤回（先修 bug）
+- 前端：入口 index-DMDGH5NM.js → /data/app/front-dist/releases/20260917-1035 已上线，页面/API 200 验证过
+- 后端：预上传包（20260917-103602）已全部撤回（本地 dist + 服务器 /tmp 均清理）；/data/app/JS-gen 软链与 4097 未动（仍 20260916-212853，pid 3596493）；原因=发现 bug 需先修完再发
+- 后续：bug 修完重新 pack→上传→部署（部署前仍需确认无活跃录制）
+
+## 2026-09-19 09:05 · ZCode — 收工：后端发版 20260919-085907（回链 09-17 10:36 开工）
+- 后端：uara_V2.0 @ 2c22d312 → /data/app/JS-gen-releases/20260919-085907（batch 47 跑 1 个 migration）；api/docs 200、server.log 干净启动、local-server-proxy 秒级重连
+- 前端：维持 09-17 的 20260917-1035，经 nginx /api 200 验证
+- 执行机：LMY 三个注册节点（2f21bad1/08d34440/413bbddf）心跳在跳但采样时无活跃 WS，属执行机侧重连节奏，非发版事故
+- 回滚：ln -sfn /data/app/JS-gen-releases/20260917-205042 /data/app/JS-gen && 重启 node server.mjs
