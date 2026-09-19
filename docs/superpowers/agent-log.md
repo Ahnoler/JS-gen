@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-19 12:25 · ZCode 合约线 — 开工：落引擎建议②（产品库 KB 卡「先查再点」补树重载过滤失效配方）
+
+- 进行中：引擎线已交付 wet9 幂等点击守门放行（81a17f22 → uara_V2.0 4db25cd8，pin 20/20+回归 6 绿，主线程已只读复核 diff 与通报一致）。本单元落地其通报中留给合约/KB 线的建议②：`data/kb/flows/product_library.json`「先查再点」规则追加「树重载（新增/保存节点自动刷新、【刷新产品树】）会清掉过滤但保留搜索框关键字——重载后须重填关键字并再次点击搜索图标再定位节点」，供后续任务门闩预声明引用。
+- 范围（可写集）：`data/kb/flows/product_library.json`（仅「先查再点」一条 rule 追加文案）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`（引擎工作树在 engine/idempotent-click-gate-20260919 分支，不触碰）、`scripts/controller/**`（引擎线地盘）、`data/kb/req/**`、其他 KB 卡文件
+- 方式：改卡 → 双侧金样例 characterization（JS flow-card-recall + Python kb-recall）→ recall-eval --baseline diff → commit+push；**V2.0 合并交给重启窗口**（引擎工作树不在 V2.0 上，避免工作树争用；届时与引擎修复一并激活）
+- 注：纯 KB 数据+文档轮次，无代码改动
+
 ## 2026-09-19 11:35 · ZCode 合约线 — 收工：树搜索「未过滤」错因调研（Playwright MCP 实机复现，修正 wet9 收工条目移交项①）
 
 - 完成：用户指示上页面调研复现 wet9 #902/#903「树搜索未过滤」签名。报告 `tmp/contract-wet9-20260919/tree-search-root-cause.md`。**结论修正：SUT 过滤功能无缺陷，wet9 收工条目引擎线移交项①「树搜索未过滤生效」措辞作废**——真因是三层叠加：
