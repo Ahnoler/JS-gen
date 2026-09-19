@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-19 12:04 · ZCode 引擎线 — 收工：wet9 幂等点击守门放行完成（回链 11:58 开工；分支 engine/idempotent-click-gate-20260919 已交付「未合并待批」）
+
+- 完成：分支 `engine/idempotent-click-gate-20260919` 两提交——`d52e3626`（开工条目）+ `81a17f22`（修复本体，3 文件 +158/−8），已推送远端，**未合并 uara_V2.0 待用户审批**：
+  - **修复**：`click_action_engine.py` 新增 `_IDEMPOTENT_BTN_RE` 白名单（搜索/查询/检索/刷新/加载/翻页/翻页族 + 「重新X」「X图标/按钮/产品树/列表/树/数据/页面/条件/结果」组合，全锚定匹配防「保存查询方案」类复合词误放行）；`click_button` 与 `click_element_by_index` 两处 `already-operated-this-phase` 守门命中白名单时放行同元素重复点击（wet9 #902/#903 锁死态的自愈路径恢复）；非幂等拒绝路径文案原样保留；`element_guard.py` 记录模块零改动（幂等点击仍照常 remember，阶段追溯不受影响）。
+- 验收（合并后集成态）：
+  - 新 pin `characterize-idempotent-click-gate.py` RED（`_is_idempotent_click_label` 不存在 ImportError）→ GREEN 20/20（白名单成员/非幂等仍拒/复合词不放行/两守门豁免在场/记录模块零改动），已登记 `verify-all.sh`
+  - 相关既有 pin 回归 6 个全绿：ai-phase-element-guard / reset-button-guard / reset-phase-not-query / search-then-click-guard / search-then-click-prompts / click-replay-engine
+  - 全量 verify-all 失败集恰为已知 3 红（step-highlight/layer-tree/confirm-notification）零新增；py_compile 过；合并 origin/uara_V2.0（带入 planner-advisory-filter/contract-sovereignty 等 pin 收编）集成态关键 pin 复绿；越界审查 diff 恰为授权 3 文件
+- 遗留移交：①wet9 其余引擎移交项未动（#903 序号框 real_click 未命中、failedReason 不带阶段号、doneLog probe 处方化=合约线建议③）待后续单元；②KB 卡配方侧缓解（建议②）归合约/KB 线裁量，与本修复独立；③**Python 侧生效需控制面重启**（重启窗口用户协调——重启后本修复与此前 B-1/B-6 一并生效）；④本分支合并 uara_V2.0 由用户拍板
+- 注：不维护 CHANGELOG；主线程内联实施未派子智能体
+
 ## 2026-09-19 11:58 · ZCode 引擎线 — 开工：wet9 幂等点击守门放行（搜索/查询/刷新/翻页类同元素重复点击，回应用户转发合约线移交）
 
 - 进行中：接用户转发 wet9 引擎缺陷（合约线 11:35 调研报告 `tmp/contract-wet9-20260919/tree-search-root-cause.md`，#902 P3/#903 P5 两单复现）：SUT 树重载清 filter 但搜索框保留关键字成错位态，自愈须再点搜索图标，被引擎 `already-operated-this-phase` 守门拒绝 → 锁死。修法（取合约线建议①收敛版）：`click_action_engine.py` 新增模块级幂等动作正则（搜索/查询/检索/刷新/翻页/下一页/上一页类文本），`click_button`（:180 duplicate 检查）与 `click_element_by_index`（:370-396 duplicate 检查）两处守门命中白名单时放行重复点击；非幂等（保存/新增/删除等）行为不变；element_guard.py 记录模块零改动。附带两小口径问题（#903 序号框 real_click 未命中、failedReason 不带阶段号）本单元不动，登记待后续单元。
