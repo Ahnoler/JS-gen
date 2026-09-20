@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-20 16:25 · ZCode 合约线 — 补记：#924 移交①定谳（step_count 口径差异，非缺陷）+ 对账口径沉淀
+
+- 引擎线定谳：#924 回执小移交①（step_count=47 vs DB 51 行）**非缺陷，系验收比对口径差异**——`trajectory.step_count` 为**业务步口径**（排除 save_form_snapshot 等 meta 行）；本单 51 行 − 4 行 meta = 47 精确吻合，步号 1..51 全连续无滞后（出处 api-docs trajectory.js:189「stepCount 亦只计业务步骤」+ 代码注释）。引擎线已排除 #917 回归关联。
+- **本线独立复核（算术验证）**：步号 1/11/15/31 四行 action_type 全为 save_form_snapshot；业务步合计 click_element_by_index 24 + fill_form_field 16 + click_button 6 + click_menu_item 1 = **47** 与字段值吻合——定谳成立。
+- **对账口径沉淀（后续验收统一）**：验步数用 `[traj-recon]` phase/finalize 日志的 `bizRows/biz=` 值，或按 `step_count = 原始行数 − meta 行数` 推算；**勿直接比原始行数**。through-report-sixth.md 第四节表述据此更正（原文「计数器滞后一拍」作废，以本条为准）。
+- 注：本条为台账更正与口径沉淀，无代码改动
+
 ## 2026-09-20 16:10 · ZCode 合约线 — 收工：第六单 #924（三项验收全过 + 首条成功轨迹 + 残留收敛，回链 15:50 开工）
 
 - 完成：#924 全管线收口（tmp/contract-wet9-20260919/wet9sixth/ + through-report-sixth.md，主线程独立落库复核；pid 20652 全程 11 采样未变）。**三项验收全部通过（引擎 #917 收口闭环）**：①步号 gaps 归零（DB 51 行 step_number 1..51 连续无缺）②无 fill+snapshot 同号双行（重复号查询 0 行）③搜索族重填放行（搜索关键字 fill 12 条全落库，含 P4 同阶段三连重填 W→U→T；步级 already-operated/nav-reclick/卡死签名 0 命中）。
