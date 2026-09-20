@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 16:12 · ZCode 引擎线 — #924 收件（三项全 PASS，cee623e1 收口）+ 开工：step_count 维护滞后移交
+
+- **#924 回执登记（运行基点 4098e49c）**：**三项全 PASS，cee623e1 收口完成**——①gaps 归零（DB 51 行 1..51 连续，对比 #917 缺 [55,62]）；②无双行（`GROUP BY step_number HAVING c>1` = 0 行）；③搜索族重填放行（搜索关键字 fill 12 条全落库，含 P4 同阶段三连重填 W→U→T 原样复现全放行；步级 already-operated/nav-reclick/卡死处方 0 命中；phase done_logs 1 次命中系叙述性否定句）。**本单为 wet9 系列首条成功轨迹**（recorded/is_successful=1/failed_kind NULL，#897-#917 全 failed），清理单判据全满足、无 probe 收口、无 quality gate 触发。V2.0.1 同事线变更本单全程无异常（pid 20652 恒定、health 恒 200、无 interrupted 标记）——其对录制链路无副作用（其线观察点亦得证）。
+- **移交①（本单元修）**：`trajectory.step_count=47` vs DB 实际 **51 行**（步 48-51 created_at 16:02:24–16:02:45，均早于 start 返回 16:02:51）——串行化修复后落库行数增加，**step_count 字段维护路径疑似滞后一拍**。本单元定位并修：让终局落库排空后的计数刷新覆盖全部已落行（成功/失败两路都要）。
+- **移交②（登记）**：SUT 悬挂关联引用第 3-4 次实证（wet9阶段V 显式拦截 / wet9阶段U 静默）+ PD 族——业务清理清单，非引擎面。
+- 上游：uara_V2.0。分支 `engine/stepcount-lag-20260920`。方式=子智能体队伍（Explore 定位计数维护链 → 主会话定设计 → worker 实现 → 主会话验收代提交）。
+- 范围（可写集）：`src/services/trajectory/**`（计数刷新链）、相关 characterization pin（RED 先行）、`scripts/refactor/verify-all.sh`、主检出 agent-log 本条目+收工条目
+- 禁入区：**运行态服务零触碰（重启须先请示）**；远端代理（用户自管）；Cursor/同事线文件集（recording-coach tools、executor-node-service 等）；Step 2 范围（recorder_emitters.py）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 16:10 · OpenCode — 修复：进入 recording 交易页自动 prepare 会重登录/导航/新开会话打断录制
 
 - 问题：`recording` 状态的交易点击进入录制页后自动 `prepare`，会重新获取执行机资源（重登录等），导致正在进行的录制失败。
