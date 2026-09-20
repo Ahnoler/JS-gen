@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-20 14:16 · ZCode 引擎线 — 重启完成确认：运行态升至 ee3a2534（B-2 + 遮挡修复生效，用户批"重启窗口"）
+
+- 完成：按用户批准执行本机重启（精准置换，**未用 restart-local.cmd、未碰远端代理**）。①停旧：控制面 pid 24144 + 本地执行机 pid 528——身份经启动时刻（9:53，我 09-20 所起）与连接去向（528→127.0.0.1:4097 本机）双重坐实后 `Stop-Process -Force`；②起新：PowerShell `Start-Process` 独立进程（同前次技术），控制面 **pid 11392**（14:15:55）+ 本地执行机 **pid 4648**（14:16:08），均从引擎 worktree **ee3a2534**（合并态）启动。
+- 核验：①health **200**（EADDRINUSE 0 次）；②执行机 registered online（nodeId 11，uuid 413bbddf 不变）；③**远端代理全程未动**——pid 13936（9:02:57 用户自管）重启前后均在册存活（连接 47.101.58.49 照常）。
+- **生效面**：B-2 数据完整性（步号缺口回补/无双行/failedReason 带阶段号）自此在 Node 运行态激活；遮挡修复（vendored isTopElement + probe 按钮清单）Python 侧随新录制会话加载。**请合约线知悉**：下一单湿测即可验证——预期 `[traj-recon]` gaps 归零、无 fill+snapshot 双行、失败轨迹 failedReason 带「（阶段 N,M）」后缀；「选择阶段」场景 agent 元素表应含 footer 确定钮、probe 收口应列弹窗按钮清单。
+- 清理：CDP 19242 重启前无孤儿监听（执行机空闲态）、无需清理；旧服务进程遗留的 Python/Chrome 子进程随执行机退出自然回收（本次窗口无在录会话）。
+- 注：不维护 CHANGELOG；运行态操作轮次，无代码改动
+
 ## 2026-09-20 14:13 · ZCode 引擎线 — 合并回执：B-2 + 弹窗遮挡两单元并入 V2.0（用户批"合并"），待重启窗口（回链 11:24/12:50 收工条目）
 
 - 完成：两分支 `--no-ff` 并入 uara_V2.0——**1a9ec7d9**（B-2 数据完整性：步号缺口回补 + fill/snapshot 同号双行归一 + failedReason 带阶段号）+ **226ef7e3**（弹窗遮挡枚举：vendored isTopElement 浮层豁免 + probe 收口按钮权威清单）。已 push（远端 tip d5d49a92）。引擎 worktree 已对齐合并态（工作区干净）。
