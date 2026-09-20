@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-20 19:15 · OpenCode — 设计稿落地：D2 SUT 503 阶段空转守卫（#925 续）
+
+- 完成：`docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md` 已落地并提交。
+- 要点：双条件触发（SUT 不可达信号 + 最近 N 步无实质进展）、Python agent hook 点
+  （`scripts/recorder.py` 的 `on_step_end`）、`SUT_SPIN_GUARD_MODE` 环境变量四档
+  （off/observation/soft/hard）、独立 reason `sut_unavailable_spin_guard`、分三阶段
+  （观测 → 软门闑 → 硬门闑）落地、不影响人工录制与回放。
+- 与 D1 关系：D1 去重落库，D2 停止空转；两者互补，D2 触发时 already-matched 动作
+  仍会被 D1 正确去重。
+- 实施前置：在线 SUT + 执行机湿测，当前服务停机，暂不动代码；设计稿供后续实施评审。
+
 ## 2026-09-20 18:55 · OpenCode — 收工：D1 already-matched select 跨阶段重复落库去重（回链 18:40 开工）
 
 - 完成：代码 `de18502d`（4 文件 / +143 -3）——`scripts/state.py` 新增只读 `has_recorded_field_action`（同 action + 同 `label_text` + 同 `option_text`/`value`）；`scripts/controller/actions/select_engine.py` 两个 already-matched 分支（预触发 xpath-only、下拉 no-items 回读）在 `_record_action` 前加守卫：**首次已匹配仍落库、后续同字段同值重访不追加**；新 pin `scripts/characterization/characterize-select-already-matched-dedup.py`；`scripts/refactor/verify-all.sh` 注册一行。
