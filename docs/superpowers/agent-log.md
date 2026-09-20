@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-20 16:10 · ZCode 合约线 — 收工：第六单 #924（三项验收全过 + 首条成功轨迹 + 残留收敛，回链 15:50 开工）
+
+- 完成：#924 全管线收口（tmp/contract-wet9-20260919/wet9sixth/ + through-report-sixth.md，主线程独立落库复核；pid 20652 全程 11 采样未变）。**三项验收全部通过（引擎 #917 收口闭环）**：①步号 gaps 归零（DB 51 行 step_number 1..51 连续无缺）②无 fill+snapshot 同号双行（重复号查询 0 行）③搜索族重填放行（搜索关键字 fill 12 条全落库，含 P4 同阶段三连重填 W→U→T；步级 already-operated/nav-reclick/卡死签名 0 命中）。
+- **首条成功轨迹（里程碑）**：record_status=**recorded**、is_successful=1、failed_kind/reason 均 NULL——wet9 B3 系列（09-19 起）首次以成功态收官（此前 #897-#917 全部 failed）。
+- **残留收敛**：wet9B3V 分类删净、wet9B3W/wet9阶段W 自造自清成功；**仅剩 wet9阶段V（显式拦截「已存在产品引用了此阶段」）+ wet9阶段U（静默拦截）** 两个阶段节点（悬挂关联引用第三/四次实证——产品已删净而关联记录仍在）+ 更早 PD 族，一并归业务清理。
+- 小移交引擎：step_count=47 vs DB 51 行（步 48-51 在 start 返回前落库，计数器滞后一拍）——建议确认 step_count 更新时点。V2.0.1 同事线变更（failed(interrupted)/viewer/attach）全程未触发异常，对录制链路无副作用。
+- 注：录制湿测轮次，无代码改动；不维护 CHANGELOG
+
 ## 2026-09-20 15:50 · ZCode 合约线 — 开工：第六单（wet9 残留清理 + 引擎三项验收，运行基点 4098e49c）
 
 - 进行中：引擎线已完成重启，运行基点 **4098e49c**（本地 merge「对齐 V2.0 最新」，**含 cee623e1 #917 收口**〔已核 merge-base〕+ V2.0.1 同事线全量〔执行机中断标 failed(interrupted)、viewer/attach 等〕；非 origin tip，属引擎线现场态）。health 200 / pid 20652 / 执行机 LMY online 空闲（与引擎线回执 pid 一致）。本单=**残留清理 + 三项集成验收**：①步号 gaps 归零 ②无 fill+snapshot 同号双行 ③搜索族重填放行（#917 P8 拒绝场景正面复现）。任务文本 tmp/contract-wet9-20260919/task-cleanup-sixth.md（6 阶段：P2 同阶段重搜三连、P3 新增分类 fill+snapshot+自清、P4 阶段残留三连、P5 新增阶段+自清、P6 全树核验）。
