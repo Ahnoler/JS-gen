@@ -51,6 +51,9 @@ import {
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** Persist-path event types: bodies are queued serially onto runtime._persistDrain. */
+const PERSIST_EVENT_TYPES = new Set(['action_log_sync', 'step_screenshot', 'page_level_screenshot']);
+
 /**
  * 录制锁状态变更后通知浏览器会话观察者。
  * 路由依赖采用惰性加载以避免静态服务-路由循环；
@@ -761,7 +764,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     if (type === 'action_log_sync' || type === 'step_screenshot' || type === 'page_level_screenshot') {
       try { phaseActivity?.(); } catch {}
     }
-    const work = (async () => {
+    const runWork = () => (async () => {
       if (type === 'phase_intent_obs' || type === 'phase_boundary_obs' || type === 'phase_end') {
         if (type === 'phase_end' && payload?.quality_failed === true) {
           // 假成功防线 v3：QUALITY FAIL（pending_fields/missing_success_token 等）只进
@@ -794,13 +797,19 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       if (runtime.suppressStepPersist || runtime.isReplay) return;
       await handleActionLogSync(payload);
     })();
-    if (type === 'action_log_sync' || type === 'step_screenshot' || type === 'page_level_screenshot') {
+    if (PERSIST_EVENT_TYPES.has(type)) {
+      // 串行化（#917 根修）：步号分配（_nextStepNumber 读-改-写）必须原子——派生快照
+      // 与主 fill 同批到达时并发进入会双双读到同一号（同号双行 + 跳号缺口的根因）。
+      // persist 类 body 惰性化：不再急切执行，改由链串行触发；链 resolve 即全部落库
+      // 完成（recordPhaseResult 与 90s 门闩 await 本值，语义不变）。
+      // 非 persist 类（phase_intent_obs 等）保持急切执行不变。
       runtime._persistDrain = Promise.resolve(runtime._persistDrain)
         .catch(() => {})
-        .then(() => work)
+        .then(() => runWork())
         .catch((err) => console.warn('[record] persist drain failed:', err?.message || err));
+      return runtime._persistDrain;
     }
-    return work;
+    return runWork();
   });
 
   // Keep the persist/screenshot subscription alive until the session closes so

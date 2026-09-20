@@ -8,6 +8,11 @@
  *      appendRecordedFormSnapshot 有效则用之、否则 max()+1 兜底）——防 fill+snapshot 同号双行
  *   ③ failedReason 带（阶段 N,M）后缀（persistFailReason phaseHint 参数 + 三处带参调用点）；
  *      total 降级与 runner_error 两处保持无参原文
+ *   ⑤ persist 事件串行化（#917 根修：生产同号双行 [54,61] + 跳号缺口 [55,62]）——
+ *      persist 类事件 body 惰性化（runWork 工厂）并真正串入 _persistDrain 链，
+ *      _nextStepNumber 读-改-写因此原子；_persistDrain 链与告警文案防顺手删
+ *   ⑥ 快照步号占用回退（#917 纵深防御）：appendRecordedFormSnapshot 收到调用方步号
+ *      但该号已被同 trajectory 占用时，在插入事务内回退 max+1（resolveFreeStepNumber）
  *   守卫钉：runner 的 refreshTrajectoryCounts(tid) 恰 2 处（防实现误加，与
  *   characterize-traj-recon-logging.mjs hook4 口径一致）
  *
@@ -94,6 +99,52 @@ record('4a runner refreshTrajectoryCounts(tid) 恰 2 处（防实现误加）',
   count(RUNNER, 'await refreshTrajectoryCounts(tid)') === 2);
 record('4b api-docs failedReason 登记（阶段 N,M）后缀说明',
   API_DOCS.includes('（阶段 N,M）'));
+
+// ── ⑤ persist 事件串行化（#917 根修） ────────────────────────────────────────
+// 根因：persist 类事件 body 急切启动，_nextStepNumber 的读取发生在链生效之前，
+// 派生快照与主 fill 并发进入双双读到同一号、各自推进计数器 → 同号双行 + 跳号。
+// 修复形态：body 惰性化（runWork 工厂），persist 类事件由 _persistDrain 链串行触发。
+// 注：find 用不抛错的 indexOf（RED 阶段 needle 未实现时输出 FAIL 行而非崩溃）。
+const find = (hay, needle) => hay.indexOf(needle);
+const runWorkIdx = find(RUNNER, 'const runWork = () => (async () => {');
+const subCbIdx = find(RUNNER, 'execSession.subscribeSessionEvents(runtime.sessionId');
+const alsDeclIdx = find(RUNNER, 'const handleActionLogSync = async (payload) => {');
+const stepNumReadIdx = find(RUNNER, 'stepNumber: runtime._nextStepNumber');
+const alsCallIdx = runWorkIdx >= 0
+  ? RUNNER.indexOf('await handleActionLogSync(payload);', runWorkIdx)
+  : -1;
+record('5a persist 类 body 惰性化（runWork 工厂形态恰 1 处，且位于订阅回调内）',
+  count(RUNNER, 'const runWork = () => (async () => {') === 1
+  && runWorkIdx > subCbIdx);
+record('5b 链内串行触发 .then(() => runWork())（恰 1 处；旧急切引用 .then(() => work) 清零）',
+  count(RUNNER, '.then(() => runWork())') === 1 && count(RUNNER, '.then(() => work)') === 0);
+// 5c 语义：#917 根因是步号读取早于链生效。步号读取必须只发生在 handleActionLogSync
+// 体内（恰 1 处），且 handleActionLogSync 仅由 runWork body 惰性调用（调用点位于
+// runWork 定义之后）——读取因此在链串行触发后才执行，与 runWork 同一串行域。
+record('5c 步号读取位于惰性执行域（恰 1 处：ALS 声明 < 读取 < 订阅回调；ALS 调用点在 runWork 定义之后）',
+  count(RUNNER, 'stepNumber: runtime._nextStepNumber') === 1
+  && alsDeclIdx >= 0 && alsDeclIdx < stepNumReadIdx && stepNumReadIdx < subCbIdx
+  && alsCallIdx > runWorkIdx);
+record('5d runtime._persistDrain 链保留（赋值形态恰 1 处）+ [record] persist drain failed: 告警文案原文',
+  count(RUNNER, 'runtime._persistDrain = Promise.resolve(runtime._persistDrain)') === 1
+  && count(RUNNER, '[record] persist drain failed:') === 1);
+record('5e persist 门改集合判定（PERSIST_EVENT_TYPES 三类型齐全：Set 定义恰 1 处、has 判定恰 1 处）',
+  count(RUNNER, "new Set(['action_log_sync', 'step_screenshot', 'page_level_screenshot'])") === 1
+  && count(RUNNER, 'PERSIST_EVENT_TYPES.has(type)') === 1);
+
+// ── ⑥ 快照步号占用回退（#917 纵深防御） ──────────────────────────────────────
+const HELPER_SIG = 'async function resolveFreeStepNumber(trx, tid, desired) {';
+const helperIdx = find(FSA, HELPER_SIG);
+const snapSigIdx = find(FSA, SNAP_SIG);
+const HELPER_BODY = helperIdx >= 0 && snapSigIdx >= 0 ? FSA.slice(helperIdx, snapSigIdx) : '';
+record('6a 占用回退 helper resolveFreeStepNumber 定义于快照函数之前（恰 1 处）',
+  count(FSA, HELPER_SIG) === 1 && helperIdx >= 0 && helperIdx < snapSigIdx);
+record('6b 占用检测在 helper 查询内（step_number: desired + limit(1) 同现），占用则回退 max(step_number)+1',
+  HELPER_BODY.includes('step_number: desired')
+  && HELPER_BODY.includes('.limit(1)')
+  && /max\(\s*\{\s*maxStep:\s*'step_number'\s*\}\s*\)/.test(HELPER_BODY));
+record('6c 占用回退在插入事务内接线（resolveFreeStepNumber(trx, tid, desiredStepNumber) 恰 1 处）',
+  count(FSA, 'resolveFreeStepNumber(trx, tid, desiredStepNumber)') === 1);
 
 const bad = results.filter((r) => !r.ok);
 console.log(`\ncharacterize-step-number-integrity: ${results.length - bad.length}/${results.length} passed`);
