@@ -132,8 +132,8 @@ function testPersistenceWiring() {
   //（qualityFails 非空 → 'quality_failed'，否则 'phase_failed'），runner 消费其输出。
   assert(/const finalVerdict = evaluateFinalVerdict\(\{ failedPhases: failedOutcomeKeys, qualityFails, trajSuccess \}\)/.test(runner),
     'runner consumes gate module final verdict');
-  assert(/persistFailReason\(finalVerdict\.failKind\)/.test(runner),
-    'runner records quality_failed / phase_failed (via evaluateFinalVerdict.failKind)');
+  assert(/persistFailReason\(finalVerdict\.failKind,/.test(runner),
+    'runner records quality_failed / phase_failed (via evaluateFinalVerdict.failKind, with phase hint)');
   assert(/persistFailReason\('runner_error'\)/.test(runner), 'runner records runner_error');
 
   const lifecycle = readFileSync(
