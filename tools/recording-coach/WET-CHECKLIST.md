@@ -2,6 +2,25 @@
 
 前提：4097 控制面 + executor 在线；本目录 `npm install` 完成。
 
+## Skill 四层与脚手架
+
+OpenCode 加载 **`skill/`** 根目录；Cursor 用时口头指向 `tools/recording-coach/skill/`（勿复制到 `.cursor/skills/`）。
+
+| 层 | 内容 |
+|----|------|
+| `skill/SKILL.md` | 短铁律（12 步顺序、红线） |
+| `skill/references/` | 管线坑、验收口径、STC 锚点 |
+| `skill/templates/` | dispatch-brief、taskText、close、证据清单 |
+| `skill/scripts/` | 三个薄脚手架（不调 `start_record`） |
+
+```bash
+node skill/scripts/init-evidence.mjs --label wet-check
+node skill/scripts/scaffold-brief.mjs --evidence <dir> --goal "…" \
+  --function-id … --account-id … --ref-traj … --task-file … --apply
+node skill/scripts/preflight-probes.mjs --evidence <dir> --profile none
+# 需要真跑 preflight 时加 --run（workflow 须已在 ReadyToCreate）
+```
+
 ## 工具顺序（铁律）
 
 严格按序调用；`create_trajectory` 的参数必须是 `{}`（inputs 已由 `mark_inputs_ready` 锁定）：

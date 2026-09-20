@@ -1,5 +1,22 @@
 # Agent 协作日志
 
+## 2026-09-20 15:00 · Cursor — 开工：recording-coach skill OpenCode 评测门禁（Tier A+B）
+
+- 范围（可写集）：	ools/recording-coach/src/opencode-path.mjs、opencode-session.mjs、scripts/eval-tier-a.mjs、val-tier-b.mjs、scripts/opencode-skill-smoke.mjs、val/**、	ools/recording-coach/README.md、WET-CHECKLIST.md、本条 agent-log、评测 plan/spec（已落盘）
+- 禁入区：ZCode 引擎线（src/services/trajectory/**、scripts/controller/actions/**、运行态重启）；产品 API；Python 录制引擎；不改 erify-all.sh 默认集
+- 方式：Subagent-Driven（计划 Tasks 1–3）；commit 默认跳过直至用户要求
+- 前置：冒烟已证 A1=save_dispatch_brief；控制面 4097 在线
+## 2026-09-20 14:50 · Cursor — 收工：skill-pack 冷 pin 扩 dry-run（回链 14:45 开工）
+
+- 完成：扩 characterize-recording-coach-skill-pack.mjs（SKILL/模板针、assert 正负例含 POST /api/v2、init→scaffold→preflight none dry-run、rating-credit 缺 custom 退出 2）；operator pin 补 POST /api/v2 负例
+- 验收（合并后）：三 coach pin 均 OK；无 HTTP / 无 --apply/--run
+- 遗留移交：无；--apply/--run 仍属湿测
+## 2026-09-20 14:45 · Cursor — 开工：skill-pack 冷 pin 扩 dry-run（无 HTTP）
+
+- 范围（可写集）：scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs、可选扩 characterize-recording-coach-operator.mjs（POST /api/v2 负例）、本条 agent-log
+- 禁入区：ZCode 引擎线热区（src/services/trajectory/**、scripts/controller/actions/**、运行态服务）；产品 API；Python 录制引擎
+- 目标：按 spec §6.4/§7.5 把 skill-pack pin 从「存在+help」扩到 init/scaffold/preflight dry-run + 模板针 + assert 负例；不做真机 HTTP
+- 执行：本会话直接改 pin 并跑三 coach pin；默认不 push 业务代码除非用户要（本条声明须 push）
 ## 2026-09-20 14:41 · ZCode 引擎线 — #917 收件 + 开工：B-2 残余（派生快照步号）+ fill 去重同容器重填（第三例）
 
 - **#917 回执登记（ee3a2534 运行态）**：①端到端首次全自动走通（三 stamp 落库→P6 关联成功→P7 裁决复核→清理，弹窗配方端到端有效，B3 义务全链闭环）；②四修复验收 **2 通过 / 2 未通过**：✅③ failedReason 带阶段号（实见「阶段执行失败（阶段 8）」）→该项关闭；✅④a 弹窗 footer「确 定」元素表可见（element_json 完整、locator_scope=dialog、popup_level_key 含 dialog 段）→**遮挡修复生产验证通过**；❌①步号 gaps **未归零**（缺 [55,62]）；❌②同号双行仍在（[54,61] 均 fill+save_form_snapshot，snapshot 先写、created_at 差 1-7ms、随后跳号）——合约线根因提示：**派生快照走独立编号分配并与主记录撞号、计数器多推进一次，B-2 未覆盖派生快照路径**（两例均在「搜索关键字」fill 场景）。⚠️④b probe 收口清单本单无场景可验（未触发收口），建议改阶段收口常态输出——登记候选。

@@ -3,6 +3,7 @@ import { POLL_INTERVAL_MS, RECORD_DEADLINE_MS, phaseDigest, pollSnapshotName } f
 import { assertNumericPhaseIds, cdpPortFromPrepare } from '../../../tools/recording-coach/src/phase-ids.mjs';
 import { formatOperatorClose, conclusionFromAssert } from '../../../tools/recording-coach/src/close-contract.mjs';
 import { assertDispatchBrief } from '../../../tools/recording-coach/src/dispatch-brief.mjs';
+import { assertBusinessTaskText } from '../../../tools/recording-coach/src/task-text.mjs';
 
 assert.equal(POLL_INTERVAL_MS, 60_000);
 assert.equal(RECORD_DEADLINE_MS, 2_400_000);
@@ -60,5 +61,22 @@ assert.match(text, /证据3：poll-1\.json/);
 const brief = ['固定参数', '业务目标', '风险预告', '管线步骤', '产出契约'].join('\n');
 assert.equal(assertDispatchBrief(brief), true);
 assert.throws(() => assertDispatchBrief('只有业务目标'), /dispatch brief missing heading: 固定参数/);
+
+assert.equal(
+  assertBusinessTaskText('【硬性成功门闩——未满足不得 done】\n' + 'x'.repeat(80)),
+  true,
+);
+assert.throws(() => assertBusinessTaskText('STC首行'), /taskText must be the business gate/);
+assert.throws(
+  () => assertBusinessTaskText('【硬性成功门闩】\n' + 'x'.repeat(80) + '\ncurl http://x'),
+  /taskText must be the business gate/,
+);
+assert.throws(
+  () =>
+    assertBusinessTaskText(
+      '【硬性成功门闩】\n' + 'x'.repeat(80) + '\nPOST /api/v2/trajectories',
+    ),
+  /taskText must be the business gate/,
+);
 
 console.log('OK characterize-recording-coach-operator');

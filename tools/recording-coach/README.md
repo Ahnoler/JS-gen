@@ -25,10 +25,35 @@ cd tools/recording-coach
 npm install
 ```
 
-## Skill
+## Skill（四层包）
 
-真源：**`skill/SKILL.md`**（`ui-record-wet-test`）。无单独 `brief.md`。  
-旧路径 stub：`scripts/prompts/skills/ui-record-wet-test/SKILL.md` → 指向此处。
+真源目录：**`skill/`**（OpenCode 加载此根；Cursor 用时口头指向该路径，**不**复制到 `.cursor/skills/`）。
+
+| 层 | 路径 |
+|----|------|
+| 元数据 + 短铁律 | `skill/SKILL.md`（`ui-record-wet-test`） |
+| 长文参考 | `skill/references/`（`pipeline-pits.md`、`acceptance.md`、`stc-anchors.md`） |
+| 填空模板 | `skill/templates/`（`dispatch-brief.md`、`task-text.md`、`close.txt`、`evidence-checklist.md`） |
+| 薄脚手架 | `skill/scripts/`（见下） |
+
+旧路径 stub：`scripts/prompts/skills/ui-record-wet-test/SKILL.md` → 指向 `skill/SKILL.md`。
+
+### 脚手架示例
+
+```bash
+# 1. 建证据目录
+node skill/scripts/init-evidence.mjs --label stc-smoke
+
+# 2. 从模板填 brief + taskText（--apply 停在 ReadyToCreate）
+node skill/scripts/scaffold-brief.mjs --evidence tmp/recording-coach-… \
+  --goal "STC首行" --function-id 9000000011 --account-id 2 --ref-traj 848 \
+  --task-file path/to/task-body.txt --apply
+
+# 3. 组装 probes（profile none → probes: []）；加 --run 才调 preflight_readonly
+node skill/scripts/preflight-probes.mjs --evidence tmp/recording-coach-… --profile none
+```
+
+环境变量：`JSGEN_BASE_URL`（默认 `http://127.0.0.1:4097`）。
 
 ## 启动
 
