@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-20 18:25 · ZCode 合约线 — 开工：KB 阶段删除规则并入 uara_V2.0（用户已批）
+
+- 进行中：用户批准合并。`fix/phase-contract-20260918` 领先 V2.0 **5 条**（929244e4 上轮合并收工条目、b2edbcfd/ce9d3c67 清理单元、fd0ee272/735f1552 KB 阶段删除规则）；V2.0 侧领先 3 条（c8d0b7c8+53047dbb OpenCode 录制 prepare 天元弹窗 trusted 补关、dc8eb83b 引擎线同步回执）。**实质变更=`data/kb/flows/product_library.json` +4 行**（规则「阶段删除/解绑」：前置=无产品关联引用 + 被拦时正规解绑路径 + 遇悬挂残留应 report 的边界），其余为文档。
+- 范围（可写集）：临时 worktree（合并操作）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`、`scripts/**`、`src/**`、KB 金样例 fixture
+- 方式：临时 worktree 从 origin/uara_V2.0 切 → merge 合约分支（agent-log 冲突=脚本化双方保留 + 严格时间序 + 逐条在位校验含尾部）→ 合并态双侧金样例验收（D:\dev\JS-gen 全 worktree）→ push → 同步主检出 → 清理 worktree → 收工条目
+- 注：KB 数据+文档合并轮次，合约侧零代码改动
+
 ## 2026-09-20 18:10 · ZCode 合约线 — 收工：阶段删除解绑规则落 KB 卡（回链 18:00 开工）
 
 - 完成：`data/kb/flows/product_library.json` **+4 行**（rules 16→17，单条追加，无格式抖动）——新增规则 keyword=「阶段删除/解绑」：**删除产品阶段前置=无产品关联引用**；被「已存在产品引用了此阶段」拦截时 ①正规路径=先在「产品个性化要素配置」页签解除关联再回阶段管理删除 ②阶段管理页详情区无解绑入口（解绑只能在产品侧）③**若引用产品已删（悬挂关联=SUT 数据残留），agent 应如实 report 交人工处理，勿自行绕过前端校验**。
