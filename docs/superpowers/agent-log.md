@@ -1,5 +1,22 @@
 # Agent 协作日志
 
+## 2026-09-20 18:55 · OpenCode — 收工：D1 already-matched select 跨阶段重复落库去重（回链 18:40 开工）
+
+- 完成：代码 `de18502d`（4 文件 / +143 -3）——`scripts/state.py` 新增只读 `has_recorded_field_action`（同 action + 同 `label_text` + 同 `option_text`/`value`）；`scripts/controller/actions/select_engine.py` 两个 already-matched 分支（预触发 xpath-only、下拉 no-items 回读）在 `_record_action` 前加守卫：**首次已匹配仍落库、后续同字段同值重访不追加**；新 pin `scripts/characterization/characterize-select-already-matched-dedup.py`；`scripts/refactor/verify-all.sh` 注册一行。
+- 修法取舍：取 todo 的**保守方案（同字段+同值跨阶段去重）**，非「已匹配一律不落库」——首次仍落库 → **回放保留该步**，只吞跨阶段重复空操作步。D2（SUT 5xx 空转）**未做**：前置需在线 SUT+执行机湿测（当前停机不可验收）且触及 agent 主循环/prompt，先出设计。
+- 与既有「同阶段」方案区别（用户问）：既有=`already-operated-this-phase` 阶段门（执行前**拦截动作**、按 identity **不分值**、每阶段清零）+ `state._record_action` **连续**同元素 coalesce；本次=**跨阶段**、**只跳过落库不拦截动作**、限定 **already-matched 同字段同值**。
+- 人工录制不受影响（用户问）：`scripts/manual_recorder/recorder.py:_record_mapped` 直连 `state._record_action(source='manual')`，**不经 SelectEngine**；回放 `is_replay` 早返回零改动。
+- 验收：select/state 域 **19 pin 全绿**（含新 pin）；引用 `state.py` 的 **13 pin 全绿**；node pin `replay-batch`/`ai-recording-boundaries` OK；`python -m py_compile` 通过；门禁口径 `npx eslint src/ executor/ scripts/` = **0 errors / 24 warnings**（与基线一致）。注：`npx eslint .` 报 3343 errors 系本地 `.venv/` 未被 eslint ignore 的**环境噪声**（错误全部来自 `.venv`，与本次改动无关）。
+- 生效面：Python 侧录制引擎 → **新录制会话磁盘加载即生效，无需重启控制面**。
+- 遗留移交：**D2**（SUT `Service Unavailable` → 同阶段空转到 `max_steps`；#925 实测 30min+/10 步）——候选=「阶段 N 步无新完成任务即 fail」或「SUT 5xx 快失败」，前置与设计已写入 `todo-list.md`；本次不维护 CHANGELOG。
+
+## 2026-09-20 18:40 · OpenCode — 开工：D1 already-matched select 跨阶段重复落库去重（用户会话内点名继续 D）
+
+- 说明：本开工条目与实现同批补写——用户在 D 登记后于同一会话直接指示「继续 D，改完直接提交」，非另起工作树；仍留痕以保证跨工具可见。
+- 范围（可写集）：`scripts/controller/actions/select_engine.py`（already-matched 两分支落库守卫）、`scripts/state.py`（只读 helper）、`scripts/characterization/characterize-select-already-matched-dedup.py`（新 pin）、`scripts/refactor/verify-all.sh`（注册）、`docs/superpowers/todo-list.md`、agent-log 本条目与收工条目
+- 禁入区：agent 主循环/prompts 与 D2 相关面（另单元）、`src/**`（A/B/C 已闭环不再动）、其它 characterization、`data/kb/**`、前端另仓、SUT
+- 方式：D 风险范围评估 → 取 D1 保守方案（同字段+同值跨阶段去重，先确认回放/人工不受影响）→ `state` 只读 helper + `select_engine` 两分支守卫 → 新 pin 注册 verify-all → select/state 域 pin 全量复跑 + `py_compile` + eslint 门禁口径 → commit；D2 因不可湿测不盲改，仅保留设计
+
 ## 2026-09-20 18:15 · OpenCode — 收工：C 补 BiB 死亡事件清绑定（回链 18:10 开工）
 
 - 完成：代码 `ae7f1189`（`src/executor-ws.js` + `scripts/characterization/characterize-executor-orphan-reconcile.mjs`，+37 -1，已推 `a1e54dc8..ae7f1189`）——`handleMessage` 处理 `session.bib_detached`/`session.bib_error`：清该会话内存 live 绑定 + 清 RSCF 缓存帧 + 按 `remoteSessionUuid` 定向广播 `remote:status{attached:false}`（无 uuid 回退全量）；`bib_error` 另打 ERROR 告警。只清绑定+广播，**完全不动录制状态机**。
