@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-20 17:34 · ZCode 引擎线 — 同步回执②：已对齐 7d309095（含 OpenCode Node 侧改动）；**本次有需重启项**
+
+- 完成：接用户「你更新一下」，引擎 worktree 已对齐 `origin/uara_V2.0` = **7d309095**（含合约线 KB 阶段删除规则合并，用户已批），工作区干净、与上游零差异（上游此后无新提交）。
+- **本次差异的文件面与生效判定**（逐项）：
+  - 合约线：`data/kb/flows/product_library.json`（+4，阶段删除解绑规则）+ docs——**Python/数据侧，对齐即对新录制会话生效，无需重启**；
+  - OpenCode 线 `53047dbb`（录制 prepare 天元弹窗 trusted 补关）：Python 侧 `scripts/controller/actions/_replay.py`、`js_snippets/page_id.py`、`scripts/event_dispatch.py`、`_js_snippets.py` + pin `characterize-page-bind.mjs`——**新录制会话即生效**；**Node 侧 `src/services/trajectory/recording-page-bind.js`（+9）——需重启才生效**。
+- 对齐态验收：全量 verify-all **215 过、失败集=3 已知红零新增**（含其 page-bind pin 与 KB 双侧契约 pin）。
+- **运行态现状**：Node 运行基点仍 **4098e49c**（15:43 启动，pid 20652/27920）——本次 Node 侧改动（recording-page-bind）**尚未 live**；Python/数据侧全部改动已对新会话生效。
+- **待用户批**：如需 Node 侧生效，需一次重启窗口（按规先请示；远端代理不碰）。
+- 注：不维护 CHANGELOG；同步轮次，无代码改动
+
 ## 2026-09-20 18:25 · ZCode 合约线 — 开工：KB 阶段删除规则并入 uara_V2.0（用户已批）
 
 - 进行中：用户批准合并。`fix/phase-contract-20260918` 领先 V2.0 **5 条**（929244e4 上轮合并收工条目、b2edbcfd/ce9d3c67 清理单元、fd0ee272/735f1552 KB 阶段删除规则）；V2.0 侧领先 3 条（c8d0b7c8+53047dbb OpenCode 录制 prepare 天元弹窗 trusted 补关、dc8eb83b 引擎线同步回执）。**实质变更=`data/kb/flows/product_library.json` +4 行**（规则「阶段删除/解绑」：前置=无产品关联引用 + 被拦时正规解绑路径 + 遇悬挂残留应 report 的边界），其余为文档。
