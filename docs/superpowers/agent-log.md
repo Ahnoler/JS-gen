@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 15:50 · ZCode 引擎线 — 现场清洁：引擎 worktree 分支/stash 清理（用户指示"过时不再使用的分支可移除"）
+
+- 完成：删除引擎 worktree 内 **9 个已全额并入 V2.0 的交付分支**（逐支核验后删，非凭名）——`engine/b2-gaps-fix-20260920`、`engine/domtree-occlusion-20260920`、`engine/fill-dedup-scope-20260920`、`engine/idempotent-click-gate-20260919`、`engine/nav-reclick-gate-20260919`、`engine/pipeline-20260918`、`engine/stepnum-dedup-r2-20260920`、`engine/stop-gate-step0-20260919`、`engine/stop-pin-sync-20260920`。
+- 核验口径：①`git branch --merged origin/uara_V2.0` 列出 + ②`git merge-base --is-ancestor <branch> origin/uara_V2.0` 逐支确认祖先关系；③对因本地 merge 提交而不显祖先的 `engine/stop-pin-sync-20260920`，改用内容核验（`git diff --name-only <branch> origin/uara_V2.0` = **0 文件**）后 `-D`。
+- **新常驻锚分支 `engine/worktree`**（@ origin/uara_V2.0，tracking 上游）：引擎 worktree 检出改挂此分支，后续仍按老流程从 origin/uara_V2.0 切交付分支；避免把检出长期挂在某个已交付的批次分支名上（本次清理的起因之一）。
+- 未触碰（他人占用/共享）：`uara_V2.0`（主检出 D:\dev\JS-gen 占用）、`fix/phase-contract-20260918`（合约树占用）、`master`（长期线）。
+- stash 处置：**drop `stash@{0}`**（我 09-19 保全的 Cursor STC 迭代残迹，2 文件 +29/−3——其提交版 faa19c83 已在 V2.0 且守卫在场、pin `characterize-search-then-click-guard` OK，内容确已被取代）；**保留 `stash@{0}`(原@{1})**「wip: pre-PR34-sync sovereignty overlay」——V1.2 时代他线工作，非本线所有，不动。
+- 遗留：①远端同名 `engine/*` 分支仍在（origin 上 9 条）——工作已并入 V2.0，可作归档保留或由用户确认后删除（本线未擅动共享远端）；②下一单元开工时按新流程：`git switch -c engine/<unit>-<date> origin/uara_V2.0`。
+- 注：不维护 CHANGELOG；纯现场清理，无代码改动
+
 ## 2026-09-20 15:46 · ZCode 引擎线 — 重启完成（终态）：运行态 = V2.0 最新（含 V2.0.1 同事线全量 + 引擎 #917）
 
 - 完成：用户批"重启窗口"后执行**两阶段重启**（首阶段 #917 生效于 6054ff9b；随后引擎线发现 V2.0 已被 V2.0.1 同事线推入 17 文件运行态更新（执行机中断标 failed(interrupted)、trajectory viewer/attach/batch/manual-record、executor-node-service、export-push-gate 等），而运行态是从引擎 worktree 启动的——**不 live 会让同事线测试困惑**，故对齐 V2.0 最新并再起一次）。
