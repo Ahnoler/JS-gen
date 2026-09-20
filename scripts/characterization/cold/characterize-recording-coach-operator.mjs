@@ -71,5 +71,12 @@ assert.throws(
   () => assertBusinessTaskText('【硬性成功门闩】\n' + 'x'.repeat(80) + '\ncurl http://x'),
   /taskText must be the business gate/,
 );
+assert.throws(
+  () =>
+    assertBusinessTaskText(
+      '【硬性成功门闩】\n' + 'x'.repeat(80) + '\nPOST /api/v2/trajectories',
+    ),
+  /taskText must be the business gate/,
+);
 
 console.log('OK characterize-recording-coach-operator');

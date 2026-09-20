@@ -1,5 +1,10 @@
 # Agent 协作日志
 
+## 2026-09-20 14:50 · Cursor — 收工：skill-pack 冷 pin 扩 dry-run（回链 14:45 开工）
+
+- 完成：扩 characterize-recording-coach-skill-pack.mjs（SKILL/模板针、assert 正负例含 POST /api/v2、init→scaffold→preflight none dry-run、rating-credit 缺 custom 退出 2）；operator pin 补 POST /api/v2 负例
+- 验收（合并后）：三 coach pin 均 OK；无 HTTP / 无 --apply/--run
+- 遗留移交：无；--apply/--run 仍属湿测
 ## 2026-09-20 14:45 · Cursor — 开工：skill-pack 冷 pin 扩 dry-run（无 HTTP）
 
 - 范围（可写集）：scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs、可选扩 characterize-recording-coach-operator.mjs（POST /api/v2 负例）、本条 agent-log
