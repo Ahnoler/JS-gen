@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 15:46 · ZCode 引擎线 — 重启完成（终态）：运行态 = V2.0 最新（含 V2.0.1 同事线全量 + 引擎 #917）
+
+- 完成：用户批"重启窗口"后执行**两阶段重启**（首阶段 #917 生效于 6054ff9b；随后引擎线发现 V2.0 已被 V2.0.1 同事线推入 17 文件运行态更新（执行机中断标 failed(interrupted)、trajectory viewer/attach/batch/manual-record、executor-node-service、export-push-gate 等），而运行态是从引擎 worktree 启动的——**不 live 会让同事线测试困惑**，故对齐 V2.0 最新并再起一次）。
+- 终态核验：①health **200**（控制面 pid **20652**，15:43:39 起）；②本地执行机 pid **27920**（15:43:52）registered online（nodeId 11，uuid 不变）；③**远端代理 pid 13936 全程未动**（仍连着 47.101.58.49）；④引擎 worktree 与 origin/uara_V2.0 **零差异**，运行基点 = **4098e49c**（V2.0 最新）。
+- **运行态现含**：引擎线全部（Step 0/1、B-2、遮挡、#917 收口）+ V2.0.1 同事线全量 + Cursor 线在途前已合入项。
+- 验收：对齐态**全量 verify-all 215 过、失败集=3 已知红零新增**（跑前先修了 `characterize-stop-semantics` 的跨线 pin 同步——见 15:45 条目）。
+- **请合约线/同事线知悉**：下一单起，运行态同时具备 ①#917 三项（gaps 归零/无双行/搜索族重填放行）②同事线的执行机中断标 failed(interrupted) 与 viewer/attach 更新——如某方形为与既有观测不符，请回执指认，引擎线可即时比对运行基点。
+- 注：不维护 CHANGELOG；运行态操作轮次
+
 ## 2026-09-20 15:45 · ZCode 引擎线 — 开工+收工：stop-semantics pin 跨线同步（V2.0.1 同事线改了 D/detach 语义）
 
 - 发现：引擎线对齐 V2.0 最新（含 V2.0.1 同事线 17 文件运行态更新）后跑全量 verify-all，`characterize-stop-semantics` 出新红 ——**断言 3a/3b 钉的 D（`detachTrajectoryLive`）旧语义已被同事线有意变更**：旧=D 只置 abort 标志、**不写任何终态**；新=D 新增 `const wasRecording = traj?.recordStatus === 'recording'` + 函数尾部 `if (wasRecording) { await markRecordingInterrupted(tid); }`（对应其 13:50 条目「执行机中断/重启后录制中交易永久卡 recording」修复）。其余谓词不变：仍**不发 cancel_step**（杀进程代替协商）、杀全链（closeSession/槽位/runtime 删除）齐备、`runtime.abortRecording = true` + `userStop = { success: false }` 保留（注释重述为"we will mark the trajectory failed(interrupted) below"）。
