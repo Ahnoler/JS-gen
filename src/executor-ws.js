@@ -7,7 +7,7 @@ import { EXECUTOR_TOKEN } from '../config/config.js';
 import * as registry from './executor-registry.js';
 import * as executorService from './services/executor-node-service.js';
 import { routeExecutorInbound } from './executor-event-hub.js';
-import { getLiveBindingByAgentSession } from './services/remote-session-state.js';
+import { getLiveBindingByAgentSession, clearLiveBinding } from './services/remote-session-state.js';
 import { broadcast, broadcastBinary, broadcastToUuid, countBinarySubscribers } from './ws-server.js';
 import { detectAgentLlmError, createAgentLlmErrorDeduper } from './services/agent-llm-error.js';
 import { shortSid } from './utils/stderr-prefix.js';
@@ -287,6 +287,35 @@ async function handleMessage(ws, msg) {
         text: payload.text == null ? '' : String(payload.text),
         reason: payload.reason || null,
       });
+    }
+    if (type === 'session.bib_detached' || type === 'session.bib_error') {
+      // C（2026-09-20）：BiB 推流被拆/出错时清除控制面残留的内存绑定。否则 live 绑定
+      // 会一直声称 attached:true，前端 ensureStream 认为 already=true 不再重附着，
+      // 叠加自愈未触发即「永久未推流」（血泪文档坑 #10）。只清绑定+广播，不动录制状态。
+      const binding = getLiveBindingByAgentSession(payload.sessionId) || null;
+      const uuid = binding?.remoteSessionUuid || payload.remoteSessionUuid || null;
+      const remoteSessionId = binding?.remoteSessionId ?? null;
+      if (remoteSessionId != null) clearLiveBinding(remoteSessionId);
+      if (uuid) clearLastRscfPacket(uuid);
+      if (type === 'session.bib_error') {
+        console.warn(
+          `[executor-ws] BiB error session=${payload.sessionId}`
+          + ` uuid=${uuid || '-'} error=${payload.error || payload.message || 'unknown'}`,
+        );
+      }
+      const bibStatus = {
+        attached: false,
+        remoteSessionId,
+        remoteSessionUuid: uuid,
+        sessionId: payload.sessionId,
+        trajectoryId: binding?.trajectoryId ?? null,
+        cdpReady: true,
+        inputEnabled: false,
+        agentBusy: false,
+        reason: type === 'session.bib_error' ? 'bib_error' : 'bib_detached',
+      };
+      const delivered = uuid ? broadcastToUuid(uuid, 'remote:status', bibStatus) : 0;
+      if (!delivered) broadcast('remote:status', bibStatus);
     }
   }
 }
