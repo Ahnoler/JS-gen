@@ -88,7 +88,7 @@
 - 菜单线：正式 `systemId=1` 全量 scan 已完成；对公客户管理孪生已合入 json_import（`7`←`1478`）；产品五叶 OK；**activity umlEcd adopt 已落地**（表征 OK；湿测 §4.2 四叶 = 部署迁移 → 再导入 → adopt）；**待办仅剩下周一推送**。
 - **wet9 产品管理湿测线（2026-09-19/20 合约线，主体已闭环）**：#897–#924 共 12 单真机录制（fid 9000000740，acct 2），证据 `tmp/contract-wet9-20260919/`、`tmp/contract-wet9-20260920-pdiag/`。
   - **已闭环**：产品库主链全走通（建树→信息→启用/禁用/克隆/删除，规则=删除仅限未启用）；**B3 解锁裁决落地**=【设置管控要素】入口以「已关联产品阶段」为前置（pdiag Playwright 人工辅助 + #917 引擎全自动，双证）；**引擎三缺陷全闭环**（树搜索引擎锁死 `81a17f22`/`d2adf8e3`、fill 去重作用域 `cee623e1`、「选择阶段」弹窗枚举遮挡 `226ef7e3`——#924 三项验收「gaps 归零 / 无双行 / 搜索族重填放行」全 PASS）；**#924 = wet9 系列首条成功轨迹**（recorded / is_successful=1）。
-  - **未闭环**：①残留族业务清理（挂起表 `wet9-residue`）；②~~「选择阶段」弹窗交互配方待落 KB 卡~~ **已落（2026-09-20 `product_library.json`：节点 `prod_stage_assoc_dlg` + 规则「设置管控要素前置=已关联阶段/关联不随产品删除级联」；双侧金样例 26 passed + py ok + recall-eval 逐字段零差异）**；③B 类五项测试报告待出。报告：`through-report-b3v/b3t/sixth.md`、`pdiag-report.md`。
+  - **未闭环**：①残留族业务清理（挂起表 `wet9-residue`）；②~~「选择阶段」弹窗交互配方待落 KB 卡~~ **已落并并入 V2.0**（2026-09-20 `product_library.json`：节点 `prod_stage_assoc_dlg` + 规则「设置管控要素前置=已关联阶段／关联不随产品删除级联」；双侧金样例 26 passed + py ok + recall-eval 逐字段零差异；合并 `08afc16c`）；③B 类五项测试报告待出。报告：`through-report-b3v/b3t/sixth.md`、`pdiag-report.md`。
 
 ### ① 830 任务收尾：自测 + bug 修复
 
