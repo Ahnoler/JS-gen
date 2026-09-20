@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 18:15 · OpenCode — 收工：C 补 BiB 死亡事件清绑定（回链 18:10 开工）
+
+- 完成：代码 `ae7f1189`（`src/executor-ws.js` + `scripts/characterization/characterize-executor-orphan-reconcile.mjs`，+37 -1，已推 `a1e54dc8..ae7f1189`）——`handleMessage` 处理 `session.bib_detached`/`session.bib_error`：清该会话内存 live 绑定 + 清 RSCF 缓存帧 + 按 `remoteSessionUuid` 定向广播 `remote:status{attached:false}`（无 uuid 回退全量）；`bib_error` 另打 ERROR 告警。只清绑定+广播，**完全不动录制状态机**。
+- 根因：BiB 已死/已拆但控制面残留 `attached:true` → 前端 `ensureStream` 认为 `already=true` 不重附着，叠加无帧自愈未触发即永久「未推流」（血泪文档坑 #10）。
+- D 登记：`todo-list.md` 挂起表新增 **`recording-redundant-step`（P2）**——D1 引擎 `ok-already` select 去重、D2 SUT 服务端错误快失败/阶段无进展上限；含取舍与证据指引，建议独立单元。
+- 验收（合并态 = 上游无新提交，`git pull` Already up to date）：`characterize-executor-orphan-reconcile` **PASS**（新增 4 条 BiB detach/error pin）；`characterize-agent-llm-error` OK；A+B 未回归（`characterize-stop-semantics` 27/27、`characterize-record-status` OK）；`node --check` + `npx eslint src/executor-ws.js` 0 error。
+- 生效面：Node 侧（executor-ws）→ **需重启控制面生效**。
+- 遗留移交：①D 待另开单元（todo `recording-redundant-step`）；②#925 空转 agent 仍在（SUT `Service Unavailable` 致 phase3 不可达），建议停掉；③C 只覆盖执行机**显式** detach/error 事件，CDP 静默断连仍依赖前端无帧自愈（登记认知，本次不扩范围）；④不维护 CHANGELOG。
+
 ## 2026-09-20 18:10 · OpenCode — 开工：C 补 BiB 死亡事件清绑定 + D 登记待办（用户批准）
 
 - 背景：接上一条收工，用户批准 C（后端补 `session.bib_detached`/`session.bib_error` 处理，清残留 `attached:true` 绑定）并把 D 登记为独立待办。
