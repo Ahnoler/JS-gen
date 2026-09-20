@@ -17,6 +17,7 @@ import {
   pickEvidence,
 } from './close-contract.mjs';
 import { cdpPrecheck } from './cdp-precheck.mjs';
+import { assertBusinessTaskText } from './task-text.mjs';
 
 const TERMINAL_RECORD = new Set(['recorded', 'completed', 'failed', 'idle', 'draft']);
 
@@ -119,18 +120,6 @@ export function createTools(opts) {
     );
     writeJson('analyze.json', raw);
     return { ok: true, data: unwrap(raw) };
-  }
-
-  function assertBusinessTaskText(taskText) {
-    const text = String(taskText || '').trim();
-    if (
-      !text.includes('【硬性成功门闩') ||
-      text.length < 80 ||
-      text.includes('POST /api/v2') ||
-      text.includes('curl')
-    ) {
-      throw new Error('taskText must be the business gate, not the operator runbook');
-    }
   }
 
   async function save_dispatch_brief({ text } = {}) {

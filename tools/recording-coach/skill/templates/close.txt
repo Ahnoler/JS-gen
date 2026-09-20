@@ -1,0 +1,5 @@
+结论：CREATED_<产物或原因前缀>
+报告：{{EVIDENCE_DIR}}/through-report.md
+证据1：traj-final.json id=<trajId> actions=<目标动作名>
+证据2：<关键落库字段，如 row_text=first>
+证据3：poll-1.json done=<已完成阶段数>/<总阶段数>
