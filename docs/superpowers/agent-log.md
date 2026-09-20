@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-20 18:20 · OpenCode — 收工：录制收尾/落步 run 归属守卫（回链 18:05 开工）
+
+- 完成：代码 `bef61b11`（3 文件 / +47 -3，已推 `59f34c60..bef61b11`）——
+  ①`trajectory-recording-runner.js` 循环末尾成功/失败收尾前补 `runStillOwnsRuntime()` 守卫（被新 run 取代→抛 `err.code='run_superseded'`，不写终态/不改 running 阶段）；
+  ②同文件 `handleActionLogSync` 顶部补同一归属守卫（非属主 run 不落步）；
+  ③`batch-record.js` 识别 `run_superseded`→`markItemFailed` 且**不 detach**（会话归新 run，避免拆掉在录会话）。
+- 根因（#925 实证）：旧 run 收尾覆写新 run 的 `recording` 终态为 `recorded` → 前端只对 draft/recording 自动 prepare → 录制中不连执行机无画面；且 persist 订阅无条件落步 → 「下一步之后又多录一条选择下拉」（#5/#8-10 晚于定稿）。
+- 验收（合并态 = 上游无新提交，`git pull` Already up to date）：`characterize-stop-semantics` **27/27 PASS**（4e pin 归属守卫 2→4 处 + 新增收尾/落步守卫断言）；`characterize-step-number-integrity` 27/27、`characterize-record-phase-finalize` all passed、`characterize-g3-runner-seam` 9/9、`characterize-run-event-ownership`/`characterize-traj-recon-logging`/`characterize-record-status`/`characterize-record-start-mutex` 全 PASS；改动文件 `npx eslint` 0 error。既有红基线未新增：`cold/characterize-batch-task-progress` 改动前即红（`trajectory-attach-runner.js` 的 stale `single-live` pin，与本次无关，已用 `git stash` 复验）。
+- 生效面：本次仅 Node 侧（runner/batch-record）→ **需重启控制面生效**；Python/数据侧未改动。
+- 遗留移交：①C（BiB 死亡事件 `session.bib_detached`/`bib_error` 控制面无处理→残留 `attached:true` 永久未推流）与 D（`select_option` ok-already 去重、SUT 服务端错误快失败）用户另行决策，登记待办；②#925 空转 agent 仍在（用户手动重录触发，SUT「Service Unavailable」致 phase3 无法达成），建议停掉；③本次不维护 CHANGELOG。
+
 ## 2026-09-20 18:05 · OpenCode — 开工：录制收尾 run 归属守卫（修「录制中无推流 + 定稿后仍落步」）
 
 - 背景：用户报交易 #925 录制页无推流（刷新多次）+「下一步之后又录了一条选择下拉」。排查证据：同轨迹存在两个会话——第一轮 `577a391c`/remote_session 2109（3 阶段 phase_done 完毕）、第二轮 `a26cb9fc`/remote_session 2115（用户手动发起）；`record_status` 已为 `recorded`（`updated_at=09:40:17`）但第二轮 agent 仍在跑并**持续落步**（`trajectory_step` 从 7 条涨到 10 条，#5 select_option 与 #8–#10 均晚于定稿）。根因=循环末尾成功/失败收尾（`trajectory-recording-runner.js:1349-1377`）**缺 `runStillOwnsRuntime()` 守卫**，旧 run 收尾覆写新 run 的 `recording` 终态 → 前端只对 draft/recording 自动 prepare，故录制中不连执行机、无画面；且 persist 订阅无条件落步。
