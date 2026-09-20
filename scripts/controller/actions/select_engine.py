@@ -6,7 +6,7 @@ import re
 import sys
 import time
 
-from scripts.state import _record_action
+from scripts.state import _record_action, has_recorded_field_action
 from ._helpers import (
     _ok, _err, _is_ok_result,
     is_absent_field_result, absent_field_skip_result,
@@ -655,7 +655,10 @@ class SelectEngine(_FormActionEngineBase):
                     )
                     xp_inv = stamp_recorded_xpath_smart(element, xp)
                     params['option_text'] = stamped
-                    _record_action('select_option', params, already, element=element)
+                    # already-matched 是空操作：同字段同值此前已落库时不再追加重复步，
+                    # 避免 agent 重访已设值字段时产生跨阶段重复下拉步（#925）。
+                    if not has_recorded_field_action('select_option', label_text, stamped):
+                        _record_action('select_option', params, already, element=element)
                     _task_done_impl(
                         label_text, self.business_data_store, value=cur_val or stamped, xpath_smart=xp_inv,
                     )
@@ -803,7 +806,8 @@ class SelectEngine(_FormActionEngineBase):
                 stamped = resolve_recorded_option_text(option_text, cur)
                 params['option_text'] = stamped
                 _task_done_impl(label_text, self.business_data_store, value=cur or stamped, xpath_smart=xp_inv)
-                _record_action('select_option', params, recheck, element=element)
+                if not has_recorded_field_action('select_option', label_text, stamped):
+                    _record_action('select_option', params, recheck, element=element)
                 _mark_picker_selection_success(self.business_data_store, cur or stamped)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', self.business_data_store))
             failed = await _final_select_failure('no-items', xp)

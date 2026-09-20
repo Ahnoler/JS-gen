@@ -96,6 +96,8 @@ run "characterize-wf-submit-guard-hint" "$PY" scripts/characterization/character
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
 run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py
+# D1 (#925): already-matched select_option 不得追加跨阶段重复步（同字段+同值去重）
+run "characterize-select-already-matched-dedup" "$PY" scripts/characterization/characterize-select-already-matched-dedup.py
 run "characterize-tssc-field-resolution" "$PY" scripts/characterization/characterize-tssc-field-resolution.py
 run "characterize-field-label-resolution" "$PY" scripts/characterization/characterize-field-label-resolution.py
 run "characterize-prefix-label-select" "$PY" scripts/characterization/cold/characterize-prefix-label-select.py
