@@ -58,11 +58,14 @@ export default function (app) {
    */
   app.post('/api/v2/trajectories/:id/record/prepare', async (req, res) => {
     try {
-      const preserveRecordStatus = req.body?.preserveRecordStatus === true
-        || req.body?.preserve_record_status === true;
-      const result = await trajectoryService.prepareTrajectoryRecording(+req.params.id, {
-        preserveRecordStatus,
-      });
+      const opts = {};
+      // 默认 preserveRecordStatus=true：prepare 只连资源，不进 recording。
+      // 显式传 false 才会进入 recording（record/start 内部路径使用）。
+      if (req.body?.preserveRecordStatus != null || req.body?.preserve_record_status != null) {
+        opts.preserveRecordStatus = req.body?.preserveRecordStatus === true
+          || req.body?.preserve_record_status === true;
+      }
+      const result = await trajectoryService.prepareTrajectoryRecording(+req.params.id, opts);
       res.json(result);
     } catch (err) {
       sendErr(res, err);

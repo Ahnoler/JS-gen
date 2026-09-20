@@ -61,24 +61,28 @@ async function injectFlowTemplateHintIfNeeded(traj) {
  * @param {boolean} [opts.skipDefaultLogin] when true, skip the prepare-time
  *   default login (same effect as runtime.skipDefaultLogin, but known before
  *   the runtime object exists — auth dry-run login segment)
- * @param {boolean} [opts.preserveRecordStatus] when true, only attach browser/stream
- *   without entering the transient 'recording' state (keeps failed/recorded/completed)
+ * @param {boolean} [opts.preserveRecordStatus] when false, enter the transient
+ *   'recording' state (used by record/start and manual-record). Default true:
+ *   prepare only attaches browser/stream without changing record_status.
  * @returns {Promise<object>} prepare result with trajectory, account, and session info
  */
 export async function prepareTrajectoryRecordingUnlocked(tid, {
   skipDefaultLogin = false,
-  preserveRecordStatus = false,
+  preserveRecordStatus = true,
 } = {}) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
 
   await injectFlowTemplateHintIfNeeded(traj);
 
   // A fresh prepare must not inherit a stale "recording" signal: reset any phase
-  // left as running by a previous interrupted recording.
-  const stalePhases = await trajectoryPhaseDao.listByTrajectory(tid);
-  for (const phase of stalePhases) {
-    if (phase.status === 'running') {
-      await trajectoryPhaseDao.updateStatus(phase.id, 'pending');
+  // left as running by a previous interrupted recording. Skip when currently
+  // recording so an active run is not torn down by an idempotent prepare.
+  if (traj.recordStatus !== 'recording') {
+    const stalePhases = await trajectoryPhaseDao.listByTrajectory(tid);
+    for (const phase of stalePhases) {
+      if (phase.status === 'running') {
+        await trajectoryPhaseDao.updateStatus(phase.id, 'pending');
+      }
     }
   }
 
@@ -222,11 +226,12 @@ export async function prepareTrajectoryRecordingUnlocked(tid, {
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
     if (preserveRecordStatus) {
-      // 仅连接浏览器/推流，不进入 recording 临时态；保持当前持久态（failed/recorded/completed）。
+      // 默认：仅连接浏览器/推流，不进入 recording 临时态；保持当前持久态。
+      // recording 只由 record/start 或人工录制开启时进入。
       console.log(`[prepare] preserveRecordStatus=true for traj #${tid}; staying in ${traj?.recordStatus || 'unknown'}`);
     } else {
-      // 状态流转 V3：启动浏览器/占用执行资源成功即进入临时「录制中」(recording)。
-      // 进入时记录持久状态基线，关闭浏览器/释放资源时恢复到该基线，持久状态不被临时态降级。
+      // 显式 preserveRecordStatus=false：record/start 等路径需要进入 recording。
+      // 进入时记录持久状态基线，非显式 stop 的释放会标为 failed(interrupted)。
       await trajectoryDao.enterTransientRecording(tid).catch((err) => {
         console.warn(`[prepare] enterTransientRecording failed for #${tid}:`, err?.message || err);
       });

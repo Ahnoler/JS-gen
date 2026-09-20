@@ -2,11 +2,11 @@
 
 > 面向后续开发者的流程说明。覆盖：交易 `record_status` 状态机、执行机资源的连接/复用/释放、前端录制页的进入与交互、WS 事件契约、以及需要特别小心的坑。
 >
-> 最后更新：2026-09-18（对应前端 `8bb8e03` / JS-gen `8d33ad9d`）。
+> 最后更新：2026-09-18（对应前端 `uara_V2.0.1` / JS-gen `uara_V2.0.1`）。
 
 ## 1. 一句话总览
 
-一个「交易（trajectory）」的录制状态由 `trajectory.record_status` 与 `trajectory.persistent_record_status` 两个字段共同表达；`recording` 是**临时态**，真正的持久态是 `draft/recorded/completed/failed`。执行机资源（Chrome + Python agent session + 槽位）由后端控制面按交易独占分配，前端只是「观众」，负责报备进出，**是否释放资源由后端决定**。
+一个「交易（trajectory）」的录制状态由 `trajectory.record_status` 与 `trajectory.persistent_record_status` 两个字段共同表达；`recording` 是**临时态**，且**唯一含义是「正在录制」**，真正的持久态是 `draft/recorded/completed/failed`。执行机资源（Chrome + Python agent session + 槽位）由后端控制面按交易独占分配，前端只是「观众」，负责报备进出，**是否释放资源由后端决定**。
 
 ## 2. 状态模型
 
@@ -22,7 +22,7 @@
 ### 2.2 核心不变量
 
 1. **`recording` 不覆盖持久态**：进入录制会话前先把当前持久态记入 `persistent_record_status`（基线）。
-2. **非终结性释放恢复基线**：关浏览器 / 断流 / 回收 / 控制面重启中断，一律 `restore` 回基线，不降级为 `draft`。
+2. **非终结性释放标为 `failed(interrupted)`**：关浏览器 / 断流 / 回收 / 控制面重启中断 / 无观众 / 空闲回收，只要释放时处于 `recording`，一律标为 `failed`，原因 `interrupted`（录制中断），不再恢复基线。
 3. **显式结束才改写持久态**：用户明确「成功结束」→ `recorded`；「失败结束」→ `failed`。
 4. **`failed_reason`**（`failed_kind/failed_reason/failed_at`）记录本轮首个失败原因；新一次进入录制/成功收官会清空。
 
@@ -30,21 +30,21 @@
 
 | 触发 | 后端入口 | 状态结果 |
 |---|---|---|
-| `POST /record/prepare`（默认） | `enterTransientRecording` | `record_status=recording`，基线=当前持久态 |
-| `POST /record/prepare`（`preserveRecordStatus=true`） | 不进入临时态 | 保持 `failed/recorded/completed` 不变（仅连资源/推流） |
+| `POST /record/prepare`（默认） | 不进入临时态 | 保持当前持久态不变（仅连资源/推流） |
+| `POST /record/prepare`（`preserveRecordStatus=false`） | `enterTransientRecording` | `record_status=recording`，基线=当前持久态 |
 | `POST /record/start` | `enterTransientRecording`；若基线=`completed` 先降为 `recorded` | `recording` |
 | `POST /record/stop`（success=true） | `finishTransientRecording(tid,'success')` | `recorded`（待确认）；基线=`completed` 时保持 `completed` |
 | `POST /record/stop`（success=false） | `finishTransientRecording(tid,'failure')` + `markFailedReason(user_marked_failed)` | `failed`（录制异常） |
 | `POST /confirm?confirmed=true` | `setPersistentRecordStatus(tid,'completed')` | `completed`（双字段） |
 | 取消确认（`confirmed=false`） | completed → `recorded`；recording → 仅基线回 `recorded` | 见下 |
-| `POST /manual-record`（recorded/completed 上开启） | 先 `enterTransientRecording`；基线 `completed`→`recorded` | `recording`，停止/释放后回 `recorded`（需再次确认） |
-| `POST /attach` / `POST /detach` / `POST /stream/detach` / 回收 / 重启 | `restorePersistentRecordStatus` | 回到持久基线 |
+| `POST /manual-record`（非 recording 状态上开启） | 先 `enterTransientRecording`；基线 `completed`→`recorded` | `recording`，停止/释放后回 `recorded`（需再次确认） |
+| `POST /attach` / `POST /detach` / `POST /stream/detach` / 回收 / 重启 / 无观众 / 空闲回收 | `markRecordingInterrupted` | 若释放时处于 `recording` → `failed`（interrupted），否则保持原状态 |
 
 关键实现：
 - `enterTransientRecording`：`src/dao/trajectory-dao.js:424`
 - `finishTransientRecording`：`src/dao/trajectory-dao.js:459`
-- `restorePersistentRecordStatus`：`src/dao/trajectory-dao.js:524`
-- `resolvePostRecordingStatus`（success→recorded / failure→failed / restore→基线）：`src/models/constants.js:66`
+- `markRecordingInterrupted`（非显式 stop 释放 → `failed(interrupted)`）：`src/services/trajectory/trajectory-attach-service.js`
+- `resolvePostRecordingStatus`（success→recorded / failure→failed）：`src/models/constants.js:66`
 - 人工确认/取消确认：`src/services/trajectory/trajectory-meta-service.js:520`
 - prepare 分流（`preserveRecordStatus`）：`src/services/trajectory/trajectory-attach-runner.js:68`、`:224`
 - 人工录制状态收口：`src/services/trajectory/trajectory-manual-record.js:48`
@@ -109,16 +109,16 @@
 
 1. 初始化 WS、加载交易/登录上下文/轨迹树/执行机列表。
 2. 注册观众 + 启动心跳 + `beforeunload` 注销。
-3. 仅当状态为 **`draft` / `recording`** 时**自动 prepare**；`failed/recorded/completed` 默认不连执行机，需用户点击「准备会话」。
+3. 当状态为 **`draft` / `recording`** 时**自动 prepare**：`draft` 首次连资源；`recording` 表示后端已有录制会话在跑（含 batch 静默录制），需要自动连上看画面。`failed/recorded/completed` 默认不连执行机，需用户手动点「准备会话」。
 4. 启动 10s 轮询（轨迹树 + 执行机列表）。
 
 ### 4.2 三个按钮的行为
 
 | 按钮 | 处理 | preserveRecordStatus |
 |---|---|---|
-| 准备会话 | `handleEnsureStream` → `doPrepare` | `failed/recorded/completed` 时为 `true`（只连资源不改状态）；`draft/recording` 为 `false` |
-| 重新录制 | `handleReRecord`：未连接先 prepare → 全选阶段 → 清空步骤 → `record/start` | `false`（进入 recording） |
-| 关闭浏览器 | `handleDetach` → `doDetach` → `POST /detach` | —（硬释放） |
+| 准备会话 | `handleEnsureStream` → `doPrepare` | 始终为 `true`（只连资源，prepare 不再进入 recording） |
+| 重新录制 | `handleReRecord`：未连接先 prepare → 全选阶段 → 清空步骤 → `record/start` | prepare 为 `true`；`record/start` 进入 recording |
+| 关闭浏览器 | `handleDetach` → `doDetach` → `POST /detach` | —（硬释放；录制中 → failed(interrupted)） |
 
 ### 4.3 画面附着（canvas/WS）
 
@@ -160,10 +160,10 @@
    修复：录制布局用 `<router-view :key="route.path" />`（`vue-project/src/layouts/Layout.vue`）。新增同类「带参数的路由页面」时请同样处理。
 2. **观众注册要早于 prepare**
    `onMounted` 必须先 `enterViewer` 再 `doPrepare`。否则上一次离开排出的「无观众 5s 延迟释放」可能在 prepare 完成后触发，把刚建立的 session 又 detach 掉。
-3. **`recording` 是临时态，判断「是否真在录」看 running 阶段**
-   前端 `recordingActive = manualOn || aiBusy || 存在 running 阶段`；不要只看 `record_status==='recording'`。
-4. **prepare 默认会进入 `recording` 临时态**
-   只想「连上看一眼/回放/继续人工录制」时，务必传 `preserveRecordStatus=true`，否则会把 `failed/recorded/completed` 覆盖成临时 `recording`。
+3. **`recording` 是临时态且唯一含义是「正在录制」**
+    `record_status==='recording'` 现在可直接表示正在录制；前端 `recordingActive` 仍保留 running 阶段等信号作为内部子状态。
+4. **prepare 默认不会进入 `recording` 临时态**
+    只有 `record/start` 和人工录制开启才会进入 `recording`；`prepare` 只连接资源/推流，保持原持久态不变。
 5. **idle-reaper 不感知观众**（见 3.5），长停留场景需注意。
 6. **`failed_reason` 迁移与重启**：涉及 `failed_kind/failed_reason/failed_at` 的改动需先跑迁移 `20260918180000_trajectory_failed_reason` 并重启控制面。
 

@@ -1,5 +1,6 @@
 # Agent 协作日志
 
+
 ## 2026-09-20 15:16 · ZCode 引擎线 — 收工：#917 两项未通过收口交付（步号串行化根修 + 搜索族 fill 豁免，分支未合并待批，回链 14:41 开工）
 
 - 完成：#917 ①步号 gaps/双行、②fill 去重第三例 —— 两项修复交付，commit 6746c6c3，分支 `engine/stepnum-dedup-r2-20260920`（01f0d236 = 6746c6c3 + 他线最新合入，已 push）。**5 files +165/−14**。子智能体队伍：Explore×2 并行调研 → 主会话定设计 → 双 worker 分域实现（文件集不相交）→ 主会话审 diff → 独立复验 → 代提交。
@@ -10,10 +11,12 @@
 - 遗留移交：①`#917④b` probe 收口弹窗清单无场景可验（本单未触发收口）——合约线建议改**阶段收口常态输出**弹窗按钮清单，登记候选（非本单元范围）；②select/radio/tree 的查询类字段去重豁免（值维度）无生产证据，登记候选；③跨写者竞态残余（P2/P3 manual/attach 路径）已由快照占用回退覆盖，通用步路径依赖串行化（AI 录制期 P2 被静音，实际风险低），登记备查。
 - 注：不维护 CHANGELOG
 
+
 ## 2026-09-20 15:00 · Cursor — 开工：recording-coach skill OpenCode 评测门禁（Tier A+B）
 
 - 范围（可写集）：	ools/recording-coach/src/opencode-path.mjs、opencode-session.mjs、scripts/eval-tier-a.mjs、val-tier-b.mjs、scripts/opencode-skill-smoke.mjs、val/**、	ools/recording-coach/README.md、WET-CHECKLIST.md、本条 agent-log、评测 plan/spec（已落盘）
-- 禁入区：ZCode 引擎线（src/services/trajectory/**、scripts/controller/actions/**、运行态重启）；产品 API；Python 录制引擎；不改 erify-all.sh 默认集
+- 禁入区：ZCode 引擎线（src/services/trajectory/**、scripts/controller/actions/**、运行态重启）；产品 API；Python 录制引擎；不改 
+erify-all.sh 默认集
 - 方式：Subagent-Driven（计划 Tasks 1–3）；commit 默认跳过直至用户要求
 - 前置：冒烟已证 A1=save_dispatch_brief；控制面 4097 在线
 ## 2026-09-20 14:50 · Cursor — 收工：skill-pack 冷 pin 扩 dry-run（回链 14:45 开工）
@@ -38,6 +41,54 @@
 - 禁入区：**运行态服务零触碰（重启须先请示）**；远端代理（用户自管，他人在用）；Cursor STC 文件集；Step 2 范围（recorder_emitters.py 双门收敛）；合约线 KB 配方落地（其线自领）
 - 台账另记：#917④ SUT 关联悬挂引用第二次实证（显式报错形态，非引擎面，业务清理清单）；wet9B3V 分类 + wet9阶段V 残留待业务清理
 - 注：不维护 CHANGELOG
+
+
+## 2026-09-20 14:20 · OpenCode — 修复：重新录制后画面永久「未推流」（前端对残留 attached 绑定受限自愈）
+
+
+- 问题：一条老的 `failed` 交易，进入录制页点「重新录制」→ 步骤清空、显示录制中、也录出了步骤，但画布一直显示「画面未推流」。
+- 根因（后端 + 前端叠加）：
+  1. 控制面 live 绑定可能残留 `attached: true` 但 BiB 实际已死——`restoreLiveBindingFromRow` 仅按 DB `remote_session.status='active'` 乐观置 attached；`executor-ws.js` 只处理 `session.bib_ready`，**没有 BiB 死亡/断流事件清除 attached**。控制面/执行机重启后尤其明显。
+  2. 前端 `useRemoteCanvas.ensureStream` 在 `status.attached === true` 时**拒绝重新 attach**（防 attach 风暴），且 `applyStatus` 每次都把 `autoReconnectAttempts` 复位为 0 → 自动重连退化为「无限 startStream 等待新帧」永不成功，占位文案恒为「画面未推流」。
+- 修复（前端另仓 `ui-auto-recording-agent-vue`，`useRemoteCanvas.ts`）：
+  - 新增 `attachedNoFrameStreak`：绑定声称 attached 但连续等待无新帧时累加（每次等待约 8s）。
+  - `ensureStream` 在 `forceAttach && already && !reattachForced && streak >= FORCE_REATTACH_AFTER(3)` 时强制真正 `attachLiveRemote` 重建 BiB；每个 attach 周期只强制一次（`reattachForced`），阈值取 3 以避开 AI 导航/执行中的瞬时停顿。
+  - 达到 `GIVE_UP_AFTER(6)` 仍无帧 → 停止重连并提示「推流不可用，请重新准备会话后重试」，避免死循环/风暴。
+  - 收到真实新帧、或用户新一次 attach（`resetReconnectState`）时清零 streak 与 `reattachForced`。
+  - **WS 连接态守卫**：仅当 `isWsConnected()` 为真才累计无帧次数；WS 断开导致的收不到帧不计入、也不触发放弃，避免长时间断网后停止自动重连且恢复后不续连。
+- 副作用评估：① 执行机 screencast 有 `STALL_RESTART_MS=2500` 停帧看门狗，健康连接下静态页面约每 2.5s 仍有帧，8s 收不到帧基本等于 BiB 真死 → 误触发重建概率低；② 每个 attach 周期只强制一次且阈值 3（约 24s+），非风暴；③ 长时间 WS 断网由上述守卫排除；④ 强制重连走 attach-live 不新增执行机资源（见下）。
+- 资源安全确认：强制重连走 `POST /api/v2/remote-sessions/attach-live` → `remoteSessionService.attachLive(body)`，**只复用同一个 agent `sessionId`**（`state.sessions.get`）并重发 `session.attach_bib`；`supersedeStaleForTrajectory(..., { keepAgentSessionId })` 明确保留本会话、关闭其它。它**不会** `openSession`，因此不会新增执行机浏览器/槽位（只有 `prepare` 会 `openSession`，强制重连不经过 `prepare`）。
+- JS-gen 代码零改动（纯前端自愈；控制面无需重启）。
+- 验收：前端 `npx vue-tsc --noEmit` 通过。真机观察点：残留 attached 场景下第 2 次重试会自动重建 BiB 并出画面。
+- 提交：前端另仓 `dev`；本文档 commit。
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 13:50 · OpenCode — 修复：执行机中断/重启后录制中交易永久卡 recording（节点离线标 failed(interrupted)）
+
+- 问题：某交易先为 failed（录制异常），用户进入录制页连上执行机并点重试（start 录制），随后在后台中断/重启执行机；交易实际已异常停止，但 `record_status` 仍停在 `recording`，永久卡住。
+- 根因：执行机 WS 断连 grace 到期（`markOfflineAndCrash`）、周期 `sweepStale`、`unregister` 三条路径只 `crashActiveSessions`（`remote_session` → crashed、`trajectory_id=null`）+ `purgeNodeBindings`（清内存 runtime/session），**从不调用 `finishTransientRecording` / `markRecordingInterrupted`**，该节点上 `recording` 交易无人置为 failed。事后兜底要么只在控制面启动时跑（`reconcileStaleTrajectoryRemoteMounts`），要么只扫 `active|idle`（执行机重连 `reconcileRemoteSessions`），断连场景都漏。
+- 修复（`src/services/executor-node-service.js`）：
+  - 新增 `markNodeRecordingsInterrupted(nodeUuid, nodeId)`，在 crash 会话前收集该节点上绑定的交易（DB `remote_session.trajectory_id` + 内存 runtime `executorNodeUuid`，覆盖断流后 FK 已清的情况），逐个调用 `markRecordingInterrupted`（failed + interrupted + 重置 running 阶段）。
+  - `unregister` / `markOfflineAndCrash` / `sweepStale` 三处均在 `crashActiveSessions` 之前调用。
+  - `src/services/trajectory/trajectory-attach-service.js` 的 `markRecordingInterrupted` 改为导出复用。
+- pin：`scripts/characterization/characterize-executor-orphan-reconcile.mjs` 新增 3 条断言（导入、定义、三处调用 + 读内存 runtime）。
+- 验收（合并后集成态，已先 `git pull` 合入 8a9fadc8 引擎线/B-2 提交，无重叠冲突）：`characterize-executor-orphan-reconcile` / `characterize-session-lifecycle` / `characterize-record-status` / `characterize-trajectory` / `characterize-agent-llm-error` 全 OK；`node --input-type=module` 动态导入无环；`npx eslint src/ executor/ scripts/` = 0 errors / 24 warnings（基线一致，零新增）。
+- 影响面：控制面改，需重启；执行机/Python 无需改。执行机离线 grace（默认 45s）后即标 failed(interrupted)。
+- 遗留：执行机在 grace 内重连但 `session.list` 短暂失败时，`reconcileRemoteSessions` 会 skipped，可能漏一轮；后续可考虑对在线节点周期复跑 reconcile（本次未做）。
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 13:05 · OpenCode — 修复：恢复 recording 状态自动 prepare，解决 batch 静默录制进入页面无推流
+
+- 问题：batch 静默录制的交易 `record_status='recording'` 且有存活 session/BiB，但用户进入录制页后前端没有推流画面。
+- 根因：上一批方案 A 实现中把 `recording` 从 `autoPrepareStatuses` 移除，导致 recording 状态不再自动调用 `/record/prepare` 连接已有会话。
+- 修复：
+  - 前端另仓 `ui-auto-recording-agent-vue`：`autoPrepareStatuses` 恢复为 `['draft', 'recording']`，并补充注释说明 `recording` 时自动 prepare 是为了连上后端已有录制会话看画面。
+  - JS-gen：`docs/superpowers/guides/recording-status-flow.md` 与 `src/dashboard/api-docs/groups/recording.js` 同步更新自动 prepare 状态说明。
+- 为何不会复现旧 bug：方案 A 后 `prepare` 默认 `preserveRecordStatus=true`，不会进入 recording；且录制中 idempotent prepare 不会重置 running 阶段。因此 recording 状态自动 prepare 只连接资源，不会把「仅连上」的状态误判为「正在录制」。
+- 验收：`npx vue-tsc --noEmit` 通过；`npx eslint src/ executor/ scripts/` 0 errors；`characterize-record-status` / `characterize-trajectory` OK。
+- 提交：JS-gen `bf239f03`；前端另仓 `dev 41797a0`。
+- 遗留：`git push origin uara_V2.0.1` 仍因 `github.com:443` 网络失败，待恢复后补推；前端 `dev` 已推送成功。
+
 
 ## 2026-09-20 14:16 · ZCode 引擎线 — 重启完成确认：运行态升至 ee3a2534（B-2 + 遮挡修复生效，用户批"重启窗口"）
 
@@ -445,7 +496,6 @@
 - 状态知会各线：**V1.2 已冻结**，后续开工声明上游一律写 `uara_V2.0`；合约线 `fix/phase-contract-20260918`（293f9f56）仍独立未并，并入时机待用户拍板；V1.2 尾部 2 笔未入任何 V2.0 祖先的提交无（当前 V1.2 tip `e150a186` 已全部吸收）
 - 注：不维护 CHANGELOG
 
->>>>>>> 276d18d9ac0e010d46aeaab2b591b7fd4eec535d
 ## 2026-09-18 19:46 · OpenCode 体验线 — 收工：录制状态流程开发者文档（回链 19:46 补记开工）
 
 - 完成：**新 `docs/superpowers/guides/recording-status-flow.md` + `docs/README.md` 索引登记**——把录制状态与执行机资源连接流程整理为开发者指南：双字段状态模型与流转总表、prepare/start/stop/confirm/manual-record/detach 各结果、资源三层绑定与释放三语义、观众统计自动释放、idle-reaper 兜底、前端录制页进入/准备会话/重新录制/画布流程、API 与 WS 事件清单、坑（详情页 `:key` 隔离、观众注册早于 prepare、`recording` 临时态判定、`preserveRecordStatus`、idle-reaper 不感知观众）、验证门禁、历史条目。关键结论均带 `file:line`/端点引用。
