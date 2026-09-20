@@ -26,6 +26,15 @@ check(nodeSvcSrc.includes('remoteSessionDao.close(row.id, { crashed: true })'), 
 check(nodeSvcSrc.includes('slotLease.confirmLease') && nodeSvcSrc.includes('registerTrajectorySession'), 'matched sessions restore runtime and slot lease');
 check(nodeSvcSrc.includes("sendToExecutor(node.nodeUuid, 'session.attach_bib'"), 'active matched sessions request idempotent BiB reattach');
 check(wsSrc.includes('reconcileRemoteSessions(node)'), 'executor registration performs remote session reconciliation');
+// Node offline / executor restart: recording trajectories bound to the node must be
+// marked failed(interrupted), not left stuck in recording.
+check(nodeSvcSrc.includes('import { markRecordingInterrupted }'), 'executor node service imports markRecordingInterrupted');
+check(nodeSvcSrc.includes('async function markNodeRecordingsInterrupted('), 'executor node service defines markNodeRecordingsInterrupted');
+check(nodeSvcSrc.includes('getAllTrajectoryRuntimes()'), 'node interruption marking also reads in-memory runtimes');
+{
+  const calls = (nodeSvcSrc.match(/await markNodeRecordingsInterrupted\(/g) || []).length;
+  check(calls >= 3, 'markNodeRecordingsInterrupted invoked on markOfflineAndCrash / sweepStale / unregister (>=3)');
+}
 const serverSrc = readFileSync(join(ROOT, 'server.mjs'), 'utf8');
 check(!serverSrc.includes('crashOccupiedOnOfflineNodes()'), 'server boot does not bulk-crash sessions from offline node status');
 const svcSrc = readFileSync(join(ROOT, 'src', 'services', 'executor-orphan-session-service.js'), 'utf-8');

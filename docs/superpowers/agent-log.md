@@ -1,6 +1,20 @@
 # Agent 协作日志
 
 
+## 2026-09-20 13:50 · OpenCode — 修复：执行机中断/重启后录制中交易永久卡 recording（节点离线标 failed(interrupted)）
+
+- 问题：某交易先为 failed（录制异常），用户进入录制页连上执行机并点重试（start 录制），随后在后台中断/重启执行机；交易实际已异常停止，但 `record_status` 仍停在 `recording`，永久卡住。
+- 根因：执行机 WS 断连 grace 到期（`markOfflineAndCrash`）、周期 `sweepStale`、`unregister` 三条路径只 `crashActiveSessions`（`remote_session` → crashed、`trajectory_id=null`）+ `purgeNodeBindings`（清内存 runtime/session），**从不调用 `finishTransientRecording` / `markRecordingInterrupted`**，该节点上 `recording` 交易无人置为 failed。事后兜底要么只在控制面启动时跑（`reconcileStaleTrajectoryRemoteMounts`），要么只扫 `active|idle`（执行机重连 `reconcileRemoteSessions`），断连场景都漏。
+- 修复（`src/services/executor-node-service.js`）：
+  - 新增 `markNodeRecordingsInterrupted(nodeUuid, nodeId)`，在 crash 会话前收集该节点上绑定的交易（DB `remote_session.trajectory_id` + 内存 runtime `executorNodeUuid`，覆盖断流后 FK 已清的情况），逐个调用 `markRecordingInterrupted`（failed + interrupted + 重置 running 阶段）。
+  - `unregister` / `markOfflineAndCrash` / `sweepStale` 三处均在 `crashActiveSessions` 之前调用。
+  - `src/services/trajectory/trajectory-attach-service.js` 的 `markRecordingInterrupted` 改为导出复用。
+- pin：`scripts/characterization/characterize-executor-orphan-reconcile.mjs` 新增 3 条断言（导入、定义、三处调用 + 读内存 runtime）。
+- 验收（合并后集成态，已先 `git pull` 合入 8a9fadc8 引擎线/B-2 提交，无重叠冲突）：`characterize-executor-orphan-reconcile` / `characterize-session-lifecycle` / `characterize-record-status` / `characterize-trajectory` / `characterize-agent-llm-error` 全 OK；`node --input-type=module` 动态导入无环；`npx eslint src/ executor/ scripts/` = 0 errors / 24 warnings（基线一致，零新增）。
+- 影响面：控制面改，需重启；执行机/Python 无需改。执行机离线 grace（默认 45s）后即标 failed(interrupted)。
+- 遗留：执行机在 grace 内重连但 `session.list` 短暂失败时，`reconcileRemoteSessions` 会 skipped，可能漏一轮；后续可考虑对在线节点周期复跑 reconcile（本次未做）。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 13:05 · OpenCode — 修复：恢复 recording 状态自动 prepare，解决 batch 静默录制进入页面无推流
 
 - 问题：batch 静默录制的交易 `record_status='recording'` 且有存活 session/BiB，但用户进入录制页后前端没有推流画面。

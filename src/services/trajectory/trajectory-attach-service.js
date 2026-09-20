@@ -467,7 +467,7 @@ export async function detachTrajectoryStream(trajectoryId) {
  * @param {number} tid trajectory DB id
  * @returns {Promise<string|null>} resulting record status or null on error
  */
-async function markRecordingInterrupted(tid) {
+export async function markRecordingInterrupted(tid) {
   try {
     const row = await trajectoryDao.getRecordStatusRow(tid);
     if (!row || row.recordStatus !== 'recording') return row?.recordStatus || null;
