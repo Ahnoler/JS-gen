@@ -18,7 +18,7 @@ sys.stdin.reconfigure(encoding='utf-8', errors='replace')
 
 from .agent_utils import (
     parse_args,
-    patch_message_manager, patch_planner_prompt, create_llm,
+    patch_message_manager, patch_planner_prompt, patch_dom_tree_js, create_llm,
 )
 from .session_runner import run_session
 
@@ -35,6 +35,7 @@ def main():
         print("--session flag is required. Use --help for usage.", file=sys.stderr)
         sys.exit(1)
 
+    patch_dom_tree_js()
     asyncio.run(run_session(args))
 
 

@@ -26,7 +26,7 @@ expected_json 为 JSON 对象（或其字符串形式），判据键全部可选
 
 - 成功：'{"ok":<mismatched 为空>,"matched":[{"criterion","expected","actual"}],
   "mismatched":[...],"context":{"title","hash"(截100),"breadcrumb"(截60),
-  "overlay":{"kind","label"}|null}}'
+  "overlay":{"kind","label","buttons"}|null}}'
 - 空判据（expectedJson 为空对象）也返回 context（ok:true），供「仅观察」用法。
 - 异常：'{"ok":false,"error":"<msg>"}'
 
@@ -70,17 +70,32 @@ JS_VERIFY_CONTEXT = '''(args) => {
             }
         }
         let overlay = null;
+        // Overlay 按钮权威清单（形状与 JS_SEMANTIC_SNAPSHOT 一致）：context
+        // 回读时多带 buttons 供 agent 认知，overlay_contains 判定语义不变。
+        const overlayButtons = (container) => {
+            const out = [];
+            try {
+                for (const b of container.querySelectorAll('button')) {
+                    if (!isVisible(b)) continue;
+                    const text = norm(b.textContent);
+                    let ariaLabel = norm(b.getAttribute('aria-label') || '');
+                    if (!text && !ariaLabel) continue;
+                    out.push({ text, ariaLabel, disabled: !!b.disabled });
+                }
+            } catch (e) { return out; }
+            return out;
+        };
         const drawer = [...document.querySelectorAll('.el-drawer')].filter(isVisible)[0];
         if (drawer) {
             const tEl = drawer.querySelector('.el-drawer__title');
             const label = norm(drawer.getAttribute('aria-label')) || norm(tEl ? tEl.innerText || tEl.textContent : '');
-            overlay = { kind: 'drawer', label: label };
+            overlay = { kind: 'drawer', label: label, buttons: overlayButtons(drawer) };
         } else {
             const dialog = [...document.querySelectorAll('.el-dialog')].filter(isVisible)[0];
             if (dialog) {
                 const hEl = dialog.querySelector('.el-dialog__header');
                 const label = norm(hEl ? hEl.innerText || hEl.textContent : '');
-                overlay = { kind: 'dialog', label: label };
+                overlay = { kind: 'dialog', label: label, buttons: overlayButtons(dialog) };
             }
         }
         let headerText = '';

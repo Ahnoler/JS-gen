@@ -16,13 +16,18 @@ JS snippet constant: JS_SEMANTIC_SNAPSHOT.
 返回 JSON 字符串形状：
 
     {"ok":true,
-     "context":{"title","hash","breadcrumb","overlay":{"kind","label"}|null,"loading"},
+     "context":{"title","hash","breadcrumb","overlay":{"kind","label","buttons"}|null,"loading"},
      "fields":[{"ref","label","kind","value","placeholder","disabled","required"}],
      "buttons":[{"ref","text","aria","disabled"}],
      "tables":[{"ref","headers":[...],"rowCount","hasRadio"}],
      "tabs":[{"title","active"}],
      "counts":{"fields","buttons","tables","tabs","truncated"}}
 失败时 {"ok":false,"error":"<message>"}。
+
+overlay.buttons 为弹窗内按钮「权威清单」（最顶层可见 .el-dialog/.el-drawer
+容器内全部 button，{text,ariaLabel,disabled}，容器内全量、不受 buttons<=40
+截断约束）——#910④ 生产事故：footer「确 定」在主按钮 40 截断之外，agent
+认知链缺失导致误报「弹窗无提交按钮」。
 
 体积纪律：fields<=60、buttons<=40、tables<=6、tabs<=12，超出截断并置
 counts.truncated=true。零参数箭头函数，只读不点，绝不触发页面变更。
@@ -60,6 +65,34 @@ JS_SEMANTIC_SNAPSHOT = '''() => {
                 }
             }
         } catch (e) { breadcrumb = ''; }
+        // Overlay 按钮权威清单：容器内全量 button（含 .el-button），不截断、
+        // 不置 truncated——agent 的「弹窗里有哪些按钮」以这份为准（#910④）。
+        const overlayButtons = (container) => {
+            const out = [];
+            try {
+                for (const b of container.querySelectorAll('button')) {
+                    if (!isVisible(b)) continue;
+                    const text = norm(b.textContent);
+                    let ariaLabel = norm(b.getAttribute('aria-label') || '');
+                    if (!ariaLabel) {
+                        for (const attr of b.attributes) {
+                            if (/^data-.*/.test(attr.name)
+                                && /tooltip|tip|title|label/i.test(attr.name)) {
+                                ariaLabel = norm(attr.value);
+                                break;
+                            }
+                        }
+                    }
+                    if (!text && !ariaLabel) continue;
+                    out.push({
+                        text,
+                        ariaLabel,
+                        disabled: !!b.disabled,
+                    });
+                }
+            } catch (e) { return out; }
+            return out;
+        };
         let overlay = null;
         const drawers = visibleAll('.el-drawer');
         if (drawers.length > 0) {
@@ -67,7 +100,7 @@ JS_SEMANTIC_SNAPSHOT = '''() => {
             const titleEl = d.querySelector('.el-drawer__title');
             const label = norm(d.getAttribute('aria-label') || '')
                 || norm(titleEl ? titleEl.textContent : '');
-            overlay = { kind: 'drawer', label };
+            overlay = { kind: 'drawer', label, buttons: overlayButtons(d) };
         }
         if (!overlay) {
             const dialogs = visibleAll('.el-dialog');
@@ -77,7 +110,7 @@ JS_SEMANTIC_SNAPSHOT = '''() => {
                 const title = d.querySelector('.el-dialog__title');
                 const label = norm(header ? header.textContent : '')
                     || norm(title ? title.textContent : '');
-                overlay = { kind: 'dialog', label };
+                overlay = { kind: 'dialog', label, buttons: overlayButtons(d) };
             }
         }
         const loading = visibleAll('.el-loading-mask').length > 0;

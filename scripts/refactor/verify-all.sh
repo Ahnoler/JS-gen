@@ -126,6 +126,8 @@ run "characterize-login-action" "$PY" scripts/characterization/characterize-logi
 run "characterize-assistant-mission-context" "$PY" scripts/characterization/characterize-assistant-mission-context.py
 run "characterize-scan-fullpage-p2" "$PY" scripts/characterization/characterize-scan-fullpage-p2.py
 run "characterize-form-snapshot-trigger" node scripts/characterization/characterize-form-snapshot-trigger.mjs
+run "characterize-step-number-integrity" node scripts/characterization/characterize-step-number-integrity.mjs
+run "characterize-domtree-occlusion" node scripts/characterization/characterize-domtree-occlusion.mjs
 run "characterize-sys-msg" node scripts/characterization/characterize-sys-msg.mjs
 run "characterize-batch-import" node scripts/characterization/characterize-batch-import.mjs
 run "characterize-step-move" node scripts/characterization/characterize-step-move.mjs

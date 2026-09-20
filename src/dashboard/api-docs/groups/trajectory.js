@@ -76,7 +76,7 @@ export const GROUP_TRAJECTORY = [
         }),
         notes: [
           '行内 authKind：null（普通交易）/ \'login\' / \'logout\'（登录/登出演练交易）— 前端列表据此渲染「登录」/「登出」徽标',
-          '行内 failedKind/failedReason/failedAt：仅 recordStatus=failed 时有值。failedReason 为用户可见类别文案（如「LLM 调用异常」「阶段执行失败」「录制质量未达标」「未录制到步骤」「录制执行异常」「人工标记录制异常」「批量任务失败」），与前端 toast/列表悬浮一致；failedKind 为机器码；无失败记录/旧数据为 null（前端不显示悬浮）',
+          '行内 failedKind/failedReason/failedAt：仅 recordStatus=failed 时有值。failedReason 为用户可见类别文案（如「LLM 调用异常」「阶段执行失败」「录制质量未达标」「未录制到步骤」「录制执行异常」「人工标记录制异常」「批量任务失败」），与前端 toast/列表悬浮一致；failedKind 为机器码；无失败记录/旧数据为 null（前端不显示悬浮）；同类文案可含（阶段 N,M）后缀标注失败阶段',
         ],
       },
       {

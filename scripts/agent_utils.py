@@ -481,6 +481,44 @@ def patch_icon_tooltip_labels():
     BrowserContext.get_state = _patched_get_state
 
 
+def patch_dom_tree_js():
+    """
+    猴子补丁 DomService.__init__：原初始化后用本仓 vendor 副本覆写 self.js_code。
+
+    生产事故 #910④：browser_use 0.1.48 自带 buildDomTree.js 的 isTopElement 在
+    Element-UI 浮层（el-select tree-popover 等）展开时误判 el-dialog footer 元素
+    非 top，不分配 index，agent 元素表缺确定钮。修复载体是
+    scripts/vendor/browser_use/buildDomTree.js（上游包不受版本控制，见
+    scripts/vendor/browser_use/buildDomTree.js 文件头同步须知）；本补丁在
+    DomService 实例化后以副本全文覆写 js_code。
+
+    - vendor 副本缺失/读取异常：stderr 写告警并保持 stock js_code，不抛错。
+    - 幂等：重复调用不重复 wrap。
+    """
+    from browser_use.dom.service import DomService
+
+    if getattr(DomService.__init__, '_agent_domtree_patched', False):
+        return
+
+    _vendor_path = os.path.join(_SCRIPT_DIR, 'vendor', 'browser_use', 'buildDomTree.js')
+    _original_init = DomService.__init__
+
+    def _patched_init(self, *args, **kwargs):
+        _original_init(self, *args, **kwargs)
+        try:
+            with open(_vendor_path, 'r', encoding='utf-8') as f:
+                js = f.read()
+            self.js_code = js
+        except Exception as e:
+            sys.stderr.write(
+                f'[agent-domtree-patch] vendor buildDomTree.js unavailable, using stock js: {type(e).__name__}: {e}\n'
+            )
+            sys.stderr.flush()
+
+    _patched_init._agent_domtree_patched = True
+    DomService.__init__ = _patched_init
+
+
 def create_llm(model, base_url, api_key=None, timeout=None):
     """
     创建 LLM 客户端。

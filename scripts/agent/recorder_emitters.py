@@ -695,6 +695,48 @@ def _guard_done_claims(_last_result, done_success) -> tuple[str, bool]:
 
 _PROBE_CLOSEOUT_SUFFIX = "（agent 步数耗尽，probe 收口）"
 
+_PROBE_BUTTONS_MAX = 8
+
+
+def _probe_overlay_button_texts() -> list[str]:
+    """从最近一次 semantic_snapshot 结果取 overlay 按钮权威清单（收口附加用）。
+
+    数据来源设计：agent 局部变量不出 _run_agent_step，semantic 结果随
+    extracted_content 落 agent.state.history（service._last_agent 全局可达），
+    故此函数自行回读最近一次 semantic_snapshot 的 ``ok:{...json}``，从
+    context.overlay.buttons 取 text（空则兜底 ariaLabel）。列表可空——
+    无 agent / 无 semantic 结果 / JSON 坏值 / overlay 为 null 一律返回 []。
+    """
+    texts: list[str] = []
+    try:
+        from . import service as _agent_service
+        agent = getattr(_agent_service, '_last_agent', None)
+        if agent is None:
+            return texts
+        done_text = ''
+        for h in reversed(agent.state.history.history):
+            if not getattr(h, 'result', None):
+                continue
+            for r in reversed(h.result):
+                done_text = str(getattr(r, 'extracted_content', None) or '')
+                if done_text.startswith('ok:') and '"overlay"' in done_text:
+                    break
+            if done_text.startswith('ok:') and '"overlay"' in done_text:
+                break
+        if not done_text.startswith('ok:'):
+            return texts
+        payload = json.loads(done_text[3:])
+        overlay = ((payload or {}).get('context') or {}).get('overlay') or {}
+        for b in (overlay.get('buttons') or []):
+            if not isinstance(b, dict):
+                continue
+            label = str(b.get('text') or b.get('ariaLabel') or '').strip()[:20]
+            if label:
+                texts.append(label)
+    except Exception:
+        return []
+    return texts
+
 
 def probe_force_close_context(business_data_store, agent=None):
     """probe 收口语境：返回 (reason, last_done_text)。
@@ -740,6 +782,10 @@ def record_probe_done_log(business_data_store, phase_number, *, reason, last_don
 
     已有 accepted outcome 时不覆盖（返回 None）；success=None 维持 unknown
     语义（控制面不伪造成败）；text 封顶 400（同 record_phase_outcome 口径）。
+    text 在固定后缀之前附加 overlay 按钮权威清单（来自最近一次
+    semantic_snapshot，最多 8 个、单个标签截 20 字防文本爆炸——#910④
+    「弹窗无 footer 提交按钮」认知缺口治理：收口时把弹窗里实际存在的按钮
+    留给 agent/回放侧）。
     返回写入的条目 dict（与 store 内为同一对象），None store / 非法相位 / 不
     覆盖时返回 None。控制面 recordPhaseResult 经 phase_done.text →
     appendPhaseDoneLog(source='agent') 落 doneLogs——probe 合成条目随事件落库。
@@ -757,7 +803,11 @@ def record_probe_done_log(business_data_store, phase_number, *, reason, last_don
     existing = store.get(phase)
     if isinstance(existing, dict):
         return None
-    text = f"probe force-close: {reason}{_PROBE_CLOSEOUT_SUFFIX}"
+    text = f"probe force-close: {reason}"
+    _btns = _probe_overlay_button_texts()[:_PROBE_BUTTONS_MAX]
+    if _btns:
+        text += f" | overlay buttons: {''.join(f'[{b}]' for b in _btns)}"
+    text += _PROBE_CLOSEOUT_SUFFIX
     if last_done_text:
         text += f" — {str(last_done_text).strip()[-120:]}"
     entry = {'success': None, 'text': truncate_text(text, 400), 'source': 'probe'}

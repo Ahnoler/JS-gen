@@ -628,6 +628,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         await removeRecordedStepsByDbIds(tid, dbIds).catch((err) => {
           console.warn('[record] remove coalesced steps failed:', err?.message || err);
         });
+        // coalesce 删除重排后回补内存步号（B1 步号缺口治理：否则后续步骤沿用旧计数，
+        // 与 DB max(step_number) 脱节留下断号）
+        runtime._nextStepNumber = (await trajectoryDao.getMaxStepNumber(tid)) + 1;
         broadcast('action_removed', {
           trajectoryDbId: tid,
           sessionId: runtime.sessionId,
@@ -976,13 +979,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
    * 落库本轨失败原因（首次为准；成功收官由 finishTransientRecording 清除）。
    * 定义在 try 之外，使 catch 分支（runner_error）也可用。
    * @param {string} kind failure kind code (see models/failure-reason.js)
+   * @param {Array<number>} [phaseHint] 失败阶段号列表，非空时文案追加（阶段 N,M）后缀
    * @returns {Promise<void>} resolves after best-effort persist
    */
-  const persistFailReason = async (kind) => {
+  const persistFailReason = async (kind, phaseHint) => {
     try {
+      const base = failReasonText(kind);
       await trajectoryDao.markFailedReason(tid, {
         failedKind: kind,
-        failedReason: failReasonText(kind),
+        failedReason: base + (Array.isArray(phaseHint) && phaseHint.length ? '（阶段 ' + phaseHint.join(',') + '）' : ''),
       });
     } catch (err) {
       console.warn(`[record] failed_reason persist skipped for #${tid}:`, err?.message || err);
@@ -1254,7 +1259,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         try {
           if (await casDegradeRecordedToFailed()) {
             await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
-            await persistFailReason('zero_step');
+            await persistFailReason('zero_step', zeroStepPhases);
             broadcast('fake_success_detected', {
               trajectoryDbId: tid,
               zeroStepPhases,
@@ -1295,7 +1300,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         try {
           if (await casDegradeRecordedToFailed()) {
             await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
-            await persistFailReason('zero_step');
+            await persistFailReason('zero_step', perRunPhases);
             broadcast('fake_success_detected', {
               trajectoryDbId: tid,
               perRunZeroPhases: perRunPhases,
@@ -1335,7 +1340,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     if (!finalVerdict.success) {
       finalStatus = await trajectoryDao.finishTransientRecording(tid, 'failure');
       await trajectoryDao.updateMeta(tid, { isDone: false, isSuccessful: false });
-      await persistFailReason(finalVerdict.failKind);
+      await persistFailReason(finalVerdict.failKind, finalVerdict.failKind === 'quality_failed'
+        ? qualityFails.map((q) => q.phase).filter(Boolean)
+        : failedOutcomeKeys);
       broadcast('fake_success_detected', {
         trajectoryDbId: tid,
         failedPhases: failedOutcomeKeys,
