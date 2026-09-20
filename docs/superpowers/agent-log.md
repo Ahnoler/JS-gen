@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 17:01 · ZCode 引擎线 — 同步回执：已对齐合约线合并态（08afc16c），运行面判定「无需重启」
+
+- 完成：接用户「合约线那边进行了合并」通报，引擎 worktree 已对齐 `origin/uara_V2.0` = **08afc16c**（合约线 merge(contract): KB stage-dialog recipe + wet9 ledger entries，用户已批），工作区干净、与上游零差异。
+- **合并文件面判定**（决定是否需重启）：仅 `data/kb/flows/product_library.json`（+18，KB 配方）+ docs（agent-log/todo-list/reports）+ `tools/recording-coach/**`（skill 包）+ `scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs`（pin）——**无 Node 运行态代码（src/services、executor/ 等零改动）**。故：①**Node 侧运行基点 4098e49c 仍然有效，无需重启**；②**KB 配方属 Python/数据侧磁盘加载面，对齐即对新录制会话生效**（与 fill 去重/遮挡修复同机制）。
+- 对齐态验收：全量 verify-all **215 过、失败集=3 已知红零新增**（含 KB 双侧契约 pin 与 coach skill pin）。
+- 跨线闭环复核：合约线已把引擎 #924 移交①的定谳更正记入其台账（`74a5cae3`：step_count 业务步口径、51−4=47 亲验）——该项互相确认完毕，无残留分歧。
+- 遗留：若合约线/他线后续再推**运行态代码**（src/ 或 executor/），需一次重启窗口方生效——本线保持"先请示后重启"。
+- 注：不维护 CHANGELOG；同步轮次，无代码改动
+
 ## 2026-09-20 17:05 · ZCode 合约线 — 开工：合约分支并入 uara_V2.0（KB 配方 + wet9 台账，用户已批）
 
 - 进行中：用户批准合并。`fix/phase-contract-20260918` 领先 V2.0 **17 条**（KB 配方 a6260324 + todo-list d12ae6cc + wet9 台账条目 #903–#924 开工/收工/补记等）；V2.0 侧领先 3 条引擎线条目（step_count 定谳 13f755f3、#924 收件 38b67bd2、coach skill 9f7d3afc）+ 同事线 V2.0.1 系列。实质变更=**KB 卡 `product_library.json` +18 行**（节点 `prod_stage_assoc_dlg` + 规则「设置管控要素前置=已关联阶段/关联不随产品删除级联」），其余为文档。
