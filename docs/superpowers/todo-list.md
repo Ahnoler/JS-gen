@@ -86,6 +86,9 @@
 - 五叶子齐：0740 / 0467 / 0468 / **0811 阶段** / **0812 映射**；0230/0231 为 intermediate 目录。
 - KB 卡已回写 0811/0812；要素 pageId 空属预期；`product_library` 未动（他线）。
 - 菜单线：正式 `systemId=1` 全量 scan 已完成；对公客户管理孪生已合入 json_import（`7`←`1478`）；产品五叶 OK；**activity umlEcd adopt 已落地**（表征 OK；湿测 §4.2 四叶 = 部署迁移 → 再导入 → adopt）；**待办仅剩下周一推送**。
+- **wet9 产品管理湿测线（2026-09-19/20 合约线，主体已闭环）**：#897–#924 共 12 单真机录制（fid 9000000740，acct 2），证据 `tmp/contract-wet9-20260919/`、`tmp/contract-wet9-20260920-pdiag/`。
+  - **已闭环**：产品库主链全走通（建树→信息→启用/禁用/克隆/删除，规则=删除仅限未启用）；**B3 解锁裁决落地**=【设置管控要素】入口以「已关联产品阶段」为前置（pdiag Playwright 人工辅助 + #917 引擎全自动，双证）；**引擎三缺陷全闭环**（树搜索引擎锁死 `81a17f22`/`d2adf8e3`、fill 去重作用域 `cee623e1`、「选择阶段」弹窗枚举遮挡 `226ef7e3`——#924 三项验收「gaps 归零 / 无双行 / 搜索族重填放行」全 PASS）；**#924 = wet9 系列首条成功轨迹**（recorded / is_successful=1）。
+  - **未闭环**：①残留族业务清理（挂起表 `wet9-residue`）；②~~「选择阶段」弹窗交互配方待落 KB 卡~~ **已落（2026-09-20 `product_library.json`：节点 `prod_stage_assoc_dlg` + 规则「设置管控要素前置=已关联阶段/关联不随产品删除级联」；双侧金样例 26 passed + py ok + recall-eval 逐字段零差异）**；③B 类五项测试报告待出。报告：`through-report-b3v/b3t/sixth.md`、`pdiag-report.md`。
 
 ### ① 830 任务收尾：自测 + bug 修复
 
@@ -147,11 +150,13 @@
 | **dedup-deletion** | 已闭 | 删死代码 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS/CLAUDE/README/jsdoc/verify-all 去门禁；活录 coalesce 仍在 `state.py`；2026-09-10 Lead 选定待裁落地 |
 | **executor-only-bib** | P3 已闭（含物理删除） | `USE_EXECUTOR` 默认 true；false→503（resolve/attach/session）；冷测 `characterize-executor-only-bib.mjs`；物理删除 `ensureGlobalBrowser`/控制面 CDP attach 已落地（plan `2026-09-11-remove-local-bib-mount`，`1455185c`..`2a9a7e3e`） |
 | **resolve-placeholder-search** | P3 已闭 | resolve inventory/needle 漏收 `.el-form-item` 外 placeholder（如「搜索关键字」）；`228d2b62`→`6c77c363`→`1bbfb9ef`；冷 pin GREEN；**湿测 PASS**（2026-09-11 用户：executor restart 后关键字搜索抓取成功） |
+| **wet9-residue** | P2 | 产品管理 SUT 残留清理（**业务侧**）：`wet9阶段V-20260920`（显式拦截「已存在产品引用了此阶段」）+ `wet9阶段U-20260920`（静默拦截）+ `PD00044268/44269/44270` + `PD00044278`——**悬挂关联引用**（产品已删净而关联记录仍在，3–4 次实证，SUT 关联表不随产品删除级联）；需业务先解绑关联记录再删阶段。`wet9B3V-20260920`/`wet9B3W-20260920`/`wet9阶段W-20260920` 已于 #924 删净 |
 
 ## 更新记录
 
 > 逐日工作流水已移交 [agent-log.md](agent-log.md)（跨工具共享日志；「开场三件事 / 收工写日志」约定见 AGENTS.md）。本文件只维护工作线与挂起项。
 >
+> - 2026-09-20 wet9 产品管理湿测线主体闭环（⑥ 节详载）：B3 解锁裁决落地（前置=已关联产品阶段）+ 引擎三缺陷全闭环 + #924 三项验收全 PASS（gaps 归零/无双行/搜索族重填放行）+ wet9 首条成功轨迹；未闭环=残留清理（`wet9-residue`）/「选择阶段」弹窗 KB 配方（`stage-dialog-kb-recipe`）/B 类五项报告
 > - 2026-09-19 上游换代落地：`uara_V2.0` 确立唯一上游（基点 `1b421bad`，engine 线 `22aa7648`+本线 `35527f80` 吸收 V1.2 全部历史，合约分支 `cf8cbe06` 并入）；V1.2 冻结；各线开工声明上游=V2.0，新分支从 V2.0 切；服务/主检出归属待用户协调（见顶部换代说明）
 > - 2026-09-07 主链跑车 R1-R5 PASS（客户/评级生效/授信通过/批复生效+WN0001 账号解锁，子代理编队 G1-G6，⑤改写为完成矩阵+R6/R7 挂起）；R6 用信三深坑全修后流程提交 BLOCKED@SUT X0018 角色配置——用户拍板暂时搁置，恢复条件与续接步骤已写入 ⑤；DB 直连方案替代 SSH 隧道（隧道不稳=落库延迟真凶）
 > - 2026-09-06 晚 重整：用户定调引擎主链贯通为最高优先（⑤改写：主链七环节+三能力验收口径+能力差盘点三待办）；KB 线转向主链流程卡供给（⑦改写），blocked 回收/T1-2批降级按需顺路；控制面+执行端已重启（LMY online）
