@@ -1,6 +1,22 @@
 # Agent 协作日志
 
 
+## 2026-09-20 14:20 · OpenCode — 修复：重新录制后画面永久「未推流」（前端对残留 attached 绑定受限自愈）
+
+- 问题：一条老的 `failed` 交易，进入录制页点「重新录制」→ 步骤清空、显示录制中、也录出了步骤，但画布一直显示「画面未推流」。
+- 根因（后端 + 前端叠加）：
+  1. 控制面 live 绑定可能残留 `attached: true` 但 BiB 实际已死——`restoreLiveBindingFromRow` 仅按 DB `remote_session.status='active'` 乐观置 attached；`executor-ws.js` 只处理 `session.bib_ready`，**没有 BiB 死亡/断流事件清除 attached**。控制面/执行机重启后尤其明显。
+  2. 前端 `useRemoteCanvas.ensureStream` 在 `status.attached === true` 时**拒绝重新 attach**（防 attach 风暴），且 `applyStatus` 每次都把 `autoReconnectAttempts` 复位为 0 → 自动重连退化为「无限 startStream 等待新帧」永不成功，占位文案恒为「画面未推流」。
+- 修复（前端另仓 `ui-auto-recording-agent-vue`，`useRemoteCanvas.ts`）：
+  - 新增 `attachedNoFrameStreak`：绑定声称 attached 但连续等待无新帧时累加。
+  - `ensureStream` 在 `forceAttach && already && streak >= FORCE_REATTACH_AFTER(2)` 时强制真正 `attachLiveRemote` 重建 BiB。
+  - 达到 `MAX_AUTO_RECONNECT(8)` 仍无帧 → 停止重连并提示「推流不可用，请重新准备会话后重试」，避免死循环/风暴。
+  - 收到真实新帧、或用户新一次 attach（`resetReconnectState`）时清零 streak。
+- JS-gen 代码零改动（纯前端自愈；控制面无需重启）。
+- 验收：前端 `npx vue-tsc --noEmit` 通过。真机观察点：残留 attached 场景下第 2 次重试会自动重建 BiB 并出画面。
+- 提交：前端另仓 `dev`；本文档 commit。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 13:50 · OpenCode — 修复：执行机中断/重启后录制中交易永久卡 recording（节点离线标 failed(interrupted)）
 
 - 问题：某交易先为 failed（录制异常），用户进入录制页连上执行机并点重试（start 录制），随后在后台中断/重启执行机；交易实际已异常停止，但 `record_status` 仍停在 `recording`，永久卡住。
