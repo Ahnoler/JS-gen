@@ -46,6 +46,58 @@ _RESET_BTN_RE = re.compile(
 )
 _RESET_PHASE_RE = re.compile(r'重置|清空|清除|恢复默认')
 
+# wet9 (#902/#903): SUT 树重载会清掉 el-tree 过滤但保留搜索框关键字，自愈须
+# 再点一次搜索图标——幂等动作（搜索/查询/检索/刷新/翻页）天然需要同元素多次
+# 触发，already-operated-this-phase 拒绝会堵死该自愈路径（错位态锁死）。
+# 全锚定匹配：复合词（如「保存查询方案」含查询）不放行。
+_IDEMPOTENT_BTN_RE = re.compile(
+    r'^(搜索|查询|检索|刷新|重新加载|加载|翻页|下一页|上一页|末页|首页|'
+    r'(?:重新)?(?:搜索|查询|检索|刷新)(?:图标|按钮|产品树|列表|树|数据|页面|条件|结果)*|'
+    r'刷新[列表树数据页面]*|搜索图标|查询图标|刷新图标)$'
+)
+
+
+def _is_idempotent_click_label(text: str) -> bool:
+    t = re.sub(r'\s+', '', (text or '').strip())
+    return bool(t and _IDEMPOTENT_BTN_RE.match(t))
+
+
+# wet9-B3r (#904 P6) ③裁决：页面卡死时 agent 重击左侧菜单/树链接复位被
+# already-operated-this-phase 拒——「卡死复位」自愈路径仍被堵。纳入导航类
+# 元素（菜单/链接）的重击放行，但**限流**：每元素每阶段 1 次额外重击预算，
+# 预算耗尽即拒绝并给处方——既恢复自愈，又封「全量放开菜单重点击」的循环
+# 风险（合约线 wet9b3r 回执警示）。
+_NAV_RECLICK_BUDGET = 1
+
+
+def _is_navigation_click_element(element_info: dict, tag_name: str = '') -> bool:
+    """True when the click target is navigation-shaped (menu item / link)."""
+    tag = str((element_info or {}).get('tag_name') or tag_name or '').strip().lower()
+    attrs = (element_info or {}).get('attributes') or {}
+    raw_class = str(attrs.get('class') or '').lower()
+    if tag in ('a', 'li'):
+        return True
+    return any(k in raw_class for k in ('menu', 'nav', 'breadcrumb'))
+
+
+def _bump_nav_reclick(business_data_store: dict | None, identity: str) -> int:
+    """Consume one unit of the per-identity nav re-click budget; return the
+    1-based attempt number. Stored inside _phase_ai_operations under a
+    __navreclick__ namespace so phase cleanup clears it for free and the
+    guard dict schema stays untouched."""
+    if business_data_store is None:
+        return 0
+    touched = business_data_store.setdefault('_phase_ai_operations', {})
+    if not isinstance(touched, dict):
+        return 0
+    key = '__navreclick__' + str(identity or '').strip().lower()
+    try:
+        value = int(touched.get(key) or 0) + 1
+    except (TypeError, ValueError):
+        value = 1
+    touched[key] = value
+    return value
+
 
 def _is_reset_button_label(text: str) -> bool:
     t = re.sub(r'\s+', '', (text or '').strip())
@@ -177,14 +229,17 @@ class ClickEngine:
         button_identities = [f'button:{button_text.strip()}']
         if button_xpath:
             button_identities = [f'click:{button_xpath}']
-        duplicate = duplicate_phase_operation_any(
-            self.business_data_store, button_identities,
-        )
-        if duplicate:
-            return _ok(
-                f'already-operated-this-phase:button={button_text} via {duplicate}; '
-                'do not click the same button again; verify state and continue the phase'
+        # 幂等动作（搜索/查询/刷新/翻页）放行同元素重复点击：SUT 树/列表
+        # 重载后过滤失效须重触发（wet9 #902/#903）；记录仍照常写入。
+        if not _is_idempotent_click_label(button_text):
+            duplicate = duplicate_phase_operation_any(
+                self.business_data_store, button_identities,
             )
+            if duplicate:
+                return _ok(
+                    f'already-operated-this-phase:button={button_text} via {duplicate}; '
+                    'do not click the same button again; verify state and continue the phase'
+                )
         # G1 container-scope-first: if a visible drawer/dialog is open and a
         # matching button exists inside it, click the in-overlay one; only fall
         # back to the page-level JS_CLICK_ICON_BUTTON on miss (original
@@ -225,6 +280,25 @@ class ClickEngine:
                     # TODO(stc-query-anchor): anchor 查询 button container on success — §7.1
                     from scripts.controller.actions.search_then_click_guard import mark_query_clicked
                     mark_query_clicked(self.business_data_store)
+            # G3: record query/nav completion evidence (query_clicked /
+            # nav_next_clicked) when phase boundary is active — symmetry with
+            # the click_element_by_index success path (S5, 2026-09-18).
+            if self.business_data_store is not None:
+                try:
+                    from scripts.controller.actions._phase_boundary import (
+                        maybe_record_click_completion_evidence,
+                    )
+                    kinds = maybe_record_click_completion_evidence(
+                        self.business_data_store,
+                        btn_label=bt,
+                    )
+                    if kinds:
+                        sys.stderr.write(f'[click-button] G3 evidence recorded: {kinds}\n')
+                        sys.stderr.flush()
+                except Exception:
+                    sys.stderr.write("[click-button] G3 completion evidence recording failed" + '\n')
+                    sys.stderr.flush()
+                    pass
             return _ok(result)
         if str(result).startswith('err-icon-label-ambiguous:'):
             # Generalized fallback found same-label buttons but could not pick
@@ -346,7 +420,12 @@ class ClickEngine:
                     }''', gate_xp))
                 except Exception:
                     date_panel_click = False
-            if not date_panel_click:
+            if not date_panel_click and not _is_idempotent_click_label(
+                str((element_info or {}).get('text') or elem_text or '')
+            ):
+                # 幂等动作（搜索/查询/刷新/翻页）同元素重复点击放行
+                # （wet9 #902/#903：树重载后过滤失效须再点搜索图标）；非幂等
+                # 维持 already-operated-this-phase 拒绝。
                 from .phase.element_guard import duplicate_phase_operation
                 duplicate = duplicate_phase_operation(self.business_data_store, click_identity)
                 button_text_identity = ''
@@ -371,10 +450,28 @@ class ClickEngine:
                                 self.business_data_store, button_text_identity,
                             )
                 if duplicate:
-                    return _ok(
-                        f'already-operated-this-phase:index={index} via {duplicate}; '
-                        'do not click the same element again; verify state and call done when complete'
-                    )
+                    # wet9-B3r ③：导航类元素（菜单/链接）的重复点击是「页面
+                    # 卡死复位」自愈路径——限流放行：每元素每阶段 1 次额外重击
+                    # 预算，预算内放行并留痕；耗尽即拒并给处方（封循环风险）。
+                    if _is_navigation_click_element(element_info, tag_name):
+                        used = _bump_nav_reclick(self.business_data_store, click_identity)
+                        if used <= _NAV_RECLICK_BUDGET:
+                            sys.stderr.write(
+                                f'[nav-reclick] budget used {used}/{_NAV_RECLICK_BUDGET} '
+                                f'index={index} identity={click_identity}\n'
+                            )
+                            sys.stderr.flush()
+                        else:
+                            return _ok(
+                                f'already-operated-this-phase:index={index} via {duplicate}; '
+                                f'nav re-click budget exhausted ({_NAV_RECLICK_BUDGET} extra allowed) — '
+                                '页面可能已卡死：勿再重试本导航元素，改用 report 上报或结束会话重开'
+                            )
+                    else:
+                        return _ok(
+                            f'already-operated-this-phase:index={index} via {duplicate}; '
+                            'do not click the same element again; verify state and call done when complete'
+                        )
             try:
                 dd_gate = await page.evaluate(
                     '''(xpath) => {
@@ -444,9 +541,8 @@ class ClickEngine:
                         stc_satisfied,
                     )
                     is_tree_for_stc = await xpath_is_tree_node(page, gate_xp)
-                    # Tree: block click if STC gate not met. Table-radio index
-                    # clicks already happened — only need satisfied flag for
-                    # record-override (same MVP shape as tree first-leaf).
+                    # Tree nodes are blocked here. Table radios are blocked after
+                    # table_radio_info is known, still before the DOM click.
                     if is_tree_for_stc:
                         stc_err = await guard_locate_or_err(page, self.business_data_store)
                         if stc_err:
@@ -496,6 +592,17 @@ class ClickEngine:
                     }''', gate_xp) or {}
                 except Exception:
                     table_radio_info = {}
+
+            # Table-radio index clicks share the dedicated action's STC hard guard.
+            # Without this, click_element_by_index records a business-key row before 查询.
+            if (
+                table_radio_info.get('isRadio')
+                or str((element_info or {}).get('target_kind') or '') == 'table_row_radio'
+            ):
+                from .search_then_click_guard import guard_locate_or_err
+                stc_err = await guard_locate_or_err(page, self.business_data_store)
+                if stc_err:
+                    return _err(stc_err, include_in_memory=True)
 
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
             # select→修改→确认 loops after premature done() rejection.

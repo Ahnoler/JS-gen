@@ -46,6 +46,7 @@ run "characterize-runid-bridge" node scripts/characterization/characterize-runid
 run "characterize-owned-wait-shape" node scripts/characterization/characterize-owned-wait-shape.mjs
 run "characterize-quality-final-gate" node scripts/characterization/characterize-quality-final-gate.mjs
 run "characterize-record-phase-finalize" node scripts/characterization/characterize-record-phase-finalize.mjs
+run "characterize-stop-semantics" node scripts/characterization/characterize-stop-semantics.mjs
 # Static gates (2026-09-17): eslint no-undef catches merge-orphan references
 # (the 'gated' incident class) — pre-commit hooks do not run on merge commits
 # and text pins cannot see undefined identifiers. ruff F821 is the Python
@@ -85,6 +86,11 @@ run "characterize-phase-done-evidence-gate" node scripts/characterization/charac
 # 前者抓"拒绝没生效"（裸 return → None → 调用方 truthy 判定静默放行）——源码形状 pin 抓不到。
 run "characterize-g3-done-gate-live" "$PY" scripts/characterization/characterize-g3-done-gate-live.py
 run "characterize-g3-runner-seam" node scripts/characterization/characterize-g3-runner-seam.mjs
+# 2026-09-18 phase-contract 冲突普查三批修复的三个 pin（仲裁盲区/熔断/反向仲裁/降噪、
+# save 通知正则「校验成功」/裸「校验」、probe 收口 doneLog 留痕 + ✂ 转移点单行）。
+run "characterize-contract-arbitration-circuit-breaker" "$PY" scripts/characterization/characterize-contract-arbitration-circuit-breaker.py
+run "characterize-save-notification-classify" "$PY" scripts/characterization/characterize-save-notification-classify.py
+run "characterize-probe-donelog-and-suspect-noise" "$PY" scripts/characterization/characterize-probe-donelog-and-suspect-noise.py
 # traj 840：wf_submit_guard 按字段类型给下一步动作（下拉→select_option；空 options≠没选项）
 run "characterize-wf-submit-guard-hint" "$PY" scripts/characterization/characterize-wf-submit-guard-hint.py
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
@@ -155,10 +161,12 @@ run "characterize-xpath-three-sources" node scripts/characterization/characteriz
 run "characterize-manual-radio-fill" "$PY" scripts/characterization/cold/characterize-manual-radio-fill.py
 run "characterize-date-range-recording" "$PY" scripts/characterization/cold/characterize-date-range-recording.py
 run "characterize-ai-phase-element-guard" "$PY" scripts/characterization/cold/characterize-ai-phase-element-guard.py
+run "characterize-element-dedup-scope" "$PY" scripts/characterization/cold/characterize-element-dedup-scope.py
 run "characterize-fill-dispatch" "$PY" scripts/characterization/cold/characterize-fill-dispatch.py
 run "characterize-fill-err-with-scope" "$PY" scripts/characterization/characterize-fill-err-with-scope.py
 run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/characterize-search-then-click-guard.py
 run "characterize-search-then-click-prompts" "$PY" scripts/characterization/cold/characterize-search-then-click-prompts.py
+run "characterize-idempotent-click-gate" "$PY" scripts/characterization/characterize-idempotent-click-gate.py
 run "characterize-fill-replay-engine" "$PY" scripts/characterization/cold/characterize-fill-replay-engine.py
 run "characterize-select-dispatch" "$PY" scripts/characterization/cold/characterize-select-dispatch.py
 run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/characterize-select-replay-engine.py
@@ -211,6 +219,8 @@ run "characterize-form-field-intra-slot" node scripts/characterization/cold/char
 run "characterize-form-structure-container" node scripts/characterization/cold/characterize-form-structure-container.mjs
 run "characterize-tree-node-text" node scripts/characterization/cold/characterize-tree-node-text.mjs
 run "characterize-tree-text-export" node scripts/characterization/cold/characterize-tree-text-export.mjs
+run "characterize-recording-coach-assert" node scripts/characterization/cold/characterize-recording-coach-assert.mjs
+run "characterize-recording-coach-operator" node scripts/characterization/cold/characterize-recording-coach-operator.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

@@ -15,7 +15,10 @@ from ._workspace import _workspace_result
 from ...models import TaskList
 from .form_rules import get_has_button_keywords
 from .form_scan_utils import _save_form_snapshot, _task_done_impl
-from .phase.element_guard import duplicate_element_action, remember_successful_element_action
+from .phase.element_guard import (
+    duplicate_element_action_scoped,
+    remember_successful_element_action_scoped,
+)
 
 # 兼容 re-export（form-actions-split）：外部/characterization 仍从 _form 导入这些
 # form_scan_utils 符号；canonical 位置是 form_scan_utils，勿再新增。
@@ -72,14 +75,14 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
 
     @controller.action('Fill a form field using Element UI native DOM setter. Works for text inputs AND date pickers (commits Vue v-model, including TsscMultiDatePicker). For a date-range control, value MUST contain both start and end dates in one call, e.g. "2026-09-05 - 2026-09-30"; never fill only one endpoint.')
     async def fill_form_field(label_text: str, value: str, xpath_smart: str = ""):
-        duplicate = duplicate_element_action(business_data_store, label_text)
+        duplicate = duplicate_element_action_scoped(business_data_store, label_text)
         if duplicate:
             return _ok(
                 f'already-operated-this-phase:{label_text} via {duplicate}; '
                 'do not repeat this field, verify if needed and call done when the phase goal is complete'
             )
         result = await _fill_engine.fill_form_field(label_text, value, xpath_smart)
-        remember_successful_element_action(
+        remember_successful_element_action_scoped(
             business_data_store, label_text, 'fill_form_field', result,
         )
         return result
@@ -169,14 +172,14 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str, xpath_smart: str = ""):
-        duplicate = duplicate_element_action(business_data_store, label_text)
+        duplicate = duplicate_element_action_scoped(business_data_store, label_text)
         if duplicate:
             return _ok(
                 f'already-operated-this-phase:{label_text} via {duplicate}; '
                 'do not repeat this field, verify if needed and call done when the phase goal is complete'
             )
         result = await _select_engine.select_option(label_text, option_text, xpath_smart)
-        remember_successful_element_action(
+        remember_successful_element_action_scoped(
             business_data_store, label_text, 'select_option', result,
         )
         return result
@@ -187,28 +190,28 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
 
     @controller.action('Click a radio option by label text and radio option text.')
     async def click_radio(label_text: str, option_text: str, xpath_smart: str = ""):
-        duplicate = duplicate_element_action(business_data_store, label_text)
+        duplicate = duplicate_element_action_scoped(business_data_store, label_text)
         if duplicate:
             return _ok(
                 f'already-operated-this-phase:{label_text} via {duplicate}; '
                 'do not repeat this field, verify if needed and call done when the phase goal is complete'
             )
         result = await _radio_engine.click_radio(label_text, option_text, xpath_smart)
-        remember_successful_element_action(
+        remember_successful_element_action_scoped(
             business_data_store, label_text, 'click_radio', result,
         )
         return result
 
     @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover. If result starts with no-tree-component, do NOT retry — use fill_form_field with a concrete value (not "first") or select_option.')
     async def select_tree_option(label_text: str, option_text: str, xpath_smart: str = ""):
-        duplicate = duplicate_element_action(business_data_store, label_text)
+        duplicate = duplicate_element_action_scoped(business_data_store, label_text)
         if duplicate:
             return _ok(
                 f'already-operated-this-phase:{label_text} via {duplicate}; '
                 'do not repeat this field, verify if needed and call done when the phase goal is complete'
             )
         result = await _tree_engine.select_tree_option(label_text, option_text, xpath_smart)
-        remember_successful_element_action(
+        remember_successful_element_action_scoped(
             business_data_store, label_text, 'select_tree_option', result,
         )
         return result
@@ -226,7 +229,7 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
         'with scan/check_field_value and verify the saved request body carries the value.'
     )
     async def set_vue_model(label_text: str, field_name: str, value: str):
-        duplicate = duplicate_element_action(business_data_store, label_text)
+        duplicate = duplicate_element_action_scoped(business_data_store, label_text)
         if duplicate:
             return _ok(
                 f'already-operated-this-phase:{label_text} via {duplicate}; '
@@ -239,7 +242,7 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
         ok, payload = _workspace_result(result)
         if ok:
             action_result = _ok(payload)
-            remember_successful_element_action(
+            remember_successful_element_action_scoped(
                 business_data_store, label_text, 'set_vue_model', action_result,
             )
             return action_result

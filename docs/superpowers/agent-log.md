@@ -1,5 +1,392 @@
 # Agent 协作日志
 
+## 2026-09-20 12:50 · ZCode 引擎线 — 收工：弹窗遮挡枚举修复交付（vendored isTopElement 浮层豁免 + probe 按钮权威清单，分支未合并待批，回链 12:19 开工）
+
+- 完成：#910④ B 定谳（引擎枚举受限）修复交付，commit 5661337e，分支 `engine/domtree-occlusion-20260920`（96aa8557 = 5661337e + d4165b79 合入，已 push）。**11 files +292/−9 + vendor 副本**。子智能体队伍：Explore 载体调研 → 双 worker 并行（文件集不相交）→ 主会话审 diff → 独立复验 → 代提交。
+- **层1（主修）枚举遮挡**：调研定谳 buildDomTree.js 唯一载体在 site-packages（不受版本控制，python/ junction+gitignore，直改即污染主检出且随 pip 升级丢失）→ 修复载体=**vendored 补丁副本 + 猴子补丁**：`scripts/vendor/browser_use/buildDomTree.js`（上游 0.1.48 全量副本+补丁，文件头注明同步须知）+ `agent_utils.patch_dom_tree_js()`（wrap DomService.__init__ 覆写 js_code，缺失回退 stock+stderr 告警、幂等），session_runner/main 接线。isTopElement 补丁语义：**祖先链 miss 后命中元素在 .el-popper 浮层内（tooltip 除外）→ 候选仍视为 top**；.el-overlay/el-dialog 模态真遮挡不变；mock 四场景验证（popper→true/tooltip→false/overlay→false/null→false）。
+- **层3（附带）probe 认知缺口**：semantic_snapshot/verify_context 的 overlay 摘要新增 `buttons` 权威清单（容器内全量、不经 40 截断、含 disabled）；record_probe_done_log 收口文本追加「| overlay buttons: [...]」（截 20 字/最多 8 个，probe 收口后缀保持居尾）。层2（buttons≤40 截断）经合约线实测排除为本次根因，原样未动（pin 钉证）。
+- 过程要点：①全量 verify-all 首跑出新红 eslint-core——vendor 副本 73 errors，已将 `scripts/vendor/**` 加入 eslint ignores（第三方 vendored 代码免本仓 lint，与 migrations 同理），复跑回基线；②worker B 纠正调研给的 verify_context 路径（实际在 js_snippets/ 非 phase/）。
+- 验收证据：新 pin `characterize-domtree-occlusion` **14/14**（RED 1/14 → GREEN）已登记 verify-all；probe-donelog pin 扩展 **56 checks**（C 组 23 新增）；controller-annotations/dialog-tasklist-scope/scan-fullpage-p1/p2 回归全过；全量 verify-all 失败集=**3 已知红零新增 209 过**（本分支基点）+ eslint 0 errors；合并态（96aa8557）复跑全绿。
+- 状态：**未合并待批**。生效机制：纯 Python/JS 注入侧，**合并入引擎 worktree 磁盘后新录制子进程即时生效，无需重启**。湿测观察点：「选择阶段」场景 agent 元素表应含 footer 确定钮、probe 收口回执应列弹窗按钮清单。
+- 遗留移交：①vendor 副本与上游 0.1.48 绑定，升级 browser_use 须重放补丁（文件头已注）；②层4 伪影（views.py get_all_text_till_next_clickable_element 不查 is_visible）本次未动，登记后续候选；③KB 配方（选择阶段=勾 checkbox+click_save 确 定+popover 遮挡属正常）为合约线自领；⑥ SUT 关联表级联=业务清单。
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 12:19 · ZCode 引擎线 — 开工：弹窗遮挡枚举缺陷（#910④ B 定谳落地，popover 遮挡 footer → isTopElement 误判漏采）
+
+- 进行中：合约线 pdiag 定谳 B 成立（SUT 无缺陷）——「选择阶段」弹窗 footer 确定钮被「请选择」触发的 tree-popover 展开遮挡，browser_use buildDomTree.js `isTopElement` elementFromPoint 命中测试判非顶层不分配 index；步 47 长串伪影=get_all_text_till_next_clickable_element 不查 is_visible。本单元按合约线分层修复面立单：
+  - **主修（层1）**：枚举遮挡——popover/popper 遮挡下的可交互元素（尤其 dialog footer 按钮）不得被 isTopElement 误杀；修复落点以调研为准（buildDomTree.js 在本仓的载体：vendored 副本 or 引用链，Explore 定谳；**site-packages 直改不可接受**——不入版本库）
+  - **附带（层3）**：probe 收口认知缺口——现只报 overlay 名，补弹窗内按钮权威清单（agent 才知道「确 定」存在可点）
+  - **层2（semantic_snapshot buttons≤40 截断）**：合约线实测已排除为本次根因（counts.truncated 对照），本单元不动，仅调研确认不回归
+- 上游：uara_V2.0（tip 11be900a）。分支 `engine/domtree-occlusion-20260920` @ 11be900a。方式=子智能体队伍（Explore 定位修复载体与 pin 面 → 主会话设计 → worker 实现 → 主会话验收代提交）。
+- 范围（可写集）：buildDomTree/isTopElement 的本仓载体文件（待 Explore 定位）、probe 收口实现、`scripts/controller/actions/**` 相关 scan 链、相关 characterization pin（RED 先行）、`scripts/refactor/verify-all.sh`、主检出 agent-log 本条目+收工条目
+- 禁入区：**运行态服务零触碰（重启须先请示）**；远端代理（用户自管）；site-packages（若 browser_use 为 pip 依赖，本单元不得直改，修复须落本仓可控载体）；Cursor STC 文件集；Step 2 范围（recorder_emitters.py）；合约线 KB 配方落地（其线自领）
+- 验收口径：RED pin 先行（遮挡场景：footer 钮被 popover 覆盖时仍分配 index）；全量 verify-all 3 已知红零新增；分支交付「未合并待批」
+- 台账随记：⑤ wet9 blocked 假设结案+B3 义务闭环（合约线自证，引擎无动作）；⑥ SUT 关联表不随产品删除级联=业务清理清单（非引擎面）
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 11:24 · ZCode 引擎线 — 收工：B-2 数据完整性三缺陷修复交付（缺号/双行/failedReason 阶段号，分支未合并待批，回链 10:47 开工）
+
+- 完成：三缺陷一次修净，commit 95006eb3，分支 `engine/b2-gaps-fix-20260920`（ea3e1222 = 95006eb3 + 6ba4ed77 合入，已 push）。**6 files +128/−16**。子智能体队伍模式执行：Explore×2 并行只读调研（步号持久化链 / failedReason 构造链）→ 主会话定设计 → worker-coder 单点实现（三修复同落 runner/persist 链，避免同文件双写）→ 主会话审 diff（零越界）→ 独立复验 → 代提交。
+- ①**步号缺口**（#904 25-30、#909 38-42/46）：根因=coalesce 删除+全表重排压实 DB 号段后，runner 内存计数器 init-once 不回补 → 后续步骤从陈旧高值起跳留永久断号。修复=删除成功分支回补 `_nextStepNumber = getMaxStepNumber(tid)+1`。调研期否决"失败动作落库"方案（不修缺口且污染 countBusinessSteps/零步门禁口径、波及 _form.py ~38 pin）。
+- ②**fill+snapshot 同号双行**（#909 步45、#910 步62）：根因=业务步（内存计数器）与 save_form_snapshot（DB max+1）双源分配相撞。修复=`appendRecordedFormSnapshot` 加 stepNumber 参数（调用方有效值优先、max+1 兜底），appendRecordedStep 透传；与①回补配合两源归一。
+- ③**failedReason 无阶段号**：`persistFailReason(kind, phaseHint?)` 非空追加"（阶段 N,M）"；zeroPhase/perRun 降级与 v3 终局（quality→qualityFails 阶段、phase→failedOutcomeKeys）带参；total/runner_error 无可靠阶段号保持原文（pin 钉原文未动）；failReasonText/dao/failedKind 全未动。
+- 验收证据：新 pin `characterize-step-number-integrity` **19/19**（回补位置/透传/拼装/调用点恰次/refreshTrajectoryCounts 恰 2 防误加）+ 已登记 verify-all；traj-recon-logging（6 hook 全绿）/form-snapshot-trigger/agent-llm-error/stop-semantics 27/27/phase-done-evidence-gate/quality-final-gate/record-phase-finalize/g3-runner-seam 全过；全量 verify-all 失败集=**3 已知红零新增 210 过**；合并态（ea3e1222）复跑全绿。
+- 状态：**未合并待批**。生效机制：本批 Node 侧改动（Python 侧零改动）——**合并后需 Node 重启生效，将按新规先请示用户批准**；未重启前生产录制行为不变（缺口/双行继续出现，属预期）。
+- 遗留移交：①湿测观察点：重启后新录制应见 `[traj-recon] phase gaps=[]` 且无双行、失败轨迹 failedReason 带（阶段 N,M）后缀；②`api-docs/groups/trajectory.js` failedReason 描述已同步后缀说明（前端纯展示透传，无破坏面）；③Step 2/事件流入流挂账不变。
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 10:47 · ZCode 引擎线 — 开工：B-2 数据完整性缺陷批（缺号/双行/failedReason 阶段号，子智能体队伍模式）
+
+- 进行中：用户点名修复缺陷，本单元收 B-2 gaps 家族三缺陷（#909/#910 连续两单实证）：①失败动作占步号不落库→步号缺口（#909 38-42/46、#904 25-30）；②fill_form_field 与 save_form_snapshot 同号双行（#909 步45、#910 步62）；③failedReason 不带阶段号（验收方定位难）。**方式=子智能体队伍**（用户要求控制上下文）：Explore×2 并行只读调研（步号持久化链 / failedReason 构造链）→ 主会话定设计 → worker-coder 分域实现（文件集不相交）→ 主会话验收代提交。子智能体一律不 commit。
+- 上游：uara_V2.0（tip 697b22bb）。分支 `engine/b2-gaps-fix-20260920` @ 697b22bb。
+- 范围（可写集）：`scripts/state.py`（_record_action 若涉）、`scripts/controller/actions/**`（录制动作落库链）、`src/services/trajectory/trajectory-persist-service.js`、`src/services/trajectory/trajectory-recording-runner.js`（persistFailReason 局部）、`src/models/failure-reason.js`、相关 characterization pin（RED 先行）、`scripts/refactor/verify-all.sh`（登记）、主检出 agent-log 本条目+收工条目
+- 禁入区：**运行态服务零触碰——重启须先请示用户批准（新规）**；远端代理执行机（用户自管，他人在用，绝对不动）；`click_action_engine.py`+`characterize-search-then-click-guard.py`（Cursor STC 文件集）；Step 2 范围（recorder_emitters.py 双门收敛，另单）；合约线湿测热区
+- 验收口径：RED pin 先行；全量 verify-all 失败集=3 已知红零新增；分支交付 push + 收工条目「未合并待批」
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 10:35 · ZCode 引擎线 — #910 回执登记：nav-reclick 取证闭环 + Step 1 生产观察无异常 + fill 规避有效（纯台账，无代码改动）
+
+- **nav-reclick（d2adf8e3）取证闭环**：#909 预算内放行 + #910 预算耗尽处方（P8 卡死→「页面可能已卡死」处方触发→agent 正确停止如实 report）两条路径均有生产证据，集成验收至此完全闭环。P8 卡死形态（产品详细信息视图菜单/面包屑/刷新/URL 导航全阻）按合约线建议登记**与 #901 config-view routing deviation 归族**（SUT 页面路由怪癖，非引擎缺陷面；引擎侧无可修点，仅台账归族待后续 SUT 反馈渠道）。
+- **Step 1 门禁收敛生产观察 PASS**：#910 全程零步/门闩/降级/90s/终局签名 0 命中、9 阶段正常收口、无兜底介入——正常路径无异常（异常路径本就是 Step 0 pin+单测守护面，生产命中要等真实假成功场景）。
+- **fill 去重（5dcbd955）状态**：合约线拆阶段规避有效（P4/P5 分填 98/99 均落库、err-pending-fields 0）——生产流量已挡在缺陷面外；修复已合并且新录制会话即刻生效（10:14 条目），「同阶段双弹窗同 label」场景的生产验证点待自然命中，命中即回执留证。
+- **④待命登记**：P6 断点在「选择阶段」弹窗无 footer 提交按钮——合约线 Playwright 页面调研定谳 SUT 结构 vs 引擎枚举受限，定谳后归位移交。引擎待命：若定谳为引擎侧（弹窗内控件枚举/可视性受限），候选面在 scan 枚举链（JS_SCAN_FORM_FIELDS / scan_editable_summary 的 dialog 作用域），届时按缺陷单流程立单。
+- **持续登记**：⑤step 62 双行（fill+snapshot 同号，B-2 gaps 家族第 3 读数）；failedKind=phase_failed 属 P7 判据被满足的正常回退，非异常；wet9B3T 产品+分类 P8 卡死残留与 PD 族同列待清理（业务侧）。
+- 引擎线挂账不变：Step 2（Python 双门收敛 + phase_blocked 伴随）、nav-reclick 事件流入流（低优先级——行为学取证已闭环）、B-2 gaps/failedReason 阶段号。
+- 注：不维护 CHANGELOG；纯台账条目
+
+## 2026-09-20 10:14 · ZCode 引擎线 — 合并回执：fill 去重修复已并入 V2.0（5dcbd955，用户批），新录制会话即刻生效（回链 10:06 收工）
+
+- 完成：`engine/fill-dedup-scope-20260920` (424d28fa) `--no-ff` 并入 uara_V2.0 = **5dcbd955**，已 push。引擎 worktree 已对齐合并态（工作区干净）。
+- 合并态验收（D:\dev\JS-gen）：五 pin 全绿（element-dedup-scope 12 断言 / ai-phase-element-guard / idempotent-click-gate / search-then-click-guard / fill-dispatch）；合并差异=本单元已验收代码（d912d506）+ docs，无新增面，未另跑全量 verify-all（合并前已在该内容上跑过 3 已知红零新增）。
+- **生效机制（更正 10:06 条目的"需重启窗口"表述）**：本修复纯 Python 侧（scripts/controller/**），录制会话的 Python 子进程**每次从磁盘新起**——引擎 worktree 磁盘自 d912d506 起已带修复，**新录制会话即刻生效，无需任何重启**；录制中会话不受影响（代码已在内存）。Node 侧本单元零改动，运行态仍 d6b713da（pid 24144）。
+- **请合约线知悉**：此刻起新开的录制已含 fill 去重修复——若任务命中「同阶段两个弹窗填同名字段」场景，即成修复的生产集成验证点（预期：两弹窗各自 fill 成功落步，无 already-operated 短路）；命中请回执留证。10:00 前已启动的录制仍为旧代码。
+- 注：不维护 CHANGELOG；合并操作轮次，无新代码
+
+## 2026-09-20 10:06 · ZCode 引擎线 — 收工：fill 去重容器作用域修复交付（#909 定谳落地，分支未合并待批，回链 09:45 开工）
+
+- 完成：#909 定谳的缺陷单交付——fill/select 等 phase 去重 identity 加容器作用域，根除 #903/#904/#909 三连根因（同阶段跨弹窗同 label 互相短路）。commit d912d506，分支 `engine/fill-dedup-scope-20260920`（424d28fa = d912d506 + 29b4eb0d 合入，已 push）。**5 files +216/−14**。
+- 修复内容：①`element_guard.py` 新增 `element_scope_key`（label 归一化+`@container`，`_active_container` 现成载体，缺省 main）+ scoped 版 duplicate/remember（旧纯 label 接口保留）；②迁移兼容：缺省 main 作用域未命中时回退查纯 label 键（热更后旧 run 记录不失效），真实容器上下文不回退（防重新引入误吞）；③`_form.py` 五 gate 点（fill_form_field/select_option/click_radio/select_tree_option/set_vue_model）gate+remember 换 scoped，拒绝文案逐字不变；④生命周期自查：operated_elements 每阶段必清、_active_container create/modify 阶段内保留（跨弹窗正是本修场景）——scoped 记忆=阶段生命周期，无跨阶段残留。
+- 验收证据：新 pin `characterize-element-dedup-scope` **RED→GREEN**（ImportError→12 断言全绿，含 #909 场景「分类弹窗→产品弹窗不互相短路」1b、同容器防御不回退 1c、旧数据兼容 1d/1f）；idempotent-click-gate 库存 needle 同步（8→11 defs）；ai-phase-element-guard/search-then-click-guard/fill-dispatch 全过；全量 verify-all 失败集=**3 已知红零新增 209 过**；合并态（424d28fa）五 pin 复跑全绿。
+- 状态：**未合并待批**——分支已推 origin。合并后需重启窗口生效（新录制 Python 子进程从磁盘加载，与 Node 侧无关，重启控制面+执行机即可；若与后续单合并批处理亦可）。
+- 遗留移交：①合约线湿测如遇「同阶段两个弹窗填同名字段」场景，在合并+重启前仍会触发 #909 已知缺陷（已在 09:45 条目告知避开该场景设计）；②`[nav-reclick]` 事件流入流（#909 移交项③）与 phase_blocked reason（#909 移交项②，Step 2 伴随）维持登记。
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 09:53 · ZCode 引擎线 — 运行态变更：服务已重启至 d6b713da（Step 1 生效，用户委托引擎线单独启动，未用 restart 脚本）
+
+- 完成：用户手动关闭控制面+本地执行机后，委托引擎线单独启动（明确不用 restart-local.cmd）。启动方式：PowerShell `Start-Process` 独立进程（脱离 agent shell 进程树，会话回收不受影响；未跑 restart-local.cmd，未动 kill-node-match/CDP 清理步骤——启动前预检 4097/19242 双端口零监听，环境干净）。
+- 核验：①health **200**（4097 LISTENING pid **24144**，从引擎 worktree **d6b713da** 启动=**Step 1 门禁收敛进入运行态**）；②EADDRINUSE 0 次；③本地执行机注册 online（nodeId 11，uuid 413bbddf…不变，B-3 registry 附着正常）。
+- **注意**：第二实例代理（start-executor-proxy.cmd，注册到远端 47.101.58.49 控制面）**本次未启动**（用户只点名控制面+执行机）——如远端控制面需要本机代理执行机，请用户或合约线告知补起。
+- 请合约线知悉：运行基线 fd30f4a7 → **d6b713da**（Step 1 零步门禁收敛在运行态，行为等价重构、六 pin 全绿）；后续湿测如涉零步门禁路径（降级/90s 门闩/终局收官）即 Step 1 集成观察点。
+- 注：不维护 CHANGELOG；无代码改动
+
+## 2026-09-20 09:45 · ZCode 引擎线 — Step 1 合并回执 + 新开工：fill 去重作用域缺陷单（#909 定谳落地，用户批"按推荐来，先完成合并"）
+
+- **Step 1 合并完成**：`engine/stop-gate-step1-20260919` (feb9a658) `--no-ff` 并入 uara_V2.0 = **d6b713da**，已 push。合并前主检出核验：他线 WIP 仅 CHANGELOG.md（用户对外文档重写）+ 22 个 untracked 备份，与合并文件集（gate/runner/pin/verify-all.sh）不相交，未触碰。合并态验收：六 pin 全绿（gate 22 收敛断言 / g3-seam 9/9 / record-phase-finalize / quality 4/4 / stop-semantics 27/27 / agent-llm-error）+ **全量 verify-all 失败集=3 已知红零新增 208 过**。引擎 worktree 已快进至 d6b713da，交付分支 engine/stop-gate-step1-20260919 已删（内容在 V2.0）。
+- **待用户执行（重启窗口）**：真实控制台运行 `D:\dev\JS-gen-engine\config\restart-local.cmd`；判据 `curl http://127.0.0.1:4097/api/health`=200 后回传。重启后 Step 1 收敛生效；合约线下单湿测可顺带观察三条门禁路径（零步降级/90s 门闩/终局收官）。
+- **新单元开工**：#909 定谳的 fill 去重缺陷单（用户批接续）。修复目标：fill/select/click_adjacent_button 的 phase 去重 identity 加容器作用域（`_element_key` 纯 label → label+container；scan 已产 `dialog:新增产品|产品` 现成可挂）——根除跨弹窗同 label 误吞（#903/#904/#909 三连的根因）。方式：RED pin 先行（跨容器同 label 必须不互相短路的行为断言）→ 最小修复 → 全量 verify-all 基线比对（3 已知红零新增）→ 分支交付「未合并待批」。
+- 上游：uara_V2.0（tip d6b713da）。引擎 worktree 新分支 `engine/fill-dedup-scope-20260920`。
+- 范围（可写集）：`scripts/controller/actions/phase/element_guard.py`（identity 构造）、`scripts/controller/actions/_form.py`（三 gate 点）、相关 characterization pin（新增 RED pin + 既有 characterize-ai-phase-element-guard.py needle 同步）、`scripts/refactor/verify-all.sh`（登记）、主检出 agent-log 本条目+收工条目
+- 禁入区：运行态服务（重启由用户真实控制台执行）；`src/services/trajectory/**`（Step 1 刚合并，本单元不碰）；`scripts/controller/actions/click_action_engine.py` 与 `characterize-search-then-click-guard.py`（Cursor STC 文件集）；合约线湿测热区
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 09:10 · ZCode 引擎线 — #909 回执定谳：产品弹窗「序号」fill 未落步 = 引擎缺陷（fill 去重跨容器 label 碰撞，非 agent 门闩违反）
+
+- **定谳（回执移交项①）**：合约线两解释中「fill 被去重拒绝」成立，判**引擎缺陷**。证据链三环：
+  1. **代码**：`_form.py:75` fill gate identity = `_element_key(label_text)`（`element_guard.py:8-10`，去空白+小写）——**仅 label，无 section/dialog 作用域**；步 13 分类弹窗 fill(序号,99) 成功 → `_phase_ai_operated_elements['序号']` 记 phase 级；产品弹窗同 label fill 被 `already-operated-this-phase` 短路返回（且返回文案是 **ok** 非 err——agent 收到"已操作过"的自相矛盾提示）。
+  2. **步序**：P4 fill 步 = 11(分类名称)/13(序号99 分类弹窗)/20(产品名称)/22(产品描述)/30(分类描述)——步 20/22 成功证明产品弹窗 fill 通道未整体堵死，**唯独 label「序号」撞记录**；步 23/24（click input[6]/real_click）即 agent 发现 fill 无效后退而直接点输入框的行为注脚（#903/#904 real_click 三连同根因第三次表现）。
+  3. **铁证**：步 21 `save_form_snapshot` container=`dialog:新增产品|产品`，5 字段含「序号」required=true——agent 明确看到该字段且任务文本点名 fill，却无 fill 步。
+- **处置登记**：①缺陷单「fill/select 去重 identity 加容器作用域隔离」（`_element_key` → label+container，scan 已产 `dialog:新增产品|产品` 现成可挂；同门 select_option/click_adjacent_button 撞同款）——**下一单候选，待用户点名后修**；②nav-reclick 集成验收行为学 PASS 收录台账（fd30f4a7 单变量窗口成立，pid 34532 全程 16 拍未变；预算耗尽场景仍未生产触发，[nav-reclick] 事件流入流建议采纳进下一批）；③「phase_blocked 独立 reason」登记进 **Step 2 伴随项**（Python 侧 reason 构造本就在 Step 2 范围，Step 1 改动已冻结不追加）；④B-2 gaps 新读数（38-42/46 缺号+步 45 双行）与 failedReason 无阶段号维持登记。
+- 引擎线现状不变：Step 0 已并入（1ce43191）；**Step 1 待批**（2ba8d549，批后建议重启窗口）。
+- 注：不维护 CHANGELOG；本条目纯定谳+登记，无代码改动
+
+## 2026-09-19 23:27 · ZCode 引擎线 — 收工：Step 1 三代零步门禁收敛交付（行为等价，分支未合并待批，回链 23:16 开工）
+
+- 完成：调研地图 **Step 1** 交付——三代零步门禁判定逻辑收敛进 `phase-done-evidence-gate.js` 单模块，runner 只留 IO 复核 + CAS 写库 + broadcast。commit 2ba8d549，分支 `engine/stop-gate-step1-20260919`（feb9a658 = 2ba8d549 + e8666be5 合入，已 push）。**7 files changed +323/−74**。
+- 收敛内容（调研地图 §二 三代杂交 → 单模块）：
+  - gate 模块新增四纯函数：`evaluatePhaseOutcome`（v1 阶段级：0步自报成功→null 降级 + `[0步完成]` 前缀 + perRun 嫌疑登记位）、`evaluateFinalizeGate`（门闩双通道裁决：zeroStepGate=v2 按阶段/v1.5 total==0 兜底**互斥对**、perRunGate=v3 **独立**判定——旧内联控制流逐字等价）、`collectFailedPhases`（phase.id 判定报 phaseNumber，P2-#6）、`evaluateFinalVerdict`（显式失败/QUALITY FAIL/聚合三选一，quality_failed 优先取值）；
+  - runner 三处消费化：recordPhaseResult / 90s 门闩 / v3 同步终局；判定文案（`[0步完成]`/`zero_step_rejected:`/降级日志/`fake_success_detected` payload 字段）逐字不变；
+  - **v1.5 total==0 兜底保留不删**（重录掩蔽兜底）；**stop 通道语义零触碰**（Step 3 范围，Step 0 pin 27/27 全程护航未红）。
+- 过程要点：①发现并纠正一处判定序偏差——v1.5 兜底在旧代码是「无嫌疑才进入」的 else 语义，第一版 gate 签名会改变可见性，已加 `hasPhaseSuspects` 参数保真；②发现并清掉一次 Edit 残留（gateDecision 双调用）；③agent-llm-error pin 新红 = needle 指向旧内联三元，同步为 `finalVerdict.failKind` 转发断言（语义由 gate pin 3c/3d 承接）。
+- 验收证据：六 pin 合并态全绿（gate 28 断言含原 6、g3-runner-seam 9/9、record-phase-finalize 全过、quality 4/4、stop-semantics 27/27、agent-llm-error OK）；全量 verify-all 两轮（第二轮修完 llm-error needle）失败集=**3 已知红零新增**（step-highlight/layer-tree/confirm-notification）208 过；eslint 0 warning；合并后验收在 feb9a658 集成态重跑六 pin 全绿。
+- 状态：**未合并待批**——分支已推 origin；本批动了 `trajectory-recording-runner.js`（运行态承载文件），**合并后建议安排重启窗口**使收敛生效并顺带成为 Step 1 的湿测观察点（90s 门闩/零步降级/终局收官三条路径）。
+- 遗留移交：①Step 2（Python 双零步门收敛，`recorder_emitters.py` v1 vs G3）保护网未动，待批后可立项——建议与 Step 1 湿测同轮观察；②Step 3（stop 单点化 + 门禁覆盖 stop 通道）依赖本步+Step 2，湿测清单见调研地图 §四；③断言 5f 裁决项（stop recorded vs 自然 recorded）在 Step 3 落。
+- 注：不维护 CHANGELOG
+
+## 2026-09-19 23:16 · ZCode 引擎线 — 开工：Step 1 三代零步门禁收敛进 phase-done-evidence-gate.js 单模块
+
+- 进行中：接上条，调研地图 Step 1 立项。目标：把 trajectory-recording-runner.js 里杂交共存的 v1 阶段级内联降级（recordPhaseResult）/ v2 按阶段双源 / v3 per-run 真源 + v3 同步终局的**判定逻辑**收进 `phase-done-evidence-gate.js` 单模块（`evaluatePhaseOutcome` + `evaluateFinalizeGate` 两个纯函数），runner 只留 CAS 写库 + broadcast 副作用。**v1.5 total==0 兜底分支保留不删**（重录掩蔽兜底，调研地图明令）。stop 通道语义本次不动（Step 3 范围），但 Step 0 pin 已把现状钉死保护。
+- 上游：uara_V2.0（tip 9d3cea6c，含 Step 0 pin）。引擎 worktree 分支 `engine/stop-gate-step1-20260919` @ 9d3cea6c。
+- 范围（可写集）：`src/services/trajectory/phase-done-evidence-gate.js`（扩展）、`src/services/trajectory/trajectory-recording-runner.js`（判定抽离）、`scripts/characterization/characterize-phase-done-evidence-gate.mjs`（新）、既有三 pin needle 同步（characterize-record-phase-finalize.mjs / characterize-g3-runner-seam.mjs / characterize-quality-final-gate.mjs——抽取时逐字核对，只动被抽走的 needle）、`scripts/refactor/verify-all.sh`（登记新 pin）、主检出 agent-log 本条目+收工条目
+- 禁入区：`trajectory-record-lifecycle.js`/`trajectory-attach-service.js`（stop 语义 Step 3 才动）；`scripts/controller/**`（合约线湿测热区）；Cursor STC 文件集；运行态服务（本单元不重启，改动经分支交付+用户批合并后生效）
+- 方式：micro-step（每步跑 `bash scripts/refactor/verify-all.sh`）；判定行为等价为目标（phaseOutcomes 写序/降级文案/payload 字段逐字保持）；全量 verify-all 与基线比对（3 已知红零新增）；分支交付 push + 收工条目「未合并待批」
+- 注：子智能体不 commit；主会话验收后代提交
+
+## 2026-09-19 23:15 · ZCode 引擎线 — Step 0 合并回执：pin 已并入 uara_V2.0（1ce43191，用户批"继续"），Step 1 随即开工（回链 22:49 收工）
+
+- 完成：用户批复"你继续吧"（对 22:49 收工条目"待批 ①并入 ②Step 1 立项"的直接回应）→ `engine/stop-gate-step0-20260919` (17e9c54e) 已 `--no-ff` 并入 uara_V2.0 = **1ce43191**，已 push。
+- 合并后验收（D:\dev\JS-gen 全 worktree 合并态）：characterize-stop-semantics **27/27** + 旁邻门禁家族 g3-runner-seam 9/9 + quality-final-gate 4/4 + record-phase-finalize 全过；合并差异仅 pin 文件 + verify-all.sh 一行登记，零代码面，**无需重启**。
+- 主检出工作区核验：仅他线 untracked 备份（.cursor/、data/kb/*.bak-*），与合并文件集不相交，未触碰。
+- 下一步：Step 1（三代零步门禁收敛进 phase-done-evidence-gate.js 单模块）随即开工，另见开工条目。
+- 注：不维护 CHANGELOG；无运行态影响
+
+## 2026-09-19 22:49 · ZCode 引擎线 — 收工：Step 0 stop 语义 pin 交付（27/27 绿，分支未合并待批，回链 22:43 开工）
+
+- 完成：挂账专项「stop 双实现 / 零步门禁三代」调研地图 **Step 0** 交付——`scripts/characterization/characterize-stop-semantics.mjs`（**27 断言全绿**，纯 read_text needle + 源码切片，零 import 被测模块、零行为驱动），verify-all.sh 已登记（quality-final-gate 家族旁）。commit 35e012a3，交付分支 `engine/stop-gate-step0-20260919`（17e9c54e = 35e012a3 + 开工声明 0b690d41 合入，已 push）。
+- 钉死内容（对应调研地图 §一/§二/§三）：
+  - **A 路由级联版**（lifecycle stopTrajectoryRecording）：cancel_step 无条件发、**终态无条件覆写**（无 CAS）、success 默认 true（函数签名+路由双默认）、失败记 user_marked_failed、**不消费任何零步门禁**（stop(success) 绕过口直证 1f+）；
+  - **C batch CAS-only**：仅 recording 态写终态、不降级持久态、success 默认 false、与 A 分叉点唯一（CAS 守卫 + capture off 缺席）；
+  - **D detach 硬停**：只置 abort 标志（userStop.success 恒 false）、不发 cancel_step、不写终态、杀全链（closeSession+槽位+runtime 删除）；
+  - **B runner 响应式状态机**：abort 检查点×2 置阶段终态后抛 'Recording aborted'、catch userStopPath 尊重 A 已写终态、finally 归属守卫（stale 不写库不砍新 run）+幂等补发 cancel_step；
+  - **承重钉（#904 P5 假成功结构性根因固化）**：finalizeGate 创建点在最后一个 abort 抛出点之后且在 try 块内——stop 路径 throw 即跳过门闩创建（断言 5a/5b 钉死该顺序）；另钉门闩三重活性守卫、CAS-only 降级（仅 recorded）、双源判定 v1.5 兜底、`fake_success_detected` 四广播点（v2/v1.5/v3 per-run/v3 同步终局）齐备映射。
+  - **裁决项入档（断言 5f）**：门闩 CAS 无 userStop 感知——90s 内用户显式 stop(success) 落的 recorded 与自然走完的 recorded 不可区分，门闩会同样降级；该优先级 Step 3 单点化时须裁决。
+- 验收证据：pin 单跑 27/27；全量 verify-all 失败集=**3 已知红零新增**（step-highlight/layer-tree/confirm-notification），208 项通过含 stop-semantics；合并后验收：ff 被拒（与 0b690d41 docs-only 平行）→ merge 合入后集成态重跑 27/27 绿，合并差异仅 agent-log 无代码面。
+- 状态：**未合并待批**——分支 `engine/stop-gate-step0-20260919` 已推 origin；uara_V2.0 并入由用户/合约线按例批（Step 0 为零行为 pin，不涉运行态，可不重启）。
+- 遗留移交：①Step 1（三代门禁收敛进 phase-done-evidence-gate.js 单模块）保护网已就位，可立项；②断言 5f 所记「stop recorded vs 自然 recorded 降级优先级」为 Step 3 裁决输入；③stash@{0} 为 Cursor STC 残迹保全（其已提交版 faa19c83 为准），留给 Cursor 处置。
+- 注：不维护 CHANGELOG；零行为改动，无重启需求
+
+## 2026-09-19 22:43 · ZCode 引擎线 — 开工：挂账专项「stop 双实现 / 零步门禁三代」Step 0（stop 语义 pin）
+
+- 进行中：用户已点名 P5 零步专项优先立项（"好的，继续吧"）。本单元执行调研地图 `docs/superpowers/reports/2026-09-18-stop-zero-gate-convergence-survey.md` 的 **Step 0**：新增 `scripts/characterization/characterize-stop-semantics.mjs`——只读 characterization pin，钉 stop A（lifecycle 路由级联无条件覆写）/C（batch CAS-only）/D（detach 硬停不写终态）三者 cancel_step/终态写入差异，及「stop 路径不 arm 90s finalize 门闩」（=stop(success) 通道绕过全部零步门禁的现状固化）。零行为改动，为 Step 1（三代门禁收敛进 phase-done-evidence-gate.js 单模块）备好保护网。
+- 上游：uara_V2.0（tip ea9eee1c）。引擎 worktree 新分支 `engine/stop-gate-step0-20260919` @ ea9eee1c。
+- 范围（可写集）：`scripts/characterization/characterize-stop-semantics.mjs`（新）、`scripts/refactor/verify-all.sh`（登记）、`src/services/trajectory/*.js` 只读、主检出 agent-log 本条目+收工条目
+- 禁入区：运行态服务与 4097（本单元不重启）；`trajectory-record-lifecycle.js`/`trajectory-recording-runner.js`/`trajectory-attach-service.js` 源文件（Step 0 只读不动，Step 1 才改）；`scripts/controller/**`（合约线湿测热区）；Cursor STC 文件集（click_action_engine.py / characterize-search-then-click-guard.py，其 22:36 收工已毕但今日湿测联调仍在跑）
+- 方式：读源 → 写 pin（read_text needle + 必要 behavior smoke）→ verify-all 登记 → 全量 verify-all 与基线比对（3 已知红零新增）→ 分支交付 push + 收工条目「未合并待批」
+- 注：子智能体不 commit；主会话验收后代提交
+
+## 2026-09-19 22:40 · ZCode 引擎线 — 收工：重启完成确认（fd30f4a7 运行态生效），回执合约线开 #905（回链 20:07 就绪条目）
+
+- 完成：用户真实控制台执行 restart-local.cmd，引擎线核验——①health **200**（4097 LISTENING pid 34532，进程启动 22:34:44 与 `tmp/server-main.log` mtime 22:35:00 交叉吻合=本次新起）；②server 启动序列正常（batch recovery 完成，EADDRINUSE 0 次=旧进程清干净）；③**运行代码=引擎 worktree fd30f4a7**（nav-reclick 限流 `_NAV_RECLICK_BUDGET`×4 + `[nav-reclick]` 留痕在本运行检出于场，py_compile+pin 33/33 于 20:07 终验过）；④执行机 LMY 重连 online（connected=true，inUse=0，heartbeat 实时）——B-3 的 DB 假活防护同步在位（另一同 uuid 旧节点行保持 offline 未被误刷）。
+- **生效面**：nav-reclick 限流（budget=1 + `[nav-reclick]` 留痕 + 耗尽处方）自此在控制面/执行机运行态激活；加上 fd30f4a7 已含的 81a17f22 搜索白名单与 KB 错位态配方，wet9 全部引擎侧修复+配方齐装。请合约线开 **#905 解锁裁决第三试**，同步取证 `[nav-reclick]` 留痕与预算耗尽处方文案（限流放行集成验收）。
+- 遗留：①引擎 worktree 在 `engine/nav-reclick-gate-20260919` @ fd30f4a7（ff 后与 V2.0 同点），下次引擎单元开工切回/重切批；②四项登记（P5 零步专项等）维持等点名；③Cursor 22:36 新收工的 STC 索引硬护栏与本线文件集不相交，无冲突。
+- 注：不维护 CHANGELOG；无代码改动，纯状态回执
+
+## 2026-09-19 22:36 · Cursor — 收工：索引点表行单选补 STC 硬护栏（湿测 908 PASS，回链 STC 派发调研）
+
+- 完成：`click_element_by_index` 在识别到表行 radio/checkbox 后、DOM 点击前调用 `guard_locate_or_err`，与专用 `click_table_row_radio` 同形；未点「查询」时返回 `err-search-first`，禁止落成业务键。pin：`characterize-search-then-click-guard` 扩「守卫须在 `_click_element_node` 之前」。
+- 背景：STC 湿测 905/907 代理主路径为索引点行；仅有落库改写、无硬拦 → 可跳过查询仍记客户号。派发对照 906 证伪「只改阶段文案」；同相文案 907 仍先点行后点查询。
+- 验收：pin OK；运行态 `JS-gen-engine` 已同步同文件（新录制子进程加载，未重启 Node）；湿测 traj **908** `CREATED_click_table_row_radio_first`（先查询再选行，`row_text=first` + 结构 xpath；证据 `tmp/recording-coach-2026-09-19T13-50-05`）。
+- 范围：`scripts/controller/actions/click_action_engine.py`、`scripts/characterization/cold/characterize-search-then-click-guard.py`、本条目
+- 遗留：①引擎 worktree 工作区若仍有未提交拷贝，pull 本提交后即可对齐；②908 未落「确认」步（STC 门闩未要求）；③换相仍清 STC 旗标（设计如此，本修不改）
+- 注：不维护 CHANGELOG
+
+## 2026-09-19 20:07 · ZCode 引擎线 — 就绪：引擎 worktree 已到 fd30f4a7，待用户真实控制台重启（nav-reclick 生效窗口）
+
+- 进行中：接合约线合并回执（origin/uara_V2.0=fd30f4a7：`0c175ac5` nav-reclick 修复并入 + `fd30f4a7` 合约 agent-log 条目）。引擎 worktree 准备完成——分支名 uara_V2.0 被主检出占用，已在交付分支 `engine/nav-reclick-gate-20260919` 上 `merge --ff-only origin/uara_V2.0` 快进到 **fd30f4a7**（代码内容与 V2.0 tip 逐字节一致，工作区干净 0 改动）。终验：py_compile 过 + `characterize-idempotent-click-gate` 33/33 绿；修复本体抽检（_NAV_RECLICK_BUDGET×4 / [nav-reclick] 留痕）在运行检出中在场。
+- **待用户执行**：真实控制台运行 `D:\dev\JS-gen-engine\config\restart-local.cmd`（同上轮约定，勿经自动化后台 shell）；判据 `curl http://127.0.0.1:4097/api/health`=200。引擎线核验后回执，合约线即开 #905 解锁裁决第三试并取证 `[nav-reclick]` 留痕与预算耗尽处方文案（=限流放行集成验收）。
+- 注：不维护 CHANGELOG；无代码改动
+
+## 2026-09-19 20:05 · ZCode 合约线 — 开工：nav-reclick 修复并 V2.0（d2adf8e3 + 合约分支 agent-log，用户已批）
+
+- 进行中：引擎线交付 wet9-B3r ③裁决修复（engine/nav-reclick-gate-20260919 @ d2adf8e3，导航类元素限流重点击：a/li/menu-class 判定 + 每元素每阶段 1 次重击预算 + [nav-reclick] 留痕 + 耗尽处方文案）。合约线只读复核通过（判定覆盖 #904 两实证元素、预算语义与裁决逐字对齐、__navreclick__ 命名空间随阶段清理归零、per-element 隔离有行为断言；搜索图标 a 标签空 text 落导航预算路径恰好覆盖错位态配方"重点一次"的量）。用户已批合并，按上轮分工执行。
+- 范围（可写集）：临时 worktree（合并操作）、`docs/superpowers/agent-log.md`（本条目+收工条目）、合并态 pin 验收在 D:\dev\JS-gen 全 worktree 跑
+- 禁入区：`D:\dev\JS-gen-engine`（引擎工作树，只读已毕）、`scripts/controller/**`（引擎线代码，本单元零改动）、SUT
+- 方式：临时 worktree 合并 d2adf8e3 + fix/phase-contract-20260918 → uara_V2.0（agent-log 冲突双方条目并排、严格时间序）→ 合并态 pin 验收（D:\dev\JS-gen 全 worktree：idempotent-click-gate + reset-button-guard + 双侧 KB 金样例）→ push → 回执引擎线重启 → #905 第二重试预备
+- 注：合并协调轮次，合约侧零代码改动
+
+## 2026-09-19 19:45 · ZCode 合约线 — 收工：B3 重试单 #904（守门修复集成验收 PASS，裁决仍未取得，回链 19:20 开工）
+
+- 完成：#904 全管线收口（tmp/contract-wet9-20260919/wet9b3r/ + through-report-b3r.md，主线程独立落库复核）。**守门修复集成验收 PASS**：`err-icon-label-miss` 全程 0 次（#902/#903 阻断签名未复现）；KB 错位态配方生产首秀成功（P4 步 14-17 树重载后重填关键字→点搜索图标→树过滤→点中节点全链无拒绝）；err-icon-label-miss 专属签名消灭。精确口径：本单未出现同阶段二次点图标场景（首点即生效），白名单路径生产流量未直接命中，判定以零复发+配方全链+pin 套件三证为准。
+- **裁决仍未取得（NOT-ADJUDICATED）**，级联再断 P4，两条根因均为 agent 违反预埋门闩（引擎忠实记录非引擎缺陷）：①分类表单点「确 定」而真实提交钮=保存[47]，静默未提交（#903 签名二连）；②产品序号再次 real_click×3 绕过 fill_form_field（同单步 12 对分类同名字段 fill_form_field 写入成功=对照在册）。P5 新形态异常：73 秒 0 步 0 doneLog 却 status=completed。P6 卡死复位时菜单[33]/链接[37]重点击仍被 already-operated-this-phase 拒（**守门残留缺口，移交引擎裁决是否纳入白名单**）。
+- 清理成立 SUT 零残留：wet9阶段R-20260919 P8 删净；分类/产品从未落库；remote_session 2063 closed、LMY inUse=0。
+- **移交引擎**：①菜单/链接重点击白名单缺口（附循环风险提示）②P5 零步完成数据完整性③失败动作占步号不落库（25-30 缺号，#903 同款）④静默提交失败无 toast 采样（二连复现，权重上调）⑤failedReason 仍无阶段号。本线移交自领：下单任务文本移除「保存/确定兼容」措辞、点名每表单确切按钮（防 agent 误读任选）。
+- 注：录制湿测轮次，无代码改动；不维护 CHANGELOG
+
+## 2026-09-19 19:42 · ZCode 引擎线 — 收工：③裁决落地——导航重击限流放行完成（回链 19:37 开工；分支 engine/nav-reclick-gate-20260919 交付「未合并待批」）
+
+- 完成：分支 `engine/nav-reclick-gate-20260919` 两提交（`805944f9` 开工 + `d2adf8e3` 修复本体，2 文件 +127/−4），已推送，**未合并 uara_V2.0 待批**：
+  - **裁决实现（回合约线 ④③裁决请求）**：纳入菜单/链接类导航重击但**限流**——`_is_navigation_click_element`（tag a/li 或 class 含 menu/nav/breadcrumb；普通 button/input 不放行）+ `_NAV_RECLICK_BUDGET=1` 每元素每阶段 1 次额外重击：duplicate 命中且导航形态时预算内放行并 `[nav-reclick]` stderr 留痕，耗尽即拒并给处方「页面可能已卡死：勿再重试本导航元素，改用 report 上报或结束会话重开」——恢复 #904 P6「卡死复位」自愈（菜单[33]/产品树[37]）同时封合约线警示的循环风险。预算存 `_phase_ai_operations` 的 `__navreclick__` 前缀键（换阶段自动清零，element_guard.py 继续零改动）；语义精确对齐：首次点击成功不耗预算，第 2 次点击（第 1 次重击）放行，第 3 次拒绝。click_button 文本路径不动。
+- 验收（合并后集成态）：pin `characterize-idempotent-click-gate.py` 同族扩展 +13 断言，RED（`_is_navigation_click_element` ImportError）→ GREEN 33/33；回归 4 守门族 pin 全绿（reset-button-guard / ai-phase-element-guard / search-then-click-guard / click-replay-engine）；全量 verify-all 失败集恰为已知 3 红零新增；py_compile 过；合并 origin/uara_V2.0（无增量）集成态复绿；越界恰为授权 2 文件。
+- **实施窗口风险披露**：控制面正从本 worktree f709fdc3 运行，实施期间工作区短暂存在 WIP 代码（运行中进程已载入内存不受影响）；B3 已收口、实施期间无在途录制，风险已留痕未发生。
+- 四项登记重申（19:37 条目）：①P5 零步完成=挂账专项（stop 绕过零步门禁）生产实证，建议下批优先；②失败动作占步号缺号 25-30=B-2 gaps 家族读数；③静默提交无 toast=SUT 改进+doneLog probe 族；④failedReason 无阶段号待排。
+- 遗留移交：①本分支合并 uara_V2.0 待用户拍板——**注意生效需再次重启**（当前运行态=81a17f22 守门，无导航重击限流；B3 类「卡死复位」场景在下轮湿测前须合并+重启才吃到本修复）；②解锁裁决叶维持 blocked，待本修复合并+重启后可再试或人工辅助采集；③四项登记见上，等点名排期。
+- 注：不维护 CHANGELOG；主线程内联实施未派子智能体
+
+## 2026-09-19 19:37 · ZCode 引擎线 — 开工：③裁决=导航重击限流放行（新单元）+ B3 PASS 回执确认闭环 wet9 + 四项登记
+
+- **B3 回执确认（wet9 全链闭环）**：#904 f709fdc3 真机——守门修复集成验收 PASS（err-icon-label-miss 0 次、#902/#903 签名未复现、41 行 error 全 NULL）+ KB 错位态配方生产首秀全链走通。至此 wet9 缺陷全生命周期闭环：调研（合约线）→ 修复 `81a17f22` → 合并 `4db25cd8` → 重启激活（f709fdc3 运行态）→ 生产验收 PASS。
+- **新单元进行中（③裁决落地）**：裁决=**纳入菜单/链接类幂等导航重击，但不全量放开**——`click_element_by_index` 守门对导航类元素（tag a/li 或 class 含 menu/nav/breadcrumb）重复点击设**每元素每阶段 1 次额外重击预算**（第 1 次重击放行并 stderr `[nav-reclick]` 留痕，第 2 次重击拒绝且文案给处方「页面可能卡死，改走 report/换会话」）；预算计数存于 `_phase_ai_operations` 内 `__navreclick__` 前缀键（随 `_clear_phase_form_state` 换阶段自动清零，element_guard.py 记录模块仍零改动）。既恢复「页面卡死复位」自愈路径（#904 P6：菜单[33]/产品树[37]被拒），又封合约线警示的循环风险。非导航元素（按钮类）行为不变；`click_button` 文本路径不动（菜单点击走 index 路径）。
+- **四项登记（本单元不动，定性如下）**：①P5 零步完成（73s/0step/0doneLog 却 completed）——**正是挂账专项预测的 stop(success) 绕过零步门禁假成功形态**（`2026-09-18-stop-zero-gate-convergence-survey.md` 最大复活口的实证），建议下批优先立项该专项；②失败动作占步号不落库（缺号 25-30，#903 同款）——B-2 `[traj-recon]` gaps 观测家族，读数判据已备；③静默提交失败无 toast 采样（二连）——SUT 侧反馈缺失，登记归 SUT 改进项+doneLog probe（建议③族）；④failedReason 无阶段号——小改待排。①②③④均不影响本单元。
+- 分支：**`engine/nav-reclick-gate-20260919（从 uara_V2.0 @ 20509136 切）`**，交付分支不合并，收工条目「未合并待批」
+- 范围（可写集）：worktree 内 `scripts/controller/actions/click_action_engine.py`、pin `scripts/characterization/characterize-idempotent-click-gate.py`（同族扩展）；主检出仅 agent-log
+- 禁入区：运行中服务（控制面+LMY 正从本 worktree f709fdc3 运行——**只改文件不重启**，运行中进程已载入内存不受影响；新录制会话在实施完成前有小窗口载入 WIP 代码的风险，B3 已收口、暂无在途录制，风险接受并留痕）；element_guard.py（继续零改动）；合约 worktree；他线 WIP
+- 方式：主线程内联实施；RED（pin 扩展先跑红）→最小修复→回归→全量 verify-all→合并后验收→分支交付
+- 注：不维护 CHANGELOG
+
+## 2026-09-19 19:20 · ZCode 合约线 — 开工：B3 解锁裁决重试单（#904，守门修复集成验收）
+
+- 进行中：引擎线已从真实控制台重启服务（V2.0 @ f709fdc3，health 200、执行机 LMY online inUse=0，运行代码含 _IDEMPOTENT_BTN_RE，KB 错位态配方在场——引擎线五项独立核验通过）。本单元开 **B3 重试单**（#904「wet9B3R 设置阶段到管控要素解锁重试-20260919」，阶段 2374-2381，fid 9000000740，acct 2）：8 阶段切片（裁决独立 P6），任务文本预埋两条对策门闩——①序号字段一律 `fill_form_field(label=序号)`（#903 real_click 三次未命中教训）②树重载错位态重搜配方 + 搜索图标可多次点击（守门修复已上线）。**本单同时是守门修复集成验收**：already-operated-this-phase 拒绝搜索图标二次点击签名应不再出现。
+- 范围（可写集）：`tmp/contract-wet9-20260919/`（b3r 证据子目录 + 报文 + 报告）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`（引擎工作树）、`scripts/controller/**`（引擎线地盘）、SUT 存量阶段/产品（只动 stamp：wet9阶段R/wet9B3R/wet9B3产品R-20260919）
+- 方式：主线程 analyze/create 已完成 → 派发录制操作员子智能体（prepare→CDP 预检→record/start→poll→detach→落库证据）→ 主线程独立落库验收（doneLogs+steps+守门签名核查）→ through-report-b3r → 收工条目；结果回传引擎线台账
+- 注：录制湿测轮次，无代码改动
+
+## 2026-09-19 19:05 · ZCode 合约线 — 收工：wet8/wet9 合约分支并入 uara_V2.0（用户批准，4edf67e8 已推）
+
+- 完成：`fix/phase-contract-20260918` 全量并入 `uara_V2.0`（合并提交 **4edf67e8**，已推 `8ba45373..4edf67e8`）——实质变更仅 1cf267ef KB 错位态配方一行（product_library 先查再点），其余为 agent-log/操作指引文档；agent-log 冲突按纪律双侧保留并按严格时间序重排（277 条目逐一在位校验）。
+- 合并态验收（JS-gen worktree 临时检出 4edf67e8 实跑）：JS `characterize-flow-card-recall` 26/26；Python `characterize-kb-recall` ok；`characterize-idempotent-click-gate` OK（引擎修复在合并态在场）；`characterize-reset-button-guard` 全过。
+- 分工回执：重启窗口=引擎线从**真实控制台**切 V2.0→pull→restart-local.cmd，完成判据=`curl /api/health` 200（上一轮脚本 [OK] 但进程随自动化 shell 会话被回收致服务未起，已双方知会沉淀口径）；重启后合约线开 B3 重试单做守门修复集成验收+解锁裁决。
+- 注：JS-gen worktree 中间临时检出已还原为 uara_V2.0 分支头；无代码改动（除 agent-log/todo-list/KB 配方）；不维护 CHANGELOG
+
+## 2026-09-19 18:54 · ZCode 引擎线 — 收工：重启完成确认，回执合约线开 B3 重试单（回链 18:49 就绪条目）
+
+- 完成：用户从真实控制台执行 `restart-local.cmd`，引擎线独立核验——①`curl http://127.0.0.1:4097/api/health` = **200**；②4097 LISTENING（pid 32472）；③`tmp/server-main.log` 确认控制面从**引擎 worktree（f709fdc3）**拉起（startup 序列 + batch recovery 正常）；④执行机 LMY 已注册 online（`executor-main.log` registered + `/api/v2/executors` connected=true，inUse=0）；⑤运行代码含 wet9 守门修复（`_IDEMPOTENT_BTN_RE` 在场）+ KB 错位态配方（f709fdc3 基线核实过）。
+- **wet9 全链生效**：守门修复（Python 侧）+ KB 配方自此在控制面/执行机运行态中激活——#902/#903 的 `already-operated-this-phase` 拒搜索图标二次点击签名应不再出现。请合约线开 B3 重试单（设置阶段→设置管控要素解锁裁决），该单即守门修复集成验收，结果回传双方台账。
+- 遗留：引擎 worktree 处于 detached f709fdc3（代码=V2.0 tip）；下次引擎单元开工时 `git switch` 回命名分支/重新从 V2.0 切批。stash 遗留条目（pre-PR34-sync sovereignty overlay）仍待主人处置。
+- 注：不维护 CHANGELOG；本条为状态回执，无代码改动
+
+## 2026-09-19 18:49 · ZCode 引擎线 — 开工：重启窗口就绪（引擎 worktree 已切 f709fdc3，待用户真实控制台执行 restart-local.cmd）
+
+- 进行中：接合约线回执（wet9 合并协作回执①②③），执行重启准备：**引擎 worktree `D:\dev\JS-gen-engine`（服务运行目录）已 detached 检出 `f709fdc3`**（=origin/uara_V2.0 tip；uara_V2.0 分支名被主检出占用故 detached，代码内容与 V2.0 完全一致）。基线核实：`4edf67e8`（合约分支合并）∈ f709fdc3；`data/kb/flows/product_library.json` 错位态配方行在场；`click_action_engine.py` 守门修复在场（_IDEMPOTENT_BTN_RE）；合约侧 agent-log 09:10/12:25/12:55 条目已恢复（32cc93cb 岔子已被 f709fdc3 修复，我方确认无残缺）。`config/restart-local.cmd` 已读核（ROOT=%~dp0..——从引擎 worktree 跑即加载 f709fdc3；杀 server.mjs/agent.mjs/proxy + 清 19242 CDP 孤儿 + 按序重启 + EADDRINUSE 检测）。
+- **重启执行约定**：按合约线②，重启由**用户从真实控制台**运行 `D:\dev\JS-gen-engine\config\restart-local.cmd`（勿经自动化工具后台 shell——上轮会话回收误杀教训）；完成判据 `curl http://127.0.0.1:4097/api/health` 200。引擎线在 health 200 后回执，合约线随即开 B3 重试单（=守门修复集成验收：already-operated-this-phase 拒搜索图标二次点击签名应消失）。
+- 范围（可写集）：引擎 worktree 分支检出状态（本条目内已完成切换）；主检出仅 agent-log 本条目与后续收工/回执条目
+- 禁入区：运行中服务（重启命令不经我方任何工具执行）；stash 遗留条目（`On uara_V1.2: wip: pre-PR34-sync sovereignty overlay`，非本线所建，不动待主人处置）；他线 WIP 与录制会话
+- 方式：主线程内联（git fetch/核实/切换 + 本条目），无代码改动
+- 注：不维护 CHANGELOG
+
+## 2026-09-19 18:23 · ZCode 引擎线 — 补记：wet9 修复并入 V2.0 完成 + 合约线复核/建议②闭环知会（回链 12:04 收工「未合并待批」）
+
+- **合并完成**：用户指示「先拉上游分支 uara2.0，然后将本次修复交给上游分支」——`engine/idempotent-click-gate-20260919` 已于主检出 no-ff 合入 `uara_V2.0`（合并提交 `4db25cd8`，已推送 `e0b0f7a3..4db25cd8`），合并态验收绿（py_compile + characterize-idempotent-click-gate 20/20 + reset-button-guard + ai-phase-element-guard）。合并时主检出 verify-all.sh 上 Cursor recording-coach 两行未提交登记经 stash 暂存后原样恢复（现随 Cursor 18:22 收工条目一并入库，双方登记行并排共存）。交付分支保留不删。12:04 收工条目「未合并待批」状态至此作废，以本条为准。**「不要合入 uara_V1.2」指示作废（用户 18 时段确认）**：V1.2 为冻结历史，引擎 worktree 即 V2.0 工作树，此后批次一律从 V2.0 切出。
+- **合约线闭环知会（已核）**：①复核通过——81a17f22 diff 与通报一致（白名单全锚定/两守门豁免/记录模块零改动），验收通过；②建议②已落地 `1cf267ef`（`data/kb/flows/product_library.json`「先查再点」追加树重载错位态配方 + 搜索图标可多次点击预声明；JS 金样例 26/26、Python ok、recall-eval 逐字段零差异）——该提交当前在 `fix/phase-contract-20260918` 分支（合约 worktree 挂载），**尚未入 uara_V2.0**，合并时机归用户/合约线拍板。
+- **重启窗口注意（呼应合约线 12:55 条目）**：V2.0 生效需控制面重启；重启前引擎 worktree 会从 `engine/idempotent-click-gate-20260919` 切回 V2.0 最新（`git pull` + 检出基线分支），确保服务从含 wet9 修复 + KB 配方的 V2.0 运行。
+- 注：不维护 CHANGELOG；本条为纯台账补记，无代码改动
+
+## 2026-09-19 18:22 · Cursor — 收工：recording-coach 湿测操作员补充落地并推送 uara_V2.0
+
+- 完成：`tools/recording-coach/` 旁路编排器补齐湿测操作员能力（计划 `docs/superpowers/plans/2026-09-19-recording-coach-wet-operator.md`，吸收合约草稿只读、不回写 JS-gen-contract）：
+  - 值守：`start_record` 每 60s 写完整 `poll-N.json`、进度含 done/doneLogs 摘要；默认超时 40 分钟，超时 `BLOCKED_录制超时` + detach；首次轮询失败不再未捕获拒绝
+  - 管线门闩：`prepare` 只认 `ready===true`；`phaseIds` 拒 UUID；`cdp_precheck`（四针、15s 超时）后才允许开录；重 prepare / retry 清 `cdpChecked`
+  - 编排门闩：五段式 `dispatch-brief.md` 与业务 `taskText` 分离；`preflight_readonly` / `accept_phases` 后才能 `create_trajectory {}`
+  - 验收：诚实失败默认 `honestReject` → `REJECTED_`；收尾工具写 `through-report.md` + `close.txt`（结论一行 + 报告路径 + 三条证据）
+- 验收：`characterize-recording-coach-assert` / `characterize-recording-coach-operator` 均 OK；已登记 `verify-all.sh`；STC traj 899 湿测 DONE 为前序证据（本笔为代码收编）
+- 遗留：①`assert_steps({criteria:{}})` 仍会盖掉 `w.inputs.assert`（预存）；②CDP open 超时后底层 WebSocket 未必立刻关闭；③真机全链路按新 12 步再跑一轮待用户点名；④不碰运行中 4097 / 他线轨迹
+- 注：不维护 CHANGELOG；本单元改动此前未 commit，随用户「推送」一并提交
+
+## 2026-09-19 12:55 · ZCode 合约线 — 收工：建议②落地（product_library 先查再点补错位态配方，回链 12:25 开工）
+
+## 2026-09-19 12:25 · ZCode 合约线 — 开工：落引擎建议②（产品库 KB 卡「先查再点」补树重载过滤失效配方）
+
+- 进行中：引擎线已交付 wet9 幂等点击守门放行（81a17f22 → uara_V2.0 4db25cd8，pin 20/20+回归 6 绿，主线程已只读复核 diff 与通报一致）。本单元落地其通报中留给合约/KB 线的建议②：`data/kb/flows/product_library.json`「先查再点」规则追加「树重载（新增/保存节点自动刷新、【刷新产品树】）会清掉过滤但保留搜索框关键字——重载后须重填关键字并再次点击搜索图标再定位节点」，供后续任务门闩预声明引用。
+- 范围（可写集）：`data/kb/flows/product_library.json`（仅「先查再点」一条 rule 追加文案）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`（引擎工作树在 engine/idempotent-click-gate-20260919 分支，不触碰）、`scripts/controller/**`（引擎线地盘）、`data/kb/req/**`、其他 KB 卡文件
+- 方式：改卡 → 双侧金样例 characterization（JS flow-card-recall + Python kb-recall）→ recall-eval --baseline diff → commit+push；**V2.0 合并交给重启窗口**（引擎工作树不在 V2.0 上，避免工作树争用；届时与引擎修复一并激活）
+- 注：纯 KB 数据+文档轮次，无代码改动
+
+## 2026-09-19 12:04 · ZCode 引擎线 — 收工：wet9 幂等点击守门放行完成（回链 11:58 开工；分支 engine/idempotent-click-gate-20260919 已交付「未合并待批」）
+
+- 完成：分支 `engine/idempotent-click-gate-20260919` 两提交——`d52e3626`（开工条目）+ `81a17f22`（修复本体，3 文件 +158/−8），已推送远端，**未合并 uara_V2.0 待用户审批**：
+  - **修复**：`click_action_engine.py` 新增 `_IDEMPOTENT_BTN_RE` 白名单（搜索/查询/检索/刷新/加载/翻页/翻页族 + 「重新X」「X图标/按钮/产品树/列表/树/数据/页面/条件/结果」组合，全锚定匹配防「保存查询方案」类复合词误放行）；`click_button` 与 `click_element_by_index` 两处 `already-operated-this-phase` 守门命中白名单时放行同元素重复点击（wet9 #902/#903 锁死态的自愈路径恢复）；非幂等拒绝路径文案原样保留；`element_guard.py` 记录模块零改动（幂等点击仍照常 remember，阶段追溯不受影响）。
+- 验收（合并后集成态）：
+  - 新 pin `characterize-idempotent-click-gate.py` RED（`_is_idempotent_click_label` 不存在 ImportError）→ GREEN 20/20（白名单成员/非幂等仍拒/复合词不放行/两守门豁免在场/记录模块零改动），已登记 `verify-all.sh`
+  - 相关既有 pin 回归 6 个全绿：ai-phase-element-guard / reset-button-guard / reset-phase-not-query / search-then-click-guard / search-then-click-prompts / click-replay-engine
+  - 全量 verify-all 失败集恰为已知 3 红（step-highlight/layer-tree/confirm-notification）零新增；py_compile 过；合并 origin/uara_V2.0（带入 planner-advisory-filter/contract-sovereignty 等 pin 收编）集成态关键 pin 复绿；越界审查 diff 恰为授权 3 文件
+- 遗留移交：①wet9 其余引擎移交项未动（#903 序号框 real_click 未命中、failedReason 不带阶段号、doneLog probe 处方化=合约线建议③）待后续单元；②KB 卡配方侧缓解（建议②）归合约/KB 线裁量，与本修复独立；③**Python 侧生效需控制面重启**（重启窗口用户协调——重启后本修复与此前 B-1/B-6 一并生效）；④本分支合并 uara_V2.0 由用户拍板
+- 注：不维护 CHANGELOG；主线程内联实施未派子智能体
+
+## 2026-09-19 11:58 · ZCode 引擎线 — 开工：wet9 幂等点击守门放行（搜索/查询/刷新/翻页类同元素重复点击，回应用户转发合约线移交）
+
+- 进行中：接用户转发 wet9 引擎缺陷（合约线 11:35 调研报告 `tmp/contract-wet9-20260919/tree-search-root-cause.md`，#902 P3/#903 P5 两单复现）：SUT 树重载清 filter 但搜索框保留关键字成错位态，自愈须再点搜索图标，被引擎 `already-operated-this-phase` 守门拒绝 → 锁死。修法（取合约线建议①收敛版）：`click_action_engine.py` 新增模块级幂等动作正则（搜索/查询/检索/刷新/翻页/下一页/上一页类文本），`click_button`（:180 duplicate 检查）与 `click_element_by_index`（:370-396 duplicate 检查）两处守门命中白名单时放行重复点击；非幂等（保存/新增/删除等）行为不变；element_guard.py 记录模块零改动。附带两小口径问题（#903 序号框 real_click 未命中、failedReason 不带阶段号）本单元不动，登记待后续单元。
+- 分支：**`engine/idempotent-click-gate-20260919`（从 uara_V2.0 @ 4ce572ee 切）**，交付分支不合并，收工条目「未合并待批」
+- 范围（可写集）：worktree `D:\dev\JS-gen-engine` 内 `scripts/controller/actions/click_action_engine.py`、新 pin `scripts/characterization/characterize-idempotent-click-gate.py`、`scripts/refactor/verify-all.sh`（登记一行）；主检出仅 agent-log 本条目与收工条目
+- 禁入区：`scripts/controller/actions/phase/element_guard.py`（记录模块不动）、合约 worktree `D:\dev\JS-gen-contract` 全部（wet9 证据在 tmp/，只读）、4097+LMY 运行中服务（本修复 Python 侧生效需随下轮重启）、主检出代码文件、`scripts/prompts/**`、他线 WIP（`data/kb/req/**`、`.cursor/`）、运行中录制会话
+- 方式：主线程内联实施（单文件小修不派子智能体）；RED pin→最小修复→相关 pin 回归（ai-phase-element-guard/reset-button-guard/search-then-click-guard/click-replay-engine）→全量 verify-all 基线比对（3 红）→合并后验收→分支交付
+- 注：不维护 CHANGELOG
+
+## 2026-09-19 11:35 · ZCode 合约线 — 收工：树搜索「未过滤」错因调研（Playwright MCP 实机复现，修正 wet9 收工条目移交项①）
+
+- 完成：用户指示上页面调研复现 wet9 #902/#903「树搜索未过滤」签名。报告 `tmp/contract-wet9-20260919/tree-search-root-cause.md`。**结论修正：SUT 过滤功能无缺陷，wet9 收工条目引擎线移交项①「树搜索未过滤生效」措辞作废**——真因是三层叠加：
+  1. **SUT 状态错位（设计坑，非功能缺陷）**：产品树任何重载（新增/保存节点自动刷新、`刷新产品树`、`loadingTree()`）都会清掉 el-tree 的 filter，但搜索框 DOM 与 Vue data（`optionsShrink.input`）的关键字仍保留 → 「框里有词、树是全量」错位态。Playwright 实锤：filter『wet9』4 节点命中 → 调 loadingTree() → 38 节点全量且框仍显 'wet9'。
+  2. **过滤触发点在搜索图标 click**（`querySearch() → shrinkTree.filter(optionsShrink.input)`），不在 input 事件——框里有词不等于过滤生效，重载后必须再点一次图标。
+  3. **引擎守门放大**：再点图标被 `already-operated-this-phase` 拒（#902 P3 step15 已点过一次、#903 P5 同款）→ SUT 错位态的唯一自愈路径被堵死 → agent 所见即「填了但没过滤」，叙事忠实于表象，agent 无过错；每一步动作回放（fill→真点击图标）在 Playwright 全部复验通过（含 1 命中/4 命中/0 命中三情形）。
+- 引擎线修复建议（三条，详见报告）：①守门对查询/搜索/刷新类幂等动作放行重复点击（或按元素+参数去重）；②KB 卡「先查再点」规则补「保存/刷新树后过滤失效，需重填关键字再点搜索」+ 门闩预声明搜索图标可多次点击；③doneLog probe 复核错位特征给出处方。
+- 页面调研足迹：登录（测试环境验证码/短信不强制）、菜单导航进产品库管理页、只读 DOM/Vue 探测 + 试搜三次（已清理搜索框恢复原状）；未修代码未动业务数据。
+
+## 2026-09-19 10:40 · ZCode 合约线 — 收工：产品管理模块湿测（wet9 全链，回链 09:10 开工）
+
+- 完成：5 单全收口（tmp/contract-wet9-20260919/，fid 9000000740，acct 2，落库复核均主线程独立验证）：
+  - **#897 wet9a 主链前半 CREATED_TREE**：权限探针=701994 侧总行全功能（非总行条款未触发）；stamp 三节点真实落库——wet9分类=PD00044268 / 子分类=PD00044269 / 产品=PD00044270（未启用 V-0.0.1）；基本信息保存 select_option×5+「操作成功」toast，37 步 0 error。
+  - **#900 wet9b 主链后半 PARTIAL（诚实 failed）**：**「空壳产品能否启用」裁决=可启用**（pdSt 1→4，updateStauts 200+「状态更新成功」双证；禁用→再启用状态机 1→4→3→4→3 全通）；克隆副本 PD00044271 建成并删净；主产品删除被拒「产品不是未启用，不能删除」——**业务规则发现：删除仅限未启用，启用过（即使已禁用）不可删**，PD00044270 以禁用态残留（预期内残留，见移交①）。
+  - **#901 wet9B1 配置视图只读 OK（零落库）**：pdCfgVw 两区块结构取证完成；**偏差登记：区块1【配置】实为路由跳转 corePdMpng 非弹窗**（SUT/需求判据偏差，落点页结构已取证 420 条映射列表）。
+  - **#902 wet9B2 排序 PARTIAL**：stamp 三节点删净零污染；「wet9B2乙」因树搜索未过滤生效未建成→互换核验缺对象未取得；边界负例（首位上移）被引擎 phase 内守门拦截覆盖，SUT 规则未独立演示。
+  - **#903 wet9B3 解锁裁决未取得（诚实 failed）**：wet9阶段-20260919 建成+删净（零残留）；产品因「序号」err-pending-fields（real_click 三次未命中）+ 树搜索未生效未落库→【设置阶段】关联与【设置管控要素】核对级联未执行；09-06 blocked 假设既未证实也未证伪。
+- **引擎线移交（本链最重要产出）**：①**树搜索未过滤生效**签名两单复现（#902 P3 / #903 P5）——填入关键字点查询后树不过滤，叠加②**already-operated-this-phase 守门过紧**（搜索图标重试被拒）直接放大断点；③新增产品弹窗「序号」字段 real_click 三次未命中（err-pending-fields）；④traj 级 failedReason 仅「阶段执行失败」不含阶段号；⑤#901 P2/P4 doneLog token 判据与页面实际渲染偏差（probe force-close 与实际状态不符两例）；⑥step_count 口径差（900：traj 记 37 vs 落库 44）与 step_number 缺号 1 步。
+- 数据残留移交（用户可裁）：PD00044268/44269/44270（wet9 分类/子分类/产品，产品为禁用态）留存于产品树——启用过不可删是 SUT 硬规则，如需清理须业务侧介入；其余 stamp 全部自清。
+- 结论：产品库主链（建树→信息保存→启用/禁用/复活/克隆/删除）引擎全链走通，「空壳可启用」裁决落地（KB 卡疑点销案）；配置视图偏差与解锁假设两条登记在案。产品管理模块无客户池依赖，不受 wet8 资源局限影响。
+- 遗留：B3 裁决重试（改任务绕开树搜索依赖，如建后立即定位不搜树）待用户示意；引擎六项移交见上；B 类五项测试报告、转正手机验证入口仍挂起。
+- 注：纯录制+文档轮次，无代码 commit；analyze 首击偶发 500「terminated」重试即过（#901，LLM 超时）
+
+## 2026-09-19 09:35 · ZCode 合约线 — 收工：录制湿测派发经验落 SKILL 草稿（供 recording coach MVP 会话吸收）
+
+- 完成：`docs/superpowers/guides/2026-09-19-recording-coach-skill-draft.md`——wet4-wet8（traj 849-896）三十余单派发经验蒸馏：任务书五段式 / 管线七步含实测坑位（phaseIds 数字 id、create 端点无 /create、CDP 端口=19242+slotIndex、doneLogs 400 字符源头截断）/ 门闩与诚实失败语义 / **派发前自查清单**（前置数据只读核查优先，wet8 三单被拒的教训）/ 操作员三变体（录制员/只读核查员/取证员）/ 红线。
+- 面向：用户正开发 recording coach 内嵌智能体（另一会话在途 MVP）；本稿为中立参考草稿，MVP 会话可整体吸收或搬入其 skill 结构，不必保持本文件同步。
+- 注：docs-only 单文件提交，无代码改动，不涉他线文件。
+
+## 2026-09-19 09:10 · ZCode 合约线 — 开工：产品管理模块湿测（wet9，主链两单+三旁验单）+ 挂载纠错
+
+- 进行中：用户指示①核心产品映射下评级批量导入交易迁回正确功能点——**已完成**：T01-T21 共 21 笔（id 763-784，id 765 不存在）从 9000000812（核心产品映射）UPDATE 至 9000000011（对公客户评级），复核 812 现剩 6 笔全为映射本体（59/513/690/691/697/698）；②产品管理模块湿测：规划已定（规划要点=主链「建分类→建产品→信息保存→启用→禁用→再启用→克隆→清理」10 阶段拆两单 + B1 配置视图只读核对 + B2 上移下移排序 + B3 设置阶段→管控要素解锁裁决），任务文本已落 tmp/contract-wet9-20260919/task-{9a,9b,b1,b2,b3}.md，挂载叶全部按 KB 卡修正口径（产品库 9000000740）
+- 范围（可写集）：`tmp/contract-wet9-20260919/`（证据）、新建交易录制数据（API）、agent-log 本条目与收工条目；trajectory.function_id 数据修正（已完成部分见上）
+- 禁入区：`D:\dev\JS-gen-engine` / `D:\dev\JS-gen` 代码文件（服务从 engine worktree 运行，不重启不触碰）、他线在途录制槽、`data/kb/req/product-mgmt/**`（KB 卡只读使用）、`scripts/prompts/**`、存量产品数据（KB测产品/产品1/KB测克隆等一律不碰，只动 stamp 自造节点）
+- 风险预埋：①systemAccountId=2 总行权限未实证——9a 阶段1 即权限探针，缺按钮则诚实失败移交用户；②「空壳产品能否启用」为本轮裁决点之一（9b 阶段6）；③wet-test.md 5 个 blocked 叶（设置管控要素族）由 B3 裁决解锁条件；④删除仅限 stamp 自造产物
+- 方式：主线程逐单 analyze/create（fid 9000000740，B3 亦挂 740）→ 子智能体执行 prepare/CDP 预检/start（数字 phaseIds）/detach → 主线程落库独立复核 → 单间串行（wet9-1→wet9-2→B1→B2→B3），失败改任务换 stamp 新建交易不重录死磕；纯录制轮次不 commit 代码
+- 注：B3 涉及 stamp 阶段落库与产品-阶段关联（比 wet8 只录不动进一步，用户在规划确认中放行范围为「写任务文本→开工声明→逐单派发」，B3 门闩已含自造自清）
+
+## 2026-09-19 09:05 · ZCode — 收工：后端发版 20260919-085907（回链 09-17 10:36 开工）
+- 后端：uara_V2.0 @ 2c22d312 → /data/app/JS-gen-releases/20260919-085907（batch 47 跑 1 个 migration）；api/docs 200、server.log 干净启动、local-server-proxy 秒级重连
+- 前端：维持 09-17 的 20260917-1035，经 nginx /api 200 验证
+- 执行机：LMY 三个注册节点（2f21bad1/08d34440/413bbddf）心跳在跳但采样时无活跃 WS，属执行机侧重连节奏，非发版事故
+- 回滚：ln -sfn /data/app/JS-gen-releases/20260917-205042 /data/app/JS-gen && 重启 node server.mjs
+
+## 2026-09-19 08:30 · ZCode 合约线 — 收工：对公授信申请湿测链 DONE_WITH_CONCERNS（回链 07:35 开工；#892/#895/#896 三单）
+
+- 完成：用户批准授信链湿测 + 授权「前置数据缺则自行开单补录」，实跑三单（tmp/contract-wet8-20260919/，fid 9000001512/acct 2，10 阶段带硬门闩）：
+  - **#892（瑞云智联）REJECTED_评级未生效**：服务端硬拒「查询不到客户有效评级，客户编号：26081714051504629」——与开工前置摸底（reference.md 判断评级已生效）矛盾，触发查证。
+  - **查证两单（只读探针，诚实纠错）**：#893 评级列表检查——瑞云 0 条评级记录（开工判断错误，PJ20260907016009 不存在）；#894 授信池检查（traj 860 的 P7 doneLogs 400 字截断残尾反推）——**PJ20260907016009 实属贯通验证企业**（早前归因错误已纠正），瑞云 09-18 实录为 PJ20260918016020（#863）。可用候选池：贯通×3（在途评级排除）、MBP 26081315592971621、银嘉 26081314543575915（均 2027-08-07 到期，通过态）。
+  - **#895（MBP软件传媒）REJECTED_在途授信**：服务端 6+ 次硬拒「该客户已存在经办人为：701994，授信性质为：授信新增，授信编号为：DGSX20260817056014的在途授信申请流程！」，9 个全局流水号落库——KB 卡预警命中，DGSX 未创建（诚实失败）。
+  - **#896（银嘉传媒）REJECTED_在途授信**：拒绝原文同构（DGSX20260813056010，经办人 701994，授信新增），6 次硬拒 6 流水号落库（P5/P6/P8 doneLogs 完整保留）；主线程独立复核 10/10 phase completed、26 步、record_status=failed。**新知：DGSX20260813056010 列表态已是「打回」，引擎仍按在途硬拒**——在途判定不看列表状态，重测须有权人真正终结流程；另代理曾做 deleteApply 前端探针（返回 false 无网络请求，既有记录未动，合规但贴红线，后续禁删除类探针）。
+- 落库验收（不认 isSuccessful）：三单均诚实终局、无伪造成功、无新建授信数据；A4 probe force-close doneLog 在 #896 P1/P7/P9 复现（V2.0 代码面机制稳定）；doneLogs ~400 字符 executor 源头截断在 #894 池检查与 #896 P6/P10 双重复现（**引擎线移交候选：截断在源头，长 doneLog 尾部不可恢复**）。
+- 结论：**授信申请链的引擎执行本身验证通过**（向导/抽屉/fixed 列选行/风险阻断等待/查询核验全链无执行故障），三单拒绝全部为 SUT 业务硬前置（评级未生效/在途授信），非工具缺陷；客户池全域无「评级生效+无在途授信」的可录客户，授信链完整成功录制**阻塞于业务数据**，非代码。
+- 遗留移交：①授信链重录前置=需有权人终结 DGSX20260817056014（MBP）/DGSX20260813056010（银嘉，已打回但仍判在途）或新开「评级通过且无在途」客户——待用户/业务侧 ②doneLogs 400 字符源头截断移交引擎线（session_runner/executor 侧）③转正重走（手机验证入口）仍挂起 ④B 类五项移交测试报告待用户示意。
+- 注：纯录制轮次不 commit 代码；本条目+todo 更新为文档提交
+
+## 2026-09-19 07:35 · ZCode 合约线 — 开工：对公授信申请湿测（wet8，V2.0 全量代码面首跑授信链）
+
+- 进行中：用户批准授信申请为下一单并授权「前置数据缺则自行开单补录」。前置摸底完成（tmp/contract-wet8-20260919/reference.md）：目标客户瑞云智联（26081714051504629）评级已生效+旧授信终态，两硬前置应满足；分项额度明细=流程提交硬校验（#876 抓包实证）已预埋阶段7门闩；KB 卡配方（fixed 列遮蔽/品种树最深叶子/意见必填/流程选人 WN0001）全部进门闩文案。任务=10 阶段（列表→向导→选客户→风险阻断→确认创建→方案→分项→影像+复查→意见→提交→列表核验）
+- 范围（可写集）：`tmp/contract-wet8-20260919/`（本单证据）、新建交易录制数据（API）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine` / `D:\dev\JS-gen` 代码文件（服务从 engine worktree 运行，不重启不触碰）、他线在途录制槽、`data/kb/req/product-mgmt/**`、`scripts/prompts/**`
+- 方式：主线程 analyze/create（fid 9000001512/acct 2）→ 子智能体执行 prepare/CDP/start/detach（模板同 wet7）→ 主线程落库独立复核；若撞引擎缺口按纪律最小修复+pin 另行声明；失败改任务新建交易重录不死磕
+- 注：纯录制轮次不 commit 不写日志（沿用纪律）
+
+## 2026-09-19 07:10 · ZCode 合约线 — 收工：评级修改/删除草稿态湿测 DONE_WITH_CONCERNS（回链 06:32 开工）
+
+- 完成：traj **#891**（8 阶段，fid 9000000011/acct 2，tmp/contract-wet7-20260919/through-report.md）——**评级修改/删除（草稿态）链路验证成功 + 三项合约机制真机实证**；随单完成**服务切换**（4097+LMY 改从 engine worktree uara_V2.0 @ 3ae49fb8 启动，旧合约分支服务退役）
+- 落库证据（主线程独立复核，不认 recordStatus）：27 步落库（24 业务步）——select_option(待发起)→click_table_row_radio×3→click『修改』核实→『删除』→确认弹窗『确定』全链；**存量草稿 PJ20260612004056（曾3有限责任公司，待发起）修改可编辑核实 + 删除成功**（按业务编号复查「共 0 条」落库级判据达成）；8 phase 全 completed、doneLogs 全非空
+- 业务阻断（如实记录，非执行故障）：新建链被两道墙拦——「合约湿测CUST」湿测客户池空（P2 引入弹窗空态双证）+ 贯通验证企业在途评级（PJ20260910016010，P6 服务端原文+全局流水号落 doneLogs，无假绿）→ 整轨 failed 为诚实终态
+- **合约机制真机首证（V2.0 代码面）**：①A4 probe 收口 doneLog——P1/P2 doneLogs 出现 `probe force-close: …` 前缀合成条目（session_runner→record_probe_done_log 通路生效）；②done 熔断——P2 introduce_pick 查询空态令牌（picker_closed/dialog_confirmed/introduced_backfilled）不可满足连拒后 ✂ suspect 放行（log L113）；③反向仲裁——llm=navigate/rules=other 降级触发（log L49）
+- 引擎缺口移交（本单新增观察）：①P4 引入弹窗确认后 doneLogs 报 dialog_confirmed 类令牌不可满足属 introduce_pick 契约粒度问题（空态场景令牌不可产出，与 R 清单同族）②P7 翻页定位耗时较长（曾 3 连拒）属 STC/分页定位非本单范围 ③record/start phaseIds 契约为数字库 id 非 UUID（子智能体首试 400，属 API 使用口径）
+- 遗留移交：①评级客户可用池=空（瑞云/贯通在途 + 湿测客户未转正）——**转正重走仍是解锁新建链的正道**（待手机验证入口确认）；②新造草稿的路径已实证：向导【确定】→待发起（本单 P6 因在途拦截未走到，可在新可用客户上重验）；③#891 整轨 failed 留档作诚实失败样例
+- 注：不维护 CHANGELOG；纯录制+文档轮次仅 agent-log 提交
+
+## 2026-09-19 06:45 · ZCode 合约线 — 收工：合约修复分支并入 uara_V2.0（用户批准）
+
+- 完成：merge `cf8cbe06`——`fix/phase-contract-20260918`（tip `293f9f56`）合入 `uara_V2.0` 并推远端。带入：三批修复 `4902b3f4`（classify S1/S2/S2b/S3 + 令牌对称 S4/S5 + 前向仲裁 + done 熔断 + 276 收敛）与 A 类收尾 `3c4473ec`（反向仲裁 / save 通知正则 / probe 收口 doneLog / 熔断降噪）；冲突仅 agent-log.md（双方条目并排，合约 16:14 条目按时间序插入），verify-all.sh 自动合（双方 pin 注册全保留）
+- 合并态验收：py_compile 8 文件过；7 个合约 pin 全绿（arbitration-circuit-breaker 40 / save-notification 20 / probe-donelog 33 / reset-phase-not-query / reset-button-guard / click-evidence-symmetry 11 / recorder-phase-reset 39）；ruff 25 处报错逐文件对账=合并基点 `35527f80` 存量（本笔带入文件 0 报错）；eslint `src/ executor/ scripts/` 0 errors
+- 状态知会各线：**合约修复已在上游 V2.0**——后续新分支从 V2.0 切即含全部合约修复；`fix/phase-contract-20260918` 分支保留不删（ wet 证据链回溯用）；运行中的 4097+LMY 服务仍从 `D:\dev\JS-gen-contract` worktree 旧代码跑，**重启后才吃到 V2.0 合并态**（重启时机待用户协调）
+- 遗留移交：①B 类移交测试报告（五项）仍待用户示意另单元执行 ②R 清单假绿窗口专项 ③`characterize-click-evidence-symmetry` 在合约分支上未注册 verify-all（本笔随分支带入，维持原状未擅注册，列下批顺手项）
+- 注：不维护 CHANGELOG
+
+## 2026-09-19 06:32 · ZCode 合约线 — 开工：评级修改/删除（草稿态）湿测 + V2.0 服务切换（接手旧会话收尾测试）
+
+- 进行中：接手归档会话（合约树）收尾——转正湿测 #877 已被「法定代表人手机号码未验证」SUT 校验阻塞（等入口确认，维持挂起），本单元按用户指示执行**评级修改/删除（草稿态）**湿测。前置事实：#863 提交成在途审批单（PJ20260918016020/瑞云），#864/#865 提交被拦未落库——**无存量暂存草稿**，草稿从何而来（评级无「暂存」路径记载，或需 DB 摸底/退回态）为本单元先决问题；客户池维持耗尽（瑞云/贯通均在途）。已同步完成**服务切换**：4097+LMY 改从 engine worktree（uara_V2.0 @ 3ae49fb8）启动（旧合约分支服务退役），代码面=合约修复+引擎修复全量在跑
+- 范围（可写集）：`tmp/contract-wet7-20260919/`（本单证据）、新建交易录制数据（API）、agent-log 本条目与收工条目（在合约 worktree `D:\dev\JS-gen-contract` 分支 fix/phase-contract-20260918 上写）；若湿测撞引擎缺口且用户模板允许：最小修复+pin（另声明）
+- 禁入区：`D:\dev\JS-gen-engine` 与 `D:\dev\JS-gen` 代码文件（服务正从 engine worktree 运行，**不重启不触碰**；进程重启仅经 restart-local.cmd 由主线程执行）、他线在途录制槽（开工前已查 LMY inUse=0）、`data/kb/req/product-mgmt/**`、`scripts/prompts/**`
+- 方式：主线程按湿测模板编排（重启已完成→DB 摸底→锚定 #849/#851/#852/#863→带门闩任务→analyze/create→子智能体执行 prepare/CDP/start/detach→落库验收）；subagent 提示词以用户提供的「功能湿测录制」模板为基；验收以 DB 落库字段为准不认 recordStatus；失败改任务/经批准修代码后新建交易重录；证据目录 tmp/contract-wet7-20260919/
+- 注：纯录制轮次不 commit 不写日志（沿用旧会话纪律）；改代码轮次才另行声明
+
+## 2026-09-19 06:14 · ZCode 合约线 — 收工：uara_V2.0 上游基线确立（吸收 V1.2 尾差）
+
+- 完成：`35527f80`——`origin/uara_V1.2` 剩余 5 提交合入 `uara_V2.0`（用户拍板 V2.0 为今后唯一上游，基点 `1b421bad`）。前序基线：engine 线 `22aa7648` 已合 V1.2 至 `105e87a4`（含 a1cf8b50 LLM 失败提示 + da4aad68 中文总结备注规范）；本笔带入尾差 5 提交（172cb1fd 录制失败原因分类落库、8d33ad9d 交易详情页串台修复说明、e150a186 录制状态流程指南、迁移 `20260918180000_trajectory_failed_reason`、backfill 日志）
+- 验收（合并态）：`characterize-agent-llm-error` OK / `characterize-quality-final-gate` 4/4 / `characterize-record-phase-finalize` all passed / eslint `src/ executor/ scripts/` 0 errors（22 warnings 存量）；合并无冲突（14 文件 +566/−41）
+- 状态知会各线：**V1.2 已冻结**，后续开工声明上游一律写 `uara_V2.0`；合约线 `fix/phase-contract-20260918`（293f9f56）仍独立未并，并入时机待用户拍板；V1.2 尾部 2 笔未入任何 V2.0 祖先的提交无（当前 V1.2 tip `e150a186` 已全部吸收）
+- 注：不维护 CHANGELOG
 
 ## 2026-09-18 21:10 · OpenCode — 收工：实施方案 A，recording 仅表示「正在录制」，非显式 stop 释放标 failed(interrupted)（回链 20:25）
 
