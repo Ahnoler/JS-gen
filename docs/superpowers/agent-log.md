@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 15:53 · ZCode 引擎线 — 远端归档：9 条 engine/* 远端分支按仓库既有归档约定处理
+
+- 指示：用户「远端也需要处理」。做法**遵循仓库既有归档惯例**（远端现存 11 条 `archive/*-archived-20260919`，系 09-19 建立），故不硬删指针而改归档名（可逆、保留定位）。
+- 前置核验：9 条远端 `engine/*` **全部为 origin/uara_V2.0 的祖先**（逐支 `git merge-base --is-ancestor` 通过）——工作已全额并入，指针处置零丢失。
+- 执行：①建归档 ref 9 条 `archive/engine-<原名>-archived-20260920`（逐条 SHA 与原文核验一致：ea3e1222/96aa8557/424d28fa/81a17f22/d2adf8e3/1b421bad/01f0d236/17e9c54e/feb9a658）；②删除原 `engine/*` 9 条。
+- 结果：远端 `engine/*` 清零，`archive/engine-*` 9 条在册；**他线远端分支未触碰**（`cursor/*` 9 条、`fix/phase-contract-20260918`、`uara_V1.2/V2.0/V2.0.1`、`master`、既有 `archive/*` 11 条）。
+- 备注：如后续希望彻底删除而非归档，可再删 `archive/engine-*`（内容均在 V2.0 血缘内，删除仍零丢失）；本线未擅自主张。
+- 注：不维护 CHANGELOG；远端 ref 操作轮次
+
 ## 2026-09-20 15:50 · ZCode 引擎线 — 现场清洁：引擎 worktree 分支/stash 清理（用户指示"过时不再使用的分支可移除"）
 
 - 完成：删除引擎 worktree 内 **9 个已全额并入 V2.0 的交付分支**（逐支核验后删，非凭名）——`engine/b2-gaps-fix-20260920`、`engine/domtree-occlusion-20260920`、`engine/fill-dedup-scope-20260920`、`engine/idempotent-click-gate-20260919`、`engine/nav-reclick-gate-20260919`、`engine/pipeline-20260918`、`engine/stepnum-dedup-r2-20260920`、`engine/stop-gate-step0-20260919`、`engine/stop-pin-sync-20260920`。
@@ -7,7 +16,7 @@
 - **新常驻锚分支 `engine/worktree`**（@ origin/uara_V2.0，tracking 上游）：引擎 worktree 检出改挂此分支，后续仍按老流程从 origin/uara_V2.0 切交付分支；避免把检出长期挂在某个已交付的批次分支名上（本次清理的起因之一）。
 - 未触碰（他人占用/共享）：`uara_V2.0`（主检出 D:\dev\JS-gen 占用）、`fix/phase-contract-20260918`（合约树占用）、`master`（长期线）。
 - stash 处置：**drop `stash@{0}`**（我 09-19 保全的 Cursor STC 迭代残迹，2 文件 +29/−3——其提交版 faa19c83 已在 V2.0 且守卫在场、pin `characterize-search-then-click-guard` OK，内容确已被取代）；**保留 `stash@{0}`(原@{1})**「wip: pre-PR34-sync sovereignty overlay」——V1.2 时代他线工作，非本线所有，不动。
-- 遗留：①远端同名 `engine/*` 分支仍在（origin 上 9 条）——工作已并入 V2.0，可作归档保留或由用户确认后删除（本线未擅动共享远端）；②下一单元开工时按新流程：`git switch -c engine/<unit>-<date> origin/uara_V2.0`。
+- 遗留：①~~远端同名 `engine/*` 分支仍在（origin 上 9 条）~~ → **已处理（见 15:53 条目）**；②下一单元开工时按新流程：`git switch -c engine/<unit>-<date> origin/uara_V2.0`。
 - 注：不维护 CHANGELOG；纯现场清理，无代码改动
 
 ## 2026-09-20 15:46 · ZCode 引擎线 — 重启完成（终态）：运行态 = V2.0 最新（含 V2.0.1 同事线全量 + 引擎 #917）
