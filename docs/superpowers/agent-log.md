@@ -8,10 +8,11 @@
   1. 控制面 live 绑定可能残留 `attached: true` 但 BiB 实际已死——`restoreLiveBindingFromRow` 仅按 DB `remote_session.status='active'` 乐观置 attached；`executor-ws.js` 只处理 `session.bib_ready`，**没有 BiB 死亡/断流事件清除 attached**。控制面/执行机重启后尤其明显。
   2. 前端 `useRemoteCanvas.ensureStream` 在 `status.attached === true` 时**拒绝重新 attach**（防 attach 风暴），且 `applyStatus` 每次都把 `autoReconnectAttempts` 复位为 0 → 自动重连退化为「无限 startStream 等待新帧」永不成功，占位文案恒为「画面未推流」。
 - 修复（前端另仓 `ui-auto-recording-agent-vue`，`useRemoteCanvas.ts`）：
-  - 新增 `attachedNoFrameStreak`：绑定声称 attached 但连续等待无新帧时累加。
-  - `ensureStream` 在 `forceAttach && already && streak >= FORCE_REATTACH_AFTER(2)` 时强制真正 `attachLiveRemote` 重建 BiB。
-  - 达到 `MAX_AUTO_RECONNECT(8)` 仍无帧 → 停止重连并提示「推流不可用，请重新准备会话后重试」，避免死循环/风暴。
-  - 收到真实新帧、或用户新一次 attach（`resetReconnectState`）时清零 streak。
+  - 新增 `attachedNoFrameStreak`：绑定声称 attached 但连续等待无新帧时累加（每次等待约 8s）。
+  - `ensureStream` 在 `forceAttach && already && !reattachForced && streak >= FORCE_REATTACH_AFTER(3)` 时强制真正 `attachLiveRemote` 重建 BiB；每个 attach 周期只强制一次（`reattachForced`），阈值取 3 以避开 AI 导航/执行中的瞬时停顿。
+  - 达到 `GIVE_UP_AFTER(6)` 仍无帧 → 停止重连并提示「推流不可用，请重新准备会话后重试」，避免死循环/风暴。
+  - 收到真实新帧、或用户新一次 attach（`resetReconnectState`）时清零 streak 与 `reattachForced`。
+- 资源安全确认：强制重连走 `POST /api/v2/remote-sessions/attach-live` → `remoteSessionService.attachLive(body)`，**只复用同一个 agent `sessionId`**（`state.sessions.get`）并重发 `session.attach_bib`；`supersedeStaleForTrajectory(..., { keepAgentSessionId })` 明确保留本会话、关闭其它。它**不会** `openSession`，因此不会新增执行机浏览器/槽位（只有 `prepare` 会 `openSession`，强制重连不经过 `prepare`）。
 - JS-gen 代码零改动（纯前端自愈；控制面无需重启）。
 - 验收：前端 `npx vue-tsc --noEmit` 通过。真机观察点：残留 attached 场景下第 2 次重试会自动重建 BiB 并出画面。
 - 提交：前端另仓 `dev`；本文档 commit。
