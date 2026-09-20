@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import re
 import sys
@@ -63,6 +64,15 @@ _PROBE_SUFFIX = "（agent 步数耗尽，probe 收口）"
 def record(name: str, ok: bool, detail: str = "") -> None:
     results.append((name, ok, detail))
     print(f"  {'✓' if ok else '✗'} {name}" + (f" — {detail}" if detail else ""))
+
+
+def _slice(src: str, start: str, end: str) -> str:
+    """容错切片：起点未命中返回空串（RED-safe），终点未命中切到文件尾。"""
+    i = src.find(start)
+    if i < 0:
+        return ""
+    j = src.find(end, i + len(start))
+    return src[i:] if j < 0 else src[i:j]
 
 
 # ── fake agent（仿 characterize-contract-arbitration-circuit-breaker.py） ────
@@ -248,10 +258,145 @@ def test_b_suspect_log_transition_only() -> None:
     record("熔断分支带 suspect_logged 转移标记", "suspect_logged" in seg)
 
 
+# ── C：层3——overlay 按钮权威清单 + probe 收口附加 ──────────────────────────
+# 背景：#910④ 生产事故中 agent 报「弹窗无 footer 提交按钮」——实为按钮存在但
+# agent 认知链缺失。overlay 摘要此前只有 kind/label（标题），收口 doneLog 不带
+# 弹窗按钮。修复形态：semantic_snapshot overlay 增加 buttons 权威清单（容器内
+# 全量、不经 LIMITS.buttons 40 截断），record_probe_done_log 收口文本附加清单。
+
+_SEMANTIC_SNAPSHOT = (
+    ROOT / "scripts" / "controller" / "actions" / "js_snippets" / "semantic_snapshot.py"
+)
+_VERIFY_CONTEXT = (
+    ROOT / "scripts" / "controller" / "actions" / "js_snippets" / "verify_context.py"
+)
+
+
+def _make_semantic_agent(buttons, *, overlay=True):
+    """仿 agent：history 最后一段 result 为 semantic_snapshot 的 ok:{...} 文本。"""
+    payload = {
+        'ok': True,
+        'context': {
+            'overlay': (
+                {'kind': 'dialog', 'label': '新增', 'buttons': buttons} if overlay else None
+            )
+        },
+        'counts': {'buttons': len(buttons)},
+    }
+    a = _AgentShim()
+    a.state.history.history[0].result[0].extracted_content = (
+        'ok:' + json.dumps(payload, ensure_ascii=False)
+    )
+    return a
+
+
+def test_c_overlay_buttons_authority() -> None:
+    print("C overlay 按钮权威清单：semantic overlay.buttons + verify_context 兼容 + 收口附加")
+
+    snap = _SEMANTIC_SNAPSHOT.read_text(encoding="utf-8")
+    vctx = _VERIFY_CONTEXT.read_text(encoding="utf-8")
+
+    # C1 semantic_snapshot：overlay 对象构造携带 buttons 权威清单
+    record("semantic overlay 构造含 buttons（drawer）",
+           "overlay = { kind: 'drawer', label, buttons: overlayButtons(d) }" in snap)
+    record("semantic overlay 构造含 buttons（dialog）",
+           "overlay = { kind: 'dialog', label, buttons: overlayButtons(d) }" in snap)
+
+    # C2 枚举限定在 overlay 容器内（querySelectorAll 作用于 container 形参而非 document）
+    helper = _slice(snap, "const overlayButtons", "let overlay = null;")
+    record("overlayButtons helper 在位", helper != "")
+    record("枚举作用于 overlay 容器（container.querySelectorAll('button')）",
+           "container.querySelectorAll('button')" in helper)
+    record("枚举不走 document 全局按钮枚举（helper 内无 document.querySelectorAll('button')）",
+           "document.querySelectorAll('button')" not in helper)
+
+    # C3 权威清单不受 40 截断：helper 路径不经过 LIMITS / truncated
+    record("overlay 按钮枚举不经 LIMITS 判断", "LIMITS" not in helper)
+    record("overlay 按钮枚举不置 truncated", "truncated" not in helper)
+
+    # C4 权威清单形状 {text, ariaLabel, disabled}（复用主按钮提取风格）
+    record("枚举形状含 text/ariaLabel/disabled",
+           all(k in helper for k in ("text", "ariaLabel", "disabled")))
+    record("docstring 返回形状注明 overlay.buttons", '"overlay":{"kind","label","buttons"' in snap)
+
+    # C5 verify_context：overlay 构造同样带 buttons（形状统一），判定语义不变
+    record("verify_context overlay 构造带 buttons（drawer）",
+           "overlay = { kind: 'drawer', label: label, buttons: overlayButtons(drawer) }" in vctx)
+    record("verify_context overlay 构造带 buttons（dialog）",
+           "overlay = { kind: 'dialog', label: label, buttons: overlayButtons(dialog) }" in vctx)
+    record("overlay_contains 判定仍只读 label（语义不变）",
+           "const actual = overlay ? overlay.label : '';" in vctx)
+    vhelper = _slice(vctx, "const overlayButtons", "let overlay = null;")
+    record("verify_context 枚举同样限定 overlay 容器内",
+           vhelper != "" and "container.querySelectorAll('button')" in vhelper
+           and "document.querySelectorAll('button')" not in vhelper)
+
+    # C6 record_probe_done_log 收口文本附加 overlay 按钮清单
+    rec_src = (ROOT / "scripts" / "agent" / "recorder_emitters.py").read_text(encoding="utf-8")
+    fn = _slice(rec_src, "def record_probe_done_log", "\ndef ")
+    record("收口函数引用按钮清单 helper", "_probe_overlay_button_texts" in fn)
+    record("收口文本拼 overlay buttons 段", "| overlay buttons: " in fn)
+    record("按钮清单拼在固定后缀之前（源码顺序）",
+           0 <= fn.find("overlay buttons: ") < fn.find("_PROBE_CLOSEOUT_SUFFIX"),
+           f"at={fn.find('overlay buttons: ')} vs {fn.find('_PROBE_CLOSEOUT_SUFFIX')}")
+    # C7 行为：semantic 结果含按钮 → 收口文本带 [确 定][取 消]，done 文本仍居尾
+    import scripts.agent.service as _agent_service
+
+    def _btn(i: int) -> dict:
+        return {'text': f'按钮{i}', 'ariaLabel': '', 'disabled': False}
+
+    _saved_agent = _agent_service._last_agent
+    try:
+        _agent_service._last_agent = _make_semantic_agent(
+            [{'text': '确 定', 'ariaLabel': '', 'disabled': False},
+             {'text': '', 'ariaLabel': '取 消', 'disabled': False}])
+        store_d: dict = {}
+        entry_d = record_probe_done_log(
+            store_d, 4, reason='missing query_clicked', last_done_text='已填 3/5 字段')
+        text_d = str((entry_d or {}).get('text') or '')
+        record("收口文本含 overlay 按钮清单（text 兜底 ariaLabel）",
+               " | overlay buttons: [确 定][取 消]" in text_d, f"text={text_d!r}")
+        record("按钮清单拼在固定后缀之前",
+               0 <= text_d.find("overlay buttons:") < text_d.find(_PROBE_SUFFIX))
+        record("done 声明文本仍居结尾（尾缀语义保持）",
+               text_d.endswith("已填 3/5 字段") and " — " in text_d)
+
+        # C8 权威清单最多列 8 个（防文本爆炸）
+        _agent_service._last_agent = _make_semantic_agent([_btn(i) for i in range(12)])
+        store_e: dict = {}
+        entry_e = record_probe_done_log(store_e, 5, reason='zero actions in phase')
+        text_e = str((entry_e or {}).get('text') or '')
+        record("按钮清单最多列 8 个", text_e.count('[') == 8 and text_e.count(']') == 8,
+               f"count={text_e.count('[')}")
+
+        # C9 无 agent / overlay 为空 / JSON 坏值 → 不附加、不炸
+        _agent_service._last_agent = None
+        store_f: dict = {}
+        entry_f = record_probe_done_log(store_f, 6, reason='zero actions in phase')
+        text_f = str((entry_f or {}).get('text') or '')
+        record("无 semantic 结果不附加清单（后缀仍结尾）",
+               "overlay buttons" not in text_f and text_f.endswith(_PROBE_SUFFIX))
+        _agent_service._last_agent = _make_semantic_agent([], overlay=False)
+        store_g: dict = {}
+        entry_g = record_probe_done_log(store_g, 7, reason='x')
+        record("overlay 为 null 不附加不抛",
+               (entry_g or {}).get("text") is not None and "overlay buttons" not in str((entry_g or {}).get("text")))
+        a_bad = _AgentShim()
+        a_bad.state.history.history[0].result[0].extracted_content = 'ok:{bad json'
+        _agent_service._last_agent = a_bad
+        store_h: dict = {}
+        entry_h = record_probe_done_log(store_h, 7, reason='x')
+        record("JSON 坏值不附加不抛",
+               (entry_h or {}).get("text") is not None and "overlay buttons" not in (entry_h or {}).get("text", ""))
+    finally:
+        _agent_service._last_agent = _saved_agent
+
+
 def main() -> int:
     tests = [
         test_a_probe_done_log,
         test_b_suspect_log_transition_only,
+        test_c_overlay_buttons_authority,
     ]
     for t in tests:
         try:
