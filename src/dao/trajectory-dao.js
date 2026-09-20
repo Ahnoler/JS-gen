@@ -6,6 +6,7 @@ import {
   isPersistentRecordStatus,
   resolvePostRecordingStatus,
 } from '../models/constants.js';
+import { failReasonText } from '../models/failure-reason.js';
 
 const TABLE = 'trajectory';
 
@@ -298,8 +299,15 @@ export async function clearMountByRemoteSessionId(remoteSessionId, {
   for (const row of rows) {
     await updateMeta(row.id, { remoteSessionId: null }, db);
     if (demoteLive && row.record_status === 'recording') {
-      // 非终结性（关浏览器/断开/回收/重启中断）：恢复到录制前持久状态，杜绝降级。
-      await restorePersistentRecordStatus(row.id, db);
+      // 非用户显式 stop 的释放：标为 failed + 录制中断，并重置 running 阶段。
+      await finishTransientRecording(row.id, 'failure', db);
+      await markFailedReason(row.id, {
+        failedKind: 'interrupted',
+        failedReason: failReasonText('interrupted'),
+      });
+      await db('trajectory_phase')
+        .where({ trajectory_id: row.id, status: 'running' })
+        .update({ status: 'failed', completed_at: null });
     }
     cleared.push(Number(row.id));
   }
@@ -344,8 +352,15 @@ export async function repairStaleRemoteMounts(trx = null) {
   for (const row of stale) {
     await updateMeta(row.id, { remoteSessionId: null }, db);
     if (row.recordStatus === 'recording') {
-      // 非终结性恢复：恢复到录制前持久状态基线，不降级。
-      await restorePersistentRecordStatus(row.id, db);
+      // 非用户显式 stop 的释放：标为 failed + 录制中断，并重置 running 阶段。
+      await finishTransientRecording(row.id, 'failure', db);
+      await markFailedReason(row.id, {
+        failedKind: 'interrupted',
+        failedReason: failReasonText('interrupted'),
+      });
+      await db('trajectory_phase')
+        .where({ trajectory_id: row.id, status: 'running' })
+        .update({ status: 'failed', completed_at: null });
     }
     cleared.push(row.id);
   }
@@ -514,9 +529,9 @@ export async function clearFailedReason(trajectoryDbId, trx = null) {
 }
 
 /**
- * Non-terminating recovery: for temporary recordings without explicit success/failure
- * (browser close, disconnect, recycle, lazy cleanup, etc.), restore to the 
- * persistent status baseline before recording, preventing downgrade to draft.
+ * Restore to the persistent status baseline before recording.
+ * Retained for compatibility; non-terminating release paths now mark recording
+ * as failed(interrupted) instead of restoring the baseline.
  * @param {number} trajectoryDbId The trajectory ID to restore
  * @param {import('knex').Knex|null} [trx] Optional transaction object
  * @returns {Promise<string|null>} Restored record status or null if not found

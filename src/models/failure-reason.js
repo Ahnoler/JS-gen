@@ -23,6 +23,7 @@ export const TRAJECTORY_FAIL_REASONS = Object.freeze({
   runner_error: '录制执行异常',
   user_marked_failed: '人工标记录制异常',
   batch_failed: '批量任务失败',
+  interrupted: '录制中断',
 });
 
 /** LLM failure kinds (all displayed as `LLM 调用异常`). */
