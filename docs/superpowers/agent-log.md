@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-20 11:24 · ZCode 引擎线 — 收工：B-2 数据完整性三缺陷修复交付（缺号/双行/failedReason 阶段号，分支未合并待批，回链 10:47 开工）
+
+- 完成：三缺陷一次修净，commit 95006eb3，分支 `engine/b2-gaps-fix-20260920`（ea3e1222 = 95006eb3 + 6ba4ed77 合入，已 push）。**6 files +128/−16**。子智能体队伍模式执行：Explore×2 并行只读调研（步号持久化链 / failedReason 构造链）→ 主会话定设计 → worker-coder 单点实现（三修复同落 runner/persist 链，避免同文件双写）→ 主会话审 diff（零越界）→ 独立复验 → 代提交。
+- ①**步号缺口**（#904 25-30、#909 38-42/46）：根因=coalesce 删除+全表重排压实 DB 号段后，runner 内存计数器 init-once 不回补 → 后续步骤从陈旧高值起跳留永久断号。修复=删除成功分支回补 `_nextStepNumber = getMaxStepNumber(tid)+1`。调研期否决"失败动作落库"方案（不修缺口且污染 countBusinessSteps/零步门禁口径、波及 _form.py ~38 pin）。
+- ②**fill+snapshot 同号双行**（#909 步45、#910 步62）：根因=业务步（内存计数器）与 save_form_snapshot（DB max+1）双源分配相撞。修复=`appendRecordedFormSnapshot` 加 stepNumber 参数（调用方有效值优先、max+1 兜底），appendRecordedStep 透传；与①回补配合两源归一。
+- ③**failedReason 无阶段号**：`persistFailReason(kind, phaseHint?)` 非空追加"（阶段 N,M）"；zeroPhase/perRun 降级与 v3 终局（quality→qualityFails 阶段、phase→failedOutcomeKeys）带参；total/runner_error 无可靠阶段号保持原文（pin 钉原文未动）；failReasonText/dao/failedKind 全未动。
+- 验收证据：新 pin `characterize-step-number-integrity` **19/19**（回补位置/透传/拼装/调用点恰次/refreshTrajectoryCounts 恰 2 防误加）+ 已登记 verify-all；traj-recon-logging（6 hook 全绿）/form-snapshot-trigger/agent-llm-error/stop-semantics 27/27/phase-done-evidence-gate/quality-final-gate/record-phase-finalize/g3-runner-seam 全过；全量 verify-all 失败集=**3 已知红零新增 210 过**；合并态（ea3e1222）复跑全绿。
+- 状态：**未合并待批**。生效机制：本批 Node 侧改动（Python 侧零改动）——**合并后需 Node 重启生效，将按新规先请示用户批准**；未重启前生产录制行为不变（缺口/双行继续出现，属预期）。
+- 遗留移交：①湿测观察点：重启后新录制应见 `[traj-recon] phase gaps=[]` 且无双行、失败轨迹 failedReason 带（阶段 N,M）后缀；②`api-docs/groups/trajectory.js` failedReason 描述已同步后缀说明（前端纯展示透传，无破坏面）；③Step 2/事件流入流挂账不变。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 10:47 · ZCode 引擎线 — 开工：B-2 数据完整性缺陷批（缺号/双行/failedReason 阶段号，子智能体队伍模式）
 
 - 进行中：用户点名修复缺陷，本单元收 B-2 gaps 家族三缺陷（#909/#910 连续两单实证）：①失败动作占步号不落库→步号缺口（#909 38-42/46、#904 25-30）；②fill_form_field 与 save_form_snapshot 同号双行（#909 步45、#910 步62）；③failedReason 不带阶段号（验收方定位难）。**方式=子智能体队伍**（用户要求控制上下文）：Explore×2 并行只读调研（步号持久化链 / failedReason 构造链）→ 主会话定设计 → worker-coder 分域实现（文件集不相交）→ 主会话验收代提交。子智能体一律不 commit。
