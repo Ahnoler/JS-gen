@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-20 15:45 · ZCode 引擎线 — 开工+收工：stop-semantics pin 跨线同步（V2.0.1 同事线改了 D/detach 语义）
+
+- 发现：引擎线对齐 V2.0 最新（含 V2.0.1 同事线 17 文件运行态更新）后跑全量 verify-all，`characterize-stop-semantics` 出新红 ——**断言 3a/3b 钉的 D（`detachTrajectoryLive`）旧语义已被同事线有意变更**：旧=D 只置 abort 标志、**不写任何终态**；新=D 新增 `const wasRecording = traj?.recordStatus === 'recording'` + 函数尾部 `if (wasRecording) { await markRecordingInterrupted(tid); }`（对应其 13:50 条目「执行机中断/重启后录制中交易永久卡 recording」修复）。其余谓词不变：仍**不发 cancel_step**（杀进程代替协商）、杀全链（closeSession/槽位/runtime 删除）齐备、`runtime.abortRecording = true` + `userStop = { success: false }` 保留（注释重述为"we will mark the trajectory failed(interrupted) below"）。
+- 处置：**pin 按新语义同步**（语义演进非缺陷，不移交）——3a 改为钉「置 abort 标志 + userStop.success 恒 false + 新注释意图」，3b 改为钉「不发 cancel_step + **仅在 wasRecording 时**条件写 failed(interrupted)（`if (wasRecording) { await markRecordingInterrupted(tid); }`）——不得无条件覆写」，3c（杀全链）不变。
+- 影响面提示：D 现成为**第三个终态写入者**（A 路由级联 / C batch CAS / D detach 条件中断）——Step 3（stop 单点化）裁决输入需纳入（原地图 §一 只记 A/C/D 三实现，现 D 的终态语义由"不写"变"条件写"）。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 15:31 · ZCode 引擎线 — 合并回执：#917 收口修复并入 V2.0（cee623e1，用户已批），Node 侧待重启（回链 15:16 收工）
 
 - 完成：`engine/stepnum-dedup-r2-20260920` (01f0d236) `--no-ff` 并入 uara_V2.0 = **cee623e1**，已 push。引擎 worktree 已对齐（工作区干净）。
