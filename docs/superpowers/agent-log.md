@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 09:45 · ZCode 引擎线 — Step 1 合并回执 + 新开工：fill 去重作用域缺陷单（#909 定谳落地，用户批"按推荐来，先完成合并"）
+
+- **Step 1 合并完成**：`engine/stop-gate-step1-20260919` (feb9a658) `--no-ff` 并入 uara_V2.0 = **d6b713da**，已 push。合并前主检出核验：他线 WIP 仅 CHANGELOG.md（用户对外文档重写）+ 22 个 untracked 备份，与合并文件集（gate/runner/pin/verify-all.sh）不相交，未触碰。合并态验收：六 pin 全绿（gate 22 收敛断言 / g3-seam 9/9 / record-phase-finalize / quality 4/4 / stop-semantics 27/27 / agent-llm-error）+ **全量 verify-all 失败集=3 已知红零新增 208 过**。引擎 worktree 已快进至 d6b713da，交付分支 engine/stop-gate-step1-20260919 已删（内容在 V2.0）。
+- **待用户执行（重启窗口）**：真实控制台运行 `D:\dev\JS-gen-engine\config\restart-local.cmd`；判据 `curl http://127.0.0.1:4097/api/health`=200 后回传。重启后 Step 1 收敛生效；合约线下单湿测可顺带观察三条门禁路径（零步降级/90s 门闩/终局收官）。
+- **新单元开工**：#909 定谳的 fill 去重缺陷单（用户批接续）。修复目标：fill/select/click_adjacent_button 的 phase 去重 identity 加容器作用域（`_element_key` 纯 label → label+container；scan 已产 `dialog:新增产品|产品` 现成可挂）——根除跨弹窗同 label 误吞（#903/#904/#909 三连的根因）。方式：RED pin 先行（跨容器同 label 必须不互相短路的行为断言）→ 最小修复 → 全量 verify-all 基线比对（3 已知红零新增）→ 分支交付「未合并待批」。
+- 上游：uara_V2.0（tip d6b713da）。引擎 worktree 新分支 `engine/fill-dedup-scope-20260920`。
+- 范围（可写集）：`scripts/controller/actions/phase/element_guard.py`（identity 构造）、`scripts/controller/actions/_form.py`（三 gate 点）、相关 characterization pin（新增 RED pin + 既有 characterize-ai-phase-element-guard.py needle 同步）、`scripts/refactor/verify-all.sh`（登记）、主检出 agent-log 本条目+收工条目
+- 禁入区：运行态服务（重启由用户真实控制台执行）；`src/services/trajectory/**`（Step 1 刚合并，本单元不碰）；`scripts/controller/actions/click_action_engine.py` 与 `characterize-search-then-click-guard.py`（Cursor STC 文件集）；合约线湿测热区
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 09:10 · ZCode 引擎线 — #909 回执定谳：产品弹窗「序号」fill 未落步 = 引擎缺陷（fill 去重跨容器 label 碰撞，非 agent 门闩违反）
 
 - **定谳（回执移交项①）**：合约线两解释中「fill 被去重拒绝」成立，判**引擎缺陷**。证据链三环：
