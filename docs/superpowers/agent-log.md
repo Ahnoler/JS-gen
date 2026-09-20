@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 10:35 · ZCode 引擎线 — #910 回执登记：nav-reclick 取证闭环 + Step 1 生产观察无异常 + fill 规避有效（纯台账，无代码改动）
+
+- **nav-reclick（d2adf8e3）取证闭环**：#909 预算内放行 + #910 预算耗尽处方（P8 卡死→「页面可能已卡死」处方触发→agent 正确停止如实 report）两条路径均有生产证据，集成验收至此完全闭环。P8 卡死形态（产品详细信息视图菜单/面包屑/刷新/URL 导航全阻）按合约线建议登记**与 #901 config-view routing deviation 归族**（SUT 页面路由怪癖，非引擎缺陷面；引擎侧无可修点，仅台账归族待后续 SUT 反馈渠道）。
+- **Step 1 门禁收敛生产观察 PASS**：#910 全程零步/门闩/降级/90s/终局签名 0 命中、9 阶段正常收口、无兜底介入——正常路径无异常（异常路径本就是 Step 0 pin+单测守护面，生产命中要等真实假成功场景）。
+- **fill 去重（5dcbd955）状态**：合约线拆阶段规避有效（P4/P5 分填 98/99 均落库、err-pending-fields 0）——生产流量已挡在缺陷面外；修复已合并且新录制会话即刻生效（10:14 条目），「同阶段双弹窗同 label」场景的生产验证点待自然命中，命中即回执留证。
+- **④待命登记**：P6 断点在「选择阶段」弹窗无 footer 提交按钮——合约线 Playwright 页面调研定谳 SUT 结构 vs 引擎枚举受限，定谳后归位移交。引擎待命：若定谳为引擎侧（弹窗内控件枚举/可视性受限），候选面在 scan 枚举链（JS_SCAN_FORM_FIELDS / scan_editable_summary 的 dialog 作用域），届时按缺陷单流程立单。
+- **持续登记**：⑤step 62 双行（fill+snapshot 同号，B-2 gaps 家族第 3 读数）；failedKind=phase_failed 属 P7 判据被满足的正常回退，非异常；wet9B3T 产品+分类 P8 卡死残留与 PD 族同列待清理（业务侧）。
+- 引擎线挂账不变：Step 2（Python 双门收敛 + phase_blocked 伴随）、nav-reclick 事件流入流（低优先级——行为学取证已闭环）、B-2 gaps/failedReason 阶段号。
+- 注：不维护 CHANGELOG；纯台账条目
+
 ## 2026-09-20 10:14 · ZCode 引擎线 — 合并回执：fill 去重修复已并入 V2.0（5dcbd955，用户批），新录制会话即刻生效（回链 10:06 收工）
 
 - 完成：`engine/fill-dedup-scope-20260920` (424d28fa) `--no-ff` 并入 uara_V2.0 = **5dcbd955**，已 push。引擎 worktree 已对齐合并态（工作区干净）。
