@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 10:06 · ZCode 引擎线 — 收工：fill 去重容器作用域修复交付（#909 定谳落地，分支未合并待批，回链 09:45 开工）
+
+- 完成：#909 定谳的缺陷单交付——fill/select 等 phase 去重 identity 加容器作用域，根除 #903/#904/#909 三连根因（同阶段跨弹窗同 label 互相短路）。commit d912d506，分支 `engine/fill-dedup-scope-20260920`（424d28fa = d912d506 + 29b4eb0d 合入，已 push）。**5 files +216/−14**。
+- 修复内容：①`element_guard.py` 新增 `element_scope_key`（label 归一化+`@container`，`_active_container` 现成载体，缺省 main）+ scoped 版 duplicate/remember（旧纯 label 接口保留）；②迁移兼容：缺省 main 作用域未命中时回退查纯 label 键（热更后旧 run 记录不失效），真实容器上下文不回退（防重新引入误吞）；③`_form.py` 五 gate 点（fill_form_field/select_option/click_radio/select_tree_option/set_vue_model）gate+remember 换 scoped，拒绝文案逐字不变；④生命周期自查：operated_elements 每阶段必清、_active_container create/modify 阶段内保留（跨弹窗正是本修场景）——scoped 记忆=阶段生命周期，无跨阶段残留。
+- 验收证据：新 pin `characterize-element-dedup-scope` **RED→GREEN**（ImportError→12 断言全绿，含 #909 场景「分类弹窗→产品弹窗不互相短路」1b、同容器防御不回退 1c、旧数据兼容 1d/1f）；idempotent-click-gate 库存 needle 同步（8→11 defs）；ai-phase-element-guard/search-then-click-guard/fill-dispatch 全过；全量 verify-all 失败集=**3 已知红零新增 209 过**；合并态（424d28fa）五 pin 复跑全绿。
+- 状态：**未合并待批**——分支已推 origin。合并后需重启窗口生效（新录制 Python 子进程从磁盘加载，与 Node 侧无关，重启控制面+执行机即可；若与后续单合并批处理亦可）。
+- 遗留移交：①合约线湿测如遇「同阶段两个弹窗填同名字段」场景，在合并+重启前仍会触发 #909 已知缺陷（已在 09:45 条目告知避开该场景设计）；②`[nav-reclick]` 事件流入流（#909 移交项③）与 phase_blocked reason（#909 移交项②，Step 2 伴随）维持登记。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 09:53 · ZCode 引擎线 — 运行态变更：服务已重启至 d6b713da（Step 1 生效，用户委托引擎线单独启动，未用 restart 脚本）
 
 - 完成：用户手动关闭控制面+本地执行机后，委托引擎线单独启动（明确不用 restart-local.cmd）。启动方式：PowerShell `Start-Process` 独立进程（脱离 agent shell 进程树，会话回收不受影响；未跑 restart-local.cmd，未动 kill-node-match/CDP 清理步骤——启动前预检 4097/19242 双端口零监听，环境干净）。
