@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-20 10:14 · ZCode 引擎线 — 合并回执：fill 去重修复已并入 V2.0（5dcbd955，用户批），新录制会话即刻生效（回链 10:06 收工）
+
+- 完成：`engine/fill-dedup-scope-20260920` (424d28fa) `--no-ff` 并入 uara_V2.0 = **5dcbd955**，已 push。引擎 worktree 已对齐合并态（工作区干净）。
+- 合并态验收（D:\dev\JS-gen）：五 pin 全绿（element-dedup-scope 12 断言 / ai-phase-element-guard / idempotent-click-gate / search-then-click-guard / fill-dispatch）；合并差异=本单元已验收代码（d912d506）+ docs，无新增面，未另跑全量 verify-all（合并前已在该内容上跑过 3 已知红零新增）。
+- **生效机制（更正 10:06 条目的"需重启窗口"表述）**：本修复纯 Python 侧（scripts/controller/**），录制会话的 Python 子进程**每次从磁盘新起**——引擎 worktree 磁盘自 d912d506 起已带修复，**新录制会话即刻生效，无需任何重启**；录制中会话不受影响（代码已在内存）。Node 侧本单元零改动，运行态仍 d6b713da（pid 24144）。
+- **请合约线知悉**：此刻起新开的录制已含 fill 去重修复——若任务命中「同阶段两个弹窗填同名字段」场景，即成修复的生产集成验证点（预期：两弹窗各自 fill 成功落步，无 already-operated 短路）；命中请回执留证。10:00 前已启动的录制仍为旧代码。
+- 注：不维护 CHANGELOG；合并操作轮次，无新代码
+
 ## 2026-09-20 10:06 · ZCode 引擎线 — 收工：fill 去重容器作用域修复交付（#909 定谳落地，分支未合并待批，回链 09:45 开工）
 
 - 完成：#909 定谳的缺陷单交付——fill/select 等 phase 去重 identity 加容器作用域，根除 #903/#904/#909 三连根因（同阶段跨弹窗同 label 互相短路）。commit d912d506，分支 `engine/fill-dedup-scope-20260920`（424d28fa = d912d506 + 29b4eb0d 合入，已 push）。**5 files +216/−14**。
