@@ -1,5 +1,23 @@
 # Agent 协作日志
 
+## 2026-09-20 17:19 · OpenCode — 收工：天元弹窗 trusted 补关（录制 prepare 关窗兜底，回链 17:10 开工）
+
+- 完成：录制 prepare 读完天元组件码后，追加 best-effort trusted 真实鼠标关窗，消除「登录后残留『天元相关配置』弹窗 → 录制 agent 全局弹窗守卫暂停」。
+  - 根因：`page_id.py` `closeTianyuanDialogs()` 用合成 `btn.click()`，SUT 只认 trusted 事件，关不掉（`scripts/kb/kb-ab-manifest.v1.json` v1.1 已记）。
+  - 改动（6 文件 +97/−3，commit **53047dbb**）：`page_id.py` 新增 `JS_FIND_TIANYUAN_DIALOG_CONFIRM`（仅可见天元弹窗 + 可见「确 定」才返按钮中心，否则 `{ok:false,reason}`，不盲点）；`_js_snippets.py` 导出；`_replay.py` 新增 direct action `close_tianyuan_dialog`（`page.mouse` trusted input，同 `_dismiss_menu_overlay`；恒返 `ok-*`、全程 try/catch 绝不抛）；`recording-page-bind.js` 在同批 `read_page_component_code` 后追加该动作（无弹窗/读失败均 no-op，仅录制 prepare，菜单扫描未动）；`event_dispatch.py` 登记签名（空参数，零行为变更）；`characterize-page-bind.mjs` 补 3 pin。
+- 验收（合并后，基点 `dc8eb83b`）：`characterize-page-bind` OK（含新 pin）、`characterize-real-click` OK、`characterize-menu-scan` OK、`characterize-close-dialog-replay` OK、`characterize-recording-coach-skill-pack` OK；`npx eslint src/services/trajectory/recording-page-bind.js` 干净；`py_compile`/`node --check`/新片段独立 `node --check` 通过。
+- 全量 verify-all：失败集为**既有/环境性**（`confirm-notification` 读未触碰的 `_misc.py`；`step-highlight`/`layer-tree` 依赖本机 DB 数据；`gbk UnicodeEncodeError`×2、`tssc-route-conflict` 的 `ModuleNotFoundError`、`network-capture` 的 portable python 缺失=Windows 本机环境；`eslint-core` 全仓扫描含 `tools/recording-coach/**` 存量）——**本次改动相关 pin 零新增红**。
+- 影响面：合成关窗兜底原样保留；回退=删 `recording-page-bind.js` 一行。**executor 端 Python 需重载后新片段才生效**；Node 侧仅加一个动作名。
+- 遗留：无。真正「不打开弹窗」（从 Vue/URL/store 读码）的方案 B 未做，属可选优化、非本次范围。
+- 注：不维护 CHANGELOG
+
+## 2026-09-20 17:10 · OpenCode — 开工：录制 prepare 天元弹窗 trusted 补关（A-minimal）
+
+- 范围（可写集）：`scripts/controller/actions/js_snippets/page_id.py`、`scripts/controller/actions/_js_snippets.py`、`scripts/controller/actions/_replay.py`、`scripts/event_dispatch.py`、`src/services/trajectory/recording-page-bind.js`、`scripts/characterization/characterize-page-bind.mjs`、本 agent-log 条目。
+- 禁入区：`scripts/controller/actions/_workspace.py`（real_click 通道不动）、`close_dialog.py`（其他弹窗不动）、菜单扫描链路（`menu-scan-*`）、他线 WIP。
+- 方式：A-minimal——不改共享 `read_page_component_code`，新增独立 direct action + service 单点追加；JS 侧可见性门控，`page.mouse` trusted；恒 `ok-*` 绝不抛；`characterize-page-bind` + eslint 验收。
+- 注：开工声明为**事后补记**（本会话内即完成改动，未及先行 push）——如实登记，非先行声明。
+
 ## 2026-09-20 17:01 · ZCode 引擎线 — 同步回执：已对齐合约线合并态（08afc16c），运行面判定「无需重启」
 
 - 完成：接用户「合约线那边进行了合并」通报，引擎 worktree 已对齐 `origin/uara_V2.0` = **08afc16c**（合约线 merge(contract): KB stage-dialog recipe + wet9 ledger entries，用户已批），工作区干净、与上游零差异。
