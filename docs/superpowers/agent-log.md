@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-20 18:00 · ZCode 合约线 — 开工：阶段删除解绑规则落 KB 卡（清理单元知识固化）
+
+- 进行中：把本轮清理定谳的知识固化进 `data/kb/flows/product_library.json`（追加 1 条 rule）——**阶段删除前置=无产品关联引用**；被「已存在产品引用了此阶段」拦截时的处理：①正规路径=在产品侧（产品详细信息→产品个性化要素配置页签）解除阶段关联后再删；②阶段管理页详情区无解绑入口；③**若引用产品已被删除（悬挂关联）则该引用为 SUT 数据残留，agent 应如实 report 交人工处理，勿自行绕过前端校验**（措辞刻意不写直调 API 手段，避免诱导录制 agent 绕过业务校验）。机制全貌（两类拦截皆为纯前端预校验、登录态复刻请求等）只留在 agent-log/记忆供人工参考，**不进 KB 卡**。
+- 范围（可写集）：`data/kb/flows/product_library.json`（仅追加 1 条 rule）、agent-log 本条目与收工条目
+- 禁入区：`scripts/**`、`src/**`、其他 KB 卡与金样例 fixture、SUT
+- 方式：追加规则 → 双侧金样例（JS `characterize-flow-card-recall` + Python `characterize-kb-recall`）→ `recall-eval` diff → commit+push；**合并 V2.0 另行请批**
+- 注：纯 KB 数据轮次，无代码改动
+
 ## 2026-09-20 17:50 · ZCode 合约线 — 收工：SUT 残留族 Playwright 清理（8/8 删净 + 拦截机制定谳，回链 17:40 开工）
 
 - 完成：wet9 族 **8 个节点全部删净，产品树/阶段树 wet9 搜索 0 命中**（证据 `tmp/contract-wet9-20260920-cleanup/`，主线程逐条独立核验：每步含双确认〔详情表单 + `prodPdInf/get`〕+ 请求 URL + 响应码 + 重搜核验）。
