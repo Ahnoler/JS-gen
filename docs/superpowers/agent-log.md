@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 12:10 · ZCode 合约线 — 收工：「选择阶段」弹窗调研（B 定谳成立+真实交互形态+裁决落地，回链 11:35 开工）
+
+- 完成：双子智能体并行调研收敛，报告 `tmp/contract-wet9-20260920-pdiag/pdiag-report.md`。**定谳 B 成立（引擎枚举受限），SUT 无缺陷**：footer「取 消/确 定」自始至终存在可见（选择器在案），#910 agent「无 footer 提交按钮」报告不成立。漏采机理=**采集链在第三方库 browser_use 0.1.48**（buildDomTree.js isTopElement 用 elementFromPoint 命中测试——tree-popover 展开正好覆盖 184px 高的弹窗 footer，「确 定」被判遮挡不分配 index；views.py 文本聚合不查 is_visible=步 47 长串伪影机理）。**agent 侧逃生门实证**：click_save("确 定") 走文本直查（footer 选择器+40 加权）不吃 index 遮挡亏，#910 agent 未试。
+- **真实提交交互**：点「请选择」展开 popover→**勾选节点 el-checkbox**（回填输入框）→点 footer「确 定」→ prodPdStgRel/saveBatch 200——标准 el-tree checkbox 模式。
+- **【重大副产品】wet9 blocked 叶裁决落地**：人工辅助完成关联后【设置管控要素】按钮立即出现（页签按钮 1→3：+设置管控要素/+阶段删除）——**裁决=入口以「已关联产品阶段」为前置，成立**；编辑主页结构已取证（高亮树 42 节点+3 表格+7 按钮），返回未保存。09-06 blocked 假设四连（#903/#904/#909/#910）结案。
+- 清理：wet9B3产品T+wet9B3T 分类删净；wet9阶段U-20260920 **删除被静默拦截**（无确认框/toast/请求，疑被已删产品的悬挂关联引用阻止）——SUT 关联表不随产品删除级联=新登记数据完整性怪癖，残留归业务清理。存量零触碰。
+- 移交引擎：B 立单修复面=browser_use 第三方库（isTopElement 遮挡判定+文本吸入）+本仓 semantic_snapshot 40 截断与 probe 弹窗按钮权威清单缺口；最小复现序列三步在 pdiag-report §移交1。
+- 本线下一步候选：KB 配方落地（勾选 checkbox + click_save(确定) + popover 遮挡属正常三则）；等用户/引擎示意。
+- 注：页面调研轮次，无代码改动；子智能体未 commit；不维护 CHANGELOG
+
 ## 2026-09-20 11:35 · ZCode 合约线 — 开工：「选择阶段」弹窗 Playwright 页面调研（A/B 定谳，双子智能体并行，引擎 ④ 委托）
 
 - 进行中：引擎线指示对 #910④ 断点（「选择阶段」弹窗无 footer 提交按钮）启动 Playwright 页面调研，定谳二选一：A=SUT 弹窗结构问题（真实提交交互形态）；B=引擎 scan 枚举受限（dialog 作用域，步 47 长串 text 伪影佐证）。本线以双子智能体并行执行：①Playwright 操作员（浏览器实测：登录→重建 stamp 阶段 wet9阶段U-20260920→用 #910 残留产品 wet9B3产品T-20260920 开「产品个性化要素配置」→【设置阶段】弹窗→DOM 全量探查（footer/按钮/隐藏元素/Vue methods）→定位真实提交交互并尝试完成关联→**若关联成功顺带观察【设置管控要素】入口（四连 NOT-ADJUDICATED 有望落地）**→清理：删产品+删分类 wet9B3T-20260920+删阶段 U（#910 残留一并清）；②引擎 scan 枚举链代码调查员（只读 scripts/controller/**+scripts/agent/**，定位元素采集链与弹窗作用域，解释步 47 text 拼接伪影）。
