@@ -109,7 +109,7 @@
 
 1. 初始化 WS、加载交易/登录上下文/轨迹树/执行机列表。
 2. 注册观众 + 启动心跳 + `beforeunload` 注销。
-3. 仅当状态为 **`draft`** 时**自动 prepare**；`recording/failed/recorded/completed` 默认不连执行机，需用户点击「准备会话」。
+3. 当状态为 **`draft` / `recording`** 时**自动 prepare**：`draft` 首次连资源；`recording` 表示后端已有录制会话在跑（含 batch 静默录制），需要自动连上看画面。`failed/recorded/completed` 默认不连执行机，需用户手动点「准备会话」。
 4. 启动 10s 轮询（轨迹树 + 执行机列表）。
 
 ### 4.2 三个按钮的行为

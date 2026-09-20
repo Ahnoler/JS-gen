@@ -52,7 +52,7 @@ export const GROUP_RECORDING = [
           '503：会话/执行机其它不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
           '状态模型（V4）：draft/recording/failed/recorded/completed，其中 recording 是临时态，仅表示「正在录制」；持久态为 draft/failed/recorded/completed。prepare 默认不进入 recording；record/start 与人工录制开启时进入 recording；stop(success) → recorded（待确认），stop(!success)/失败 → failed（录制异常）；非用户显式 stop 的资源释放（关浏览器/断开/回收/重启/无观众/空闲回收）一律标为 failed + 录制中断（interrupted）。',
-          'prepare（默认，preserveRecordStatus=true）保持 failed/recorded/completed/draft 不变；prepare(preserveRecordStatus=false) → recording（临时态，内部路径）；record/start(draft|failed|recorded|completed) → recording（临时态）；stop(success) → recorded（待确认）；stop(!success)/失败 → failed（录制异常）；completed 重新录制 stop(success) → recorded（需再次人工确认）；detach/stream-detach/回收/清理/无观众/空闲回收 → failed（interrupted）。',
+          'prepare（默认，preserveRecordStatus=true）只连资源/推流，保持当前 record_status 不变，因此 draft/recording 进入页面会自动 prepare 以连上画面；显式传 preserveRecordStatus=false 才会进入 recording（内部路径）。record/start(draft|failed|recorded|completed) → recording（临时态）；stop(success) → recorded（待确认）；stop(!success)/失败 → failed（录制异常）；completed 重新录制 stop(success) → recorded（需再次人工确认）；detach/stream-detach/回收/清理/无观众/空闲回收 → failed（interrupted）。',
         ],
       },
       {
