@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 10:47 · ZCode 引擎线 — 开工：B-2 数据完整性缺陷批（缺号/双行/failedReason 阶段号，子智能体队伍模式）
+
+- 进行中：用户点名修复缺陷，本单元收 B-2 gaps 家族三缺陷（#909/#910 连续两单实证）：①失败动作占步号不落库→步号缺口（#909 38-42/46、#904 25-30）；②fill_form_field 与 save_form_snapshot 同号双行（#909 步45、#910 步62）；③failedReason 不带阶段号（验收方定位难）。**方式=子智能体队伍**（用户要求控制上下文）：Explore×2 并行只读调研（步号持久化链 / failedReason 构造链）→ 主会话定设计 → worker-coder 分域实现（文件集不相交）→ 主会话验收代提交。子智能体一律不 commit。
+- 上游：uara_V2.0（tip 697b22bb）。分支 `engine/b2-gaps-fix-20260920` @ 697b22bb。
+- 范围（可写集）：`scripts/state.py`（_record_action 若涉）、`scripts/controller/actions/**`（录制动作落库链）、`src/services/trajectory/trajectory-persist-service.js`、`src/services/trajectory/trajectory-recording-runner.js`（persistFailReason 局部）、`src/models/failure-reason.js`、相关 characterization pin（RED 先行）、`scripts/refactor/verify-all.sh`（登记）、主检出 agent-log 本条目+收工条目
+- 禁入区：**运行态服务零触碰——重启须先请示用户批准（新规）**；远端代理执行机（用户自管，他人在用，绝对不动）；`click_action_engine.py`+`characterize-search-then-click-guard.py`（Cursor STC 文件集）；Step 2 范围（recorder_emitters.py 双门收敛，另单）；合约线湿测热区
+- 验收口径：RED pin 先行；全量 verify-all 失败集=3 已知红零新增；分支交付 push + 收工条目「未合并待批」
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 10:35 · ZCode 引擎线 — #910 回执登记：nav-reclick 取证闭环 + Step 1 生产观察无异常 + fill 规避有效（纯台账，无代码改动）
 
 - **nav-reclick（d2adf8e3）取证闭环**：#909 预算内放行 + #910 预算耗尽处方（P8 卡死→「页面可能已卡死」处方触发→agent 正确停止如实 report）两条路径均有生产证据，集成验收至此完全闭环。P8 卡死形态（产品详细信息视图菜单/面包屑/刷新/URL 导航全阻）按合约线建议登记**与 #901 config-view routing deviation 归族**（SUT 页面路由怪癖，非引擎缺陷面；引擎侧无可修点，仅台账归族待后续 SUT 反馈渠道）。
