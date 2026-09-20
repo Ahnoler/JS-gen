@@ -1,5 +1,10 @@
 # Agent 协作日志
 
+## 2026-09-20 15:30 · Cursor — 收工：skill OpenCode 评测门禁落地 + 迭代闭环（回链 15:00 开工）
+
+- 完成：Tier A/B harness（PATH/session、fixture v1.1 共 8 题含真实失败主题 A6–A8、否定安全 forbid、OPENCODE_BIN 优先、tier-a-score cold pin）；WET-CHECKLIST「改文后必跑」；FAILURE-SAMPLES 溯源
+- 验收：cold pins OK；`eval-tier-a` **8/8**（报告 tmp/recording-coach-skill-eval-A-2026-09-20T07-28-54.237Z.json）；Tier B 先前 PASS
+- 遗留：index.mjs 与 session helper 仍双份 bootstrap；Tier A 未禁工具调用本身；湿测 A/B 对照未开
 ## 2026-09-20 15:16 · ZCode 引擎线 — 收工：#917 两项未通过收口交付（步号串行化根修 + 搜索族 fill 豁免，分支未合并待批，回链 14:41 开工）
 
 - 完成：#917 ①步号 gaps/双行、②fill 去重第三例 —— 两项修复交付，commit 6746c6c3，分支 `engine/stepnum-dedup-r2-20260920`（01f0d236 = 6746c6c3 + 他线最新合入，已 push）。**5 files +165/−14**。子智能体队伍：Explore×2 并行调研 → 主会话定设计 → 双 worker 分域实现（文件集不相交）→ 主会话审 diff → 独立复验 → 代提交。

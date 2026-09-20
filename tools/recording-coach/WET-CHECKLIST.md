@@ -2,6 +2,27 @@
 
 前提：4097 控制面 + executor 在线；本目录 `npm install` 完成。
 
+## Skill 改文后必跑（迭代门禁）
+
+改 `skill/SKILL.md`、`references/`、`templates/` 或评测 fixture 后，**按序**：
+
+```bash
+# 1) 契约层（无 LLM；verify-all 已登记）
+node scripts/characterization/cold/characterize-recording-coach-assert.mjs
+node scripts/characterization/cold/characterize-recording-coach-operator.mjs
+node scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs
+node scripts/characterization/cold/characterize-recording-coach-tier-a-score.mjs
+
+# 2) OpenCode 过程层（需本机 opencode.exe + LLM）
+node tools/recording-coach/scripts/eval-tier-a.mjs
+# 期望：OK eval-tier-a 8/8（tier-a.v1.1）
+
+# 3) 可选：工具轨迹到 ReadyToCreate（需 4097）
+node tools/recording-coach/scripts/eval-tier-b.mjs
+```
+
+说明与 PATH：`eval/README.md`。扩题样本来源：`eval/fixtures/FAILURE-SAMPLES.md`。
+
 ## Skill 四层与脚手架
 
 OpenCode 加载 **`skill/`** 根目录；Cursor 用时口头指向 `tools/recording-coach/skill/`（勿复制到 `.cursor/skills/`）。

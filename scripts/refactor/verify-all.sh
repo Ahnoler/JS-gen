@@ -224,6 +224,7 @@ run "characterize-tree-text-export" node scripts/characterization/cold/character
 run "characterize-recording-coach-assert" node scripts/characterization/cold/characterize-recording-coach-assert.mjs
 run "characterize-recording-coach-operator" node scripts/characterization/cold/characterize-recording-coach-operator.mjs
 run "characterize-recording-coach-skill-pack" node scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs
+run "characterize-recording-coach-tier-a-score" node scripts/characterization/cold/characterize-recording-coach-tier-a-score.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
