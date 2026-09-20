@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-20 18:40 · ZCode 合约线 — 收工：KB 阶段删除规则并入 uara_V2.0（7d309095 已推，回链 18:25 开工）
+
+- 完成：`fix/phase-contract-20260918` 5 条（上轮合并收工条目 + 清理单元 + KB 阶段删除规则）并入 `uara_V2.0`，合并提交 **7d309095**（已推 `c8d0b7c8..7d309095`）。实质变更=`data/kb/flows/product_library.json` **+4 行**（规则「阶段删除/解绑」），其余为文档。
+- **agent-log 冲突解决**：双侧 9 条合并（HEAD 3 + 合约 6）、时间序单调、关键时间戳抽验全在位、尾部完整（末条 2026-09-12 Grok Bot）；09-16/09-17 两条 OpenCode 同首行重复仍为**两侧历史遗留**（与上轮同一现象，未新增、未擅自改）。
+- 合并态验收（D:\dev\JS-gen 全 worktree @ 7d309095 实跑）：JS `characterize-flow-card-recall` **26 passed**；Python `characterize-kb-recall` **ok**；KB 卡 17 规则/8 节点在场（`阶段删除/解绑` 规则 + `prod_stage_assoc_dlg` 节点均在）。主检出已同步；临时 worktree 已清理。
+- 注：KB 数据+文档合并轮次，合约侧零代码改动
+
 ## 2026-09-20 18:25 · ZCode 合约线 — 开工：KB 阶段删除规则并入 uara_V2.0（用户已批）
 
 - 进行中：用户批准合并。`fix/phase-contract-20260918` 领先 V2.0 **5 条**（929244e4 上轮合并收工条目、b2edbcfd/ce9d3c67 清理单元、fd0ee272/735f1552 KB 阶段删除规则）；V2.0 侧领先 3 条（c8d0b7c8+53047dbb OpenCode 录制 prepare 天元弹窗 trusted 补关、dc8eb83b 引擎线同步回执）。**实质变更=`data/kb/flows/product_library.json` +4 行**（规则「阶段删除/解绑」：前置=无产品关联引用 + 被拦时正规解绑路径 + 遇悬挂残留应 report 的边界），其余为文档。
