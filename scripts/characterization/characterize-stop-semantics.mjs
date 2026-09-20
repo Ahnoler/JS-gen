@@ -101,15 +101,18 @@ record('2d C 与 A 的分叉点唯一：CAS 守卫 + capture off 缺席（A 的�
   count(C_BODY, "event: 'cancel_step'") === 1
   && !C_BODY.includes("event: 'capture_screenshots'"));
 
-// ── 3. D：detach 硬停 ────────────────────────────────────────────────────────
-record('3a D 只置 abort 标志且 userStop.success 恒 false',
+// ── 3. D：detach 硬停（2026-09-20 语义更新：V2.0.1 同事线新增 wasRecording 条件中断） ──
+record('3a D 置 abort 标志 + userStop.success 恒 false（注释明示将标 failed(interrupted)）',
   D_BODY.includes('runtime.abortRecording = true;')
   && D_BODY.includes('runtime.userStop = { success: false };')
-  && D_BODY.includes('detach must not'));
-record('3b D 不发 cancel_step、不写终态、不记失败原因（杀进程代替协商）',
+  && D_BODY.includes('failed(interrupted)'));
+record('3b D 不发 cancel_step、不记失败原因；仅 wasRecording 时条件标 failed(interrupted)（不得无条件覆写）',
   !D_BODY.includes('cancel_step')
   && !D_BODY.includes('finishTransientRecording')
-  && !D_BODY.includes('markFailedReason'));
+  && !D_BODY.includes('markFailedReason')
+  && D_BODY.includes("const wasRecording = traj?.recordStatus === 'recording';")
+  && D_BODY.includes('if (wasRecording) {')
+  && D_BODY.includes('await markRecordingInterrupted(tid);'));
 record('3c D 杀全链：closeSession(keepBrowser:false) + 槽位 + runtime 删除',
   D_BODY.includes('execSession.closeSession(')
   && D_BODY.includes('keepBrowser: false')
