@@ -282,6 +282,78 @@ export async function prepareTrajectoryRecording(trajectoryId, opts = {}) {
 
 
 /**
+ * Recover a still-live executor session already recorded for a trajectory when the
+ * in-memory runtime is gone (e.g. control-plane restart mid-recording). Prevents
+ * opening a SECOND browser that would conflict with an in-flight recording.
+ * @param {number} tid trajectory DB id
+ * @param {object} traj trajectory row
+ * @returns {Promise<{status: 'recovered'|'unreachable'|'gone', result?: object}>}
+ *   recovered → reuse `result`; unreachable → executor cannot confirm (retryable);
+ *   gone → no live session exists (recording was interrupted)
+ */
+async function recoverLiveSessionForTrajectory(tid, traj) {
+  const remoteSessionId = traj?.remoteSessionId != null ? Number(traj.remoteSessionId) : null;
+  if (!Number.isFinite(remoteSessionId) || remoteSessionId <= 0) return { status: 'gone' };
+  const row = await remoteSessionDao.getById(remoteSessionId).catch(() => null);
+  if (!row || !row.agentSessionId) return { status: 'gone' };
+  if (row.status !== 'active' && row.status !== 'idle') return { status: 'gone' };
+  if (row.trajectoryId != null && Number(row.trajectoryId) !== Number(tid)) return { status: 'gone' };
+
+  const node = row.executorNodeId != null
+    ? await executorNodeDao.getById(row.executorNodeId).catch(() => null)
+    : null;
+  const nodeUuid = node?.nodeUuid || null;
+  if (!nodeUuid) return { status: 'gone' };
+
+  const sessions = await execSession.listExecutorSessions(nodeUuid, 8000).catch(() => null);
+  if (!Array.isArray(sessions)) {
+    // Executor unreachable — cannot confirm the session is gone. NEVER open a new
+    // browser here (might disturb a live recording); surface a retryable error.
+    return { status: 'unreachable' };
+  }
+  const live = sessions.find((s) => String(s?.sessionId) === String(row.agentSessionId));
+  if (!live) return { status: 'gone' };
+
+  const slotIndex = row.slotIndex ?? live.slotIndex ?? 0;
+  const runtime = registerTrajectorySession(tid, String(row.agentSessionId), {
+    nodeUuid,
+    slotIndex,
+    model: live.model || null,
+    cdpPort: live.cdpPort ?? null,
+    cdpReady: true,
+  }, { remoteSessionId: row.id });
+  if (traj?.recordStatus === 'recording') {
+    // Agent owns the page during an active recording — prepare must not re-login.
+    runtime.loginDone = true;
+  }
+  slotLease.confirmLease({
+    sessionId: String(row.agentSessionId),
+    nodeUuid,
+    slotIndex,
+    trajectoryId: tid,
+  });
+  bindTrajectoryManualPersist(tid, String(row.agentSessionId), runtime);
+  remoteSessionService.restoreLiveBindingFromRow(row, {
+    nodeUuid,
+    attached: row.status === 'active',
+  });
+  console.log(`[attach] recovered live executor session for traj #${tid} (agent=${row.agentSessionId})`);
+  return {
+    status: 'recovered',
+    result: {
+      trajectoryId: tid,
+      sessionId: String(row.agentSessionId),
+      executorNodeUuid: nodeUuid,
+      remoteSessionId: row.id,
+      status: await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null),
+      reused: true,
+      reusedChrome: true,
+      recovered: true,
+    },
+  };
+}
+
+/**
  * Acquire executor resources for a trajectory (agent session + optional BiB).
  * @param {number} trajectoryId trajectory DB id
  * @returns {Promise<object>} attach result (sessionId, executorNodeUuid, remoteSessionId, status, …)
@@ -319,6 +391,28 @@ export async function attachTrajectoryLive(trajectoryId) {
       reused: true,
       reusedChrome: false,
     };
+  }
+
+  // 录制进行中：内存 runtime 丢失（控制面重启）时，优先恢复已绑定的执行机会话，
+  // 而不是新开浏览器——否则会与正在进行的录制冲突并使其失败。
+  if (traj.recordStatus === 'recording') {
+    const rec = await recoverLiveSessionForTrajectory(tid, traj);
+    if (rec.status === 'recovered') return rec.result;
+    if (rec.status === 'unreachable') {
+      // 执行机暂不可达：无法确认会话是否还在，绝不新开浏览器（可能打断在录），
+      // 返回可重试错误，让用户稍后重试。
+      const err = new Error('执行机暂不可达，无法确认录制会话状态，请稍后重试');
+      err.statusCode = 503;
+      throw err;
+    }
+    // 执行机可达但会话确已不存在 → 录制已中断：标记 failed(interrupted)，
+    // 并给用户明确指引（此时状态已非 recording，点「重新录制」会正常开新会话）。
+    await markRecordingInterrupted(tid).catch(() => {});
+    const err = new Error(
+      '该交易的录制已中断（执行机会话已不存在），已标记为「录制异常」。如需继续请点击「重新录制」。',
+    );
+    err.statusCode = 409;
+    throw err;
   }
 
   slotLease.releaseByTrajectory(tid);

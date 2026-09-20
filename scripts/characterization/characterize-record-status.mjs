@@ -289,6 +289,33 @@ function testWiringCallChains() {
     '批量回收链不再恢复持久基线');
 }
 
+function testWiringRecordingInFlightPrepareGuard() {
+  // 录制进行中进入录制页会自动 prepare：不得重新登录、不得导航页面绑定、
+  // 不得新开执行机会话（会打断在录 agent）。
+  const runner = readFileSync(join(root, 'src/services/trajectory/trajectory-attach-runner.js'), 'utf8');
+  assert.match(runner, /const recordingInFlight = traj\?\.recordStatus === 'recording'/,
+    'attach-runner 计算 recordingInFlight');
+  assert.match(runner, /runtime\.skipDefaultLogin \|\| skipDefaultLogin \|\| recordingInFlight/,
+    '录制中跳过 prepare-time 默认登录');
+  assert.match(runner, /traj\?\.functionId && !recordingInFlight/,
+    '录制中跳过页面绑定导航（bindRecordingPageId 会点菜单打断录制）');
+
+  const attach = readFileSync(join(root, 'src/services/trajectory/trajectory-attach-service.js'), 'utf8');
+  assert.match(attach, /async function recoverLiveSessionForTrajectory\(tid, traj\)/,
+    'attach-service 定义 recoverLiveSessionForTrajectory');
+  assert.match(attach,
+    /if \(traj\.recordStatus === 'recording'\)[\s\S]{0,400}recoverLiveSessionForTrajectory\(tid, traj\)/,
+    '录制中优先恢复已有执行机会话而不是新开浏览器');
+  assert.match(attach, /status: 'unreachable'/,
+    '恢复函数区分执行机不可达（不确认即不乱开）');
+  assert.match(attach, /执行机暂不可达，无法确认录制会话状态/,
+    '执行机不可达返回可重试错误，不新开会话');
+  assert.match(attach, /markRecordingInterrupted\(tid\)\.catch/,
+    '会话确不存在时标记 interrupted');
+  assert.match(attach, /该交易的录制已中断/,
+    '会话确不存在时给出重新录制指引（不静默新开会话）');
+}
+
 function testWiringConfirmAndCasUsages() {
   // 确认/取消确认走 setPersistentRecordStatus + updateMetaIf CAS（recordStatusIn 条件）。
   const meta = readFileSync(join(root, 'src/services/trajectory/trajectory-meta-service.js'), 'utf8');
@@ -341,6 +368,7 @@ function main() {
     ['wiring: writeRecordStatusResilient 必写 record_status，persistent 缺列降级 warn', testWiringWriteRecordStatusResilient],
     ['wiring: 双状态字段 record_status + persistent_record_status（getRecordStatusRow）', testWiringDualStatusFields],
     ['wiring: 调用链 显式结束→finishTransientRecording，非终结→markRecordingInterrupted/failed', testWiringCallChains],
+    ['wiring: 录制中 prepare 不登录/不导航页面绑定/不新开会话', testWiringRecordingInFlightPrepareGuard],
     ['wiring: 确认/取消确认 setPersistentRecordStatus + updateMetaIf CAS', testWiringConfirmAndCasUsages],
     ['wiring: 人工确认无状态闸，直接 completed', testWiringConfirmUnconditionalCompleted],
   ];

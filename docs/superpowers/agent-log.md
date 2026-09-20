@@ -1,5 +1,19 @@
 # Agent 协作日志
 
+## 2026-09-20 16:10 · OpenCode — 修复：进入 recording 交易页自动 prepare 会重登录/导航/新开会话打断录制
+
+- 问题：`recording` 状态的交易点击进入录制页后自动 `prepare`，会重新获取执行机资源（重登录等），导致正在进行的录制失败。
+- 根因（两处）：
+  1. `prepareTrajectoryRecordingUnlocked` 的登录段只按 `runtime.loginDone` 跳过；**页面绑定段 `bindRecordingPageId` 完全没跳过**——它会 `navigateToFunctionMenu`（点菜单）+ `read_page_component_code`（可能开弹窗），在录制中进入页面时会直接导航打断 agent。
+  2. 控制面重启（切分支/合并后重启）丢失内存 runtime：`attachTrajectoryLive` 只查内存 runtime，找不到就 `openSession` 新开浏览器，与在录会话冲突。
+- 修复（JS-gen 后端）：
+  - `trajectory-attach-runner.js`：新增 `recordingInFlight = traj.recordStatus === 'recording'`；登录段与页面绑定段都在录制中**跳过**（`emitStage('login','skipped',{reason:'recording_in_flight'})`；page-bind 打日志跳过）。
+  - `trajectory-attach-service.js`：新增 `recoverLiveSessionForTrajectory(tid,traj)`，在 `attachTrajectoryLive` 中当 `recordStatus==='recording'` 且内存无 runtime 时：优先从 DB `remote_session` 恢复执行机会话（`registerTrajectorySession` + `confirmLease` + `bindTrajectoryManualPersist` + `restoreLiveBindingFromRow`，并置 `runtime.loginDone=true`）；三分支——`recovered` 复用；`unreachable`（`listExecutorSessions` 失败，无法确认）→ 503 可重试、**不新开**；`gone`（可达但会话不存在）→ `markRecordingInterrupted` 标 `failed(interrupted)` + 409 明确指引「点重新录制」（此时状态非 recording，重录会正常开新会话，避免死锁）。
+- pin：`scripts/characterization/characterize-record-status.mjs` 新增 1 组断言（录制中不登录/不页面绑定/优先恢复/不可达不新开/确不存在标 interrupted）。
+- 验收：`characterize-record-status` / `characterize-trajectory` / `characterize-session-lifecycle` / `characterize-executor-orphan-reconcile` / `characterize-batch-import` / `characterize-agent-llm-error` 全 OK；`node --check` / 动态导入无环；`npx eslint` 0 errors。
+- 影响面：纯控制面改动，**需重启控制面**生效；执行机/Python 无需改。前端无需改（自动 prepare 保留，现由后端保证非破坏性）。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 15:31 · ZCode 引擎线 — 合并回执：#917 收口修复并入 V2.0（cee623e1，用户已批），Node 侧待重启（回链 15:16 收工）
 
 - 完成：`engine/stepnum-dedup-r2-20260920` (01f0d236) `--no-ff` 并入 uara_V2.0 = **cee623e1**，已 push。引擎 worktree 已对齐（工作区干净）。

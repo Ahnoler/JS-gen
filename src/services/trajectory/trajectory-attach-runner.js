@@ -72,6 +72,10 @@ export async function prepareTrajectoryRecordingUnlocked(tid, {
 } = {}) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
 
+  // 录制进行中：prepare 只做「连资源/推流」，绝不重新登录、绝不导航页面绑定，
+  // 否则会打断 agent 正在进行的录制（进入录制页会自动 prepare）。
+  const recordingInFlight = traj?.recordStatus === 'recording';
+
   await injectFlowTemplateHintIfNeeded(traj);
 
   // A fresh prepare must not inherit a stale "recording" signal: reset any phase
@@ -243,9 +247,14 @@ export async function prepareTrajectoryRecordingUnlocked(tid, {
   // Auth dry-run login segment: the agent performs the login itself as the
   // recorded phase — skip the prepare-time default login (incl. cold-start retry).
   // Flag is read-only here; it lives until the runtime is torn down at detach.
-  if (runtime.skipDefaultLogin || skipDefaultLogin) {
+  // recordingInFlight: the agent owns the page during an active recording — never
+  // re-login (would navigate the page and abort the in-flight recording).
+  if (runtime.skipDefaultLogin || skipDefaultLogin || recordingInFlight) {
     login = { skipped: true, done: true, accountId };
-    emitStage('login', 'skipped', { accountId });
+    emitStage('login', 'skipped', {
+      accountId,
+      ...(recordingInFlight ? { reason: 'recording_in_flight' } : {}),
+    });
   } else
   try {
     if (runtime.loginDone && Number(runtime.loginAccountId) === Number(accountId)) {
@@ -278,9 +287,12 @@ export async function prepareTrajectoryRecordingUnlocked(tid, {
   }
 
   // ── 起点页面 ID 绑定：导航到功能菜单 → 读组件编号（读不到 AILZ 兜底）；绝不阻断 prepare ──
+  // 录制进行中禁止导航/读页：bindRecordingPageId 会点菜单并可能开弹窗，直接打断在录 agent。
   try {
-    if (traj?.functionId) {
+    if (traj?.functionId && !recordingInFlight) {
       await bindRecordingPageId({ runtime, tid, functionId: Number(traj.functionId), execSession });
+    } else if (recordingInFlight) {
+      console.log(`[prepare] page-bind skipped for traj #${tid} (recording in flight)`);
     }
   } catch (bindErr) {
     console.warn('[prepare] page-bind failed:', bindErr?.message || bindErr);
