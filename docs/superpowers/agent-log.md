@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 18:55 · ZCode 合约线 — 完成：B 类移交测试报告两份（引擎线/系统线，按用户指示即时执行）
+
+- 完成：用户指示「写两份，一份引擎线，一份系统线」。本次为**文档撰写单元（用户直接指示即时执行，未预先开工声明）**，产出：
+  - `docs/reports/2026-09-20-b-class-handover-engine-line.md`（引擎线侧 3 项）：①**TsscMultiSelect 路由互拒**（#864；#865 对照组）——**唯一待引擎新动作项**，归属=录制引擎 Python 字段路由（`fill_engine.py:550` 拒绝码 / `form_scan_utils.py:512` kind 判定 / `select_engine.py:549` dispatch 日志，两枚冷 pin 可作护栏），互拒应加单侧兜底；②**stepNumber 空号/同号双行**（#858/#859）——**已修复闭环**（1a9ec7d9 + cee623e1；#924 验收 1..51 连续无双行）；③**analyze 合并阶段**（#861 首例，跨多单）——策略态，已转门闩 + 12 案例卡专项，待引擎确认口径。
+  - `docs/reports/2026-09-20-b-class-handover-system-line.md`（系统线侧 2 项）：④**executor 僵死双进程互踢**（#861，同 nodeUuid 双实例半开循环）——现场已处置，**建议补单实例守护**（现状仅人工 pid 采样）；⑤**MySQL deadlock 触发步持久化重试**（#865 落库期，兜底已在 `trajectory-recording-runner.js:649-660`）——根因 DB 侧未根治，**请求系统线裁决是否排期**（含复发时取证建议）。
+- 取证方式：派 Explore 只读研究员回溯 5 项原始记录（wet/wet2/wet3/wet4 四份 through-report + agent-log 早期条目），主线程**逐条独立核验**：证据路径 8 处全存在、代码行号 6 处全部实测吻合。
+- **口径校正（写入报告）**：①stepNumber 空号机理更正为「派生快照与主 fill 并发读同一 `_nextStepNumber`」（原记录写"疑似 coalesce 吞并"）；②轨迹号锚定更正——互拒在 #864（#865 为成功对照组）、deadlock 在 #865（汇总条目误记 #863）。
+- 台账：`todo-list.md` 待办「B 类五项移交测试报告」**完成**（wet9 线遗留项至此清空）。两份报告已落**主检出 `D:\dev\JS-gen\docs\reports\`**（合约 worktree 同路径留副本）——**注意 `docs/reports/` 按 `.gitignore:26` 约定不入版本控制（本地分发区），故本单元无合并事项**。
+- 注：纯文档轮次，无代码改动
+
 ## 2026-09-20 18:40 · ZCode 合约线 — 收工：KB 阶段删除规则并入 uara_V2.0（7d309095 已推，回链 18:25 开工）
 
 - 完成：`fix/phase-contract-20260918` 5 条（上轮合并收工条目 + 清理单元 + KB 阶段删除规则）并入 `uara_V2.0`，合并提交 **7d309095**（已推 `c8d0b7c8..7d309095`）。实质变更=`data/kb/flows/product_library.json` **+4 行**（规则「阶段删除/解绑」），其余为文档。
