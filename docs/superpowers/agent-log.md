@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-20 18:05 · OpenCode — 开工：录制收尾 run 归属守卫（修「录制中无推流 + 定稿后仍落步」）
+
+- 背景：用户报交易 #925 录制页无推流（刷新多次）+「下一步之后又录了一条选择下拉」。排查证据：同轨迹存在两个会话——第一轮 `577a391c`/remote_session 2109（3 阶段 phase_done 完毕）、第二轮 `a26cb9fc`/remote_session 2115（用户手动发起）；`record_status` 已为 `recorded`（`updated_at=09:40:17`）但第二轮 agent 仍在跑并**持续落步**（`trajectory_step` 从 7 条涨到 10 条，#5 select_option 与 #8–#10 均晚于定稿）。根因=循环末尾成功/失败收尾（`trajectory-recording-runner.js:1349-1377`）**缺 `runStillOwnsRuntime()` 守卫**，旧 run 收尾覆写新 run 的 `recording` 终态 → 前端只对 draft/recording 自动 prepare，故录制中不连执行机、无画面；且 persist 订阅无条件落步。
+- 范围（可写集）：`src/services/trajectory/trajectory-recording-runner.js`（A 收尾归属守卫 + B 落步归属守卫）、`src/services/trajectory/batch-record.js`（被取代的 run 不得 detach 新 run 的会话）、`scripts/characterization/characterize-stop-semantics.mjs`（4e pin 由恰 2 处更新为恰 4 处 + 新增守卫断言）、agent-log 本条目与收工条目
+- 禁入区：`src/routes/**`、其它 characterization pin、`data/kb/**`、前端另仓、SUT
+- 方式：runner 循环末尾 finalize 前加 `runStillOwnsRuntime()` 守卫（被取代→抛 `err.code='run_superseded'`）；`handleActionLogSync` 顶部加同一守卫；`batch-record.js` 识别 `run_superseded` → `markItemFailed` 且**不 detach**；扩 `characterize-stop-semantics`；跑相关 characterization 验收 → commit+push
+
 ## 2026-09-20 17:40 · OpenCode — 文档：录制状态流程指南更新到 V4；修正「准备会话」过时语义
 
 - 完成：
