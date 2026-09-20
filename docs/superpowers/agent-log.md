@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-20 18:10 · OpenCode — 开工：C 补 BiB 死亡事件清绑定 + D 登记待办（用户批准）
+
+- 背景：接上一条收工，用户批准 C（后端补 `session.bib_detached`/`session.bib_error` 处理，清残留 `attached:true` 绑定）并把 D 登记为独立待办。
+- 范围（可写集）：`src/executor-ws.js`（C）、`scripts/characterization/`（C 的 pin，新增或并入既有）、`docs/superpowers/todo-list.md`（D 登记）、agent-log 本条目与收工条目
+- 禁入区：`src/services/trajectory/**`（A+B 已闭环不再动）、其它 characterization、`data/kb/**`、前端另仓、SUT
+- 方式：`executor-ws.js` 处理 `session.bib_detached`/`bib_error` → 清 live binding + 清 RSCF 缓存 + 定向广播 `remote:status{attached:false}`；补 pin；跑相关 characterization + eslint → commit+push（用户：改完直接提交）
+
 ## 2026-09-20 18:20 · OpenCode — 收工：录制收尾/落步 run 归属守卫（回链 18:05 开工）
 
 - 完成：代码 `bef61b11`（3 文件 / +47 -3，已推 `59f34c60..bef61b11`）——

@@ -150,6 +150,7 @@
 | **dedup-deletion** | 已闭 | 删死代码 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS/CLAUDE/README/jsdoc/verify-all 去门禁；活录 coalesce 仍在 `state.py`；2026-09-10 Lead 选定待裁落地 |
 | **executor-only-bib** | P3 已闭（含物理删除） | `USE_EXECUTOR` 默认 true；false→503（resolve/attach/session）；冷测 `characterize-executor-only-bib.mjs`；物理删除 `ensureGlobalBrowser`/控制面 CDP attach 已落地（plan `2026-09-11-remove-local-bib-mount`，`1455185c`..`2a9a7e3e`） |
 | **resolve-placeholder-search** | P3 已闭 | resolve inventory/needle 漏收 `.el-form-item` 外 placeholder（如「搜索关键字」）；`228d2b62`→`6c77c363`→`1bbfb9ef`；冷 pin GREEN；**湿测 PASS**（2026-09-11 用户：executor restart 后关键字搜索抓取成功） |
+| **recording-redundant-step** | P2 | **D（#925 登记，2026-09-20）**：①引擎 `select_engine.py:643-668` 对「值已匹配」(`ok-already`) 的 `select_option` 仍落库 → 跨阶段重复下拉步（用户实测「下一步之后又多录一条选择下拉」）；②SUT 服务端错误（`Service Unavailable`）下目标不可达，阶段只有 10min 无活动 idle watchdog，agent 有活动即不超时 → 同阶段空转到 `max_steps` 上界（#925 实测空转 30min+，落 10 步）。修法取舍（已匹配不落库 vs 同字段+同值跨阶段去重）与证据见 agent-log 2026-09-20 18:20 收工「遗留移交」；涉及 `select_engine`/`_form` 众多 pin 与 prompt，建议独立任务单元+双侧金样例复跑 |
 
 ## 更新记录
 
