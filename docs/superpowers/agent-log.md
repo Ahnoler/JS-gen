@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 16:55 · ZCode 合约线 — 收工：stage-dialog KB 配方落地（挂起项 stage-dialog-kb-recipe 关闭，回链 16:45 开工）
+
+- 完成：`data/kb/flows/product_library.json` +18 行（无格式抖动，单文件）：
+  - **新增节点 `prod_stage_assoc_dlg`**（产品个性化要素配置页签·设置阶段）：enter=产品详细信息→页签→【设置阶段】；fields=产品管控阶段（点「请选择」展开）；buttons=确定/确 定/取消；note=**未关联时页签仅【设置阶段】，关联成功后按钮 1→3（+设置管控要素/+阶段删除）；交互=点「请选择」展开 tree-popover→勾选 el-checkbox 回填→footer「确 定」提交 prodPdStgRel/saveBatch；下拉展开遮挡 footer 属正常形态，提交优先 click_save("确 定") 文本直查（不吃遮挡亏）**。
+  - **rules 追加一条**（keyword=设置阶段/管控要素）：**【设置管控要素】入口以「已关联产品阶段」为前置**（wet9-B3 裁决，pdiag 人工 + #917 全自动双证）+ **阶段关联记录不随产品删除级联**（产品删净后删阶段仍报「已存在产品引用了此阶段」，#910 静默/#924 显式，3-4 次实证，残留须业务先解绑）。
+- 验收（跨语言契约）：JS `characterize-flow-card-recall` **26 passed**；Python `characterize-kb-recall` **ok**（自带 python，py-divergence 噪声不变）；`recall-eval` 跑分与基线**逐字段零差异**——Acc@1 0.740 / Recall@5 0.847 / MRR@5 0.784 / nDCG@5 0.798 / 拒答 0.633 / 分层 A1.00·B0.233·C0.867·D0.933（卡面追加对召回零影响，同 1cf267ef 结论）。
+- 台账：`docs/superpowers/todo-list.md` 挂起项 `stage-dialog-kb-recipe` 关闭移除；⑥ 节 wet9 线未闭环清单同步更新（剩残留清理 + B 类报告）。
+- 注：纯 KB 数据+文档轮次，无代码改动
+
 ## 2026-09-20 16:45 · ZCode 合约线 — 开工：stage-dialog KB 配方落地（pdiag 定谳 + wet9 裁决固化为卡面知识）
 
 - 进行中：把 wet9 系列踩出来的「设置阶段·选择阶段弹窗」交互形态与业务规则固化为 `data/kb/flows/product_library.json` 卡面知识（挂起项 `stage-dialog-kb-recipe` 关闭）。两处改动：①**新增节点** `prod_stage_assoc_dlg`（「产品个性化要素配置」页签 + 选择阶段弹窗：页签按钮三态、弹窗=点「请选择」展开 tree-popover→勾选 el-checkbox 回填→footer「确 定」提交 prodPdStgRel/saveBatch、**下拉展开遮挡 footer 属正常**、提交优先 click_save(确 定) 文本直查）；②**rules 追加一条**（业务规则：**【设置管控要素】入口以「已关联产品阶段」为前置**〔pdiag 人工 + #917 全自动双证〕+ **关联记录不随产品删除级联**〔阶段删除报「已存在产品引用了此阶段」，3-4 次实证〕）。

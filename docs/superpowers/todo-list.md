@@ -88,7 +88,7 @@
 - 菜单线：正式 `systemId=1` 全量 scan 已完成；对公客户管理孪生已合入 json_import（`7`←`1478`）；产品五叶 OK；**activity umlEcd adopt 已落地**（表征 OK；湿测 §4.2 四叶 = 部署迁移 → 再导入 → adopt）；**待办仅剩下周一推送**。
 - **wet9 产品管理湿测线（2026-09-19/20 合约线，主体已闭环）**：#897–#924 共 12 单真机录制（fid 9000000740，acct 2），证据 `tmp/contract-wet9-20260919/`、`tmp/contract-wet9-20260920-pdiag/`。
   - **已闭环**：产品库主链全走通（建树→信息→启用/禁用/克隆/删除，规则=删除仅限未启用）；**B3 解锁裁决落地**=【设置管控要素】入口以「已关联产品阶段」为前置（pdiag Playwright 人工辅助 + #917 引擎全自动，双证）；**引擎三缺陷全闭环**（树搜索引擎锁死 `81a17f22`/`d2adf8e3`、fill 去重作用域 `cee623e1`、「选择阶段」弹窗枚举遮挡 `226ef7e3`——#924 三项验收「gaps 归零 / 无双行 / 搜索族重填放行」全 PASS）；**#924 = wet9 系列首条成功轨迹**（recorded / is_successful=1）。
-  - **未闭环**：①残留族业务清理（挂起表 `wet9-residue`）；②「选择阶段」弹窗交互配方待落 `product_library` KB 卡（勾选 checkbox + click_save(确 定) + popover 遮挡属正常）；③B 类五项测试报告待出。报告：`through-report-b3v/b3t/sixth.md`、`pdiag-report.md`。
+  - **未闭环**：①残留族业务清理（挂起表 `wet9-residue`）；②~~「选择阶段」弹窗交互配方待落 KB 卡~~ **已落（2026-09-20 `product_library.json`：节点 `prod_stage_assoc_dlg` + 规则「设置管控要素前置=已关联阶段/关联不随产品删除级联」；双侧金样例 26 passed + py ok + recall-eval 逐字段零差异）**；③B 类五项测试报告待出。报告：`through-report-b3v/b3t/sixth.md`、`pdiag-report.md`。
 
 ### ① 830 任务收尾：自测 + bug 修复
 
@@ -151,7 +151,6 @@
 | **executor-only-bib** | P3 已闭（含物理删除） | `USE_EXECUTOR` 默认 true；false→503（resolve/attach/session）；冷测 `characterize-executor-only-bib.mjs`；物理删除 `ensureGlobalBrowser`/控制面 CDP attach 已落地（plan `2026-09-11-remove-local-bib-mount`，`1455185c`..`2a9a7e3e`） |
 | **resolve-placeholder-search** | P3 已闭 | resolve inventory/needle 漏收 `.el-form-item` 外 placeholder（如「搜索关键字」）；`228d2b62`→`6c77c363`→`1bbfb9ef`；冷 pin GREEN；**湿测 PASS**（2026-09-11 用户：executor restart 后关键字搜索抓取成功） |
 | **wet9-residue** | P2 | 产品管理 SUT 残留清理（**业务侧**）：`wet9阶段V-20260920`（显式拦截「已存在产品引用了此阶段」）+ `wet9阶段U-20260920`（静默拦截）+ `PD00044268/44269/44270` + `PD00044278`——**悬挂关联引用**（产品已删净而关联记录仍在，3–4 次实证，SUT 关联表不随产品删除级联）；需业务先解绑关联记录再删阶段。`wet9B3V-20260920`/`wet9B3W-20260920`/`wet9阶段W-20260920` 已于 #924 删净 |
-| **stage-dialog-kb-recipe** | P2 | 「选择阶段」弹窗交互配方落 `data/kb/flows/product_library.json`：点「请选择」展开 popover → 勾选节点 checkbox（回填输入框）→ 提交优先 `click_save("确 定")`（文本直查不吃 index 遮挡）→ popover 遮挡 footer 属正常（pdiag 定谳 B=引擎枚举遮挡，采集链在 browser_use）；改卡须复跑双侧金样例 + recall-eval diff |
 
 ## 更新记录
 
