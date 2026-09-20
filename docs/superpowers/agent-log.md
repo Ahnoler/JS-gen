@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-20 17:40 · OpenCode — 文档：录制状态流程指南更新到 V4；修正「准备会话」过时语义
+
+- 完成：
+  - `docs/superpowers/guides/recording-status-flow.md` 全面重写为 **V4**：`recording` 仅表示「正在录制」；非显式 stop 释放一律 `failed(interrupted)`（含执行机离线/重启/无观众/空闲回收）；`prepare` 默认不进入 recording；新增「录制中非破坏性 prepare」（不重登录/不页面绑定导航/不新开会话；`recovered`/`unreachable(503)`/`gone(409+interrupted)` 三分支）；执行机离线标 `markNodeRecordingsInterrupted`；前端画面残留 attached 受限自愈；坑清单、门禁、历史条目同步。并修正行号引用与 `stream/detach` 不改状态等过时描述。
+  - `docs/README.md` 索引描述同步 V4 要点。
+  - `src/dashboard/api-docs/groups/recording.js`：修正 `stream/detach` 被误列为 `failed(interrupted)`；新增录制中 prepare 非破坏性与 503/409 说明。
+  - 前端另仓 `ui-auto-recording-agent-vue`：`detail/index.vue` 的「准备会话」按钮改为**始终默认 `preserveRecordStatus=true`**（此前对 `draft/recording` 传 false，会误把 `draft` 置为 `recording`，与 Plan A「prepare 不进入 recording」相悖）。
+- 验收：`npx eslint`（JS-gen 改动文件）0 errors；`characterize-agent-llm-error`（api-docs 契约）OK；前端 `npx vue-tsc --noEmit` 通过。
+- 影响面：文档 + 前端一处按钮传参修正；后端无行为改动（本次仅文档与前端）。前端需重新构建部署。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 17:19 · OpenCode — 收工：天元弹窗 trusted 补关（录制 prepare 关窗兜底，回链 17:10 开工）
 
 - 完成：录制 prepare 读完天元组件码后，追加 best-effort trusted 真实鼠标关窗，消除「登录后残留『天元相关配置』弹窗 → 录制 agent 全局弹窗守卫暂停」。
