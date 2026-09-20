@@ -93,12 +93,15 @@ def main() -> None:
         "element_guard import untouched (record module zero-change)",
     )
 
-    # 5. guard module itself untouched by this fix: its behavior needles
+    # 5. guard module inventory: 8 defs at wet9-fix time; +3 scoped-identity
+    # additions from the #909 fill-dedup-scope fix (element_scope_key +
+    # duplicate/remember _scoped pair). Any OTHER growth needs a fresh look
+    # at this fix's zero-touch assumption.
     check(
         (ROOT / "scripts" / "controller" / "actions" / "phase" / "element_guard.py").read_text(
             encoding="utf-8"
-        ).count("\ndef ") == 8,
-        "element_guard.py function inventory unchanged (8 defs)",
+        ).count("\ndef ") == 11,
+        "element_guard.py function inventory (8 wet9 + 3 #909 scoped-identity defs)",
     )
 
     # 6. behavioral: duplicate still detected for a normal button

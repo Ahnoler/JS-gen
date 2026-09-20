@@ -161,6 +161,7 @@ run "characterize-xpath-three-sources" node scripts/characterization/characteriz
 run "characterize-manual-radio-fill" "$PY" scripts/characterization/cold/characterize-manual-radio-fill.py
 run "characterize-date-range-recording" "$PY" scripts/characterization/cold/characterize-date-range-recording.py
 run "characterize-ai-phase-element-guard" "$PY" scripts/characterization/cold/characterize-ai-phase-element-guard.py
+run "characterize-element-dedup-scope" "$PY" scripts/characterization/cold/characterize-element-dedup-scope.py
 run "characterize-fill-dispatch" "$PY" scripts/characterization/cold/characterize-fill-dispatch.py
 run "characterize-fill-err-with-scope" "$PY" scripts/characterization/characterize-fill-err-with-scope.py
 run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/characterize-search-then-click-guard.py
