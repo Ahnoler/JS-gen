@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 14:20 · ZCode 合约线 — 开工：#911 B3 第五试（端到端全自动走通 + 引擎四修复集成验收，运行态 ee3a2534）
+
+- 进行中：引擎线重启至 ee3a2534（B-2 数据完整性修复 1a9ec7d9 + 弹窗遮挡枚举修复 226ef7e3 已入 V2.0 @ 081de3c7，health 200/pid 11392 已核，执行机空闲）。本单两条使命：①**端到端全自动走通 B3 全链**（前三连断点已在 #910 排除，弹窗交互形态已由 pdiag 定谳=勾选 checkbox+click_save(确 定)，本单不再需人工辅助，目标一口气走通到关联成功+裁决观察+清理）；②**引擎四修复集成验收**：㈠[traj-recon] 步号 gaps 归零 ㈡无 fill+snapshot 同号双行 ㈢失败轨迹 failedReason 带「（阶段 N,M）」后缀 ㈣「选择阶段」场景 agent 元素表可见 footer 确定钮+probe 收口列出弹窗按钮清单。
+- 任务文本：tmp/contract-wet9-20260919/task-b3-fifth.md（9 阶段；stamp wet9阶段V/wet9B3V/wet9B3产品V-20260920；预埋选择阶段弹窗 KB 配方=勾选 checkbox 提交、click_save(确 定) 优先于 index 点击、popover 遮挡 footer 属正常）
+- 范围（可写集）：`tmp/contract-wet9-20260919/`（b3v 证据子目录+报文+报告）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`、`scripts/controller/**`（引擎代码）、SUT 存量阶段/产品（只动 stamp；已知残留族 PD00044268-70/PD00044278/wet9阶段U-20260920 一律不碰）
+- 方式：主线程 analyze/create → 派发录制操作员（含四验证点专项取证）→ 主线程独立落库验收（四验证点逐项核）→ through-report-b3v → 收工条目 + 引擎回执
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-20 12:10 · ZCode 合约线 — 收工：「选择阶段」弹窗调研（B 定谳成立+真实交互形态+裁决落地，回链 11:35 开工）
 
 - 完成：双子智能体并行调研收敛，报告 `tmp/contract-wet9-20260920-pdiag/pdiag-report.md`。**定谳 B 成立（引擎枚举受限），SUT 无缺陷**：footer「取 消/确 定」自始至终存在可见（选择器在案），#910 agent「无 footer 提交按钮」报告不成立。漏采机理=**采集链在第三方库 browser_use 0.1.48**（buildDomTree.js isTopElement 用 elementFromPoint 命中测试——tree-popover 展开正好覆盖 184px 高的弹窗 footer，「确 定」被判遮挡不分配 index；views.py 文本聚合不查 is_visible=步 47 长串伪影机理）。**agent 侧逃生门实证**：click_save("确 定") 走文本直查（footer 选择器+40 加权）不吃 index 遮挡亏，#910 agent 未试。
