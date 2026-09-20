@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-20 12:50 · ZCode 引擎线 — 收工：弹窗遮挡枚举修复交付（vendored isTopElement 浮层豁免 + probe 按钮权威清单，分支未合并待批，回链 12:19 开工）
+
+- 完成：#910④ B 定谳（引擎枚举受限）修复交付，commit 5661337e，分支 `engine/domtree-occlusion-20260920`（96aa8557 = 5661337e + d4165b79 合入，已 push）。**11 files +292/−9 + vendor 副本**。子智能体队伍：Explore 载体调研 → 双 worker 并行（文件集不相交）→ 主会话审 diff → 独立复验 → 代提交。
+- **层1（主修）枚举遮挡**：调研定谳 buildDomTree.js 唯一载体在 site-packages（不受版本控制，python/ junction+gitignore，直改即污染主检出且随 pip 升级丢失）→ 修复载体=**vendored 补丁副本 + 猴子补丁**：`scripts/vendor/browser_use/buildDomTree.js`（上游 0.1.48 全量副本+补丁，文件头注明同步须知）+ `agent_utils.patch_dom_tree_js()`（wrap DomService.__init__ 覆写 js_code，缺失回退 stock+stderr 告警、幂等），session_runner/main 接线。isTopElement 补丁语义：**祖先链 miss 后命中元素在 .el-popper 浮层内（tooltip 除外）→ 候选仍视为 top**；.el-overlay/el-dialog 模态真遮挡不变；mock 四场景验证（popper→true/tooltip→false/overlay→false/null→false）。
+- **层3（附带）probe 认知缺口**：semantic_snapshot/verify_context 的 overlay 摘要新增 `buttons` 权威清单（容器内全量、不经 40 截断、含 disabled）；record_probe_done_log 收口文本追加「| overlay buttons: [...]」（截 20 字/最多 8 个，probe 收口后缀保持居尾）。层2（buttons≤40 截断）经合约线实测排除为本次根因，原样未动（pin 钉证）。
+- 过程要点：①全量 verify-all 首跑出新红 eslint-core——vendor 副本 73 errors，已将 `scripts/vendor/**` 加入 eslint ignores（第三方 vendored 代码免本仓 lint，与 migrations 同理），复跑回基线；②worker B 纠正调研给的 verify_context 路径（实际在 js_snippets/ 非 phase/）。
+- 验收证据：新 pin `characterize-domtree-occlusion` **14/14**（RED 1/14 → GREEN）已登记 verify-all；probe-donelog pin 扩展 **56 checks**（C 组 23 新增）；controller-annotations/dialog-tasklist-scope/scan-fullpage-p1/p2 回归全过；全量 verify-all 失败集=**3 已知红零新增 209 过**（本分支基点）+ eslint 0 errors；合并态（96aa8557）复跑全绿。
+- 状态：**未合并待批**。生效机制：纯 Python/JS 注入侧，**合并入引擎 worktree 磁盘后新录制子进程即时生效，无需重启**。湿测观察点：「选择阶段」场景 agent 元素表应含 footer 确定钮、probe 收口回执应列弹窗按钮清单。
+- 遗留移交：①vendor 副本与上游 0.1.48 绑定，升级 browser_use 须重放补丁（文件头已注）；②层4 伪影（views.py get_all_text_till_next_clickable_element 不查 is_visible）本次未动，登记后续候选；③KB 配方（选择阶段=勾 checkbox+click_save 确 定+popover 遮挡属正常）为合约线自领；⑥ SUT 关联表级联=业务清单。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 12:19 · ZCode 引擎线 — 开工：弹窗遮挡枚举缺陷（#910④ B 定谳落地，popover 遮挡 footer → isTopElement 误判漏采）
 
 - 进行中：合约线 pdiag 定谳 B 成立（SUT 无缺陷）——「选择阶段」弹窗 footer 确定钮被「请选择」触发的 tree-popover 展开遮挡，browser_use buildDomTree.js `isTopElement` elementFromPoint 命中测试判非顶层不分配 index；步 47 长串伪影=get_all_text_till_next_clickable_element 不查 is_visible。本单元按合约线分层修复面立单：
