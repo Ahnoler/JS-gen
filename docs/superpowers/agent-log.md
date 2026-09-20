@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 16:45 · ZCode 合约线 — 开工：stage-dialog KB 配方落地（pdiag 定谳 + wet9 裁决固化为卡面知识）
+
+- 进行中：把 wet9 系列踩出来的「设置阶段·选择阶段弹窗」交互形态与业务规则固化为 `data/kb/flows/product_library.json` 卡面知识（挂起项 `stage-dialog-kb-recipe` 关闭）。两处改动：①**新增节点** `prod_stage_assoc_dlg`（「产品个性化要素配置」页签 + 选择阶段弹窗：页签按钮三态、弹窗=点「请选择」展开 tree-popover→勾选 el-checkbox 回填→footer「确 定」提交 prodPdStgRel/saveBatch、**下拉展开遮挡 footer 属正常**、提交优先 click_save(确 定) 文本直查）；②**rules 追加一条**（业务规则：**【设置管控要素】入口以「已关联产品阶段」为前置**〔pdiag 人工 + #917 全自动双证〕+ **关联记录不随产品删除级联**〔阶段删除报「已存在产品引用了此阶段」，3-4 次实证〕）。
+- 依据：#917 端到端全自动验收（勾选+提交确定→弹窗关闭→页签按钮 1→3）、pdiag 定谳 B（枚举遮挡在 browser_use buildDomTree isTopElement）、#924 残留实证（悬挂引用拦截）。
+- 范围（可写集）：`data/kb/flows/product_library.json`（仅上述两处）、agent-log 本条目与收工条目、`docs/superpowers/todo-list.md`（挂起项关闭一行）
+- 禁入区：`scripts/controller/**`、`src/**`、其他 KB 卡与金样例 fixture、SUT
+- 方式：改卡 → 双侧金样例 characterization（JS `characterize-flow-card-recall` + Python `characterize-kb-recall`〔自带 python〕）→ `recall-eval` --baseline diff → commit+push
+- 注：纯 KB 数据+文档轮次，无代码改动
+
 ## 2026-09-20 16:25 · ZCode 合约线 — 补记：#924 移交①定谳（step_count 口径差异，非缺陷）+ 对账口径沉淀
 
 - 引擎线定谳：#924 回执小移交①（step_count=47 vs DB 51 行）**非缺陷，系验收比对口径差异**——`trajectory.step_count` 为**业务步口径**（排除 save_form_snapshot 等 meta 行）；本单 51 行 − 4 行 meta = 47 精确吻合，步号 1..51 全连续无滞后（出处 api-docs trajectory.js:189「stepCount 亦只计业务步骤」+ 代码注释）。引擎线已排除 #917 回归关联。
