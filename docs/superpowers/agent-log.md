@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-20 17:05 · ZCode 合约线 — 开工：合约分支并入 uara_V2.0（KB 配方 + wet9 台账，用户已批）
+
+- 进行中：用户批准合并。`fix/phase-contract-20260918` 领先 V2.0 **17 条**（KB 配方 a6260324 + todo-list d12ae6cc + wet9 台账条目 #903–#924 开工/收工/补记等）；V2.0 侧领先 3 条引擎线条目（step_count 定谳 13f755f3、#924 收件 38b67bd2、coach skill 9f7d3afc）+ 同事线 V2.0.1 系列。实质变更=**KB 卡 `product_library.json` +18 行**（节点 `prod_stage_assoc_dlg` + 规则「设置管控要素前置=已关联阶段/关联不随产品删除级联」），其余为文档。
+- 范围（可写集）：临时 worktree（合并操作）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`、`scripts/controller/**`、`src/**`、KB 金样例 fixture
+- 方式：临时 worktree 从 origin/uara_V2.0 切 → merge 合约分支（agent-log 冲突=双方保留 + 严格时间序重排 + **逐条在位校验含尾部**，勿重演 32cc93cb 截断）→ 合并态双侧金样例验收（D:\dev\JS-gen 全 worktree）→ push V2.0 → 同步主检出 → 清理临时 worktree → 收工条目
+- 注：KB 数据+文档合并轮次，合约侧零代码改动
+
 ## 2026-09-20 16:55 · ZCode 合约线 — 收工：stage-dialog KB 配方落地（挂起项 stage-dialog-kb-recipe 关闭，回链 16:45 开工）
 
 - 完成：`data/kb/flows/product_library.json` +18 行（无格式抖动，单文件）：
