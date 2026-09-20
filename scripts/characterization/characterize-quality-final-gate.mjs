@@ -32,14 +32,18 @@ function testRunnerQualityCapture() {
 function testRunnerFinalGate() {
   const runner = readFileSync(
     join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
+  const gate = readFileSync(
+    join(root, 'src/services/trajectory/phase-done-evidence-gate.js'), 'utf8');
   // 终局判定必须消费 phaseOutcomes 显式 false + qualityFails
+  //（Step 1 收敛后判定在 G3 模块 evaluateFinalVerdict/collectFailedPhases，runner 消费其输出）
   assert.ok(
-    runner.includes('outcome?.success === false'),
-    'final gate consumes explicit phase failure outcomes',
+    gate.includes('outcome?.success === false'),
+    'final gate consumes explicit phase failure outcomes (collectFailedPhases in gate module)',
   );
   assert.ok(
-    runner.includes('failedOutcomeKeys.length || qualityFails.length'),
-    'final gate degrades on explicit failure OR quality fail',
+    runner.includes('collectFailedPhases(runtime.phaseOutcomes, phases)')
+      && runner.includes('const finalVerdict = evaluateFinalVerdict({ failedPhases: failedOutcomeKeys, qualityFails, trajSuccess })'),
+    'runner final gate degrades via gate module verdict (explicit failure OR quality fail)',
   );
   // 顺序 pin：降级判定必须在无条件 success 写之前（而非只靠 90s 异步兜底）
   const degradeIdx = runner.indexOf('finalized as failure: failedPhases=');

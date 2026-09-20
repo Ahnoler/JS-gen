@@ -16,7 +16,7 @@ from browser_use.browser.context import BrowserContextConfig
 
 from .agent_utils import (
     emit_json,
-    patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, create_llm,
+    patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, patch_dom_tree_js, create_llm,
 )
 from .controller import build_controller
 from .controller.actions.network_capture import attach_network_capture
@@ -311,6 +311,7 @@ async def run_session(args):
     patch_message_manager()
     patch_planner_prompt()
     patch_icon_tooltip_labels()
+    patch_dom_tree_js()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None), timeout=_env_llm_timeout_sec())
 
     session_id = args.session_id or "unknown"
@@ -547,6 +548,35 @@ async def run_session(args):
                 # No accepted done() → unknown (not success). Control plane must not
                 # coerce missing success to true.
                 phase_done_data['success'] = None
+                # A4（2026-09-18 wet5 traj #861/#863/#866-868）：probe 收口（done
+                # 未被接受，步数耗尽）此前不产 text → 控制面 recordPhaseResult
+                # 跳过 appendPhaseDoneLog → doneLogs 空白，真实页面状态只留在
+                # executor 日志。经 record_probe_done_log 向与正常 done 相同的
+                # _phase_outcomes 通路补写合成条目（success=None 维持 unknown、
+                # source='probe'、已有 accepted outcome 不覆盖），text 随
+                # phase_done 事件落 doneLogs。canceled 阶段不打探针收口文本。
+                if outcome is None and not step_canceled:
+                    try:
+                        from .agent import service as _agent_service
+                        from .agent.recorder_emitters import (
+                            probe_force_close_context,
+                            record_probe_done_log,
+                        )
+                        # spec：probe 点能取到 agent 最后一次 done 声明文本则附加
+                        # 其尾 120 字——agent 局部变量不出 _run_agent_step，经
+                        # service._last_agent 模块全局取当前（刚跑完的）agent。
+                        _pc_reason, _pc_last = probe_force_close_context(
+                            business_data_store,
+                            agent=getattr(_agent_service, '_last_agent', None),
+                        )
+                        _pc_entry = record_probe_done_log(
+                            business_data_store, phase_num,
+                            reason=_pc_reason, last_done_text=_pc_last,
+                        )
+                        if _pc_entry and _pc_entry.get('text'):
+                            phase_done_data['text'] = _pc_entry['text']
+                    except Exception:
+                        pass
         except Exception:
             pass
         try:

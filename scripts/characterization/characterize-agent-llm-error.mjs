@@ -128,8 +128,12 @@ function testPersistenceWiring() {
   );
   assert(/import \{ failReasonText \}/.test(runner), 'runner imports failure taxonomy');
   assert(/persistFailReason\('zero_step'\)/.test(runner), 'runner records zero_step');
-  assert(/persistFailReason\(qualityFails\.length \? 'quality_failed' : 'phase_failed'\)/.test(runner),
-    'runner records quality_failed / phase_failed');
+  // Step 1 收敛后：quality_failed/phase_failed 取值在 gate 模块 evaluateFinalVerdict
+  //（qualityFails 非空 → 'quality_failed'，否则 'phase_failed'），runner 消费其输出。
+  assert(/const finalVerdict = evaluateFinalVerdict\(\{ failedPhases: failedOutcomeKeys, qualityFails, trajSuccess \}\)/.test(runner),
+    'runner consumes gate module final verdict');
+  assert(/persistFailReason\(finalVerdict\.failKind,/.test(runner),
+    'runner records quality_failed / phase_failed (via evaluateFinalVerdict.failKind, with phase hint)');
   assert(/persistFailReason\('runner_error'\)/.test(runner), 'runner records runner_error');
 
   const lifecycle = readFileSync(

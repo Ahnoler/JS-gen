@@ -243,6 +243,22 @@ def main() -> int:
     if "_structural_first_row_radio_xpath" not in engine_src:
         print("FAIL: index→table radio STC path missing structural first-row xpath helper")
         return 1
+    # Index-click on a table radio must hard-block before the DOM click, same as
+    # click_table_row_radio. Record-override alone still persists a business key
+    # when the agent clicks the row before 查询 (traj 905/907).
+    guard_marker = "Table-radio index clicks share the dedicated action's STC hard guard"
+    guard_at = engine_src.find(guard_marker)
+    click_at = engine_src.find("await self.browser_context._click_element_node")
+    if guard_at < 0 or click_at < 0 or guard_at > click_at:
+        print("FAIL: table-radio index STC guard must run before _click_element_node")
+        return 1
+    guard_window = engine_src[guard_at:click_at]
+    if "guard_locate_or_err" not in guard_window:
+        print("FAIL: table-radio index path must call guard_locate_or_err before click")
+        return 1
+    if "table_radio_info.get('isRadio')" not in guard_window:
+        print("FAIL: table-radio index STC guard must key off pre-click isRadio")
+        return 1
     if (
         "'option_text': 'first'" not in engine_src
         and '"option_text": "first"' not in engine_src

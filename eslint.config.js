@@ -24,6 +24,7 @@ export default [
       'scripts/_scratch/**',
       'scripts/characterization/**',
       'scripts/smoke/**',
+      'scripts/vendor/**',
       'migrations/**',
     ],
   },

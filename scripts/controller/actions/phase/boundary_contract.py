@@ -273,7 +273,11 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
             '_from_boundary': True,
         }
     if role == 'query':
-        q_kinds = list(boundary.get('success_when') or ['query_clicked'])
+        # 276 兜底收敛（2026-09-18）：空合同显式传播为空 kinds，不再凭空抬升为
+        # query 合同（2026-09-17 评级重置 done 死循环的隐患点之一）；空合同默认值
+        # 职责由 apply_phase_contract 的既有逻辑承担。compile_boundary 对 query
+        # 永不产空合同（G3），此分支只影响手工构造/未来调用方。
+        q_kinds = list(boundary.get('success_when') or [])
         return {
             'mode': 'query',
             'refill': 'none',
@@ -296,7 +300,8 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
         }
     if role == 'navigate':
         nav_goals = boundary.get('goals') or []
-        nav_kinds = list(boundary.get('success_when') or ['url_change', 'page_opened'])
+        # 276 兜底收敛（2026-09-18）：同 query —— 空合同不再抬升默认令牌。
+        nav_kinds = list(boundary.get('success_when') or [])
         return {
             'mode': 'navigate',
             'refill': 'none',

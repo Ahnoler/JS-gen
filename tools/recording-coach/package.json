@@ -1,0 +1,24 @@
+{
+  "name": "recording-coach",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bypass OpenCode orchestrator for JS-gen UI-record wet tests (not part of product control-plane deps)",
+  "bin": {
+    "recording-coach": "./src/index.mjs"
+  },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "cli": "node src/index.mjs --cli-only",
+    "assert-selftest": "node ../../scripts/characterization/cold/characterize-recording-coach-assert.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^0.15.0"
+  },
+  "optionalDependencies": {
+    "@opencode-ai/plugin": "^0.15.0"
+  }
+}
