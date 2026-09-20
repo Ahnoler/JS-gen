@@ -48,7 +48,8 @@ description: >-
 | 11 | `assert_steps` |
 | 12 | `write_through_report` |
 
-不可跳过 `analyze_trajectory` → `accept_phases` 再 create。管线坑位（phaseIds、CDP、槽位、doneLogs 截断等）详见 `references/pipeline-pits.md`。
+不可跳过 `analyze_trajectory` → `accept_phases` 再 create。  
+`accept_phases` **之前**须按 `references/phase-granularity.md` 做阶段粒度速查（过碎必合 / 过粗必拆 / 描述可执行；**禁止**把已修复的引擎规避升格为粒度铁律）。管线坑位（phaseIds、CDP、槽位、doneLogs 截断等）详见 `references/pipeline-pits.md`。
 
 ## 派发前核查
 

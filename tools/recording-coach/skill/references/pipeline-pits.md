@@ -40,4 +40,5 @@
 
 严格：`save_dispatch_brief` → `mark_inputs_ready` → `preflight_readonly` → `analyze_trajectory` → `accept_phases` → `create_trajectory` `{}` → `prepare_record` → `cdp_precheck` → `start_record` → `detach_trajectory` → `assert_steps` → `write_through_report`。
 
-不可跳过 `analyze_trajectory` → `accept_phases` 再 create。
+不可跳过 `analyze_trajectory` → `accept_phases` 再 create。  
+`accept_phases` 前阶段粒度速查见 `phase-granularity.md`（勿把 engine-workaround 升格为铁律）。

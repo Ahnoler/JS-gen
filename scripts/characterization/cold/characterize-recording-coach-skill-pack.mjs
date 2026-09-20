@@ -28,6 +28,7 @@ for (const rel of [
   'SKILL.md',
   'references/pipeline-pits.md',
   'references/acceptance.md',
+  'references/phase-granularity.md',
   'references/stc-anchors.md',
   'templates/dispatch-brief.md',
   'templates/task-text.md',
@@ -60,6 +61,17 @@ for (const prefix of ['结论：', '报告：', '证据1：', '证据2：', '证
 const acceptance = fs.readFileSync(path.join(skill, 'references/acceptance.md'), 'utf8');
 assert.match(acceptance, /索引点击可能归一为/);
 assert.match(acceptance, /click_table_row_radio/);
+
+const phaseGranularity = fs.readFileSync(
+  path.join(skill, 'references/phase-granularity.md'),
+  'utf8',
+);
+assert.match(phaseGranularity, /一个可验证的状态变更/);
+assert.match(phaseGranularity, /确认弹窗并入触发它的动作/);
+assert.match(phaseGranularity, /展开\/更多 = 状态边界/);
+assert.match(phaseGranularity, /禁止沉淀为铁律/);
+assert.match(phaseGranularity, /skillWorthy=no-workaround/);
+assert.match(skillMd, /phase-granularity\.md/);
 
 assert.equal(
   assertBusinessTaskText('【硬性成功门闩——未满足不得 done】\n' + 'y'.repeat(80)),

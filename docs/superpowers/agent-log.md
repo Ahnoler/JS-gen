@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-20 16:51 · Cursor — 收工：analyze 阶段粒度标准写入 recording-coach skill（回链研究 brief + ZCode 案例卡）
+
+- 完成：据 `docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md` §0 抽出必合/必拆/正例/描述质量规则，写入 `tools/recording-coach/skill/references/phase-granularity.md`；`SKILL.md` / `pipeline-pits.md` 在 `accept_phases` 前挂速查；**卡 6/7（skillWorthy=no-workaround）专节禁止升格为铁律**；一并入库研究 brief + 案例卡；skill-pack pin 增断言。
+- 验收：`node scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs` → OK（合并后复跑）。
+- 遗留移交：可选 Tier A 加粒度题；湿测下单真用速查后再补案例。未改引擎 analyze prompt / `accept_phases` 机械门。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 16:20 · ZCode 引擎线 — 收工：#924 移交① 定谳「非缺陷」——step_count=47 是业务步口径，零代码改动（回链 16:12 开工）
 
 - **定谳：口径比对错误，非缺陷、非滞后、与 #917 无关**。主会话独立亲验 `wet9sixth/mysql-verify-sixth-steps.txt`（TSV 51 行）：**`save_form_snapshot` meta 行恰 4 条（步号 1/11/15/31），51 − 4 = 47 = `step_count`，精确吻合**；步号 1..51 全连续；步 48-51 均为 P6 业务行（click/fill，created_at 16:02:24–16:02:45，早于 P6 收官 16:02:54）。
