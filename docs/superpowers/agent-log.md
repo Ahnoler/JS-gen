@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 09:10 · ZCode 引擎线 — #909 回执定谳：产品弹窗「序号」fill 未落步 = 引擎缺陷（fill 去重跨容器 label 碰撞，非 agent 门闩违反）
+
+- **定谳（回执移交项①）**：合约线两解释中「fill 被去重拒绝」成立，判**引擎缺陷**。证据链三环：
+  1. **代码**：`_form.py:75` fill gate identity = `_element_key(label_text)`（`element_guard.py:8-10`，去空白+小写）——**仅 label，无 section/dialog 作用域**；步 13 分类弹窗 fill(序号,99) 成功 → `_phase_ai_operated_elements['序号']` 记 phase 级；产品弹窗同 label fill 被 `already-operated-this-phase` 短路返回（且返回文案是 **ok** 非 err——agent 收到"已操作过"的自相矛盾提示）。
+  2. **步序**：P4 fill 步 = 11(分类名称)/13(序号99 分类弹窗)/20(产品名称)/22(产品描述)/30(分类描述)——步 20/22 成功证明产品弹窗 fill 通道未整体堵死，**唯独 label「序号」撞记录**；步 23/24（click input[6]/real_click）即 agent 发现 fill 无效后退而直接点输入框的行为注脚（#903/#904 real_click 三连同根因第三次表现）。
+  3. **铁证**：步 21 `save_form_snapshot` container=`dialog:新增产品|产品`，5 字段含「序号」required=true——agent 明确看到该字段且任务文本点名 fill，却无 fill 步。
+- **处置登记**：①缺陷单「fill/select 去重 identity 加容器作用域隔离」（`_element_key` → label+container，scan 已产 `dialog:新增产品|产品` 现成可挂；同门 select_option/click_adjacent_button 撞同款）——**下一单候选，待用户点名后修**；②nav-reclick 集成验收行为学 PASS 收录台账（fd30f4a7 单变量窗口成立，pid 34532 全程 16 拍未变；预算耗尽场景仍未生产触发，[nav-reclick] 事件流入流建议采纳进下一批）；③「phase_blocked 独立 reason」登记进 **Step 2 伴随项**（Python 侧 reason 构造本就在 Step 2 范围，Step 1 改动已冻结不追加）；④B-2 gaps 新读数（38-42/46 缺号+步 45 双行）与 failedReason 无阶段号维持登记。
+- 引擎线现状不变：Step 0 已并入（1ce43191）；**Step 1 待批**（2ba8d549，批后建议重启窗口）。
+- 注：不维护 CHANGELOG；本条目纯定谳+登记，无代码改动
+
 ## 2026-09-19 23:27 · ZCode 引擎线 — 收工：Step 1 三代零步门禁收敛交付（行为等价，分支未合并待批，回链 23:16 开工）
 
 - 完成：调研地图 **Step 1** 交付——三代零步门禁判定逻辑收敛进 `phase-done-evidence-gate.js` 单模块，runner 只留 IO 复核 + CAS 写库 + broadcast。commit 2ba8d549，分支 `engine/stop-gate-step1-20260919`（feb9a658 = 2ba8d549 + e8666be5 合入，已 push）。**7 files changed +323/−74**。
