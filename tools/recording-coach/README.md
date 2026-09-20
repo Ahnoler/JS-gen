@@ -90,6 +90,22 @@ node src/index.mjs --resume tmp/recording-coach-<ts> --tool get_trajectory --arg
 
 首次 `createOpencode` 成功后，会话文件落在 OpenCode 默认 location（常见为本机 OpenCode data / 传入的 working directory）。以运行日志与 `workflow.json` 的 `opencodeSessionId` 为准；本 README 不硬编码厂商路径。
 
+## Skill 评测（OpenCode + LLM）
+
+改 `skill/SKILL.md` 或 references/templates 后，先跑 cold pin（见 WET-CHECKLIST「改文后必跑」），再手跑：
+
+```bash
+node tools/recording-coach/scripts/eval-tier-a.mjs   # tier-a.v1.1 → 8/8
+```
+
+可选工具轨迹钩子（需控制面 4097；不可达则 SKIP）：
+
+```bash
+node tools/recording-coach/scripts/eval-tier-b.mjs
+```
+
+详见 [eval/README.md](./eval/README.md)（`OPENCODE_BIN`、Windows PATH、与 cold pin 分工、FAILURE-SAMPLES）。
+
 ## 验收 pin
 
 ```bash
