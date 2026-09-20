@@ -132,10 +132,13 @@ record('4c 非用户 stop 才写失败终态（runner_error + 整轨 failed）',
 record('4d finally 幂等补发 cancel_step（防执行机 agent 僵尸）',
   B_FINALLY.includes('runtime._sentStepThisRun')
   && B_FINALLY.includes("event: 'cancel_step'"));
-record('4e 归属守卫：stale 循环不写库不砍新 run（catch + finally 双点）',
-  count(RUNNER, 'runStillOwnsRuntime()') === 2
+record('4e 归属守卫：stale 循环不写库不砍新 run（catch + finally + 收尾 + 落步四点）',
+  count(RUNNER, 'runStillOwnsRuntime()') === 4
   && B_CATCH.includes('stale recording loop exit suppressed')
-  && B_FINALLY.includes('stale recording loop cleanup suppressed'));
+  && B_FINALLY.includes('stale recording loop cleanup suppressed')
+  && RUNNER.includes('stale recording finalize suppressed')
+  && RUNNER.includes("supersededErr.code = 'run_superseded'")
+  && RUNNER.includes('stale run step persist skipped'));
 
 // ── 5. 承重钉：stop 路径不 arm 90s 门闩（#904 P5 假成功结构性根因） ────────────
 const gateCreate = idx(RUNNER, 'const finalizeGate = setTimeout(async () => {', '90s 门闩创建');
