@@ -1,5 +1,17 @@
 # Agent 协作日志
 
+## 2026-09-20 13:05 · OpenCode — 修复：恢复 recording 状态自动 prepare，解决 batch 静默录制进入页面无推流
+
+- 问题：batch 静默录制的交易 `record_status='recording'` 且有存活 session/BiB，但用户进入录制页后前端没有推流画面。
+- 根因：上一批方案 A 实现中把 `recording` 从 `autoPrepareStatuses` 移除，导致 recording 状态不再自动调用 `/record/prepare` 连接已有会话。
+- 修复：
+  - 前端另仓 `ui-auto-recording-agent-vue`：`autoPrepareStatuses` 恢复为 `['draft', 'recording']`，并补充注释说明 `recording` 时自动 prepare 是为了连上后端已有录制会话看画面。
+  - JS-gen：`docs/superpowers/guides/recording-status-flow.md` 与 `src/dashboard/api-docs/groups/recording.js` 同步更新自动 prepare 状态说明。
+- 为何不会复现旧 bug：方案 A 后 `prepare` 默认 `preserveRecordStatus=true`，不会进入 recording；且录制中 idempotent prepare 不会重置 running 阶段。因此 recording 状态自动 prepare 只连接资源，不会把「仅连上」的状态误判为「正在录制」。
+- 验收：`npx vue-tsc --noEmit` 通过；`npx eslint src/ executor/ scripts/` 0 errors；`characterize-record-status` / `characterize-trajectory` OK。
+- 提交：JS-gen `bf239f03`；前端另仓 `dev 41797a0`。
+- 遗留：`git push origin uara_V2.0.1` 仍因 `github.com:443` 网络失败，待恢复后补推；前端 `dev` 已推送成功。
+
 ## 2026-09-20 12:50 · ZCode 引擎线 — 收工：弹窗遮挡枚举修复交付（vendored isTopElement 浮层豁免 + probe 按钮权威清单，分支未合并待批，回链 12:19 开工）
 
 - 完成：#910④ B 定谳（引擎枚举受限）修复交付，commit 5661337e，分支 `engine/domtree-occlusion-20260920`（96aa8557 = 5661337e + d4165b79 合入，已 push）。**11 files +292/−9 + vendor 副本**。子智能体队伍：Explore 载体调研 → 双 worker 并行（文件集不相交）→ 主会话审 diff → 独立复验 → 代提交。
