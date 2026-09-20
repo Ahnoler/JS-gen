@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-20 15:00 · Cursor — 开工：recording-coach skill OpenCode 评测门禁（Tier A+B）
+
+- 范围（可写集）：	ools/recording-coach/src/opencode-path.mjs、opencode-session.mjs、scripts/eval-tier-a.mjs、val-tier-b.mjs、scripts/opencode-skill-smoke.mjs、val/**、	ools/recording-coach/README.md、WET-CHECKLIST.md、本条 agent-log、评测 plan/spec（已落盘）
+- 禁入区：ZCode 引擎线（src/services/trajectory/**、scripts/controller/actions/**、运行态重启）；产品 API；Python 录制引擎；不改 erify-all.sh 默认集
+- 方式：Subagent-Driven（计划 Tasks 1–3）；commit 默认跳过直至用户要求
+- 前置：冒烟已证 A1=save_dispatch_brief；控制面 4097 在线
 ## 2026-09-20 14:50 · Cursor — 收工：skill-pack 冷 pin 扩 dry-run（回链 14:45 开工）
 
 - 完成：扩 characterize-recording-coach-skill-pack.mjs（SKILL/模板针、assert 正负例含 POST /api/v2、init→scaffold→preflight none dry-run、rating-credit 缺 custom 退出 2）；operator pin 补 POST /api/v2 负例
