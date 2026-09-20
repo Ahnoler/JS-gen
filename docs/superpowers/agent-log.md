@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-20 16:20 · ZCode 引擎线 — 收工：#924 移交① 定谳「非缺陷」——step_count=47 是业务步口径，零代码改动（回链 16:12 开工）
+
+- **定谳：口径比对错误，非缺陷、非滞后、与 #917 无关**。主会话独立亲验 `wet9sixth/mysql-verify-sixth-steps.txt`（TSV 51 行）：**`save_form_snapshot` meta 行恰 4 条（步号 1/11/15/31），51 − 4 = 47 = `step_count`，精确吻合**；步号 1..51 全连续；步 48-51 均为 P6 业务行（click/fill，created_at 16:02:24–16:02:45，早于 P6 收官 16:02:54）。
+- **口径出处（早已明示）**：①`src/services/trajectory/trajectory-step-service.js:28-46` 注释「Product stepCount = business steps only: exclude meta steps（save_form_snapshot 等）AND engineering actions」；②api-docs `trajectory.js:189`「stepCount 亦只计业务步骤；meta 仍入库供 Type B 回放」。即合约线拿**原始行数(51)**比**业务步数(47)**。
+- **时间线反证"滞后"不成立**：poll-9（16:03，早于 90s 门闩约 16:04:2x）stepCount 已为 47 —— P6 阶段收官刷新（约 16:02:54）就已看到全部 51 行；步 48-51 在 `recordPhaseResult` 的 `await _persistDrain` 覆盖内，恰证明 #917 串行化工作正常。
+- **回归判定**：`git show 6746c6c3` 比对——改动前 body 急切/链只等待 vs 改动后惰性/真串行，「await 链头 → 刷新」的覆盖语义**相同**；滞后窗口（捕获链头后才入链的事件）为**既有**且被 90s 门闩/detach flush/手工编辑多点收敛。**#917 未引入亦未扩大**。
+- **对账建议（供各线验收采用）**：step_count 勿与原始行数比对——用 `[traj-recon] phase/finalize` 日志的 `bizRows/biz=` 值对账，或按 `step_count = 原始行数 − meta 行数(save_form_snapshot 等)` 推算。
+- 收尾：本单元分支 `engine/stepcount-lag-20260920` **零提交**，已删（不产生交付物）；无代码/文档改动（口径已在代码注释与 api-docs 中明示，无需补记）。
+- 遗留：SUT 悬挂关联引用第 3-4 次实证（wet9阶段V/U）维持业务清理清单，非引擎面。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 16:12 · ZCode 引擎线 — #924 收件（三项全 PASS，cee623e1 收口）+ 开工：step_count 维护滞后移交
 
 - **#924 回执登记（运行基点 4098e49c）**：**三项全 PASS，cee623e1 收口完成**——①gaps 归零（DB 51 行 1..51 连续，对比 #917 缺 [55,62]）；②无双行（`GROUP BY step_number HAVING c>1` = 0 行）；③搜索族重填放行（搜索关键字 fill 12 条全落库，含 P4 同阶段三连重填 W→U→T 原样复现全放行；步级 already-operated/nav-reclick/卡死处方 0 命中；phase done_logs 1 次命中系叙述性否定句）。**本单为 wet9 系列首条成功轨迹**（recorded/is_successful=1/failed_kind NULL，#897-#917 全 failed），清理单判据全满足、无 probe 收口、无 quality gate 触发。V2.0.1 同事线变更本单全程无异常（pid 20652 恒定、health 恒 200、无 interrupted 标记）——其对录制链路无副作用（其线观察点亦得证）。
