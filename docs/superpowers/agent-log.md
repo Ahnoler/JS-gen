@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-20 09:53 · ZCode 引擎线 — 运行态变更：服务已重启至 d6b713da（Step 1 生效，用户委托引擎线单独启动，未用 restart 脚本）
+
+- 完成：用户手动关闭控制面+本地执行机后，委托引擎线单独启动（明确不用 restart-local.cmd）。启动方式：PowerShell `Start-Process` 独立进程（脱离 agent shell 进程树，会话回收不受影响；未跑 restart-local.cmd，未动 kill-node-match/CDP 清理步骤——启动前预检 4097/19242 双端口零监听，环境干净）。
+- 核验：①health **200**（4097 LISTENING pid **24144**，从引擎 worktree **d6b713da** 启动=**Step 1 门禁收敛进入运行态**）；②EADDRINUSE 0 次；③本地执行机注册 online（nodeId 11，uuid 413bbddf…不变，B-3 registry 附着正常）。
+- **注意**：第二实例代理（start-executor-proxy.cmd，注册到远端 47.101.58.49 控制面）**本次未启动**（用户只点名控制面+执行机）——如远端控制面需要本机代理执行机，请用户或合约线告知补起。
+- 请合约线知悉：运行基线 fd30f4a7 → **d6b713da**（Step 1 零步门禁收敛在运行态，行为等价重构、六 pin 全绿）；后续湿测如涉零步门禁路径（降级/90s 门闩/终局收官）即 Step 1 集成观察点。
+- 注：不维护 CHANGELOG；无代码改动
+
 ## 2026-09-20 09:45 · ZCode 引擎线 — Step 1 合并回执 + 新开工：fill 去重作用域缺陷单（#909 定谳落地，用户批"按推荐来，先完成合并"）
 
 - **Step 1 合并完成**：`engine/stop-gate-step1-20260919` (feb9a658) `--no-ff` 并入 uara_V2.0 = **d6b713da**，已 push。合并前主检出核验：他线 WIP 仅 CHANGELOG.md（用户对外文档重写）+ 22 个 untracked 备份，与合并文件集（gate/runner/pin/verify-all.sh）不相交，未触碰。合并态验收：六 pin 全绿（gate 22 收敛断言 / g3-seam 9/9 / record-phase-finalize / quality 4/4 / stop-semantics 27/27 / agent-llm-error）+ **全量 verify-all 失败集=3 已知红零新增 208 过**。引擎 worktree 已快进至 d6b713da，交付分支 engine/stop-gate-step1-20260919 已删（内容在 V2.0）。
