@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 15:16 · ZCode 引擎线 — 收工：#917 两项未通过收口交付（步号串行化根修 + 搜索族 fill 豁免，分支未合并待批，回链 14:41 开工）
+
+- 完成：#917 ①步号 gaps/双行、②fill 去重第三例 —— 两项修复交付，commit 6746c6c3，分支 `engine/stepnum-dedup-r2-20260920`（01f0d236 = 6746c6c3 + 他线最新合入，已 push）。**5 files +165/−14**。子智能体队伍：Explore×2 并行调研 → 主会话定设计 → 双 worker 分域实现（文件集不相交）→ 主会话审 diff → 独立复验 → 代提交。
+- **①步号（根因与 B-2 不同，调研已证）**：persist 事件 async 体被**急切启动**（`const work = (async()=>{})()` 同步段立即执行到首个 await），`_persistDrain` 链只等待不串行 → 派生快照与主 fill 两条事件 1-7ms 内并发进入、**双双读到同一 `_nextStepNumber`=54**，各写 54 后各推进一次 → 55 永不发出（证据 id 25130/25131 均 sn=54，created_at 差 1ms；missing {55,62} 与推演逐位吻合）。**根修=persist 类事件 body 惰性化（runWork 工厂）并真正串入 `_persistDrain` 链**（步号读-改-写原子；非 persist 类保持急切；`_persistDrain` 消费语义不变）。**纵深防御=快照路径事务内占用回退**（`resolveFreeStepNumber`，占用则 MAX+1，防跨写者竞态；通用步路径不加查询以免每步多 RTT）。
+- **②fill 去重第三例**：门在 `_form.py` phase gate、引擎"同值跳过/不等值放行"守卫在其后——门一短路，引擎逻辑没机会执行；且 KB 错位态配方（product_library.json「重载后须重新填写关键字」）要的是**同值重填**，故值签名方案不够。**修复=`fill_form_field` 的 phase gate 前置搜索族 label 豁免**（复用现成 `is_search_field_label`，fill_engine 已有同判先例）；正确性由引擎同值守卫兜底、步数由 `_record_action` coalesce 收敛；其余四 gate 无生产证据不动（select/radio 需值维度另议，登记候选）。
+- 验收证据：step-number-integrity **19→27 断言**（RED 20/27 → GREEN 27/27）；element-dedup-scope 追加搜索族三断言（RED→GREEN）；家族回归全绿（idempotent-click-gate def 数 11 / ai-phase-element-guard / fill-already-filled / search-then-click-guard / fill-dispatch / traj-recon-logging / form-snapshot-trigger / record-phase-finalize / stop-semantics 27/27）；**全量 verify-all 合并态 213 过、失败集=3 已知红零新增**（含他线新增 pin）。
+- 状态：**未合并待批**。生效机制：Node 侧（串行化+占用回退）**需重启**；Python 侧（搜索族豁免）**新录制会话即刻生效**。
+- 遗留移交：①`#917④b` probe 收口弹窗清单无场景可验（本单未触发收口）——合约线建议改**阶段收口常态输出**弹窗按钮清单，登记候选（非本单元范围）；②select/radio/tree 的查询类字段去重豁免（值维度）无生产证据，登记候选；③跨写者竞态残余（P2/P3 manual/attach 路径）已由快照占用回退覆盖，通用步路径依赖串行化（AI 录制期 P2 被静音，实际风险低），登记备查。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 15:00 · Cursor — 开工：recording-coach skill OpenCode 评测门禁（Tier A+B）
 
 - 范围（可写集）：	ools/recording-coach/src/opencode-path.mjs、opencode-session.mjs、scripts/eval-tier-a.mjs、val-tier-b.mjs、scripts/opencode-skill-smoke.mjs、val/**、	ools/recording-coach/README.md、WET-CHECKLIST.md、本条 agent-log、评测 plan/spec（已落盘）
