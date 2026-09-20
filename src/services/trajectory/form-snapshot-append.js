@@ -144,6 +144,29 @@ export async function appendRecordedStep(trajectoryDbId, entry, {
 }
 
 /**
+ * 快照步号占用回退（#917 纵深防御）：调用方给了步号但该号已被同 trajectory 的
+ * trajectory_step 行占用时，回退 MAX(step_number)+1。占用检测放在调用方的插入事务内
+ * 执行，避免 check-then-insert 的 TOCTOU 窗口；快照插入频率低，额外一次索引查询可接受。
+ * 通用路径 appendRecordedStep 不做占用查询（每步多一次 RTT，不划算）。
+ * @param {object} trx 插入事务句柄（knex transaction）
+ * @param {number} tid trajectory DB id
+ * @param {number} desired 调用方期望步号（调用方已校验为正数）
+ * @returns {Promise<number>} 未被占用的步号（desired 或 MAX(step_number)+1）
+ */
+async function resolveFreeStepNumber(trx, tid, desired) {
+  const occupied = await trx('trajectory_step')
+    .where({ trajectory_id: tid, step_number: desired })
+    .select('id')
+    .limit(1)
+    .first();
+  if (!occupied) return desired;
+  const maxRows = await trx('trajectory_step')
+    .where('trajectory_id', tid)
+    .max({ maxStep: 'step_number' });
+  return Number(maxRows?.[0]?.maxStep || 0) + 1;
+}
+
+/**
  * Atomic checkpoint: trajectory_step (save_form_snapshot) + form_snapshot with trigger_step_id.
  * Fingerprint dedupe: same phase + root container + fields → update existing, no new step.
  * @param {number} trajectoryDbId trajectory DB id
@@ -151,7 +174,7 @@ export async function appendRecordedStep(trajectoryDbId, entry, {
  * @param {object} [root0] options
  * @param {string} [root0.source] step source (manual/agent/cdp)
  * @param {number} [root0.trajectoryPhaseId] explicit phase DB id
- * @param {number} [root0.stepNumber] caller-managed step number (skips max() query; fallback max()+1 when absent/invalid)
+ * @param {number} [root0.stepNumber] caller-managed step number (skips max() query; fallback max()+1 when absent/invalid; occupied → max()+1 in-transaction, #917)
  * @returns {{ stepNumber: number, actionId: string|null, trajectoryPhaseId: number|null, dbId?: number|null }|null} append result, or null if invalid
  */
 export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source, trajectoryPhaseId, stepNumber } = {}) {
@@ -222,7 +245,7 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
 
   // 调用方内存步号优先（fill+snapshot 同号双行治理）；无有效值时保持 max()+1 兜底
   const callerStepNumber = Number(stepNumber);
-  const stepNumberOut = Number.isFinite(callerStepNumber) && callerStepNumber > 0
+  const desiredStepNumber = Number.isFinite(callerStepNumber) && callerStepNumber > 0
     ? callerStepNumber
     : (await trajectoryDao.getMaxStepNumber(tid)) + 1;
   const step = stepFromActionLog(
@@ -240,17 +263,20 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
     },
     {
       trajectoryId: tid,
-      stepNumber: stepNumberOut,
+      stepNumber: desiredStepNumber,
       phaseNumber,
       source: resolvedSource,
     },
   );
   step.trajectoryId = tid;
-  step.stepNumber = stepNumberOut;
+  step.stepNumber = desiredStepNumber;
   step.trajectoryPhaseId = resolvedPhaseId;
 
   const db = getDB();
+  // 占用回退在插入事务内定号（#917 纵深防御）：调用方步号已被占用时用 MAX+1
+  let stepNumberOut = desiredStepNumber;
   const result = await db.transaction(async (trx) => {
+    stepNumberOut = await resolveFreeStepNumber(trx, tid, desiredStepNumber);
     const stepRow = {
       trajectory_id: tid,
       step_number: stepNumberOut,
