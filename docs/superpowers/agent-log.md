@@ -1,5 +1,18 @@
 # Agent 协作日志
 
+## 2026-09-20 12:19 · ZCode 引擎线 — 开工：弹窗遮挡枚举缺陷（#910④ B 定谳落地，popover 遮挡 footer → isTopElement 误判漏采）
+
+- 进行中：合约线 pdiag 定谳 B 成立（SUT 无缺陷）——「选择阶段」弹窗 footer 确定钮被「请选择」触发的 tree-popover 展开遮挡，browser_use buildDomTree.js `isTopElement` elementFromPoint 命中测试判非顶层不分配 index；步 47 长串伪影=get_all_text_till_next_clickable_element 不查 is_visible。本单元按合约线分层修复面立单：
+  - **主修（层1）**：枚举遮挡——popover/popper 遮挡下的可交互元素（尤其 dialog footer 按钮）不得被 isTopElement 误杀；修复落点以调研为准（buildDomTree.js 在本仓的载体：vendored 副本 or 引用链，Explore 定谳；**site-packages 直改不可接受**——不入版本库）
+  - **附带（层3）**：probe 收口认知缺口——现只报 overlay 名，补弹窗内按钮权威清单（agent 才知道「确 定」存在可点）
+  - **层2（semantic_snapshot buttons≤40 截断）**：合约线实测已排除为本次根因（counts.truncated 对照），本单元不动，仅调研确认不回归
+- 上游：uara_V2.0（tip 11be900a）。分支 `engine/domtree-occlusion-20260920` @ 11be900a。方式=子智能体队伍（Explore 定位修复载体与 pin 面 → 主会话设计 → worker 实现 → 主会话验收代提交）。
+- 范围（可写集）：buildDomTree/isTopElement 的本仓载体文件（待 Explore 定位）、probe 收口实现、`scripts/controller/actions/**` 相关 scan 链、相关 characterization pin（RED 先行）、`scripts/refactor/verify-all.sh`、主检出 agent-log 本条目+收工条目
+- 禁入区：**运行态服务零触碰（重启须先请示）**；远端代理（用户自管）；site-packages（若 browser_use 为 pip 依赖，本单元不得直改，修复须落本仓可控载体）；Cursor STC 文件集；Step 2 范围（recorder_emitters.py）；合约线 KB 配方落地（其线自领）
+- 验收口径：RED pin 先行（遮挡场景：footer 钮被 popover 覆盖时仍分配 index）；全量 verify-all 3 已知红零新增；分支交付「未合并待批」
+- 台账随记：⑤ wet9 blocked 假设结案+B3 义务闭环（合约线自证，引擎无动作）；⑥ SUT 关联表不随产品删除级联=业务清理清单（非引擎面）
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 11:24 · ZCode 引擎线 — 收工：B-2 数据完整性三缺陷修复交付（缺号/双行/failedReason 阶段号，分支未合并待批，回链 10:47 开工）
 
 - 完成：三缺陷一次修净，commit 95006eb3，分支 `engine/b2-gaps-fix-20260920`（ea3e1222 = 95006eb3 + 6ba4ed77 合入，已 push）。**6 files +128/−16**。子智能体队伍模式执行：Explore×2 并行只读调研（步号持久化链 / failedReason 构造链）→ 主会话定设计 → worker-coder 单点实现（三修复同落 runner/persist 链，避免同文件双写）→ 主会话审 diff（零越界）→ 独立复验 → 代提交。
