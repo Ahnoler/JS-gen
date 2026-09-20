@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 15:50 · ZCode 合约线 — 开工：第六单（wet9 残留清理 + 引擎三项验收，运行基点 4098e49c）
+
+- 进行中：引擎线已完成重启，运行基点 **4098e49c**（本地 merge「对齐 V2.0 最新」，**含 cee623e1 #917 收口**〔已核 merge-base〕+ V2.0.1 同事线全量〔执行机中断标 failed(interrupted)、viewer/attach 等〕；非 origin tip，属引擎线现场态）。health 200 / pid 20652 / 执行机 LMY online 空闲（与引擎线回执 pid 一致）。本单=**残留清理 + 三项集成验收**：①步号 gaps 归零 ②无 fill+snapshot 同号双行 ③搜索族重填放行（#917 P8 拒绝场景正面复现）。任务文本 tmp/contract-wet9-20260919/task-cleanup-sixth.md（6 阶段：P2 同阶段重搜三连、P3 新增分类 fill+snapshot+自清、P4 阶段残留三连、P5 新增阶段+自清、P6 全树核验）。
+- 风险知会：运行基点含 V2.0.1 同事线变更（执行机中断语义、viewer/attach），若观测与预期不符，收工回执**附交易号**供引擎线比对基点定位代码/环境。
+- 范围（可写集）：`tmp/contract-wet9-20260919/`（sixth 证据子目录+报文+报告）、agent-log 本条目与收工条目
+- 禁入区：`D:\dev\JS-gen-engine`、`scripts/controller/**`、`src/**`；SUT 存量节点与 PD000442xx 族（本轮不碰；仅动 stamp 与已知残留 wet9B3V/wet9阶段V/wet9阶段U + 新建自清 wet9B3W/wet9阶段W）
+- 方式：主线程 analyze/create → 派发录制操作员（含三验收专项取证）→ 主线程独立落库验收 → through-report-sixth → 收工条目 + 引擎回执（附交易号）
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-20 14:50 · ZCode 合约线 — 收工：#917 第五试（端到端全自动首次走通+裁决复核，引擎四验收 2 过 1 部分 1 未过，回链 14:20 开工）
 
 - 完成：#917 全管线收口（tmp/contract-wet9-20260919/wet9b3v/ + through-report-b3v.md，主线程独立落库复核；pid 11392 全程 14 采样未变）。
