@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-20 00:20 · ZCode 合约线 — 开工：#910 解锁裁决第四试（拆阶段规避 fill 去重缺陷，Step 1 基线 d6b713da）
+
+- 进行中：运行基线已切 Step 1（d6b713da 行为等价重构，health 200/pid 24144 已核，origin/uara_V2.0=29b4eb0d 含引擎合并回执与 fill 去重缺陷单开工声明）。引擎定谳 #909 产品序号无 fill 步=**引擎 fill 去重作用域缺陷**（同阶段两弹窗同名字段第二个 fill 被吞，修复在途）——本单按引擎提示**拆阶段规避**：分类新建（P4，序号 98）与产品新建（P5，序号 99）独立阶段，去重状态随阶段清零即无碰撞面。traj 待建，任务文本 tmp/contract-wet9-20260919/task-b3-fourth.md（9 阶段：裁决 P7 独立；清理阶段补上分类删除=修复 #909 残留缺陷）。
+- Step 1 集成观察点（引擎委托）：若命中零步门禁相关路径（零步降级/90s 门闩/终局收官签名），收工回执显式记录供 Step 1 立卷。
+- 范围（可写集）：`tmp/contract-wet9-20260919/`（b3t 证据子目录+报文+报告）、agent-log 本条目与收工条目、记忆文件
+- 禁入区：`D:\dev\JS-gen-engine`、`scripts/controller/**`（引擎 fill 去重修复单在途，更不触碰）、SUT 存量阶段/产品（只动 stamp：wet9阶段T/wet9B3T/wet9B3产品T-20260920）
+- 方式：主线程 analyze/create → 派发录制操作员（prepare→CDP 预检→start→poll+pid 监测→detach→落库证据）→ 主线程独立落库验收 → through-report-b3t → 收工条目
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-19 23:59 · ZCode 合约线 — 收工：#905 解锁裁决第三试 #909（nav-reclick 行为学 PASS，三连 NOT-ADJUDICATED，回链 21:05 开工）
 
 - 完成：#909 全管线收口（tmp/contract-wet9-20260919/wet9b3s/ + through-report-b3s.md，主线程独立落库复核）。**单变量窗口成立**：pid 34532 每拍核验未变，nav-reclick 单变量取证有效。
