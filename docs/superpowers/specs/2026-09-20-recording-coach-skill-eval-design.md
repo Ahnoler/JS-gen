@@ -1,7 +1,7 @@
 # Recording Coach Skill OpenCode 评测门禁设计
 
 > 日期：2026-09-20  
-> 状态：设计定稿（待实现）  
+> 状态：定稿（已实现）  
 > Lead：本会话 Cursor  
 > 相关：  
 > - [`2026-09-20-recording-coach-skill-pack-design.md`](./2026-09-20-recording-coach-skill-pack-design.md)（四层包）  

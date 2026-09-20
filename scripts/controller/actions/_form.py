@@ -19,6 +19,7 @@ from .phase.element_guard import (
     duplicate_element_action_scoped,
     remember_successful_element_action_scoped,
 )
+from .search_then_click_guard import is_search_field_label
 
 # 兼容 re-export（form-actions-split）：外部/characterization 仍从 _form 导入这些
 # form_scan_utils 符号；canonical 位置是 form_scan_utils，勿再新增。
@@ -75,12 +76,19 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
 
     @controller.action('Fill a form field using Element UI native DOM setter. Works for text inputs AND date pickers (commits Vue v-model, including TsscMultiDatePicker). For a date-range control, value MUST contain both start and end dates in one call, e.g. "2026-09-05 - 2026-09-30"; never fill only one endpoint.')
     async def fill_form_field(label_text: str, value: str, xpath_smart: str = ""):
-        duplicate = duplicate_element_action_scoped(business_data_store, label_text)
-        if duplicate:
-            return _ok(
-                f'already-operated-this-phase:{label_text} via {duplicate}; '
-                'do not repeat this field, verify if needed and call done when the phase goal is complete'
-            )
+        # #917: 搜索族 label（关键字/过滤/搜索）豁免 phase 去重——同容器先填关键字
+        # 删产品、再填关键字搜分类时，第二次 fill 曾被 already-operated-this-phase
+        # 短路（ok 文案），而引擎「不等值=有意纠错放行」的同值守卫在门之后没机会
+        # 执行；KB 错位态配方还要求树重载后同值重填。故搜索族绕过 gate 直接进引擎，
+        # 正确性由引擎同值守卫兜底、步数由 _record_action coalesce 收敛（同元素
+        # 连续操作只留后者并 emit removedIds）。其余四 gate 无生产证据，不豁免。
+        if not is_search_field_label(label_text):
+            duplicate = duplicate_element_action_scoped(business_data_store, label_text)
+            if duplicate:
+                return _ok(
+                    f'already-operated-this-phase:{label_text} via {duplicate}; '
+                    'do not repeat this field, verify if needed and call done when the phase goal is complete'
+                )
         result = await _fill_engine.fill_form_field(label_text, value, xpath_smart)
         remember_successful_element_action_scoped(
             business_data_store, label_text, 'fill_form_field', result,

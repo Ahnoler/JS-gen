@@ -12,6 +12,10 @@ agent 误以为已填，退而 real_click 三连。#909 定谳：引擎缺陷，
 2. needle 断言：六个 gate 点（fill_form_field/select_option/click_adjacent_button/
    click_radio/select_tree_option/set_vue_model）必须走 scoped identity，
    `_form.py` 不得残留纯 label 版 gate。
+3. #917 第三例（同容器同 label 二次 fill）：搜索族 label（关键字/过滤/搜索）
+   fill gate 前置豁免——`is_search_field_label` 为真时不做 phase 去重直接进引擎
+   （引擎同值守卫「不等值=有意纠错放行」接手；KB 错位态配方要求树重载后同值
+   重填也放行）；其余四 gate 不豁免（n_scoped 仍 == 5），拒绝文案逐字不变。
 """
 from pathlib import Path
 import sys
@@ -25,6 +29,9 @@ from scripts.controller.actions.phase.element_guard import (  # noqa: E402
     element_scope_key,
     remember_successful_element_action,
     remember_successful_element_action_scoped,
+)
+from scripts.controller.actions.search_then_click_guard import (  # noqa: E402
+    is_search_field_label,
 )
 
 class Result:
@@ -119,6 +126,56 @@ def main() -> None:
     # ── 4. gate 拒绝文案保持（agent 依赖文案语义） ───────────────────────────
     assert 'already-operated-this-phase:{label_text} via {duplicate}' in src_form
     print('PASS 4 already-operated-this-phase 拒绝文案保持')
+
+    # ── 5. #917 fill 去重门搜索族豁免（RED→GREEN pin）───────────────────────
+    # 生产实证：同容器先 fill「搜索关键字」（=值A）删产品、再 fill 同 label（=值B）
+    # 搜分类 → 第二次 fill 被 already-operated-this-phase 短路（返回 ok 文案），
+    # 引擎「不等值=有意纠错放行」的同值守卫在门之后、没机会执行 → 分类无法定位删除。
+    # 5a 源码层：谓词 import 存在于 _form.py
+    assert 'from .search_then_click_guard import is_search_field_label' in src_form, \
+        '_form.py 缺 is_search_field_label import'
+    # 5b 源码切片：豁免判定在 fill_form_field 函数体内、且位于 gate 调用之前
+    def _fn_body(src: str, start_needle: str, end_needle: str) -> str:
+        start = src.index(start_needle)
+        return src[start:src.index(end_needle, start)]
+
+    fill_body = _fn_body(src_form, 'async def fill_form_field(', '@controller.action')
+    assert 'is_search_field_label(' in fill_body, 'fill_form_field 函数体内缺搜索族豁免判定'
+    assert fill_body.index('is_search_field_label(') < fill_body.index('duplicate_element_action_scoped('), \
+        '搜索族豁免判定必须位于 fill gate 之前'
+    assert 'if not is_search_field_label(label_text):' in fill_body, \
+        'gate 须由 if not is_search_field_label(label_text): 守卫（搜索族绕过，非搜索族照查）'
+    print('PASS 5a/5b fill gate 前置搜索族豁免（import 存在 + 函数内先于 gate）')
+
+    # 5c 行为等价（条件表达式复现 gate 语义；gate 是 _register_form_actions 闭包，
+    # 无法脱离浏览器上下文直调，故按任务约定用条件表达式断言）：同容器已 remember
+    # 后，搜索族 gate 路径跳过（引擎接手），非搜索族（序号）仍拦。
+    assert is_search_field_label('搜索关键字') and is_search_field_label('过滤条件') \
+        and is_search_field_label('搜索')
+    assert not is_search_field_label('序号'), '「序号」非搜索族——1c 的仍拦语义依赖此判定'
+
+    def _fill_gate_passes(store_: dict, label_text_: str, container_: str) -> bool:
+        # 与 _form.fill_form_field 门语义逐字对齐：搜索族跳过去重，其余查 scoped store。
+        if is_search_field_label(label_text_):
+            return True
+        return duplicate_element_action_scoped(store_, label_text_, container=container_) == ''
+
+    store_gate = {}
+    remember_successful_element_action_scoped(
+        store_gate, '搜索关键字', 'fill_form_field', Result('ok:changed'),
+        container='dialog:产品库|产品',
+    )
+    remember_successful_element_action_scoped(
+        store_gate, '序号', 'fill_form_field', Result('ok:changed'),
+        container='dialog:产品库|产品',
+    )
+    # 底层 store 确实登记了同容器同 label（原拦截依据仍在）——豁免改变的是门是否查询它
+    assert duplicate_element_action_scoped(
+        store_gate, '搜索关键字', container='dialog:产品库|产品',
+    ) == 'fill_form_field'
+    assert _fill_gate_passes(store_gate, '搜索关键字', 'dialog:产品库|产品') is True
+    assert _fill_gate_passes(store_gate, '序号', 'dialog:产品库|产品') is False
+    print('PASS 5c 搜索族同容器重填绕过 gate（引擎同值守卫接手），非搜索族仍拦')
 
     print('characterize-element-dedup-scope: OK')
 
