@@ -44,7 +44,7 @@ export async function appendRecordedStep(trajectoryDbId, entry, {
 
   const actionName = String(entry.action || entry.actionType || '').trim();
   if (actionName === 'save_form_snapshot') {
-    return appendRecordedFormSnapshot(tid, entry, { source, trajectoryPhaseId });
+    return appendRecordedFormSnapshot(tid, entry, { source, trajectoryPhaseId, stepNumber });
   }
   // 观察/工程类动作（semantic_snapshot 等）不产生页面交互，不写入 trajectory_step
   if (isEngineeringStepAction(actionName)) {
@@ -151,9 +151,10 @@ export async function appendRecordedStep(trajectoryDbId, entry, {
  * @param {object} [root0] options
  * @param {string} [root0.source] step source (manual/agent/cdp)
  * @param {number} [root0.trajectoryPhaseId] explicit phase DB id
+ * @param {number} [root0.stepNumber] caller-managed step number (skips max() query; fallback max()+1 when absent/invalid)
  * @returns {{ stepNumber: number, actionId: string|null, trajectoryPhaseId: number|null, dbId?: number|null }|null} append result, or null if invalid
  */
-export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source, trajectoryPhaseId } = {}) {
+export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source, trajectoryPhaseId, stepNumber } = {}) {
   const tid = Number(trajectoryDbId);
   if (!Number.isFinite(tid) || tid <= 0 || !entry) return null;
 
@@ -219,8 +220,11 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
   let phaseNumber = phaseNumberHint;
   if (resolvedPhaseNumber != null) phaseNumber = resolvedPhaseNumber;
 
-  const maxStep = await trajectoryDao.getMaxStepNumber(tid);
-  const stepNumber = maxStep + 1;
+  // 调用方内存步号优先（fill+snapshot 同号双行治理）；无有效值时保持 max()+1 兜底
+  const callerStepNumber = Number(stepNumber);
+  const stepNumberOut = Number.isFinite(callerStepNumber) && callerStepNumber > 0
+    ? callerStepNumber
+    : (await trajectoryDao.getMaxStepNumber(tid)) + 1;
   const step = stepFromActionLog(
     {
       ...entry,
@@ -236,20 +240,20 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
     },
     {
       trajectoryId: tid,
-      stepNumber,
+      stepNumber: stepNumberOut,
       phaseNumber,
       source: resolvedSource,
     },
   );
   step.trajectoryId = tid;
-  step.stepNumber = stepNumber;
+  step.stepNumber = stepNumberOut;
   step.trajectoryPhaseId = resolvedPhaseId;
 
   const db = getDB();
   const result = await db.transaction(async (trx) => {
     const stepRow = {
       trajectory_id: tid,
-      step_number: stepNumber,
+      step_number: stepNumberOut,
       phase_number: phaseNumber,
       action_index: step.actionIndex ?? 0,
       action_type: 'save_form_snapshot',
@@ -292,7 +296,7 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
   touchTrajectoryRuntimeActivity(tid);
 
   return {
-    stepNumber,
+    stepNumber: stepNumberOut,
     actionId: entry.id || null,
     trajectoryPhaseId: resolvedPhaseId,
     dbId: result.stepId,
