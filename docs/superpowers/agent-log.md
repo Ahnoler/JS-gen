@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-20 14:13 · ZCode 引擎线 — 合并回执：B-2 + 弹窗遮挡两单元并入 V2.0（用户批"合并"），待重启窗口（回链 11:24/12:50 收工条目）
+
+- 完成：两分支 `--no-ff` 并入 uara_V2.0——**1a9ec7d9**（B-2 数据完整性：步号缺口回补 + fill/snapshot 同号双行归一 + failedReason 带阶段号）+ **226ef7e3**（弹窗遮挡枚举：vendored isTopElement 浮层豁免 + probe 收口按钮权威清单）。已 push（远端 tip d5d49a92）。引擎 worktree 已对齐合并态（工作区干净）。
+- **冲突一处**：`scripts/refactor/verify-all.sh` 两分支同锚点插登记行——按协议双方并排保留（step-number-integrity + domtree-occlusion 相邻）。
+- **合并后验收（D:\dev\JS-gen 合并态）**：七 pin 全绿（step-number-integrity 19/19、domtree-occlusion 14/14、traj-recon-logging、form-snapshot-trigger、agent-llm-error、probe-donelog 56 checks、controller-annotations）；全量 verify-all **211 过（基线 209+2 新 pin）失败集=3 已知红零新增**。
+- **推送顺带**：远端 tip 现为 **d5d49a92**（Cursor 的 recording-coach skill 设计定稿，单 docs 文件 +162 行，在主检出并发提交、叠于两 merge 之上被我 push 一并带上；与本次合并文件集零交叠，注明备查）。
+- **生效状态（两单元机制不同）**：①遮挡修复=Python/JS 注入侧，运行磁盘即载（引擎 worktree 已对齐，**新录制会话即刻生效**）；②B-2=Node 侧，**需重启控制面+本地执行机后生效**——按新规待用户点名重启窗口（本线不自行重启；远端代理不碰）。
+- **湿测建议**：合约线下一单重测「选择阶段」即验遮挡修复（agent 元素表应含 footer 确定钮、probe 收口应列弹窗按钮清单）；本批含 B-2 的 `[traj-recon] gaps` 修复，重启后的单子应见 gaps 归零、无双行、failedReason 带（阶段 N,M）。
+- 注：不维护 CHANGELOG；合并操作轮次
+
 ## 2026-09-20 12:50 · ZCode 引擎线 — 收工：弹窗遮挡枚举修复交付（vendored isTopElement 浮层豁免 + probe 按钮权威清单，分支未合并待批，回链 12:19 开工）
 
 - 完成：#910④ B 定谳（引擎枚举受限）修复交付，commit 5661337e，分支 `engine/domtree-occlusion-20260920`（96aa8557 = 5661337e + d4165b79 合入，已 push）。**11 files +292/−9 + vendor 副本**。子智能体队伍：Explore 载体调研 → 双 worker 并行（文件集不相交）→ 主会话审 diff → 独立复验 → 代提交。
