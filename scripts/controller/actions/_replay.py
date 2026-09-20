@@ -40,6 +40,7 @@ from ._js_snippets import (
     JS_READ_PAGE_COMPONENT_CODE,
     JS_CLICK_MENU_XPATH,
     JS_FIND_MENU_DISMISS_POINT,
+    JS_FIND_TIANYUAN_DIALOG_CONFIRM,
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH,
     JS_SELECT_VALUE_BY_XPATH,
@@ -124,6 +125,50 @@ async def _direct_read_page_component_code(page, params, entry):
     sys.stderr.write(f'[replay] read_page_component_code code={payload.get("componentCode", "")} scenario={payload.get("scenarioCode", "")} reason={payload.get("reason", "")} diag={json.dumps(payload.get("diag"), ensure_ascii=False)}\n')
     sys.stderr.flush()
     return 'ok', {'pageCode': payload}
+
+
+@_direct_replay('close_tianyuan_dialog', set())
+async def _direct_close_tianyuan_dialog(page, params, entry):
+    """直派回放 close_tianyuan_dialog：best-effort 关掉仍可见的「天元相关配置」弹窗。
+
+    合成 el.click() 关不掉该弹窗（SUT 只认 trusted 事件；见 kb-ab-manifest v1.1），
+    故复用 _dismiss_menu_overlay 同款 ``page.mouse``（Playwright trusted input）在其
+    「确 定」按钮中心补一次真实点击。仅在**可见**天元弹窗存在时动作（JS 侧门控），
+    否则 no-op；返 ``ok-*`` 恒计成功，且全程吞异常——prepare 绝不因关窗失败而失败。
+    """
+    try:
+        info = await page.evaluate(JS_FIND_TIANYUAN_DIALOG_CONFIRM)
+    except Exception as e:
+        sys.stderr.write(f'[replay] close_tianyuan_dialog evaluate failed: {e}\n')
+        sys.stderr.flush()
+        return 'ok-noop:evaluate-failed', None
+    if not isinstance(info, dict) or not info.get('ok'):
+        reason = info.get('reason') if isinstance(info, dict) else 'bad-payload'
+        return 'ok-noop:' + str(reason or 'no-visible-dialog'), None
+    try:
+        x = int(info.get('x'))
+        y = int(info.get('y'))
+        await page.mouse.move(x, y, steps=3)
+        await page.mouse.down()
+        await page.wait_for_timeout(30)
+        await page.mouse.up()
+        await page.wait_for_timeout(200)
+    except Exception as e:
+        sys.stderr.write(f'[replay] close_tianyuan_dialog click failed: {e}\n')
+        sys.stderr.flush()
+        return 'ok-noop:click-failed', None
+    # 复核：仍可见则如实记录（best-effort，不抛）
+    try:
+        again = await page.evaluate(JS_FIND_TIANYUAN_DIALOG_CONFIRM)
+        if isinstance(again, dict) and again.get('ok'):
+            sys.stderr.write('[replay] close_tianyuan_dialog still visible after trusted click\n')
+            sys.stderr.flush()
+            return 'ok-close-still-visible', None
+    except Exception:
+        pass
+    sys.stderr.write('[replay] close_tianyuan_dialog closed\n')
+    sys.stderr.flush()
+    return 'ok-closed', None
 
 
 # 登录前探测：判定浏览器当前是否已处于登录态。

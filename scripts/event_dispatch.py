@@ -45,6 +45,7 @@ _REPLAY_ACTION_SIGNATURES = {
     "scan_menu_tree": set(),
     "click_menu_xpath": {"xpath"},
     "read_page_component_code": set(),
+    "close_tianyuan_dialog": set(),
     "login": {"username", "password", "captcha", "sms_code"},
 }
 

@@ -217,3 +217,43 @@ JS_FIND_MENU_DISMISS_POINT = '''() => {
     }
     return fallback;
 }'''
+
+# trusted 关闭通道的定位半边（best-effort，配套动作见 _replay.py close_tianyuan_dialog）：
+# 合成 el.click() 关不掉「天元相关配置」弹窗（SUT 只认 trusted 事件；kb-ab-manifest v1.1
+# 实证），故由 Python 侧用 page.mouse（Playwright trusted input）在按钮中心补一次真实点击。
+# 仅当存在**可见**天元弹窗且其 footer 有可见「确 定」按钮时返回按钮中心 viewport 坐标；
+# 否则 {ok:false, reason}——调用方据此直接 no-op，绝不盲点。返回对象（非 JSON 串），
+# 与 JS_READ_PAGE_COMPONENT_CODE 一致，Playwright 端反序列化为 dict。
+JS_FIND_TIANYUAN_DIALOG_CONFIRM = '''async () => {
+    const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
+    const isVisible = (el) => {
+        if (!el || el.getClientRects().length === 0) return false;
+        const wrap = el.closest('.el-dialog__wrapper');
+        if (wrap && getComputedStyle(wrap).display === 'none') return false;
+        return true;
+    };
+    let target = null;
+    for (const d of document.querySelectorAll('.el-dialog')) {
+        if (!isVisible(d)) continue;
+        const title = norm((d.querySelector('.el-dialog__title') || {}).textContent);
+        if (title.indexOf('天元相关配置') === -1) continue;
+        target = d;
+        break;
+    }
+    if (!target) return { ok: false, reason: 'no-visible-tianyuan-dialog' };
+    const btns = [...target.querySelectorAll('button')].filter(isVisible);
+    const confirm = btns.find((b) => /^确\\s*定$/.test(norm(b.textContent)))
+        || btns.find((b) => norm(b.textContent).indexOf('确定') !== -1)
+        || null;
+    if (!confirm) return { ok: false, reason: 'no-confirm-button' };
+    confirm.scrollIntoView({ block: 'center', behavior: 'instant' });
+    await new Promise((r) => setTimeout(r, 80));
+    const r = confirm.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return { ok: false, reason: 'confirm-invisible' };
+    return {
+        ok: true,
+        x: Math.round(r.left + r.width / 2),
+        y: Math.round(r.top + r.height / 2),
+        title: norm((target.querySelector('.el-dialog__title') || {}).textContent),
+    };
+}'''

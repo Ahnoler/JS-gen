@@ -31,7 +31,7 @@ export function generatePageId() {
  * 流程：
  * 1. `Number(functionId)` 无效 → 直接走 AILZ 兜底路径（跳过导航/读页）
  * 2. `navigateToFunctionMenu`（失败仅 log，继续——导航失败时读的是当前页，读不到就 AILZ）
- * 3. 发 `read_page_component_code` replay 动作，从 `r.results` 取 `row.pageCode`
+ * 3. 发 `read_page_component_code` replay 动作（同批追加 `close_tianyuan_dialog` best-effort 关窗），从 `r.results` 取 `row.pageCode`
  * 4. `pageId = componentCode || scenarioCode || generatePageId()`
  * 5. 与功能节点 system_page 已知页面 ID 交叉校验（仅 console.log，不阻断）
  * 6. `trajectoryDao.updateMeta(tid, { pageId })` 落库
@@ -92,7 +92,12 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
         execSession,
         sessionId: runtime.sessionId,
         nodeUuid: runtime.executorNodeUuid,
-        actions: [{ action: 'read_page_component_code', params: {} }],
+        actions: [
+          { action: 'read_page_component_code', params: {} },
+          // 读完立即用 trusted 真实鼠标关掉可能残留的「天元相关配置」弹窗；
+          // 合成点击关不掉该弹窗，残留会让录制 agent 按全局弹窗守卫暂停。
+          { action: 'close_tianyuan_dialog', params: {} },
+        ],
         timeoutMs: READ_PAGE_CODE_TIMEOUT_MS,
         stopOnFail: false,
         isReplay: true,
