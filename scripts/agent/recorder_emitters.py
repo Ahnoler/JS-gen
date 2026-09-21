@@ -1291,6 +1291,8 @@ async def _guard_spin_on_step_end(agent, business_data_store, goal_tracker, curr
 
     每步 on_step_end 调用。默认 off 零 I/O；stall 窗口满后才做一次页面探测；
     soft/hard 触发=直发 phase_error(reason=sut_unavailable_spin_guard)+停 agent。
+    幂等按 phase+runId 作用域：同 run 同相位不重复发；换 run 重录（重录路径同
+    runtime 换 runId 再录、同 store 重入同相位号）或阶段推进自动重新武装。
     返回 True 表示已触发止损（调用方应 return）；任何异常吞掉返 False。
     """
     try:
@@ -1322,6 +1324,7 @@ async def _guard_spin_on_step_end(agent, business_data_store, goal_tracker, curr
 
         from ..state import get_current_phase, get_current_run_id   # lazy，触发分支里再 import emit_json
         phase = int(get_current_phase() or 0)
+        run_id = get_current_run_id()
 
         # ===== 进展信号（全部内存读取，零页面 I/O）=====
         raw = store.get('task_list')
@@ -1335,9 +1338,15 @@ async def _guard_spin_on_step_end(agent, business_data_store, goal_tracker, curr
         path = url.split('#')[0].split('?')[0] if url else ''
         container = str(store.get('_active_container') or '')
 
-        # ===== 阶段自动重置（基线初始化为当前值）=====
-        if store.get('_spin_guard_phase') != phase:
+        # ===== 阶段/run 自动重置（基线初始化为当前值）=====
+        # run 维度（F1 终审阻断修复）：重录路径同 runtime 换 runId 再录、失败收尾
+        # 不关 session → 同 Python 进程同 business_data_store 重入同相位号。换 run
+        # 必须重置计数并 pop 触发戳重新武装，否则重录相位被旧戳 neuter——每步
+        # on_step_end 被过早 return，done 门禁/循环检测/CSS 补抓整段失效，
+        # #925 空转问题在重录中复活。
+        if store.get('_spin_guard_phase') != phase or store.get('_spin_guard_run_id') != run_id:
             store['_spin_guard_phase'] = phase
+            store['_spin_guard_run_id'] = run_id
             store['_spin_guard_stall_steps'] = 0
             store['_spin_guard_a1_hits'] = 0
             store['_spin_guard_a3_steps'] = 0
@@ -1345,10 +1354,16 @@ async def _guard_spin_on_step_end(agent, business_data_store, goal_tracker, curr
             store['_spin_guard_seen_containers'] = []
             store['_spin_guard_last_done_count'] = count
             store['_spin_guard_last_path'] = path
+            store.pop('_spin_guard_triggered', None)   # 重新武装
 
-        # ===== 触发幂等：同阶段已触发过不再重复发 phase_error（新阶段随重置重新武装）=====
+        # ===== 触发幂等：同 phase+同 run 已触发过不再重复发 phase_error =====
+        # （换 run 重录或阶段推进由上方重置块 pop 戳重新武装后可再次触发）
         _prev_triggered = store.get('_spin_guard_triggered')
-        if isinstance(_prev_triggered, dict) and _prev_triggered.get('phase') == phase:
+        if (
+            isinstance(_prev_triggered, dict)
+            and _prev_triggered.get('phase') == phase
+            and _prev_triggered.get('runId') == run_id
+        ):
             return True
 
         # ===== 进展判定（任一成立即进展）=====
@@ -1459,11 +1474,13 @@ async def _guard_spin_on_step_end(agent, business_data_store, goal_tracker, curr
             'mode': mode,
             'sutSignal': signal,
             'phase': phase,
+            'runId': run_id,
             'step': n,
             'stepsSinceProgress': stall,
             'progressWindow': progress_window,
         }
         if mode == 'soft':
+            # 预留台账标志，当前无消费方（设计稿 §10 dashboard 候选）
             store['_spin_guard_soft_triggered'] = True
         sys.stderr.write(
             f'[spin-guard] {mode} triggered phase={phase} step={n} '

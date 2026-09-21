@@ -11,7 +11,9 @@
 - 条件 A 优先级 A1（页面文本 503）> A3（URL 错误页，连续 2 步）> A4（关键 DOM
   缺失连续 dom_window 步）；
 - observation 只观测不打断；soft/hard 触发 = emit phase_error(reason=
-  sut_unavailable_spin_guard) + 停 agent，且已触发后不得重复发 phase_error。
+  sut_unavailable_spin_guard) + 停 agent；幂等按 phase+runId 作用域——同 run
+  同相位不重复发，换 run 重录（同 runtime 换 runId 再录、同 store 重入同相位号）
+  或阶段推进由重置块 pop 戳自动重新武装。
 
 源码 needle 断言 pin 住：守卫函数存在、recorder 调用点先于 done 门禁、
 service 续跑循环 break、verify-all 注册。
@@ -482,6 +484,89 @@ def test_9_url_error_page_trigger() -> None:
         restore()
 
 
+def test_10a_cross_run_same_phase_re_arms() -> None:
+    """F1：同相位跨 run 重入不得被旧触发戳 neuter（重录路径回归）。"""
+    g = _guard_fn()
+    if g is None:
+        return
+    emitted.clear()
+    store, gt = {}, {}
+    page = _FPage(dict(_INFO_503))
+    import scripts.state as st
+    apply, restore = _with_env("hard", PROGRESS_WINDOW=1)
+    apply()
+    try:
+        a1 = _mk_agent(1, "http://sut/app", page)
+        check(_step(g, a1, store, gt, []) is True, "10a run1 phase3 triggers")
+        check(len(emitted) == 1, "10a first trigger emits exactly one event")
+        # 同相位换 runId 重入：守卫必须正常走判定（不早退），重新武装后再次触发
+        st.get_current_run_id = lambda: "run-pin-2"
+        gt2 = {}
+        a2 = _mk_agent(2, "http://sut/app", page)
+        r = _step(g, a2, store, gt2, [])
+        check(r is True, "10a run2 same phase triggers again (no early return)")
+        check(len(emitted) == 2, "10a second phase_error emitted after run switch")
+        stamp = store.get("_spin_guard_triggered") or {}
+        check(stamp.get("runId") == "run-pin-2", "10a stamp runId is run-pin-2")
+        check(stamp.get("phase") == 3, "10a stamp phase still 3")
+        check(page.evaluate_calls == 2, "10a run2 re-probed page (guard not neutered)")
+    finally:
+        st.get_current_run_id = lambda: "run-pin-1"
+        restore()
+
+
+def test_10b_phase_advance_re_arms() -> None:
+    """F1：同 run 相位推进由重置块重新武装，守卫不早退、健康页不触发。"""
+    g = _guard_fn()
+    if g is None:
+        return
+    emitted.clear()
+    store, gt = {}, {}
+    page503 = _FPage(dict(_INFO_503))
+    page_health = _FPage(dict(_INFO_HEALTHY))
+    import scripts.state as st
+    apply, restore = _with_env("hard", PROGRESS_WINDOW=1)
+    apply()
+    try:
+        a1 = _mk_agent(1, "http://sut/app", page503)
+        check(_step(g, a1, store, gt, []) is True, "10b phase3 triggers")
+        check(len(emitted) == 1, "10b one emission after phase3 trigger")
+        st.get_current_phase = lambda: 4
+        a2 = _mk_agent(2, "http://sut/app", page_health)
+        r = _step(g, a2, store, gt, [])
+        check(r is False, "10b phase4 healthy page returns False (no early return)")
+        check(page_health.evaluate_calls >= 1, "10b guard probed page in phase4 (not neutered)")
+        check(a2.state.stopped is False, "10b agent not stopped in phase4")
+        check(store.get("_spin_guard_triggered") is None,
+              "10b old stamp cleared by phase reset")
+    finally:
+        st.get_current_phase = lambda: 3
+        restore()
+
+
+def test_10c_unknown_mode_is_off() -> None:
+    """未知 MODE 值等同 off：零 store/页面访问，无异常逃逸。"""
+    g = _guard_fn()
+    if g is None:
+        return
+    emitted.clear()
+    store, gt = {}, {}
+    agent = _FAgent(1, ["http://sut/app"])
+    agent.browser_context = _FBombContext()
+    apply, restore = _with_env("bogus")
+    apply()
+    try:
+        r = _step(g, agent, store, gt, [])
+        check(r is False, "10c unknown mode returns False")
+        check(getattr(agent.browser_context, "calls", 0) == 0,
+              "10c unknown mode never touches the page")
+        _no_spin_keys(store, "10c unknown mode writes no _spin_guard_ keys")
+        check(emitted == [], "10c unknown mode never emits phase_error")
+        check(agent.state.stopped is False, "10c unknown mode never stops agent")
+    finally:
+        restore()
+
+
 def main() -> int:
     _patch_modules()
     test_source_needles_recorder_emitters()
@@ -497,6 +582,9 @@ def main() -> int:
     test_7_wait_for_loading_excluded()
     test_8_query_mode_excluded()
     test_9_url_error_page_trigger()
+    test_10a_cross_run_same_phase_re_arms()
+    test_10b_phase_advance_re_arms()
+    test_10c_unknown_mode_is_off()
     if _FAILURES:
         print(
             f"characterize-sut-spin-guard: FAIL "
