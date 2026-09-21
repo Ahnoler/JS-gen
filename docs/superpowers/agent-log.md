@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 20:15 · ZCode 引擎线 — 开工：D2 SUT 503 阶段空转守卫实施（SDD；分支 engine/d2-spin-guard-20260921）
+
+- 授权：实施计划已经用户批准（plan mode 产出）；设计稿 `docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md`（系统线 10:00 验证 #925 空转 31m/落 10 步归属引擎线）。
+- 工作范围：`scripts/agent/recorder_emitters.py`（新增 `_guard_spin_on_step_end`）、`scripts/recorder.py`（`on_step_end` 挂守卫约 3 行）、`scripts/agent/service.py`（续跑循环补 `goal_tracker['stopped']` break 1 行）、`scripts/characterization/characterize-sut-spin-guard.py`（新 pin，RED 先行）、`scripts/refactor/verify-all.sh`（仅注册 1 行）、上述设计稿状态行；agent-log/todo 条目。
+- 分支与场地：`engine/d2-spin-guard-20260921` 自 `origin/uara_V2.0`（=0988b7bd）新切（不叠 B 类/小批次栈），**branch-only 未合并待批**；场地=D:\dev\JS-gen-engine 主场（small-batch 分支无代码原地驻留零冲突）；默认 `SUT_SPIN_GUARD_MODE=off` 零行为影响，纯 Python 侧，新录制会话磁盘加载即生效，无需重启。
+- 禁入区（他线知悉）：`src/**` 全部（系统线刚收工待重启窗口；合约线 SPA stop 适配面）；`scripts/prompts/**`、`data/kb/**` 只读；`fill_engine.py`/`click_action_engine.py`/`select_engine.py` 他线热区。
+- 执行方式：SDD——worker-coder 实现（RED→GREEN）+ reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；湿测（#925 复现场景 observation 档必须命中 + 正常长阶段不误杀）移交合约线（SUT 当前停机，不阻塞合并）。
+
 ## 2026-09-21 21:55 · ZCode 系统线 — 收工：停止回放系统线 12 项缺陷全部修复合入（回链 18:05 开工；SDD 六任务 + 终审 + 修复波）
 
 - 完成（代码 8 提交 `35ac10fe→c7f8ffcf`，+831/−40，全量 verify-all 182 pins + statics **EXIT=0 ALL GREEN 零 FAILED**）：
