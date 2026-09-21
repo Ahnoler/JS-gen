@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-21 12:40 · ZCode 合约线 — 收工：recording-coach subagent 执行经验案例卡 13 张交付（回链 12:20 开工）
+
+- 完成：`docs/superpowers/reports/2026-09-21-recording-coach-subagent-ops-cases.md`（13 卡：诚实拒绝 3 / task 改写重试 2 / 假报告识破 2 / 管线坑 3 / 收尾契约 1 / keep 正例 2；`yes` 11 张 / `no-oneoff` 1 / `engine-side` 1）。文首总结 10 条=「操作员反复踩的坑 + 主会话派发最小必备项」，委托 8 个优先覆盖项全命中（粒度速查按约回链粒度卡不重复）。
+- 素材全部锚定 agent-log 原文（git 逐条核过）：wet7 #891（phaseIds UUID 400）、wet8 #892-896（前置摸底错→REJECTED 诚实收口、在途授信 6+ 次硬拒、deleteApply 探针红线）、wet9 #904→#909→#910（门闩违反→点名按钮根治→拆阶段规避→越权自判纠正）、pdiag（footer 假断点证伪）、#925（SUT 503 空转移交引擎）、#924/#971（keep 正例：四件套 brief + 模板复用）、#970/#971 对照（stderr 取证时点）。
+- 纪律沿用：`no-workaround` 同款——卡 5（fill 去重拆阶段规避）标 `no-oneoff`，缺陷 cee623e1 已修、规避作废；卡 8（503 止损）标 `engine-side`，D2 守卫 0cbcbd35 已落地，coach 只保留「识别+移交」提示。
+- 顺带补漏（蒸馏稿 §3 可并表三处）：record/start 同步长连超时≠失败（先 GET 状态勿重发，#971 实证）；stderr 取证 detach 前走 API、detach 后直读 executor-main.log（会话轮转后全文即新增段）；确定性业务拒绝限重试 1 次。
+- 注：文档交付轮次，无代码改动；未触碰 tools/recording-coach/**（Cursor 主场）
+
 ## 2026-09-21 12:20 · ZCode 合约线 — 开工：recording-coach subagent 执行经验案例卡抽取（Cursor 线委托）
 
 - **收件**：Cursor 线委托（用户转交 request.md）——recording-coach skill 已定位为「跑湿测的操作员 subagent」，需抽取**执行面**可复用经验（主会话怎么派、操作员怎么跑、哪类失败该停/该改 task/该移交引擎），按「模式一卡」≥8 张，落盘 `docs/superpowers/reports/2026-09-21-recording-coach-subagent-ops-cases.md`。粒度标准已另案交付（9f7d3afc），本单只做执行面，不挖 analyze 段数。
