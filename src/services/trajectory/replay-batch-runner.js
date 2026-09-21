@@ -193,6 +193,7 @@ export async function runReplayBatch({
   const skippedIds = new Set();
 
   emitReplay('replay:started', tid, { stepIds: orderedStepIds });
+  runtime.replayRunning = true;
   logReplayPlan(tid, orderedStepIds, actions, runtime, secretValues);
 
   // ── 执行前菜单导航（同菜单跳过/空菜单直接执行/失败不阻断）──
@@ -679,6 +680,7 @@ export async function runReplayBatch({
     runtime.isReplay = false;
     runtime.formStructureHealLabels = null;
     runtime.abortReplay = false;
+    runtime.replayRunning = false;
     if (session) session.busy = false;
   }
 }

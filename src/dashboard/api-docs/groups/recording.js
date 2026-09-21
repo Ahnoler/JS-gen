@@ -207,17 +207,21 @@ export const GROUP_RECORDING = [
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/steps/replay/stop',
-        summary: '停止进行中的 steps/replay（含 Type A/B 自愈）',
+        summary: '停止进行中的 steps/replay（含 Type A/B 自愈）；无批次时诚实返回 stopped:false',
         desc:
-          '置 abortReplay 并向执行机发送 cancel_step。不改变 recordStatus、不释放槽位。'
+          '仅在回放批真正进行中（runtime.replayRunning=true）时置 abortReplay 并向执行机发送 cancel_step。不改变 recordStatus、不释放槽位。'
           + '自愈中任何 cancel（含误点 record/stop 触发的 cancel_step）均视为用户中断，避免假成功。'
           + '批次以 WS replay:finished { aborted:true, reason:"user_stop", error:null } 结束。'
-          + '幂等：无进行中批次时仍返回 stopped:true。',
+          + '诚实化：无进行中批次（replayRunning=false，含 AI 录制期与空闲期）时不再置 abortReplay / 发 cancel_step，'
+          + '返回 stopped:false + reason:"no_replay_batch_running"——录制期调用本端点不会误杀录制 Agent。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
-        respExample: J({ trajectoryId: 42, trajectoryDbId: 42, stopped: true }),
+        respExample: J({ trajectoryId: 42, trajectoryDbId: 42, stopped: true, batchWasRunning: true, cancelStepDelivered: true }),
         notes: [
           '需已 attach（record/prepare）；未附着 → 400',
+          'stopped=true：批次确实在跑，已置 abortReplay；batchWasRunning 同值回显',
+          'cancelStepDelivered：cancel_step 是否成功下发（forwardStdin 异常时为 false，批次仍会经 abortReplay 收敛）',
+          'stopped=false（无批次，含录制期）：返回 batchWasRunning:false + reason:"no_replay_batch_running"，无 cancelStepDelivered 字段',
           '确定性 replay_actions 当前步可能仍跑完，停止在自愈边界 / 下一步边界生效',
           'FE 应用 aborted 判断主动停止，勿把 error 当失败 toast（error 为 null）',
         ],

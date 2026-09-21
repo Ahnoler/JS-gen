@@ -40,6 +40,23 @@
  * 中止时不可达）。故补发落在步后分支，循环头分支 pin 为「批次级收敛、无步级
  * 补发」以固化核查结论、防冗余代码。
  *
+ * Task 4/6 — #5 stop 诚实化 + #8 录制期拒绝 + #13 sync busy 泄漏（断言组 9）：
+ * stopTrajectoryStepsReplay 此前无条件置 abortReplay + 下发 cancel_step——
+ * 无批次时返回 stopped:true 是谎言且留 abortReplay 残留（#5/#16），而
+ * session.busy=true 涵盖 AI 录制占用，录制期调 stop 会把 cancel_step 打进
+ * 录制 Agent（#8 误杀）。runtime 新增 replayRunning 字段（trajectory-runtime.js
+ * 默认 false；runReplayBatch 于 replay:started 后置 true、finally 复位 false，
+ * replay-batch-runner.js 纯插两行）：stop 以 replayRunning 为「回放批真正在跑」
+ * 判定——false → 早退 { stopped:false, batchWasRunning:false,
+ * reason:'no_replay_batch_running' }（不动 abortReplay、不发 cancel_step）；
+ * true → 现行为 + 返回 batchWasRunning:true / cancelStepDelivered。
+ * #13：sync 路径 replayTrajectorySteps 的 finally 空壳——runReplayBatch 在进入
+ * 其主 try 前抛出时（replay:started 广播/计划日志/菜单导航段）自身 finally 不
+ * 执行，busy 泄漏；sync 补 catch 复位（字段集对齐 accept 路径 .catch 兜底：
+ * suppressStepPersist/isReplay/abortReplay + session.busy=false，另含
+ * replayRunning），并补发 replay:finished error 终态（对齐 accept 路径，防前端
+ * 悬挂）后原样 rethrow。
+ *
  * 全部为 read_text needle + 源码切片断言（零 import 被测模块——该模块 import
  * 副作用面含 ws-server / executor-session-client，无 ESM mock 能力下不做行为
  * 驱动；锚定为「函数名 + 语义行」切片，任一守卫被移除或移位即红）。
@@ -243,6 +260,72 @@ record('8e 循环头中止分支无步级补发（空档核查结论固化：con
     return LOOP_HEAD_SLICE.includes('if (runtime.abortReplay)')
       && LOOP_HEAD_SLICE.includes('emitReplayAborted(')
       && !LOOP_HEAD_SLICE.includes("emitReplay('replay:step'");
+  })());
+
+// ══ Task 4/6 — #5 stop 诚实化 + #8 录制期拒绝 + #13 sync busy 泄漏 ════════════
+const TSR = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-session-replay.js'), 'utf8');
+const TRT = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-runtime.js'), 'utf8');
+
+// ── 切片定位：stopTrajectoryStepsReplay 函数体（止于 prepareReplayBatch 的 JSDoc） ─
+const STOP_FN = 'export async function stopTrajectoryStepsReplay(trajectoryId) {';
+const stopFnIdx = idx(TSR, STOP_FN, 'stopTrajectoryStepsReplay 定义');
+const stopEndIdx = TSR.indexOf('/**', stopFnIdx);
+assert.ok(stopEndIdx > stopFnIdx, 'stop 函数体后应紧跟 prepareReplayBatch 的 JSDoc');
+const STOP_BODY = TSR.slice(stopFnIdx, stopEndIdx);
+
+// ── 切片定位：早退分支（replayRunning 守卫 → 真停 abortReplay 置位） ───────────
+const EARLY_GUARD = 'if (!runtime.replayRunning) {';
+const earlyIdx = idx(STOP_BODY, EARLY_GUARD, 'stop 早退分支守卫');
+const abortSetIdx = STOP_BODY.indexOf('runtime.abortReplay = true;');
+assert.ok(abortSetIdx > earlyIdx, '真停分支（abortReplay 置位）应在早退分支之后');
+const EARLY_SLICE = STOP_BODY.slice(earlyIdx, abortSetIdx);
+
+// ── 9. #5/#8/#16 stop 诚实化：无批次（含录制期）早退，不碰 abortReplay/cancel_step ─
+record('9a stop 早退分支存在：runtime.replayRunning=false → stopped:false + batchWasRunning:false + reason:no_replay_batch_running',
+  EARLY_SLICE.includes('stopped: false,')
+  && EARLY_SLICE.includes('batchWasRunning: false,')
+  && EARLY_SLICE.includes("reason: 'no_replay_batch_running',"));
+record('9b 早退分支不置 abortReplay、不下发 cancel_step（#8 录制期不误杀录制 Agent + #16 空闲期无 abortReplay 残留）',
+  !EARLY_SLICE.includes('runtime.abortReplay') && !EARLY_SLICE.includes('forwardStdin'));
+record('9c 真停分支返回 batchWasRunning:true + cancelStepDelivered（forwardStdin catch 置 false，正常 true）',
+  STOP_BODY.includes('let cancelStepDelivered = true;')
+  && count(STOP_BODY, 'cancelStepDelivered = false;') === 1
+  && /stopped: true,\s*\n\s*batchWasRunning: true,\s*\n\s*cancelStepDelivered,/.test(STOP_BODY));
+record('9d runtime 工厂默认字段 replayRunning:false（trajectory-runtime.js，恰一次）',
+  count(TRT, 'replayRunning: false,') === 1);
+record('9e runReplayBatch 置位 replayRunning=true：replay:started 之后、首个 await runReplayActions 之前（恰一次）',
+  count(RBR, 'runtime.replayRunning = true;') === 1
+  && (() => {
+    const startedIdx = idx(RBR, "emitReplay('replay:started', tid, { stepIds: orderedStepIds });", 'replay:started 发射');
+    const setIdx = idx(RBR, 'runtime.replayRunning = true;', 'replayRunning 置位');
+    const firstAwaitIdx = idx(RBR, 'await runReplayActions({', '首个 await runReplayActions');
+    return startedIdx < setIdx && setIdx < firstAwaitIdx;
+  })());
+record('9f runReplayBatch finally 复位 replayRunning=false（与 abortReplay 复位 / busy 释放同段）',
+  (() => {
+    const finIdx = idx(RBR, '  } finally {', 'runReplayBatch finally');
+    const busyIdx = idx(RBR, 'if (session) session.busy = false;', 'busy 释放');
+    assert.ok(busyIdx > finIdx, 'busy 释放应在 finally 段内');
+    const FIN_SLICE = RBR.slice(finIdx, busyIdx);
+    return FIN_SLICE.includes('runtime.abortReplay = false;')
+      && FIN_SLICE.includes('runtime.replayRunning = false;');
+  })());
+record('9g #13 sync 路径补 catch 复位：replayTrajectorySteps 内 catch 含 abortReplay 复位 + busy=false（对齐 accept .catch 字段集）+ 补发 replay:finished 后 rethrow',
+  (() => {
+    const syncFnIdx = idx(TSR, 'export async function replayTrajectorySteps(', 'sync 回放入口');
+    const syncEndIdx = TSR.indexOf('/**', syncFnIdx);
+    assert.ok(syncEndIdx > syncFnIdx, 'sync 函数体后应紧跟 stop 的 JSDoc');
+    const SYNC_BODY = TSR.slice(syncFnIdx, syncEndIdx);
+    const awaitIdx = idx(SYNC_BODY, 'return await runReplayBatch({', 'sync await 批执行');
+    const syncCatchIdx = SYNC_BODY.indexOf('} catch (err) {', awaitIdx);
+    assert.ok(syncCatchIdx > awaitIdx, 'sync catch 应在 await runReplayBatch 之后');
+    const SYNC_CATCH = SYNC_BODY.slice(syncCatchIdx);
+    return SYNC_CATCH.includes('runtime.suppressStepPersist = false;')
+      && SYNC_CATCH.includes('runtime.isReplay = false;')
+      && SYNC_CATCH.includes('runtime.abortReplay = false;')
+      && SYNC_CATCH.includes('if (session) session.busy = false;')
+      && SYNC_CATCH.includes("emitReplay('replay:finished'")
+      && SYNC_CATCH.includes('throw err;');
   })());
 
 const bad = results.filter((r) => !r.ok);
