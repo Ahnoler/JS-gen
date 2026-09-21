@@ -14,6 +14,9 @@
  * 2026-09-21 起改为动态锚点：每次运行从最近 40 张 phase_highlight 截图中选
  * 「bbox 直用命中 × 步数」最优的一张做真实数据断言。阈值按当前录制形态放宽
  * （阶段化录制后单阶段步数量级 ~15，旧全链路 27 步的锚点不再存在）。
+ * 2026-09-21 晚补充两段式选优：湿测小轨迹（4 步纯 click 验收单）会把近 40 张池子
+ * 稀释到无一张达 FLOORS——此时有界回溯（至多 400 张）找达标富锚；FLOORS 不放宽，
+ * 回溯到底仍无达标仍判录制链真回归。
  */
 import { getDB } from '../../config/database.js';
 import {
@@ -28,6 +31,10 @@ import {
 } from '../tools/lightup-step-highlight.mjs';
 
 const ANCHOR_SCAN = 40;
+// 锚池回溯上限：近 40 张被小步数轨迹（如 4 步纯 click 湿测单）稀释时，向前回溯
+// 找达 FLOORS 的富锚；回溯到底仍无达标 → 维持"录制链路未产出可用数据"的真回归判定。
+// FLOORS 本身不放宽——回溯只解决"池子稀释"，不降低对锚点信息量的要求。
+const ANCHOR_BACKSCAN = 400;
 // 真实数据阈值下限：按动态锚点的预期量级设定（当前最优锚点 ~14 步 / 12 bbox 直用），
 // 低于此值视为录制链路未产出可用 phase_highlight 数据，属真实回归。
 const FLOORS = { elements: 1, steps: 10, json: 10, bbox: 10, solid: 10 };
@@ -36,27 +43,55 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
 
-/** 动态锚点：最近 ANCHOR_SCAN 张 phase_highlight 中选 bbox 直用命中×步数最优的一张。 */
+/** 动态锚点：最近 ANCHOR_SCAN 张 phase_highlight 中选 bbox 直用命中×步数最优的一张；
+ *  若近窗无一张达 FLOORS（池子被小步数轨迹稀释），有界回溯至 ANCHOR_BACKSCAN 张找
+ *  达标富锚中评分最优者。 */
 async function pickAnchor(db) {
-  const shots = await db('screenshot')
-    .where({ kind: 'phase_highlight' })
-    .orderBy('id', 'desc')
-    .limit(ANCHOR_SCAN);
-  let best = null;
-  for (const s of shots) {
+  const evaluate = async (s) => {
     const data = await loadPhaseData(db, { screenshotId: s.id });
     const elements = (data.meta?.elements || []).filter((e) => e && e.rect);
-    if (!elements.length || !data.steps.length) continue;
+    if (!elements.length || !data.steps.length) return null;
     const resolved = resolveStepBoxes(data.steps, data.meta.elements);
     const bboxHits = resolved.filter((r) => r.boxes[0]?.source === 'bbox').length;
+    const jsonSteps = data.steps.filter((st) => st.hasElementJson).length;
+    const qualified =
+      data.steps.length >= FLOORS.steps &&
+      jsonSteps >= FLOORS.json &&
+      bboxHits >= FLOORS.bbox;
     const score = bboxHits * 10000 + data.steps.length * 100 + elements.length;
-    if (!best || score > best.score) {
-      best = { shotId: s.id, trajId: s.trajectory_id, phaseId: s.trajectory_phase_id, score };
+    return { shotId: s.id, trajId: s.trajectory_id, phaseId: s.trajectory_phase_id, score, qualified };
+  };
+  const scanBatch = (beforeId, limit) => {
+    const q = db('screenshot').where({ kind: 'phase_highlight' }).orderBy('id', 'desc').limit(limit);
+    return beforeId ? q.where('id', '<', beforeId) : q;
+  };
+  let best = null;        // 近窗内评分最优（不问达标）——保底与旧行为一致
+  let qualifiedBest = null; // 达标锚中评分最优
+  let lastId = null;
+  let scanned = 0;
+  let backscanned = false;
+  while (scanned < ANCHOR_BACKSCAN) {
+    const batch = await scanBatch(lastId, scanned === 0 ? ANCHOR_SCAN : 100);
+    if (!batch.length) break;
+    lastId = batch[batch.length - 1].id;
+    scanned += batch.length;
+    if (scanned > ANCHOR_SCAN) backscanned = true;
+    for (const s of batch) {
+      const r = await evaluate(s);
+      if (!r) continue;
+      if (!best || r.score > best.score) best = r;
+      if (r.qualified && (!qualifiedBest || r.score > qualifiedBest.score)) qualifiedBest = r;
     }
+    if (qualifiedBest) break; // 达标即止：近窗优先，回溯批内首个达标批也够用
   }
-  assert(!!best, `最近 ${ANCHOR_SCAN} 张 phase_highlight 截图中无带元素+步骤的锚点 — DB 锚点数据缺失或录制链路未产出 phase_highlight`);
-  console.log(`  anchor: shot #${best.shotId} (traj ${best.trajId} phase ${best.phaseId}), score=${best.score}`);
-  return best;
+  const chosen = qualifiedBest || best;
+  assert(!!chosen, `最近 ${Math.min(scanned, ANCHOR_BACKSCAN)} 张 phase_highlight 截图中无带元素+步骤的锚点 — DB 锚点数据缺失或录制链路未产出 phase_highlight`);
+  assert(qualifiedBest, `回溯 ${scanned} 张仍无达 FLOORS（steps/json/bbox ≥10）的锚点 — 录制链路未产出可用 phase_highlight 数据，属真实回归`);
+  if (backscanned) {
+    console.log(`  锚池稀释：近 ${ANCHOR_SCAN} 张无达 FLOORS 锚点，回溯至第 ${scanned} 张命中富锚`);
+  }
+  console.log(`  anchor: shot #${chosen.shotId} (traj ${chosen.trajId} phase ${chosen.phaseId}), score=${chosen.score}`);
+  return chosen;
 }
 
 async function testRealDataLoad(db, anchor) {
