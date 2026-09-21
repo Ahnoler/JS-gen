@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-21 12:20 · ZCode 合约线 — 开工：recording-coach subagent 执行经验案例卡抽取（Cursor 线委托）
+
+- **收件**：Cursor 线委托（用户转交 request.md）——recording-coach skill 已定位为「跑湿测的操作员 subagent」，需抽取**执行面**可复用经验（主会话怎么派、操作员怎么跑、哪类失败该停/该改 task/该移交引擎），按「模式一卡」≥8 张，落盘 `docs/superpowers/reports/2026-09-21-recording-coach-subagent-ops-cases.md`。粒度标准已另案交付（9f7d3afc），本单只做执行面，不挖 analyze 段数。
+- **范围（可写集）**：上述新报告文件、agent-log 本条目+收工条目。
+- **禁入区**：`tools/recording-coach/**`（Cursor 线主场，只交报告不改 skill）；`scripts/**`、`src/**`；`docs/superpowers/guides/2026-09-19-recording-coach-skill-draft.md`（只引用不改动）；他线在途（引擎 locator-snap WIP、D2 spin-guard 待办）。
+- **执行方式**：主线程直接抽取——数据源=agent-log 全部 wet 条目原文（git show 逐条核过：wet7 #891 / wet8 #892-896 / wet9 #897-924 / pdiag / #925 D2 / #970-971）+ 蒸馏稿 65d1dc5e + 粒度案例卡风格回链；不派子智能体、不改代码。
+- **口径**：沿用粒度卡 `no-workaround` 纪律——已修复的引擎规避（fill 去重拆阶段等）标 `engine-side`，勿让 Cursor 写成 coach 铁律；卡面事实以 agent-log 原文为准。
+- 注：文档交付轮次，无代码改动
+
 ## 2026-09-21 11:55 · ZCode 合约线 — 收工：unboundlocal-retest PASS（traj 971，回链 11:42 开工）
 
 - 完成：#970 P2 弹窗【查询】点击路径复测全管线收口（`tmp/contract-wet9-20260919/wet-unboundlocal/` + `through-report-unboundlocal.md`；traj 971，fid 9000000011/acct 2，7 阶段 2623..2629，pid 9908 全程 5 采样未变）。
