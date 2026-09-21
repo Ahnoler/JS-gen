@@ -2,6 +2,16 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 22:15 · ZCode 引擎线 — 收工：E1-E4 停止回放 Python 侧闭环交付（回链 20:28 承接；分支 4b7829a9 已推送，未合并待批）
+
+- 完成（代码 `4b7829a9`，7 文件 +333/−19）：**E1 根缺陷闭环**——`replay_action_entries` 步边界（步号赋值后、动作分发前）读 cancel 标志内容=='cancel' 即中断：该步不执行、不进 results/count，返回条件性带 `aborted:true`+`stoppedAt`（与 stop_on_fail 的 stoppedAt 文档化区分）；event_dispatch 回放分支入口先清标志（残留不得误中断新批次首步）+ aborted 透传 replay_done（非中止批次 payload 形状不变）。**E3**——recorder :91/:251 与 service.py:606 统一 `is_cancel_requested` 内容判定（exists() 会把「先清再跑」空文件误判为取消）；共享纯函数三枚落 state.py。**E4**——`_tasks` 死代码 ×2 删除 + 协作式语义注明；`agent_stopped` payload `{reason}` 逐字未动（控制面只认 'cancel_step'）。**E2 随 E1 自动闭合**（控制面步超时补发 cancel_step 即可真正杀掉 Python 僵尸回放）。session_runner.py:471-476 先清再跑零改动（兼容）。
+- 流程：worker-coder 实现（会话中断但代码已完整落地，主会话接手验证）→ reviewer 全清单 **CLEAN/APPROVE**（5 Minor）→ 修复波 M1（pin 跨域登记 PINS_CORE+PINS_EXECUTOR，防 --changed 漏跑）/M2（针断言收紧到循环头段）/M4（service.py:606 残留 exists() 一并统一）；M3/M4 分析结论入下。
+- 验收（分支态）：全量 verify-all **183 pin + statics ALL GREEN 零 FAILED**；新 pin `characterize-replay-cancel-awareness`（helper 行为 ×3 场景 fake-context 循环行为 + 源针）OK；executor 域 16 pin、core/click/ui/phase/fill/select 107 pin 全绿；ruff 零新增。
+- 遗留移交：①**E2 联测链**（超时→补发 cancel_step→Python 步边界中断→replay_done aborted）归系统线/合约线，话术见下；②M3：`_special_element.py:109` 嵌套回放与 `run_traj56_cdp_replay.py:171` 调试脚本未接 cancel_flag_path（默认 None=无循环内中断）——协作语义下停录制步边界即可覆盖，特此说明供系统线知悉；③M5：`docs/reports/2026-09-21-stop-replay-*.md` 三份报告在主检出仍未入库（untracked），系统线可自行 commit；④Node 侧 12 项修复需重启控制面生效——建议与合并本批同窗重启，一次载双侧后联测 E2。
+- 生效面：纯 Python+pin 侧，并入 V2.0 后新录制/回放会话磁盘加载即效、无需重启。
+- **E2 联测话术（可直接转发系统线/合约线）**：【联测请求】E1-E4 已落地分支 `engine/replay-cancel-20260921`（4b7829a9），未合并待批。请联测一条链：「回放批次执行中 → 控制面 stop（或步超时补发 cancel_step）→ Python 在当前步完成后的下一个步边界中断 → replay_done 带 aborted:true + stoppedAt=中断步号 → 后续步不执行」。注意：①停止语义=协作式，cancel 在步边界生效，步内长动作（click_save 后 idle 等待）仍会跑完当前步；②replay_done 无 aborted 键=正常跑完，SPA 前端无需强制适配（可选用 aborted 做停止态展示）；③建议与 Node 侧 12 项修复同窗重启后联测。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 20:28 · ZCode 引擎线 — 声明更正/承接：E1-E4 由本会话按用户指令执行（20:25 他会话自认领作废）；沿其分支 engine/replay-cancel-20260921 与引擎 worktree
 
 - 授权：用户 20:2x 将系统线移交的 **E1-E4 明确移交本会话**（「请你带领 agent team（reviewer 和 worker-coder）完成」，含缺陷清单与三条协同注意）。20:25 他会话对 E1-E4 的自认领（a3ef03df）**由本会话承接作废**——该分支 engine/replay-cancel-20260921 = tip 零代码落地，无在途工作可冲突；该会话本日已有 20:15 D2 误声明（20:20 自勘误），疑似上下文压缩后状态混乱，**请其停止 E1-E4 相关动作**，用户侧已同步知会。
