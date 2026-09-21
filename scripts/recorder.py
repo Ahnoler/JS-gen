@@ -17,6 +17,7 @@ import re
 import sys
 from langchain_core.messages import HumanMessage
 from . import controller as ctrl_mod
+from .state import is_cancel_requested
 from .controller.actions._js_snippets import JS_SMART_LOCATOR
 from .controller.actions._helpers import _as_dict
 from .agent.recorder_emitters import (  # noqa: E402
@@ -88,7 +89,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
         3. 处理提交就绪提示
         4. 打断已匹配的重选循环
         """
-        if cancel_flag_path is not None and cancel_flag_path.exists():
+        if cancel_flag_path is not None and is_cancel_requested(cancel_flag_path):
             sys.stderr.write("[recorder] Cancel signal on step start — stopping agent\n")
             sys.stderr.flush()
             agent.state.stopped = True
@@ -248,7 +249,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
         # ===== End URL capture =====
 
         # Check cancel signal before any processing
-        if cancel_flag_path is not None and cancel_flag_path.exists():
+        if cancel_flag_path is not None and is_cancel_requested(cancel_flag_path):
             sys.stderr.write("[recorder] Cancel signal received, stopping agent\n")
             sys.stderr.flush()
             agent.state.stopped = True
