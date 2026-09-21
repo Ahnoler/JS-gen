@@ -1,0 +1,5 @@
+结论：PROPOSED_<模块或原因前缀>
+报告：{{EVIDENCE_DIR}}/through-report.md
+证据1：propose-snapshot.json atoms=<n> rejected=<m>
+证据2：pick-list-suggested.md
+证据3：<若 COMMITTED_：commit.json created=<k>；否则写「未 commit，等人勾选」>

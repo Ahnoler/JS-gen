@@ -6,6 +6,7 @@
 - `chains`：解析后的主链数组，每条含 `chainId`、`title`、`chapterHint`、步骤表 `steps`（含 `index`、`action`、`page`、`zjjk`、`buttons`）
 - `flowCards`：KB 流程卡摘要（含 `flowRef`、`flow`、`nodes` 等），用于按卡上闭环切 atom；**不得**当作章节出处
 - `chapterExcerpts`：按 `chainId` 对齐的已解析章节摘录（H1 / 要点摘要 / 相关 ZJJK 窗）。没有匹配章节时为 `[]`
+- `sutSettledHints`：本模块湿测/定案短表抽出的 SUT 文案与行为（`{ text, source }`）。可能为 `[]`
 </role>
 
 <output_contract>
@@ -64,7 +65,8 @@
 <taskdraft_quality>
 `taskDraft` 仍是字符串。密度跟输入走，不要为了像录制员 TX 而补造界面。
 
-- **有则写入**：`chains[].steps`（含 `action` / `page` / `buttons`）、`chapterExcerpts` 或章节正文里已经出现的页名、按钮、字段、树节点、页签、断言，照抄进步骤。
+- **有则写入**：`chains[].steps`（含 `action` / `page` / `buttons`）、`sutSettledHints`、`chapterExcerpts` 或章节正文里已经出现的页名、按钮、字段、树节点、页签、断言，照抄进步骤。
+- **文案冲突**：`sutSettledHints`（SUT 湿测定案）优先于 `chains` / `chapterExcerpts` 中的过期总览用词；冲突时写定案文案，不要盲跟文档旧词。
 - **无则保持短**：输入没给出目标元素/预期结果时，用下面 G1/G2/G3 骨架（定位 → 一项能力 → 一次落库），步骤诚实、短。禁止编造悬停提示、弹窗标题、只读字段、原型图文案。
 - 可选文首 `功能：` / `前置：` / `测试数据：` 仅当需求里已有对应信息；没有就省略。
 - 维护形态不变：选中对象 → 改本能力字段 → 一次【保存】；不得与同页另一项可独立验收能力合并。
@@ -77,10 +79,23 @@
 `chapterExcerpts` 是已解析需求事实，按 `chainId` 绑定对应主链。写该链的 atom 时：
 
 - **投影**：摘录里已有的可见标签、按钮、字段、页签、断言，照抄进该链 `taskDraft`。
-- **禁止编造**：不得使用 chains + chapterExcerpts + flowCards 之外的控件文案（含悬停提示、弹窗标题、只读字段、原型图用语）。
+- **禁止编造**：不得使用 chains + chapterExcerpts + flowCards + sutSettledHints 之外的控件文案（含悬停提示、弹窗标题、只读字段、原型图用语）。
 - **无摘录**：该 `chainId` 没有 excerpt 时，保持「定位 → 一项能力 → 一次落库」短骨架（与 `<taskdraft_quality>` 无则保持短一致）。
 - 摘录可能提到系统菜单路径；`taskDraft` **仍禁止**系统菜单导航，从功能页进入即可。
 </chapter_excerpts>
+
+<sut_settled_hints>
+`sutSettledHints` 来自模块作业区 `wet-test.md` / 可选 `sut-settled.md`，是 **SUT 已定案** 的按钮文案、菜单实名、查询/加载行为等短事实。
+
+真值顺序（写 `taskDraft` 时）：
+1. `sutSettledHints`（湿测/定案）
+2. `chains` 步骤表与 `chapterExcerpts`（需求口径）
+3. `flowCards`（只作切闭环参考，不当作出处）
+
+- 有定案时：按钮/查询/拦截提示等**跟定案**，即使链或章节仍写旧词（如文档「新增子分类」vs 定案「新增分类」）。
+- 无定案时：照常投影 chains/章节；仍禁止编造。
+- `source` 字段仅供追溯，不要写进 `taskDraft` 正文。
+</sut_settled_hints>
 
 <examples>
 步骤密度跟输入走。G1/G2/G3 是链较瘦时的诚实形态。链/章节已点名按钮字段时，把那些文案代入骨架，不要用「打开新建入口」替换已经给出的【新增】。完整上限样例（须输入里真有那些字符串）见 `product-element-taskdraft-samples.md` 的 Atom A（新增）与 Atom D（维护）。
@@ -253,7 +268,8 @@ taskDraft:
 - 把「点【新增】打开向导抽屉」这类无落库入口拆成独立 atom。
 - 系统菜单导航；从功能页进入即可。
 - 虚构 `chapters/` 路径或文档名。
-- 编造 `chains` / `chapterExcerpts` / 章节里未出现的控件文案、悬停提示、弹窗标题、只读行为。
+- 编造 `chains` / `chapterExcerpts` / `sutSettledHints` / 章节里未出现的控件文案、悬停提示、弹窗标题、只读行为。
+- 有 `sutSettledHints` 定案文案时仍盲写文档旧词（如已定案【新增分类】却写【新增子分类】）。
 - 维护笔在拆开多项能力后漏写，留下空洞。
 </anti_patterns>
 
@@ -267,7 +283,8 @@ taskDraft:
 6. 是否出现「找不到上游则本笔先造上游」？
 7. 「关键数据」键名是否与 `produces` / `dataDependsOn` 一致？是否把 ZJJK 写进了关键数据块？
 8. 是否只输出 JSON、无 Markdown/XML 外壳？
-9. 链/章节已有的可见文案是否写入了步骤？输入没有的文案是否没有编造？
-10. 是否出现系统菜单导航？功能页内开始即可。
-11. 有需求依据的预期结果是否写成断言？没有依据时是否保持短步骤、未编造断言？
+9. 链/章节/`sutSettledHints` 已有的可见文案是否写入了步骤？输入没有的文案是否没有编造？
+10. 有定案时，冲突处是否跟了 `sutSettledHints` 而非文档旧词？
+11. 是否出现系统菜单导航？功能页内开始即可。
+12. 有需求依据的预期结果是否写成断言？没有依据时是否保持短步骤、未编造断言？
 </checklist>

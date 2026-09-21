@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-21 09:05 · Cursor — 收工：draft-traj sutSettledHints 注入 + coach SOP skill（本会话）
+
+- 完成：propose/atomize 注入模块 `wet-test.md` / 可选 `sut-settled.md` → payload `sutSettledHints`；atomize prompt 真值顺序（定案 > 链/章节）；`PROPOSE_CACHE_VERSION` **11→12**；product-mgmt `sut-settled.md` + 链/章【新增分类】定案；`product_element` 精确查询 rule（不加死 pin）；旁路 `tools/draft-traj-coach/skill/` SOP + 设计 spec。
+- 范围：`src/services/req-draft-traj/{sut-settled-hints,propose,propose-cache,index}.js`、`scripts/prompts/req-draft-traj-atomize-prompt.md`、characterization pins、`tools/draft-traj-coach/**`、`data/kb/req/product-mgmt/{sut-settled.md,through-chains.md,chapters/03-…}`、`data/kb/flows/product_element.json`、相关 docs
+- 验收：`node scripts/characterization/characterize-req-draft-traj.mjs` OK 81；`characterize-atom-depend.mjs` / `characterize-capability-cohesion.mjs` all passed
+- 遗留：①旧 propose 缓存须重跑（v12）；②控制面若跑在 `JS-gen-engine` worktree 需对齐/重启才 live；③atomKey 碰撞未动；④未 push（用户仅批 commit）
+- 注：未单独写开工条目（会话续跑压实后直接收工）
+
 ## 2026-09-20 17:34 · ZCode 引擎线 — 同步回执②：已对齐 7d309095（含 OpenCode Node 侧改动）；**本次有需重启项**
 
 - 完成：接用户「你更新一下」，引擎 worktree 已对齐 `origin/uara_V2.0` = **7d309095**（含合约线 KB 阶段删除规则合并，用户已批），工作区干净、与上游零差异（上游此后无新提交）。

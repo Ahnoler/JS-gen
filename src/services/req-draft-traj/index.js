@@ -14,8 +14,14 @@ export {
   fillTaskDraftProvenancePlaceholders,
 } from './provenance.js';
 export { buildChapterExcerpts } from './chapter-excerpt.js';
+export {
+  loadSutSettledHints,
+  extractSutSettledHintsFromWetTest,
+  extractSutSettledHintsFromSettledFile,
+  mergeSutSettledHints,
+} from './sut-settled-hints.js';
 export { readProposeCache, writeProposeCache, PROPOSE_CACHE_FILENAME } from './propose-cache.js';
-export { proposeDraftTrajectories } from './propose.js';
+export { proposeDraftTrajectories, buildAtomizeUserPayload } from './propose.js';
 export { commitDraftTrajectories, validateCommitAtoms } from './commit.js';
 export {
   FLOW_TEMPLATE_MARKER,

@@ -205,7 +205,7 @@ await run('propose LLM omitted depend fields after materialize → missing_depen
 await run('atomize prompt XML partitions + few-shots', async () => {
   const { readFileSync } = await import('node:fs');
   const prompt = readFileSync(join(ROOT, 'scripts/prompts/req-draft-traj-atomize-prompt.md'), 'utf8');
-  for (const tag of ['role', 'output_contract', 'split_rules', 'chapter_excerpts', 'examples', 'anti_patterns', 'checklist']) {
+  for (const tag of ['role', 'output_contract', 'split_rules', 'chapter_excerpts', 'sut_settled_hints', 'examples', 'anti_patterns', 'checklist']) {
     assert.ok(prompt.includes(`<${tag}>`), `missing <${tag}>`);
     assert.ok(prompt.includes(`</${tag}>`), `missing </${tag}>`);
   }
@@ -232,6 +232,9 @@ await run('atomize prompt XML partitions + few-shots', async () => {
   assert.match(excerpts, /禁止编造/);
   assert.match(excerpts, /无摘录|没有 excerpt/);
   assert.match(excerpts, /系统菜单/);
+  const settled = prompt.slice(prompt.indexOf('<sut_settled_hints>'), prompt.indexOf('</sut_settled_hints>'));
+  assert.match(settled, /sutSettledHints|真值顺序/);
+  assert.match(settled, /wet-test|sut-settled/);
 });
 
 await run('atom-depend samples cover good/bad pairs from prompt', async () => {

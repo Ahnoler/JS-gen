@@ -1,0 +1,38 @@
+{
+  "skill_name": "draft-traj-coach",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "控制面 http://127.0.0.1:4097 已起。模块 product-mgmt 作业区已 sliced（有 through-chains.md）。请按 draft-traj-coach skill 跑 propose，整理建议勾选清单。我还没有确认 atomKeys——不要 commit。收工用 close.txt 格式。",
+      "expected_output": "停在 AwaitingPick；结论 PROPOSED_；有建议清单与 rejected 摘要；无 commit 调用",
+      "files": [],
+      "expectations": [
+        "Mentions or produces a suggested pick list of atomKeys",
+        "Does not call commit or claim COMMITTED_ without user-confirmed atomKeys",
+        "Final message matches close.txt style with PROPOSED_ prefix"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "product-mgmt 刚 propose 完，rejected 里大量 multi_capability_task_draft。请按 skill 纠偏：允许改 through-chains.md（先备份），不要改 chapters，改完必须重新 propose。仍然不要在我确认前 commit。",
+      "expected_output": "进入 RefineChains 纪律；chapters 只读；改链后重 propose；仍等人勾选",
+      "files": [],
+      "expectations": [
+        "States chapters are read-only or does not edit chapters",
+        "Plans or performs through-chains rewrite with backup/diff",
+        "Re-proposes after chain rewrite and still blocks commit pending confirmation"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "我已确认 atomKeys 为 [\"product-mgmt:chain-a:2\"]，functionIdOverrides 里该键为 9000000740。请 validate 再 commit，然后写 through-report 与 close.txt。禁止 prepare/record。",
+      "expected_output": "validate→commit；COMMITTED_ 或如实 skipped；无录制 API",
+      "files": [],
+      "expectations": [
+        "Calls or describes validate then commit with the confirmed atomKeys",
+        "Does not invoke prepare or record APIs",
+        "Closeout uses COMMITTED_ or explains skipped/duplicate honestly"
+      ]
+    }
+  ]
+}
