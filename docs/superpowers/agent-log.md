@@ -2,6 +2,15 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 19:40 · ZCode 引擎线 — 开工：verify-phase-token 第一步落地——门侧兜底（判定式 v1 冻结执行，用户「继续」=按设计稿推荐），SDD 临时 worktree
+
+- 进行中：设计稿 §5 三裁定按推荐执行（判定式 v1 四条冻结 / 先门侧兜底一个湿测窗口再议主收口 / mode='verify' 维持死值）。**本单元只落第一步**：`service.py:724-729` 核验型豁免（镜像 introduce_pick 例外）+ 判定式纯函数模块 + RED pin。主收口（apply_phase_contract+boundary 同笔清理）**不在本单元**——待门侧兜底湿测窗口无 FP 后另单。
+- 判定式 v1 冻结（设计稿 §2，实施取保守面）：纯函数 `is_verification_phase_task(task_text, contract, boundary_active_role)` 四条件全满足才 True——①task_text 无保存线索词；②核验词根（核验/验证/确认/检查/复核/是否存在/不存在）与「已删除/已删/不存在/无数据/是否生效/是否还存」宾语共现（近邻窗口 ≤16 字）；③写动词黑名单零命中（保存/提交/填写/输入/勾选/上传/新增/编辑/修改/删除/启用/停用/导入/确定(动词语境从宽=含即拒)）；④合约 mode∈{query,other,navigate}（create/modify/introduce_pick/login 硬排除；boundary role 同规则侧证、role 未知不否决——保守面=漏豁免可容忍，误豁免零容忍）。
+- 工作范围（临时 worktree `D:\dev\JS-gen-tmp-pblocked` 复用，分支 `engine/verify-phase-gate-20260921` 自 origin/uara_V2.0=**d8463214** 新切）：`scripts/controller/actions/phase/verification_gate.py`（新建，判定式纯函数）、`scripts/agent/service.py`（:724-729 豁免接线，约 5 行）、新 pin `scripts/characterization/characterize-verification-phase-gate.py`（校准对 #973/#924 行为断言 + 词表边界 + source needle）、`scripts/refactor/verify-all.sh`（core 域注册表追加 1 行）；design 稿状态行更新。
+- 禁入区：引擎 worktree（快照复刻线在途）；系统线 stop-replay 范围（`src/services/trajectory/**` 全部、`replay-heal-shared.js` 等——其 6 任务在途，git 已见其 35ac10fe/d8463214 两提交）；`scripts/prompts/**`、`data/kb/**`；`fill_engine.py`/`click_action_engine.py`/`select_engine.py`；运行态服务（4097 pid 9908 / 执行机 32220 / 用户代理 9228）
+- 验收基线：d8463214 全量 ALL GREEN 零已知红（上游 202 项口径 + 系统线新增 pin）；门侧豁免纯 Python，合并后新录制会话即效、无需重启。
+- 注：不维护 CHANGELOG；子智能体一律不 commit
+
 ## 2026-09-21 19:15 · ZCode 引擎线 — 收工：verify-phase-token 判定式草案 v1 落稿（纯设计零代码，回链 18:50 开工）
 
 - 完成：设计稿 `docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md`。核心：①**判定式 v1 四条机械条件**（无保存线索 / 核验词根+宾语共现 / brief_plan 无写动词 / mode∈{query,other,navigate} 硬排除）——校准对应用钉死：#973（重搜确认已删节点不存在）判核验型不再产 submit.required/kinds，#924（核验+删除混合）③命中写动词不豁免；②**主收口=apply_phase_contract 唯一汇合写点**（`intent_contract.py:269-405`，LLM/规则双路径同归；Explore 证实 LLM create/modify 直通无降级路径、规则侧 `校验`→form_fill 而 `删除` 堵 query 逃生门=双路径均可误产 token 合约），且**须同笔清 boundary.success_when+role→other**（has_contract_success 优先读 boundary，单改合约不完整）；③mode='verify' 死值维持不启用（LLM 侧会被 normalize 拒收、全链需锁步，爆炸半径不成比例）；④**纪律**：判定式冻结后才盘点历史集、禁按错分样本回改词表（防反向拟合）、FP 零容忍 FN 可容忍、黑名单从严配置；⑤默认节奏=先门侧兜底（service.py:724-729 镜像 introduce_pick 豁免）一个湿测窗口无 FP 再升主收口。
