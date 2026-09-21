@@ -11,6 +11,8 @@ from ._js_snippets import (
 )
 from .replay_timing import WAIT_500_MS
 from ._workspace import _workspace_result, _real_click_via_cdp
+from .click_locator_tail import apply_click_locator_snapshot, split_locator_tail
+from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
 
 _FIRST_ROW_RADIO_LOCAL = (
@@ -73,6 +75,21 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
             element['target_kind'] = 'table_row_button'
         result = await page.evaluate('''
             ([rowText, btnText]) => {
+''' + PAGE_LOCATOR_HELPERS + '''
+                // ══ 点击命中时刻定位快照（同 JS_CLICK_ICON_BUTTON，U+241F 尾段）══
+                // 落库 element 此前只来自点击前的 _enrich_click_element（文本匹配
+                // 取最后命中），实际被点节点可能不同——每个成功分支在点击当场对
+                // 被点节点 buildLocatorSnap，尾段携带 JSON，Python 侧解析覆盖落库。
+                const LOC_SEP = '␟';
+                const snapLocator = (el, text, kindHint) => {
+                    try {
+                        const abs = absXPath(el);
+                        const kind = kindHint || detectTargetKind(el);
+                        const t = normalizeControlText(text) || cleanVisibleText(el);
+                        const loc = buildLocatorSnap(el, t, abs, '', { targetKind: kind });
+                        return LOC_SEP + JSON.stringify(loc);
+                    } catch (e) { return ''; }
+                };
                 const rows = document.querySelectorAll('.el-table__body-wrapper .el-table__row');
                 const rowCellTexts = (row) => {
                     const cells = row.querySelectorAll('td, .el-table__cell');
@@ -105,16 +122,28 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                         const text = btn.textContent?.trim() || '';
                         const cls = btn.className || '';
                         if (text.includes(btnText) || cls.includes(btnText.toLowerCase())) {
-                            if (btn.offsetParent !== null) { btn.click(); return 'ok'; }
+                            if (btn.offsetParent !== null) {
+                                const tail = snapLocator(btn, text, 'table_row_button');
+                                btn.click();
+                                return 'ok' + tail;
+                            }
                         }
                     }
                     if (btnText === 'edit' || btnText === '编辑') {
                         const editIcon = row.querySelector('i.el-icon-edit, i[class*="bianji"], i[class*="edit"], i[class*="xiugai"]');
-                        if (editIcon && editIcon.offsetParent !== null) { editIcon.click(); return 'ok-icon'; }
+                        if (editIcon && editIcon.offsetParent !== null) {
+                            const tail = snapLocator(editIcon, btnText, 'icon');
+                            editIcon.click();
+                            return 'ok-icon' + tail;
+                        }
                     }
                     if (btnText === 'delete' || btnText === '删除') {
                         const delIcon = row.querySelector('i.el-icon-delete, i[class*="shanchu"], i[class*="delete"]');
-                        if (delIcon && delIcon.offsetParent !== null) { delIcon.click(); return 'ok-icon'; }
+                        if (delIcon && delIcon.offsetParent !== null) {
+                            const tail = snapLocator(delIcon, btnText, 'icon');
+                            delIcon.click();
+                            return 'ok-icon' + tail;
+                        }
                     }
                     // NO blind first-visible-button fallback — it clicked unrelated
                     // controls (e.g. the customer-name view link) and recorded fake
@@ -134,16 +163,24 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
         ''', [row_text, button_text])
         await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
+            head, _ = split_locator_tail(result)
+            merged = apply_click_locator_snapshot(result, element)
+            if merged is not None:
+                element = merged
+            # ok-icon 分支快照 kindHint='icon' 会把 target_kind 带成 'icon'——
+            # 持久化口径保持 table_row_button（回放按 action 名路由，但落库
+            # 语义键不随快照 kindHint 漂移）。
+            element['target_kind'] = 'table_row_button'
             _record_action(
                 'click_table_row_button',
                 {'row_text': row_text, 'button_text': button_text},
-                result,
+                head,
                 element=element,
             )
             if business_data_store is not None:
                 from scripts.controller.actions.container_naming import remember_trigger_button
                 remember_trigger_button(business_data_store, button_text)
-            return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
+            return _ok(head + ' | loc:.el-table__row:has-text("' + row_text + '")')
         if str(result).startswith('button-not-found-in-row'):
             import json as _json
             body = {}
@@ -212,19 +249,39 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                 element['target_kind'] = 'table_row_radio'
         result = await page.evaluate('''
             async ([rowText]) => {
+''' + PAGE_LOCATOR_HELPERS + '''
                 if (!rowText) return 'row-text-empty';
+                // ══ 点击命中时刻定位快照（同 JS_CLICK_ICON_BUTTON，U+241F 尾段）══
+                // clickSel 的真实点击目标是 inner || el（label 宿主 or .el-radio__inner
+                // 节点），落库 element 此前只来自点击前的 enrich/合成 xpath——快照在
+                // mousedown 链之前当场采样，Python 侧解析尾段覆盖落库。
+                const LOC_SEP = '␟';
+                const snapLocator = (el, text, kindHint) => {
+                    try {
+                        const abs = absXPath(el);
+                        const kind = kindHint || detectTargetKind(el);
+                        const t = normalizeControlText(text) || cleanVisibleText(el);
+                        const loc = buildLocatorSnap(el, t, abs, '', { targetKind: kind });
+                        return LOC_SEP + JSON.stringify(loc);
+                    } catch (e) { return ''; }
+                };
                 const pickSel = (root) => root && root.querySelector(
                     'label.el-radio, .el-radio, label.el-checkbox, .el-checkbox, input[type="radio"]'
                 );
                 // KB-I5 round 4: Element UI radios need the real
                 // mousedown -> mouseup -> click chain; a synthetic single
                 // click() does not update the Vue model.
+                // Returns the locator-snapshot tail ('' on null input) so the
+                // caller can append it to the ok result.
                 const clickSel = async (el) => {
-                    if (!el) return false;
+                    if (!el) return '';
                     const inner = el.querySelector
                         ? el.querySelector('.el-radio__inner, .el-checkbox__inner')
                         : null;
                     const target = inner || el;
+                    // 快照在事件链 fire 之前采样：Vue 重渲染会让 fire 后的采样命中
+                    // 陈旧/重建节点（同 _misc 容器链 tailNode 理由）。
+                    const tail = snapLocator(target, rowText);
                     const fire = (type) => target.dispatchEvent(
                         new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
                     );
@@ -233,7 +290,7 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                     fire('mouseup');
                     await new Promise((r) => setTimeout(r, 30));
                     fire('click');
-                    return true;
+                    return tail;
                 };
                 const wantFirst = /^(first|1st|第一个|第一项|首行)$/i.test(String(rowText).trim());
                 // Container scope first: when a topmost visible drawer/dialog is
@@ -316,12 +373,12 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                             if (wantFirst) continue;
                             return 'radio-not-found-in-row';
                         }
-                        await clickSel(radio);
+                        const selTail = await clickSel(radio);
                         let scopeKind = '';
                         if (scope) {
                             scopeKind = scope.classList.contains('el-drawer') ? 'drawer' : 'dialog';
                         }
-                        return 'ok|scope=' + scopeKind;
+                        return 'ok|scope=' + scopeKind + (selTail || '');
                     }
                 }
                 // N2: zero VISIBLE matched rows — an empty table (0 rows, e.g.
@@ -336,22 +393,41 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
         ''', [effective_row])
         await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
+            # 尾段（U+241F 快照 JSON）先剥离：'|scope=' 提取只跑在干净 head 上，
+            # JSON 尾段内的 '|' 不能污染 scope_kind；落库/返回文案与今日同形。
+            head, _ = split_locator_tail(result)
+            head = str(head)
             record_params = {'row_text': row_text}
             if force_first:
                 scope_kind = ''
-                if '|scope=' in str(result):
-                    scope_kind = str(result).split('|scope=', 1)[1].split('|', 1)[0]
+                if '|scope=' in head:
+                    scope_kind = head.split('|scope=', 1)[1].split('|', 1)[0]
                 if element is None:
                     element = {}
                 element['xpath_smart'] = _structural_first_row_radio_xpath(scope_kind)
                 element['row_text'] = 'first'
                 element['target_kind'] = 'table_row_radio'
                 record_params = {'row_text': 'first'}
+            # 点击命中时刻定位快照（同 icons.py / click_button）：enrich 路径与
+            # force_first 合成路径都经快照覆盖——合成 xpath_smart 被点击当场对
+            # 被点节点的快照覆盖；快照缺键回退 enrich/合成值。
+            merged = apply_click_locator_snapshot(result, element)
+            if merged is not None:
+                element = merged
+            if force_first:
+                # 合成路径的持久化语义键不受快照影响（row_text=first 由
+                # characterize-search-then-click-guard 钉住；row kind 必须留
+                # table_row_radio 供 replay_table 定位）。
+                element['row_text'] = 'first'
+            # clickSel 快照不带 kindHint，detectTargetKind 对裸 input 单选可能
+            # 判成 form_radio——持久化口径统一 table_row_radio（enrich 路径
+            # 与 force_first 路径同此）。
+            element['target_kind'] = 'table_row_radio'
             _record_action(
-                'click_table_row_radio', record_params, result, element=element,
+                'click_table_row_radio', record_params, head, element=element,
             )
             loc_row = 'first' if force_first else row_text
-            return _ok(result + ' | loc:.el-table__row:has-text("' + loc_row + '")')
+            return _ok(head + ' | loc:.el-table__row:has-text("' + loc_row + '")')
         if str(result).startswith('err-no-row-match:'):
             # N2: explicit zero-row failure — never treat rowCount=0 as success.
             return err_with(

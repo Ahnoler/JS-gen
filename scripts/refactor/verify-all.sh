@@ -42,6 +42,7 @@ resolve_python || exit 1
 # domain whose source files it reads; when unsure, add to `core`.
 # ---------------------------------------------------------------------------
 PINS_CORE='
+characterize-click-locator-snap-replica|"$PY" scripts/characterization/cold/characterize-click-locator-snap-replica.py
 characterize-trajectory|node scripts/characterization/characterize-trajectory.mjs
 characterize-deadlock-forensics|node scripts/characterization/characterize-deadlock-forensics.mjs
 characterize-bib-navigate-input|node scripts/characterization/cold/characterize-bib-navigate-input.mjs
@@ -145,6 +146,7 @@ characterize-close-dialog-replay|"$PY" scripts/characterization/characterize-clo
 characterize-introduce-dialog-close|"$PY" scripts/characterization/cold/characterize-introduce-dialog-close.py
 '
 PINS_CLICK='
+characterize-click-locator-snap-replica|"$PY" scripts/characterization/cold/characterize-click-locator-snap-replica.py
 characterize-real-click|"$PY" scripts/characterization/characterize-real-click.py
 characterize-idempotent-click-gate|"$PY" scripts/characterization/characterize-idempotent-click-gate.py
 characterize-click-replay-engine|"$PY" scripts/characterization/cold/characterize-click-replay-engine.py
