@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-21 12:20 · ZCode 引擎线 — 合并回执：more-btn xpath 伪造修复并入 V2.0（8bf573b1，traj 974 三面 PASS）
+
+- 完成：`engine/locator-snap-20260921`（9ee4af45）`--no-ff` 并入 uara_V2.0 = **8bf573b1**，已 push（tip 248885c7，含他线 agent-log 补记合并）。引擎 worktree 已对齐。
+- **合约线验收（traj 974，三面全过）**：①落库面——评级页 more-btn 两步落库 xpath_full 完整指向实际被点内层 button，`locator_fallback_reason=empty_anchor_text` 正是快照通路生效明证（旧 enrich 必空）；②回放面——不 detach 直回放 3/3 confirmed=1、两步 ok-xpath|locate=ok；③forensic 面——注入 `jsgen-forensic-fake` 假按钮后落库 xpath 仍唯一命中真 more-btn 内层 button（isFake:false/inMoreBtn:true/count=1）。守卫面健康：err-icon-label-ambiguous 0 次，err-more-toggle-already-expanded 单次拒后 agent 改 index 成功（非互拒）。证据 `tmp/contract-wet10-20260921/` + through-report-morebtn.md，其回执 7479afb5。
+- 合并态验收：全量 verify-all **221 过、失败集=3 已知红零新增**；核心 pin 全绿（icon-buttons 含实验 C 全链护栏/idempotent-click-gate/step-number-integrity/stop-semantics）。
+- **跨线协同（两次）**：合并窗口内主检出存在他线未提交 WIP（`docs/superpowers/reports/2026-09-21-recording-coach-subagent-ops-cases.md` 暂存态 + coach skill 文件）——均按协议 **path 限定 stash → 合并 → `stash pop --index` 原样恢复**（含暂存态），他线内容零改动、零丢失；上游 e119ea40 合并同法处置。
+- 状态：**已合并并推送**。生效：纯 Python 侧，引擎 worktree 已对齐磁盘 → **新录制会话即载**（无需重启控制面）。合约线可安排复测/回归。
+- 登记后续批：同族 `_navigation.py`（switch_tab/click_menu_item）/`close_dialog`/`_table.py` 快照复刻；aria-label 盖章不对称（合约线已明示不设卡）。
+- 注：不维护 CHANGELOG
+
+
 ## 2026-09-21 12:30 · OpenCode 系统线 — 开工：prepare 登录回放会话死亡时快速释放轨迹锁
 
 - 工作范围：`src/services/replay-actions.js`（核心改动：replay_done 等待增加会话终态事件竞速）、`src/services/trajectory/trajectory-record-lifecycle.js`（登录回放/探测启用）、`src/services/trajectory/prepare-login-retry.js`（沉降启用）、`src/services/trajectory/recording-page-bind.js`（读页绑定启用）、`src/services/trajectory/menu-navigation.js`（菜单导航启用）；新增 characterization pin `scripts/characterization/characterize-replay-terminal-abort.mjs`。
