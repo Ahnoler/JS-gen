@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 21:05 · Cursor — 开工：方案 D 第 2 刀（阶段结构元数据持久化并在有效时跳过文本重签）
+
+- 进行中：按已审规格与计划实施。规格 `docs/superpowers/specs/2026-09-21-phase-structured-contract-design.md`，计划 `docs/superpowers/plans/2026-09-21-phase-structured-contract.md`。Task 1–6、8 本会话直做；Task 7（`scripts/agent/service.py`）等 E1–E4 合入后再接。
+- 场地：`D:\dev\JS-gen-phase-contract`。分支 `cursor/phase-structured-contract-20260921`（自 `uara_V2.0` `280abdd2`）。branch-only，未合并。
+- 工作范围：`src/services/trajectory/phase-contract.js`（新）、`trajectory-meta-service.js`、`trajectory-phase-service.js`、`trajectory-recording-runner.js`、`src/dao/trajectory-phase-dao.js`、`migrations/20260921120000_phase_contract_json.js`、`schemas/init.sql`、`src/dashboard/api-docs/groups/trajectory.js`、`scripts/controller/actions/phase/phase_contract_snapshot.py`（新）、`scripts/characterization/characterize-phase-contract.mjs`、`characterize-persisted-phase-contract.py`、`scripts/refactor/verify-all.sh` 的 `PINS_PHASE` 两行、上述规格与计划。
+- 禁入区：`D:\dev\JS-gen-engine` 与 `engine/replay-cancel-20260921` 文件集（`scripts/agent/service.py`、`_replay.py`、`event_dispatch.py`、`state.py`、`recorder.py`）；运行态 4097 与执行机；本单元不重启。
+- 执行方式：本会话按计划逐步实现。代码提交等用户要求；开工声明按仓库约定先推送。
+
 ## 2026-09-21 21:55 · ZCode 系统线 — 收工：停止回放系统线 12 项缺陷全部修复合入（回链 18:05 开工；SDD 六任务 + 终审 + 修复波）
 
 - 完成（代码 8 提交 `35ac10fe→c7f8ffcf`，+831/−40，全量 verify-all 182 pins + statics **EXIT=0 ALL GREEN 零 FAILED**）：
