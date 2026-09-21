@@ -2,6 +2,19 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 16:40 · ZCode 引擎线（D2 线） — 收工：D2 A/C 代理加速件交付并已并入 V2.0（回链 14:15 开工；`eab5e83c`；用户批「这个 flag 可以加」）
+
+- 完成（代码 `14bcbb9e` → V2.0 合并 `eab5e83c`，已 push）：
+  - **`scripts/browser/factory.py`**：`_chrome_automation_args()` 按 `tmp/chrome-proxy.flag` 追加 `--proxy-server`（每次浏览器启动即时读取；默认态=文件不存在，参数表逐字节等同现状零行为影响；内容形态 8 种覆盖，无法解析回落 `http://127.0.0.1:8899`）。刻意不加 bypass list——Chromium 对 loopback 有隐式直连，控制面/CDP 流量天然不走代理。
+  - **离线 pin `characterize-chrome-proxy-flag`**（23 断言，注册 verify-all）+ **on-demand 真件端到端 `characterize-chrome-proxy-live`**（6 断言，不注册，需 bundled chromium）。
+  - **代理本体 `tmp/d2-accept-sim/d2-503-proxy.py`**（tmp 不入库）+ **`PROXY-RUNBOOK.md`**（合约线执行版：起代理→开 flag→ARM 注入→收场四步，含判定口径与已知边界）。
+- **机理发现（重要，负控实证）**：Chromium 对 `--proxy-server` **隐式绕过 loopback**（localhost/127.0.0.1 永远直连）——e2e 若用 localhost 当 origin 会假阳性（首版 4/6 假阳性即此）；修正为假域名 `sut-selfcheck.invalid` + 代理 `--map` 映射后 6/6 真 PASS（负控「代理死→导航必败 ERR_PROXY_CONNECTION_FAILED」证明 flag 位真实生效）。真实 SUT 非 loopback 不受影响。
+- 验收：pin 23/23 + 代理 selfcheck 4/4（转发/503/随时 disarm/host 过滤）+ live 端到端 6/6（proxy.log 实证 Chrome 请求穿越代理）；**合并态全量 verify-all 196 ok / 失败集=3 已知红零新增**（step-highlight/layer-tree/confirm-notification，合并前主检出对照同红）。本临时 worktree 曾因缺 node_modules/python 大面积假红，junction 补齐后定位清楚，教训=临时 worktree 跑 verify-all 必须先补 node_modules + python 两个 junction。
+- 运行态：控制面 4097=pid 9908 未动（不需要重启——flag 按会话读取，新录制会话即生效）；`tmp/chrome-proxy.flag` 与 ARM/MODE 已确认零残留。
+- 合并后验收已按硬约定在主检出合并态执行（196 ok/3 已知红零新增）；期间合入他线 OpenCode 回放开场计划打印改动（`2e9b33b3`，与本次文件集零交集）。引擎 worktree 已对齐 `eab5e83c`，`tmp/d2-accept-sim/` 交付物三处检出均已就位（JS-gen / JS-gen-engine）。
+- **移交合约线**：按 `tmp/d2-accept-sim/PROXY-RUNBOOK.md` 执行腿 A/C（单条 ≤15 分钟，零系统改动零重启，删 flag 即恢复直连）；腿 C soft 档升档仍需重启窗口（用户批）。代理日志=验收证据（每请求一行 JSON）。
+- 注：不维护 CHANGELOG；未合并待批状态解除（用户已批「这个 flag 可以加」即含合并授权）。
+
 ## 2026-09-21 16:20 · OpenCode — 续工：人工点回放时开场一次性打印完整回放计划（控制面 + 执行机双份）
 
 - 背景：上一单元 15:40 收工时只在控制面打印了简表（`actions=[…]` 只有动作名），且执行机逐条收 `replay_actions` 无法自行汇总整批，操作人员在执行机日志里看不到「本次要回放哪些步骤」。
