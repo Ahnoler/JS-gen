@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-21 13:50 · ZCode 合约线 — 阶段：D2 验收收口（B 腿 PASS，A/C 腿因 SUT 无法配合确认不可执行）
+
+- **B 腿（observation 零误报）PASS**：两轨 `[spin-guard]` 0 条 / `phase_error` 0 条，业务与基线一致（B1 #972 recorded、B2 #973 三 stamp 自造自清达成）——详见 12:55 条目与 `d2-acceptance-report-b.md`。
+- **A/C 腿（503 场景）标记 BLOCKED（外部依赖不可得）**：用户裁定 SUT 侧不好配合制造 503 窗口；后台探针（每分钟 curl 蹲守，检测非 200/503 文本）已停（`sut-probe.log` 留痕，SUT 实测恒 200）。**未验证的半程**=observation 档能否命中 503 场景 + soft 档能否 ~6 步快速失败并落 `reason=sut_unavailable_spin_guard`。
+- 移交建议：①引擎线若具备环境模拟能力（本地代理/hosts 伪造 503 + 录制中途切换；注：SUT 为 http 无 TLS 障碍，但 prepare 需先真实登录成功再切 503），我方可配合提供配方与判定口径；②若后续 SUT 自然进入 503 态（维护窗口等），我线**随时可开单**（单条 15 分钟内完成，配方已备 `d2-acceptance-runbook.md`，observation 档仍在运行态）；③判定逻辑的离线覆盖已有 pin（设计稿 §8.2 `characterize-sut-spin-guard.py`），A/C 腿未跑=端到端未验、非逻辑未验，风险由引擎线评估。
+- 顺带移交：B2 终态 quality_failed（阶段 2）归因=**核验型阶段（无保存动作、doneLog 完整记录重搜「暂无数据」）被质量门按契约索要 success token**——非守卫误杀；观察项，建议引擎/KB 评估核验型阶段 token 口径。
+- 注：验收轮次，无代码改动
+
 ## 2026-09-21 13:10 · ZCode 合约线 — 开工：more-btn locator-snap 修复湿测验收（引擎线 9ee4af45 待批；与同线 D2 B 腿并行不悖）
 
 - **收件**：引擎线验收请求——more-btn 落库 xpath「伪造」修复 @ `engine/locator-snap-20260921` 9ee4af45（未合并待批）。修复=点击命中时刻对实际被点节点 buildLocatorSnap 落库（enrich 降 fallback）+ 回放 clickToolbarIcon 补 more-btn 信号 + icon 宿主歧义守卫（收集→滤页头→恰一才点，多命中 err-icon-label-ambiguous）。验收路径（引擎指定=系统线取证报告 §六）：评级页录 `click_button('更多')` → 回放全链验证；落库 xpath 应指向实际被点内层 button，jsgen-forensic-fake 式注入复检不得命中假按钮。
