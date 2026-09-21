@@ -2,6 +2,17 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 16:55 · ZCode 合约线 — 开工：同族快照复刻湿测验收（snap-replica 7e43c736，场景=关弹窗；引擎 worktree 临时切换代管）
+
+- **收件**：引擎线验收请求——同族快照复刻 @ `engine/snap-replica-20260921` **7e43c736**（未合并待批）：五类点击链（switch_tab/click_menu_item/close_dialog/click_table_row_button/click_table_row_radio）落库定位改为「实际被点节点命中时刻快照」（more-btn #974 同款，snap-before-fire 经 U+241F 尾段回传、Python 键级覆盖 element）。验收=任选一场景录制+回放全链通即 PASS；观察面：关弹窗落库 xpath 应命中真实关闭控件（旧行为误指 headerbtn/内层 i）、表格行按钮 xpath 不得指向从未被点的节点。
+- **选景：关弹窗（产品阶段管理页，fid 9000000740 / acct 2）**——4 阶段：①菜单进入 mntPdStg（顺带覆盖 click_menu_item 链）→②【新增阶段】开弹窗→③弹窗右上角 X 关闭（**close_dialog 链=新逻辑主靶**）→④再开弹窗点「取 消」关闭（click_button 链=未改动对照）。**零 SUT 写操作**（全程不点保存/确定，弹窗只开只关）。
+- **磁盘态已核 + 临时切换（代管声明）**：引擎 worktree 原在 `engine/worktree` @ 014b4dfc（不含修复，工作区净仅 .zcodeignore 未跟踪）；已切至 `engine/snap-replica-20260921` @ 7e43c736（py_compile 5 文件全过 + `buildLocatorSnap` 四文件在场 grep 实证）。**测毕还原回 engine/worktree @ 014b4dfc**。服务 pid 9908 / health 200 不变；纯 Python 侧新录制会话即载，无需重启。
+- **范围（可写集）**：`tmp/contract-wet11-20260921/`、agent-log 本条目+收工条目。
+- **禁入区**：`scripts/**`、`src/**`、`tools/recording-coach/**`；引擎 worktree 写操作（除上述一次性 branch switch，测毕即还原）；远端代理 9228 与 D2 线证据目录；SUT 存量数据。
+- **执行方式**：主线程直接执行——create→prepare→CDP 预检→record/start（后台+60s 轮询）→**不 detach**→回放全链（steps/replay 202 异步，confirmed 判定）→DB 步级复核（close 步落库 element/xpath 结构 + 实际被点节点交叉比对）→detach→executor 日志 grep（本单 sid 界定）。
+- **验收判据**：①回放全链 confirmed；②X 关闭步落库 xpath 命中真实被点关闭控件（非未点节点）；③取消步（对照链）不退化；④零 SUT 写操作复核（steps 全审计）。
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-21 18:05 · ZCode 合约线 — 收工：uara_V2.0 上游合并（d5086613，各线自并 V2.0 维护惯例；合并态验收 PASS）
 
 - 完成：`origin/uara_V2.0`（eab5e83c，含 more-btn 9ee4af45 态、D2 守卫 0cbcbd35/c87b9be7、回放修复、代理加速件、系统线 executor 修复批）并入 `fix/phase-contract-20260918`，合并提交 **d5086613**。上游 +230 提交；代码侧全自动并入无冲突。
