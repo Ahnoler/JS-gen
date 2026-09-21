@@ -88,6 +88,7 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 - **Click record/replay (index+button):** product replay routes through `ClickEngine` (`*_for_replay` / durable); see `docs/superpowers/archive/specs/2026-09-10-click-record-replay-unify-design.md`.
 - **`el-select`** → use `selectOption`; generic click-by-index on option spans fails silently.
 - **Re-query DOM** before each op — Vue may recreate dialogs/components.
+- **Phase contract token ownership** (`scripts/controller/actions/phase/`): a terminal token (`toast_ok` / `confirm_click` / `picker_closed` / `saved_navigation`) belongs to the phase that actually performs the terminal action. Open-picker-only → `navigate` (no picker token); fill-only whose save is in a later phase → `maintain` + `all_editable` but `submit.required=false`/`success.kinds=[]`; the cross-phase guard (`_apply_cross_phase_token_guard`) drops a token owned by a later phase. `compile_boundary`/`apply_phase_contract` callers must pass `all_phases` + `current_phase_number`. See `docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`; pins `characterize-cross-phase-token-guard.py`, `cold/characterize-phase-boundary.py`, `cold/characterize-phase-intent.py`.
 
 **Recording / detach semantics:**
 - `record/stop` ends recording but does **not** free the executor slot; `stream/detach` stops BiB only (`remote_session`→`idle`, `live`→`draft`); `detach` closes Chrome + Python + slot.

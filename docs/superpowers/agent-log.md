@@ -11,6 +11,26 @@
 - 结论：合并态 e6f072d3 的 182 pin 现势=**179 绿 + step-highlight（系统线数据面口径）/ refill-contract（OpenCode prompt 双 9 号）两挂账，均他线归属、零本线回归**。
 - 注：不维护 CHANGELOG。
 
+## 2026-09-21 19:35 · OpenCode — 收工：阶段合约「实际逻辑流程」开发备注（纯文档）
+
+- **完成**：`e355f7f0`（纯文档，零运行代码触碰）。
+  - 新建 `docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`：实际编译流程（meta-service → classify → compile_boundary → boundary_to_legacy_intent → apply_phase_contract → cross-phase guard → done gate → recovery）、三条核心规则（R1 open-only→navigate / R2 fill-only 无保存令牌 / R3 终态令牌归执行阶段）、分支优先级与令牌对照表、关键判定函数扫描范围、后续同类开发 checklist、改动落点、边界与非目标。
+  - `2026-09-18-phase-contract-conflict-survey.md` 追加 §6 修订备注（不改历史正文），指向新 spec 并说明与 #858 纯填写 query 外溢、R 清单的关系。
+  - `todo-list.md` 的 `phase-structured-contract`（方案 D）行更新前置状态：方案 C 已落地跑稳（`be21aafd`/`5639541c`），方案 D 目标=运行时文本分类退化为 fallback。
+  - `AGENTS.md` Element UI/正确性规则区补一条阶段令牌归属要点（作为 agent 单一事实源，指向 spec 与 pin）。
+- **验收**：`git diff --stat` 仅 4 个文档文件（+171/−1），零 `scripts/**`、`src/**`、`tools/**` 改动；无运行逻辑影响，verify-all 不适用。
+- **遗留移交**：无（方案 D 仍为 todo-list 长期项，前置已更新）。
+- **现场清点**：工作树干净；无 stash 操作；无他线 WIP 残留。
+- **注**：不维护 CHANGELOG。
+
+## 2026-09-21 19:10 · OpenCode — 开工：阶段合约「实际逻辑流程」开发备注（纯文档，不动运行逻辑）
+
+- **进行中**：用户指示「按实际逻辑流程修改相关文档，为后续同类开发备注」——把本轮跨阶段令牌越界修复后的实际阶段合约流程与后续须遵循规则沉淀为可复用开发备注；**明确不动任何运行逻辑代码**（`scripts/**`、`src/**` 只读）。
+- **工作范围**：`docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`（新建，实际流程 + 规则 + 坑）；`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`（尾部加 2026-09-21 修订备注，不改历史正文）；`docs/superpowers/todo-list.md`（phase-structured-contract 行状态/前置更新）；`AGENTS.md`（Element UI/正确性规则区补一条阶段令牌归属要点）；agent-log 本条目+收工条目。
+- **禁入区**：一切 `scripts/**`、`src/**`、`tools/**` 运行代码；他线在途分支工作区；运行态服务。
+- **执行方式**：主会话直写文档；不改代码故 verify-all 不适用（仅文档 diff 自查零代码文件被触碰）。
+- **注**：不维护 CHANGELOG。
+
 ## 2026-09-21 19:00 · ZCode 引擎线 — 合并回执：同族快照复刻并入 uara_V2.0（7e43c736→合并 4776b7f0；合约线湿测 PASS 回执可合并）+ 两项移交
 
 - 合并：`engine/snap-replica-20260921`（7e43c736）`--no-ff` 并入 uara_V2.0 = **4776b7f0**；agent-log 冲突按协议双方条目并排消解（保留他线 9 条），verify-all.sh 注册表自动合并。push 遇 non-fast-forward（OpenCode 线同窗口推 e3825ee3）→ pull 合并 **c1c3f06a** 再推，全程零 force。主检出现场他线活跃 WIP（trajectory-runtime.js / trajectory-session-replay.js）未触碰、未随本合并。

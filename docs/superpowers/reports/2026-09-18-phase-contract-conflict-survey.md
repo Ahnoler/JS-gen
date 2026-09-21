@@ -47,3 +47,21 @@
 ## 5. 验收口径
 
 worktree 干净基线（3 红：step-highlight / layer-tree / confirm-notification）→ 三批改后全量 verify-all 3 红零新增 → 合并回 uara_V1.2 合并态重跑（AGENTS.md 硬约定）→ 控制面重启生效 → 真机复跑对公客户评级三阶段批次验证阶段 3 done 一次放行。
+
+---
+
+## 6. 后续修订备注（2026-09-21，OpenCode 跨阶段令牌越界修复）
+
+> 本节为**备注**，不改上文历史正文。本次修复的是本文 §1「编译一次定错令牌 → done 连拒放大」的另一条成因链：**令牌归属错阶段**。
+
+- **新根因**：不是「令牌在当前阶段产不出」，而是「令牌的终态动作其实发生在**后续阶段**」——开选择器阶段被判 `introduce_pick` 索要 `picker_closed`、纯填写阶段被索要保存令牌；recovery 因此把 agent 推过阶段边界，后续阶段零动作。
+- **对应修法**：见新档 `docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`（实际流程 + R1/R2/R3 规则 + 分支令牌对照 + 后续开发 checklist）。要点：
+  1. 仅打开窗口/弹窗/页面 → `navigate`，令牌 = 窗口/页面打开（`_OPEN_PAGE_*_RE` 补 `窗口/选择窗/选择框`）；
+  2. 纯填写/选择（保存动作在后续阶段）→ `maintain` + `all_editable`，但 `success_when=[]`、`submit.required=false`；
+  3. `_apply_cross_phase_token_guard`（L1c）：后续阶段持有终态动作时，当前阶段丢弃终态令牌；
+  4. recovery 仅 `submit.required=true` 才推荐 `click_save`。
+- **对 §2 普查表 / §24 R 清单的影响**：
+  - 与 `#858 纯填写阶段被索 query_clicked`（本报告 §1597 反向仲裁、§1635 遗留①）**同族但不同面**——本次处理的是「终态动作归属」，不复用 query 仲裁路径；两者可并存。
+  - R 清单（R1–R5 放松向假绿窗口）结论不变，仍留后续专项；本次不改放松方向。
+- **验收**：新 pin `scripts/characterization/characterize-cross-phase-token-guard.py`；复跑 `cold/characterize-phase-boundary.py`、`cold/characterize-phase-intent.py`、`characterize-phase-reviewer.py` 全绿。
+- **台账**：`docs/superpowers/todo-list.md` 的 `phase-structured-contract`（方案 D）行已同步前置状态。
