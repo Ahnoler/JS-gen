@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-21 13:10 · ZCode 合约线 — 开工：more-btn locator-snap 修复湿测验收（引擎线 9ee4af45 待批；与同线 D2 B 腿并行不悖）
+
+- **收件**：引擎线验收请求——more-btn 落库 xpath「伪造」修复 @ `engine/locator-snap-20260921` 9ee4af45（未合并待批）。修复=点击命中时刻对实际被点节点 buildLocatorSnap 落库（enrich 降 fallback）+ 回放 clickToolbarIcon 补 more-btn 信号 + icon 宿主歧义守卫（收集→滤页头→恰一才点，多命中 err-icon-label-ambiguous）。验收路径（引擎指定=系统线取证报告 §六）：评级页录 `click_button('更多')` → 回放全链验证；落库 xpath 应指向实际被点内层 button，jsgen-forensic-fake 式注入复检不得命中假按钮。
+- **磁盘态已核**：引擎 worktree @ 9ee4af45 工作区净（仅 .zcodeignore 未跟踪）；纯 Python 侧，新录制会话即载（Node 侧 39dadd7f 内存态不含本修复——回放路径若涉及 Node 侧定位需留意，主靶落库 element 在 Python 侧不受影响）。
+- **与同线 D2 开工条目（12:15）并行互认**：文件集不相交（我 `tmp/contract-wet10-20260921/`，它 `d2-acceptance/`）；执行机槽位充足（容量 4）；SUT 业务面双方均无提交写操作、各占独立 Chrome 槽。**executor-main.log 共享追加**：双方签名扫描均须按 sid/时间界过滤（本单 sid 开跑后登记）；forensic 注入只动我方槽位页签，零真实点击纪律沿用（拦截 click 捕获、即插即删、核还原）。
+- **范围（可写集）**：`tmp/contract-wet10-20260921/`、agent-log 本条目+收工条目。
+- **禁入区**：`scripts/**`、`src/**`、`tools/recording-coach/**`；引擎 worktree 现场；D2 线证据目录与其 B1/B2 录制会话；远端代理 9228；SUT 存量数据。
+- **执行方式**：主线程直接执行——建单（fid 9000000011/acct 2，4 阶段：进页→click_button('更多') 展开筛选区→【查询】→收尾，无提交）→ prepare→CDP 预检→record/start→轮询→**不 detach**→回放全链（POST steps/replay 202 异步，confirmed 落库判定）→ forensic 复检（CDP evaluate 注入 fake→解析落库 xpath 不得命中 fake、应命中 more-btn 族内层 button→删 fake 核还原）→ executor 日志签名（按 sid）+ MySQL 复核 → detach。
+- **验收判据**：①more-btn 步落库 element xpath 非空且命中实际被点内层 button（非 fake 非空壳）；②icon_class 信号落库（meta 链闭合）；③回放全链 confirmed；④fake 注入后 xpath 不命中 fake；⑤本页恰 1 个 more-btn，无 err-icon-label-ambiguous 误伤。
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-21 12:40 · ZCode 合约线 — 收工：recording-coach subagent 执行经验案例卡 13 张交付（回链 12:20 开工）
 
 - 完成：`docs/superpowers/reports/2026-09-21-recording-coach-subagent-ops-cases.md`（13 卡：诚实拒绝 3 / task 改写重试 2 / 假报告识破 2 / 管线坑 3 / 收尾契约 1 / keep 正例 2；`yes` 11 张 / `no-oneoff` 1 / `engine-side` 1）。文首总结 10 条=「操作员反复踩的坑 + 主会话派发最小必备项」，委托 8 个优先覆盖项全命中（粒度速查按约回链粒度卡不重复）。
