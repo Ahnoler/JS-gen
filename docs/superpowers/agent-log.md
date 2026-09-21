@@ -1,6 +1,15 @@
 # Agent 协作日志
 
-# Agent 协作日志
+## 2026-09-21 11:05 · ZCode 引擎线 — 开工：more-btn 图标按钮 xpath「伪造」修复（系统线 L1c 取证移交，点击命中时刻定位快照）
+
+- **收件**：系统线取证报告 `docs/reports/2026-09-21-l1c-xpath-morebtn-forensics.md`（本地分发区）——L1c 已排除；根因实锤：`click_button('更多')` 落库 xpath 来自点击前 `_enrich_click_element` 文本匹配（includes 取最后命中），实际点击走 `JS_CLICK_ICON_BUTTON`（more-toggle class 兜底下钻内层 button），两选点链无一致性校验 → 落库 xpath 可指向从未被点击的节点（真机注入假按钮实锤）；纯图标无 tooltip 时 enrich null → 落库无定位、回放 not-found。
+- **修复方向（按报告 §六）**：①点击成功后对实际被点 el 当场 `buildLocatorSnap` 随 result 返回，落库以命中时刻快照为准（enrich 留 fallback）；②回放 `clickToolbarIcon` 补 more-btn class 信号（消费 ok-more-toggle 返回的 class）；③icon 宿主候选补歧义守卫（对齐同事仓 41992f0）。两处需知一并评估：空 xpath 时 locator_strategy 落空串（action.py:426-429）、合成 aria-label 盖章不对称。
+- 上游：uara_V2.0（251c461b）。分支 `engine/locator-snap-20260921`——**经临时 worktree 作业**（共享 worktree 仍由 D2 线占用，其单元进行中；本批与其文件集零交叠，仅 verify-all.sh 登记行惯例性相邻）。
+- 范围（可写集）：`scripts/controller/actions/click_action_engine.py`、enrich/icon 相关 js_snippets、`scripts/models/action.py`（如 locator_strategy 需动）、相关 characterization pin（`characterize-icon-buttons.py` 扩展 + RED 先行）、`scripts/refactor/verify-all.sh`、主检出 agent-log 本条目+收工条目
+- 禁入区：运行态服务零触碰（重启须先请示）；远端代理 9228（用户自管）；D2 线分支与其 worktree 现场（`engine/d2-spin-guard-20260921` 及其未提交 WIP 零触碰）；`fill_engine.py`/`select_engine.py`
+- 验收口径：pin 扩展（引擎全链 + click listener 对比，实验 C 离线化）RED→GREEN；全量 verify-all 3 已知红零新增；分支交付「未合并待批」，湿测验收归合约线（评级页录 more-btn→回放全链通）
+- 注：不维护 CHANGELOG
+
 
 ## 2026-09-21 11:02 · ZCode 引擎线 — 合并回执：B 类① + 小批次 + #970② 热修并入 V2.0（02764a04/251c461b）；⚠️ 运行磁盘待 D2 交付后恢复
 
