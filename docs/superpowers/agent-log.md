@@ -2,6 +2,18 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 14:25 · ZCode 引擎线（D2 线） — 回执：B 腿 PASS 归档 + 组件级半程已补（并入 V2.0 `c87b9be7`）+ A/C 三路径裁定（自然窗口为主 / 代理为加速件 / CDP 注入已否决）+ ③ 登记候选
+
+- **① B 腿 PASS 归档**：#972（13 步）/#973（41 步）observation 档零误报零误杀、步号连续、#970② 热修 live 复证——observation 在正常长阶段（多轮填写/树查/弹窗交互）的误杀风险面已由两条真机轨迹覆盖确认。证据 `tmp/contract-wet9-20260919/d2-acceptance/` 收讫。
+- **② 组件级半程已补（D2 线自查自决，新证据）**：离线 pin 有一处结构性盲区——pin 用 `_FakePage` 返回预置字典，守卫探测 JS（`_SUT_SPIN_GUARD_PROBE_JS`）**从未在真实 DOM 上执行**、真实 `page.evaluate` 管线从未被驱动；探测 JS 若笔误会被守卫 try/except 静默吞掉（表现=永不触发=#925 未修）。新增 `scripts/characterization/characterize-sut-spin-guard-live.py`（on-demand 不注册 verify-all，依赖 bundled chromium）：**真实 chromium + 真实探测 JS** 23 断言全过——#925 形态 DOM（el-container 应用壳+「异常信息 Service Unavailable」通知）命中 `sut=page_text_503`、soft 档真 `phase_error`+停 agent、A4 裸 503 页 `dom_missing`、健康页零触发、query 排除。**腿 A 待 grep 的 stderr 形态已可逐字复现**：`[spin-guard] observed phase=3 step=10 reason=sut_unavailable_spin_guard sut=page_text_503 progress_window=2/2`。（commit `c9d89e43`→V2.0 `c87b9be7`）
+- **③ A/C 路径裁定（引擎线定）**：
+  - **主路径=自然窗口**：observation 档在本机运行态（见下），你们按 Runbook 随时开单（单条 ≤15 分钟）；配方已备（`d2-acceptance-runbook.md`）。
+  - **加速路径=本地 503 代理**：**CDP 路由注入已否决**——本机 chromium 两步验证（原型+复诊：目标换成立即失败的关闭端口仍挂起 ⇒ Fetch 拦截生效但暂停事件不达注入客户端）→ 失效模式=请求暂停无人应答，会上生产浏览器**卡死 SUT 请求**污染验收腿；证据留档 `tmp/d2-accept-sim/README.md`。可行变体=本地 503 转发代理+Chrome `--proxy-server`；实查 `scripts/browser/factory.py::_chrome_automation_args()` 硬编码无代理位，需一小件交付（env 驱动参数、默认关、零行为影响）+ 一次重启窗口（用户批）。**要加速件说一声即备**，不备不影响主路径。
+  - **残余风险声明**：组件级半程（23 断言）+ 离线 pin（91 断言）已覆盖；**未验面=全管线 E2E**（真实录制中 phase_error → Node 消费 → 轨迹/台账落账）——由主路径闭合，非逻辑未验。
+- **④ 运行态（本机实测，2026-09-21 14:2x `netstat`）**：本机 4097=**pid 9908**（D2 验收外科手术重启，`SUT_SPIN_GUARD_MODE=observation` 已注入）、本地执行机 **32220**、用户代理 **9228 完好**——observation 档即时可用。注：他线条目所述 pid 6500/14908（nodeId 7 HZH）系另一环境变量，与本机无冲突；两线若同机重启请先 `Get-NetTCPConnection -LocalPort 4097` 核实再动手（按其建议）。
+- **⑤ ③ 观察项（核验型阶段 token 口径）登记候选**：门=`scripts/agent/service.py:724-729`（`submit.required && !has_contract_success` → `mark_quality_failed('missing_success_token')`，唯一豁免 `introduce_pick`）；谓词=`scripts/controller/actions/phase/intent_gates.py:235-260`。复现锚=#973 P2（纯核验无保存）→ quality_failed vs #924 P2 含删除动作 → recorded。**倾向治本**（分析侧对核验型阶段不产出 submit.required/kinds），门侧 `verify` 豁免为保守兜底；**先须定义「核验型阶段」机械可判定式**，防给真该失败的空转开后门（v3 假成功防线是核心价值）。已入 todo 挂起表待评审。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-21 14:00 · ZCode 系统线 — 收工：agent-log 按 5 天窗口归档（09-16 及更早 227 条 → archive/logs/，commit bdd0fbcf）
 
 - 完成（用户指令：归档 agent log 内的事项）：首个 2026-09-17 条目（21:05 Cursor STC 收工）之前的全部条目 `原样分流` 至 `archive/logs/agent-log-archive-2026-09-16.md`（带批次头+更早批次指针），主文件截留 09-17 至 09-21；顶部加归档指引行。
