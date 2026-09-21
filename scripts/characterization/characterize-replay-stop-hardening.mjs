@@ -16,6 +16,18 @@
  *   G3  删除段结束后、插入段（addingLabels）之前：user-abort 返回，
  *       已删条目如实记入 deletedStepIds（不回滚，也不再进入插入/改快照段）
  *
+ * Task 2/6 — runHealStep 对 agent_stopped 的 reason 区分 + heal 超时补发：
+ * replay-heal-shared.js 的 runHealStep 此前把任何 agent_stopped 一律当用户中断
+ * （abortReplay=true + USER_ABORT reject），且 heal 超时后不叫停执行机。本 pin
+ * 钉住两处修复（断言组 5/6）：
+ *
+ *   #3  unsubStopped 回调按 payload?.reason 分流：'new_step_arrived'（新步骤
+ *       抢占 heal）不置 abortReplay/sawAgentStopped、以普通 Error reject（走
+ *       heal 失败重试路径）；'cancel_step' / 缺失 reason（旧执行机）保持既有
+ *       用户中断收敛
+ *   #11 超时 reject 之前补发 cancel_step（forwardStdin fire-and-forget + warn，
+ *       对齐 replay-actions.js P1-6 模式），避免迟到 phase_done 污染下一轮等待
+ *
  * 全部为 read_text needle + 源码切片断言（零 import 被测模块——该模块 import
  * 副作用面含 ws-server / executor-session-client，无 ESM mock 能力下不做行为
  * 驱动；锚定为「函数名 + 语义行」切片，任一守卫被移除或移位即红）。
@@ -100,6 +112,65 @@ record('3d G3 先于插入段（addingLabels 之前拦截，不进入 runHealSte
 record('4a runtime.abortReplay 读点 ≥4（G1/G2/G3 + 既有 AI 修复段收敛）',
   count(FSH, 'runtime.abortReplay') >= 4,
   `count=${count(FSH, 'runtime.abortReplay')}`);
+
+// ══ Task 2/6 — replay-heal-shared.js runHealStep：reason 分流 + 超时补发 ══════
+const RHS = readFileSync(join(ROOT, 'src/services/trajectory/replay-heal-shared.js'), 'utf8');
+
+// ── 切片定位：unsubStopped 订阅 → 超时计时器头（#3 reason 分流所在区间） ──────
+const STOP_SUB = "const unsubStopped = execSession.onSessionEvent(runtime.sessionId, 'agent_stopped'";
+const TIMER_HEAD = 'const timer = setTimeout(() => {';
+const stopSubIdx = idx(RHS, STOP_SUB, 'unsubStopped 订阅');
+const timerHeadIdx = idx(RHS, TIMER_HEAD, 'heal 超时计时器头');
+assert.ok(stopSubIdx >= 0 && timerHeadIdx > stopSubIdx, 'unsubStopped 应先于 heal 超时计时器');
+const STOP_SLICE = RHS.slice(stopSubIdx, timerHeadIdx);
+
+// ── 5. #3：unsubStopped 回调按 payload?.reason 分流 ───────────────────────────
+const NSA_IF = "if (payload?.reason === 'new_step_arrived') {";
+const nsaIfIdx = STOP_SLICE.indexOf(NSA_IF);
+const nsaEndIdx = nsaIfIdx >= 0 ? STOP_SLICE.indexOf('sawAgentStopped = true;', nsaIfIdx) : -1;
+assert.ok(nsaEndIdx > nsaIfIdx, 'new_step_arrived 分支应先于用户中断收敛段（sawAgentStopped 置位）');
+const NSA_SLICE = STOP_SLICE.slice(nsaIfIdx, nsaEndIdx);
+
+record('5a unsubStopped 回调读取 payload?.reason（handler 带 payload 形参，reason 分流入口）',
+  STOP_SLICE.includes("'agent_stopped', (payload) => {") && STOP_SLICE.includes('payload?.reason'));
+record('5b new_step_arrived 专属分支存在（语义行锚定，非恒真）',
+  nsaIfIdx >= 0 && count(STOP_SLICE, NSA_IF) === 1);
+record('5c new_step_arrived 分支不置 abortReplay/sawAgentStopped（只 cleanup + 普通 Error reject）',
+  !NSA_SLICE.includes('runtime.abortReplay') && !NSA_SLICE.includes('sawAgentStopped')
+  && NSA_SLICE.includes('cleanup();') && NSA_SLICE.includes('rejectP(new Error('));
+record('5d NSA reject message 含 agent_stopped(new_step_arrived) 且不被 isUserAbort 误判',
+  (() => {
+    const m = NSA_SLICE.match(/new Error\('([^']+)'\)/);
+    return Boolean(m) && m[1].includes('agent_stopped(new_step_arrived)')
+      && !/USER_ABORT|Replay aborted/i.test(m[1]) && m[1] !== 'USER_ABORT';
+  })());
+record('5e 用户中断收敛保留：cancel_step 语义 + sawAgentStopped/abortReplay/USER_ABORT 原样在回调尾部',
+  STOP_SLICE.includes("'cancel_step'")
+  && STOP_SLICE.includes('sawAgentStopped = true;')
+  && STOP_SLICE.includes('runtime.abortReplay = true;')
+  && STOP_SLICE.includes('rejectP(makeUserAbortError());'));
+record('5f runHealStep 仍是 agent_stopped 唯一监听方（新增监听方须同 commit 补评估）',
+  count(RHS, "onSessionEvent(runtime.sessionId, 'agent_stopped'") === 1);
+
+// ── 切片定位：heal 超时回调（#11 超时补发所在区间） ────────────────────────────
+const TIMER_TAIL = '}, HEAL_TIMEOUT_MS);';
+const timerEndIdx = idx(RHS, TIMER_TAIL, 'heal 超时回调结束');
+assert.ok(timerEndIdx > timerHeadIdx, '计时器头应先于其结束标记');
+const TIMER_SLICE = RHS.slice(timerHeadIdx, timerEndIdx);
+
+// ── 6. #11：heal 超时 reject 前补发 cancel_step ───────────────────────────────
+record('6a 超时回调内补发 cancel_step：forwardStdin 携带 event/data 且指向本会话',
+  count(TIMER_SLICE, "event: 'cancel_step'") === 1
+  && TIMER_SLICE.includes('execSession.forwardStdin({')
+  && TIMER_SLICE.includes('runtime.executorNodeUuid')
+  && TIMER_SLICE.includes('runtime.sessionId'));
+record('6b 补发先于超时 reject（rejectP 之前下发）',
+  TIMER_SLICE.indexOf('execSession.forwardStdin({')
+  < TIMER_SLICE.indexOf("rejectP(new Error('Timeout waiting for heal phase_done'))"));
+record('6c 补发为 fire-and-forget：try/catch 包裹 + console.warn 降级（下发失败不阻塞 reject）',
+  /try \{\s*execSession\.forwardStdin\(\{[\s\S]*?\} catch \(err\) \{\s*console\.warn\(/.test(TIMER_SLICE));
+record('6d 超时 reject 语义保持：Timeout waiting for heal phase_done 仍在',
+  TIMER_SLICE.includes('Timeout waiting for heal phase_done'));
 
 const bad = results.filter((r) => !r.ok);
 console.log(`\ncharacterize-replay-stop-hardening: ${results.length - bad.length}/${results.length} passed`);
