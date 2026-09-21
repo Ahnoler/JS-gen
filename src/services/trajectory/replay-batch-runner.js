@@ -61,6 +61,65 @@ function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
 }
 
 /**
+ * 汇总单条回放动作的可读描述（动作名 + 关键参数），用于回放计划日志。
+ * @param {object} entry 动作条目
+ * @param {number} index 0-based 下标
+ * @returns {string} 形如 `1. fill_form_field (id=12) {label=客户名称, value=张三}`
+ */
+function describeReplayStep(entry, index) {
+  const p = entry?.params || {};
+  const fields = [
+    ['label_text', 'label'],
+    ['value', 'value'],
+    ['option_text', 'option'],
+    ['button_text', 'button'],
+    ['menu_text', 'menu'],
+    ['tab_name', 'tab'],
+    ['row_text', 'row'],
+    ['text', 'text'],
+    ['url', 'url'],
+  ];
+  const bits = [];
+  for (const [key, label] of fields) {
+    const v = p[key];
+    if (v === undefined || v === null || v === '') continue;
+    bits.push(`${label}=${String(v)}`);
+  }
+  const idPart = entry?.id != null ? ` (id=${entry.id})` : '';
+  const suffix = bits.length ? ` {${bits.join(', ')}}` : '';
+  return `${index + 1}. ${entry?.action || '?'}${idPart}${suffix}`;
+}
+
+/**
+ * 回放开始前一次性打印本次要执行的步骤清单：控制面控制台一份，并通过
+ * `replay_plan` 事件送给执行机在 stderr 打印一份（执行机逐条下发
+ * `replay_actions`，无法自行汇总整批，故由控制面在开跑前提供完整计划）。
+ * @param {number} tid 交易数据库 ID
+ * @param {Array<number>} orderedStepIds 有序步骤 ID
+ * @param {Array<object>} actions 动作条目
+ * @param {object} runtime 带执行机会话标识的交易运行时
+ * @returns {void}
+ */
+function logReplayPlan(tid, orderedStepIds, actions, runtime) {
+  const lines = actions.map((a, i) => describeReplayStep(a, i));
+  console.log(
+    `[replay-batch] traj=${tid} 共 ${actions.length} 步 stepIds=[${orderedStepIds.join(',')}]\n`
+    + lines.map((l) => `  ${l}`).join('\n'),
+  );
+  if (!runtime?.sessionId || !runtime?.executorNodeUuid) return;
+  try {
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'replay_plan',
+      data: { trajectoryId: tid, steps: lines },
+    });
+  } catch (err) {
+    console.warn(`[replay-batch] replay_plan forward failed: ${err?.message || err}`);
+  }
+}
+
+/**
  * 使用回放超时语义将一条已录制操作转发给执行机。
  * @param {object} runtime 带执行机会话标识的交易运行时
  * @param {object} entry 已录制的操作条目
@@ -110,11 +169,7 @@ export async function runReplayBatch({
   const skippedIds = new Set();
 
   emitReplay('replay:started', tid, { stepIds: orderedStepIds });
-  console.log(
-    `[replay-batch] traj=${tid} steps=${orderedStepIds.length} `
-    + `stepIds=[${orderedStepIds.join(',')}] `
-    + `actions=[${actions.map((a) => a.action).join(',')}]`,
-  );
+  logReplayPlan(tid, orderedStepIds, actions, runtime);
 
   // ── 执行前菜单导航（同菜单跳过/空菜单直接执行/失败不阻断）──
   try {

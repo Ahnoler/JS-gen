@@ -2,6 +2,17 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 16:20 · OpenCode — 续工：人工点回放时开场一次性打印完整回放计划（控制面 + 执行机双份）
+
+- 背景：上一单元 15:40 收工时只在控制面打印了简表（`actions=[…]` 只有动作名），且执行机逐条收 `replay_actions` 无法自行汇总整批，操作人员在执行机日志里看不到「本次要回放哪些步骤」。
+- 改动：
+  - `src/services/trajectory/replay-batch-runner.js`：新增 `describeReplayStep` / `logReplayPlan`；在 `emitReplay('replay:started')` 之后、菜单导航与步骤循环之前，一次性打印 `traj / 共 N 步 / stepIds` + 逐条 `序号. 动作(id=…) {关键参数}`；同时通过 `replay_plan` 事件把同一份清单送到执行机。
+  - `scripts/event_dispatch.py`：新增 `replay_plan` 事件处理，在回放开始前把完整计划打印到执行机 stderr（`===== 即将回放 N 步（轨迹 tid）=====` + 逐条 + `===== 开始执行 =====`）。
+  - `scripts/characterization/characterize-replay-batch.mjs`：新增行为断言（整批只下发一次 `replay_plan`、条数/轨迹 id/文案正确）+ 结构断言（计划在首个 `runReplayActions` 之前、执行机有 handler）。
+- 验收：`characterize-replay-batch` 全绿（含新用例）；`characterize-menu-navigation` / `characterize-page-bind` / `characterize-special-element` / `characterize-trajectory` 全绿；`event_dispatch.py`/`_replay.py` py_compile 通过；eslint 0 error。
+- 生效：Node 侧需重启控制面；执行机侧 Python 随新会话子进程加载（`event_dispatch.py`）。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 15:40 · OpenCode — 收工：修复回放误入表单结构自愈 + 增加回放内容日志（回链 14:00 开工）
 
 - 完成（6 files / +116 −1655；agent-log 差额系 09-16 及更早条目已归档）：

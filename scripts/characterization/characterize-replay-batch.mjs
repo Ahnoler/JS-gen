@@ -291,6 +291,15 @@ async function testStepSuccessAggregation() {
     assert.equal(forwards[0].payload.data.is_replay, true, 'is_replay = doSuppress');
     assert.equal(forwards[0].payload.data.stop_on_fail, true, 'stop_on_fail true');
     assert.equal(forwards[1].payload.data.actions[0].id, 'b', 'second forward is step 2');
+
+    // pre-batch plan: control plane sends the full step list once before the loop
+    const plans = node.sent.filter((m) => m.payload?.event === 'replay_plan');
+    assert.equal(plans.length, 1, 'exactly one replay_plan forward per batch');
+    assert.equal(plans[0].payload.data.steps.length, 2, 'plan lists every step');
+    assert.equal(plans[0].payload.data.trajectoryId, TID, 'plan carries trajectory id');
+    assert.match(plans[0].payload.data.steps[0], /^1\. click/, 'plan step 1 is labeled 1-based with action');
+    assert.match(plans[0].payload.data.steps[1], /^2\. input/, 'plan step 2 is labeled 2-based with action');
+    assert.match(plans[0].payload.data.steps[0], /\(id=a\)/, 'plan includes recorded step id');
   } finally {
     hub.removeSessionHub('rb-char-success');
     node.detach('rb-char-node-ok');
@@ -553,6 +562,21 @@ function testStructureForwardContract() {
   assert.match(helper, /cancel_step/, 'helper cancels Python on replay_done timeout');
 }
 
+function testStructureReplayPlan() {
+  const src = readFileSync(join(root, SUT), 'utf8');
+  assert.match(src, /function logReplayPlan\(/, 'batch runner defines logReplayPlan');
+  assert.match(src, /event: 'replay_plan'/, 'plan forwarded to executor as replay_plan event');
+  assert.match(src, /logReplayPlan\(tid, orderedStepIds, actions, runtime\)/,
+    'plan logged once at batch start');
+  const planCall = src.indexOf('logReplayPlan(tid, orderedStepIds, actions, runtime)');
+  const firstForward = src.indexOf('await runReplayActions({');
+  assert.ok(planCall !== -1 && firstForward !== -1 && planCall < firstForward,
+    'plan is emitted before the first replay forward');
+  const dispatch = readFileSync(join(root, 'scripts/event_dispatch.py'), 'utf8');
+  assert.match(dispatch, /if event == "replay_plan":/, 'executor handles replay_plan');
+  assert.match(dispatch, /即将回放/, 'executor prints the replay plan header');
+}
+
 function testWiringSharedModule() {
   const src = readFileSync(join(root, SHARED), 'utf8');
   assert.match(src, /const USER_ABORT_CODE = 'USER_ABORT';/, 'shared defines USER_ABORT_CODE');
@@ -586,6 +610,7 @@ async function main() {
     ['structure: heal routes skip/fail/retry + retry clamp 1..3', testStructureHealBranches],
     ['structure: finally resets runtime + session.busy', testStructureFinallyReset],
     ['structure: single-action replay forward contract (stop_on_fail)', testStructureForwardContract],
+    ['structure: pre-batch replay plan wired to executor (replay_plan)', testStructureReplayPlan],
     ['wiring: replay-heal-shared exports the abort/stepId helpers', testWiringSharedModule],
   ];
   let failed = 0;
