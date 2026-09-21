@@ -1,5 +1,27 @@
 # Agent 协作日志
 
+## 2026-09-21 11:05 · ZCode 引擎线 — 开工：more-btn 图标按钮 xpath「伪造」修复（系统线 L1c 取证移交，点击命中时刻定位快照）
+
+- **收件**：系统线取证报告 `docs/reports/2026-09-21-l1c-xpath-morebtn-forensics.md`（本地分发区）——L1c 已排除；根因实锤：`click_button('更多')` 落库 xpath 来自点击前 `_enrich_click_element` 文本匹配（includes 取最后命中），实际点击走 `JS_CLICK_ICON_BUTTON`（more-toggle class 兜底下钻内层 button），两选点链无一致性校验 → 落库 xpath 可指向从未被点击的节点（真机注入假按钮实锤）；纯图标无 tooltip 时 enrich null → 落库无定位、回放 not-found。
+- **修复方向（按报告 §六）**：①点击成功后对实际被点 el 当场 `buildLocatorSnap` 随 result 返回，落库以命中时刻快照为准（enrich 留 fallback）；②回放 `clickToolbarIcon` 补 more-btn class 信号（消费 ok-more-toggle 返回的 class）；③icon 宿主候选补歧义守卫（对齐同事仓 41992f0）。两处需知一并评估：空 xpath 时 locator_strategy 落空串（action.py:426-429）、合成 aria-label 盖章不对称。
+- 上游：uara_V2.0（251c461b）。分支 `engine/locator-snap-20260921`——**经临时 worktree 作业**（共享 worktree 仍由 D2 线占用，其单元进行中；本批与其文件集零交叠，仅 verify-all.sh 登记行惯例性相邻）。
+- 范围（可写集）：`scripts/controller/actions/click_action_engine.py`、enrich/icon 相关 js_snippets、`scripts/models/action.py`（如 locator_strategy 需动）、相关 characterization pin（`characterize-icon-buttons.py` 扩展 + RED 先行）、`scripts/refactor/verify-all.sh`、主检出 agent-log 本条目+收工条目
+- 禁入区：运行态服务零触碰（重启须先请示）；远端代理 9228（用户自管）；D2 线分支与其 worktree 现场（`engine/d2-spin-guard-20260921` 及其未提交 WIP 零触碰）；`fill_engine.py`/`select_engine.py`
+- 验收口径：pin 扩展（引擎全链 + click listener 对比，实验 C 离线化）RED→GREEN；全量 verify-all 3 已知红零新增；分支交付「未合并待批」，湿测验收归合约线（评级页录 more-btn→回放全链通）
+- 注：不维护 CHANGELOG
+
+
+## 2026-09-21 11:02 · ZCode 引擎线 — 合并回执：B 类① + 小批次 + #970② 热修并入 V2.0（02764a04/251c461b）；⚠️ 运行磁盘待 D2 交付后恢复
+
+- 完成：两段合并入 uara_V2.0——**02764a04**（B 类① tssc 路由互拒收口，#970 验收 PASS）+ **251c461b**（挂账小批次 T1 常态弹窗按钮清单/T2 nav-reclick 落库尾缀 + **#970② 热修**）。已 push。
+- **#970② 定谳与修复（7a8c41eb）**：`button_text_identity` UnboundLocalError = **wet9 两已合并修复的交互潜伏缺陷**（81a7f22 幂等白名单使点【查询】跳过整个门块 → 变量初始化被跳过；d2adf8e3 nav-reclick 记忆块在门块外无条件引用）——非 8d131f72 所致（该提交只动 fill_engine）。修复=初始化移至门块前无条件执行；RED 复现生产同源异常（引擎兜底转 click-failed），pin 扩至 61 ✓。任务评审 Approved。
+- 合并态验收：全量 verify-all **219 过、失败集=3 已知红零新增**；核心 pin 全绿（fill-tssc-downgrade/idempotent-click-gate/phase-overlay-buttons/step-number-integrity 27/27/stop-semantics 27/27/element-dedup-scope）。agent-log 两段冲突按协议双方条目并排时间序消解（首次消解脚本静默失败致标记短暂入树，已 reset 重做，远端未见污染）。
+- 分支清理（按既定归档惯例）：远端 `engine/tssc-route-fix-20260920`/`engine/small-batch-20260921` → `archive/engine-*-archived`，本地已删；临时 worktree JS-gen-engine-sb 已移除。
+- **⚠️ 运行态提示（要紧）**：共享引擎 worktree 当前在 **D2 线分支**（其单元进行中）——**新录制会话的 Python 子进程从该磁盘加载，尚不含本批修复（会复现 #970② click-failed）**；Node 侧仍为 4098e49c+。待 D2 收工、worktree 恢复到 V2.0 最新（251c461b）后全部生效——恢复动作届时按规执行/请示。
+- **转 OpenCode 线**（#970③）：天元弹窗补关严格口径未达成——合约线假设"弹窗异步出现于补关窗口之后"，建议核对口触发时机与弹窗出现时序（证据 wet-tssc/cdp-precheck-tssc.json 首拍原文）。
+- 注：不维护 CHANGELOG
+
+
 ## 2026-09-21 10:35 · ZCode 引擎线 — 收工：小批次 T1/T2 交付（T3 前置否决转登记，分支未合并待批，回链 10:02 开工）
 
 - 完成：挂账候选小批次收口，分支 `engine/small-batch-20260921`（1568143a = T1 e07935de + T2 6a1ab47e + F1 修复，已 push）。SDD 模式全流程：前置 Explore → 每任务 fresh implementer + task review → 终审 → 修复波次 + scoped re-review。
