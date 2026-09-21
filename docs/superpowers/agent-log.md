@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 17:20 · OpenCode — 补记：回放三项修复合并后验收通过；push 因 GitHub 不可达待补
+
+- 代码 commit `d18604d5`；`git pull origin uara_V2.0 --no-rebase` 合入远端 `52f4adf3`（ZCode D2 回执/代理件条目 + todo 更新），仅 `agent-log.md` 冲突，按协议双方条目并排消解，零代码冲突。
+- **合并后验收**：合并态 11 枚相关 characterization 全绿（replay-batch / replay-terminal-abort / menu-navigation / special-element / replay-table-row-radio / replay-secret-redaction / search-then-click-guard / fill·select·radio·click-replay-engine）；合并提交 `1190c068`。
+- **push 状态**：`git push origin uara_V2.0` 连续 2 次失败（`Failed to connect to github.com:443` / `Recv failure: Connection was reset`）；本线 `d18604d5` + `1190c068` 为**本地未推送**，网络恢复后按硬约定补推（无需再合并，远端已在其中）。
+- `config/.db-whitelist-seen` 运行时改动未提交。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 17:10 · OpenCode — 收工：修复首行单选回放假失败 + 回放日志凭据掩码 + 回放模块 Python 3.10 兼容
 
 - 收件（用户 review 两条 + 同批日志实证一条）：
