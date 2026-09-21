@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-21 12:35 · ZCode 合约线 — 收工：more-btn locator-snap 修复湿测验收 PASS（traj 974，回链 13:10 开工；可合并回执已发）
+
+- 完成：9ee4af45 三面验收全过（`tmp/contract-wet10-20260921/` + `through-report-morebtn.md`；traj 974，fid 9000000011/acct 2，4 阶段，pid 9908 全程未变；与同线 D2 B 腿并行零互扰）。
+- **①落库面（主靶）**：more-btn 步（展开/收起）落库 element **xpath_full 完整指向实际被点内层 button**（`class=el-button disableBtn…`，取证报告金标本同构；`locator_fallback_reason=empty_anchor_text` 即快照通路生效明证）——实验 A 型「enrich null 落库无定位」未复现。**②回放面**：未 detach 直回放全链，**3/3 confirmed=1**，more-btn 两步 `ok-xpath | locate=ok`（落库 xpath 直查命中，修复的直接效果；moreSel 兜底分支条件性未覆盖非反证）。**③forensic 面**：jsgen-forensic-fake 式注入（零真实点击、即插即删、fake 自检在场）——落库 xpath **注入后仍唯一命中真 more-btn 内层 button**（isFake:false/inMoreBtn:true），实验 C 型「伪造指向假按钮」未复现；removed 还原核验。守卫面：`err-icon-label-ambiguous` 0 次；`click_button('更多')` 在展开态被 `err-more-toggle-already-expanded` 单次拒后 agent 即改 index 收起——语义守卫健康。
+- 判定：**验收 PASS，建议引擎合并 9ee4af45**。icon_class meta 链本单湿测面不重复计分（agent 未走 click_button 文本路径，以离线 pin RED→GREEN 为准）。
+- 执行机日志共享追加（D2 并行），证据按 sid=398f5b58 过滤取段（150 行）；detach 200，槽位释放。
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-21 13:10 · ZCode 合约线 — 开工：more-btn locator-snap 修复湿测验收（引擎线 9ee4af45 待批；与同线 D2 B 腿并行不悖）
 
 - **收件**：引擎线验收请求——more-btn 落库 xpath「伪造」修复 @ `engine/locator-snap-20260921` 9ee4af45（未合并待批）。修复=点击命中时刻对实际被点节点 buildLocatorSnap 落库（enrich 降 fallback）+ 回放 clickToolbarIcon 补 more-btn 信号 + icon 宿主歧义守卫（收集→滤页头→恰一才点，多命中 err-icon-label-ambiguous）。验收路径（引擎指定=系统线取证报告 §六）：评级页录 `click_button('更多')` → 回放全链验证；落库 xpath 应指向实际被点内层 button，jsgen-forensic-fake 式注入复检不得命中假按钮。
