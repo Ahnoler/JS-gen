@@ -13,7 +13,7 @@
 - **两个实施须吸收的勘误（已写回 todo D2 行）**：①idle watchdog 断言精确化=「有**落库动作**就不触发」——纯未落库读操作（如反复 get_page_state，state.py:61 跳截图）空转反而 10min 会触发 watchdog 使整 run 失败；设计稿 A4/观测模式应以此为边界。②`phase_error` 现无 `reason` 字段（三处 emitter payload 仅 phase/name/message/runId）——设计稿新增 reason 属加法改动，Node 侧只读 message（`trajectory-recording-runner.js:1054`），兼容无破坏。
 - **附带发现（不阻塞 D2，移交记录）**：①轨迹 #925 现值 record_status='recorded'/is_successful=1（非叙事中的 failed），updated_at 10:58:05 晚于末步 58min，疑被批量作业收尾覆写——与 V2.0.1 failed(interrupted) 状态归因改进相关，建议下次遇到同类比对 persistent_record_status 生成时序；②事故执行机为 nodeId 8/7（round-1 在 8、round-2 在 7），与 09-19 list-executors.json 的 nodeId=10 无关——D2 证据引用时注意；③OpenCode 两会话原文（577a391c/a26cb9fc）在本机 opencode.db 已不可达（疑被清理），本文 DB 证据为其替代锚点。
 - 范围实际改动：`docs/superpowers/todo-list.md`（D2 行追加验证结论+勘误）、agent-log 本条目；零代码改动
-- 注：不维护 CHANGELOG；push 仍待用户批准（本地领先远端 6 条）
+- 注：不维护 CHANGELOG；本条 commit 后随 push 硬约定推送（此前 5 条已被会话外推送至远端 tip=843aaa0c，非本会话所为）
 
 ## 2026-09-21 10:05 · ZCode 系统线 — 收工：B 类移交系统线侧两项处置闭环（回链 09:18 开工）
 
