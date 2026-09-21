@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 20:30 · ZCode 引擎线 — 收工：两笔挂账红代收口（用户令「解决一下」；f484110f）——全量 182 pin ALL GREEN 零 FAILED
+
+- 授权与范围：用户 20:10「解决一下」——对本日 19:00/20:05 两条目的两笔移交（OpenCode prompt 双 9 号 / 系统线 step-highlight 锚池数据面红）代收口。他线工作区已清空、local==remote 时动手，两线如有异议可在 agent-log 提出，可回退各自文件。
+- **refill-contract 修复**：`scripts/prompts/phase-reviewer-prompt.md` 第 10 条「泛指 vs 点名判定基准」（be21aafd 引入）到货时编号与既有 9 号撞车，重编号 `10.`（内容零改动）；`characterize-refill-contract.py` 断言同步 1..9→1..10 + tie-breaker needle 改 10 号。规则语义与 prompt 运行面零变化，纯编号连续性修复。单跑 OK。
+- **step-highlight 修复**：动态锚点改两段式选优——近 40 张内优先取达 FLOORS 锚（评分序不变）；近窗被小步数轨迹（4 步纯 click 湿测验收单）稀释至无一达标时，**有界回溯（≤400 张）**取达标富锚评分最优者；回溯到底仍无达标仍判「录制链真回归」。**FLOORS 阈值一个未动**（尊重系统线移交①「不放宽阈值」的前提，只解决锚池稀释这一形态）。本机实测回溯至第 140 张命中 shot #33014（traj 944，31 步/30 bbox 直用），全部断言过。
+- 验收：两 pin 单跑 OK；**合并态全量 verify-all 182 pin + statics ALL GREEN 零 FAILED**（grep 判定，顺带验证系统线 c7f8ffcf 新 failed.list 机制并行无误）。本日至此闭环：快照复刻批次（湿测 PASS + 合并 4776b7f0）+ DB 恢复复跑 + 两笔挂账代收，V2.0 无已知红。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 20:05 · ZCode 引擎线 — 补记：DB 恢复，合并回执移交项①复跑闭环（layer-tree / export-v3 转绿）；step-highlight 转数据面红归因移交系统线
 
 - 用户 19:43 起开启 47.101.58.49 白名单同步窗口（IP 白名单机制，此前本机 IP 不在册即合并回执归因的 TCP 超时根因）。复跑回执移交项①三 pin（合并态 e6f072d3 主检出）：
