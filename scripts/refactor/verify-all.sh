@@ -56,6 +56,7 @@ characterize-traj-recon-logging|node scripts/characterization/characterize-traj-
 characterize-step-number-integrity|node scripts/characterization/characterize-step-number-integrity.mjs
 characterize-agent-llm-error|node scripts/characterization/characterize-agent-llm-error.mjs
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
+characterize-verification-phase-gate|"$PY" scripts/characterization/characterize-verification-phase-gate.py
 '
 PINS_PHASE='
 characterize-phase-section-scope|"$PY" scripts/characterization/characterize-phase-section-scope.py
