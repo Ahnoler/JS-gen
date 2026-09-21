@@ -2,6 +2,15 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 20:05 · ZCode 引擎线 — 补记：DB 恢复，合并回执移交项①复跑闭环（layer-tree / export-v3 转绿）；step-highlight 转数据面红归因移交系统线
+
+- 用户 19:43 起开启 47.101.58.49 白名单同步窗口（IP 白名单机制，此前本机 IP 不在册即合并回执归因的 TCP 超时根因）。复跑回执移交项①三 pin（合并态 e6f072d3 主检出）：
+  - **layer-tree OK、export-v3 OK——两项闭环**，连接超时归因成立（同码同机，DB 通即绿）。
+  - **step-highlight 仍 FAILED (3)，但失败面已从"连接超时"变为"真数据断言"**：动态锚点选中 shot #34045（traj 956），steps total=6 < FLOORS 下限 10 → 「load data ≥10」+ 两个下游断言连带。**归因=录制库锚池数据面漂移，非代码回归**——本日合约线湿测单（#975/#976 快照复刻验收单）均为 4 步纯 click 小轨迹入库，把「最近 40 张」锚池的最优步数拉到 6。这正是系统线收工条目（3 红修复转绿）**移交①预告的原样**：「FLOORS(10) 按现势数据定，未来单阶段步数再降动态锚点会红——届时修录制链而非放宽阈值」。**移交系统线**处置（复现 `node scripts/characterization/characterize-step-highlight.mjs`），引擎线不改其 pin 口径。
+  - 回执移交项②（refill-contract 双 9 号）**仍红未修**（19:00 移交后 OpenCode 未动），继续挂账 OpenCode 线。
+- 结论：合并态 e6f072d3 的 182 pin 现势=**179 绿 + step-highlight（系统线数据面口径）/ refill-contract（OpenCode prompt 双 9 号）两挂账，均他线归属、零本线回归**。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 19:00 · ZCode 引擎线 — 合并回执：同族快照复刻并入 uara_V2.0（7e43c736→合并 4776b7f0；合约线湿测 PASS 回执可合并）+ 两项移交
 
 - 合并：`engine/snap-replica-20260921`（7e43c736）`--no-ff` 并入 uara_V2.0 = **4776b7f0**；agent-log 冲突按协议双方条目并排消解（保留他线 9 条），verify-all.sh 注册表自动合并。push 遇 non-fast-forward（OpenCode 线同窗口推 e3825ee3）→ pull 合并 **c1c3f06a** 再推，全程零 force。主检出现场他线活跃 WIP（trajectory-runtime.js / trajectory-session-replay.js）未触碰、未随本合并。
