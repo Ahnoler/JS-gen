@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-21 10:25 · ZCode 合约线 — 收工：#970 tssc 路由互拒修复复测（验收① PASS / ②严格口径未达 / 新发现疑似回归，回链 10:00 开工）
+
+- 完成：#970 全管线收口（tmp/contract-wet9-20260919/wet-tssc/ + through-report-tssc.md，主线程独立落库+executor 日志复核；pid 14224 全程 8 采样未变）。
+- **验收① tssc 路由互拒修复 PASS**：wet4 #864 的 7 步互推死循环未复现——`err-use-tssc-multi-select` 全程仅 1 次（类型预检单次拒）→ 立即切 `select_option` 一次成功（`ok-p1:贯通验证企业190416有限公司` 回填+模型回显 disabled）；`no-tssc-multi-select` 0 次、无同字段交替；`[select] dispatch path=tssc` ×3（真 tssc 字段正常路由，#865 对照形态无退化）；`[tssc-route-conflict]` 留痕未触发=store/live 相撞场景未出现（条件性未覆盖，非反证）。
+- **验收② prepare 天元弹窗补关：严格口径未达成**——ready 后约 34s 首拍预检仍见「天元相关配置」弹窗 1 条（预检补关后二拍干净）；目标效果「agent 暂停」未发生。交 OpenCode 线假设：弹窗或为补关窗口后异步出现。
+- **新发现（建议并分支前核查）**：`click_element_by_index` 连续抛 `UnboundLocalError: cannot access local variable 'button_text_identity'`（executor log 新增段 5-6 处，res=click-failed，agent 被迫绕行，与 P2 未完成因果关联）——变量属 click 守门路径，疑似 engine/tssc-route-fix-20260920 @ 8d131f72 blast radius 内回归。
+- 其他：P2 查询 0 条=在途客户被过滤（wet4 R2 P6 同款已知业务行为，诚实失败）；**步号 1..15 连续（修复持续稳固）**；step_count=13 vs 15 行=口径差异（2 meta 行）与定谳一致。
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-21 10:00 · ZCode 合约线 — 开工：B 类① TsscMultiSelect 路由互拒修复复测单（wet4 场景重建，运行基点 39dadd7f）
 
 - 进行中：引擎线重启至 39dadd7f（本地 merge 态；health 200/pid 14224/LMY 空闲已核），两项待验收：①**TsscMultiSelect 路由互拒修复**（B 类移交①）②prepare 天元弹窗补关（OpenCode 线）。本单重建 wet4 #864 P6 场景：**对公客户评级（fid 9000000011）→【选择客户】弹层「客户名称」字段 fill/select 交互**——旧引擎 7 步互推死循环（err-use-tssc-multi-select ↔ no-tssc-multi-select），#865 同字段 tssc 路由一次成功为对照形态。任务 7 阶段（导航→引入弹窗→查询→评级申请抽屉→**选择客户弹层验收点**：字段 fill 尝试≤2 次后正常点选→回显核验→收尾不提交）。引擎预期留痕：`[fill][tssc-route-conflict] store kind=tssc-multi-select live=plain` 为降级放行非异常。
