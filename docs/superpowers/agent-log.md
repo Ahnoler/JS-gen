@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-21 14:00 · OpenCode — 开工：修复回放阶段勾选多条却只执行一条并误入表单结构自愈的问题
+
+- 工作范围：`src/services/replay-actions.js`、`_replay.py` 及回放链路上与表单结构自愈（`healType=form_structure`）相关的调用点；可能涉及 `form-snapshot` 结构比较与 `special_element_candidates` 处理。
+- 禁入区：`scripts/controller/actions/fill_engine.py`、`select_engine.py` 等他线热区（除非 replay 调用路径必须改）；录制侧代码不动；数据侧 KB/流程卡不动。
+- 执行方式：读代码定位为何阶段内勾选多条仅执行 1 条、为何回放未继续执行后续步骤即进入 form_structure 自愈、以及统计失败数为何为 1；加日志/修复后复跑同场景验证；完成后 commit + push（网络恢复后补推）。
+
 ## 2026-09-21 12:30 · OpenCode 系统线 — 开工：prepare 登录回放会话死亡时快速释放轨迹锁
 
 - 工作范围：`src/services/replay-actions.js`（核心改动：replay_done 等待增加会话终态事件竞速）、`src/services/trajectory/trajectory-record-lifecycle.js`（登录回放/探测启用）、`src/services/trajectory/prepare-login-retry.js`（沉降启用）、`src/services/trajectory/recording-page-bind.js`（读页绑定启用）、`src/services/trajectory/menu-navigation.js`（菜单导航启用）；新增 characterization pin `scripts/characterization/characterize-replay-terminal-abort.mjs`。
