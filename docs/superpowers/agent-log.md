@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-21 11:55 · ZCode 合约线 — 收工：unboundlocal-retest PASS（traj 971，回链 11:42 开工）
+
+- 完成：#970 P2 弹窗【查询】点击路径复测全管线收口（`tmp/contract-wet9-20260919/wet-unboundlocal/` + `through-report-unboundlocal.md`；traj 971，fid 9000000011/acct 2，7 阶段 2623..2629，pid 9908 全程 5 采样未变）。
+- **验收 PASS——原缺陷未复现**：`UnboundLocalError: button_text_identity` **0 处**（#970 时 5-6 处）、`res=click-failed` **0 处**；弹窗内【查询】**ok-clicked-15 ×2**（executor step 7/10）+ **DB 落库 ×2**（phase2 step 3/6，btn_text=查询，error 列 0 处 UnboundLocal 行）——幂等白名单路径（_QueryButtonNode 组合断言场景）点击成功落库，热修行为实证。
+- **终态优于 #970**：**recorded / is_done=1 / is_successful=1**（#970 为 failed/phase_failed，彼时正是本缺陷迫使 agent 绕行致 P2 未完成）；步号 1..14 连续无缺无重（步号修复持续稳固）；7 阶段 done_logs 全 completed，无提交动作，detach 200。
+- 预期留痕核对：nav-reclick-budget 0 处（该路径条件性未触发，非反证）；tssc 形态与 #970 验收①一致不退化（err-use 单次拒 → select_option 选中贯通验证企业成功，dispatch path=tssc，无交替）。
+- **顺带观察（供 OpenCode 天元弹窗线）**：本次 CDP 预检两拍均 0 弹窗——「天元相关配置」出现是**间歇性**的（#970 出现 / #971 未出现），支持「异步加载、时序不定」假设。
+- 台账：todo-list `unboundlocal-retest` 已核销（P2 已闭）。运行态提示：pid 9908 系重启窗口后新实例（Node 39dadd7f 内存态 + Python 磁盘 93cef7ce 含热修）；D2 spin-guard 验收仍待 503 窗口 + restart-local.cmd 注入 `SUT_SPIN_GUARD_MODE`（runbook 已备）。
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-21 11:42 · ZCode 合约线 — 开工：unboundlocal-retest 执行（#970 P2 弹窗【查询】点击场景复测，引擎线 11:25 知会放行）
 
 - **放行依据**：引擎线知会（bc6bf63c）——引擎 worktree @ 93cef7ce（locator-snap 分支已对齐上游），251c461b 为其祖先、热修直验在场；我线复验：`button_text_identity=''` 初始化位于幂等门块前（click_action_engine.py:490 vs :506）、磁盘 WIP（locator-snap 6 文件）py_compile 全过、纯增量无删改，**运行态可测**。运行基点=控制面 pid 14224（39dadd7f 内存态，Node 侧）+ Python 子进程磁盘 93cef7ce（含热修）——复测靶在 Python click 路径，Node 增量不生效不影响本单。

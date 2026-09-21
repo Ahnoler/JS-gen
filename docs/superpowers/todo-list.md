@@ -150,7 +150,7 @@
 | **dedup-deletion** | 已闭 | 删死代码 `src/dedup.js` + `characterize-dedup.mjs`；AGENTS/CLAUDE/README/jsdoc/verify-all 去门禁；活录 coalesce 仍在 `state.py`；2026-09-10 Lead 选定待裁落地 |
 | **executor-only-bib** | P3 已闭（含物理删除） | `USE_EXECUTOR` 默认 true；false→503（resolve/attach/session）；冷测 `characterize-executor-only-bib.mjs`；物理删除 `ensureGlobalBrowser`/控制面 CDP attach 已落地（plan `2026-09-11-remove-local-bib-mount`，`1455185c`..`2a9a7e3e`） |
 | **resolve-placeholder-search** | P3 已闭 | resolve inventory/needle 漏收 `.el-form-item` 外 placeholder（如「搜索关键字」）；`228d2b62`→`6c77c363`→`1bbfb9ef`；冷 pin GREEN；**湿测 PASS**（2026-09-11 用户：executor restart 后关键字搜索抓取成功） |
-| **unboundlocal-retest** | P2 | #970② 定谳后复测：`button_text_identity` UnboundLocalError（幂等白名单 81a17f22 × nav-reclick d2adf8e3 交互潜伏，白名单跳过整个去重门块致门内赋值变量被门外引用）引擎已修（初始化移至门块前，`02764a04`/`251c461b` 已并 V2.0）；**运行态未生效**（共享引擎 worktree 在 D2 线分支）——待 D2 收工、worktree 回 V2.0 最新后，复测弹窗内【查询】按钮点击场景（参照 #970 P2） |
+| ~~**unboundlocal-retest**~~ | P2 已闭 | #970② 定谳后复测（`button_text_identity` UnboundLocalError，幂等白名单 81a17f22 × nav-reclick d2adf8e3 交互潜伏，热修 `02764a04`/`251c461b` 并 V2.0）：**PASS（2026-09-21，traj 971）**——引擎线 11:25 放行（磁盘 93cef7ce 含热修），同款 7 阶段场景重录：UnboundLocalError 0 处（原 5-6）/ click-failed 0 处 / 弹窗内【查询】ok-clicked ×2 + DB 落库 ×2 / 终态 **recorded·is_successful=1**（#970 为 failed）/ 步号 1..14 连续 / tssc 形态与 #970 验收①一致不退化；报告 `tmp/contract-wet9-20260919/through-report-unboundlocal.md` |
 
 ## 更新记录
 
