@@ -2,6 +2,18 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 22:35 · OpenCode — 收工：阶段合约「实际逻辑流程」开发备注（纯文档，回链 22:10 开工）
+
+- **完成**：`e355f7f0`（纯文档，零运行代码触碰）。
+  - 新建 `docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`：实际编译流程（meta-service → classify → compile_boundary → boundary_to_legacy_intent → apply_phase_contract → cross-phase guard → done gate → recovery）、三条核心规则（R1 open-only→navigate / R2 fill-only 无保存令牌 / R3 终态令牌归执行阶段）、分支优先级与令牌对照表、关键判定函数扫描范围、后续同类开发 checklist、改动落点、边界与非目标。
+  - `2026-09-18-phase-contract-conflict-survey.md` 追加 §6 修订备注（不改历史正文），指向新 spec 并说明与 #858 纯填写 query 外溢、R 清单的关系。
+  - `todo-list.md` 的 `phase-structured-contract`（方案 D）行更新前置状态：方案 C 已落地跑稳（`be21aafd`/`5639541c`），方案 D 目标=运行时文本分类退化为 fallback。
+  - `AGENTS.md` Element UI/正确性规则区补一条阶段令牌归属要点（作为 agent 单一事实源，指向 spec 与 pin）。
+- **验收**：`git diff --stat` 仅 4 个文档文件（+171/−1），零 `scripts/**`、`src/**`、`tools/**` 改动；无运行逻辑影响，verify-all 不适用。
+- **遗留移交**：无（方案 D 仍为 todo-list 长期项，前置已更新）。
+- **现场清点**：工作树干净；无 stash 操作；无他线 WIP 残留。
+- **注**：不维护 CHANGELOG。
+
 ## 2026-09-21 22:10 · OpenCode — 开工：阶段合约「实际逻辑流程」开发备注（纯文档，不动运行逻辑）
 
 - **进行中**：用户指示「按实际逻辑流程修改相关文档，为后续同类开发备注」——把本轮跨阶段令牌越界修复后的实际阶段合约流程与后续须遵循规则沉淀为可复用开发备注；**明确不动任何运行逻辑代码**（`scripts/**`、`src/**` 只读）。
