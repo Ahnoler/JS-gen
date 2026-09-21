@@ -2,6 +2,15 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 15:14 · ZCode 系统线 — 收工：verify-all 域管线化验收改造（微步验收 2m58s→15-20s，commit 48d277ab）
+
+- 完成（用户指令：功能变大后不必每次改动跑全量 characterization，切管线验收 + 优化验收时间）：`scripts/refactor/verify-all.sh` 域管线化改造——**12 域注册表**（core/phase/fill/select/click/xpath/tree/kb/executor/ui/export/misc）+ 三种用法（无参=全量 / `verify-all.sh select,fill`=按域选 / `--changed`=git diff 自动映射选域，无映射兜底全量）+ 有限并发（`VERIFY_JOBS` 默认 4）+ 基线红显式标注（KNOWN-RED 不再令域管线误报回归）。
+- 计时实测：**全量 2m58s→1m08s**（并发 4；瓶颈是 176 个进程串行启动非单 pin 慢，逐 pin 计时基线在案）；**单域管线 15-20s**（kb 17s/phase 20s/ui 16s/select 未单测估同量级）。AGENTS.md 口径已更新：微步验收=域管线/--changed，**合并后验收=全量不变**，新 pin 须登记域注册表（跨域 pin 可登记多域防漏跑，拿不准进 core）。
+- 安全性审计（并发前提）：全部写入类 pin 用 mkdtemp 自隔离（req-draft-traj/kb-insights/network-capture 等逐一核验）；浏览器 pin（g3-live/field-label/login-fallback/tree-select/probe）各自 headless launch 无固定端口；DB 写仅 phase-group-shot（不在注册表）。调试竞态时可 `VERIFY_JOBS=1` 回严格串行。
+- 验收：两轮全量 177 项（175 pin + eslint + ruff）稳定 ALL GREEN，3 红与基线逐项一致零新增；175 pin 与旧口径 comm 核验零丢失；域抽样 kb(17s)/phase(31 green)/ui(含 3 基线红正确标注)；--changed 抽测映射正确（select_dispatch→select、js_snippets→xpath、trajectory-runner→ui+export+core、data/kb→kb、executor→executor）。
+- 遗留移交：①各线后续新 pin **登记进域注册表**（改 verify-all.sh 的热点冲突依旧存在，但注册表是显式清单、冲突好解）；②`--changed` 路径映射规则保守（未映射兜底全量），跑一段时间后可按实际 diff 命中情况微调规则；③并发度默认 4 是保守值，机器富裕可 `VERIFY_JOBS=6` 再压。
+- 注：不维护 CHANGELOG；本条与代码提交一并 push。
+
 ## 2026-09-21 17:05 · ZCode 引擎线（D2 线） — 回执：A/C 终局口径收讫（主路径=自然窗口值守，加速件不点单）+ 两处精确更正（代理件已零重启 / grep 签名防漏报）+ ③ 校准对已登记
 
 - **① A/C 终局口径收讫并存档**：主路径=自然窗口值守（observation 常开），加速件已备未点单——尊重裁定，D2 行已改值守口径。**但更正不点单理由（事实性）**：「代理件需重启窗口」基于旧 env 方案；交付版（`eab5e83c`）为 flag 文件门控、每次浏览器启动即时读取，**零重启零外部依赖**（合约线回执口径「PROXY-RUNBOOK.md 全程零系统改动、零重启」）。唯一真实存在的重启需求=observation→soft 档位切换（腿 C），与走不走代理无关——自然窗口路径的腿 C 同样需要。维持现裁定无异议；再点单成本≈零，随时可开。
