@@ -1,6 +1,18 @@
 # Agent 协作日志
 
 
+## 2026-09-21 11:45 · ZCode 引擎线 — 收工：D2 SUT 503 阶段空转守卫交付（SDD 全流程，含终审阻断 F1 修复，分支未合并待批，回链 11:00 开工）
+
+- 完成：commit 链 `42246117`（开工）→ `c40bb502`（守卫实现+pin）→ `974c23f9`（终审 F1 修复：幂等改 phase+runId 双键）→ `18caffbe`（设计稿/todo 登记）→ `0f093176`（merge `0cbc19b2` 归档条目，agent-log 冲突按协议双方并排）。分支 `engine/d2-spin-guard-20260921`（自 `1bc5aa81` 切，不叠 B 类/小批次栈）。
+- **交付**：`scripts/agent/recorder_emitters.py` 新增 `_guard_spin_on_step_end`（A1 页面文本/A3 URL 错误页/A4 关键 DOM 缺失 × B 无进展三信号〔done 数增长/pathname 变化/新容器首开，重开不算〕双条件；`SUT_SPIN_GUARD_MODE` 四档**默认 off**，off 与 stall 未满窗两档零页面 I/O；soft/hard 触发=直发 `phase_error(reason='sut_unavailable_spin_guard', spinGuard{...})`+停 agent；**幂等=phase+runId 双键，重录/相位推进自动重武装**）；`recorder.py` on_step_end 接入（done 门禁前，自带 try/except）；`service.py` 续跑循环补 stopped break；pin `characterize-sut-spin-guard`（**91 断言**）入 verify-all。A2（网络 5xx）缓发——`network_capture` 只发内存事件 store 无读取路径（设计稿 §12 三裁定全文）。
+- **SDD 过程**：实现者（RED 18/21→GREEN）→ 任务评审规格✅+Approved（4 Minor/2 Info）→ 主会话验收 → 终审 **NO**（阻断 F1：重录路径〔runner :390-391 同 runtime 换 runId 再录、失败收尾不关 session〕存在同进程同 store 同相位重入，原「同阶段」幂等会 neuter 重录相位 on_step_end 尾段〔done 门禁/循环检测/CSS 补抓失效〕且守卫不再武装——**#925 本身即重录场景**，我此前 parked 裁定被代码证据推翻）→ 修复（resume 实现者，pin+18 断言 10a/10b/10c）→ 定向复审 F1/F4 ADDRESSED、**合并就绪 YES**。
+- 验收证据（合并态=`0f093176` 含 `0cbc19b2`）：pin 91 断言全过（主会话复跑 2 次）；py_compile 过；全量 verify-all **191 过 / 失败集=3 已知红（step-highlight/layer-tree/confirm-notification）零新增**（合并前 `tmp/verify-all-d2-20260921.log`、合并后 `tmp/verify-all-d2-merged-20260921.log` 两份）。
+- **F2 表述项（终审要求显式写明）**：`service.py:605-607` 的续跑 break **不受 mode 门控、是无条件行为变化**——影响既有 goal-loop stop/heal 空转 stop/cycle-deviate stop/cancel 四路径的预算续跑（效果=裁掉停止后的 0 步僵尸轮，属正向修复，verify-all 零新增红佐证）；「默认 off 零行为影响」承诺仅对守卫本体成立，他线归因时注意。
+- 生效面：纯 Python 录制侧；**默认 off 合并零行为影响**（守卫本体）；新录制会话磁盘加载即生效无需重启；人工录制（manual_recorder 不经此钩子）与回放不走 build_recording_hooks 均不受影响。
+- 状态：**未合并待批**（branch-only 交付）。
+- 遗留移交：①**湿测验收移交合约线**（前置在线 SUT+执行机，当前停机）：observation 档 #925 复现场景必须命中 + 正常长阶段（多轮填写/树搜索/分页）不得误杀 → 按湿测数据逐级升档（observation→soft→hard），默认值升 hard 须 Lead 批；②A2 网络 5xx 检测=条件候选（须先挂 memory writer 旁路）；③observation 期关注项：A3 `/error` 子串可能过匹配业务路由（终审 F5）、满窗后每步 stderr 一行、A3/A4 按探测步计数默认窗口下触发滞后放大（调参知会）；④小批次 SDD T1/T2 让位解除，可重启（其 T2 WIP 曾现于本 worktree 后被其会话收走，本单元与其零交集）。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-21 11:00 · ZCode 引擎线 — 开工：D2 SUT 503 阶段空转守卫实施（系统线已验证，设计稿三阶段，默认 off）
 
 - **收件**：系统线 2026-09-21 10:00 验证收工（`1bc5aa81`）——D2 问题真实、归属引擎线、按设计稿 `docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md` 实施；两勘误（①idle watchdog=「有落库动作才不触发」纯读操作空转 10min 反会触发使整 run 失败，观测模式以此为边界；②`phase_error` 现无 reason 字段，加法改动 Node 侧只读 message 兼容无破坏）已吸收进实现。
