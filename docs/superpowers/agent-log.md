@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 14:00 · ZCode 系统线 — 收工：agent-log 按 5 天窗口归档（09-16 及更早 227 条 → archive/logs/，commit bdd0fbcf）
+
+- 完成（用户指令：归档 agent log 内的事项）：首个 2026-09-17 条目（21:05 Cursor STC 收工）之前的全部条目 `原样分流` 至 `archive/logs/agent-log-archive-2026-09-16.md`（带批次头+更早批次指针），主文件截留 09-17 至 09-21；顶部加归档指引行。
+- 对账：分流前总数 381 条 = 归档 227 条（09-12 至 09-16 各日：29/3/16/32/94 + 无时刻条目若干）+ 主文件 154 条（09-17 至 09-21），逐侧 `grep -c '^## '` 核实吻合；切点边界行逐行目检（主文件末条=09-17 09:05 引擎线开工、归档首条=09-17 21:05 收工，中间无夹带）。
+- 说明：①主文件惯例窗口为「近 3 天」，本次按用户 5 天口径放宽一档执行（AGENTS.md 09-19 约定「主文件只留近 3 天」，下次归档可二选一并统一）；②分流零改写，历史条目内旧路径不回改；③本条目自身落主文件顶部。
+- 验收：零代码改动，无验收命令需重跑；`git pull` 合流态 Already up to date；提交面仅 agent-log.md + 新归档文件 2 件。
+- 注：不维护 CHANGELOG；本条 commit 后随 push 硬约定推送。
+
 ## 2026-09-21 13:53 · Cursor — 收工：湿测操作员执行手册写入 recording-coach skill
 
 - 完成：据 `docs/superpowers/reports/2026-09-21-recording-coach-subagent-ops-cases.md` 的 11 张 `yes` 卡写入 `tools/recording-coach/skill/references/operator-ops.md`，并挂到 `SKILL.md` / `acceptance.md` / `pipeline-pits.md`。卡 5（`no-oneoff`，拆阶段规避已随 cee623e1 作废）与卡 8（`engine-side`，D2 守卫不复制进 coach）未升铁律。`NOT-ADJUDICATED` / `UNVERIFIED` 收成现有 `BLOCKED_` 子型，不改 `close.txt` 四前缀契约。
