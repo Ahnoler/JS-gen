@@ -232,6 +232,17 @@ def main() -> None:
         def get_all_text_till_next_clickable_element(self):
             return '产品库管理'
 
+    class _QueryButtonNode:
+        # #970 回执②：弹窗内【查询】按钮（幂等白名单 label）——修复前走
+        # 幂等旁路跳过整个门块，button_text_identity 未赋值即被收口记忆块
+        # 读取 → UnboundLocalError（click-failed，agent 被迫绕行）。
+        tag_name = 'button'
+        xpath = '//div[@class="query-bar"]/button[1]'
+        attributes = {'class': 'el-button el-button--primary'}
+
+        def get_all_text_till_next_clickable_element(self):
+            return '查询'
+
     class _FakePage:
         url = 'http://sut/app/list'
 
@@ -241,14 +252,15 @@ def main() -> None:
             return {}
 
     class _FakeBrowserContext:
-        def __init__(self, page):
+        def __init__(self, page, node=None):
             self._page = page
+            self._node = node if node is not None else _FakeElementNode()
 
         async def get_current_page(self):
             return self._page
 
         async def get_dom_element_by_index(self, index):
-            return _FakeElementNode()
+            return self._node
 
         async def _click_element_node(self, _node):
             return None
@@ -324,6 +336,65 @@ def main() -> None:
         )
 
     asyncio.run(_nav_reclick_ledger_behavior())
+
+    # 11. #970 回执②（2026-09-21）：幂等白名单 label（查询）跳过整个门块，
+    #     收口记忆块（门块之外、点击成功后无条件执行）读取
+    #     button_text_identity → UnboundLocalError（生产 5-6 次 click-failed）。
+    #     修复钉两点：门块之前无条件初始化（与 date_panel_click /
+    #     select_trigger_click 同区）；记忆块仍按 if button_text_identity:
+    #     追加——button 身份为空时 identities 仅为 click 身份，不追加别名。
+    async def _idempotent_query_button_remember_aliases():
+        _state._ACTION_LOG.clear()
+        store_q: dict = {}
+        engine_q = ClickEngine(
+            _FakeBrowserContext(_FakePage(), _QueryButtonNode()), store_q,
+        )
+        raised = ''
+        res_q = None
+        try:
+            res_q = await engine_q.click_element_by_index(1)
+        except Exception as exc:  # characterization: report, do not swallow
+            raised = f'{type(exc).__name__}: {exc}'
+        res_text = str(getattr(res_q, 'extracted_content', res_q)) if res_q is not None else ''
+        # RED 证据形态：引擎外层兜底把 UnboundLocalError 转成
+        # click-failed:cannot access local variable 'button_text_identity' ...
+        # （生产 #970 的 res=click-failed 同源）；GREEN 后必须回到 ok-clicked-1。
+        check(
+            not raised and res_text == 'ok-clicked-1',
+            f'query-button (idempotent) click succeeds as bare ok-clicked-1 '
+            f'without UnboundLocalError, got raised={raised!r} result={res_text!r}',
+        )
+        entry_q = _state._ACTION_LOG[-1] if _state._ACTION_LOG else {}
+        check(
+            entry_q.get('action') == 'click_element_by_index'
+            and entry_q.get('result') == 'ok-clicked-1',
+            f"query-button click records bare ok-clicked-1, got {entry_q.get('result')!r}",
+        )
+        # remember_phase_operation_aliases 把收到的每个 identity 写进
+        # _phase_ai_operations（键经 _operation_key 规范化）：断言收到的
+        # identities 仅为 click 身份——button: 别名未被追加。
+        ops_q = store_q.get('_phase_ai_operations') or {}
+        expected_key = 'click:' + _QueryButtonNode.xpath
+        check(
+            set(ops_q.keys()) == {expected_key},
+            f'remember received only the click identity (no button: alias), '
+            f'got {sorted(ops_q.keys())!r}',
+        )
+
+    asyncio.run(_idempotent_query_button_remember_aliases())
+
+    check(
+        'if button_text_identity:' in src,
+        "memory block still guards on button_text_identity "
+        "(button alias appended only when set)",
+    )
+    check(
+        src.count("button_text_identity = ''") == 1
+        and src.find("button_text_identity = ''")
+        < src.find("if not date_panel_click and not _is_idempotent_click_label("),
+        "button_text_identity initialized unconditionally before the gate block "
+        "(single init, outside the idempotent/date-panel bypass)",
+    )
 
     if failures:
         print(f"FAILED ({len(failures)})")

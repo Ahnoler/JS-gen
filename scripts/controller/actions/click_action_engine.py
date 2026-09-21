@@ -409,6 +409,11 @@ class ClickEngine:
             # 给 recorded result 加 nav-reclick-budget 尾缀自证（stderr 痕迹
             # 不落库，回放侧只读不解析该文案）。
             nav_reclick_pass = False
+            # button 文本身份在门块之前无条件初始化：幂等白名单 label（如
+            # 「查询」）或 date_panel_click 会整体跳过门块，而收口记忆块
+            # （门块之外）无条件读取本变量——初始化留入门块内即触发
+            # UnboundLocalError（#970 弹窗【查询】click-failed 根因）。
+            button_text_identity = ''
             if gate_xp:
                 try:
                     date_panel_click = bool(await page.evaluate('''(xpath) => {
@@ -432,7 +437,6 @@ class ClickEngine:
                 # 维持 already-operated-this-phase 拒绝。
                 from .phase.element_guard import duplicate_phase_operation
                 duplicate = duplicate_phase_operation(self.business_data_store, click_identity)
-                button_text_identity = ''
                 if element_info:
                     candidate_text = str(
                         element_info.get('text') or elem_text or ''
