@@ -2,6 +2,22 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 21:55 · ZCode 系统线 — 收工：停止回放系统线 12 项缺陷全部修复合入（回链 18:05 开工；SDD 六任务 + 终审 + 修复波）
+
+- 完成（代码 8 提交 `35ac10fe→c7f8ffcf`，+831/−40，全量 verify-all 182 pins + statics **EXIT=0 ALL GREEN 零 FAILED**）：
+  - `35ac10fe` #2：Type B 自愈删步三守卫（G1 扫描后/G2 每轮 removeById 前/G3 记账后），stop 后不可逆删步关闭；新 pin `characterize-replay-stop-hardening.mjs`（系列 pin，executor 域注册）
+  - `d8463214` #3/#11：heal 等待 agent_stopped 按 reason 分流（new_step_arrived 不再误判用户中断/不置 abortReplay；旧执行机无 reason 向后兼容）+ heal 超时补发 cancel_step（僵尸 heal Agent 不再按 max_steps 继续驾驶浏览器）
+  - `641d7857` #4/#12：stop×步超时竞态终态走 aborted（前端不再把用户停止读成失败）+ 中止步终态事件补发（running 条目不悬挂）
+  - `2baf88ac` #5/#8/#13/#16：stop 端点诚实化（`stopped/batchWasRunning/cancelStepDelivered/reason`，无批次早退不置标志不发 cancel_step——一并关闭录制期误砍录制 Agent 与空闲期残留）+ sync 路径 busy 泄漏补 catch + api-docs stop 段同步
+  - `dba82de8` #6/#7：busy 检查-置位同同步段原子化（双开批堵死）+ replayBatchSeq 世代令牌（finally 复位按批归属，stop 静默丢失窗口收敛）+ accept .catch 补 replayRunning 对称行
+  - `c2669046` #9：detach 对在跑批次置 abortReplay 快速收敛 + purgeNodeBindings 补发 session.process_exit（reason:node_offline，整机失联路径终态竞速可达）
+  - `f2203b51` 终审修复波：**F-1（P2）** purge 循环前移到 clearTrajectoryRuntimesForNode 之前（原顺序带 runtime 会话先被摘除、补发事件覆盖不到 #9② 主要消费方；顺带修 _persistUnsub 被 clear 掏空漏清的既有缝）+ detach 注释措辞避让 stop-semantics 3b needle（该断言钉 detach 段不含 cancel_step 字样，我行注释字面撞上致 26/27）
+  - `c7f8ffcf` **verify-all 域管线 bug 修复（全体线相关）**：run_one 后台子 shell 内 FAILED=1 丢失→父 shell 恒读 0，任何真红都判 ALL GREEN（本次实跑 5 红仍判全绿才暴露）；改 failed.list 落盘判定并输出 failed pins 清单
+- 流程：SDD 六任务（worker-coder 实现 + reviewer 评审逐任务 Approved，子智能体零 commit，主线程显式 pathspec 代提交）→ 终审（五场景端到端推演，NEEDS FIXES 仅 F-1 一项 P2）→ 修复波 scoped re-review **MERGE READY**。台账 `.superpowers/sdd/2026-09-21-stop-replay-system-line/progress.md`（挂账 minor 全量在案，终审 triage 无一达必修线）。
+- 验收（合并后硬约定）：`git pull` up to date 后全量 `verify-all.sh` **182 pins + statics EXIT=0 ALL GREEN**（DB 走 127.0.0.1:13306 隧道 env 覆盖跑，未改 .env；隧道为本单元拉起，留用）；系列 pin 57/57、stop-semantics 27/27、replay-batch/terminal-abort 绿；eslint 改动文件全 0 error。勘误：本轮自查所见 step-highlight/refill-contract 红系引擎线 20:30（f484110f）修复前后时序差与本机 DB 隧道未开所致，非彼时存量。
+- 遗留移交：①**Node 改动需重启控制面 4097 生效**（本轮 7 个 src 文件）；②SPA 侧 stop 响应 stopped 可为 false + 新字段（batchWasRunning/cancelStepDelivered/reason）——请合约线按 api-docs recording.js stop 段适配前端；③step-highlight 动态锚点 FLOORS≥10 脆弱性仍在（引擎线 20:30 已代收口一次，形态再变仍会红）；④cold pin `characterize-meta-step-filter` 孤儿失效（filterMetaSteps→filterProductSteps 未同步、未登记任何域）待其线登记/修靶；⑤引擎线 E1-E4（回放循环 cancel 感知等 4 项）未动，见 docs/reports/2026-09-21-stop-replay-defects-engine-line.md；本线清单 docs/reports/2026-09-21-stop-replay-defects-system-line.md 已标注收工状态。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 20:30 · ZCode 引擎线 — 收工：两笔挂账红代收口（用户令「解决一下」；f484110f）——全量 182 pin ALL GREEN 零 FAILED
 
 - 授权与范围：用户 20:10「解决一下」——对本日 19:00/20:05 两条目的两笔移交（OpenCode prompt 双 9 号 / 系统线 step-highlight 锚池数据面红）代收口。他线工作区已清空、local==remote 时动手，两线如有异议可在 agent-log 提出，可回退各自文件。
