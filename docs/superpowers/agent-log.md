@@ -2,6 +2,16 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 21:10 · ZCode 引擎线 — 收工：verify-phase-token 第一步（门侧豁免）已并入 V2.0（回链 19:40 开工；`2e4c24fe`→合并 `c55cc849`，设计稿推荐节奏执行）
+
+- 完成：核验型阶段门侧兜底交付并合并。**`scripts/controller/actions/phase/verification_gate.py`**（新）：`is_verification_phase_task` 四条件机械判定（词表 v1 冻结逐字采用；±16 字共现窗口；**黑名单扫描前掩蔽宾语状态词**——「已删除」是状态补语非动作故 #973 阳性不杀，裸「删除」仍命中故 #924 对照不豁免；FP 零容忍=拿不准一律 False）。**`service.py` 收尾门**：introduce_pick 豁免后追加核验型豁免（纯 8 行插入，lazy import；pending_fields/semantic_doubt 路径原样）。新 pin `characterize-verification-phase-gate`（40 断言，入 core 域）。
+- SDD 证据链：worker-coder RED→GREEN（40 断言；RED 11/12 先行）→ reviewer **Approved**（0 Critical/Important；词表六清单与 plan 逐字比对一致；掩蔽机制=计划内矛盾〔字面黑名单与 #973 校准对互斥〕的必要解、双向 pin 钉死）→ 主会话补验 reviewer Cannot-verify 项（pin 复跑 40/40、py_compile、ruff F821、`git diff 30cacdf9` 范围=恰 4 文件、禁改文件零 diff）→ 5 Minor 全裁决记账（「不存在」根词自共现/死参 boundary_role/pin 鲁棒性=第三项 parked 至第二步校准批）。
+- 合并：`--no-ff` 并入 uara_V2.0 = **`c55cc849`**（零冲突；系统线 stop-replay 系提交 35ac10fe/d8463214/2baf88ac 均 src Node 侧，文件集零交叠）。**合并后验收**：全量 verify-all 202 ok，判定 ALL GREEN；layer-tree/step-highlight 两红经 **BASE stash 往返**归因=共享录制库数据漂移（系统线今日湿测写库所致），非本线——临时 worktree 与主检出合并态同红，本线文件零交叠。已 push。
+- 生效：纯 Python 侧，**合并已落磁盘，新录制会话即效、无需重启**。Node 侧零改动。
+- 遗留移交：①**verify-all.sh 并行 runner 缺陷**——`run_one &` 置 FAILED=1 于后台子 shell，并行 pin 失败不阻退出（exit 0 但有 `!! FAILED` 行），影响系统级验收语义，建议系统线或另单修复；②条件②「不存在」根词自共现（根=宾语同词，含「不存在」即过条件②）——词表冻结的机械推论，FP 面被①③条件兜住，**第二步校准批复核**；③第二步主收口（apply_phase_contract+boundary 同笔清 success_when/role→other）**待门侧兜底湿测窗口零 FP 后点单**；④历史核验型阶段盘点待判定式第二步定稿后。
+- 现场清点：临时 worktree 保留（junctions+.env，合并验收后可删）；stash@{0} 仍系他线旧条目未触碰；本线零 tracked WIP 残留。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-21 19:40 · ZCode 引擎线 — 开工：verify-phase-token 第一步落地——门侧兜底（判定式 v1 冻结执行，用户「继续」=按设计稿推荐），SDD 临时 worktree
 
 - 进行中：设计稿 §5 三裁定按推荐执行（判定式 v1 四条冻结 / 先门侧兜底一个湿测窗口再议主收口 / mode='verify' 维持死值）。**本单元只落第一步**：`service.py:724-729` 核验型豁免（镜像 introduce_pick 例外）+ 判定式纯函数模块 + RED pin。主收口（apply_phase_contract+boundary 同笔清理）**不在本单元**——待门侧兜底湿测窗口无 FP 后另单。
