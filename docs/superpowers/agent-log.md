@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-21 09:12 · ZCode 引擎线 — 开工：B 类移交处置（TsscMultiSelect 路由互拒 fill 侧收口 + analyze 粒度策略结论）
+
+- **收件**：合约线 B 类移交报告 `docs/reports/2026-09-20-b-class-handover-engine-line.md`（本地分发区，不入 git）三项——①TsscMultiSelect 路由互拒（traj #864，唯一需新动作）；②stepNumber 空号/同号双行（已闭环，仅记录）；③analyze 合并阶段（策略待确认）。
+- **①调研定谳（Explore 只读调研 + 现场复核）**：**select 侧半边已在库**（`216b2688` = 引擎线 B-1：执行器 live 复核否认 tssc 时 `[tssc-route-conflict]` 落日志并 fall through el-select，不再把 `no-tssc-multi-select` 回抛给 agent）；**残缺在 fill 侧**——`fill_engine.py` 的 kind「只升不降」：快照判 tssc 时，即使 live 探测**明确解析到字段项且无 tssc 后代**（确定性否认，区别于 `''` 歧义/未解析）仍硬拒 `err-use-tssc-multi-select` → 与 select 的旧行为构成互推（#864 7 步不收敛）；歧义源=同 label 多候选（查询区「客户名称」普通 input vs 向导抽屉真 tssc，`lookup_field_kind` 取 `_scan_fields` 首条）。
+- **①本单元修复**：fill 侧加「live 明确否认 → kind 降级为空 + `[fill][tssc-route-conflict]` 日志 + 继续正常 fill」；live 命中 tssc 仍硬拒（保 #696 防误直填护栏）；不动 `select_engine.py`/`select_dispatch.py`（216b2688 已单向化）；新增冷 pin 护栏（仿 `characterize-tssc-route-conflict` 的行为冒烟：store 判 tssc + live 否认 → 不返回 err；live 命中 tssc → 仍返回 err）。护栏基线=既有两枚冷 pin（`characterize-tssc-multi-select` / `characterize-tssc-field-resolution`）。
+- **③结论（引擎侧，随本单元写入专项报告）**：见 `docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md` 末尾「引擎线结论」节——**不写动作类型硬规则、不做 create 侧自动拆分兜底**，理由=27 轨量化（仅 4 条人工调整、净段数非判据）+ 既有提示词已含 3.1 状态边界硬原则与 Rule 9「能少则少」；给出可随时启用的候选措辞备查。
+- 上游：uara_V2.0（tip cf4c7ae7）。分支 `engine/tssc-route-fix-20260920`。
+- 范围（可写集）：`scripts/controller/actions/fill_engine.py`（fill 侧降级分支）、新 cold pin、`scripts/refactor/verify-all.sh`（登记）、`docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md`（追加引擎线结论节）、本分支 agent-log 本条目+收工条目
+- 禁入区：**运行态服务零触碰（重启须先请示）**；远端代理（用户自管）；`select_engine.py`/`select_dispatch.py`（216b2688 已收敛，勿动）；引擎 worktree 内他线未提交 WIP（`data/kb/flows/product_element.json`、`data/kb/req/product-mgmt/{through-chains.md,chapters/03-…}`——Cursor 线在途，不触碰）；主检出未推送的他线提交（Cursor 7bb27e9c/5cb2a999，其未批 push）——故本单元条目写在交付分支上，不落主检出。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-20 19:15 · OpenCode — 设计稿落地：D2 SUT 503 阶段空转守卫（#925 续）
 
 - 完成：`docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md` 已落地并提交。
