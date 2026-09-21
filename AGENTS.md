@@ -6,6 +6,12 @@ Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. Th
 
 多个 Agent 工具（Zcode / Cursor / Codex 等）在同一仓库开发，会话记忆互不相通；跨工具互通靠仓库内文件 + git 历史，不靠任何工具的内置记忆。
 
+**版本双线（2026-09-21 起为硬约定）：**
+- 每个版本两套分支：开发 `uara_V<版本>_dev`，相对稳定的 test `uara_V<版本>_test`。日常只在 **dev** 上改；test 只接收从对应 dev 合入的、已验收的结果。
+- **V2.0**：稳定 test 沿用已有分支 **`uara_V2.0`**（定盘点 `eab6c041`，不再直接提交）。开发分支是 **`uara_V2.0_dev`**。V2.0 不另建 `uara_V2.0_test`，避免和 `uara_V2.0` 两条稳定线分叉。
+- 开工先 `git pull` 的上游是 **`uara_V2.0_dev`**。功能分支从 `uara_V2.0_dev` 切出，合回 `uara_V2.0_dev`。要发布到稳定 test 时，再把 `uara_V2.0_dev` 合入 `uara_V2.0`（`--no-ff`，禁止 force push）。
+- 以后新版本按对开：`uara_V<x.y>_dev` 与 `uara_V<x.y>_test`，同样只在 dev 上改。
+
 **开场三件事（每次会话开始先做）：**
 1. `git log --oneline -15` + `git status` — 看最近提交与未提交改动
 2. 读 `docs/superpowers/todo-list.md` — 当前工作线与挂起项
