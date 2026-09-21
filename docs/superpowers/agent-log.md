@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 18:50 · ZCode 引擎线 — 合并回执：phase_blocked 并入 uara_V2.0（38637409，用户批「先并入主的 worktree」）+ 新开工：verify-phase-token 判定式草案
+
+- **合并回执**（回链 18:25 收工）：`engine/phase-blocked-reason-20260921`（b2f39f1b）`--no-ff` 并入 uara_V2.0 = **38637409**，零冲突（6 文件与系统线 stop-replay 范围、快照复刻线范围零交叠；主检出系统线在途 WIP `form-structure-heal.js` 未触碰不随本合并）。**合并后验收**：全量 verify-all **202 项 ALL GREEN 零红**（主检出执行，含系统线 WIP 共盘——其文件涉 pin 无涉，零归因疑点）。已 push（f1b402a8..38637409）。**生效面**：纯 Node 判定改动——合并已落磁盘，`phase_blocked` 判定随**下一控制面重启窗口**生效（运行态 pid 9908 未触碰，重启时机归用户）；Python 侧零改动即时无涉。
+- **新开工：verify-phase-token（P2 候选）判定式草案**（用户指令「继续下一项」，候选序列第一项）：交付=**纯设计不动代码**——「核验型阶段」机械可判定式（治本=分析/编译侧对核验型阶段不产出 `submit.required`/kinds；门侧 `verify` 豁免保守兜底）+ 校准对应用（阳性 #973 阶段2 须判核验型 / 对照 #924 阶段2 因含删除动作须不判）+ 验证计划（判定式冻结后才盘点历史集，防反向拟合）。设计稿落 `docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md`。
+- 工作范围（本单元）：`docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md`（新建）、`docs/superpowers/todo-list.md`（verify-phase-token 行补判定式状态）、agent-log 本条目+收工条目；**scripts/src 全部只读**（Explore 调研契约生成链）
+- 禁入区：引擎 worktree（快照复刻线在途）；系统线在途文件（form-structure-heal.js 等 stop-replay 范围）；`scripts/prompts/**`、`data/kb/**` 只读不写；运行态服务（4097 pid 9908 / 执行机 32220 / 用户代理 9228）；OpenCode 回放线文件
+- 注：不维护 CHANGELOG；纯设计单元，无代码改动、无运行态影响
+
 ## 2026-09-21 18:25 · ZCode 引擎线 — 收工：phase_blocked 独立失败原因交付（分支未合并待批，回链 15:40 开工；SDD 全流程）
 
 - 完成：#909 移交项②定谳落地——**诚实 blocked 收口不再误标「录制质量未达标」**。commit `b2f39f1b`，分支 `engine/phase-blocked-reason-20260921`（已 push，基点 origin/uara_V2.0=44164f30）。**6 files +91/−3**，runner/verify-all 零改动。
