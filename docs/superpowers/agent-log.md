@@ -2,6 +2,13 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 22:47 · Cursor — 收工：方案 D 第 2 刀并入 uara_V2.0（回链 21:05）
+
+- 完成：功能分支 `cursor/phase-structured-contract-20260921` 代码 `ea0ca6af`，`--no-ff` 并入 `uara_V2.0` = **79b4b8ba**（已在远端）。分析输出等长 `phaseContracts`，写入 `trajectory_phase.contract_json`；录制下发有效快照时执行机直接落阶段意图，不再跑 `compile_boundary` / `compile_phase_intent` / `review_phase_contract` / `_apply_cross_phase_token_guard`。缺失、非法或 heal 仍走文本分类。改描述清空合约。核验型阶段主收口未做。
+- 验收（合并态 `79b4b8ba`）：`characterize-phase-contract`、`characterize-persisted-phase-contract`、`characterize-phase-reviewer`、`characterize-phase-boundary` 均 OK。全量 `bash scripts/refactor/verify-all.sh` 报 3 红，复跑归因均为本机环境、与本次 diff 无关：`characterize-fill-err-with-scope` 与 `characterize-idempotent-click-gate` 在 Git Bash 默认 GBK 下打印 `✓` 抛 `UnicodeEncodeError`，`PYTHONIOENCODING=utf-8` 单跑 OK；`characterize-network-capture` 在 Git Bash 把 `TMPDIR=/tmp` 解析成不存在的 `D:\tmp`，PowerShell 去掉该变量后单跑 OK 5。
+- 遗留移交：①迁移 `migrations/20260921120000_phase_contract_json.js` **尚未对现网库执行**，`contract_json` 列不存在时创建轨迹会失败，需另批跑迁移；②Node 录制 runner 下发 `phase_contract` 要**再重启一次控制面 4097** 才生效（22:29 那次重启早于本合并）；Python 新会话从磁盘加载 `service.py`，新录制会话即带持久化签合同；③核验型阶段主收口仍等湿测窗口，不在本刀。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 22:29 · ZCode 引擎线 — 运行态：控制面+本地执行机重启（用户批；E1-E4 合并后双载生效），E2 联测话术交合约线
 
 - 重启（外科手术式，非 restart-local.cmd——该脚本会连带拉起用户自管代理 9228）：发现 4097/32220/9228 本就全部未监听（用户此前已停），故为全新启动、零误杀面。从引擎 worktree（=uara_V2.0 tip ae0988cb，**Node 12 项修复 + Python E1-E4 双侧同载**）PowerShell Start-Process 分离拉起：控制面（`npm start`，SUT_SPIN_GUARD_MODE=observation 注入）+ 本地执行机（`npm run executor` 同 env）。
