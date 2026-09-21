@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 18:05 · ZCode 系统线 — 开工：停止回放系统线 12 项缺陷修复（SDD 模式，6 任务串行）
+
+- 进行中：用户批「完成系统线相关的缺陷」。范围=docs/reports/2026-09-21-stop-replay-defects-system-line.md 全部 12 项（#2/#3/#4/#5/#6/#7/#8/#9/#11/#12/#13+#16 随 #5）。
+- 工作范围：`src/services/trajectory/form-structure-heal.js`、`replay-heal-shared.js`、`replay-batch-runner.js`、`trajectory-session-replay.js`、`trajectory-runtime.js`、`trajectory-attach-service.js`、`src/services/executor-node-service.js`、`src/dashboard/api-docs/groups/recording.js`（仅 stop 端点段）、`src/services/replay-actions.js`（如需只读参照）；新增/扩展 pin（stop-semantics 系）+ `scripts/refactor/verify-all.sh`（仅 executor 域注册表**追加行**）；计划文件 `docs/superpowers/plans/2026-09-21-stop-replay-system-line.md`。
+- 禁入区：D2 线在途（phase-done-evidence-gate.js / src/models/failure-reason.js / api-docs/groups/trajectory.js / characterize-phase-done-evidence-gate·quality-final-gate·agent-llm-error / 临时 worktree `D:\dev\JS-gen-tmp-pblocked`）；引擎线 E1-E4 范围（scripts/ 全部：_replay.py / replay_table.py / agent/ / session_runner.py / event_dispatch.py）；OpenCode 刚交付的 redactSecrets/replay_plan 逻辑段（replay-batch-runner.js 内只读不改动）；运行态服务（4097 pid 9908 / 执行机 32220 / 用户代理 9228）；data/kb/**。
+- 执行方式：SDD——每任务一个 worker-coder 子智能体（不 commit）+ reviewer 评审 + 主线程显式 pathspec 代提交；台账 `.superpowers/sdd/stop-replay-system-line-20260921/`；每任务 pin 单跑绿 + eslint 0 error，收工合并后全量 verify-all（基线=ALL GREEN 零已知红）。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 15:40 · ZCode 引擎线 — 开工：phase_blocked reason 区分（#909 移交项②，用户点名），SDD 模式临时 worktree
 
 - 进行中：用户批「你做 phase_blocked reason 区分」。定谳落点=**Node 终局裁决**：`evaluateFinalVerdict`（`src/services/trajectory/phase-done-evidence-gate.js:168`）qualityFails 非空即判 `quality_failed`，不区分该阶段是否 agent 显式自报 `success=false`（诚实受阻上报）→ #909 P5 诚实 blocked 被误标「录制质量未达标」。区分规则（机械可判）：**失败全部来自显式 `success=false` 阶段，且质量标记仅 `missing_success_token`（受阻的必然推论）且全部附着于失败阶段 → failKind=`phase_blocked`**；含 `pending_fields:*`/`semantic_doubt_fields:*` 等真质量信号或标记附着于非显式失败阶段（#973 形态）→ 维持 `quality_failed`，零质量标记维持 `phase_failed`（3c 语义不变）。
