@@ -786,6 +786,19 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
             reasons: payload?.quality_failed_reasons || [],
           });
         }
+        if (type === 'phase_end' && Array.isArray(payload?.overlayButtons) && payload.overlayButtons.length > 0) {
+          // 常态收口弹窗按钮清单（#917④b）：phase_end 先于 phase_done 到达且此时
+          // session.activePhaseId 已置（与下方 fail 落库同源），直接落该阶段 doneLog，
+          // 台账不必等卡死收口即可见弹窗按钮。文本形态对齐 probe 收口 [a][b] 拼法；
+          // 空清单不落（防噪红线），.catch(() => {}) 包裹防落库噪声上抛。
+          // await 对齐既有落库调用（零步门禁/fail 路径）：appendPhaseDoneLog 非
+          // 原子 RMW，不 await 会与紧随的 phase_done → recordPhaseResult 写入
+          // 并发交错丢条目（可能丢的恰是阶段主 done 文本）。
+          await appendPhaseDoneLog(session?.activePhaseId, {
+            text: 'overlay buttons: ' + payload.overlayButtons.map((b) => `[${b}]`).join(''),
+            source: 'agent',
+          }).catch(() => {});
+        }
         pushPhaseObservation(type, payload);
         return;
       }
