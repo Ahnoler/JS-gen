@@ -2,7 +2,7 @@
 
 已落地、不再作为当前实施入口的设计/计划。**保留作决策记录**；活待办见 [`../todo-list.md`](../todo-list.md)，当前实施入口见 [`../specs/`](../specs/) 与 [`../plans/`](../plans/)。
 
-目录结构：`specs/`（规格）、`plans/`(实施计划)、`todos/`（已完成的单点 TODO）。文件按日期命名；本 README 只索引代表性批次，未列出的条目按文件名日期检索。
+目录结构：`specs/`（规格）、`plans/`(实施计划)、`reports/`(评审/验收/收尾报告)、`research/`(调研与交接)、`guides/`(已退役操作手册)、`samples/`(样例数据)、`todos/`（已完成的单点 TODO）、`logs/`（agent-log 旧档）。文件按日期命名；本 README 只索引代表性批次，未列出的条目按文件名日期检索。
 
 ## 归档批次索引
 
@@ -20,6 +20,8 @@
 | | 早期已收官：消息捕获 MVP 与持久化、JS/Python 改名 | message-capture-mvp（spec）、capture-persistence（plan）、rename-js-python（plan） |
 | | 已落地：系统账号同名唯一提示 UX | system-account-name-unique-ux（spec+plan） |
 | | 已落地：需求草稿关键数据与流式 UX（引用已删 script-runner.js） | req-draft-keydata-and-streaming-ux（plan） |
+| 第四波（2026-09-21 迁入） | 按修改时间口径批量归档：早于 2026-09-14（>7 天）的全部 133 件——specs 45 / plans 37 / reports 23+根目录 3（code-review-2026-08-31、security-review-2026-09-05、重构交接-波次4-6） / research 20 / guides 4 / samples 1 | 不逐条列出，按文件名日期检索 |
+| | 迁入说明：AGENTS.md 5 处、todo-list 21 处引用已同步改写为 archive/ 路径；代码注释内的出处引用未改（历史标注，以本目录实际路径为准）；flow-card-guided-propose 线活入口 spec（2026-09-19 仍更新）留主区，仅其 plan 归档 | |
 
 ## 第一波成对明细
 

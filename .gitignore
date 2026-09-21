@@ -66,3 +66,7 @@ data/kb/req/*/.draft-traj-propose.json
 
 # 控制面打包产物
 dist/
+
+# 本机会话件（多 Agent 工具本地产物，不入库）
+.cursor/
+_prompt_export/
