@@ -23,7 +23,10 @@ import {
  */
 function purgeNodeBindings(nodeUuid) {
   slotLease.releaseByNode(nodeUuid);
-  clearTrajectoryRuntimesForNode(nodeUuid);
+  // 本循环必须在 clearTrajectoryRuntimesForNode 之前：clear（trajectory-runtime.js）
+  // 会把带轨迹 runtime 的会话从 state.sessions 删除，之后遍历只能命中无 runtime 的
+  // 裸浏览器会话——而 waitForTerminalSessionEvent 的调用方（回放/录制编排）依附的
+  // 恰是带 runtime 的会话，终态补发将全部落空。
   for (const [sessionId, session] of [...state.sessions.entries()]) {
     if (session?.executorNodeUuid === nodeUuid) {
       // 节点失联/下线清绑定时，向该会话的 hub 补发终态事件：执行机整机失联后
@@ -51,6 +54,7 @@ function purgeNodeBindings(nodeUuid) {
       state.sessions.delete(sessionId);
     }
   }
+  clearTrajectoryRuntimesForNode(nodeUuid);
   // Clear stale BiB live pointer so UI does not think attach is still valid.
   import('./remote-session-service.js')
     .then((m) => m.clearExecutorLiveForNode?.(nodeUuid))

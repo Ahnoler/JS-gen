@@ -606,7 +606,7 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
       runtime.abortRecording = true;
       runtime.userStop = { success: false };
       // Session 即将关闭：若回放批在跑，置 abortReplay 让批循环在步边界/循环头
-      // 快速收敛（无需 cancel_step，随后的 closeSession 即会话终态）。
+      // 快速收敛（无需再向执行机下发停止事件，随后的 closeSession 即会话终态）。
       if (runtime.replayRunning) runtime.abortReplay = true;
     }
     // Cache/runtime may be null after streamDetach — resolve via truth

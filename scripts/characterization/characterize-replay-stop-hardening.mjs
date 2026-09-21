@@ -89,7 +89,11 @@
  * 执行机侧 process_exit 摊平形态（code/sessionId/slotIndex 顶层）+ reason:
  * 'node_offline' 供日志区分失联补发与真实子进程退出。emit 全文件恰一次且挂在
  * purge 内（三调用方均为「节点失联/下线 → 会话判死」语义；reconcile 重连路径
- * 走独立清理逻辑不经过 purge，无误伤面）。
+ * 走独立清理逻辑不经过 purge，无误伤面）。emit 循环整体位于
+ * clearTrajectoryRuntimesForNode 之前——clear 会把带轨迹 runtime 的会话从
+ * state.sessions 删除，后置的遍历只能命中无 runtime 的裸会话，waitForTerminal
+ * SessionEvent 的调用方（回放/录制编排）依附的恰是带 runtime 的会话，终态补发
+ * 将全部落空（终审 F-1 修复）。
  *
  * 全部为 read_text needle + 源码切片断言（零 import 被测模块——该模块 import
  * 副作用面含 ws-server / executor-session-client，无 ESM mock 能力下不做行为
@@ -472,6 +476,15 @@ record('11g emit 调用全文件恰一次且只挂 purge（unregister/markOfflin
 record('11h emit 位于 state.sessions.delete 之前（清绑定时该会话 hub 仍在，事件必达等待方）',
   PURGE_BODY.indexOf("emitSessionEvent(sessionId, 'session.process_exit'")
   < PURGE_BODY.indexOf('state.sessions.delete(sessionId);'));
+record('11j emit 循环位于 clearTrajectoryRuntimesForNode 之前（终审 F-1：clear 会先删带 runtime 会话，emit 后置只能命中裸会话、终态补发落空）',
+  (() => {
+    const emitIdx = PURGE_BODY.indexOf("emitSessionEvent(sessionId, 'session.process_exit'");
+    const clearIdx = PURGE_BODY.indexOf('clearTrajectoryRuntimesForNode(nodeUuid);');
+    if (emitIdx < 0 || clearIdx < 0) return false;
+    // 次序钉死 + emit 与 delete 同循环（先 emit 后删，遍历期间目标集未被 clear 掏空）
+    return emitIdx < clearIdx
+      && PURGE_BODY.indexOf('state.sessions.delete(sessionId);') < clearIdx;
+  })());
 record('11i hub 导入单次（emitSessionEvent 恰好 import 一次，来自 executor-event-hub.js）',
   count(ENS, "from '../executor-event-hub.js';") === 1
   && ENS.includes("import { emitSessionEvent } from '../executor-event-hub.js';"));
