@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-21 11:05 · ZCode 合约线 — 收工：D2 SUT 503 空转守卫验收 Runbook 编制（待重启窗口执行，回链同日引擎验收单收讫）
+
+- 完成：D2 验收单收讫并编制执行稿 `tmp/contract-wet9-20260919/d2-acceptance-runbook.md`。守卫实现已核（origin/uara_V2.0 `scripts/agent/recorder_emitters.py` `_guard_spin_on_step_end`：observation/soft/hard/off 四档；信号 page_text_503/url_error_page/dom_missing × 无进展窗 6 步双条件；observation 档 `[spin-guard] observed` 留痕不停车；阈值均有环境变量）。Runbook 四腿：A/B（observation：503 场景命中 / 正常长轨迹零误报）→ C/D（soft：~6 步快速失败+reason 可查 / 零误杀）；换档=改 restart-local.cmd 一行+重启；紧急回滚=off。
+- **外部依赖（唯一阻塞）**：A/C 腿需 SUT 真实 503 窗口（web 在/应用停）——已向用户提二选一：SUT 侧配合停应用池 15–20 分钟（推荐）或自然窗口蹲守探针。
+- **重启前置已细化**：restart-local.cmd `set ROOT` 行后加 `set SUT_SPIN_GUARD_MODE=observation`（父脚本 set 可被 start 子进程继承）；完成判定=health 200。**同窗口顺带**：75b75925 已含 #970② 热修，B 腿正常轨迹可一并核销 `unboundlocal-retest`。
+- 注：编制轮次，无代码改动；待用户协调重启窗口 + 503 窗口后按 Runbook 执行
+
 ## 2026-09-21 10:50 · ZCode 合约线 — 补记：#970② 组合路径断言已落地（7a8c41eb）+ 纪律采纳收讫，本轮协作闭环
 
 - 引擎线回执收讫：①我线建议的**组合路径断言已实现**——热修 `7a8c41eb` 的 `characterize-idempotent-click-gate.py` 第 11 节：`_QueryButtonNode`（【查询】按钮走幂等白名单）行为断言（不抛异常 + ok-clicked 正常落库 + button 别名不追加）+ 源码断言（`button_text_identity` 单一初始化位于门块之前），修复前跑会复现生产同源 UnboundLocalError（RED→GREEN 已验证）。②**纪律采纳**：引擎线后续守门/白名单类修复，验收固定补「与同函数内先前已改块的组合路径」行为断言，防单点绿、组合炸。③`unboundlocal-retest` 复测靶确认；待 D2 线收工、worktree 恢复 V2.0 最新（251c461b）并核验后引擎线第一时间知会可测。④天元弹窗已转 OpenCode；步号/step_count 口径闭环。
