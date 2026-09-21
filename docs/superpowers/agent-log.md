@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-21 12:05 · ZCode 引擎线（D2 线） — 合并回执：D2 SUT 503 阶段空转守卫并入 V2.0（0cbcbd35，用户批）；⚠️运行磁盘已恢复（回应 11:05 前兄弟回执 db1b2abf）
+
+- 完成：用户指令「没有问题的话，去合并吧」→ D2 分支 `engine/d2-spin-guard-20260921`（fec9b5e3）**并入 uara_V2.0 = `0cbcbd35`**（主检出合并，--no-ff，**零冲突**）。合并序：D2 线为后合并方，按兄弟小批次线合并回执的预告核验——`service.py` 双方改动区域不同自动合流且**双方均 live**（D2 续跑 break :606 + 小批次 T1 overlayButtons 块），`verify-all.sh` 登记行并排，D2 六文件（recorder.py/recorder_emitters.py/守卫/pin/verify-all 注册/设计稿）与交付 tip `fec9b5e3` **逐字节一致**。
+- **⚠️运行磁盘已恢复**：引擎 worktree（D:\dev\JS-gen-engine）已对齐合并态 `75b75925`（d2 分支 merge 0cbcbd35 内容全集 = B 类① fill 收口 + 挂账小批次 T1/T2 + #970② 热修 + D2，已 push）——**新录制会话磁盘加载即载全部修复**，db1b2abf 所警示「新会话暂复现旧缺陷」状态自本条起解除。注：Node 侧增量（如小批次 T1 runner await 修复 `1568143a`）仍需下一重启窗口生效，归属用户/小批次线决策；Python 侧全部磁盘已 live。
+- **合并态验收**（内容=0cbcbd35，于引擎 worktree 75b75925 执行）：`characterize-sut-spin-guard` **91 断言全过**；全量 verify-all **193 过 / 失败集=3 已知红（step-highlight/layer-tree/confirm-notification）零新增**（193=前值 191+小批次新增两 pin 均过）；日志 `tmp/verify-all-d2-v2-merged-20260921.log`。D2 默认 off，合并零行为影响。
+- push 状态：`0cbcbd35` 系兄弟会话推 V2.0（db1b2abf）时连带发布（refs 共享）；本条目 commit 后随硬约定推送（连带携带 11:05 locator-snap 线在 V2.0 的开工条目 commit e4ce6212）。
+- 遗留移交：①**D2 湿测验收归合约线**（前置在线 SUT+执行机）：observation 档 #925 复现场景必须命中 + 正常长阶段（多轮填写/树搜索/分页）不得误杀 → 按湿测数据逐级升档，默认值升 hard 须 Lead 批（设计稿 §7/§12）；②locator-snap 线（11:05 开工，基点 251c461b）后合并方消解 verify-all.sh 相邻登记行；③D2 实施三裁定与幂等双键语义全文见设计稿 §12。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-21 11:05 · ZCode 引擎线 — 开工：more-btn 图标按钮 xpath「伪造」修复（系统线 L1c 取证移交，点击命中时刻定位快照）
 
 - **收件**：系统线取证报告 `docs/reports/2026-09-21-l1c-xpath-morebtn-forensics.md`（本地分发区）——L1c 已排除；根因实锤：`click_button('更多')` 落库 xpath 来自点击前 `_enrich_click_element` 文本匹配（includes 取最后命中），实际点击走 `JS_CLICK_ICON_BUTTON`（more-toggle class 兜底下钻内层 button），两选点链无一致性校验 → 落库 xpath 可指向从未被点击的节点（真机注入假按钮实锤）；纯图标无 tooltip 时 enrich null → 落库无定位、回放 not-found。
