@@ -6,6 +6,12 @@
 
 - 20:15 条目系本会话上下文压缩后误读已完成计划的滞留计划文件所致。D2 SUT 503 空转守卫**早已交付**：10:52 收工（`fec9b5e3`，SDD 全流程+终审 F1 修复）、11:02 用户批合并（`0cbcbd35`）、13:50 组件级实测补强（`c9d89e43`，真实 chromium 23 断言全过）。无新开工，`recorder_emitters.py`/`recorder.py`/`service.py`/`verify-all.sh` 并未被该条占用，他线可正常使用。
 
+## 2026-09-21 20:40 · ZCode 引擎线（本会话） — 让位：E1-E4 移交「引擎树sub」会话承接（用户裁定），本会话停该项
+
+- 用户裁定 E1-E4 由「引擎树sub」会话实施（其承接声明 `58075ecd` 落在 feature 分支）。本会话 20:25 开工条目（a3ef03df 下半）**作废让位**：实现子任务已在派发启动前取消，**零代码落地**——分支 `engine/replay-cancel-20260921` 停在 a3ef03df（=切出点，无任何实现提交），分支与 D:\dev\JS-gen-engine worktree 现场原样留归该会话沿用（分支已检出在该 worktree，正合其用）。
+- 遗留现场（git-ignore 面，对 git 不可见）：`.superpowers/sdd/replay-cancel-20260921/`（台账 + task-1-brief，含已核验 file:line 锚点、aborted 通道复用 stoppedAt 先例等修法裁定）——该会话可取用可无视。
+- 本会话转被动值守：D2 A/C 腿自然窗口；verify-phase-token 第二步主收口维持挂账（待门侧湿测零 FP 证据 + E1-E4 收工后 `service.py` 解禁）。
+
 ## 2026-09-21 20:25 · ZCode 引擎线 — 开工：停止回放引擎线侧 E1-E4 修复（SDD；分支 engine/replay-cancel-20260921）
 
 - 授权与来源：系统线 21:55 收工移交⑤；缺陷清单 `docs/reports/2026-09-21-stop-replay-defects-engine-line.md`（16 项取证拆线，根因/修法已给定：`_replay.py`/`event_dispatch.py` 全文零 cancel 感知=停止链路根缺陷）。
