@@ -170,7 +170,11 @@ export class SessionManager {
    */
   forward(sessionId, stdinEvent, data = {}) {
     const slot = this.sessions.get(sessionId);
-    if (!slot) throw new Error(`Unknown session ${sessionId}`);
+    if (!slot) {
+      const err = new Error(`Unknown session ${sessionId}`);
+      err.code = 'unknown_session';
+      throw err;
+    }
     slot.writeEvent(stdinEvent, data);
     return { sessionId, slotIndex: slot.slotIndex };
   }
@@ -324,7 +328,11 @@ export class SessionManager {
     deviceScaleFactor,
     resize,
   }) {
-    if (!this.sessions.has(sessionId)) throw new Error(`Unknown session ${sessionId}`);
+    if (!this.sessions.has(sessionId)) {
+      const err = new Error(`Unknown session ${sessionId}`);
+      err.code = 'unknown_session';
+      throw err;
+    }
     if (!remoteSessionUuid) throw new Error('remoteSessionUuid required for attachBib');
     if (!this.sendBinary) throw new Error('sendBinary callback missing');
 

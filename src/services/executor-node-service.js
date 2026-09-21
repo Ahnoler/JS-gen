@@ -273,6 +273,27 @@ export async function reconcileRemoteSessions(node) {
       await remoteSessionDao.close(row.id, { crashed: true });
       const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
       await clearOwnershipOnClose(row.id).catch(() => {});
+      if (agentId) {
+        slotLease.releaseBySession(agentId);
+        const session = state.sessions.get(agentId);
+        if (session) {
+          if (session._persistUnsub) {
+            try { session._persistUnsub(); } catch {}
+          }
+          if (session._trajPersistUnsub) {
+            try { session._trajPersistUnsub(); } catch {}
+          }
+          if (session._aiRecordUnsub) {
+            try { session._aiRecordUnsub(); } catch {}
+          }
+          state.sessions.delete(agentId);
+        }
+        for (const [tid, runtime] of [...getAllTrajectoryRuntimes().entries()]) {
+          if (runtime?.sessionId === agentId) {
+            getAllTrajectoryRuntimes().delete(tid);
+          }
+        }
+      }
       crashed += 1;
       continue;
     }

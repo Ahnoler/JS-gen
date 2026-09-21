@@ -8,6 +8,7 @@ import * as executorNodeDao from './dao/executor-node-dao.js';
 import * as lease from './executor-slot-lease.js';
 import {
   waitForSessionEvent,
+  waitForSessionEventWhere,
   onSessionEvent,
   removeSessionHub,
 } from './executor-event-hub.js';
@@ -330,7 +331,15 @@ export async function closeSession({
       // false = kill Chrome（释放资源）；true = leave idle CDP（一般不走这条）
       keepBrowser: keepBrowser === true,
     });
-    await waitForSessionEvent(sessionId, 'session.closed', timeoutMs).catch(() => {});
+    await Promise.race([
+      waitForSessionEvent(sessionId, 'session.closed', timeoutMs),
+      waitForSessionEventWhere(
+        sessionId,
+        'session.error',
+        (payload) => payload?.code === 'unknown_session',
+        timeoutMs,
+      ),
+    ]).catch(() => {});
   } finally {
     lease.releaseBySession(sessionId);
     removeSessionHub(sessionId);
@@ -402,4 +411,4 @@ export function subscribeSessionEvents(sessionId, handler) {
   return onSessionEvent(sessionId, '*', ({ type, payload }) => handler(type, payload));
 }
 
-export { onSessionEvent, waitForSessionEvent, removeSessionHub };
+export { onSessionEvent, waitForSessionEvent, waitForSessionEventWhere, removeSessionHub };

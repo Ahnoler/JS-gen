@@ -12,7 +12,9 @@ export function createSessionHandler(manager) {
     const sessionId = payload?.sessionId;
     // list / list_cdp may use requestId as sessionId for reply routing
     if (!sessionId && type !== 'session.list' && type !== 'session.list_cdp' && type !== 'session.bib_stream_viewers') {
-      throw new Error('sessionId is required');
+      const err = new Error('sessionId is required');
+      err.code = 'bad_request';
+      throw err;
     }
 
     switch (type) {

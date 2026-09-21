@@ -165,7 +165,7 @@ export const REMOTE_SESSION_GRACE_MS = parseInt(
   10,
 );
 export const TRAJ_LOCK_WAIT_TIMEOUT_MS = parseInt(
-  _resolve('TRAJ_LOCK_WAIT_TIMEOUT_MS', '30000'),
+  _resolve('TRAJ_LOCK_WAIT_TIMEOUT_MS', '60000'),
   10,
 );
 

@@ -181,6 +181,7 @@ const client = new ExecutorWsClient({
       client.send('session.error', {
         sessionId: msg.payload?.sessionId,
         error: err.message,
+        code: err?.code || 'session_error',
       });
     }
   },
