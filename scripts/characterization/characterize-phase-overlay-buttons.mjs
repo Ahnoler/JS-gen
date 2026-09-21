@@ -70,8 +70,9 @@ record('3a phase_end 分支窗口存在（quality_failed 捕获块 → pushPhase
 record('3b 窗口内对 overlayButtons 判非空数组（空 → 不落，防噪红线）',
   count(WIN, 'Array.isArray(payload?.overlayButtons)') === 1
   && count(WIN, 'payload.overlayButtons.length > 0') === 1);
-record('3c 窗口内 appendPhaseDoneLog 落 session.activePhaseId（恰 1 处，与 runner 其他调用同源）',
-  count(WIN, 'appendPhaseDoneLog(session?.activePhaseId, {') === 1);
+record('3c 窗口内 await appendPhaseDoneLog 落 session.activePhaseId（恰 1 处，与 runner 其他落库调用 await 同形——F1 修复：非原子 RMW 不 await 会与 phase_done 写入并发丢条目）',
+  count(WIN, 'await appendPhaseDoneLog(session?.activePhaseId, {') === 1
+  && count(WIN, 'appendPhaseDoneLog(session?.activePhaseId, {') === 1);
 record('3d 文本前缀 overlay buttons: 与 [a][b] 拼法（对齐 probe 收口形态）',
   count(WIN, "'overlay buttons: '") === 1
   && count(WIN, '.map((b) => `[${b}]`).join(\'\')') === 1);
