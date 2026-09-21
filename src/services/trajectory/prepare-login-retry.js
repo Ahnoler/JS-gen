@@ -44,6 +44,8 @@ export async function runPrepareLoginWithColdStartRetry({
       return { attempts: attempt };
     } catch (err) {
       lastErr = err;
+      // 会话已死（process_exit / unknown_session 等）：再重试也是立刻失败，直接抛出避免空转。
+      if (err?.isTerminalReplayAbort) break;
       if (attempt >= attemptsCap) break;
       if (typeof settle === 'function') {
         try {

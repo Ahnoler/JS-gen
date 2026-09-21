@@ -18,6 +18,62 @@
 
 import { randomUUID } from 'node:crypto';
 
+/** 运行期 replay 等待应中断的会话终态事件集合。 */
+const TERMINAL_SESSION_EVENTS = Object.freeze([
+  'session.process_exit',
+  'session.closed',
+  'session.bib_error',
+  'session.error',
+]);
+
+/**
+ * 根据终态事件类型与负载构造可读错误信息。
+ * @param {string} type 事件类型
+ * @param {object} payload 事件负载
+ * @returns {string} 错误描述
+ */
+function terminalErrorMessage(type, payload) {
+  const base = `Executor session terminated mid-replay (${type})`;
+  switch (type) {
+    case 'session.process_exit':
+      return `${base}; exit code=${payload?.code ?? 'unknown'}`;
+    case 'session.closed':
+      return `${base}; slotIndex=${payload?.slotIndex ?? payload?.slot_index ?? 'unknown'}`;
+    case 'session.bib_error':
+      return `${base}; ${payload?.error || payload?.message || 'unknown'}`;
+    case 'session.error':
+      return `${base}; ${payload?.error || payload?.message || 'unknown'} (code=${payload?.code || 'unknown'})`;
+    default:
+      return base;
+  }
+}
+
+/**
+ * 等待给定会话的任意终态事件。返回的 promise 只在终态事件发生时 resolve；
+ * 超时/无事件不会 reject，便于与 replay_done 的 timeout 统一竞争。
+ * @param {object} execSession executor 会话客户端（需提供 waitForSessionEvent）
+ * @param {string} sessionId session id
+ * @param {number} timeoutMs 底层每个终态监听的超时毫秒数
+ * @returns {Promise<{ type: string, payload: object }>} 终态事件信息；带 cancel() 方法
+ */
+function waitForTerminalSessionEvent(execSession, sessionId, timeoutMs) {
+  let cancel = () => {};
+  const promise = new Promise((resolve) => {
+    const waiters = TERMINAL_SESSION_EVENTS.map((type) =>
+      execSession.waitForSessionEvent(sessionId, type, timeoutMs));
+    cancel = () => waiters.forEach((w) => w.cancel?.());
+    waiters.forEach((w, i) => {
+      w.then((payload) => {
+        cancel();
+        resolve({ type: TERMINAL_SESSION_EVENTS[i], payload });
+      }).catch(() => {});
+    });
+  });
+  promise.cancel = cancel;
+  promise.catch(() => {});
+  return promise;
+}
+
 /**
  * Decide whether a replay_done payload belongs to the expected replayId.
  * Missing replayId → legacy accept (old Python / executor).
@@ -106,11 +162,15 @@ export function waitForOwnedReplayDone(execSession, sessionId, replayId, timeout
  *   提供时与 replay_done 用 Promise.race 竞速，先结算者的 payload 即返回值中的 result；
  *   输家经 promise.cancel 释放（executor-event-hub 的 cancel：清定时器 + 摘监听且不再结算），
  *   .finally 兜底保证拒绝（超时）路径上输家同样被释放。
+ * @param {boolean} [opts.abortOnSessionTerminal] 是否在等待期间监听会话终态事件
+ *   （session.process_exit / session.closed / session.bib_error / session.error），
+ *   命中时立即抛错中断 replay，避免死会话上的 prepare 长时间占住轨迹锁。默认 false。
  * @returns {Promise<{ result: object|null, results: Array<object>, ok: number, failed: number, error: string|null }>}
  *   result 为胜出事件的原始 payload（无 errorEvent 时即 replay_done 载荷）；
  *   results 为其 results 数组（非数组时归一为空数组）；ok / failed 为
  *   Number(payload?.ok||0) / Number(payload?.failed||0)；error 为 payload.error || null。
- * @throws {Error} forwardStdin 同步抛错（executor 未连接）或等待超时（Timeout waiting for …）时原样向上抛
+ * @throws {Error} forwardStdin 同步抛错（executor 未连接）、等待超时（Timeout waiting for …）
+ *   或会话终态事件（isTerminalReplayAbort=true）时原样向上抛
  */
 export async function runReplayActions({
   execSession,
@@ -122,6 +182,7 @@ export async function runReplayActions({
   isReplay = true,
   seedActionLog = false,
   errorEvent = null,
+  abortOnSessionTerminal = false,
 }) {
   const replayId = randomUUID();
 
@@ -138,7 +199,13 @@ export async function runReplayActions({
     errP.catch(() => {});
   }
 
-  // 3. 下发 replay_actions；forwardStdin 同步抛错（executor 未连接）会正常向上抛——
+  // 3. 可选会话终态监听：prepare 等持锁路径中，会话死亡应立刻失败释放锁。
+  let terminalP = null;
+  if (abortOnSessionTerminal) {
+    terminalP = waitForTerminalSessionEvent(execSession, sessionId, timeoutMs);
+  }
+
+  // 4. 下发 replay_actions；forwardStdin 同步抛错（executor 未连接）会正常向上抛——
   //    此时孤儿等待 promise 已被 no-op catch 免疫。
   try {
     execSession.forwardStdin({
@@ -156,24 +223,38 @@ export async function runReplayActions({
   } catch (err) {
     doneP.cancel?.();
     errP?.cancel?.();
+    terminalP?.cancel?.();
     throw err;
   }
 
-  // 4. errorEvent 时竞速：先结算者为赢，输家经 promise.cancel 释放（清定时器 + 摘监听）。
+  // 5. errorEvent / 终态事件 时竞速：先结算者为赢，输家经 promise.cancel 释放（清定时器 + 摘监听）。
   let donePayload;
   try {
+    const candidates = [
+      doneP.finally(() => {
+        errP?.cancel?.();
+        terminalP?.cancel?.();
+      }),
+    ];
     if (errP) {
-      donePayload = await Promise.race([
-        doneP.finally(() => {
-          errP.cancel?.();
-        }),
-        errP.finally(() => {
-          doneP.cancel?.();
-        }),
-      ]);
-    } else {
-      donePayload = await doneP;
+      candidates.push(errP.finally(() => {
+        doneP.cancel?.();
+        terminalP?.cancel?.();
+      }));
     }
+    if (terminalP) {
+      candidates.push(terminalP.then((t) => {
+        doneP.cancel?.();
+        errP?.cancel?.();
+        const err = new Error(terminalErrorMessage(t.type, t.payload));
+        err.isTerminalReplayAbort = true;
+        err.terminalType = t.type;
+        err.terminalPayload = t.payload;
+        throw err;
+      }));
+    }
+    // 用数组字面量保持既有 structural pin（Promise.race([）可见。
+    donePayload = await Promise.race([...candidates]);
   } catch (err) {
     // P1-6：超时后叫停仍在跑的 Python，避免迟到 done 污染下一轮等待。
     if (/Timeout waiting for replay_done/i.test(String(err?.message || err || ''))) {

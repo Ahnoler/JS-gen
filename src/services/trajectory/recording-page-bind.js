@@ -101,6 +101,7 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
         timeoutMs: READ_PAGE_CODE_TIMEOUT_MS,
         stopOnFail: false,
         isReplay: true,
+        abortOnSessionTerminal: true,
       });
       const results = Array.isArray(r?.results) ? r.results : [];
       const row = results.find((it) => it && it.action === 'read_page_component_code');

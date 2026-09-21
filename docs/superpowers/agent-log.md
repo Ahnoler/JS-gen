@@ -1,5 +1,29 @@
 # Agent 协作日志
 
+## 2026-09-21 12:30 · OpenCode 系统线 — 开工：prepare 登录回放会话死亡时快速释放轨迹锁
+
+- 工作范围：`src/services/replay-actions.js`（核心改动：replay_done 等待增加会话终态事件竞速）、`src/services/trajectory/trajectory-record-lifecycle.js`（登录回放/探测启用）、`src/services/trajectory/prepare-login-retry.js`（沉降启用）、`src/services/trajectory/recording-page-bind.js`（读页绑定启用）、`src/services/trajectory/menu-navigation.js`（菜单导航启用）；新增 characterization pin `scripts/characterization/characterize-replay-terminal-abort.mjs`。
+- 禁入区：不碰 D2 的 SUT 503 守卫文件；不碰 executor 侧。
+- 执行方式：代码改动 + pin + `bash scripts/refactor/verify-all.sh`；完成后 commit + push（网络若仍抖则本地 commit 待恢复 push）。
+
+## 2026-09-21 12:50 · OpenCode 系统线 — 收工：prepare 登录回放终态事件竞速释放轨迹锁（回链 12:30 开工，commit `4a282cbd`）
+
+- 完成（代码 `4a282cbd`，9 files / +362 −13）：
+  - **核心改动**：`src/services/replay-actions.js` 新增 `abortOnSessionTerminal` 选项；等待 `replay_done` 时同时监听 `session.process_exit` / `session.closed` / `session.bib_error` / `session.error`，任一终态事件命中立即抛错并带 `isTerminalReplayAbort=true` / `terminalType` / `terminalPayload`，避免死会话上的 prepare 白等 180s 占锁。
+  - **prepare 路径启用**：`trajectory-record-lifecycle.js`（登录前探测、组件/硬编码登录回放）、`trajectory-attach-runner.js`（冷启动沉降 `wait_for_loading`）、`recording-page-bind.js`（读页绑定）、`menu-navigation.js`（菜单导航）均传 `abortOnSessionTerminal: true`。
+  - **重试快速退出**：`prepare-login-retry.js` 捕获到 `isTerminalReplayAbort` 时直接结束重试，不再无意义指数退避。
+  - **结构性 pin 兼容**：保留 `Promise.race([` 字面量，修复 `characterize-special-element` wiring 断言（初次 `Promise.race(candidates)` 导致 regex 失配）。
+  - **新 pin**：`scripts/characterization/characterize-replay-terminal-abort.mjs` **7/7**（process_exit / session.error / 正常 replay_done / disabled 忽略 / 监听器清理 / helper wiring / prepare caller wiring），已注册 `verify-all.sh`。
+- 验收（本地状态；合并后验收因网络阻塞未能执行，见下）：
+  - 改动文件 `npx eslint` 0 error；pre-commit 钩子通过。
+  - 全量 `verify-all`（Git Bash @ `D:\Software\Git\bin\bash.exe`）红集与合并前基线一致，**零新增本线归属失败**：`eslint-core`（.venv + tools/recording-coach 既有 3343 errors）、`step-highlight`/`layer-tree`（DB 数据噪声）、`confirm-notification`（ markers 缺失）、`fill-err-with-scope`/`idempotent-click-gate`（GBK `UnicodeEncodeError`）、`tssc-route-conflict`（`ModuleNotFoundError: scripts.controller`）、`network-capture`（portable python 缺失）。
+  - 新增 pin 与受影响 pin 均绿：`characterize-replay-terminal-abort` 7/7、`characterize-special-element`、`characterize-menu-navigation`、`characterize-page-bind`。
+- 状态与遗留：
+  - **GitHub 网络仍抖**：`git pull origin uara_V2.0` 连续 `Recv failure: Connection was reset`，本次代码 commit `4a282cbd` 与 agent-log 收工条目目前均为**本地未 push**；网络恢复后将立即补 `pull --no-rebase` → 合并后重跑 verify-all → push。
+  - **生效**：Node 控制面侧 → 已重启控制面加载新代码：**旧 pid 5968 停止，新 pid 7156 @12:56 health 200**；执行机 pid 6500 自动重连（nodeId 7 online，inUse=1）。复测 traj 969 prepare → 200。
+  - **Push 仍被网络阻塞**：`git push origin uara_V2.0` 报 `Failed to connect to github.com:443`；本地 commits `4a282cbd`（代码）+ `2547774f`（agent-log 收工）待网络恢复后补推。
+  - 不维护 CHANGELOG。
+
 ## 2026-09-21 11:20 · ZCode 引擎线 — 收工：more-btn xpath 伪造修复交付（点击命中时刻定位快照，分支未合并待批，回链 11:05 开工）
 
 - 完成：分支 `engine/locator-snap-20260921`（**9ee4af45**，已 push），**6 files +330/−16**。SDD 全流程：前置 Explore → 实现 → 任务评审（3 Important）→ 修复波次 → scoped re-review（代码 CLEAN）→ 修复后全量 verify-all。
@@ -150,6 +174,7 @@
   - **运行态已重启（补记 11:50，用户批准）**：按 sanctioned `config/restart-local.cmd` 重启——**控制面 pid 6500（11:46:50 起，health 200）、本地执行机 pid 14908（11:46:56 起，nodeId 7 HZH/registered online）**；本次 Node 侧改动 + 合并态代码已 live；`SUT_SPIN_GUARD_MODE=observation` 随该脚本注入两进程（D2 验收档可用）。boot 日志 `tmp\server-main.log` / `tmp\executor-main.log`；boot sweep 已清 traj 969 的 stale mount（`[server] cleared 1 stale trajectory.remote_session_id mount(s): 969`）。**协调注意**：本机 4097 端口被本线 pid 6500 占用为当前真身；他线 agent-log 12:45 条目（log 时钟领先本机约 1h）所述 pid 9908/32220 在本机未监听——如他线需以其变体重启，请先核 `Get-NetTCPConnection -LocalPort 4097` 再动手，避免互相顶替。
   - **多实例并发缺口**：登记 todo 挂起项 `executor-multiprocess-concurrency`（P2）——slot 租约/轨迹锁/aiRecording claim 全为控制面单进程内存，多实例会重复分配同槽；候选=Redis/DB 外置锁、按 nodeUuid 归属、执行机侧分配 slotIndex。
   - **proxy 守护生效留痕（非本线问题）**：`config\restart-local.cmd` 拉起的 local-server-proxy 因远端 47.101.58.49 已有同 uuid 现役（pid 9228）按 4001 守护自杀退出（`logs-executor-server-proxy.log`），符合双活防护预期。
+  - **复测 503 根因（补记 12:20，用户报告 prepare 仍 503 waited 60000ms）**：**执行机本身正常**（`/api/v2/executors` nodeId 7 connected=true、inUse=0；executor 注册成功）。503 是**轨迹锁被前一个 prepare 占住**：`logs/agent-stderr/32ad703c…log` 显示该会话 Chrome 起来后登录首跳 `go_to_url http://test.creditv5p2.tansun.com.cn/#/login` 报 `ERR_HTTP_RESPONSE_CODE_FAILURE`（SUT 登录页当时返回错误页，属 D2 的 SUT 5xx 面），`wait_for_loading` 因导航中断失败，会话随后被 cancel；prepare 登录回放/冷启动重试在死会话上继续等 `replay_done`，持锁超过 60s，后续 prepare 全部 503。**处置**：重启控制面仅清内存锁（本线 pid 5968 @12:19，health 200；旧 pid 4600 系他线/用户拉起、日志未落 tmp），**复测 `POST /969/record/prepare` 200**，新建 `remote_session` 2163（active，agent=1462a3c0，slot 0）。**遗留（移交 D2/引擎线）**：prepare 登录回放的等待需可被 `session.process_exit`/确定错误页中断，否则单次 SUT 抖动可持锁数分钟；与 D2「SUT 503 阶段空转守卫」同族，本线不在该域扩范围。
   - 工作区 `config/.db-whitelist-seen` 为运行时白名单时间戳改动，非本线所为，未提交。
 - 注：不维护 CHANGELOG。
 

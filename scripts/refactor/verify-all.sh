@@ -190,6 +190,7 @@ run "characterize-backfill" node scripts/characterization/characterize-backfill.
 run "characterize-refill-contract" "$PY" scripts/characterization/characterize-refill-contract.py
 run "characterize-executor-orphan-reconcile" node scripts/characterization/characterize-executor-orphan-reconcile.mjs
 run "characterize-executor-unknown-session" node scripts/characterization/characterize-executor-unknown-session.mjs
+run "characterize-replay-terminal-abort" node scripts/characterization/characterize-replay-terminal-abort.mjs
 run "characterize-executor-duplicate-uuid" node scripts/characterization/characterize-executor-duplicate-uuid.mjs
 run "characterize-executor-only-bib" node scripts/characterization/cold/characterize-executor-only-bib.mjs
 run "characterize-remove-local-bib-mount" node scripts/characterization/cold/characterize-remove-local-bib-mount.mjs
