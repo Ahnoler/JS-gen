@@ -2,6 +2,18 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 18:25 · ZCode 引擎线 — 收工：phase_blocked 独立失败原因交付（分支未合并待批，回链 15:40 开工；SDD 全流程）
+
+- 完成：#909 移交项②定谳落地——**诚实 blocked 收口不再误标「录制质量未达标」**。commit `b2f39f1b`，分支 `engine/phase-blocked-reason-20260921`（已 push，基点 origin/uara_V2.0=44164f30）。**6 files +91/−3**，runner/verify-all 零改动。
+- 改动：①`phase-done-evidence-gate.js` 新增纯函数 `isBlockedOnlyFailure`（三条件全满足才降级：failedPhases 非空 / qualityFails reasons **全为精确** `missing_success_token` / 标记附着 phase 全在失败阶段内）+ `evaluateFinalVerdict` 接线 blocked 形态→`failKind='phase_blocked'`，既有 3c-3f 分支逐字不变；②`failure-reason.js` 目录加 `phase_blocked: '阶段受阻'`；③api-docs failedReason 类别清单补「阶段受阻」；④三枚既有 pin 扩展 RED→GREEN（3g-3j 终局形态 + 纯函数直测 + 目录/防内联 needle）。
+- 判定语义（机械可判）：受阻推论=保存动作做了但收不到 success token 且 agent 诚实自报 success=false → `阶段受阻`；含 `pending_fields:*`/`semantic_doubt_fields:*` 任一真质量信号、或标记附着于非显式失败阶段（**#973 纯核验形态仍判 quality_failed 不变**，verify-phase-token 另单）→ 维持 `quality_failed`；零质量标记维持 `phase_failed`（3c 语义不变）。
+- SDD 证据链：实现者 RED→GREEN（三 pin：gate 34 断言 / quality-final-gate 5/5 / agent-llm-error 8 查）→ 任务评审 **Spec ✅ / Approved**（3 Minor 均裁决记账：JSDoc 契约行=文档真值同步采纳；pin 尾标签计数=沿基旧口径不动；空 reasons 保守面=预期行为）→ 终审 **READY**（端到端链 gate→runner persistFailReason else 分支→DAO 无白名单→目录→api-docs 核验；src/ 无 failKind 穷举消费方；与 snap-replica/OpenCode 回放线**文件集零交叠**）→ 交付前独立验证 **VERIFY-PASS**（worker-coder 全量复跑）。
+- 合并后验收：全量 verify-all **202 项 ALL GREEN 两轮零红**（曾现 3 项红系临时 worktree 缺未跟踪 `config/.env` 的 DB 口令环境差异——主检出对照定谳，补 .env 后全绿，非本线改动）；eslint 3 src 文件零新 warning。
+- 状态：**未合并待批**（用户批后 `--no-ff` 并入 V2.0）。生效：纯 Node 判定改动，**合并后需控制面重启生效**；Python 侧零改动。`'phase_blocked'`（13 字符）可落 `failed_kind` VARCHAR(48)。
+- 遗留移交：①runner catch 路径对一切 `phase_error` 落 `runner_error`——D2 守卫 soft/hard 触发的 `phase_error(reason=sut_unavailable_spin_guard)` 亦被标「录制执行异常」，reason 未透传 failedKind，待 D2 湿测真机命中后按需立单；②#973 纯核验误杀（quality_failed）不在本单元范围，verify-phase-token 待评审排期。
+- 现场清点：临时 worktree `D:\dev\JS-gen-tmp-pblocked` 保留（junctions 两枚，含 config/.env 副本——合并验收后可删）；stash@{0} 系他线旧条目未触碰；主检出无本线 tracked WIP 残留。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 18:05 · ZCode 系统线 — 开工：停止回放系统线 12 项缺陷修复（SDD 模式，6 任务串行）
 
 - 进行中：用户批「完成系统线相关的缺陷」。范围=docs/reports/2026-09-21-stop-replay-defects-system-line.md 全部 12 项（#2/#3/#4/#5/#6/#7/#8/#9/#11/#12/#13+#16 随 #5）。
