@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 20:28 · ZCode 引擎线 — 声明更正/承接：E1-E4 由本会话按用户指令执行（20:25 他会话自认领作废）；沿其分支 engine/replay-cancel-20260921 与引擎 worktree
+
+- 授权：用户 20:2x 将系统线移交的 **E1-E4 明确移交本会话**（「请你带领 agent team（reviewer 和 worker-coder）完成」，含缺陷清单与三条协同注意）。20:25 他会话对 E1-E4 的自认领（a3ef03df）**由本会话承接作废**——该分支 engine/replay-cancel-20260921 = tip 零代码落地，无在途工作可冲突；该会话本日已有 20:15 D2 误声明（20:20 自勘误），疑似上下文压缩后状态混乱，**请其停止 E1-E4 相关动作**，用户侧已同步知会。
+- 承接后的工作范围（在其 20:25 清单上加细）：`scripts/controller/actions/_replay.py`（步边界消费 cancel 标志 + 返回 aborted/stoppedAt）、`scripts/event_dispatch.py`（replay 分支入口消费+清标志 + replay_done 透传 aborted）、`scripts/state.py`（新增 `is_cancel_requested(path)` 内容判定纯函数——recorder/_replay/event_dispatch 共用，防环导入）、`scripts/recorder.py`（E3 :91/:251 exists()→内容=='cancel'）、`scripts/agent/service.py`（E4 删 `_close_agent`/`_request_agent_stop` 内 `_tasks` 死代码循环 ×2 + 协作式停止语义注明；**agent_stopped 的 payload.reason 字段保持原样**——控制面只认 'cancel_step'）、`scripts/session_runner.py` 零改动只读参照（先清再跑顺序保持）；新 pin `scripts/characterization/characterize-replay-cancel-awareness.py`（含 tmp 目录行为断言）+ `scripts/refactor/verify-all.sh` executor 域注册 1 行。
+- 场地：`D:\dev\JS-gen-engine`（本分支已检出于此，干净）；分支 `engine/replay-cancel-20260921`（基点 a3ef03df）；branch-only 未合并待批。纯 Python+pin 侧，合并后新录制/回放会话即效。
+- 禁入区：`src/**`（系统线已收工待重启窗口）、`scripts/prompts/**`、`data/kb/**`、运行态服务（控制面 4097 pid 9908 / 用户代理 9228 一律不触碰）；E2 联测（超时→补发→Python 中断链）交系统线/合约线执行，本线交付联测话术。
+- 执行方式：SDD——worker-coder 实现（零 commit）+ reviewer 评审 + 修复波 + 主会话显式 pathspec 代提交；验收=新 pin + executor 域 + 全量 verify-all（基线 182 pin ALL GREEN）。
+
 ## 2026-09-21 20:20 · ZCode 引擎线 — 勘误：20:15「守卫开工」条目作废（重复声明）
 
 - 20:15 条目系本会话上下文压缩后误读已完成计划的滞留计划文件所致。D2 SUT 503 空转守卫**早已交付**：10:52 收工（`fec9b5e3`，SDD 全流程+终审 F1 修复）、11:02 用户批合并（`0cbcbd35`）、13:50 组件级实测补强（`c9d89e43`，真实 chromium 23 断言全过）。无新开工，`recorder_emitters.py`/`recorder.py`/`service.py`/`verify-all.sh` 并未被该条占用，他线可正常使用。
