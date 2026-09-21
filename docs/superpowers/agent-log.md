@@ -2,6 +2,13 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 22:45 · ZCode 引擎线 — 合并回执：E1-E4 并入 uara_V2.0（4b7829a9→合并 8e0dd470 + 抗抖加固 06613851，用户批合并）；全量 183 pin ALL GREEN 零 FAILED
+
+- 合并：`engine/replay-cancel-20260921`（4b7829a9）`--no-ff` 并入 uara_V2.0 = **8e0dd470**，零冲突。push 前重跑合并态全量验收：首跑 step-highlight 一红——单跑 3/3 绿归因=回溯扫描（≤400 查询）在 VERIFY_JOBS=4 并行下被远端 DB（47.101.58.49）偶发抖动打死一次；**加固 06613851**：单候选查询失败跳过不炸整针（DB 整体不可达时 assert 照常红，语义不变）。加固后重跑全量：**183 pin + statics ALL GREEN，`!! FAILED` 零行**（新 failed.list 判定机制并行验证无误）。已 push（280abdd2→06613851）。
+- 生效面：本批纯 Python 侧，合并已落主检出磁盘，**新录制/回放会话即效**；但停止链路的控制面侧 12 项修复是 Node 侧（7 个 src 文件，系统线 21:55 交付）**仍需重启控制面窗口**——建议尽快安排一次重启，之后按 E2 联测话术（收工条目 22:15 ④）跑「超时→补发 cancel_step→Python 步边界中断」链闭环整条停止线。
+- 引擎 worktree 随后对齐（engine/replay-cancel-20260921 快进至 06613851）。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 22:15 · ZCode 引擎线 — 收工：E1-E4 停止回放 Python 侧闭环交付（回链 20:28 承接；分支 4b7829a9 已推送，未合并待批）
 
 - 完成（代码 `4b7829a9`，7 文件 +333/−19）：**E1 根缺陷闭环**——`replay_action_entries` 步边界（步号赋值后、动作分发前）读 cancel 标志内容=='cancel' 即中断：该步不执行、不进 results/count，返回条件性带 `aborted:true`+`stoppedAt`（与 stop_on_fail 的 stoppedAt 文档化区分）；event_dispatch 回放分支入口先清标志（残留不得误中断新批次首步）+ aborted 透传 replay_done（非中止批次 payload 形状不变）。**E3**——recorder :91/:251 与 service.py:606 统一 `is_cancel_requested` 内容判定（exists() 会把「先清再跑」空文件误判为取消）；共享纯函数三枚落 state.py。**E4**——`_tasks` 死代码 ×2 删除 + 协作式语义注明；`agent_stopped` payload `{reason}` 逐字未动（控制面只认 'cancel_step'）。**E2 随 E1 自动闭合**（控制面步超时补发 cancel_step 即可真正杀掉 Python 僵尸回放）。session_runner.py:471-476 先清再跑零改动（兼容）。
