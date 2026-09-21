@@ -165,6 +165,41 @@ def _chrome_headless_enabled() -> bool:
     return raw in ('1', 'true', 'yes', 'on')
 
 
+# Flag-file gate for --proxy-server (D2 A/C leg accelerator, 2026-09-21).
+# Read live at every browser launch: create tmp/chrome-proxy.flag to route
+# agent Chrome traffic through the local forward proxy, delete the file to
+# go direct again. No env var, no restart, per-session granularity. Absent
+# file (the default state) is byte-identical to the pre-flag arg list.
+_CHROME_PROXY_FLAG = Path(__file__).resolve().parents[2] / 'tmp' / 'chrome-proxy.flag'
+_CHROME_PROXY_DEFAULT = 'http://127.0.0.1:8899'
+
+
+def _chrome_proxy_server() -> str | None:
+    """Proxy URL from tmp/chrome-proxy.flag, or None when the file is absent.
+
+    Content forms: full URL used as-is; ``host:port`` normalized to
+    ``http://host:port``; empty/whitespace/unparseable content falls back to
+    ``_CHROME_PROXY_DEFAULT``. Never add a proxy bypass list —
+    Chrome already bypasses loopback implicitly, so CDP and control-plane
+    traffic stay direct.
+    """
+    try:
+        raw = _CHROME_PROXY_FLAG.read_text(encoding='utf-8').strip()
+    except OSError:
+        return None
+    if not raw:
+        return _CHROME_PROXY_DEFAULT
+    first = raw.splitlines()[0].strip() if raw else ''
+    if not first:
+        return _CHROME_PROXY_DEFAULT
+    if '://' in first:
+        return first
+    host, sep, port = first.rpartition(':')
+    if sep and host and port.isdigit():
+        return f'http://{first}'
+    return _CHROME_PROXY_DEFAULT
+
+
 def _chrome_automation_args() -> list[str]:
     """Flags that suppress Chrome chrome UI prompts agents cannot click."""
     # NOT incognito — Incognito enables stricter HTTPS-First by default.
@@ -219,6 +254,9 @@ def _chrome_automation_args() -> list[str]:
     # Linux root (typical cloud executor): Chrome exits immediately without these.
     if sys.platform != 'win32' and hasattr(os, 'geteuid') and os.geteuid() == 0:
         args.extend(['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
+    proxy = _chrome_proxy_server()
+    if proxy:
+        args.append(f'--proxy-server={proxy}')
     return args
 
 
