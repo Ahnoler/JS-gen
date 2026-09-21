@@ -67,6 +67,7 @@ characterize-phase-reviewer|"$PY" scripts/characterization/characterize-phase-re
 characterize-phase-reviewer-flow|"$PY" scripts/characterization/characterize-phase-reviewer-flow.py
 characterize-phase-done-runid|"$PY" scripts/characterization/characterize-phase-done-runid.py
 characterize-phase-boundary|"$PY" scripts/characterization/cold/characterize-phase-boundary.py
+characterize-cross-phase-token-guard|"$PY" scripts/characterization/characterize-cross-phase-token-guard.py
 characterize-phase-done-evidence-gate|node scripts/characterization/characterize-phase-done-evidence-gate.mjs
 characterize-g3-done-gate-live|"$PY" scripts/characterization/characterize-g3-done-gate-live.py
 characterize-g3-runner-seam|node scripts/characterization/characterize-g3-runner-seam.mjs

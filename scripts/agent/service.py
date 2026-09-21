@@ -269,9 +269,17 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     # goals were empty → open-page fallback never ran; phase 3 LLM
                     # omitted nav_next_clicked for 下一步 wizard step).
                     from ..controller.actions._phase_boundary import compile_boundary
-                    boundary = compile_boundary(phase_core)
+                    boundary = compile_boundary(
+                        phase_core,
+                        all_phases=all_phases if isinstance(all_phases, list) else [],
+                        current_phase_number=cur_phase,
+                    )
                     contract = apply_phase_contract(
-                        business_data_ref, reviewed, boundary_override=boundary
+                        business_data_ref,
+                        reviewed,
+                        boundary_override=boundary,
+                        all_phases=all_phases if isinstance(all_phases, list) else [],
+                        current_phase_number=cur_phase,
                     )
                     mode = business_data_ref.get('_task_mode') or 'other'
                     from ..controller.actions.phase.reviewer import contract_debug_line
@@ -283,7 +291,12 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     sys.stderr.flush()
                 else:
                     mode = apply_task_mode(business_data_ref, phase_core)
-                    contract = apply_phase_intent(business_data_ref, phase_core)
+                    contract = apply_phase_intent(
+                        business_data_ref,
+                        phase_core,
+                        all_phases=all_phases if isinstance(all_phases, list) else [],
+                        current_phase_number=cur_phase,
+                    )
                     mode = business_data_ref.get('_task_mode') or mode
                     from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(

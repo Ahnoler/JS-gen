@@ -19,6 +19,7 @@ from .._phase_context import (
     is_query_task,
     is_wizard_nav_task,
 )
+from .classify import _action_clause
 
 Role = Literal['maintain', 'query', 'introduce', 'navigate', 'other']
 CompletionEvidence = Literal[
@@ -50,6 +51,98 @@ _MAINTAIN_TITLE_RE = re.compile(r'维护|修改|编辑|新增|录入|详情|信�
 _SAVE_BTN_RE = re.compile(r'^(保存|提交)')
 _CONFIRM_BTN_RE = re.compile(r'^(确认|确定)')
 
+# 2026-09-21：阶段终态动作词表——用于区分"只打开/填写"与"要完成保存/确认"的阶段。
+# 只匹配动作子句（预期结果之前），避免把"预期结果：保存成功"等下一阶段的终态描述
+# 误判为本阶段动作。
+# 注意："选中/选行/勾选"是中间选择动作，不是终态（如开页前选行不算完成阶段），
+# 因此不列入通用终态动作；但引入流程的"选中/选目标"可视为该子流程终态。
+_TERMINAL_ACTION_RE = re.compile(
+    r'点击\s*(?:保存|提交|确认|确定)|(?:保存|提交|确认|确定)\s*按钮|'
+    r'保存|提交|确认|确定|回填|完成引入|完成选择|完成选人'
+)
+_INTRODUCE_TERMINAL_RE = re.compile(
+    r'点击\s*(?:确认|确定)|(?:确认|确定)\s*按钮|选中|选行|选择目标|确认|确定|回填|完成引入|完成选择|完成选人'
+)
+_SAVE_TERMINAL_RE = re.compile(
+    r'点击\s*(?:保存|提交|确认|确定)|(?:保存|提交|确认|确定)\s*按钮|'
+    r'保存成功|提交成功|保存并|提交并|并保存|并提交|保存后|提交后|保存|提交|确认|确定'
+)
+
+
+def _has_terminal_action(task_text: str) -> bool:
+    """动作子句中是否含本阶段终态动作（保存/确认/选中等）。"""
+    return bool(_TERMINAL_ACTION_RE.search(_action_clause(task_text)))
+
+
+def _has_introduce_terminal(task_text: str) -> bool:
+    """动作子句中是否含引入/选人流程的终态动作。"""
+    return bool(_INTRODUCE_TERMINAL_RE.search(_action_clause(task_text)))
+
+
+def _has_save_terminal(task_text: str) -> bool:
+    """本阶段是否含保存/提交终态动作（动作子句或预期结果）。"""
+    return bool(_SAVE_TERMINAL_RE.search(task_text))
+
+
+def _terminal_action_in_later_phase(
+    task_text: str,
+    all_phases: list,
+    current_phase_number: int,
+) -> bool:
+    """后续阶段是否含可能承接本阶段终态的动作词（跨阶段令牌归属辅助）。"""
+    if not all_phases or current_phase_number is None:
+        return False
+    try:
+        cur = int(current_phase_number)
+    except (TypeError, ValueError):
+        return False
+    # 优先看本阶段主题词：引入/选择/保存；后续阶段含对应终态词才认为承接。
+    t = (task_text or '').strip()
+    has_intro = bool(_INTRODUCE_RE.search(t))
+    has_save = bool(_SAVE_TERMINAL_RE.search(t))
+    for p in all_phases:
+        if not isinstance(p, dict):
+            continue
+        n = p.get('phaseNumber') if p.get('phaseNumber') is not None else p.get('phase_number')
+        try:
+            if n is None or int(n) <= cur:
+                continue
+        except (TypeError, ValueError):
+            continue
+        desc = str(p.get('description') or p.get('title') or p.get('name') or '').strip()
+        if not desc:
+            continue
+        if has_intro and _has_introduce_terminal(desc):
+            return True
+        if has_save and _has_save_terminal(desc):
+            return True
+        # 若本阶段无明确主题，后续阶段有任何终态动作也视为可能承接（保守）
+        if not has_intro and not has_save and _has_terminal_action(desc):
+            return True
+    return False
+
+
+def _is_open_only_dialog_or_page(
+    task_text: str,
+    all_phases: list | None = None,
+    current_phase_number: int | None = None,
+) -> bool:
+    """阶段是否仅为"打开/弹出页面或弹窗"，而终态动作归后续阶段。
+
+    典型："点击客户名称右侧的【引入】按钮。预期结果：打开客户选择窗口。"
+    动作子句只有触发，没有保存/确认/选中；预期结果是开页/开窗；且（有 catalog
+    时）后续阶段含对应终态动作。
+    """
+    t = (task_text or '').strip()
+    if not is_open_page_task(t):
+        return False
+    # 动作子句已含终态动作 → 不是纯打开阶段（如"点击新增按钮打开表单后点击保存"）。
+    if _has_terminal_action(t):
+        return False
+    # 有全阶段目录时，要求后续阶段确实含终态动作，避免单阶段流程被误判。
+    if all_phases is not None and current_phase_number is not None:
+        return _terminal_action_in_later_phase(t, all_phases, current_phase_number)
+    return True
 
 
 def phase_boundary_active(business_data_store: dict | None) -> bool:
@@ -82,7 +175,17 @@ def get_phase_boundary(business_data_store: dict | None) -> dict[str, Any] | Non
     return raw if isinstance(raw, dict) else None
 
 
-def _is_introduce_primary(task_text: str) -> bool:
+def _is_introduce_primary(
+    task_text: str,
+    all_phases: list | None = None,
+    current_phase_number: int | None = None,
+) -> bool:
+    """True when introduce/pick is the *complete* primary phase goal.
+
+    2026-09-21：单纯的"打开选择窗口"阶段（动作子句只有触发、无选中/确定）
+    应判为 navigate/open_page，不归入 introduce——否则 done 会索要 picker_closed
+    等本阶段产不出的令牌，迫使 agent 执行下一阶段动作。
+    """
     t = (task_text or '').strip()
     if not t or is_login_task(t):
         return False
@@ -90,7 +193,11 @@ def _is_introduce_primary(task_text: str) -> bool:
         return False
     if _CRUD_PHASE_RE.search(t):
         return False
-    return True
+    # 纯开弹窗/页面阶段 → navigate
+    if _is_open_only_dialog_or_page(t, all_phases, current_phase_number):
+        return False
+    # 必须在本阶段完成选/确定/回填，否则终态动作属于后续阶段
+    return _has_introduce_terminal(t) or bool(_INTRODUCE_COMPLETE_RE.search(t))
 
 
 def _requires_introduce_then_save(task_text: str) -> bool:
@@ -103,7 +210,12 @@ def _requires_introduce_then_save(task_text: str) -> bool:
     return bool(_INTRODUCE_COMPLETE_RE.search(t))
 
 
-def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]:
+def compile_boundary(
+    task_text: str,
+    container_kind: str = '',
+    all_phases: list | None = None,
+    current_phase_number: int | None = None,
+) -> dict[str, Any]:
     """Compile NL task into a PhaseBoundary dict (JSON-serializable)."""
     from .._phase_context import classification_task_text
 
@@ -111,6 +223,8 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
     task_mode = classify_task_mode(t)
     explicit_all = bool(_ALL_FIELDS_SYNONYMS.search(t)) or force_refill_all_required(t)
     needs_intro_then_save = _requires_introduce_then_save(t)
+    # 是否本阶段就包含保存/提交终态动作
+    has_save_terminal = _has_save_terminal(t)
 
     if is_login_task(t):
         # login keeps empty success_when — prepare already uses replay_done, not
@@ -121,7 +235,9 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         success_when: list[str] = []
         forbid_index = False
         picker_allowed = False
-    elif _is_introduce_primary(t):
+    elif _is_introduce_primary(t, all_phases, current_phase_number):
+        # Complete introduce/pick phase (select + confirm) must win over query,
+        # because picker phases routinely contain「查询/填写」words.
         role = 'introduce'
         requires_write = False
         goals = ['introduce_pick']
@@ -129,6 +245,8 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         forbid_index = False
         picker_allowed = True
     elif is_query_task(t):
+        # Query wins over open-page expectation: "点击查询。预期结果：打开查询结果页面"
+        # must still record query_clicked evidence.
         role = 'query'
         requires_write = False
         goals = ['query_filter']
@@ -136,8 +254,9 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         success_when = ['query_clicked']
         forbid_index = False
         picker_allowed = False
-    elif is_open_page_task(t):
-        # Open-page expect wins over incidental 维护/修改 in navigation titles.
+    elif _is_open_only_dialog_or_page(t, all_phases, current_phase_number):
+        # Open-page / open-picker-only intermediate stage. Terminal action belongs
+        # to a later phase, so success token = page/dialog opened.
         role = 'navigate'
         requires_write = False
         goals = ['open_page']
@@ -148,7 +267,7 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
     elif task_mode in ('form_fill', 'form_modify'):
         role = 'maintain'
         requires_write = True  # all_editable for recording (current container only)
-        goals = ['fill_form', 'save_form']
+        # 保存/提交终态动作在本阶段才给保存令牌；否则只是"填写完成"的中间阶段
         if needs_intro_then_save:
             goals = ['fill_form', 'introduce_legal_person', 'save_form']
             # Must have introduce evidence AND save evidence (checked in phase_done_ok)
@@ -160,8 +279,13 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
                 'url_change',
                 'saved_navigation',
             ]
-        else:
+        elif has_save_terminal:
+            goals = ['fill_form', 'save_form']
             success_when = ['toast_ok', 'url_change', 'saved_navigation']
+        else:
+            # 纯填写阶段：保留 all_editable 以采集可写元素，但不索要保存令牌
+            goals = ['fill_form']
+            success_when = []
         forbid_index = True
         picker_allowed = True  # nested picker may open during maintain
     elif is_wizard_nav_task(t):
@@ -197,7 +321,12 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
     }
 
 
-def apply_phase_boundary(business_data_store: dict | None, task_text: str) -> dict[str, Any] | None:
+def apply_phase_boundary(
+    business_data_store: dict | None,
+    task_text: str,
+    all_phases: list | None = None,
+    current_phase_number: int | None = None,
+) -> dict[str, Any] | None:
     """Clear + compile boundary when flag on. Returns boundary or None."""
     clear_phase_boundary(business_data_store)
     if business_data_store is None:
@@ -206,7 +335,11 @@ def apply_phase_boundary(business_data_store: dict | None, task_text: str) -> di
     business_data_store['_phase_boundary_flag_locked'] = enabled
     if not enabled:
         return None
-    boundary = compile_boundary(task_text)
+    boundary = compile_boundary(
+        task_text,
+        all_phases=all_phases,
+        current_phase_number=current_phase_number,
+    )
     business_data_store['_phase_boundary'] = boundary
     business_data_store['_evidence_observed'] = []
     business_data_store['_force_refill_all'] = bool(boundary.get('requires_write_all_editable'))
@@ -222,18 +355,32 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
         mode = 'create' if boundary.get('task_mode') != 'form_modify' else 'modify'
         refill = 'all_editable' if boundary.get('requires_write_all_editable') else 'none'
         btn = '确认' if mode == 'modify' else '保存'
+        boundary_success_when = list(boundary.get('success_when') or [])
         success_kinds = []
-        if any(k in (boundary.get('success_when') or []) for k in ('toast_ok',)):
+        if any(k in boundary_success_when for k in ('toast_ok',)):
             success_kinds.append('toast_ok')
-        if any(k in (boundary.get('success_when') or []) for k in ('url_change', 'saved_navigation')):
+        if any(k in boundary_success_when for k in ('url_change', 'saved_navigation')):
             success_kinds.append('url_change')
+        # 2026-09-21：纯填写阶段 boundary 给空 success_when → 不索要保存令牌，
+        # recovery 也不应强推 click_save，避免 agent 越过阶段边界执行下一阶段的保存。
+        requires_save = bool(success_kinds)
+        submit = {
+            'required': requires_save,
+            'via': 'click_save' if requires_save else 'any',
+            'button_text': btn if requires_save else '',
+        }
+        recovery_next = (
+            f'click_save(button_text="{btn}")'
+            if requires_save
+            else '填写/选择字段完成后调用 done(success=true)（本阶段无保存动作）'
+        )
         return {
             'mode': mode,
             'refill': refill,
-            'submit': {'required': True, 'via': 'click_save', 'button_text': btn},
+            'submit': submit,
             'success': {
-                'kinds': success_kinds or ['toast_ok', 'url_change'],
-                'evidence': ['ok-save-success', 'post_save_navigation'],
+                'kinds': success_kinds,
+                'evidence': ['ok-save-success', 'post_save_navigation'] if requires_save else [],
             },
             'forbid': [
                 'index_submit_on_form_maintain',
@@ -241,7 +388,7 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
                 'done_without_token',
             ],
             'recovery': {
-                'next_action': f'click_save(button_text="{btn}")',
+                'next_action': recovery_next,
                 'forbid_reopen_modify_cycle': True,
                 'on_cycle': 'prescribe_once_then_stop_if_deviate',
                 'deviate_actions': ['reselect_row', 'reopen_modify', 'reopen_maintain_dialog'],

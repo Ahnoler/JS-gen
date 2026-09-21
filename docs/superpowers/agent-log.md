@@ -2,6 +2,29 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 21:45 · OpenCode — 收工：阶段合约跨阶段令牌越界修复（P4/P6/P7 录制中断）
+
+- **完成**（回链 20:00 开工）：方案 C 合约引擎 + prompt + 评审器 prompt 已落地合并。
+  - 代码 commit：`be21aafd`；与远端 ZCode 引擎线 verify-phase-token 第一步合并后 commit：`5639541c`。
+  - 改动文件：`scripts/controller/actions/phase/{classify,boundary_contract,intent_contract,intent_gates}.py`、`scripts/agent/service.py`（仅追加 all_phases/current_phase_number 透传，未触碰门侧豁免代码）、`src/services/trajectory/trajectory-meta-service.js`、`scripts/prompts/phase-reviewer-prompt.md`、新 pin `scripts/characterization/characterize-cross-phase-token-guard.py`、`scripts/refactor/verify-all.sh`（PINS_PHASE 注册 1 行）。
+  - 核心修复：开弹窗/选择器-only 阶段识别为 navigate（不索要 introduce_pick 令牌）；纯填写/选择阶段识别为 maintain 但 `submit.required=false`/`success.kinds=[]`；保存/确认动作真正所在的阶段才持有终态令牌；recovery 处方不再对无保存阶段强推 `click_save`。
+- **合并后验收**：`git pull` 与 ZCode 引擎线 verify-phase-token 第一步（`verification_gate.py` + `service.py:724-729` 门侧豁免）自动合并无冲突；复跑关键 pins 全部通过：
+  - `characterize-cross-phase-token-guard.py` OK
+  - `characterize-verification-phase-gate.py` OK（40 passed）
+  - `cold/characterize-phase-boundary.py` OK、`cold/characterize-phase-intent.py` OK
+  - `characterize-phase-reviewer.py` OK、`characterize-phase-reviewer-flow.py` OK
+  - `characterize-g3-done-gate-live.py` OK、`characterize-contract-arbitration-circuit-breaker.py` OK
+  - `characterize-phase-save-cue-promote.py` OK、`characterize-phase-done-runid.py` OK
+  - `characterize-quality-final-gate.mjs` 5/5、`characterize-stop-semantics.mjs` 27/27
+  - `characterize-record-phase-finalize.mjs` OK、`characterize-trajectory.mjs` OK
+  - `characterize-runid-bridge.mjs` 4/4、`characterize-run-event-ownership.mjs` OK
+  - `characterize-done-accept-reason.py` OK
+  - eslint 对改动 JS 文件无新增 warning；Python 改动文件 `py_compile` 通过。
+- **与他线关系**：本线未进入 `scripts/agent/service.py:724-729` 门侧豁免区，仅在其上游透传参数；合并后未破坏 ZCode 引擎线 verify-phase-token 第一步功能。
+- **遗留移交**：长期项「阶段结构元数据（方案 D）」已登记在 `docs/superpowers/todo-list.md`，待后续排期；本次未动 `CHANGELOG.md`。
+- **现场清点**：工作树干净，无 stash 操作，无他线 WIP 残留。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 21:10 · ZCode 引擎线 — 收工：verify-phase-token 第一步（门侧豁免）已并入 V2.0（回链 19:40 开工；`2e4c24fe`→合并 `c55cc849`，设计稿推荐节奏执行）
 
 - 完成：核验型阶段门侧兜底交付并合并。**`scripts/controller/actions/phase/verification_gate.py`**（新）：`is_verification_phase_task` 四条件机械判定（词表 v1 冻结逐字采用；±16 字共现窗口；**黑名单扫描前掩蔽宾语状态词**——「已删除」是状态补语非动作故 #973 阳性不杀，裸「删除」仍命中故 #924 对照不豁免；FP 零容忍=拿不准一律 False）。**`service.py` 收尾门**：introduce_pick 豁免后追加核验型豁免（纯 8 行插入，lazy import；pending_fields/semantic_doubt 路径原样）。新 pin `characterize-verification-phase-gate`（40 断言，入 core 域）。
