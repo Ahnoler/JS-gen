@@ -405,7 +405,9 @@ run_one() {
       echo "△ KNOWN-RED (baseline, non-regression): $desc"
     else
       echo "!! FAILED: $desc"
-      FAILED=1
+      # run_one 以后台子进程运行：FAILED 变量的改动留在子 shell 副本里，
+      # 父 shell 永远读不到（并发化后 ALL GREEN 误判的根因）。落盘判定。
+      echo "$desc" >> "$OUT_DIR/failed.list"
     fi
   else
     tail -1 "$OUT_DIR/$desc.log"
@@ -443,8 +445,10 @@ wait
 status=0
 echo "========================================"
 echo "verify-all: domains=[${DOMAINS[*]}] pins=${#pin_list[@]} + statics"
-if [ "$FAILED" -ne 0 ]; then
+# 以落盘清单为准（并发子进程写、此处只读）；FAILED 变量仅存串行首两门兼容。
+if [ -s "$OUT_DIR/failed.list" ]; then
   echo "verify-all: FAILED — revert the micro-step (or fix before merge)"
+  echo "failed pins: $(tr '\n' ' ' < "$OUT_DIR/failed.list")"
   for f in "$OUT_DIR"/*.log; do
     desc=$(basename "$f" .log)
     if [ -s "$f" ]; then
