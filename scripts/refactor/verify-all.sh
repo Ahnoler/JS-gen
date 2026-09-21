@@ -180,6 +180,8 @@ run "characterize-radio-replay-engine" "$PY" scripts/characterization/cold/chara
 run "characterize-click-replay-engine" "$PY" scripts/characterization/cold/characterize-click-replay-engine.py
 run "characterize-tssc-multi-select" "$PY" scripts/characterization/cold/characterize-tssc-multi-select.py
 run "characterize-tssc-route-conflict" "$PY" scripts/characterization/characterize-tssc-route-conflict.py
+# traj 864 fill 侧收口：store kind=tssc + live 确定性否认（plain）→ 降级放行
+run "characterize-fill-tssc-live-downgrade" "$PY" scripts/characterization/cold/characterize-fill-tssc-live-downgrade.py
 run "characterize-picker-atomic-recording" "$PY" scripts/characterization/cold/characterize-picker-atomic-recording.py
 run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs

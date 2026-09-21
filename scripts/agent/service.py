@@ -765,6 +765,15 @@ async def _run_agent_step_post(step_index, task_text, business_data_ref,
                 sys.stderr.flush()
                 phase_payload["quality_failed"] = True
                 phase_payload["quality_failed_reasons"] = reasons
+            # 常态收口弹窗按钮清单（#917④b）：页面存在可见 dialog/drawer 时，把
+            # semantic 最近一次 overlay.buttons 权威清单随 phase_end 上报，控制面
+            # 落该阶段 doneLog——台账不必等卡死收口即可见弹窗按钮。复用 probe
+            # 收口取数与上限（至多 8 个、单标签截 20 字），不重复实现截断；
+            # 非空才置键（无弹窗/清单空 = 零输出，防噪红线）。
+            from .recorder_emitters import _PROBE_BUTTONS_MAX, _probe_overlay_button_texts
+            _overlay_buttons = _probe_overlay_button_texts()[:_PROBE_BUTTONS_MAX]
+            if _overlay_buttons:
+                phase_payload["overlayButtons"] = _overlay_buttons
             emit_json({"event": "phase_end", "data": phase_payload})
     except Exception as e:
         sys.stderr.write(f"phase_end observability skipped: {e}\n")

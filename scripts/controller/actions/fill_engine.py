@@ -175,47 +175,69 @@ class FillEngine(_FormActionEngineBase):
         # TsscMultiSelect/TsscMultiTree: typing into the trigger looks like a
         # successful fill (filterable input) but never selects a row/node and
         # falsely marks task_done — seen on traj #696 / sid 5b463582.
+        # live 探测三态 + store/live 仲裁（record/replay 两段同码，勿单边改——
+        # 冷 pin characterize-fill-tssc-live-downgrade 断言两段逐字节一致）。
         kind = lookup_field_kind(self.business_data_store, label_text)
-        if kind not in ('tssc-multi-select', 'tree-select'):
-            try:
-                live = await page.evaluate(
-                    '''(label) => {
-                        const container = ''' + JS_GET_CONTAINER + ''';
-                        const pick = ''' + JS_FIELD_ITEM_PICK + ''';
-                        // 与动作体 findFieldItem 同源解析（JS_FIELD_ITEM_PICK）：
-                        // 可见精确 → 隐藏精确 → 唯一包含兜底，多命中=歧义。
-                        // 作用域对齐动作体：JS_GET_CONTAINER 优先，未中补扫可见
-                        // dialog/drawer（替换旧的 document 全域 [0] 盲取——隐藏
-                        // 同名 tssc 节点曾致 err-use-tssc-multi-select 假阳性）。
-                        // 歧义/未解析 → ''（未知，走正常 fill 流程）。
-                        const resolveField = () => {
-                            const hit = pick(container, label);
-                            if (hit && hit.ambiguous) return { ambiguous: true };
-                            if (hit && hit.item) return { item: hit.item };
-                            for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
-                                if (dlg.offsetParent === null) continue;
-                                const h2 = pick(dlg, label);
-                                if (h2 && h2.ambiguous) return { ambiguous: true };
-                                if (h2 && h2.item) return { item: h2.item };
-                            }
-                            return null;
-                        };
-                        const field = resolveField();
-                        if (!field || field.ambiguous || !field.item) return '';
-                        const fi = field.item;
-                        if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
-                        if (fi.querySelector(
-                            '.tree-popover, .tsscTree, .el-tree-select,'
-                            + ' [class*="tsscmultitree"], [class*="TsscMultiTree"]'
-                        )) return 'tree-select';
-                        return '';
-                    }''',
-                    [label_text],
-                )
-                if live in ('tssc-multi-select', 'tree-select'):
-                    kind = live
-            except Exception:
-                pass
+        store_kind = kind
+        live = ''
+        try:
+            live = await page.evaluate(
+                '''(label) => {
+                    const container = ''' + JS_GET_CONTAINER + ''';
+                    const pick = ''' + JS_FIELD_ITEM_PICK + ''';
+                    // 与动作体 findFieldItem 同源解析（JS_FIELD_ITEM_PICK）：
+                    // 可见精确 → 隐藏精确 → 唯一包含兜底，多命中=歧义。
+                    // 作用域对齐动作体：JS_GET_CONTAINER 优先，未中补扫可见
+                    // dialog/drawer（替换旧的 document 全域 [0] 盲取——隐藏
+                    // 同名 tssc 节点曾致 err-use-tssc-multi-select 假阳性）。
+                    // 三态返回（traj #864 fill 侧降级判定，record/replay 同码）：
+                    //   'tssc-multi-select'/'tree-select' → live 命中（升 kind 硬拒）；
+                    //   'plain' → 解析到唯一字段项且无 tssc/tree 后代（确定性否认）；
+                    //   'unresolved' → 未解析到字段；'ambiguous' → 多命中歧义
+                    //   （两者不可判定，维持 store kind 原判，保持拒绝）。
+                    const resolveField = () => {
+                        const hit = pick(container, label);
+                        if (hit && hit.ambiguous) return { ambiguous: true };
+                        if (hit && hit.item) return { item: hit.item };
+                        for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+                            if (dlg.offsetParent === null) continue;
+                            const h2 = pick(dlg, label);
+                            if (h2 && h2.ambiguous) return { ambiguous: true };
+                            if (h2 && h2.item) return { item: h2.item };
+                        }
+                        return null;
+                    };
+                    const field = resolveField();
+                    if (!field) return 'unresolved';
+                    if (field.ambiguous) return 'ambiguous';
+                    const fi = field.item;
+                    if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
+                    if (fi.querySelector(
+                        '.tree-popover, .tsscTree, .el-tree-select,'
+                        + ' [class*="tsscmultitree"], [class*="TsscMultiTree"]'
+                    )) return 'tree-select';
+                    return 'plain';
+                }''',
+                [label_text],
+            )
+        except Exception:
+            live = 'unresolved'
+        if store_kind not in ('tssc-multi-select', 'tree-select'):
+            # store 未知/非 tssc：live 命中才升 kind（traj #696 防误直填护栏，只升）。
+            if live in ('tssc-multi-select', 'tree-select'):
+                kind = live
+        elif store_kind == 'tssc-multi-select' and live == 'plain':
+            # 确定性否认（traj #864 fill 侧）：快照 kind=tssc 但 live 已解析到
+            # 唯一字段项且无 tssc/tree 后代 → 快照过期，降级放行走正常 fill，
+            # 消除与 select 侧 no-tssc-multi-select 的互拒震荡（select 侧
+            # fall-through 已收敛为单向，不成环）。'unresolved'/'ambiguous'
+            # 不可判定 → 维持拒绝。
+            sys.stderr.write(
+                '[fill][tssc-route-conflict] store kind=' + str(store_kind)
+                + ' live=plain label=' + str(label_text or '') + '\n'
+            )
+            sys.stderr.flush()
+            kind = ''
         if kind == 'tssc-multi-select':
             nxt = (
                 f'select_option(label_text="{resolved.label or label_text}", '
@@ -501,47 +523,69 @@ class FillEngine(_FormActionEngineBase):
         label = label_text
         ph = placeholder
 
+        # live 探测三态 + store/live 仲裁（与录制段同码，勿单边改——冷 pin
+        # characterize-fill-tssc-live-downgrade 断言两段逐字节一致）。
         kind = lookup_field_kind(self.business_data_store, label_text)
-        if kind not in ('tssc-multi-select', 'tree-select'):
-            try:
-                live = await page.evaluate(
-                    '''(label) => {
-                        const container = ''' + JS_GET_CONTAINER + ''';
-                        const pick = ''' + JS_FIELD_ITEM_PICK + ''';
-                        // 与动作体 findFieldItem 同源解析（JS_FIELD_ITEM_PICK）：
-                        // 可见精确 → 隐藏精确 → 唯一包含兜底，多命中=歧义。
-                        // 作用域对齐动作体：JS_GET_CONTAINER 优先，未中补扫可见
-                        // dialog/drawer（替换旧的 document 全域 [0] 盲取——隐藏
-                        // 同名 tssc 节点曾致 err-use-tssc-multi-select 假阳性）。
-                        // 歧义/未解析 → ''（未知，走正常 fill 流程）。
-                        const resolveField = () => {
-                            const hit = pick(container, label);
-                            if (hit && hit.ambiguous) return { ambiguous: true };
-                            if (hit && hit.item) return { item: hit.item };
-                            for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
-                                if (dlg.offsetParent === null) continue;
-                                const h2 = pick(dlg, label);
-                                if (h2 && h2.ambiguous) return { ambiguous: true };
-                                if (h2 && h2.item) return { item: h2.item };
-                            }
-                            return null;
-                        };
-                        const field = resolveField();
-                        if (!field || field.ambiguous || !field.item) return '';
-                        const fi = field.item;
-                        if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
-                        if (fi.querySelector(
-                            '.tree-popover, .tsscTree, .el-tree-select,'
-                            + ' [class*="tsscmultitree"], [class*="TsscMultiTree"]'
-                        )) return 'tree-select';
-                        return '';
-                    }''',
-                    [label_text],
-                )
-                if live in ('tssc-multi-select', 'tree-select'):
-                    kind = live
-            except Exception:
-                pass
+        store_kind = kind
+        live = ''
+        try:
+            live = await page.evaluate(
+                '''(label) => {
+                    const container = ''' + JS_GET_CONTAINER + ''';
+                    const pick = ''' + JS_FIELD_ITEM_PICK + ''';
+                    // 与动作体 findFieldItem 同源解析（JS_FIELD_ITEM_PICK）：
+                    // 可见精确 → 隐藏精确 → 唯一包含兜底，多命中=歧义。
+                    // 作用域对齐动作体：JS_GET_CONTAINER 优先，未中补扫可见
+                    // dialog/drawer（替换旧的 document 全域 [0] 盲取——隐藏
+                    // 同名 tssc 节点曾致 err-use-tssc-multi-select 假阳性）。
+                    // 三态返回（traj #864 fill 侧降级判定，record/replay 同码）：
+                    //   'tssc-multi-select'/'tree-select' → live 命中（升 kind 硬拒）；
+                    //   'plain' → 解析到唯一字段项且无 tssc/tree 后代（确定性否认）；
+                    //   'unresolved' → 未解析到字段；'ambiguous' → 多命中歧义
+                    //   （两者不可判定，维持 store kind 原判，保持拒绝）。
+                    const resolveField = () => {
+                        const hit = pick(container, label);
+                        if (hit && hit.ambiguous) return { ambiguous: true };
+                        if (hit && hit.item) return { item: hit.item };
+                        for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+                            if (dlg.offsetParent === null) continue;
+                            const h2 = pick(dlg, label);
+                            if (h2 && h2.ambiguous) return { ambiguous: true };
+                            if (h2 && h2.item) return { item: h2.item };
+                        }
+                        return null;
+                    };
+                    const field = resolveField();
+                    if (!field) return 'unresolved';
+                    if (field.ambiguous) return 'ambiguous';
+                    const fi = field.item;
+                    if (fi.querySelector('.tssc-multi-select')) return 'tssc-multi-select';
+                    if (fi.querySelector(
+                        '.tree-popover, .tsscTree, .el-tree-select,'
+                        + ' [class*="tsscmultitree"], [class*="TsscMultiTree"]'
+                    )) return 'tree-select';
+                    return 'plain';
+                }''',
+                [label_text],
+            )
+        except Exception:
+            live = 'unresolved'
+        if store_kind not in ('tssc-multi-select', 'tree-select'):
+            # store 未知/非 tssc：live 命中才升 kind（traj #696 防误直填护栏，只升）。
+            if live in ('tssc-multi-select', 'tree-select'):
+                kind = live
+        elif store_kind == 'tssc-multi-select' and live == 'plain':
+            # 确定性否认（traj #864 fill 侧）：快照 kind=tssc 但 live 已解析到
+            # 唯一字段项且无 tssc/tree 后代 → 快照过期，降级放行走正常 fill，
+            # 消除与 select 侧 no-tssc-multi-select 的互拒震荡（select 侧
+            # fall-through 已收敛为单向，不成环）。'unresolved'/'ambiguous'
+            # 不可判定 → 维持拒绝。
+            sys.stderr.write(
+                '[fill][tssc-route-conflict] store kind=' + str(store_kind)
+                + ' live=plain label=' + str(label_text or '') + '\n'
+            )
+            sys.stderr.flush()
+            kind = ''
         if kind == 'tssc-multi-select':
             return 'err-use-tssc-multi-select'
         if kind == 'tree-select':
