@@ -2,6 +2,16 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 19:15 · ZCode 引擎线 — 收工：verify-phase-token 判定式草案 v1 落稿（纯设计零代码，回链 18:50 开工）
+
+- 完成：设计稿 `docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md`。核心：①**判定式 v1 四条机械条件**（无保存线索 / 核验词根+宾语共现 / brief_plan 无写动词 / mode∈{query,other,navigate} 硬排除）——校准对应用钉死：#973（重搜确认已删节点不存在）判核验型不再产 submit.required/kinds，#924（核验+删除混合）③命中写动词不豁免；②**主收口=apply_phase_contract 唯一汇合写点**（`intent_contract.py:269-405`，LLM/规则双路径同归；Explore 证实 LLM create/modify 直通无降级路径、规则侧 `校验`→form_fill 而 `删除` 堵 query 逃生门=双路径均可误产 token 合约），且**须同笔清 boundary.success_when+role→other**（has_contract_success 优先读 boundary，单改合约不完整）；③mode='verify' 死值维持不启用（LLM 侧会被 normalize 拒收、全链需锁步，爆炸半径不成比例）；④**纪律**：判定式冻结后才盘点历史集、禁按错分样本回改词表（防反向拟合）、FP 零容忍 FN 可容忍、黑名单从严配置；⑤默认节奏=先门侧兜底（service.py:724-729 镜像 introduce_pick 豁免）一个湿测窗口无 FP 再升主收口。
+- 关键调研锚点（Explore，只读）：合约写点唯一性、`_QUERY_EXCLUDE_RE` 含「删除」与 `_FILL_TASK_RE` 含「校验」= #973 形态双路径误产 token 的机理、needs_token 消费族 5 处 blast radius、#973/#924 无既有特判（确认零基础）。
+- 与 phase_blocked（38637409）正交性已在设计稿 §4.4 记录：两修不冲突不重复。
+- 台账：todo verify-phase-token 行补判定式状态（python utf-8 替换 count-guard）；本条 commit+push。
+- **待用户裁定（设计稿 §5）**：①判定式四条取舍；②节奏（一次到位 vs 先兜底后收口——推荐后者）；③mode='verify' 维持死值确认。
+- 遗留：判定式批准后按 §4.3 落地（两步各自 RED pin 先行 + 全量验收）；历史核验型阶段盘点**待判定式冻结后**点单。
+- 注：不维护 CHANGELOG；纯设计单元零代码改动，verify-all 不适用（无代码面）。
+
 ## 2026-09-21 18:50 · ZCode 引擎线 — 合并回执：phase_blocked 并入 uara_V2.0（38637409，用户批「先并入主的 worktree」）+ 新开工：verify-phase-token 判定式草案
 
 - **合并回执**（回链 18:25 收工）：`engine/phase-blocked-reason-20260921`（b2f39f1b）`--no-ff` 并入 uara_V2.0 = **38637409**，零冲突（6 文件与系统线 stop-replay 范围、快照复刻线范围零交叠；主检出系统线在途 WIP `form-structure-heal.js` 未触碰不随本合并）。**合并后验收**：全量 verify-all **202 项 ALL GREEN 零红**（主检出执行，含系统线 WIP 共盘——其文件涉 pin 无涉，零归因疑点）。已 push（f1b402a8..38637409）。**生效面**：纯 Node 判定改动——合并已落磁盘，`phase_blocked` 判定随**下一控制面重启窗口**生效（运行态 pid 9908 未触碰，重启时机归用户）；Python 侧零改动即时无涉。
