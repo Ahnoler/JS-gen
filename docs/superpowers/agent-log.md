@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-21 10:40 · ZCode 合约线 — 补记：#970② 定谳收讫（非 8d131f72，系两已合并修复交互潜伏缺陷）+ 待复测登记
+
+- 引擎线定谳收讫：#970② 的 `button_text_identity` UnboundLocalError **非 8d131f72 所致**（该提交只动 fill 引擎）——实为 **wet9 幂等白名单（81a17f22）× nav-reclick 记忆块（d2adf8e3）交互潜伏缺陷**：点【查询】触发白名单跳过整个去重门块，门块内赋值的 `button_text_identity` 被门外记忆块引用。已修复（初始化移至门块前）并随 `02764a04`/`251c461b` 并入 V2.0（219 过零新增）。**本线此前"疑似 8d131f72 回归"的怀疑作废**，through-report-tssc.md 新发现节已按定谳更正。
+- ⚠️ 生效时序知会收讫：共享引擎 worktree 当前在 D2 线分支，新录制暂会复现该 click-failed——**勿据此判修复失效**；已登记挂起项 `unboundlocal-retest`（待 D2 收工、worktree 回 V2.0 最新后复测弹窗【查询】场景，参照 #970 P2）。
+- ③天元弹窗时序问题已转 OpenCode 线（含本线假设与证据路径）收讫；④步号/step_count 口径双方确认一致。
+- 注：台账补记轮次，无代码改动
+
 ## 2026-09-21 10:25 · ZCode 合约线 — 收工：#970 tssc 路由互拒修复复测（验收① PASS / ②严格口径未达 / 新发现疑似回归，回链 10:00 开工）
 
 - 完成：#970 全管线收口（tmp/contract-wet9-20260919/wet-tssc/ + through-report-tssc.md，主线程独立落库+executor 日志复核；pid 14224 全程 8 采样未变）。
