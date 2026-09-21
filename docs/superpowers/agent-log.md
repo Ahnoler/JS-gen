@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 22:29 · ZCode 引擎线 — 运行态：控制面+本地执行机重启（用户批；E1-E4 合并后双载生效），E2 联测话术交合约线
+
+- 重启（外科手术式，非 restart-local.cmd——该脚本会连带拉起用户自管代理 9228）：发现 4097/32220/9228 本就全部未监听（用户此前已停），故为全新启动、零误杀面。从引擎 worktree（=uara_V2.0 tip ae0988cb，**Node 12 项修复 + Python E1-E4 双侧同载**）PowerShell Start-Process 分离拉起：控制面（`npm start`，SUT_SPIN_GUARD_MODE=observation 注入）+ 本地执行机（`npm run executor` 同 env）。
+- 验证：`/api/health` 200（skillDir=D:\dev\JS-gen-engine\... 证实在跑引擎 worktree 新态）；执行机 LMY online、connected:true、心跳实时（/api/v2/executors）。**用户自管代理 9228 未触碰未拉起**（按惯例由用户自启）；observation 常开（D2 自然窗口值守口径），grep 签名 `[spin-guard] observed` + `sut=page_text_503`（A3 形态；生产 6 步窗）。
+- **E2 联测话术（请合约线执行）**：
+  > 【停止链路联测】控制面已重启，Node 12 项修复 + Python E1-E4 双侧生效。请跑一条链验证根缺陷闭环：①起一批含长动作步（如 click_save 后 idle 等待）的回放；②回放执行中在控制面点停止（或等步超时自动补发 cancel_step）；③预期：Python 侧在**当前步完成后的下一个步边界**中断，replay_done 带 `aborted:true` + `stoppedAt=中断步号`，后续步不执行；④对照：正常跑完的批次 replay_done **无** aborted 键（payload 形状不变，SPA 前端无需强制适配）。注意停止语义=协作式，步内长动作（含 click_save 后 idle 等待）仍会跑完当前步——但这已封顶在单步时长内，不再是旧链路的最坏 300s/步叠加 12 分钟级。顺带：spin-guard observation 常开，正常回放/录制流程预期零新 stderr 签名。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 22:45 · ZCode 引擎线 — 合并回执：E1-E4 并入 uara_V2.0（4b7829a9→合并 8e0dd470 + 抗抖加固 06613851，用户批合并）；全量 183 pin ALL GREEN 零 FAILED
 
 - 合并：`engine/replay-cancel-20260921`（4b7829a9）`--no-ff` 并入 uara_V2.0 = **8e0dd470**，零冲突。push 前重跑合并态全量验收：首跑 step-highlight 一红——单跑 3/3 绿归因=回溯扫描（≤400 查询）在 VERIFY_JOBS=4 并行下被远端 DB（47.101.58.49）偶发抖动打死一次；**加固 06613851**：单候选查询失败跳过不炸整针（DB 整体不可达时 assert 照常红，语义不变）。加固后重跑全量：**183 pin + statics ALL GREEN，`!! FAILED` 零行**（新 failed.list 判定机制并行验证无误）。已 push（280abdd2→06613851）。
