@@ -58,7 +58,11 @@ python scripts/characterization/characterize-form-rules.py
 node scripts/characterization/characterize-trajectory.mjs
 
 # refactor gate — run after every refactoring micro-step (core smokes)
-bash scripts/refactor/verify-all.sh
+bash scripts/refactor/verify-all.sh                # 全量（合并后验收必须用这个）
+bash scripts/refactor/verify-all.sh select,fill    # 域管线：只跑改动涉及的域
+bash scripts/refactor/verify-all.sh --changed      # 按 git diff 自动选域
+# 微步验收=域管线/--changed（秒级）；合并后验收（上方硬约定）必须全量；新 pin 须在
+# verify-all.sh 域注册表登记（跨域 pin 可登记进多个域，防漏跑；拿不准就进 core）
 ```
 
 Manual verification: product API docs at `http://localhost:4097/api/docs` (`src/dashboard/api-docs/catalog.js` is the sole frontend contract); public APIs under `/api/v2/*`. Legacy engineering HTML (`/api/test`, record-console/studio) 301s to `/api/docs`; legacy `/api/trajectory` and `/api/case-data` → **410 Gone**.
