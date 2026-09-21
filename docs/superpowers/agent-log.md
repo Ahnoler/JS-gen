@@ -89,6 +89,12 @@
 - 验收（合并后硬约定）：`git pull`（up to date）后全量 verify-all **178 pins + 2 statics 全部真绿，EXIT=0，零 KNOWN-RED 零 FAILED**；三个改靶 pin 单跑均 OK（step-highlight 锚 #33388 traj 973：14 步/12 bbox 直用；layer-tree 锚 #33503：53 元素全带 layers、6 步 5 分区）。
 - 遗留移交：①FLOORS 下限（10）是按现势数据定的，若未来录制形态单阶段步数再降（如 <10），动态锚点会红——那是真回归信号，不是锚点问题，届时修录制链而非放宽阈值；②本次仅改 characterization 与 verify-all，无业务代码改动。
 - 本条与代码提交一并 push。
+## 2026-09-21 15:27 · ZCode 引擎线 — 开工：同族快照复刻（more-btn locator-snap 模式复刻至导航/弹窗/表格点击链），引擎 worktree 本场
+
+- 工作范围：`scripts/controller/actions/_navigation.py`（switch_tab / click_menu_item）、`_misc.py`（close_dialog）、`_table.py`（click_table_row_button / click_table_row_radio）四条点击链；同族 js_snippets 与共享解析 helper（如需抽取，动 `click_action_engine.py` 或新建模块）；新增/扩展 characterization pin（`scripts/characterization/**`）；`scripts/refactor/verify-all.sh` 域注册表登记。
+- 禁入区：`src/services/trajectory/**`（用户已另派会话做 phase_blocked reason 区分，phase-done-evidence-gate 族归其所有）；主检出 `D:\dev\JS-gen` 他线 WIP（characterize-confirm-notification.py 在途）；OpenCode 回放线（`_replay.py` / `replay_table.py` / replay-batch-runner.js——注意与本批 `_table.py` 录制侧同名相邻、文件不相交）；D2 运行态（控制面 4097 pid 9908、用户自启代理 9228 一律不触碰）。
+- 执行方式：分支 `engine/snap-replica-20260921`（自 uara_V2.0 tip 5b315a29）；Explore 摸底 → 子智能体实现（一律不 commit，主会话显式 pathspec 代提交）→ 评审 → 域管线微步 + 合并态全量 verify-all 基线对比；纯 Python/pin 侧，合并后新录制会话即效、无需重启。
+- 基线：合并后验收全量以 5b315a29 合并态 3 已知红（step-highlight / layer-tree / confirm-notification）为零新增基线。
 
 ## 2026-09-21 15:14 · ZCode 系统线 — 收工：verify-all 域管线化验收改造（微步验收 2m58s→15-20s，commit 48d277ab）
 

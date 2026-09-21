@@ -23,6 +23,7 @@ from ._js_snippets import (
     JS_STRIP_STALE_WRAPPERS,
 )
 from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS as _PAGE_LOCATOR_HELPERS
+from .click_locator_tail import apply_click_locator_snapshot, split_locator_tail
 from ...models import ActionFile, FormSnapshot, FormSnapshotCollection
 from .replay_timing import WAIT_300_MS, WAIT_400_MS, WAIT_450_MS, WAIT_500_MS
 
@@ -502,12 +503,26 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             page, text='', target_kind='dialog_close',
         )
         result = await page.evaluate('''() => {
+''' + _PAGE_LOCATOR_HELPERS + '''
+            // ══ 点击命中时刻定位快照（同 JS_CLICK_ICON_BUTTON，U+241F 尾段）══
+            // clickClose 只回选中的 btn：三个成功位置在点击前对 btn buildLocatorSnap
+            // 快照，Python 侧解析尾段覆盖落库（首段 'ok' 判定不变）。
+            const LOC_SEP = '␟';
+            const snapLocator = (el, text, kindHint) => {
+                try {
+                    const abs = absXPath(el);
+                    const kind = kindHint || detectTargetKind(el);
+                    const t = normalizeControlText(text) || cleanVisibleText(el);
+                    const loc = buildLocatorSnap(el, t, abs, '', { targetKind: kind });
+                    return LOC_SEP + JSON.stringify(loc);
+                } catch (e) { return ''; }
+            };
             function clickClose(root, sels) {
               for (const sel of sels) {
                 const btn = root.querySelector(sel);
-                if (btn && btn.offsetParent !== null) { btn.click(); return true; }
+                if (btn && btn.offsetParent !== null) return btn;
               }
-              return false;
+              return null;
             }
             const closeSels = [
               '.el-dialog__headerbtn', '.el-dialog__close', '.el-dialog__headerbtn .el-icon-close',
@@ -516,19 +531,22 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             ];
             for (const d of [...document.querySelectorAll('.el-dialog')].reverse()) {
               if (d.offsetParent !== null) {
-                if (clickClose(d, closeSels)) return 'ok';
+                const btn = clickClose(d, closeSels);
+                if (btn) { const tail = snapLocator(btn, '', 'dialog_close'); btn.click(); return 'ok' + tail; }
                 return 'no-close-button';
               }
             }
             for (const d of [...document.querySelectorAll('.el-drawer')].reverse()) {
               if (d.offsetParent !== null) {
-                if (clickClose(d, closeSels)) return 'ok';
+                const btn = clickClose(d, closeSels);
+                if (btn) { const tail = snapLocator(btn, '', 'dialog_close'); btn.click(); return 'ok' + tail; }
                 return 'no-close-button';
               }
             }
             for (const d of [...document.querySelectorAll('.el-message-box')].reverse()) {
               if (d.offsetParent !== null) {
-                if (clickClose(d, closeSels)) return 'ok';
+                const btn = clickClose(d, closeSels);
+                if (btn) { const tail = snapLocator(btn, '', 'dialog_close'); btn.click(); return 'ok' + tail; }
                 return 'no-close-button';
               }
             }
@@ -536,7 +554,11 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         }''')
         await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
-            _state._record_action('close_dialog', {}, result, element=element)
+            head, _ = split_locator_tail(result)
+            merged = apply_click_locator_snapshot(result, element)
+            if merged is not None:
+                element = merged
+            _state._record_action('close_dialog', {}, head, element=element)
             if business_data_store is not None:
                 from scripts.controller.actions.container_naming import clear_trigger_button
                 clear_trigger_button(business_data_store)
@@ -558,7 +580,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 sys.stderr.write("[close-dialog] maybe_record_picker_closed helper failed" + '\n')
                 sys.stderr.flush()
                 pass
-            return _ok(result)
+            return _ok(head)
         return result
 
     @controller.action('Take a screenshot and save it to the snapshots directory.')
