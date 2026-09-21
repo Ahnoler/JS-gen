@@ -14,6 +14,16 @@
 - 附带两条系统线发现已吸收：a) #925 终态疑被批量作业覆写——归属 V2.0.1 状态归因改进，引擎线不动；b) 事发执行机 nodeId 8/7（非 10）——证据引用已按此校准。
 - 注：不维护 CHANGELOG
 
+## 2026-09-21 10:23 · ZCode 系统线 — 收工：docs/superpowers 按 mtime>7 天批量归档 133 件进 archive/（commit 68ab4fcb）
+
+- 完成（用户指令：修改时间 7 天前的文件都需要归档）：早于 2026-09-14 的非活文档 133 件 `git mv` 进 `archive/`（保历史）——specs 45 / plans 37 / reports 26（新建子目录，含根目录 code-review-2026-08-31、security-review-2026-09-05、重构交接-波次4-6）/ research 20（新建）/ guides 4（新建）/ samples 1（新建）；主区仅剩 agent-log.md / todo-list.md 及近期在途文档。
+- 引用同步：AGENTS.md 5 处路径（4 个 record/replay-unify 设计稿 + KB 评测基线报告）、todo-list 21 处链接改指 `archive/`；`archive/README.md` 补第四波批次索引与目录结构说明。
+- 归档前核实三件：①代码树对被归档文档的引用全为注释性出处标注（唯一功能性读取指向 `prompt-engineering/`，不在清单）——**代码注释一律未改**，避免触碰 characterization pin 断言的源码行；②CronList 空——guides 4 件无定时自动化消费；③flow-card-guided-propose 线活入口 spec（09-19 仍更新）留主区，仅归档其 plan。
+- 纠错记录：首次 `git add -A` 误卷 35 件他线未跟踪件（.cursor、_prompt_export、product-mgmt 湿测产物）——push 前 `reset --soft` 退回重做（远端从未见过污染历史）；顺带补齐 `.gitignore` 的 `.cursor/`+`_prompt_export/` 条目（昨日 93702623 message 提及但实际未落盘）。
+- 验收：移动后主区 `find -mtime +7` 残留=0；提交面仅 `docs/superpowers/**` + `.gitignore` + `AGENTS.md`（137 文件）；零代码改动，无验收命令需重跑；`git pull` 合流态（Already up to date）。
+- 遗留移交：todo-list 归档行内历史链接已改指 archive/，agent-log 历史条目内旧路径按惯例不回改（archive/README 有路径口径说明）；`prompt-engineering/`、`decisions/` 等近期目录未动。
+- 注：不维护 CHANGELOG；本条与代码提交一并 push。
+
 ## 2026-09-21 10:00 · ZCode 系统线 — 收工：D2（SUT 503 阶段空转）问题真实性验证 + 三线归属裁决（只读，无代码变更，免开工声明按约补收工）
 
 - 任务：用户指令——带 agent team 按 systematic-debugging 纪律验证 D2 设计稿（`docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md`）所述问题真实存在，并裁决归属（系统线/合约线/引擎线）。
