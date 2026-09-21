@@ -1,6 +1,15 @@
 # Agent 协作日志
 
 
+## 2026-09-21 09:18 · ZCode 系统线 — 开工：B 类移交系统线侧两项（executor 双实例守护验证 + deadlock 复发取证插桩）
+
+- 背景：接合约线湿测 B 类移交报告（`docs/reports/2026-09-20-b-class-handover-system-line.md`）——①executor 僵死双进程互踢（traj #861）②MySQL deadlock 步持久化重试（traj #865），用户指示本线带 agent team 处置。
+- 初步定案（Explore 双线调研后）：**①守护已存在**——`216b2688`（09-18 17:06，事故当天）已落地三层守护（executor 启动锁 os.tmpdir 按 uuid8 互斥 + 控制面同 uuid 异 pid 拒绝注册 4001 自杀 + restart-local 进程清理），互踢机理=旧代码注册 payload 无 pid 致顶替循环；本项**零代码改动**，仅验证+裁决回报（pin `characterize-executor-duplicate-uuid` 已复跑全绿）。**②不盲改锁序**——牺牲语句已锚定 `UPDATE trajectory SET is_export=0`（markExportDirty），但无 InnoDB deadlock 打印原文、锁环未实锤，且 SUT 停机无法湿测锁序改动；本项落「复发自动取证」插桩（deadlock catch 时抓 `SHOW ENGINE INNODB STATUS` LATEST DETECTED DEADLOCK 段落日志），根治留证据到位后的 15 分钟级小改。
+- 范围（可写集）：`src/services/trajectory/trajectory-recording-runner.js`（仅 retry catch 区插桩）、`src/services/trajectory/deadlock-forensics.js`（新增）、`scripts/characterization/characterize-deadlock-forensics.mjs`（新增 pin）、`scripts/refactor/verify-all.sh`（注册一行）、`docs/superpowers/todo-list.md`（deadlock-forensics 登记）、agent-log 本条目与收工条目
+- 禁入区：`executor/**` 与 `src/executor-ws.js`/`src/executor-registry.js`（①项判闭合不动他线执行机运行面）、`src/services/trajectory/` 其余文件（今日 OpenCode/合约线刚收工的热区）、其它 characterization pin、`data/kb/**`（他线未提交工作区）、前端另仓、SUT
+- 方式：Explore 双线调研（已完成）→ 1 个实施子智能体（插桩+pin，主会话代为声明）→ 主线程 verify-all 注册+验收 → pull 合并态复跑 → 收工条目
+- 注：本地领先远端 2 条（今晨 Cursor 线 sutSettledHints 提交，用户仅批 commit 未批 push）——push 会连带这 2 条，故本线条目先 commit、push 待用户批准后与其他条目一并执行
+
 ## 2026-09-21 09:05 · Cursor — 收工：draft-traj sutSettledHints 注入 + coach SOP skill（本会话）
 
 - 完成：propose/atomize 注入模块 `wet-test.md` / 可选 `sut-settled.md` → payload `sutSettledHints`；atomize prompt 真值顺序（定案 > 链/章节）；`PROPOSE_CACHE_VERSION` **11→12**；product-mgmt `sut-settled.md` + 链/章【新增分类】定案；`product_element` 精确查询 rule（不加死 pin）；旁路 `tools/draft-traj-coach/skill/` SOP + 设计 spec。
