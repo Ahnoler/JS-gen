@@ -40,6 +40,7 @@ run() {
 }
 
 run "characterize-trajectory"  node scripts/characterization/characterize-trajectory.mjs
+run "characterize-deadlock-forensics" node scripts/characterization/characterize-deadlock-forensics.mjs
 run "characterize-bib-navigate-input" node scripts/characterization/cold/characterize-bib-navigate-input.mjs
 run "characterize-run-event-ownership" node scripts/characterization/characterize-run-event-ownership.mjs
 run "characterize-runid-bridge" node scripts/characterization/characterize-runid-bridge.mjs

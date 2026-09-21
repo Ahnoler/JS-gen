@@ -28,6 +28,7 @@ import {
   attachSpecialElementCandidates,
 } from './recording-runner-step-context.js';
 import { appendPhaseDoneLog } from './trajectory-phase-service.js';
+import { captureDeadlockForensics } from './deadlock-forensics.js';
 import { applyActionLogSync, countBusinessSteps, countBusinessStepsByPhase, clearActionLogCopy } from './action-log-copy.js';
 import { META_STEP_ACTIONS, isEngineeringStepAction } from '../../models/meta-step-actions.js';
 import { failReasonText } from '../../models/failure-reason.js';
@@ -678,6 +679,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         // P6-0/T0.2 落库丢失治理：失败重试一次，仍失败则广播告警（不再静默丢弃）
         let persisted = await appendRecordedStep(tid, entry, persistArgs).catch((err1) => {
           console.warn(`[record] step persist retry: trajectoryDbId=${tid} actionId=${id}:`, err1?.message || err1);
+          void captureDeadlockForensics(err1, { trajectoryDbId: tid, actionId: id }).catch(() => {});
           return null;
         });
         if (!persisted) {
