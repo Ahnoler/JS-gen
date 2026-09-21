@@ -14,7 +14,7 @@
   - 全量 `verify-all.sh` 仅命中既有环境/数据噪声失败（eslint-core、step-highlight/layer-tree、confirm-notification、fill-err-with-scope/idempotent-click-gate GBK、tssc-route-conflict ModuleNotFound、network-capture portable python），零新增本线归属失败。
 - 遗留与生效：
   - Node 侧改动需重启控制面生效；Python/执行机侧改动随新录制/回放会话加载生效。
-  - GitHub 网络恢复后按硬约定 `pull --no-rebase` → 合并后验收 → push；本次本地 commit 已落。
+  - `git pull origin uara_V2.0 --no-rebase` 合入 ZCode D2 代理加速件开工条目（`fad9050b`）零代码冲突；合并后定向 characterization 全绿；已 push 到远端（`uara_V2.0` `10452726`）。
   - `config/.db-whitelist-seen` 为运行时白名单时间戳改动，非本线所为，未提交。
 
 ## 2026-09-21 14:25 · ZCode 引擎线（D2 线） — 回执：B 腿 PASS 归档 + 组件级半程已补（并入 V2.0 `c87b9be7`）+ A/C 三路径裁定（自然窗口为主 / 代理为加速件 / CDP 注入已否决）+ ③ 登记候选
