@@ -275,6 +275,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid, {
             timeoutMs: 30000,
             stopOnFail: false,
             isReplay: true,
+            abortOnSessionTerminal: true,
           });
         },
       });

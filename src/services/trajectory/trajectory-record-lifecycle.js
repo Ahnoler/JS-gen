@@ -312,6 +312,7 @@ async function probeLoggedInBeforeLogin(runtime, url) {
       // 探测失败不得中断 prepare：旧执行机没有 login_probe 动作时按未登录继续。
       stopOnFail: false,
       isReplay: true,
+      abortOnSessionTerminal: true,
     });
     const row = (Array.isArray(results) ? results : []).find((r) => r?.action === 'login_probe');
     const sig = /^ok-probe:(\S+)/.exec(String(row?.result || ''))?.[1] || '';
@@ -392,6 +393,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
         timeoutMs: 180000,
         stopOnFail: true,
         isReplay: true,
+        abortOnSessionTerminal: true,
       });
       const failed = Number(result?.failed || 0);
       const okCount = Number(result?.ok || 0);
@@ -419,6 +421,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
       timeoutMs: 180000,
       stopOnFail: true,
       isReplay: true,
+      abortOnSessionTerminal: true,
     });
     const failed = Number(result?.failed || 0);
     const okCount = Number(result?.ok || 0);

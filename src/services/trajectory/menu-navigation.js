@@ -100,6 +100,7 @@ export async function navigateToFunctionMenu({ runtime, functionId, execSession 
       timeoutMs: REPLAY_NAV_TIMEOUT_MS,
       stopOnFail: false,
       isReplay: true,
+      abortOnSessionTerminal: true,
     });
     const failed = Number(result?.failed || 0);
     if (result?.error || failed > 0) {

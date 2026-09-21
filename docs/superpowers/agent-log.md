@@ -1,5 +1,11 @@
 # Agent 协作日志
 
+## 2026-09-21 12:30 · OpenCode 系统线 — 开工：prepare 登录回放会话死亡时快速释放轨迹锁
+
+- 工作范围：`src/services/replay-actions.js`（核心改动：replay_done 等待增加会话终态事件竞速）、`src/services/trajectory/trajectory-record-lifecycle.js`（登录回放/探测启用）、`src/services/trajectory/prepare-login-retry.js`（沉降启用）、`src/services/trajectory/recording-page-bind.js`（读页绑定启用）、`src/services/trajectory/menu-navigation.js`（菜单导航启用）；新增 characterization pin `scripts/characterization/characterize-replay-terminal-abort.mjs`。
+- 禁入区：不碰 D2 的 SUT 503 守卫文件；不碰 executor 侧。
+- 执行方式：代码改动 + pin + `bash scripts/refactor/verify-all.sh`；完成后 commit + push（网络若仍抖则本地 commit 待恢复 push）。
+
 ## 2026-09-21 11:20 · ZCode 引擎线 — 收工：more-btn xpath 伪造修复交付（点击命中时刻定位快照，分支未合并待批，回链 11:05 开工）
 
 - 完成：分支 `engine/locator-snap-20260921`（**9ee4af45**，已 push），**6 files +330/−16**。SDD 全流程：前置 Explore → 实现 → 任务评审（3 Important）→ 修复波次 → scoped re-review（代码 CLEAN）→ 修复后全量 verify-all。
