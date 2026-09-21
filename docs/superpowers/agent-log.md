@@ -1,6 +1,24 @@
 # Agent 协作日志
 
 
+## 2026-09-21 11:55 · OpenCode 系统线 — 收工：executor 未知会话终态快失败 + reconcile 清理残留内存绑定（回链 11:30 开工，commit 255d15b2）
+
+- 完成（代码 `255d15b2`，12 文件 / +215 −10）：
+  - **executor 侧**：`session.error` 带结构化 `code`——`Unknown session`→`unknown_session`（`session-manager.js` 的 `forward` 与 `_attachBibLocked` 两处）、缺 sessionId→`bad_request`（`session-handler.js`）、兜底 `session_error`（`agent.mjs`）。加法字段，老执行机无 code → 控制面不认，行为同旧。
+  - **控制面侧**：`executor-event-hub.js` 新增 `waitForSessionEventWhere(sessionId, type, predicate, timeout)`（谓词等待，非命中不 settle、不吞监听，清理监听/定时器，`cancel()` 可丢弃）；`attachLive` race 增加 `code==='unknown_session'` 终态等待（45s 超时保底），`closeSession` race 增加同名终态等待（不再白等 15s）；**只认 code 不认文案**，网络无事件/非终态 error 走原超时不变。
+  - **根因清理**：`executor-node-service.reconcileRemoteSessions` 在执行机权威报告 agent session 不存在时，除关 DB 行外补清 `slotLease.releaseBySession` / `state.sessions`（含 `_persistUnsub`/`_trajPersistUnsub`/`_aiRecordUnsub` 退订）/ `trajectoryRuntimeMap`，消除残留绑定继续对执行机发指令。
+  - **锁等待**：`TRAJ_LOCK_WAIT_TIMEOUT_MS` 默认 30s→60s（≥45s attach 等待），避免后到 prepare 假 503。
+- 验收（本地合并态；上游不可达见下）：
+  - 新 pin `scripts/characterization/characterize-executor-unknown-session.mjs` **20/20**（谓词等待语义/无监听泄漏/两侧接线/reconcile 清理/锁默认值），已注册 `verify-all.sh`；
+  - 相关 pin 全绿：`characterize-menu-navigation`（同步更新其 `executor-session-client` 重导出精确断言）、`characterize-executor-orphan-reconcile`、`characterize-executor-duplicate-uuid`、`characterize-agent-llm-error`、`characterize-stop-semantics` 27/27、`characterize-record-status`、`characterize-deadlock-forensics`；改动文件 `npx eslint` 0 error（pre-commit 钩子同口径通过）；
+  - 全量 `verify-all`（Git Bash @ `D:\Software\Git\bin\bash.exe`，`PYTHON_EXE=/d/anaconda3/envs/browser_use/python.exe`）复跑：**新 pin 绿**；红集=既有环境/数据噪声，零新增本次归属——`eslint-core`（`.venv` 未 ignore，3343 errors，与 09-20 基线同量）、`step-highlight`/`layer-tree`（本机 DB 轨迹数据）、`confirm-notification`（读未触碰的 `_misc.py`）、`fill-err-with-scope`/`idempotent-click-gate`（GBK `UnicodeEncodeError`）、`tssc-route-conflict`（`ModuleNotFoundError: scripts.controller`）、`network-capture`（portable python 缺失）。
+- 生效面：全为 **Node 侧**（executor + 控制面 src + config）→ **需重启控制面/执行机才 live**；Python/数据侧零改动。
+- 遗留移交：
+  - **push 待网络**：`git pull`/`git push` 均因 GitHub `Recv failure: Connection was reset` / 无法连 443 失败（重试 fetch 同）；本线 2 条本地提交（`3e8672b7` 开工 + `255d15b2` 代码）待网络恢复补推，**无法做远端合并态复核**，如他线已改 `executor-session-client` 重导出或 `executor-node-service` reconcile，请以本线 pin 为准重跑。
+  - **多实例并发缺口**：登记 todo 挂起项 `executor-multiprocess-concurrency`（P2）——slot 租约/轨迹锁/aiRecording claim 全为控制面单进程内存，多实例会重复分配同槽；候选=Redis/DB 外置锁、按 nodeUuid 归属、执行机侧分配 slotIndex。
+  - 工作区 `config/.db-whitelist-seen` 为运行时白名单时间戳改动，非本线所为，未提交。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 11:30 · OpenCode 系统线 — 开工：executor 未知会话终态快失败 + reconcile 清理残留内存绑定（用户已批）
 
 - 背景（用户实测 traj #969）：手动 prepare 报 503 `traj_lock_wait_timeout`，执行机日志刷 `session error: Unknown session 9b796f0b-…`。取证：`remote_session` 2157 状态 `crashed`、`agent_session_id` 正是该 uuid，traj 969 的 `remote_session_id` 仍指向它。机理：执行机重启/会话崩溃后，`reconcileRemoteSessions` 只关 DB 行，**不清 `state.sessions` / `trajectoryRuntimeMap` / `slotLease`**；残留绑定继续对执行机发 `attach_bib`/`bib_start` 等 → 执行机回 `session.error`；`attachLive` 只 race `bib_ready`/`bib_error`，不认 `session.error`，空等 45s；轨迹锁只等 30s，后到 prepare 先 503。前一个操作超时释放锁后重试即成功（复测 prepare 200，新建 rs 2158 active）。
