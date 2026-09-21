@@ -1,5 +1,18 @@
 # Agent 协作日志
 
+# Agent 协作日志
+
+## 2026-09-21 11:02 · ZCode 引擎线 — 合并回执：B 类① + 小批次 + #970② 热修并入 V2.0（02764a04/251c461b）；⚠️ 运行磁盘待 D2 交付后恢复
+
+- 完成：两段合并入 uara_V2.0——**02764a04**（B 类① tssc 路由互拒收口，#970 验收 PASS）+ **251c461b**（挂账小批次 T1 常态弹窗按钮清单/T2 nav-reclick 落库尾缀 + **#970② 热修**）。已 push。
+- **#970② 定谳与修复（7a8c41eb）**：`button_text_identity` UnboundLocalError = **wet9 两已合并修复的交互潜伏缺陷**（81a7f22 幂等白名单使点【查询】跳过整个门块 → 变量初始化被跳过；d2adf8e3 nav-reclick 记忆块在门块外无条件引用）——非 8d131f72 所致（该提交只动 fill_engine）。修复=初始化移至门块前无条件执行；RED 复现生产同源异常（引擎兜底转 click-failed），pin 扩至 61 ✓。任务评审 Approved。
+- 合并态验收：全量 verify-all **219 过、失败集=3 已知红零新增**；核心 pin 全绿（fill-tssc-downgrade/idempotent-click-gate/phase-overlay-buttons/step-number-integrity 27/27/stop-semantics 27/27/element-dedup-scope）。agent-log 两段冲突按协议双方条目并排时间序消解（首次消解脚本静默失败致标记短暂入树，已 reset 重做，远端未见污染）。
+- 分支清理（按既定归档惯例）：远端 `engine/tssc-route-fix-20260920`/`engine/small-batch-20260921` → `archive/engine-*-archived`，本地已删；临时 worktree JS-gen-engine-sb 已移除。
+- **⚠️ 运行态提示（要紧）**：共享引擎 worktree 当前在 **D2 线分支**（其单元进行中）——**新录制会话的 Python 子进程从该磁盘加载，尚不含本批修复（会复现 #970② click-failed）**；Node 侧仍为 4098e49c+。待 D2 收工、worktree 恢复到 V2.0 最新（251c461b）后全部生效——恢复动作届时按规执行/请示。
+- **转 OpenCode 线**（#970③）：天元弹窗补关严格口径未达成——合约线假设"弹窗异步出现于补关窗口之后"，建议核对口触发时机与弹窗出现时序（证据 wet-tssc/cdp-precheck-tssc.json 首拍原文）。
+- 注：不维护 CHANGELOG
+
+
 ## 2026-09-21 10:35 · ZCode 引擎线 — 收工：小批次 T1/T2 交付（T3 前置否决转登记，分支未合并待批，回链 10:02 开工）
 
 - 完成：挂账候选小批次收口，分支 `engine/small-batch-20260921`（1568143a = T1 e07935de + T2 6a1ab47e + F1 修复，已 push）。SDD 模式全流程：前置 Explore → 每任务 fresh implementer + task review → 终审 → 修复波次 + scoped re-review。
