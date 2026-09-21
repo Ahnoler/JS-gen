@@ -165,6 +165,31 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
       snapshotsByTrigger,
       secretValues,
     });
+  } catch (err) {
+    // #13 sync busy 泄漏：runReplayBatch 的 finally 只覆盖其主 try 段；若批在
+    // 进入主 try 前抛出（replay:started 广播 / 计划日志 / 菜单导航段），其
+    // finally 不会执行，busy/replayRunning 只能由本 catch 兜底复位。字段集对齐
+    // accept 路径的 .catch 兜底（suppressStepPersist/isReplay/abortReplay +
+    // session.busy=false，另含本任务新增的 replayRunning），并补发
+    // replay:finished error 终态——sync 调用方同样以前端 WS 收尾信号为准，
+    // 缺失会让条目悬挂。随后原样 rethrow，保持同步调用方的错误语义不变。
+    const msg = err?.message || String(err);
+    try {
+      emitReplay('replay:finished', tid, {
+        successCount: 0,
+        failedCount: orderedStepIds.length,
+        failedStepIds: orderedStepIds,
+        error: msg,
+      });
+    } catch { /* ignore */ }
+    try {
+      runtime.suppressStepPersist = false;
+      runtime.isReplay = false;
+      runtime.abortReplay = false;
+      runtime.replayRunning = false;
+      if (session) session.busy = false;
+    } catch { /* ignore */ }
+    throw err;
   } finally {
     // runReplayBatch also clears busy in finally
   }
@@ -172,9 +197,13 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
 
 /**
  * Stop an in-flight steps/replay batch (including Type A/B heal).
- * Does not change recordStatus. Idempotent if no batch is running.
+ * Does not change recordStatus. Honest when no batch is running: returns
+ * stopped:false without touching abortReplay or forwarding cancel_step —
+ * this covers both idle leftovers (#16) and AI-recording occupancy (#8:
+ * session.busy is true while recording but runtime.replayRunning is false,
+ * so stop can no longer kill the recording agent via cancel_step).
  * @param {number} trajectoryId trajectory DB id
- * @returns {Promise<{ trajectoryId: number, trajectoryDbId: number, stopped: boolean }>} stop result
+ * @returns {Promise<{ trajectoryId: number, trajectoryDbId: number, stopped: boolean, batchWasRunning: boolean, cancelStepDelivered?: boolean, reason?: string }>} stop result
  */
 export async function stopTrajectoryStepsReplay(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -185,7 +214,21 @@ export async function stopTrajectoryStepsReplay(trajectoryId) {
     throw err;
   }
 
+  // #5/#8/#16 诚实化：仅当回放批真正在跑（runtime.replayRunning，由
+  // runReplayBatch 置位/复位）才置 abortReplay 并下发 cancel_step；录制期
+  // （busy=true 但 replayRunning=false）与空闲期一律早退返回诚实结果。
+  if (!runtime.replayRunning) {
+    return {
+      trajectoryId: tid,
+      trajectoryDbId: tid,
+      stopped: false,
+      batchWasRunning: false,
+      reason: 'no_replay_batch_running',
+    };
+  }
+
   runtime.abortReplay = true;
+  let cancelStepDelivered = true;
   try {
     execSession.forwardStdin({
       nodeUuid: runtime.executorNodeUuid,
@@ -194,6 +237,7 @@ export async function stopTrajectoryStepsReplay(trajectoryId) {
       data: {},
     });
   } catch (err) {
+    cancelStepDelivered = false;
     console.warn('[steps/replay/stop] cancel_step failed:', err?.message || err);
   }
 
@@ -201,6 +245,8 @@ export async function stopTrajectoryStepsReplay(trajectoryId) {
     trajectoryId: tid,
     trajectoryDbId: tid,
     stopped: true,
+    batchWasRunning: true,
+    cancelStepDelivered,
   };
 }
 

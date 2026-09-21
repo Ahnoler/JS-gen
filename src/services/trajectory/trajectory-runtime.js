@@ -175,6 +175,8 @@ export function registerTrajectorySession(tid, sessionId, opened, { bibError = n
     abortRecording: false,
     /** User stop for in-flight steps/replay (incl. Type A/B heal). */
     abortReplay: false,
+    /** True while a steps/replay batch (runReplayBatch) is actually in flight. */
+    replayRunning: false,
     /** Set by record/stop: { success } so the runner preserves the user's chosen result. */
     userStop: null,
     bibError,

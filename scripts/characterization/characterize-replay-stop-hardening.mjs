@@ -28,6 +28,35 @@
  *   #11 超时 reject 之前补发 cancel_step（forwardStdin fire-and-forget + warn，
  *       对齐 replay-actions.js P1-6 模式），避免迟到 phase_done 污染下一轮等待
  *
+ * Task 3/6 — #4 超时×stop 竞态终态口径 + #12 中止步无终态事件：
+ * replay-batch-runner.js 的单步 catch 此前不读 runtime.abortReplay——stop 与步
+ * 超时撞车（runReplayActions 超时补发 cancel_step 后 reject）时，批级终态发
+ * replay:finished {error} 而非 aborted 收敛（#4，断言组 7）；步后 abort 检查点
+ * 直接丢弃已跑完的那一步且不发任何步终态事件，replay:step running 永久悬挂
+ * （#12，断言组 8）。空档核查结论（replay:step 发射点全集）：循环头中止分支
+ * 无空档——所有带 running 广播的 continue 路径（Type A 成功/失败、Type B 各
+ * 返回路径、heal skip/retry-ok）在 continue 前均已发步终态，循环头补发即死
+ * 代码；真实空档仅在步后 abort 检查点（status:'success' 发射点位于该检查之后，
+ * 中止时不可达）。故补发落在步后分支，循环头分支 pin 为「批次级收敛、无步级
+ * 补发」以固化核查结论、防冗余代码。
+ *
+ * Task 4/6 — #5 stop 诚实化 + #8 录制期拒绝 + #13 sync busy 泄漏（断言组 9）：
+ * stopTrajectoryStepsReplay 此前无条件置 abortReplay + 下发 cancel_step——
+ * 无批次时返回 stopped:true 是谎言且留 abortReplay 残留（#5/#16），而
+ * session.busy=true 涵盖 AI 录制占用，录制期调 stop 会把 cancel_step 打进
+ * 录制 Agent（#8 误杀）。runtime 新增 replayRunning 字段（trajectory-runtime.js
+ * 默认 false；runReplayBatch 于 replay:started 后置 true、finally 复位 false，
+ * replay-batch-runner.js 纯插两行）：stop 以 replayRunning 为「回放批真正在跑」
+ * 判定——false → 早退 { stopped:false, batchWasRunning:false,
+ * reason:'no_replay_batch_running' }（不动 abortReplay、不发 cancel_step）；
+ * true → 现行为 + 返回 batchWasRunning:true / cancelStepDelivered。
+ * #13：sync 路径 replayTrajectorySteps 的 finally 空壳——runReplayBatch 在进入
+ * 其主 try 前抛出时（replay:started 广播/计划日志/菜单导航段）自身 finally 不
+ * 执行，busy 泄漏；sync 补 catch 复位（字段集对齐 accept 路径 .catch 兜底：
+ * suppressStepPersist/isReplay/abortReplay + session.busy=false，另含
+ * replayRunning），并补发 replay:finished error 终态（对齐 accept 路径，防前端
+ * 悬挂）后原样 rethrow。
+ *
  * 全部为 read_text needle + 源码切片断言（零 import 被测模块——该模块 import
  * 副作用面含 ws-server / executor-session-client，无 ESM mock 能力下不做行为
  * 驱动；锚定为「函数名 + 语义行」切片，任一守卫被移除或移位即红）。
@@ -171,6 +200,133 @@ record('6c 补发为 fire-and-forget：try/catch 包裹 + console.warn 降级（
   /try \{\s*execSession\.forwardStdin\(\{[\s\S]*?\} catch \(err\) \{\s*console\.warn\(/.test(TIMER_SLICE));
 record('6d 超时 reject 语义保持：Timeout waiting for heal phase_done 仍在',
   TIMER_SLICE.includes('Timeout waiting for heal phase_done'));
+
+// ══ Task 3/6 — replay-batch-runner.js：#4 超时×stop 竞态终态 + #12 中止步终态 ══
+const RBR = readFileSync(join(ROOT, 'src/services/trajectory/replay-batch-runner.js'), 'utf8');
+
+// ── 切片定位：单步 catch 头 → batchResults 解析（#4 竞态收敛 + #12 步后中止分支） ─
+const CATCH_E = '} catch (e) {';
+const BATCH_RESULTS = 'const batchResults = Array.isArray(result?.results) ? result.results : [];';
+const catchEIdx = idx(RBR, CATCH_E, '单步 catch 头');
+const batchResultsIdx = idx(RBR, BATCH_RESULTS, 'batchResults 解析行');
+assert.ok(catchEIdx >= 0 && batchResultsIdx > catchEIdx, '单步 catch 应先于 batchResults 解析');
+const STEP_CATCH_SLICE = RBR.slice(catchEIdx, batchResultsIdx);
+
+// ── 7. #4：单步 catch 内先查 abortReplay，置位走 aborted 终态收敛 ──────────────
+const raceCheckIdx = STEP_CATCH_SLICE.indexOf('if (runtime.abortReplay)');
+const firstFinishedIdx = STEP_CATCH_SLICE.indexOf("emitReplay('replay:finished'");
+assert.ok(raceCheckIdx >= 0 && firstFinishedIdx > raceCheckIdx,
+  'catch 内竞态检查应先于非中止批级终态（replay:finished {error}）');
+const RACE_SLICE = STEP_CATCH_SLICE.slice(raceCheckIdx, firstFinishedIdx);
+
+record('7a 竞态检查先于终态判定：catch 内查 runtime.abortReplay 先于 replay:finished {error}',
+  raceCheckIdx >= 0 && raceCheckIdx < firstFinishedIdx);
+record('7b 竞态置位收敛为 aborted 批级终态：emitReplayAborted + aborted/reason=user_stop',
+  RACE_SLICE.includes('emitReplayAborted(tid, { successCount, failedStepIds })')
+  && RACE_SLICE.includes('aborted: true,') && RACE_SLICE.includes("reason: 'user_stop',"));
+record('7c 落库口径不变：markStepReplayFailed + failedStepIds.push 先于竞态检查（该步仍记失败）',
+  STEP_CATCH_SLICE.indexOf('markStepReplayFailed(stepId)') < raceCheckIdx
+  && STEP_CATCH_SLICE.indexOf('failedStepIds.push(stepId)') < raceCheckIdx);
+record('7d 步级 failed 终态先于批级收敛：running 步在竞态收敛前已有终态事件',
+  STEP_CATCH_SLICE.indexOf("status: 'failed'") < raceCheckIdx);
+
+// ── 8. #12：步后 abort 检查点补发当前步终态（真实空档；循环头无空档） ───────────
+const postAbortIdx = STEP_CATCH_SLICE.lastIndexOf('if (runtime.abortReplay)');
+assert.ok(postAbortIdx > raceCheckIdx, '步后中止分支应在 catch 内竞态检查之后');
+const POST_ABORT_SLICE = STEP_CATCH_SLICE.slice(postAbortIdx);
+const stepTermIdx = POST_ABORT_SLICE.indexOf("emitReplay('replay:step'");
+const batchAbortIdx = POST_ABORT_SLICE.indexOf('emitReplayAborted(');
+assert.ok(stepTermIdx >= 0 && batchAbortIdx > stepTermIdx,
+  '步后中止分支应先补发步终态再收敛批次终态');
+const STEP_TERMINAL_SLICE = POST_ABORT_SLICE.slice(stepTermIdx, batchAbortIdx);
+
+record('8a 步后中止分支补发当前步终态：replay:step failed + error=user_stop',
+  STEP_TERMINAL_SLICE.includes("emitReplay('replay:step'")
+  && STEP_TERMINAL_SLICE.includes("status: 'failed',")
+  && STEP_TERMINAL_SLICE.includes("error: 'user_stop',")
+  && STEP_TERMINAL_SLICE.includes('stepId,'));
+record('8b 补发带 aborted 标记（前端可区分 user_stop 与真实失败）',
+  STEP_TERMINAL_SLICE.includes('aborted: true,'));
+record('8c 补发先于批级 aborted 收敛（步终态 → emitReplayAborted → return）',
+  stepTermIdx < batchAbortIdx && POST_ABORT_SLICE.includes("reason: 'user_stop',"));
+record('8d 成功路径终态保留：步后中止分支之后 status:success 发射点仍在（补发不替代成功终态）',
+  RBR.indexOf("status: 'success'", batchResultsIdx) > -1);
+record('8e 循环头中止分支无步级补发（空档核查结论固化：continue 路径均已带终态，此处补发即死代码）',
+  (() => {
+    const loopHeadIdx = idx(RBR, 'for (let i = 0; i < actions.length; i += 1) {', '批循环头');
+    const entryIdx = idx(RBR, 'const entry = actions[i];', 'entry 声明');
+    assert.ok(entryIdx > loopHeadIdx, 'entry 声明应在循环头之后');
+    const LOOP_HEAD_SLICE = RBR.slice(loopHeadIdx, entryIdx);
+    return LOOP_HEAD_SLICE.includes('if (runtime.abortReplay)')
+      && LOOP_HEAD_SLICE.includes('emitReplayAborted(')
+      && !LOOP_HEAD_SLICE.includes("emitReplay('replay:step'");
+  })());
+
+// ══ Task 4/6 — #5 stop 诚实化 + #8 录制期拒绝 + #13 sync busy 泄漏 ════════════
+const TSR = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-session-replay.js'), 'utf8');
+const TRT = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-runtime.js'), 'utf8');
+
+// ── 切片定位：stopTrajectoryStepsReplay 函数体（止于 prepareReplayBatch 的 JSDoc） ─
+const STOP_FN = 'export async function stopTrajectoryStepsReplay(trajectoryId) {';
+const stopFnIdx = idx(TSR, STOP_FN, 'stopTrajectoryStepsReplay 定义');
+const stopEndIdx = TSR.indexOf('/**', stopFnIdx);
+assert.ok(stopEndIdx > stopFnIdx, 'stop 函数体后应紧跟 prepareReplayBatch 的 JSDoc');
+const STOP_BODY = TSR.slice(stopFnIdx, stopEndIdx);
+
+// ── 切片定位：早退分支（replayRunning 守卫 → 真停 abortReplay 置位） ───────────
+const EARLY_GUARD = 'if (!runtime.replayRunning) {';
+const earlyIdx = idx(STOP_BODY, EARLY_GUARD, 'stop 早退分支守卫');
+const abortSetIdx = STOP_BODY.indexOf('runtime.abortReplay = true;');
+assert.ok(abortSetIdx > earlyIdx, '真停分支（abortReplay 置位）应在早退分支之后');
+const EARLY_SLICE = STOP_BODY.slice(earlyIdx, abortSetIdx);
+
+// ── 9. #5/#8/#16 stop 诚实化：无批次（含录制期）早退，不碰 abortReplay/cancel_step ─
+record('9a stop 早退分支存在：runtime.replayRunning=false → stopped:false + batchWasRunning:false + reason:no_replay_batch_running',
+  EARLY_SLICE.includes('stopped: false,')
+  && EARLY_SLICE.includes('batchWasRunning: false,')
+  && EARLY_SLICE.includes("reason: 'no_replay_batch_running',"));
+record('9b 早退分支不置 abortReplay、不下发 cancel_step（#8 录制期不误杀录制 Agent + #16 空闲期无 abortReplay 残留）',
+  !EARLY_SLICE.includes('runtime.abortReplay') && !EARLY_SLICE.includes('forwardStdin'));
+record('9c 真停分支返回 batchWasRunning:true + cancelStepDelivered（forwardStdin catch 置 false，正常 true）',
+  STOP_BODY.includes('let cancelStepDelivered = true;')
+  && count(STOP_BODY, 'cancelStepDelivered = false;') === 1
+  && /stopped: true,\s*\n\s*batchWasRunning: true,\s*\n\s*cancelStepDelivered,/.test(STOP_BODY));
+record('9d runtime 工厂默认字段 replayRunning:false（trajectory-runtime.js，恰一次）',
+  count(TRT, 'replayRunning: false,') === 1);
+record('9e runReplayBatch 置位 replayRunning=true：replay:started 之后、首个 await runReplayActions 之前（恰一次）',
+  count(RBR, 'runtime.replayRunning = true;') === 1
+  && (() => {
+    const startedIdx = idx(RBR, "emitReplay('replay:started', tid, { stepIds: orderedStepIds });", 'replay:started 发射');
+    const setIdx = idx(RBR, 'runtime.replayRunning = true;', 'replayRunning 置位');
+    const firstAwaitIdx = idx(RBR, 'await runReplayActions({', '首个 await runReplayActions');
+    return startedIdx < setIdx && setIdx < firstAwaitIdx;
+  })());
+record('9f runReplayBatch finally 复位 replayRunning=false（与 abortReplay 复位 / busy 释放同段）',
+  (() => {
+    const finIdx = idx(RBR, '  } finally {', 'runReplayBatch finally');
+    const busyIdx = idx(RBR, 'if (session) session.busy = false;', 'busy 释放');
+    assert.ok(busyIdx > finIdx, 'busy 释放应在 finally 段内');
+    const FIN_SLICE = RBR.slice(finIdx, busyIdx);
+    return FIN_SLICE.includes('runtime.abortReplay = false;')
+      && FIN_SLICE.includes('runtime.replayRunning = false;');
+  })());
+record('9g #13 sync 路径补 catch 复位：replayTrajectorySteps 内 catch 含 abortReplay 复位 + busy=false（对齐 accept .catch 字段集）+ 补发 replay:finished 后 rethrow',
+  (() => {
+    const syncFnIdx = idx(TSR, 'export async function replayTrajectorySteps(', 'sync 回放入口');
+    const syncEndIdx = TSR.indexOf('/**', syncFnIdx);
+    assert.ok(syncEndIdx > syncFnIdx, 'sync 函数体后应紧跟 stop 的 JSDoc');
+    const SYNC_BODY = TSR.slice(syncFnIdx, syncEndIdx);
+    const awaitIdx = idx(SYNC_BODY, 'return await runReplayBatch({', 'sync await 批执行');
+    const syncCatchIdx = SYNC_BODY.indexOf('} catch (err) {', awaitIdx);
+    assert.ok(syncCatchIdx > awaitIdx, 'sync catch 应在 await runReplayBatch 之后');
+    const SYNC_CATCH = SYNC_BODY.slice(syncCatchIdx);
+    return SYNC_CATCH.includes('runtime.suppressStepPersist = false;')
+      && SYNC_CATCH.includes('runtime.isReplay = false;')
+      && SYNC_CATCH.includes('runtime.abortReplay = false;')
+      && SYNC_CATCH.includes('if (session) session.busy = false;')
+      && SYNC_CATCH.includes("emitReplay('replay:finished'")
+      && SYNC_CATCH.includes('throw err;');
+  })());
 
 const bad = results.filter((r) => !r.ok);
 console.log(`\ncharacterize-replay-stop-hardening: ${results.length - bad.length}/${results.length} passed`);

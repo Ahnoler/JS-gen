@@ -739,7 +739,15 @@ async def _run_agent_step_post(step_index, task_text, business_data_ref,
                 # has_contract_success already respects success.kinds — do not waive
                 # missing toast_ok just because an introduce picker confirmed.
                 if contract and contract.get('mode') not in ('introduce_pick',):
-                    mark_quality_failed(business_data_ref, 'missing_success_token')
+                    from ..controller.actions.phase.verification_gate import (
+                        is_verification_phase_task,
+                    )
+                    # 纯核验型阶段（重搜确认已删对象不存在，无保存动作）产不出
+                    # 保存令牌，保守豁免 missing_success_token（镜像 introduce_pick
+                    # 豁免；FP 零容忍——判定拿不准一律不豁免）。见
+                    # docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md §4.3。
+                    if not is_verification_phase_task(task_text, contract):
+                        mark_quality_failed(business_data_ref, 'missing_success_token')
             doubts = business_data_ref.get('_semantic_doubts')
             if doubts and business_data_ref.get('_quality_failed'):
                 mark_quality_failed(
