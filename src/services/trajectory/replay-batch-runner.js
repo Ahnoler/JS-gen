@@ -172,6 +172,9 @@ async function forwardReplayEntry(runtime, entry, doSuppress) {
  * @param {Array<object>} root0.rows DB step rows
  * @param {Map<number, object>} root0.snapshotsByTrigger form snapshots keyed by trigger step id
  * @param {Array<string>} [root0.secretValues] resolved auth credentials to redact from logs
+ * @param {number|null} [root0.seq] 批次世代令牌（起跑时 runtime.replayBatchSeq 的值）；
+ *   finally 仅当 runtime.replayBatchSeq 仍等于本批 seq 才整体复位运行标志（null =
+ *   未版本化调用方，保持既有总是复位）
  * @returns {Promise<object>} replay batch result with success/failed counts
  */
 export async function runReplayBatch({
@@ -184,6 +187,7 @@ export async function runReplayBatch({
   rows,
   snapshotsByTrigger,
   secretValues = [],
+  seq = null,
 }) {
   const allResults = [];
   const healed = [];
@@ -676,12 +680,19 @@ export async function runReplayBatch({
       failedStepIds: uniqueFailed,
     });
   } finally {
-    runtime.suppressStepPersist = false;
-    runtime.isReplay = false;
-    runtime.formStructureHealLabels = null;
-    runtime.abortReplay = false;
-    runtime.replayRunning = false;
-    if (session) session.busy = false;
+    // #7 批次世代守卫：仅当本批仍是该 runtime 的最新批次才整体复位运行标志。
+    // busy 已在 prepareReplayBatch 尾部原子置位，同一 runtime 同时至多一个批次
+    // 在跑，守卫正常恒真（零行为变化）；seq == null 的未版本化调用方（离线
+    // characterization fakes）保持既有总是复位。防御未来再引入并发批次时，先
+    // 结束的旧批次误复位新批次的 abortReplay/suppressStepPersist/busy 等标志。
+    if (seq == null || runtime.replayBatchSeq === seq) {
+      runtime.suppressStepPersist = false;
+      runtime.isReplay = false;
+      runtime.formStructureHealLabels = null;
+      runtime.abortReplay = false;
+      runtime.replayRunning = false;
+      if (session) session.busy = false;
+    }
   }
 }
 

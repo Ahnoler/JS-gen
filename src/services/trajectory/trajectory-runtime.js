@@ -177,6 +177,11 @@ export function registerTrajectorySession(tid, sessionId, opened, { bibError = n
     abortReplay: false,
     /** True while a steps/replay batch (runReplayBatch) is actually in flight. */
     replayRunning: false,
+    /**
+     * 批次世代令牌：accept/sync 起跑前递增并随批传入 runReplayBatch；其
+     * finally 仅当本字段仍等于该批 seq 才复位运行标志（防跨批误复位）。
+     */
+    replayBatchSeq: 0,
     /** Set by record/stop: { success } so the runner preserves the user's chosen result. */
     userStop: null,
     bibError,

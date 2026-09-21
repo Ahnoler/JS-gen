@@ -57,6 +57,23 @@
  * replayRunning），并补发 replay:finished error 终态（对齐 accept 路径，防前端
  * 悬挂）后原样 rethrow。
  *
+ * Task 5/6 — #6 busy 检查-置位原子化 + #7 批次世代令牌（断言组 10）：
+ * #6：busy 检查（prepareReplayBatch 尾部）与置位（accept/sync continuation）之间
+ * 隔着 prepare 返回 + 微任务调度——A、B 两请求都 await 在 prepare 的 DB 段时，
+ * A 的置位排在 B 的检查之后，B 在「检查已通过、置位未发生」窗口通过 → 双开批
+ * 回放（TOCTOU）。修复：检查通过后同一同步段内立即置位（`if (session?.busy)`
+ * throw 409 与 `if (session) session.busy = true;` 连续、中间无 await——Node 单
+ * 线程下不可插入）；置位后剩余段以 try/catch 包住，任何意外抛出先复位 busy 再
+ * 原样 rethrow（4xx/5xx 响应不得把 session 卡死成永久 busy）；accept/sync 原有
+ * 置位保留为幂等赋值。#7：runtime 工厂新默认字段 replayBatchSeq: 0；accept/sync
+ * 起跑前（prepare 成功后）递增并随批传入 runReplayBatch（解构参数 seq = null，
+ * JSDoc 补充）；其 finally 复位段整体包在 `if (seq == null ||
+ * runtime.replayBatchSeq === seq)` 守卫内——全部复位字段统一在守卫内（busy
+ * 原子化后同一 runtime 同时至多一个批次，守卫正常恒真，零行为变化，防御未来
+ * 再引入并发批次；seq == null 分支兼容未版本化调用方——离线 characterization
+ * fakes——保持既有总是复位）。Task 4 评审遗留顺带：accept 路径 .catch 兜底复位
+ * 集补 `runtime.replayRunning = false;`，与 sync catch 字段集对称。
+ *
  * 全部为 read_text needle + 源码切片断言（零 import 被测模块——该模块 import
  * 副作用面含 ws-server / executor-session-client，无 ESM mock 能力下不做行为
  * 驱动；锚定为「函数名 + 语义行」切片，任一守卫被移除或移位即红）。
@@ -326,6 +343,73 @@ record('9g #13 sync 路径补 catch 复位：replayTrajectorySteps 内 catch 含
       && SYNC_CATCH.includes('if (session) session.busy = false;')
       && SYNC_CATCH.includes("emitReplay('replay:finished'")
       && SYNC_CATCH.includes('throw err;');
+  })());
+
+// ══ Task 5/6 — #6 busy 检查-置位原子化 + #7 批次世代令牌（断言组 10） ═════════
+// ── 切片定位：accept / sync 函数体 + prepareReplayBatch 函数体（文件末函数） ───
+const acceptFnIdx = idx(TSR, 'export async function acceptTrajectoryStepsReplay(', 'accept 回放入口');
+const acceptEndIdx = TSR.indexOf('/**', acceptFnIdx);
+assert.ok(acceptEndIdx > acceptFnIdx, 'accept 函数体后应紧跟 sync 的 JSDoc');
+const ACCEPT_BODY = TSR.slice(acceptFnIdx, acceptEndIdx);
+const syncFnIdx = idx(TSR, 'export async function replayTrajectorySteps(', 'sync 回放入口');
+const syncEndIdx = TSR.indexOf('/**', syncFnIdx);
+assert.ok(syncEndIdx > syncFnIdx, 'sync 函数体后应紧跟 stop 的 JSDoc');
+const SYNC_BODY = TSR.slice(syncFnIdx, syncEndIdx);
+const PREP_FN = 'async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true } = {}) {';
+const prepFnIdx = idx(TSR, PREP_FN, 'prepareReplayBatch 定义');
+const PREP_BODY = TSR.slice(prepFnIdx);
+const SEQ_INCR = 'runtime.replayBatchSeq = (runtime.replayBatchSeq || 0) + 1;';
+
+// ── 10. #6 busy 原子置位 + #7 世代令牌 ────────────────────────────────────────
+record('10a #6 busy 检查-置位原子化：prepare 内 if (session?.busy) 检查与 session.busy = true 置位相邻出现，中间切片无 await 关键字（检查通过后同一同步段内置位，Node 单线程下不可插入）',
+  (() => {
+    const checkIdx = PREP_BODY.indexOf('if (session?.busy)');
+    if (checkIdx < 0) return false;
+    const setIdx = PREP_BODY.indexOf('if (session) session.busy = true;', checkIdx);
+    if (setIdx < 0) return false;
+    const BETWEEN = PREP_BODY.slice(checkIdx, setIdx);
+    return !BETWEEN.includes('await');
+  })());
+record('10b #6 prepare 置位后 throw 路径复位 busy：置位行之后为 try 包住 return + catch 段先 session.busy=false 复位再原样 rethrow（错误响应不卡死 busy）',
+  (() => {
+    const setIdx = PREP_BODY.indexOf('if (session) session.busy = true;');
+    if (setIdx < 0) return false;
+    const TAIL = PREP_BODY.slice(setIdx);
+    const tryIdx = TAIL.indexOf('try {');
+    const catchIdx = TAIL.indexOf('} catch (err) {');
+    if (tryIdx < 0 || catchIdx < tryIdx) return false;
+    const CATCH_SLICE = TAIL.slice(catchIdx);
+    const resetIdx = CATCH_SLICE.indexOf('if (session) session.busy = false;');
+    const rethrowIdx = CATCH_SLICE.indexOf('throw err;');
+    return resetIdx >= 0 && rethrowIdx > resetIdx;
+  })());
+record('10c #7 runtime 工厂默认字段 replayBatchSeq:0（trajectory-runtime.js，恰一次）',
+  count(TRT, 'replayBatchSeq: 0,') === 1);
+record('10d #7 accept/sync 起跑前（prepare 成功后）各自递增世代令牌（两路径各恰一次）',
+  count(ACCEPT_BODY, SEQ_INCR) === 1 && count(SYNC_BODY, SEQ_INCR) === 1);
+record('10e #7 本批 seq 随批传入 runReplayBatch（accept/sync 均带 seq: batchSeq）+ runner 解构默认 seq = null（JSDoc @param 补充）',
+  ACCEPT_BODY.includes('seq: batchSeq,') && SYNC_BODY.includes('seq: batchSeq,')
+  && count(RBR, 'seq = null,') === 1 && RBR.includes('@param {number|null} [root0.seq]'));
+record('10f #7 runReplayBatch finally 整体世代守卫：runtime.replayBatchSeq === seq 条件在 finally 头之后、复位段之前（全部复位字段统一在守卫内）',
+  (() => {
+    const finIdx = idx(RBR, '  } finally {', 'runReplayBatch finally');
+    const guardIdx = idx(RBR, 'runtime.replayBatchSeq === seq', '世代守卫条件');
+    const supIdx = idx(RBR, 'runtime.suppressStepPersist = false;', 'finally 首个复位行');
+    const busyIdx = idx(RBR, 'if (session) session.busy = false;', 'busy 释放');
+    return finIdx < guardIdx && guardIdx < supIdx && supIdx < busyIdx;
+  })());
+record('10g #7 守卫兼容未版本化调用方：seq == null 短路分支存在（离线 characterization fakes 不传 seq 时保持既有总是复位，零行为变化）',
+  RBR.includes('if (seq == null || runtime.replayBatchSeq === seq) {'));
+record('10h Task 4 评审遗留：accept 路径 .catch 兜底复位集补 replayRunning=false（字段集与 sync catch 对称）',
+  (() => {
+    const catchIdx = ACCEPT_BODY.indexOf('.catch((err) => {');
+    if (catchIdx < 0) return false;
+    const CATCH_SLICE = ACCEPT_BODY.slice(catchIdx);
+    return CATCH_SLICE.includes('runtime.suppressStepPersist = false;')
+      && CATCH_SLICE.includes('runtime.isReplay = false;')
+      && CATCH_SLICE.includes('runtime.abortReplay = false;')
+      && CATCH_SLICE.includes('runtime.replayRunning = false;')
+      && CATCH_SLICE.includes('if (session) session.busy = false;');
   })());
 
 const bad = results.filter((r) => !r.ok);
