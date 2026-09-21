@@ -212,6 +212,9 @@ characterize-session-lifecycle|node scripts/characterization/characterize-sessio
 characterize-sso-auth|node scripts/characterization/characterize-sso-auth.mjs
 characterize-replay-terminal-abort|node scripts/characterization/characterize-replay-terminal-abort.mjs
 characterize-replay-batch|node scripts/characterization/characterize-replay-batch.mjs
+# d18604d5（replay 假失败修复+凭据掩码）新增 pin，登记进回放域
+characterize-replay-table-row-radio|"$PY" scripts/characterization/cold/characterize-replay-table-row-radio.py
+characterize-replay-secret-redaction|"$PY" scripts/characterization/cold/characterize-replay-secret-redaction.py
 '
 PINS_UI='
 characterize-step-highlight|node scripts/characterization/characterize-step-highlight.mjs

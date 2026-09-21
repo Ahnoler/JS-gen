@@ -82,7 +82,10 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
   isReplay = true,
 } = {}) {
   const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
-  const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
+  const {
+    tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger,
+    secretValues,
+  } = prepared;
 
   runtime.abortReplay = false;
   runtime.suppressStepPersist = doSuppress;
@@ -106,6 +109,7 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
       actions,
       rows,
       snapshotsByTrigger,
+      secretValues,
     }).catch((err) => {
       const msg = err?.message || String(err);
       console.error(`[steps/replay] background batch failed traj=${tid}:`, msg);
@@ -139,7 +143,10 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
  */
 export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isReplay = true } = {}) {
   const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
-  const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
+  const {
+    tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger,
+    secretValues,
+  } = prepared;
 
   runtime.abortReplay = false;
   runtime.suppressStepPersist = doSuppress;
@@ -156,6 +163,7 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
       actions,
       rows,
       snapshotsByTrigger,
+      secretValues,
     });
   } finally {
     // runReplayBatch also clears busy in finally
@@ -285,11 +293,17 @@ async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true 
       for (const id of droppedIds) selectedIdSet?.delete?.(id);
     }
   }
+  // Resolved auth credentials are redacted from replay logs (plan + executor
+  // per-step stderr) so manual replay of auth trajectories never prints the
+  // plaintext password / account.
+  const secretValues = [];
   if (trajRow?.system_account_id) {
     const accountRow = await db('system_account')
       .where('id', Number(trajRow.system_account_id))
       .first();
     if (accountRow && (accountRow.account || accountRow.password)) {
+      if (accountRow.account) secretValues.push(String(accountRow.account));
+      if (accountRow.password) secretValues.push(String(accountRow.password));
       const { resolveAuthPlaceholdersDeep } =
         await import('../operation-component-service.js');
       for (const r of rows) {
@@ -354,5 +368,6 @@ async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true 
     actions,
     rows,
     snapshotsByTrigger,
+    secretValues,
   };
 }

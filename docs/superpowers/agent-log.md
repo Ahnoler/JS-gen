@@ -10,6 +10,31 @@
 - 验收：两轮全量 177 项（175 pin + eslint + ruff）稳定 ALL GREEN，3 红与基线逐项一致零新增；175 pin 与旧口径 comm 核验零丢失；域抽样 kb(17s)/phase(31 green)/ui(含 3 基线红正确标注)；--changed 抽测映射正确（select_dispatch→select、js_snippets→xpath、trajectory-runner→ui+export+core、data/kb→kb、executor→executor）。
 - 遗留移交：①各线后续新 pin **登记进域注册表**（改 verify-all.sh 的热点冲突依旧存在，但注册表是显式清单、冲突好解）；②`--changed` 路径映射规则保守（未映射兜底全量），跑一段时间后可按实际 diff 命中情况微调规则；③并发度默认 4 是保守值，机器富裕可 `VERIFY_JOBS=6` 再压。
 - 注：不维护 CHANGELOG；本条与代码提交一并 push。
+=======
+## 2026-09-21 17:20 · OpenCode — 补记：回放三项修复合并后验收通过；push 因 GitHub 不可达待补
+
+- 代码 commit `d18604d5`；`git pull origin uara_V2.0 --no-rebase` 合入远端 `52f4adf3`（ZCode D2 回执/代理件条目 + todo 更新），仅 `agent-log.md` 冲突，按协议双方条目并排消解，零代码冲突。
+- **合并后验收**：合并态 11 枚相关 characterization 全绿（replay-batch / replay-terminal-abort / menu-navigation / special-element / replay-table-row-radio / replay-secret-redaction / search-then-click-guard / fill·select·radio·click-replay-engine）；合并提交 `1190c068`。
+- **push 状态**：`git push origin uara_V2.0` 连续 2 次失败（`Failed to connect to github.com:443` / `Recv failure: Connection was reset`）；本线 `d18604d5` + `1190c068` 为**本地未推送**，网络恢复后按硬约定补推（无需再合并，远端已在其中）。
+- `config/.db-whitelist-seen` 运行时改动未提交。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 17:10 · OpenCode — 收工：修复首行单选回放假失败 + 回放日志凭据掩码 + 回放模块 Python 3.10 兼容
+
+- 收件（用户 review 两条 + 同批日志实证一条）：
+  - **凭据泄漏**（`2e9b33b3`）：`describeReplayStep` 白名单含 `value`，而 `prepareReplayBatch` 在打计划前已把 `__AUTH_PASSWORD__` 还原为真实密码 → auth 轨迹人工回放时明文密码同时进控制面 console 与执行机 stderr，违背凭据掩码先例。
+  - **Python 版本**（`244af4f7`）：`_replay.py` batch start 日志用嵌套同引号 f-string（PEP 701，3.12+），README 承诺 3.10+，低版本执行机会导致整个回放模块 import 失败。
+  - **首行单选假失败**（用户日志 traj 969 step 5）：`_replay_table_row_radio` 在 xpath-first 失败、语义首行兜底成功（`ok|scope=`）时，把失败的 `click-failed` 前缀拼到成功结果前，`_result_ok` 只读头段 → 判 FAIL 并进单步自愈。
+- 改动：
+  - `scripts/controller/actions/replay_table.py`：语义兜底成功时把成功结果置头，失败的 xpath 尝试降为尾段诊断 `xpath-first-failed:`；durable-fallback 成功分支同修（成功段置头）。
+  - `src/services/trajectory/replay-batch-runner.js`：新增 `redactSecrets`；`logReplayPlan` 按精确凭据值把计划行掩码为 `***`，并在 `replay_plan` 事件携带 `secretValues`。
+  - `src/services/trajectory/trajectory-session-replay.js`：`prepareReplayBatch` 收集 auth 还原出的账号/密码为 `secretValues`，经两个调用方传入 `runReplayBatch`。
+  - `scripts/event_dispatch.py`：`replay_plan` 缓存 `secretValues` 到 `session_state` 并掩码打印；`replay_actions` 透传 `secretValues`。
+  - `scripts/controller/actions/_replay.py`：新增 `redact_secrets`；逐步 params/result 日志掩码；batch start 日志改用循环拼接，删除 PEP 701 嵌套 f-string。
+  - 新 pin：`characterize-replay-table-row-radio`（语义兜底不成假失败）、`characterize-replay-secret-redaction`（`redact_secrets` + 接线 + `ast.parse(feature_version=(3,10))` 兼容闸）；`characterize-replay-batch` 增计划掩码行为断言（执行用 params 仍为真值）。
+- 验收：三枚相关 pin 全绿；定向 characterization 9/9 PASS；全量 `verify-all` 失败集与本机前次基线一致（eslint-core / step-highlight / layer-tree / confirm-notification / fill-err-with-scope / idempotent-click-gate / tssc-route-conflict / network-capture），**零新增本线归属**。
+- 生效：Node 侧需重启控制面；执行机 Python 随新会话子进程加载（`event_dispatch.py` / `_replay.py`）。
+- 注：不维护 CHANGELOG。
 
 ## 2026-09-21 17:05 · ZCode 引擎线（D2 线） — 回执：A/C 终局口径收讫（主路径=自然窗口值守，加速件不点单）+ 两处精确更正（代理件已零重启 / grep 签名防漏报）+ ③ 校准对已登记
 

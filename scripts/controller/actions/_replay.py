@@ -342,6 +342,21 @@ def _result_ok(action_name: str, result: str) -> bool:
     return False
 
 
+def redact_secrets(text, secrets) -> str:
+    """将文本中出现的凭据明文替换为 ``***``（与 Node 侧 redactSecrets 同口径）。
+
+    auth 轨迹回放时控制面已把 ``__AUTH_PASSWORD__`` 还原成真实密码；回放计划
+    与逐步 stderr 日志都必须掩码，避免明文密码进入执行机日志。
+    """
+    out = str(text if text is not None else '')
+    for s in secrets or ():
+        v = str(s if s is not None else '')
+        if len(v) < 2 or v not in out:
+            continue
+        out = out.replace(v, '***')
+    return out
+
+
 async def _replay_verify_form_structure(page, params: dict) -> str:
     """Run verifyFormStructure; always return form-structure:<json> on success.
 
@@ -661,11 +676,15 @@ async def replay_action_entries(
     business_data_store: dict | None = None,
     emit=None,
     stop_on_fail: bool = False,
+    secret_values: list | None = None,
 ) -> dict:
     """
     Replay recorded steps sequentially (auto-fill style orchestration).
 
     When stop_on_fail=True, break after the first failed step (still emit replay_step).
+
+    ``secret_values``: resolved auth credentials (account/password) to redact from
+    the stderr step logs — never mutate the executed params themselves.
 
     Returns {count, ok, failed, results, stoppedAt?}.
     """
@@ -682,21 +701,24 @@ async def replay_action_entries(
     try:
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        sys.stderr.write(
-            '[replay] batch start: '
-            + ', '.join(
-                f"{i + 1}:{e.get('action') or '?'}{f'(id={e.get('id')})' if e.get('id') is not None else ''}"
-                for i, e in enumerate(entries)
-            )
-            + '\n'
-        )
+        # 计划摘要只含动作名与 step id，无参数，无需掩码；用循环拼接避免
+        # 嵌套同引号 f-string（PEP 701，Python 3.12+），保持 3.10 兼容。
+        parts = []
+        for i, e in enumerate(entries):
+            action_name = e.get('action') or '?'
+            sid = e.get('id')
+            parts.append(f'{i + 1}:{action_name}' + (f'(id={sid})' if sid is not None else ''))
+        sys.stderr.write('[replay] batch start: ' + ', '.join(parts) + '\n')
         sys.stderr.flush()
 
         for i, entry in enumerate(entries):
             action_name = normalize_action_name(entry.get('action') or '')
             params = _normalize_params(action_name, entry.get('params'))
             step_num = i + 1
-            sys.stderr.write(f'[replay] [{step_num}/{total}] {action_name} {params}\n')
+            sys.stderr.write(
+                redact_secrets(f'[replay] [{step_num}/{total}] {action_name} {params}', secret_values)
+                + '\n'
+            )
             sys.stderr.flush()
 
             extra_row_fields = None
@@ -782,8 +804,13 @@ async def replay_action_entries(
             if extra_row_fields:
                 row.update(extra_row_fields)
             results.append(row)
+            # result may echo the written value (e.g. false_ok:expected=…) — redact.
             sys.stderr.write(
-                f'[replay] [{step_num}/{total}] {"OK" if ok else "FAIL"} → {result} | locate={locate}\n'
+                redact_secrets(
+                    f'[replay] [{step_num}/{total}] {"OK" if ok else "FAIL"} → {result} | locate={locate}',
+                    secret_values,
+                )
+                + '\n'
             )
             sys.stderr.flush()
 

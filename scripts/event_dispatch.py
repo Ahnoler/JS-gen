@@ -266,14 +266,18 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
 
     if event == "replay_plan":
         # 控制面在整批回放开跑前一次性下发完整步骤清单（执行机逐条收
-        # replay_actions，无法自行汇总整批），这里原样打印到 stderr，便于
-        # 操作人员在回放开始前核对本次要执行的步骤。
+        # replay_actions，无法自行汇总整批），这里打印到 stderr，便于操作人员
+        # 在回放开始前核对本次要执行的步骤。secretValues 为该轨迹已还原的
+        # 账号/密码明文，用于掩码逐步日志，绝不打印其本身。
         data = msg.get("data", {}) or {}
         steps = data.get("steps") or []
         tid = data.get("trajectoryId", "")
+        secret_values = list(data.get("secretValues") or data.get("secret_values") or [])
+        session_state['_replay_secret_values'] = secret_values
+        from .controller.actions._replay import redact_secrets
         sys.stderr.write(f"[replay] ===== 即将回放 {len(steps)} 步（轨迹 {tid}）=====\n")
         for line in steps:
-            sys.stderr.write(f"[replay]   {line}\n")
+            sys.stderr.write("[replay]   " + redact_secrets(line, secret_values) + "\n")
         sys.stderr.write("[replay] ===== 开始执行 =====\n")
         sys.stderr.flush()
         return 'continue'
@@ -319,6 +323,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             business_data_store=business_data_store,
             emit=emit_json,
             stop_on_fail=stop_on_fail,
+            secret_values=session_state.get('_replay_secret_values') or [],
         )
 
         # 修复路径：用原始失败前的条目填充 ACTION_LOG，以便后续 agent 录制

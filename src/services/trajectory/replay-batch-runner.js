@@ -61,6 +61,23 @@ function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
 }
 
 /**
+ * 用 `***` 替换文本中出现的凭据明文（auth 轨迹的账号/密码）。与
+ * `maskTrajectoryStepSecrets` 同口径：按精确值替换，不做正则猜测。
+ * @param {string} text 原始文本
+ * @param {Array<string>} secrets 需掩码的明文值列表
+ * @returns {string} 掩码后的文本
+ */
+function redactSecrets(text, secrets) {
+  let out = String(text ?? '');
+  for (const s of secrets || []) {
+    const v = String(s ?? '');
+    if (v.length < 2 || !out.includes(v)) continue;
+    out = out.split(v).join('***');
+  }
+  return out;
+}
+
+/**
  * 汇总单条回放动作的可读描述（动作名 + 关键参数），用于回放计划日志。
  * @param {object} entry 动作条目
  * @param {number} index 0-based 下标
@@ -98,10 +115,14 @@ function describeReplayStep(entry, index) {
  * @param {Array<number>} orderedStepIds 有序步骤 ID
  * @param {Array<object>} actions 动作条目
  * @param {object} runtime 带执行机会话标识的交易运行时
+ * @param {Array<string>} [secretValues] 需掩码的凭据明文（auth 轨迹账号/密码）
  * @returns {void}
  */
-function logReplayPlan(tid, orderedStepIds, actions, runtime) {
-  const lines = actions.map((a, i) => describeReplayStep(a, i));
+function logReplayPlan(tid, orderedStepIds, actions, runtime, secretValues = []) {
+  // Mask resolved auth credentials: prepareReplayBatch restores
+  // __AUTH_PASSWORD__ before the plan is built, so raw params would leak the
+  // plaintext password to the control-plane console and executor stderr.
+  const lines = actions.map((a, i) => redactSecrets(describeReplayStep(a, i), secretValues));
   console.log(
     `[replay-batch] traj=${tid} 共 ${actions.length} 步 stepIds=[${orderedStepIds.join(',')}]\n`
     + lines.map((l) => `  ${l}`).join('\n'),
@@ -112,7 +133,8 @@ function logReplayPlan(tid, orderedStepIds, actions, runtime) {
       nodeUuid: runtime.executorNodeUuid,
       sessionId: runtime.sessionId,
       event: 'replay_plan',
-      data: { trajectoryId: tid, steps: lines },
+      // secretValues lets the executor redact its per-step stderr log too.
+      data: { trajectoryId: tid, steps: lines, secretValues: secretValues || [] },
     });
   } catch (err) {
     console.warn(`[replay-batch] replay_plan forward failed: ${err?.message || err}`);
@@ -149,6 +171,7 @@ async function forwardReplayEntry(runtime, entry, doSuppress) {
  * @param {Array<object>} root0.actions action entries to replay
  * @param {Array<object>} root0.rows DB step rows
  * @param {Map<number, object>} root0.snapshotsByTrigger form snapshots keyed by trigger step id
+ * @param {Array<string>} [root0.secretValues] resolved auth credentials to redact from logs
  * @returns {Promise<object>} replay batch result with success/failed counts
  */
 export async function runReplayBatch({
@@ -160,6 +183,7 @@ export async function runReplayBatch({
   actions,
   rows,
   snapshotsByTrigger,
+  secretValues = [],
 }) {
   const allResults = [];
   const healed = [];
@@ -169,7 +193,7 @@ export async function runReplayBatch({
   const skippedIds = new Set();
 
   emitReplay('replay:started', tid, { stepIds: orderedStepIds });
-  logReplayPlan(tid, orderedStepIds, actions, runtime);
+  logReplayPlan(tid, orderedStepIds, actions, runtime, secretValues);
 
   // ── 执行前菜单导航（同菜单跳过/空菜单直接执行/失败不阻断）──
   try {
