@@ -24,7 +24,7 @@ from ..agent_utils import (
     make_step_callback,
     resolve_max_actions_per_step,
 )
-from ..state import get_current_phase
+from ..state import get_current_phase, is_cancel_requested
 
 _last_agent = None
 
@@ -32,11 +32,6 @@ _last_agent = None
 def _close_agent():
     global _last_agent
     if _last_agent is not None:
-        try:
-            for t in getattr(_last_agent, '_tasks', []):
-                t.cancel()
-        except Exception:
-            pass
         _last_agent = None
 
 
@@ -45,6 +40,9 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
 
     Cooperative: browser-use honors agent.state.stopped at the next step boundary.
     Also writes cancel_flag_path so on_step_start/end hooks reinforce the stop.
+    停止为协作式语义——当前 LLM 步/动作完成后生效；历史 ``agent._tasks`` 取消循环
+    为死代码（browser_use Agent 无该属性）已于 2026-09-21 移除，若未来 browser_use
+    暴露可取消协程集合再接回。
     """
     global _last_agent
     try:
@@ -62,14 +60,6 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
         try:
             if getattr(agent, 'state', None) is not None:
                 agent.state.stopped = True
-        except Exception:
-            pass
-        try:
-            for t in getattr(agent, '_tasks', []) or []:
-                try:
-                    t.cancel()
-                except Exception:
-                    pass
         except Exception:
             pass
 
@@ -612,8 +602,8 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
             if business_data_ref is None:
                 break
             done_fired = business_data_ref.get('_done_fired', False)
-            # 检查取消
-            if cancel_flag_path.exists():
+            # 检查取消（E3 口径统一：内容判定，exists() 会把清残留空文件误判为取消）
+            if is_cancel_requested(cancel_flag_path):
                 break
             # 守卫/goal-loop 已置 stopped：不再续跑（避免 0 步空转轮）
             if goal_tracker.get('stopped'):

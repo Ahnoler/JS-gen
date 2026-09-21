@@ -13,7 +13,9 @@ from .models import ActionEntry
 import asyncio
 import base64
 import re
+import tempfile
 import uuid
+from pathlib import Path
 from urllib.parse import urlsplit
 
 _ACTION_LOG: list[dict] = []
@@ -87,6 +89,45 @@ _FIELD_COALESCE_ACTIONS = frozenset({
     'fill_form_field',
     'select_option', 'select_tree_option', 'tssc_multi_select', 'click_radio',
 })
+
+
+def cancel_flag_path_for(session_id):
+    """Per-session cancel flag file (%TEMP%/browser_use_cancel_{session_id}).
+    每会话取消标志文件（%TEMP%/browser_use_cancel_{session_id}）。
+    """
+    return Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
+
+
+def is_cancel_requested(cancel_flag_path) -> bool:
+    """E3: content=='cancel' 判定（exists() 会把清残留写下的空文件误判为取消）。
+
+    Content check instead of exists(): the compat "clear-then-run" order writes
+    an EMPTY flag file (never unlinks), so a leftover empty file must not be
+    read as a cancel request.
+    内容判定而非存在性判定：兼容序「先清再跑」写的是空文件（非 unlink），
+    残留空文件不得被误判为取消请求。
+    """
+    try:
+        if cancel_flag_path is None:
+            return False
+        p = Path(cancel_flag_path)
+        return p.exists() and p.read_text(encoding='utf-8').strip() == 'cancel'
+    except Exception:
+        return False
+
+
+def clear_cancel_flag(cancel_flag_path) -> None:
+    """E1③: 消费后清标志（写空与录制分支 session_runner 先清再跑同款），失败静默。
+
+    Writes an empty payload (same convention as the recording branch's
+    phase-start clear); never raises.
+    写空内容（与录制分支 phase 开始时清残留同一手法）；不抛异常。
+    """
+    try:
+        if cancel_flag_path is not None:
+            Path(cancel_flag_path).write_text('', encoding='utf-8')
+    except Exception:
+        pass
 
 
 def set_current_run_id(run_id):

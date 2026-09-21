@@ -52,6 +52,7 @@ characterize-owned-wait-shape|node scripts/characterization/characterize-owned-w
 characterize-quality-final-gate|node scripts/characterization/characterize-quality-final-gate.mjs
 characterize-record-phase-finalize|node scripts/characterization/characterize-record-phase-finalize.mjs
 characterize-stop-semantics|node scripts/characterization/characterize-stop-semantics.mjs
+characterize-replay-cancel-awareness|"$PY" scripts/characterization/characterize-replay-cancel-awareness.py
 characterize-record-status|node scripts/characterization/characterize-record-status.mjs
 characterize-traj-recon-logging|node scripts/characterization/characterize-traj-recon-logging.mjs
 characterize-step-number-integrity|node scripts/characterization/characterize-step-number-integrity.mjs
@@ -220,6 +221,7 @@ characterize-replay-stop-hardening|node scripts/characterization/characterize-re
 # d18604d5（replay 假失败修复+凭据掩码）新增 pin，登记进回放域
 characterize-replay-table-row-radio|"$PY" scripts/characterization/cold/characterize-replay-table-row-radio.py
 characterize-replay-secret-redaction|"$PY" scripts/characterization/cold/characterize-replay-secret-redaction.py
+characterize-replay-cancel-awareness|"$PY" scripts/characterization/characterize-replay-cancel-awareness.py
 '
 PINS_UI='
 characterize-step-highlight|node scripts/characterization/characterize-step-highlight.mjs
