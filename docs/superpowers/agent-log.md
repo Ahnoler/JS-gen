@@ -1,5 +1,12 @@
 # Agent 协作日志
 
+## 2026-09-21 14:10 · ZCode 合约线 — D2 验收回执处置（引擎线三路径裁定收讫，主路径=自然窗口采纳）
+
+- **引擎线裁定收讫**：主路径=自然窗口（observation 档本机运行态**常开**：控制面 pid 9908 + 执行机 32220，环境变量已注入）；加速路径=本地 503 转发代理可行变体（CDP 路由注入已被引擎线自证否决——暂停事件不达注入客户端，证据 `tmp/d2-accept-sim/README.md`；代理变体需引擎小件 env 驱动 `--proxy-server` 参数 + 重启窗口）；残余风险=引擎线未接受现状，自补组件级半程：发现离线 pin 结构性盲区（假页面返回预置字典→守卫探测 JS 从未在真实 DOM 执行→笔误被 try/except 静默吞掉→表现「永不触发」），新增 live 实测脚本（**c87b9be7**，真实 chromium + 真实探测 JS，23 断言全过）已并 V2.0——腿 A stderr 形态现可逐字复现（`[spin-guard] observed phase=3 step=10 reason=sut_unavailable_spin_guard sut=page_text_503 progress_window=2/2`）。
+- **合约线采纳与处置**：① 主路径采纳——**不点加速件**（代理件需重启窗口，在「SUT 不配合」的用户裁定下不追加外部依赖；如后续需要再向引擎线点单）；自然 503 出现即按 `d2-acceptance-runbook.md` 开单（≤15 分钟）。② 认可残余风险口径：component 级已验（live 脚本）+ 逻辑级已验（离线 pin），未验面收敛为全管线 E2E（真实录制 phase_error → Node 消费 → 轨迹/台账落账），由主路径闭合——非逻辑未验。③ **常开红利**：observation 常开后，合约线后续每单湿测的 executor stderr grep（`[spin-guard]`/`phase_error`）纳入常规验收清单，零成本积累 spin-guard 真机证据。
+- **verify-phase-token 观察项收讫**：引擎线已登记 todo 候选（定位 service.py:724-729 missing_success_token，唯一豁免 introduce_pick；谓词 intent_gates.py:235-260；倾向治本=分析侧对核验型阶段不产出 submit.required/kinds + 门侧 verify 豁免保守兜底，前置=「核验型阶段」机械可判定式）。合约线贡献谓词校准案例对：**阳性 #973 阶段2**（纯核验型：无保存动作、doneLog 三次重搜「暂无数据」，被 missing_success_token 误杀）/ **对照 #924 阶段2**（核验+删除混合，token 充分 recorded）——两例同配方同页签，差异仅 P2 动作构成；如需更大校准集可点单，我方按 doneLogs+steps 全量盘点历史轨迹核验型阶段。
+- 注：回执处置轮次，无代码改动；挂起项 `d2-503-leg` 已改为「值守」口径（todo-list 同步更新）
+
 ## 2026-09-21 13:50 · ZCode 合约线 — 阶段：D2 验收收口（B 腿 PASS，A/C 腿因 SUT 无法配合确认不可执行）
 
 - **B 腿（observation 零误报）PASS**：两轨 `[spin-guard]` 0 条 / `phase_error` 0 条，业务与基线一致（B1 #972 recorded、B2 #973 三 stamp 自造自清达成）——详见 12:55 条目与 `d2-acceptance-report-b.md`。
