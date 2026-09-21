@@ -228,9 +228,20 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
   const clickToolbarIcon = async () => {
     const cls = extractIconClass();
     const tipWant = want || wantBase;
+    // more-btn 信号（镜像录制侧 icons.py _moreToggleCandidates）：宿主 span/div
+    // （tsscBtn more-btn）非 button 时下钻内层 button——录制落库的是下钻后的内层
+    // button 快照，回放若只命中宿主则与录制不一致。
+    const moreSel = '[class*="more-btn"], [class*="moreBtn"], [class*="more_btn"]';
+    const drillIntoButton = (el) => {
+      if (!el) return null;
+      const tag = String(el.tagName || '').toLowerCase();
+      if (tag === 'button' || el.matches('.el-button, [role="button"], a')) return el;
+      return el.querySelector('button, .el-button, a, [role="button"]') || el;
+    };
     const anchors = [...document.querySelectorAll(
-      'a.el-tooltip, .el-tooltip[class*="el-icon"], a[class*="el-icon-"], i.el-tooltip, .el-tooltip.item'
-    )].filter(isVisible);
+      'a.el-tooltip, .el-tooltip[class*="el-icon"], a[class*="el-icon-"], i.el-tooltip, .el-tooltip.item,'
+      + moreSel
+    )].filter(isVisible).map((el) => drillIntoButton(el));
     // Prefer class match
     if (cls) {
       const byClass = anchors.filter((el) => String(el.className || '').includes(cls));
