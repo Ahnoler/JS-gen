@@ -44,8 +44,10 @@ _QUERY_CONDITION_HARD_EXCLUDE_RE = re.compile(
 _WIZARD_NAV_RE = re.compile(r'下一步|上一步|进入下一步|点击下一步')
 # Open-page / navigate phases:「点击评级申请。预期结果：打开评级申请相关页面」—
 # done once the target page/dialog appears; do NOT continue the flow inside it.
+# 2026-09-21：补「窗口/选择窗/选择框」——客户选择窗口、引入窗口等 picker 打开阶段
+# 此前只认页面/弹窗/对话框，导致「打开客户选择窗口」不被识别为开页导航。
 _OPEN_PAGE_EXPECT_RE = re.compile(
-    r'预期结果[:：]?[^。；\n]{0,12}(?:打开|进入|抵达|到达)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框|向导页?)'
+    r'预期结果[:：]?[^。；\n]{0,12}(?:打开|进入|抵达|到达|弹出)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框|向导页?|窗口|选择窗|选择框)'
 )
 # Save-to-open phases (点击保存。预期结果：保存成功并进入列表页) keep prompt rule 3
 # (click_save → ok-save-navigation → done) — NOT open-page navigation.
@@ -55,7 +57,7 @@ _OPEN_PAGE_EXCLUDE_RE = re.compile(r'保存|提交')
 # 语义是导航开页，不签 query_clicked 合同。限定动作子句匹配（而非全文本）
 # 是为放过真查询的「打开查询结果页」预期（cold pin: query + open expectation）。
 _OPEN_PAGE_ACTION_RE = re.compile(
-    r'(?:打开|进入|抵达|到达)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框|向导页?)'
+    r'(?:打开|进入|抵达|到达|弹出)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框|向导页?|窗口|选择窗|选择框)'
 )
 
 # Suffixes appended for AI fill context — must NOT affect task-mode / boundary classify.
