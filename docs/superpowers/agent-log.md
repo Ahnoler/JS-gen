@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+## 2026-09-21 09:46 · ZCode 引擎线 — 收工：B 类移交处置交付（fill 侧 tssc 互拒收口 + analyze 粒度结论，分支未合并待批，回链 09:12 开工）
+
+- 完成：B 类报告三项处置完毕，commit 8d131f72，分支 `engine/tssc-route-fix-20260920`（已 push；主检出有 Cursor 未推送提交故本单元条目均落本分支）。**4 files +350/−80**（fill_engine.py / 新 cold pin / verify-all.sh 登记 / 专项报告 §6）。
+- **①TsscMultiSelect 互拒（traj #864）**：修复=fill 侧 live 探测升级**三态返回**（tssc/tree 命中 | `plain` 确定性否认 | `unresolved`/`ambiguous` 不可判定）+ store/live 仲裁——store 判 tssc 且 live=plain → 降级放行走正常 fill + `[fill][tssc-route-conflict]` stderr 留痕；live 命中仍硬拒（保 #696 护栏）；不可判定维持拒绝。record/replay 两段同码（pin 断言逐字节一致）。**select 侧（216b2688）零触碰**——至此链路闭合：任一侧确定性否认即放行/诚实失败，互拒死循环结构性不可能。worker 实现含 `_FakePage` 行为冒烟三场景（RED 15 failures → GREEN）。
+- **③analyze 粒度结论**（已写入 `docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md` §6）：**不写展开类硬规则、不做 create 自动拆分兜底**——27 轨量化主导偏差是过碎（Rule 9「能少则少」已在）、Rule 3/3.1 状态边界原则已覆盖该形态、机械拆点依赖业务语义不可判；干预走门闩（阶段描述点名"展开后确认字段集出现再填"）；候选措辞 3.2 备查未落库（启用需 wet 观察）；engine-workaround 两卡确认 `no-workaround`（对应缺陷已修 5dcbd955/cee623e1）。**②闭环记录无动作**（1a9ec7d9+cee623e1，#924 已验收）。
+- 验收证据：新 pin `characterize-fill-tssc-live-downgrade` RED→GREEN（源码 needle + 行为冒烟）；tssc 家族四 pin + fill-already-filled/fill-dispatch 回归全绿；全量 verify-all 失败集=**3 已知红零新增 219 过**（本分支基点含他线新 pin）。观察记录：新 pin 首跑曾偶发 exit=1（telemetry 冷启动竞态），连跑 3×exit=0 稳定，非 pin 缺陷。
+- 状态：**未合并待批**。生效：纯 Python 侧，**合并入引擎 worktree 后新录制会话即生效，无需重启**。
+- 遗留移交：①`tree-select` 未做同款降级（无生产证据，且同款 #696 护栏保护，登记候选）；②`lookup_field_kind` 取 `_scan_fields` 首条的多候选权威排序（调研 §2）未动——降级放行已使分歧无害化，登记候选；③另有一项**此前已批待办**：重启窗口使 OpenCode Node 侧 `recording-page-bind.js` 生效（等用户点名）。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-21 09:12 · ZCode 引擎线 — 开工：B 类移交处置（TsscMultiSelect 路由互拒 fill 侧收口 + analyze 粒度策略结论）
 
 - **收件**：合约线 B 类移交报告 `docs/reports/2026-09-20-b-class-handover-engine-line.md`（本地分发区，不入 git）三项——①TsscMultiSelect 路由互拒（traj #864，唯一需新动作）；②stepNumber 空号/同号双行（已闭环，仅记录）；③analyze 合并阶段（策略待确认）。
