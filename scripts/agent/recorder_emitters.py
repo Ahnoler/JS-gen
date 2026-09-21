@@ -1271,3 +1271,211 @@ async def _emit_step_notice_scan(agent, business_data_store) -> None:
     except Exception as e:
         sys.stderr.write(f'[recorder] step-notice skipped: {e}\n')
         sys.stderr.flush()
+
+
+_SUT_SPIN_GUARD_PROBE_JS = """
+() => {
+  const collapse = (s) => (s || '').replace(/\\s+/g, ' ').toLowerCase();
+  return {
+    title: collapse(document.title).slice(0, 300),
+    text: collapse(document.body ? document.body.innerText : '').slice(0, 4000),
+    url: location.href,
+    keyDom: !!document.querySelector('.el-form, .el-table, .el-tree, .el-dialog, .el-drawer, .el-container'),
+  };
+}
+"""
+
+
+async def _guard_spin_on_step_end(agent, business_data_store, goal_tracker, current_actions):
+    """D2 SUT 503 阶段空转守卫（#925）：A(SUT 不可达)+B(无进展) 双条件止损。
+
+    每步 on_step_end 调用。默认 off 零 I/O；stall 窗口满后才做一次页面探测；
+    soft/hard 触发=直发 phase_error(reason=sut_unavailable_spin_guard)+停 agent。
+    返回 True 表示已触发止损（调用方应 return）；任何异常吞掉返 False。
+    """
+    try:
+        import os
+        mode = str(os.environ.get('SUT_SPIN_GUARD_MODE') or 'off').strip().lower()
+        if mode not in ('observation', 'soft', 'hard'):
+            return False          # off 或未知值：立即返回，此前不得访问 store/页面
+
+        def _win(name, default):
+            try:
+                return max(1, int(os.environ.get(name) or default))
+            except (TypeError, ValueError):
+                return default
+
+        progress_window = _win('SUT_SPIN_GUARD_PROGRESS_WINDOW', 6)
+        text_window = _win('SUT_SPIN_GUARD_503_TEXT_WINDOW', 1)
+        dom_window = _win('SUT_SPIN_GUARD_DOM_MISSING_WINDOW', 3)
+
+        store = business_data_store
+        # ===== 排除项（计数与触发都不做，直接 return False）=====
+        if store is None:
+            return False
+        if store.get('_heal_mode'):
+            return False
+        if store.get('_task_mode') == 'query' or store.get('_query_task') or store.get('_query_ui'):
+            return False
+        if any('"wait_for_loading"' in str(a) for a in (current_actions or [])):
+            return False
+
+        from ..state import get_current_phase, get_current_run_id   # lazy，触发分支里再 import emit_json
+        phase = int(get_current_phase() or 0)
+
+        # ===== 进展信号（全部内存读取，零页面 I/O）=====
+        raw = store.get('task_list')
+        try:
+            from ..models.task import TaskList
+            count = len(TaskList.from_store(raw).done)
+        except Exception:
+            count = 0
+        _last_state = agent.state.history.history[-1].state if agent.state.history and agent.state.history.history else None
+        url = getattr(_last_state, 'url', '') or (_last_state.get('url') if isinstance(_last_state, dict) else '')
+        path = url.split('#')[0].split('?')[0] if url else ''
+        container = str(store.get('_active_container') or '')
+
+        # ===== 阶段自动重置（基线初始化为当前值）=====
+        if store.get('_spin_guard_phase') != phase:
+            store['_spin_guard_phase'] = phase
+            store['_spin_guard_stall_steps'] = 0
+            store['_spin_guard_a1_hits'] = 0
+            store['_spin_guard_a3_steps'] = 0
+            store['_spin_guard_a4_steps'] = 0
+            store['_spin_guard_seen_containers'] = []
+            store['_spin_guard_last_done_count'] = count
+            store['_spin_guard_last_path'] = path
+
+        # ===== 触发幂等：同阶段已触发过不再重复发 phase_error（新阶段随重置重新武装）=====
+        _prev_triggered = store.get('_spin_guard_triggered')
+        if isinstance(_prev_triggered, dict) and _prev_triggered.get('phase') == phase:
+            return True
+
+        # ===== 进展判定（任一成立即进展）=====
+        last_done = int(store.get('_spin_guard_last_done_count') or 0)
+        last_path = str(store.get('_spin_guard_last_path') or '')
+        seen = list(store.get('_spin_guard_seen_containers') or [])
+        progressed = (
+            count > last_done
+            or bool(path and path != last_path)
+            or bool(container and container not in seen)
+        )
+        if progressed:
+            store['_spin_guard_last_done_count'] = count
+            store['_spin_guard_last_path'] = path
+            if container and container not in seen:
+                seen.append(container)
+                store['_spin_guard_seen_containers'] = seen
+            store['_spin_guard_stall_steps'] = 0
+            store['_spin_guard_a1_hits'] = 0
+            store['_spin_guard_a3_steps'] = 0
+            store['_spin_guard_a4_steps'] = 0
+            return False
+        # 无进展：stall 累加，基线始终刷新
+        stall = int(store.get('_spin_guard_stall_steps') or 0) + 1
+        store['_spin_guard_stall_steps'] = stall
+        store['_spin_guard_last_done_count'] = count
+        store['_spin_guard_last_path'] = path
+
+        # ===== 窗口未满：零页面 I/O =====
+        if stall < progress_window:
+            return False
+
+        # ===== 页面探测（stall 满窗后，一次 evaluate）=====
+        page = await agent.browser_context.get_current_page()
+        info = await page.evaluate(_SUT_SPIN_GUARD_PROBE_JS) or {}
+
+        # A 判定（本步），优先级 A1 > A3 > A4
+        hay = str(info.get('title') or '') + ' ' + str(info.get('text') or '')
+        if any(m in hay for m in (
+                'service unavailable', '服务不可用', 'bad gateway',
+                'gateway timeout', 'gateway time-out')):
+            a1_hits = int(store.get('_spin_guard_a1_hits') or 0) + 1
+        else:
+            a1_hits = 0
+        store['_spin_guard_a1_hits'] = a1_hits
+
+        u = str(info.get('url') or '').lower()
+        if any(m in u for m in (
+                '/error', '/503', '/502', '/504',
+                'service-unavailable', 'service_unavailable')):
+            a3_steps = int(store.get('_spin_guard_a3_steps') or 0) + 1
+        else:
+            a3_steps = 0
+        store['_spin_guard_a3_steps'] = a3_steps
+
+        if not info.get('keyDom'):
+            a4_steps = int(store.get('_spin_guard_a4_steps') or 0) + 1
+        else:
+            a4_steps = 0
+        store['_spin_guard_a4_steps'] = a4_steps
+
+        if a1_hits >= text_window:
+            signal = 'page_text_503'
+        elif a3_steps >= 2:
+            signal = 'url_error_page'
+        elif a4_steps >= dom_window:
+            signal = 'dom_missing'
+        else:
+            return False
+
+        # ===== 触发 =====
+        n = int(getattr(agent.state, 'n_steps', 0) or 0)
+        if mode == 'observation':
+            sys.stderr.write(
+                f'[spin-guard] observed phase={phase} step={n} '
+                f'reason=sut_unavailable_spin_guard sut={signal} '
+                f'progress_window={stall}/{progress_window}\n'
+            )
+            sys.stderr.flush()
+            store['_spin_guard_observed_last'] = {
+                'mode': 'observation',
+                'sutSignal': signal,
+                'phase': phase,
+                'step': n,
+                'stepsSinceProgress': stall,
+                'progressWindow': progress_window,
+            }
+            return False
+
+        from ..agent_utils import emit_json   # lazy，勿在模块顶部 import
+        payload = {
+            'phase': phase,
+            'name': f'phase {phase}',
+            'message': '阶段在 SUT 不可达且无实质进展时停止（sut_unavailable_spin_guard）',
+            'reason': 'sut_unavailable_spin_guard',
+            'spinGuard': {
+                'mode': mode,
+                'sutSignal': signal,
+                'progressWindow': progress_window,
+                'stepsSinceProgress': stall,
+            },
+        }
+        run_id = get_current_run_id()
+        if run_id:
+            payload['runId'] = run_id
+        emit_json({'event': 'phase_error', 'data': payload})
+        store['_spin_guard_triggered'] = {
+            'mode': mode,
+            'sutSignal': signal,
+            'phase': phase,
+            'step': n,
+            'stepsSinceProgress': stall,
+            'progressWindow': progress_window,
+        }
+        if mode == 'soft':
+            store['_spin_guard_soft_triggered'] = True
+        sys.stderr.write(
+            f'[spin-guard] {mode} triggered phase={phase} step={n} '
+            f'reason=sut_unavailable_spin_guard sut={signal} '
+            f'progress_window={stall}/{progress_window}\n'
+        )
+        sys.stderr.flush()
+        agent.state.stopped = True
+        if goal_tracker is not None:
+            goal_tracker['stopped'] = True
+        return True
+    except Exception as e:
+        sys.stderr.write(f'[spin-guard] error: {e}\n')
+        sys.stderr.flush()
+        return False

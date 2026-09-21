@@ -27,6 +27,7 @@ from .agent.recorder_emitters import (  # noqa: E402
     _emit_step_notice_scan,
     _emit_memory_action_event,
     _guard_done_on_step_end,
+    _guard_spin_on_step_end,
 )
 
 
@@ -259,6 +260,14 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
 
         if goal_tracker['stopped']:
             return
+
+        # D2 SUT 503 空转守卫（默认 off）：A(SUT 不可达)+B(无进展) 双条件止损
+        try:
+            if await _guard_spin_on_step_end(agent, business_data_store, goal_tracker, _actions):
+                return
+        except Exception as e:
+            sys.stderr.write(f'[recorder] spin-guard error: {e}\n')
+            sys.stderr.flush()
 
         # ===== Prevent premature done() =====
         # Only block done() when something VISIBLE still blocks the phase goal
