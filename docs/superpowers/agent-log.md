@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-21 10:02 · ZCode 引擎线 — 开工：挂账候选小批次（probe 常态清单 + nav-reclick 入流 + tree-select 降级，SDD 模式）
+
+- 进行中：用户批"小事项完成"并点名 subagent-driven-development 技能。三任务：**T1** probe 常态弹窗按钮清单（#917④b：阶段收口常态输出，限存在可见弹窗时，doneLog 尾注形态）；**T2** nav-reclick 放行入流（台账级可查，替代行为学反推）；**T3** tree-select 同款降级（**前置**：须先证 fill live 探测的 tree 识别面 ≥ 执行器判定面，否则放弃——误降级即 #696 型误直填）。
+- 分支策略：**栈式** `engine/small-batch-20260921` ← `engine/tssc-route-fix-20260920`（4a9fad33）——T3 与 B 类同落 fill_engine 仲裁区，栈式避免冲突；B 类合约线 PASS 合并后本批随其后并入。
+- 模式：SDD（fresh implementer per task → task review → 终审；subagent 不 commit，主会话验收代提交；SDD 台账 `.superpowers/sdd/engine-small-batch-20260921/progress.md`）。
+- 范围（可写集）：`scripts/agent/recorder_emitters.py`/`scripts/session_runner.py`（T1 候选落点）、`scripts/controller/actions/click_action_engine.py`（T2）、`scripts/controller/actions/fill_engine.py`（T3，仅仲裁分支）、相关 pin（RED 先行）、`scripts/refactor/verify-all.sh`、本分支 agent-log 条目
+- 禁入区：运行态服务（刚重启的 14224/27920——T1/T2 属 Python 侧，**新录制会话即生效，无需再重启**）；远端代理 9228（用户自管）；`select_engine.py`/`select_dispatch.py`；他线在途文件
+- 注：不维护 CHANGELOG
+
 ## 2026-09-21 09:54 · ZCode 引擎线 — 重启完成：运行基点 39dadd7f（B 类 fill 修复 + OpenCode recording-page-bind 均 live），合约线验收通过前不合并
 
 - 完成：按用户指令执行重启窗口。现场状态：**控制面/本地执行机原本已停**（health=000、无 4097 监听；今晨 9:06 起的 pid 9228 系**用户自启的远端代理执行机**，连接 47.101.58.49——判定身份后未触碰）→ 本次为全新启动：控制面 **pid 14224**（health 200，EADDRINUSE 0）+ 本地执行机 registered online（nodeId 11，uuid 不变），均从引擎 worktree **39dadd7f**（B 类交付分支 tip）启动。
