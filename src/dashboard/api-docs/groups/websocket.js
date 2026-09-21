@@ -76,6 +76,30 @@ export const GROUP_WEBSOCKET = [
         ],
       },
       {
+        method: 'WS', path: 'recording:llm_error',
+        summary: 'AI 录制时上游 LLM 调用失败（余额不足 / 鉴权 / 限流 / 服务端错误）',
+        tryable: false,
+        respExample: J({
+          type: 'recording:llm_error',
+          payload: {
+            trajectoryId: 42,
+            sessionId: 'uuid',
+            sid: '66f97c26',
+            kind: 'llm_insufficient_balance',
+            reason: 'LLM 调用异常',
+            upstream: "Error code: 402 - {'error': {'message': 'Insufficient Balance', ...}}",
+            at: '2026-09-18T09:34:00.000Z',
+          },
+        }),
+        notes: [
+          '控制面识别执行机 agent stderr 中的 LLM 网关错误后广播；同时写 control-plane 日志 [agent-llm-error]（含详细原因）与 session stderr 标记行',
+          'kind: llm_insufficient_balance | llm_auth | llm_rate_limit | llm_server | llm_unknown',
+          'reason: 用户可见类别文案（恒为「LLM 调用异常」）；详细原因仅在日志，不落前端',
+          '同一 session + kind 只广播一次（模型每步重试会重复报错）',
+          '前端收到后按 trajectoryId 归属：把「AI 录制结束」成功提示改为失败提示（reason 与列表悬浮同文案）',
+        ],
+      },
+      {
         method: 'WS', path: 'action_log_sync',
         summary: 'AI 步骤实时同步',
         tryable: false,

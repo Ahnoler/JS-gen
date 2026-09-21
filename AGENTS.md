@@ -24,7 +24,9 @@ Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. Th
 - **push 冲突处理**（2026-09-16 起）：push 被拒（non-fast-forward）时先 `git pull`，逐处解决冲突（agent-log 条目冲突=保留双方条目并排，不删他线内容）后合并提交，再重新 push；**禁止 force push、禁止以丢弃他线条目换取合并**。合并引入了他线代码改动时，须按上条**重跑验收**再 push
 - 提交 agent-log 时若顺带携带了其他会话的未提交条目，在 commit message 注明
 - 任务单元的代码改动结束即 commit；agent-log 条目（开工/收工）写完一律 commit + push——未提交/未推送的工作对其他 Agent 不可见
-- **不维护 CHANGELOG.md**（2026-09-04 已移除）：变更史以翔实的 git commit message 为准，不要重建该文件
+- **commit message 用中文总结备注**（2026-09-18 起）：提交改动内容时一律写**中文总结式备注**——首行一句话概括"改了什么 + 为什么"（`fix`/`feat`/`docs` 等类型前缀可保留），正文用中文分条写改了什么、为什么、验收证据与影响面；禁止纯英文、`update`/`fix bug` 等无信息 message。变更史以 commit message 为准，备注须足以让他线判断影响范围与是否需重跑验收。
+- **不维护 CHANGELOG.md**（2026-09-04 已移除）：变更史以翔实的 git commit message 为准，不要重建该文件。**例外（2026-09-19 起）**：根目录 `CHANGELOG.md` 为用户指定的对外汇报文档（非技术读者、按月版本），仅按用户要求更新，Agent 不主动改写
+- **收工前现场清点（2026-09-19 起）**：stash 条目逐一看过再处置（只 drop 不裸 pop）；本地分支落后远端即 pull（可快进时安全）；工作区不遗留与本线无关的他线 WIP
 
 ## Working with subagents
 
@@ -71,15 +73,15 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 - 仍存在的跨语言单源是 **PAGE_LOCATOR_HELPERS 生成链**：JS 源 `src/cdp/page-locator-helpers.js` 经 `node scripts/_gen_locator_helpers_py.mjs` 生成 `scripts/controller/actions/js_snippets/_locator_helpers_js.py`，仍禁止手改生成物。
 - Do **not** hand-edit generated `scripts/controller/actions/js_snippets/_locator_helpers_js.py` — it's produced by `node scripts/_gen_locator_helpers_py.mjs` from `src/cdp/page-locator-helpers.js`.
 - **KB 召回金样例是唯一跨语言契约**：`scripts/characterization/fixtures/kb-recall-golden.json` 由 JS（`characterize-flow-card-recall.mjs`）与 Python（`characterize-kb-recall.py`）两侧共同断言；改任一侧召回实现必须同 commit 复跑两侧 characterization，已知分歧以 `divergenceAccepted` 显式登记（收敛后移除），禁止在实现对金样例 query 特判。
-- **KB 召回质量评测与跨语言契约职责分离**：质量门禁 = `scripts/characterization/fixtures/kb-recall-eval.v1.json`（130 条独立标注，冻结，`evalVersion`/`changeLog` 变更须 Lead 批准），指标由 `node scripts/kb/recall-eval.mjs` 产出（Acc@1/Recall@5/MRR/nDCG/拒答/噪声/延迟冷热，`--baseline` diff）；任何召回改动须复跑评测并与基线 diff（设计/基线/阈值提案见 `docs/superpowers/reports/2026-09-09-kb-recall-eval-baseline.md`）；扩充/修订该评测集时禁止先跑匹配器反推 gold。
+- **KB 召回质量评测与跨语言契约职责分离**：质量门禁 = `scripts/characterization/fixtures/kb-recall-eval.v1.json`（130 条独立标注，冻结，`evalVersion`/`changeLog` 变更须 Lead 批准），指标由 `node scripts/kb/recall-eval.mjs` 产出（Acc@1/Recall@5/MRR/nDCG/拒答/噪声/延迟冷热，`--baseline` diff）；任何召回改动须复跑评测并与基线 diff（设计/基线/阈值提案见 `docs/superpowers/archive/reports/2026-09-09-kb-recall-eval-baseline.md`）；扩充/修订该评测集时禁止先跑匹配器反推 gold。
 
 **Element UI / correctness rules:**
 - **Recording coalesce** (`scripts/state.py` `_record_action`): consecutive same-element ops keep the later entry and emit `removedIds`; non-consecutive duplicates stay. (Former Node assemble-time `src/dedup.js` removed with the assemble pipeline.)
 - **Native setter pattern** for Element UI inputs — never rely on Playwright `page.fill()` alone for `el-form`.
-- **Select record/replay dispatch:** `select_option` recording and product replay share `resolve_select_dispatch` (`scripts/controller/actions/select_dispatch.py`) — do not assume docstring “same JS path” means the same Python router; see `docs/superpowers/specs/2026-09-09-select-record-replay-unify-design.md`.
-- **Fill record/replay dispatch:** `fill_form_field` shares `resolve_fill_attempt_order` (`scripts/controller/actions/fill_dispatch.py`); Phase B routes replay through `FillEngine` — see `docs/superpowers/specs/2026-09-09-fill-record-replay-unify-design.md`.
-- **Radio record/replay:** `click_radio` product replay routes through `RadioEngine` (`mode=replay` / `click_radio_for_replay`); xpath then label JS — see `docs/superpowers/specs/2026-09-09-radio-record-replay-unify-design.md`.
-- **Click record/replay (index+button):** product replay routes through `ClickEngine` (`*_for_replay` / durable); see `docs/superpowers/specs/2026-09-10-click-record-replay-unify-design.md`.
+- **Select record/replay dispatch:** `select_option` recording and product replay share `resolve_select_dispatch` (`scripts/controller/actions/select_dispatch.py`) — do not assume docstring “same JS path” means the same Python router; see `docs/superpowers/archive/specs/2026-09-09-select-record-replay-unify-design.md`.
+- **Fill record/replay dispatch:** `fill_form_field` shares `resolve_fill_attempt_order` (`scripts/controller/actions/fill_dispatch.py`); Phase B routes replay through `FillEngine` — see `docs/superpowers/archive/specs/2026-09-09-fill-record-replay-unify-design.md`.
+- **Radio record/replay:** `click_radio` product replay routes through `RadioEngine` (`mode=replay` / `click_radio_for_replay`); xpath then label JS — see `docs/superpowers/archive/specs/2026-09-09-radio-record-replay-unify-design.md`.
+- **Click record/replay (index+button):** product replay routes through `ClickEngine` (`*_for_replay` / durable); see `docs/superpowers/archive/specs/2026-09-10-click-record-replay-unify-design.md`.
 - **`el-select`** → use `selectOption`; generic click-by-index on option spans fails silently.
 - **Re-query DOM** before each op — Vue may recreate dialogs/components.
 

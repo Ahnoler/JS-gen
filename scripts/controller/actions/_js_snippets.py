@@ -57,5 +57,5 @@ from .js_snippets.error_notify import JS_READ_ERROR_NOTIFY, JS_NOTIFY_HOOK
 from .js_snippets.step_notice import JS_SCAN_STEP_NOTICES
 from .js_snippets.semantic_snapshot import JS_SEMANTIC_SNAPSHOT
 from .js_snippets.verify_context import JS_VERIFY_CONTEXT
-from .js_snippets.page_id import JS_READ_PAGE_COMPONENT_CODE, JS_CLICK_MENU_XPATH, JS_FIND_MENU_DISMISS_POINT
+from .js_snippets.page_id import JS_READ_PAGE_COMPONENT_CODE, JS_CLICK_MENU_XPATH, JS_FIND_MENU_DISMISS_POINT, JS_FIND_TIANYUAN_DIALOG_CONFIRM
 from scripts.controller.actions.js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS

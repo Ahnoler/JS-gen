@@ -148,6 +148,34 @@ async function main() {
   assert.equal(custom.report.count, 6);
   console.log('ok: custom title slot dialog resolves via |unnamed');
 
+  // 9. Selection-only table rows (single radio per row) must NOT be treated as
+  //    form fields — their row text (business numbers) must not appear in the
+  //    field list or trigger a false "added_optional" form-structure change.
+  const tableWithRadioRows = `
+    <div class="el-form-item"><label class="el-form-item__label">业务编号</label>`
+    + `<div class="el-form-item__content"><input class="el-input__inner" /></div></div>`
+    + `<div class="el-form-item"><label class="el-form-item__label">客户名称</label>`
+    + `<div class="el-form-item__content"><input class="el-input__inner" /></div></div>`
+    + `<div class="el-table"><div class="el-table__body-wrapper"><table><tbody>`
+    + `<tr><td>PJ20260910016010</td><td><label class="el-radio"><span class="el-radio__input"><input type="radio" name="row" /></span></label></td></tr>`
+    + `<tr><td>PJ20260907016009</td><td><label class="el-radio"><span class="el-radio__input"><input type="radio" name="row" /></span></label></td></tr>`
+    + `</tbody></table></div></div>`;
+  await p.setContent(page(tableWithRadioRows));
+  const radioRowsArg = JSON.stringify({
+    fields: [
+      { label: '业务编号', is_required: false },
+      { label: '客户名称', is_required: false },
+    ],
+    container: 'main',
+  });
+  const rawRadioRows = await p.evaluate(`(${VERIFY_JS})(${radioRowsArg})`);
+  const radioRows = { raw: rawRadioRows, report: JSON.parse(rawRadioRows) };
+  assert.equal(radioRows.report.ok, true, 'selection-only table rows do not cause structural drift');
+  assert.equal(radioRows.report.count, 2, 'only real form fields are counted');
+  assert.deepEqual(radioRows.report.fields, ['业务编号', '客户名称'], 'table row texts are not treated as field labels');
+  assert.equal(radioRows.report.added_optional.length, 0, 'no added_optional from table rows');
+  console.log('ok: selection-only table rows excluded from form structure scan');
+
   await browser.close();
   console.log('characterize-form-structure-container: OK');
 }

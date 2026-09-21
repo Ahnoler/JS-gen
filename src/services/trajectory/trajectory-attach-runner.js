@@ -61,19 +61,32 @@ async function injectFlowTemplateHintIfNeeded(traj) {
  * @param {boolean} [opts.skipDefaultLogin] when true, skip the prepare-time
  *   default login (same effect as runtime.skipDefaultLogin, but known before
  *   the runtime object exists — auth dry-run login segment)
+ * @param {boolean} [opts.preserveRecordStatus] when false, enter the transient
+ *   'recording' state (used by record/start and manual-record). Default true:
+ *   prepare only attaches browser/stream without changing record_status.
  * @returns {Promise<object>} prepare result with trajectory, account, and session info
  */
-export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin = false } = {}) {
+export async function prepareTrajectoryRecordingUnlocked(tid, {
+  skipDefaultLogin = false,
+  preserveRecordStatus = true,
+} = {}) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
+
+  // 录制进行中：prepare 只做「连资源/推流」，绝不重新登录、绝不导航页面绑定，
+  // 否则会打断 agent 正在进行的录制（进入录制页会自动 prepare）。
+  const recordingInFlight = traj?.recordStatus === 'recording';
 
   await injectFlowTemplateHintIfNeeded(traj);
 
   // A fresh prepare must not inherit a stale "recording" signal: reset any phase
-  // left as running by a previous interrupted recording.
-  const stalePhases = await trajectoryPhaseDao.listByTrajectory(tid);
-  for (const phase of stalePhases) {
-    if (phase.status === 'running') {
-      await trajectoryPhaseDao.updateStatus(phase.id, 'pending');
+  // left as running by a previous interrupted recording. Skip when currently
+  // recording so an active run is not torn down by an idempotent prepare.
+  if (traj.recordStatus !== 'recording') {
+    const stalePhases = await trajectoryPhaseDao.listByTrajectory(tid);
+    for (const phase of stalePhases) {
+      if (phase.status === 'running') {
+        await trajectoryPhaseDao.updateStatus(phase.id, 'pending');
+      }
     }
   }
 
@@ -216,11 +229,17 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
-    // 状态流转 V3：启动浏览器/占用执行资源成功即进入临时「录制中」(recording)。
-    // 进入时记录持久状态基线，关闭浏览器/释放资源时恢复到该基线，持久状态不被临时态降级。
-    await trajectoryDao.enterTransientRecording(tid).catch((err) => {
-      console.warn(`[prepare] enterTransientRecording failed for #${tid}:`, err?.message || err);
-    });
+    if (preserveRecordStatus) {
+      // 默认：仅连接浏览器/推流，不进入 recording 临时态；保持当前持久态。
+      // recording 只由 record/start 或人工录制开启时进入。
+      console.log(`[prepare] preserveRecordStatus=true for traj #${tid}; staying in ${traj?.recordStatus || 'unknown'}`);
+    } else {
+      // 显式 preserveRecordStatus=false：record/start 等路径需要进入 recording。
+      // 进入时记录持久状态基线，非显式 stop 的释放会标为 failed(interrupted)。
+      await trajectoryDao.enterTransientRecording(tid).catch((err) => {
+        console.warn(`[prepare] enterTransientRecording failed for #${tid}:`, err?.message || err);
+      });
+    }
   }
 
   emitStage('login', 'running', { accountId });
@@ -228,9 +247,14 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
   // Auth dry-run login segment: the agent performs the login itself as the
   // recorded phase — skip the prepare-time default login (incl. cold-start retry).
   // Flag is read-only here; it lives until the runtime is torn down at detach.
-  if (runtime.skipDefaultLogin || skipDefaultLogin) {
+  // recordingInFlight: the agent owns the page during an active recording — never
+  // re-login (would navigate the page and abort the in-flight recording).
+  if (runtime.skipDefaultLogin || skipDefaultLogin || recordingInFlight) {
     login = { skipped: true, done: true, accountId };
-    emitStage('login', 'skipped', { accountId });
+    emitStage('login', 'skipped', {
+      accountId,
+      ...(recordingInFlight ? { reason: 'recording_in_flight' } : {}),
+    });
   } else
   try {
     if (runtime.loginDone && Number(runtime.loginAccountId) === Number(accountId)) {
@@ -251,6 +275,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
             timeoutMs: 30000,
             stopOnFail: false,
             isReplay: true,
+            abortOnSessionTerminal: true,
           });
         },
       });
@@ -263,9 +288,12 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
   }
 
   // ── 起点页面 ID 绑定：导航到功能菜单 → 读组件编号（读不到 AILZ 兜底）；绝不阻断 prepare ──
+  // 录制进行中禁止导航/读页：bindRecordingPageId 会点菜单并可能开弹窗，直接打断在录 agent。
   try {
-    if (traj?.functionId) {
+    if (traj?.functionId && !recordingInFlight) {
       await bindRecordingPageId({ runtime, tid, functionId: Number(traj.functionId), execSession });
+    } else if (recordingInFlight) {
+      console.log(`[prepare] page-bind skipped for traj #${tid} (recording in flight)`);
     }
   } catch (bindErr) {
     console.warn('[prepare] page-bind failed:', bindErr?.message || bindErr);
@@ -279,7 +307,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid, { skipDefaultLogin
   return {
     trajectoryId: tid,
     trajectory: fresh || traj,
-    recordStatus: fresh?.recordStatus || (streamOk ? 'recording' : traj?.recordStatus) || null,
+    recordStatus: fresh?.recordStatus || traj?.recordStatus || null,
     phases: tree?.phases || [],
     orphanSteps: tree?.orphanSteps || [],
     sessionId: runtime.sessionId,

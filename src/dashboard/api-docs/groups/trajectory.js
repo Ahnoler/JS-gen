@@ -63,16 +63,20 @@ export const GROUP_TRAJECTORY = [
         respExample: J({
           rows: [{
             id: 42, name: '开户交易', task: '需求描述',
-            recordStatus: 'draft', isExport: 0, stepCount: 0, phaseCount: 3,
+            recordStatus: 'failed', isExport: 0, stepCount: 0, phaseCount: 3,
             functionId: 3, systemAccountId: 10, model: 'Qwen/Qwen3.5-35B-A3B',
             batchTaskName: '批量录制导入模板_0814-1251',
             authKind: null,
+            failedKind: 'llm_insufficient_balance',
+            failedReason: 'LLM 调用异常',
+            failedAt: '2026-09-18T09:34:00.000Z',
           }],
           total: 42, page: 1, pageSize: 20,
-          stats: { total: 42, draft: 8, recording: 7, failed: 0, recorded: 20, completed: 7 },
+          stats: { total: 42, draft: 8, recording: 7, failed: 1, recorded: 20, completed: 7 },
         }),
         notes: [
           '行内 authKind：null（普通交易）/ \'login\' / \'logout\'（登录/登出演练交易）— 前端列表据此渲染「登录」/「登出」徽标',
+          '行内 failedKind/failedReason/failedAt：仅 recordStatus=failed 时有值。failedReason 为用户可见类别文案（如「LLM 调用异常」「阶段执行失败」「录制质量未达标」「未录制到步骤」「录制执行异常」「人工标记录制异常」「批量任务失败」），与前端 toast/列表悬浮一致；failedKind 为机器码；无失败记录/旧数据为 null（前端不显示悬浮）；同类文案可含（阶段 N,M）后缀标注失败阶段',
         ],
       },
       {

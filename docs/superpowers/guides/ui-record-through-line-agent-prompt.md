@@ -4,7 +4,8 @@
 > 用途：交给其他 Agent / 同事，按产品「UI录制」标准路径做 **新增交易录制 → 填任务 → AI 分析拆阶段 → 按阶段执行**  
 > 实证来源：客户管理档位 A（建档 #515/#524）+ 档位 B（查询 #526）；对齐控制面 `/api/v2/trajectories/*`  
 > 前端契约：`http://localhost:4097/api/docs`；本仓 Python：`D:/anaconda3/python.exe`  
-> **Agent Skill（湿测精简版）**：`scripts/prompts/skills/ui-record-wet-test/SKILL.md`
+> **Agent Skill（湿测精简版）**：`tools/recording-coach/skill/SKILL.md`  
+> **相关设计（录制陪跑 OpenCode）**：`docs/superpowers/specs/2026-09-18-recording-coach-opencode-design.md`
 
 ---
 

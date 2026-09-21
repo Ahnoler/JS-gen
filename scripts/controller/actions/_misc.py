@@ -22,7 +22,7 @@ from ._js_snippets import (
     JS_STAMP_ICON_ARIA_LABELS,
     JS_STRIP_STALE_WRAPPERS,
 )
-from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
+from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS as _PAGE_LOCATOR_HELPERS
 from ...models import ActionFile, FormSnapshot, FormSnapshotCollection
 from .replay_timing import WAIT_300_MS, WAIT_400_MS, WAIT_450_MS, WAIT_500_MS
 
@@ -42,7 +42,7 @@ def _is_form_submit_label(text: str) -> bool:
 
 
 _JS_VISIBLE_FORM_OVERLAY = '''() => {
-''' + PAGE_LOCATOR_HELPERS + '''
+''' + _PAGE_LOCATOR_HELPERS + '''
     for (const d of document.querySelectorAll('.el-dialog')) {
         const wrap = d.closest('.el-dialog__wrapper') || d;
         if (isVisible(wrap) && isVisible(d) && d.querySelector('.el-form')) return true;
@@ -65,6 +65,20 @@ _JS_VISIBLE_FORM_OVERLAY = '''() => {
 # Counterpart of JS_IDENTIFY_CONTAINER (base.py): that one names the active
 # container for scan/fill; this one clicks within the overlay scope first.
 _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
+''' + _PAGE_LOCATOR_HELPERS + r'''
+    // ══ 点击命中时刻定位快照（more-btn xpath 伪造修复，同 JS_CLICK_ICON_BUTTON）══
+    // 该分支被点节点在 JS 内当场可得：点击前 buildLocatorSnap 以 U+241F 尾段携带
+    // JSON，ClickEngine 解析后覆盖落库 element（首段 ok-container/ok-click 判定不变）。
+    const LOC_SEP = '␟';
+    const snapLocator = (el, text, kindHint) => {
+        try {
+            const abs = absXPath(el);
+            const kind = kindHint || detectTargetKind(el);
+            const t = normalizeControlText(text) || cleanVisibleText(el);
+            const loc = buildLocatorSnap(el, t, abs, '', { targetKind: kind });
+            return LOC_SEP + JSON.stringify(loc);
+        } catch (e) { return ''; }
+    };
     const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
     const want = norm(buttonText);
     if (!want) return 'miss';
@@ -136,6 +150,7 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
                 || item.querySelector('input'));
             if (trigger && (trigger.offsetParent !== null || trigger.getClientRects().length > 0)) {
                 trigger.scrollIntoView({ block: 'center', behavior: 'instant' });
+                const tail = snapLocator(trigger, want);
                 const fireT = (type) => trigger.dispatchEvent(
                     new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
                 );
@@ -144,7 +159,7 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
                 fireT('mouseup');
                 await new Promise((r) => setTimeout(r, 40));
                 fireT('click');
-                return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+                return (inContainer ? ('ok-container:' + want) : ('ok-click:' + want)) + tail;
             }
         }
     }
@@ -171,6 +186,8 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
                     new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
                 );
                 trigger.scrollIntoView({ block: 'center', behavior: 'instant' });
+                // 快照在触发器选定时刻采样（fire 之前，同 tailNode 理由）。
+                const tailTrigger = snapLocator(trigger, want);
                 ft(trigger, 'mousedown');
                 await new Promise((r) => setTimeout(r, 40));
                 ft(trigger, 'mouseup');
@@ -185,6 +202,9 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
                 if (nodeNow) {
                     const cb = nodeNow.querySelector('.el-checkbox');
                     const tgt = cb || nodeNow.querySelector('.el-tree-node__content') || nodeNow;
+                    // 快照在节点选定时刻采样（fire 之前）：Vue 重渲染会让 fire 后的
+                    // 采样命中陈旧/重建节点，非空即覆盖 enrich 反而引入伪造。
+                    const tailNode = snapLocator(tgt, want);
                     const fire2 = (type) => tgt.dispatchEvent(
                         new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
                     );
@@ -203,9 +223,11 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
                         await new Promise((r) => setTimeout(r, 40));
                         fire2('click');
                     }
-                    return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+                    return (inContainer ? ('ok-container:' + want) : ('ok-click:' + want))
+                        + tailNode;
                 }
-                return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+                return (inContainer ? ('ok-container:' + want) : ('ok-click:' + want))
+                    + tailTrigger;
             }
         }
     }
@@ -225,6 +247,9 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
         else if (lbl) target = lbl;
     }
     target.scrollIntoView({ block: 'center', behavior: 'instant' });
+    // 快照在节点选定时刻采样（fire 之前）：Vue 重渲染会让 fire 后的采样命中
+    // 陈旧/重建节点，非空即覆盖 enrich 反而引入伪造。
+    const tailMatch = snapLocator(target, hit.text);
     // Element UI widgets (el-select, el-table radios, drawer confirm buttons,
     // todo-card action divs) need the real mousedown -> mouseup -> click
     // sequence; a synthetic single click() leaves Vue models un-updated.
@@ -237,7 +262,8 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
     fire('mouseup');
     await new Promise((r) => setTimeout(r, 40));
     fire('click');
-    return inContainer ? ('ok-container:' + hit.text) : ('ok-click:' + hit.text);
+    return (inContainer ? ('ok-container:' + hit.text) : ('ok-click:' + hit.text))
+        + tailMatch;
 }'''
 
 

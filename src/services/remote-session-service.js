@@ -8,7 +8,7 @@ import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import { USE_EXECUTOR } from '../../config/config.js';
 import { state } from '../state.js';
-import { sendToExecutor, waitForSessionEvent, closeSession as closeExecutorSession } from '../executor-session-client.js';
+import { sendToExecutor, waitForSessionEvent, waitForSessionEventWhere, closeSession as closeExecutorSession } from '../executor-session-client.js';
 import {
   bindingToStatus,
   liveByRemoteSessionId,
@@ -411,6 +411,18 @@ export async function attachLive(opts = {}) {
     err.statusCode = 503;
     throw err;
   });
+  const unknownP = waitForSessionEventWhere(
+    sessionId,
+    'session.error',
+    (payload) => payload?.code === 'unknown_session',
+    45000,
+  ).then((p) => {
+    const msg = p?.error || p?.message || 'Unknown executor session';
+    const err = new Error(msg);
+    err.statusCode = 503;
+    err.code = 'unknown_session';
+    throw err;
+  });
   sendToExecutor(nodeUuid, 'session.attach_bib', {
     sessionId,
     remoteSessionUuid: remoteSession.sessionUuid,
@@ -424,7 +436,7 @@ export async function attachLive(opts = {}) {
 
   let ready;
   try {
-    ready = await Promise.race([readyP, errP]);
+    ready = await Promise.race([readyP, errP, unknownP]);
   } catch (err) {
     liveByRemoteSessionId.delete(remoteSession.id);
     // Failure path must also sweep trajectory FKs, otherwise

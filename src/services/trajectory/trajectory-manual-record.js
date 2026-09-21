@@ -45,6 +45,17 @@ export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phas
     throw err;
   }
 
+  // 开启人工录制时，若当前不处于 recording，先进入 recording 临时态，避免在
+  // 已确认/待确认/录制异常等状态写步骤。若原状态为 completed，把持久基线改为
+  // recorded，停止/释放后需再次人工确认。
+  if (enabled && traj.recordStatus !== 'recording') {
+    await trajectoryDao.enterTransientRecording(tid);
+    const statusRow = await trajectoryDao.getRecordStatusRow(tid);
+    if (statusRow?.persistentRecordStatus === 'completed') {
+      await trajectoryDao.updateMeta(tid, { persistentRecordStatus: 'recorded' });
+    }
+  }
+
   const session = state.sessions.get(runtime.sessionId);
   let resolvedPhaseId = null;
   if (enabled) {

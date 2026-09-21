@@ -2,6 +2,16 @@ import * as trajectoryService from '#src/services/trajectory-service.js';
 import { sendErr } from './trajectory-shared.js';
 
 /**
+ * Extract a client-generated viewer id from request body.
+ * @param {import('express').Request} req Express request
+ * @returns {string|null} viewer id or null
+ */
+function getViewerId(req) {
+  const id = req.body?.viewerId ?? req.body?.viewer_id ?? null;
+  return id ? String(id) : null;
+}
+
+/**
  * Trajectory recording lifecycle — attach/detach live BiB, prepare/start/stop
  * AI recording, human confirm, element resolution, and manual-record toggle.
  *
@@ -48,7 +58,14 @@ export default function (app) {
    */
   app.post('/api/v2/trajectories/:id/record/prepare', async (req, res) => {
     try {
-      const result = await trajectoryService.prepareTrajectoryRecording(+req.params.id);
+      const opts = {};
+      // 默认 preserveRecordStatus=true：prepare 只连资源，不进 recording。
+      // 显式传 false 才会进入 recording（record/start 内部路径使用）。
+      if (req.body?.preserveRecordStatus != null || req.body?.preserve_record_status != null) {
+        opts.preserveRecordStatus = req.body?.preserveRecordStatus === true
+          || req.body?.preserve_record_status === true;
+      }
+      const result = await trajectoryService.prepareTrajectoryRecording(+req.params.id, opts);
       res.json(result);
     } catch (err) {
       sendErr(res, err);
@@ -139,6 +156,53 @@ export default function (app) {
       res.json(result);
     } catch (err) {
       res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Register a viewer for the recording studio page.
+   * Body: { viewerId: string }
+   * Returns: { trajectoryId, viewerId, count }
+   */
+  app.post('/api/v2/trajectories/:id/viewers/enter', async (req, res) => {
+    try {
+      const tid = +req.params.id;
+      const viewerId = getViewerId(req);
+      const count = trajectoryService.enterViewer(tid, viewerId || `anon-${Date.now()}`);
+      res.json({ trajectoryId: tid, viewerId, count });
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
+  /**
+   * Unregister a viewer. Body: { viewerId: string }
+   * Called on route leave and via sendBeacon on tab close.
+   * Returns: { trajectoryId, viewerId, count }
+   */
+  app.post('/api/v2/trajectories/:id/viewers/leave', async (req, res) => {
+    try {
+      const tid = +req.params.id;
+      const viewerId = getViewerId(req);
+      const count = viewerId ? trajectoryService.leaveViewer(tid, viewerId) : trajectoryService.getViewerCount(tid);
+      res.json({ trajectoryId: tid, viewerId, count });
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
+  /**
+   * Viewer heartbeat. Body: { viewerId: string }
+   * Keeps the viewer alive when the page is open but navigation is idle.
+   */
+  app.post('/api/v2/trajectories/:id/viewers/heartbeat', async (req, res) => {
+    try {
+      const tid = +req.params.id;
+      const viewerId = getViewerId(req);
+      const count = viewerId ? trajectoryService.touchViewer(tid, viewerId) : trajectoryService.getViewerCount(tid);
+      res.json({ trajectoryId: tid, viewerId, count });
+    } catch (err) {
+      sendErr(res, err);
     }
   });
 }

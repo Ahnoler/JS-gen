@@ -575,6 +575,8 @@ export async function removeRecordedStepsByDbIds(trajectoryDbId, dbIds = []) {
     .whereIn('id', ids)
     .del();
 
+  console.log(`[traj-recon] remove traj=${tid} requested=${ids.length} deleted=${deleted} mismatch=${ids.length - deleted}`);
+
   if (deleted > 0) {
     await trajectoryStepDao.reorderByTrajectory(tid);
     const counts = await refreshTrajectoryCounts(tid);

@@ -45,6 +45,7 @@ _REPLAY_ACTION_SIGNATURES = {
     "scan_menu_tree": set(),
     "click_menu_xpath": {"xpath"},
     "read_page_component_code": set(),
+    "close_tianyuan_dialog": set(),
     "login": {"username", "password", "captcha", "sms_code"},
 }
 
@@ -261,6 +262,20 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             emit_json({"event": "switch_tab_result", "data": {"ok": False, "error": str(e)}})
             sys.stderr.write(f"switch_tab failed: {e}\n")
             sys.stderr.flush()
+        return 'continue'
+
+    if event == "replay_plan":
+        # 控制面在整批回放开跑前一次性下发完整步骤清单（执行机逐条收
+        # replay_actions，无法自行汇总整批），这里原样打印到 stderr，便于
+        # 操作人员在回放开始前核对本次要执行的步骤。
+        data = msg.get("data", {}) or {}
+        steps = data.get("steps") or []
+        tid = data.get("trajectoryId", "")
+        sys.stderr.write(f"[replay] ===== 即将回放 {len(steps)} 步（轨迹 {tid}）=====\n")
+        for line in steps:
+            sys.stderr.write(f"[replay]   {line}\n")
+        sys.stderr.write("[replay] ===== 开始执行 =====\n")
+        sys.stderr.flush()
         return 'continue'
 
     if event == "replay_actions":

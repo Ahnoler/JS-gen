@@ -28,7 +28,7 @@ export const PROPOSE_CACHE_FILENAME = '.draft-traj-propose.json';
  * must re-propose). v5 was the structural gate (`multi_capability_task_draft`)
  * + title-as-key reject.
  */
-export const PROPOSE_CACHE_VERSION = 11;
+export const PROPOSE_CACHE_VERSION = 12;
 
 /**
  * Read cached propose result from a module directory.

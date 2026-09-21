@@ -55,6 +55,7 @@ function testWiringService() {
   const service = readFileSync(join(root, 'src/services/trajectory/recording-page-bind.js'), 'utf8');
   assert.match(service, /runReplayActions/, 'service routes read_page_component_code replay through runReplayActions');
   assert.match(service, /read_page_component_code/, 'service references read_page_component_code');
+  assert.match(service, /close_tianyuan_dialog/, 'service appends best-effort tianyuan close to the read batch');
   assert.match(service, /AILZ/, 'service references AILZ prefix');
   assert.match(service, /updateMeta/, 'service references updateMeta');
   assert.doesNotMatch(service, /writeBackFunctionLandingPage|writeFunctionLandingPage/, 'prepare must not write menu landing page');
@@ -113,6 +114,7 @@ function testWiringPageIdPy() {
   assert.match(py, /场景编号/, 'wait/parse path includes 场景编号');
   // empty-config / timeout 早退也必须关窗，否则录制 agent 见可见「天元相关配置」即暂停
   assert.match(py, /closeTianyuanDialogs/, 'defines closeTianyuanDialogs helper');
+  assert.match(py, /JS_FIND_TIANYUAN_DIALOG_CONFIRM/, 'defines visible-dialog gated confirm finder');
   const emptyIdx = py.indexOf("reason: 'empty-config'");
   const timeoutIdx = py.indexOf("reason: 'timeout-or-mismatch'");
   assert.ok(emptyIdx > 0 && py.lastIndexOf('closeTianyuanDialogs()', emptyIdx) > 0,
@@ -125,6 +127,7 @@ function testWiringReplayPy() {
   const py = readFileSync(join(root, 'scripts/controller/actions/_replay.py'), 'utf8');
   assert.match(py, /_DIRECT_REPLAY_ACTIONS/, '_replay.py defines _DIRECT_REPLAY_ACTIONS registry');
   assert.match(py, /read_page_component_code/, '_replay.py references read_page_component_code');
+  assert.match(py, /close_tianyuan_dialog/, '_replay.py registers close_tianyuan_dialog direct action');
 }
 
 function testWiringMenuNavigation() {

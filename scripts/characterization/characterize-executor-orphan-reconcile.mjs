@@ -26,6 +26,22 @@ check(nodeSvcSrc.includes('remoteSessionDao.close(row.id, { crashed: true })'), 
 check(nodeSvcSrc.includes('slotLease.confirmLease') && nodeSvcSrc.includes('registerTrajectorySession'), 'matched sessions restore runtime and slot lease');
 check(nodeSvcSrc.includes("sendToExecutor(node.nodeUuid, 'session.attach_bib'"), 'active matched sessions request idempotent BiB reattach');
 check(wsSrc.includes('reconcileRemoteSessions(node)'), 'executor registration performs remote session reconciliation');
+// C (2026-09-20): executor BiB detach/error must clear the control-plane live binding,
+// otherwise live/status keeps claiming attached:true and clients never re-attach
+// (permanent "未推流"; dev guide 坑 #10).
+check(wsSrc.includes("type === 'session.bib_detached' || type === 'session.bib_error'"), 'executor-ws handles BiB detach/error events');
+check(wsSrc.includes('clearLiveBinding(remoteSessionId)'), 'BiB detach/error clears stale live binding');
+check(wsSrc.includes('clearLastRscfPacket(uuid)'), 'BiB detach/error drops cached RSCF frame');
+check(wsSrc.includes("broadcastToUuid(uuid, 'remote:status', bibStatus)"), 'BiB detach/error broadcasts attached:false to owning client');
+// Node offline / executor restart: recording trajectories bound to the node must be
+// marked failed(interrupted), not left stuck in recording.
+check(nodeSvcSrc.includes('import { markRecordingInterrupted }'), 'executor node service imports markRecordingInterrupted');
+check(nodeSvcSrc.includes('async function markNodeRecordingsInterrupted('), 'executor node service defines markNodeRecordingsInterrupted');
+check(nodeSvcSrc.includes('getAllTrajectoryRuntimes()'), 'node interruption marking also reads in-memory runtimes');
+{
+  const calls = (nodeSvcSrc.match(/await markNodeRecordingsInterrupted\(/g) || []).length;
+  check(calls >= 3, 'markNodeRecordingsInterrupted invoked on markOfflineAndCrash / sweepStale / unregister (>=3)');
+}
 const serverSrc = readFileSync(join(ROOT, 'server.mjs'), 'utf8');
 check(!serverSrc.includes('crashOccupiedOnOfflineNodes()'), 'server boot does not bulk-crash sessions from offline node status');
 const svcSrc = readFileSync(join(ROOT, 'src', 'services', 'executor-orphan-session-service.js'), 'utf-8');

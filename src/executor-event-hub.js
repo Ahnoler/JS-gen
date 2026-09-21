@@ -103,3 +103,45 @@ export function waitForSessionEvent(sessionId, type, timeoutMs = 120000) {
   promise.catch(() => {});
   return promise;
 }
+
+/**
+ * Wait for the first event on a session hub whose payload satisfies a predicate.
+ * Non-matching events are ignored (the listener stays attached) until a match or timeout.
+ * @param {string} sessionId session id
+ * @param {string} type type
+ * @param {(payload: object) => boolean} predicate payload test for the awaited event
+ * @param {number|null} [timeoutMs] pass null to wait indefinitely.
+ * @returns {Promise<object>} the matching event payload
+ */
+export function waitForSessionEventWhere(sessionId, type, predicate, timeoutMs = 120000) {
+  let cancel = () => {};
+  const promise = new Promise((resolve, reject) => {
+    const hub = getSessionHub(sessionId);
+    let settled = false;
+    let timer = null;
+    function finish(fn) {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      hub.off(type, onEvent);
+      fn();
+    }
+    function onEvent(payload) {
+      if (!predicate(payload)) return;
+      finish(() => resolve(payload));
+    }
+    if (timeoutMs != null && Number.isFinite(Number(timeoutMs))) {
+      timer = setTimeout(() => {
+        finish(() => reject(new Error(`Timeout waiting for ${type}`)));
+      }, Number(timeoutMs));
+    }
+    hub.on(type, onEvent);
+    cancel = () => finish(() => {});
+  });
+  promise.cancel = cancel;
+  // 预挂 no-op：调用方在 send 同步抛错时可能永远不 await 本 promise，
+  // 超时 rejection 不能成为 unhandledRejection 打崩进程（2026-08-29 事故根因）。
+  // 不影响后续正常 await（多消费者各自独立处理）。
+  promise.catch(() => {});
+  return promise;
+}

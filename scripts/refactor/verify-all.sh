@@ -40,12 +40,14 @@ run() {
 }
 
 run "characterize-trajectory"  node scripts/characterization/characterize-trajectory.mjs
+run "characterize-deadlock-forensics" node scripts/characterization/characterize-deadlock-forensics.mjs
 run "characterize-bib-navigate-input" node scripts/characterization/cold/characterize-bib-navigate-input.mjs
 run "characterize-run-event-ownership" node scripts/characterization/characterize-run-event-ownership.mjs
 run "characterize-runid-bridge" node scripts/characterization/characterize-runid-bridge.mjs
 run "characterize-owned-wait-shape" node scripts/characterization/characterize-owned-wait-shape.mjs
 run "characterize-quality-final-gate" node scripts/characterization/characterize-quality-final-gate.mjs
 run "characterize-record-phase-finalize" node scripts/characterization/characterize-record-phase-finalize.mjs
+run "characterize-stop-semantics" node scripts/characterization/characterize-stop-semantics.mjs
 # Static gates (2026-09-17): eslint no-undef catches merge-orphan references
 # (the 'gated' incident class) — pre-commit hooks do not run on merge commits
 # and text pins cannot see undefined identifiers. ruff F821 is the Python
@@ -95,6 +97,8 @@ run "characterize-wf-submit-guard-hint" "$PY" scripts/characterization/character
 run "characterize-phase-save-cue-promote" "$PY" scripts/characterization/characterize-phase-save-cue-promote.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
 run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py
+# D1 (#925): already-matched select_option 不得追加跨阶段重复步（同字段+同值去重）
+run "characterize-select-already-matched-dedup" "$PY" scripts/characterization/characterize-select-already-matched-dedup.py
 run "characterize-tssc-field-resolution" "$PY" scripts/characterization/characterize-tssc-field-resolution.py
 run "characterize-field-label-resolution" "$PY" scripts/characterization/characterize-field-label-resolution.py
 run "characterize-prefix-label-select" "$PY" scripts/characterization/cold/characterize-prefix-label-select.py
@@ -125,6 +129,8 @@ run "characterize-login-action" "$PY" scripts/characterization/characterize-logi
 run "characterize-assistant-mission-context" "$PY" scripts/characterization/characterize-assistant-mission-context.py
 run "characterize-scan-fullpage-p2" "$PY" scripts/characterization/characterize-scan-fullpage-p2.py
 run "characterize-form-snapshot-trigger" node scripts/characterization/characterize-form-snapshot-trigger.mjs
+run "characterize-step-number-integrity" node scripts/characterization/characterize-step-number-integrity.mjs
+run "characterize-domtree-occlusion" node scripts/characterization/characterize-domtree-occlusion.mjs
 run "characterize-sys-msg" node scripts/characterization/characterize-sys-msg.mjs
 run "characterize-batch-import" node scripts/characterization/characterize-batch-import.mjs
 run "characterize-step-move" node scripts/characterization/characterize-step-move.mjs
@@ -160,15 +166,23 @@ run "characterize-xpath-three-sources" node scripts/characterization/characteriz
 run "characterize-manual-radio-fill" "$PY" scripts/characterization/cold/characterize-manual-radio-fill.py
 run "characterize-date-range-recording" "$PY" scripts/characterization/cold/characterize-date-range-recording.py
 run "characterize-ai-phase-element-guard" "$PY" scripts/characterization/cold/characterize-ai-phase-element-guard.py
+run "characterize-element-dedup-scope" "$PY" scripts/characterization/cold/characterize-element-dedup-scope.py
 run "characterize-fill-dispatch" "$PY" scripts/characterization/cold/characterize-fill-dispatch.py
+run "characterize-fill-err-with-scope" "$PY" scripts/characterization/characterize-fill-err-with-scope.py
 run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/characterize-search-then-click-guard.py
 run "characterize-search-then-click-prompts" "$PY" scripts/characterization/cold/characterize-search-then-click-prompts.py
+run "characterize-idempotent-click-gate" "$PY" scripts/characterization/characterize-idempotent-click-gate.py
+run "characterize-sut-spin-guard" "$PY" scripts/characterization/characterize-sut-spin-guard.py
+run "characterize-chrome-proxy-flag" "$PY" scripts/characterization/characterize-chrome-proxy-flag.py
 run "characterize-fill-replay-engine" "$PY" scripts/characterization/cold/characterize-fill-replay-engine.py
 run "characterize-select-dispatch" "$PY" scripts/characterization/cold/characterize-select-dispatch.py
 run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/characterize-select-replay-engine.py
 run "characterize-radio-replay-engine" "$PY" scripts/characterization/cold/characterize-radio-replay-engine.py
 run "characterize-click-replay-engine" "$PY" scripts/characterization/cold/characterize-click-replay-engine.py
 run "characterize-tssc-multi-select" "$PY" scripts/characterization/cold/characterize-tssc-multi-select.py
+run "characterize-tssc-route-conflict" "$PY" scripts/characterization/characterize-tssc-route-conflict.py
+# traj 864 fill 侧收口：store kind=tssc + live 确定性否认（plain）→ 降级放行
+run "characterize-fill-tssc-live-downgrade" "$PY" scripts/characterization/cold/characterize-fill-tssc-live-downgrade.py
 run "characterize-picker-atomic-recording" "$PY" scripts/characterization/cold/characterize-picker-atomic-recording.py
 run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs
@@ -176,6 +190,9 @@ run "characterize-log-extract" node scripts/characterization/characterize-log-ex
 run "characterize-backfill" node scripts/characterization/characterize-backfill.mjs
 run "characterize-refill-contract" "$PY" scripts/characterization/characterize-refill-contract.py
 run "characterize-executor-orphan-reconcile" node scripts/characterization/characterize-executor-orphan-reconcile.mjs
+run "characterize-executor-unknown-session" node scripts/characterization/characterize-executor-unknown-session.mjs
+run "characterize-replay-terminal-abort" node scripts/characterization/characterize-replay-terminal-abort.mjs
+run "characterize-executor-duplicate-uuid" node scripts/characterization/characterize-executor-duplicate-uuid.mjs
 run "characterize-executor-only-bib" node scripts/characterization/cold/characterize-executor-only-bib.mjs
 run "characterize-remove-local-bib-mount" node scripts/characterization/cold/characterize-remove-local-bib-mount.mjs
 run "characterize-resolve-placeholder-search" node scripts/characterization/cold/characterize-resolve-placeholder-search.mjs
@@ -187,6 +204,8 @@ run "characterize-menu-uml-ecd-nav-guard" node scripts/characterization/characte
 run "characterize-special-element" node scripts/characterization/characterize-special-element.mjs
 run "characterize-replay-batch" node scripts/characterization/characterize-replay-batch.mjs
 run "characterize-record-status" node scripts/characterization/characterize-record-status.mjs
+run "characterize-traj-recon-logging" node scripts/characterization/characterize-traj-recon-logging.mjs
+run "characterize-agent-llm-error" node scripts/characterization/characterize-agent-llm-error.mjs
 run "characterize-menu-navigation" node scripts/characterization/characterize-menu-navigation.mjs
 run "characterize-page-bind" node scripts/characterization/characterize-page-bind.mjs
 run "characterize-kb-store" "$PY" scripts/characterization/characterize-kb-store.py
@@ -211,6 +230,10 @@ run "characterize-form-field-intra-slot" node scripts/characterization/cold/char
 run "characterize-form-structure-container" node scripts/characterization/cold/characterize-form-structure-container.mjs
 run "characterize-tree-node-text" node scripts/characterization/cold/characterize-tree-node-text.mjs
 run "characterize-tree-text-export" node scripts/characterization/cold/characterize-tree-text-export.mjs
+run "characterize-recording-coach-assert" node scripts/characterization/cold/characterize-recording-coach-assert.mjs
+run "characterize-recording-coach-operator" node scripts/characterization/cold/characterize-recording-coach-operator.mjs
+run "characterize-recording-coach-skill-pack" node scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs
+run "characterize-recording-coach-tier-a-score" node scripts/characterization/cold/characterize-recording-coach-tier-a-score.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

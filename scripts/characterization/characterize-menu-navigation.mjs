@@ -188,8 +188,8 @@ function testWiringReplayPayload() {
   assert.match(helper, /stop_on_fail: stopOnFail/, 'helper 透传 stop_on_fail');
   const client = readFileSync(join(root, 'src/executor-session-client.js'), 'utf8');
   assert.match(client, /export function forwardStdin\(/, 'executor-session-client 导出 forwardStdin');
-  assert.match(client, /export \{ onSessionEvent, waitForSessionEvent, removeSessionHub \}/,
-    'executor-session-client 重导出 waitForSessionEvent');
+  assert.match(client, /export \{ onSessionEvent, waitForSessionEvent, waitForSessionEventWhere, removeSessionHub \}/,
+    'executor-session-client 重导出 waitForSessionEvent/waitForSessionEventWhere');
 }
 
 function testWiringNavFailureSwallowed() {

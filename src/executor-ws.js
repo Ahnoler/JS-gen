@@ -7,10 +7,63 @@ import { EXECUTOR_TOKEN } from '../config/config.js';
 import * as registry from './executor-registry.js';
 import * as executorService from './services/executor-node-service.js';
 import { routeExecutorInbound } from './executor-event-hub.js';
-import { getLiveBindingByAgentSession } from './services/remote-session-state.js';
+import { getLiveBindingByAgentSession, clearLiveBinding } from './services/remote-session-state.js';
 import { broadcast, broadcastBinary, broadcastToUuid, countBinarySubscribers } from './ws-server.js';
+import { detectAgentLlmError, createAgentLlmErrorDeduper } from './services/agent-llm-error.js';
+import { shortSid } from './utils/stderr-prefix.js';
 
 let wss = null;
+
+/** 同一 session 同一 LLM 错误只广播/记一次（模型每步重试会重复刷屏）。 */
+const shouldNotifyAgentLlmError = createAgentLlmErrorDeduper();
+
+/**
+ * 记录并广播一条 LLM 网关失败：控制面 ERROR 日志 + 该 session stderr 日志
+ * 追加中文标记 + WS `recording:llm_error`（前端据此把「AI 录制结束」改为失败提示）。
+ * @param {string} sessionId agent session id
+ * @param {{ kind: string, message: string, upstream: string }} llmError classified error
+ * @returns {Promise<void>} resolves after marker append attempt
+ */
+async function announceAgentLlmError(sessionId, llmError) {
+  const binding = getLiveBindingByAgentSession(sessionId) || null;
+  const trajectoryId = binding?.trajectoryId ?? null;
+  const sid = shortSid(sessionId);
+  console.error(
+    `[agent-llm-error] trajectory=${trajectoryId ?? '-'} session=${sessionId} sid=${sid} `
+    + `reason=${llmError.logReason} kind=${llmError.kind} upstream=${llmError.upstream || ''}`,
+  );
+  // 落库失败原因（首次为准）：前端 toast / 列表「录制异常」悬浮用同一类别文案。
+  if (trajectoryId) {
+    try {
+      const { markFailedReason } = await import('./dao/trajectory-dao.js');
+      await markFailedReason(trajectoryId, {
+        failedKind: llmError.kind,
+        failedReason: llmError.reason,
+      });
+    } catch (err) {
+      console.warn('[agent-llm-error] failed_reason persist failed:', err?.message || err);
+    }
+  }
+  try {
+    const { appendLines } = await import('./services/agent-stderr-log-service.js');
+    appendLines(sessionId, [
+      `[系统] AI 录制中断：${llmError.reason}`
+      + (llmError.logReason ? `（${llmError.logReason}）` : '')
+      + (llmError.upstream ? `（上游：${llmError.upstream}）` : ''),
+    ]);
+  } catch (err) {
+    console.warn('[agent-llm-error] marker append failed:', err?.message || err);
+  }
+  broadcast('recording:llm_error', {
+    trajectoryId,
+    sessionId,
+    sid,
+    kind: llmError.kind,
+    reason: llmError.reason,
+    upstream: llmError.upstream || '',
+    at: new Date().toISOString(),
+  });
+}
 
 /**
  * @param {import('http').IncomingMessage} req req
@@ -55,6 +108,20 @@ async function handleRegister(ws, payload) {
     return;
   }
 
+  // b-时序：先 attach 校验、通过后再 DB upsert —— 同 uuid 异 pid 双活被拒（close 4001）
+  // 时不再把 executor_node 刷成 online（DB 假活）。attach 需要 nodeId：已有行先只读取出
+  // id（不写库，常见于重连/顶替路径）；首注册时 registry 必无 entry、不可能被拒，
+  // 先以 null 挂载，upsert 产生行后回填 nodeId。
+  const existingNode = await executorService.getByUuid(nodeUuid);
+  const attached = registry.attach(nodeUuid, ws, existingNode?.id ?? null, pid);
+  if (!attached) {
+    // 同 uuid 异 pid 双活被 registry 拒绝（已向新连接回发 executor.error 并 close 4001）
+    console.warn(
+      `[executor-ws] register rejected for ${nodeUuid}: duplicate executor process`
+      + ` (incoming pid ${pid ?? 'unknown'}, active pid ${registry.get(nodeUuid)?.pid ?? 'unknown'})`,
+    );
+    return;
+  }
   const node = await executorService.register({
     nodeUuid,
     name,
@@ -63,14 +130,11 @@ async function handleRegister(ws, payload) {
     labels,
     agentVersion,
   });
-  const attached = registry.attach(nodeUuid, ws, node.id, pid);
-  if (!attached) {
-    // 同 uuid 异 pid 双活被 registry 拒绝（已向新连接回发 executor.error 并 close 4001）
-    console.warn(
-      `[executor-ws] register rejected for ${nodeUuid}: duplicate executor process`
-      + ` (incoming pid ${pid ?? 'unknown'}, active pid ${registry.get(nodeUuid)?.pid ?? 'unknown'})`,
-    );
-    return;
+  if (node?.id != null && node.id !== (existingNode?.id ?? null)) {
+    // 首注册：attach 时行尚不存在（nodeId=null），upsert 后回填，保证后续断连
+    // grace 到期仍能用 nodeId 定位 DB 行（markOfflineAndCrash）。
+    const entry = registry.get(nodeUuid);
+    if (entry) entry.nodeId = node.id;
   }
   sendJson(ws, 'executor.registered', {
     nodeId: node.id,
@@ -144,6 +208,13 @@ async function handleMessage(ws, msg) {
     import('./services/agent-stderr-log-service.js')
       .then(({ appendLines }) => appendLines(payload.sessionId, payload.lines))
       .catch((err) => console.warn('[executor-ws] agent_stderr append failed:', err?.message || err));
+    // LLM 网关失败（余额不足/鉴权/限流/5xx）：记控制面日志 + stderr 标记 + 广播前端。
+    const llmError = detectAgentLlmError(payload.lines);
+    if (llmError && shouldNotifyAgentLlmError(payload.sessionId, llmError.kind)) {
+      announceAgentLlmError(payload.sessionId, llmError).catch((err) => {
+        console.warn('[executor-ws] agent-llm-error announce failed:', err?.message || err);
+      });
+    }
     return;
   }
   if (payload?.sessionId) {
@@ -216,6 +287,35 @@ async function handleMessage(ws, msg) {
         text: payload.text == null ? '' : String(payload.text),
         reason: payload.reason || null,
       });
+    }
+    if (type === 'session.bib_detached' || type === 'session.bib_error') {
+      // C（2026-09-20）：BiB 推流被拆/出错时清除控制面残留的内存绑定。否则 live 绑定
+      // 会一直声称 attached:true，前端 ensureStream 认为 already=true 不再重附着，
+      // 叠加自愈未触发即「永久未推流」（血泪文档坑 #10）。只清绑定+广播，不动录制状态。
+      const binding = getLiveBindingByAgentSession(payload.sessionId) || null;
+      const uuid = binding?.remoteSessionUuid || payload.remoteSessionUuid || null;
+      const remoteSessionId = binding?.remoteSessionId ?? null;
+      if (remoteSessionId != null) clearLiveBinding(remoteSessionId);
+      if (uuid) clearLastRscfPacket(uuid);
+      if (type === 'session.bib_error') {
+        console.warn(
+          `[executor-ws] BiB error session=${payload.sessionId}`
+          + ` uuid=${uuid || '-'} error=${payload.error || payload.message || 'unknown'}`,
+        );
+      }
+      const bibStatus = {
+        attached: false,
+        remoteSessionId,
+        remoteSessionUuid: uuid,
+        sessionId: payload.sessionId,
+        trajectoryId: binding?.trajectoryId ?? null,
+        cdpReady: true,
+        inputEnabled: false,
+        agentBusy: false,
+        reason: type === 'session.bib_error' ? 'bib_error' : 'bib_detached',
+      };
+      const delivered = uuid ? broadcastToUuid(uuid, 'remote:status', bibStatus) : 0;
+      if (!delivered) broadcast('remote:status', bibStatus);
     }
   }
 }

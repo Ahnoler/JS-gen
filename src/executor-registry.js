@@ -30,11 +30,13 @@ export function attach(nodeUuid, ws, nodeId, pid = null) {
     existing.pid != null && newPid != null && newPid !== existing.pid
   ) {
     // 同 nodeUuid 已有另一进程的现役连接：拒绝双活注册（非 4000，避免被 agent
-    // 当作普通"被顶替"；close 前先回发一条 executor.error 说明原因）。
+    // 当作普通"被顶替"；close 前先回发一条 executor.error 说明原因——code 供
+    // agent 侧识别后自杀退出，与 close 4001 双保险）。
     try {
       ws.send(JSON.stringify({
         type: 'executor.error',
         payload: {
+          code: 'duplicate_node_uuid',
           error: `nodeUuid ${nodeUuid} is already served by another executor process (pid ${existing.pid})`,
         },
       }));

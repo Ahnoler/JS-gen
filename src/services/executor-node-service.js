@@ -8,7 +8,8 @@ import * as slotLease from '../executor-slot-lease.js';
 import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import { listExecutorSessions, sendToExecutor } from '../executor-session-client.js';
 import { restoreLiveBindingFromRow } from './remote-session-state.js';
-import { clearTrajectoryRuntimesForNode } from './trajectory-service.js';
+import { clearTrajectoryRuntimesForNode, getAllTrajectoryRuntimes } from './trajectory-service.js';
+import { markRecordingInterrupted } from './trajectory/trajectory-attach-service.js';
 import { state } from '../state.js';
 import {
   EXECUTOR_DISCONNECT_GRACE_MS,
@@ -40,6 +41,48 @@ function purgeNodeBindings(nodeUuid) {
   import('./remote-session-service.js')
     .then((m) => m.clearExecutorLiveForNode?.(nodeUuid))
     .catch(() => {});
+}
+
+/**
+ * Mark all recording trajectories bound to a node as interrupted before its
+ * sessions are crashed. 执行机离线/重启属于非用户显式 stop 的资源释放：
+ * 该节点上仍处于 recording 的交易必须标为 failed(interrupted)，否则会永久卡在录制中。
+ * @param {string} nodeUuid executor node uuid (in-memory runtime source)
+ * @param {number} nodeId executor node numeric id (DB binding source)
+ * @returns {Promise<number>} number of trajectory ids that were considered
+ */
+async function markNodeRecordingsInterrupted(nodeUuid, nodeId) {
+  const tids = new Set();
+
+  // DB bindings: active/idle remote sessions on this node.
+  if (nodeId != null) {
+    try {
+      const rows = await remoteSessionDao.listByNode(nodeId, ['active', 'idle']);
+      for (const r of rows) {
+        const tid = r?.trajectoryId != null ? Number(r.trajectoryId) : 0;
+        if (Number.isFinite(tid) && tid > 0) tids.add(tid);
+      }
+    } catch (err) {
+      console.warn('[executor] list node sessions for interruption failed:', err?.message || err);
+    }
+  }
+
+  // In-memory runtimes still bound to this node — covers stream-detached sessions
+  // whose remote_session.trajectory_id was already cleared.
+  if (nodeUuid) {
+    for (const [tid, runtime] of getAllTrajectoryRuntimes()) {
+      if (runtime?.executorNodeUuid === nodeUuid) tids.add(Number(tid));
+    }
+  }
+
+  for (const tid of tids) {
+    try {
+      await markRecordingInterrupted(tid);
+    } catch (err) {
+      console.warn(`[executor] mark interrupted failed for traj #${tid}:`, err?.message || err);
+    }
+  }
+  return tids.size;
 }
 
 /**
@@ -81,6 +124,7 @@ export async function unregister(nodeUuid) {
   if (!node) return null;
 
   await executorNodeDao.setStatus(nodeUuid, 'offline');
+  await markNodeRecordingsInterrupted(nodeUuid, node.id);
   await executorNodeDao.crashActiveSessions(node.id);
   purgeNodeBindings(nodeUuid);
   registry.detach(nodeUuid, { immediate: true });
@@ -95,6 +139,7 @@ export async function unregister(nodeUuid) {
  */
 export async function markOfflineAndCrash(nodeUuid, nodeId) {
   await executorNodeDao.setStatus(nodeUuid, 'offline');
+  await markNodeRecordingsInterrupted(nodeUuid, nodeId);
   await executorNodeDao.crashActiveSessions(nodeId);
   purgeNodeBindings(nodeUuid);
 }
@@ -185,6 +230,7 @@ export async function getByUuid(nodeUuid) {
 export async function sweepStale(timeoutMs) {
   const stale = await executorNodeDao.markStaleOffline(timeoutMs);
   for (const { nodeId, nodeUuid } of stale) {
+    await markNodeRecordingsInterrupted(nodeUuid, nodeId);
     await executorNodeDao.crashActiveSessions(nodeId);
     purgeNodeBindings(nodeUuid);
     registry.detach(nodeUuid, { immediate: true });
@@ -227,6 +273,27 @@ export async function reconcileRemoteSessions(node) {
       await remoteSessionDao.close(row.id, { crashed: true });
       const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
       await clearOwnershipOnClose(row.id).catch(() => {});
+      if (agentId) {
+        slotLease.releaseBySession(agentId);
+        const session = state.sessions.get(agentId);
+        if (session) {
+          if (session._persistUnsub) {
+            try { session._persistUnsub(); } catch {}
+          }
+          if (session._trajPersistUnsub) {
+            try { session._trajPersistUnsub(); } catch {}
+          }
+          if (session._aiRecordUnsub) {
+            try { session._aiRecordUnsub(); } catch {}
+          }
+          state.sessions.delete(agentId);
+        }
+        for (const [tid, runtime] of [...getAllTrajectoryRuntimes().entries()]) {
+          if (runtime?.sessionId === agentId) {
+            getAllTrajectoryRuntimes().delete(tid);
+          }
+        }
+      }
       crashed += 1;
       continue;
     }

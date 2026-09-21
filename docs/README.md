@@ -1,4 +1,4 @@
-# docs 索引（2026-09-08 更新）
+# docs 索引（2026-09-18 更新）
 
 本地工程文档（多数 gitignore）。**以代码 + git commit 历史 + `/api/docs` 为准**；此处是设计/计划/分析的导航。
 
@@ -17,6 +17,7 @@
 | 文档 | 用途 |
 |------|------|
 | [superpowers/guides/context-management-flow.md](superpowers/guides/context-management-flow.md) | 上下文管理逻辑流程：6 层上下文架构、生命周期、事件路由、设计模式全景 |
+| [superpowers/guides/recording-status-flow.md](superpowers/guides/recording-status-flow.md) | 录制状态与执行机资源连接流程（V4）：状态机、非显式释放标 failed(interrupted)、录制中非破坏性 prepare、执行机离线标记、观众统计、前端录制页与画面自愈、坑与门禁 |
 
 ## 设计/分析（保留）
 

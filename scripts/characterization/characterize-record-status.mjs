@@ -252,7 +252,8 @@ function testWiringDualStatusFields() {
 }
 
 function testWiringCallChains() {
-  // 显式结束录制 → finishTransientRecording(success/failure)；非终结性释放 → restorePersistentRecordStatus。
+  // 显式结束录制 → finishTransientRecording(success/failure)；
+  // 非终结性释放 → markRecordingInterrupted / finishTransientRecording('failure') + interrupted。
   const lifecycle = readFileSync(join(root, 'src/services/trajectory/trajectory-record-lifecycle.js'), 'utf8');
   assert.match(lifecycle, /finishTransientRecording\(\s*tid,\s*success \? 'success' : 'failure',?\s*\)/,
     'record stop：finishTransientRecording 按 success/failure 解析结果态');
@@ -260,14 +261,59 @@ function testWiringCallChains() {
   assert.match(runner, /finishTransientRecording\(tid, 'success'\)/, '录制成功 → outcome success');
   assert.match(runner, /finishTransientRecording\(tid, 'failure'\)/, '录制失败 → outcome failure');
   assert.match(runner, /enterTransientRecording\(tid\)/, '录制启动 → enterTransientRecording');
-  // 非终结性（关浏览器/断开/回收）：clearMount / repairStale 链走 restorePersistentRecordStatus。
-  assert.match(daoSource(),
-    /demoteLive && row\.record_status === 'recording'[\s\S]{0,400}restorePersistentRecordStatus\(row\.id, db\)/,
-    'clearMountByRemoteSessionId 对 recording 轨迹恢复持久基线');
-  const batch = readFileSync(join(root, 'src/services/trajectory/trajectory-batch-service.js'), 'utf8');
-  assert.match(batch, /restorePersistentRecordStatus\(tid\)/, '批量回收链恢复持久基线');
+
+  // attach-service：非显式 stop 的资源释放统一走 markRecordingInterrupted。
   const attach = readFileSync(join(root, 'src/services/trajectory/trajectory-attach-service.js'), 'utf8');
-  assert.match(attach, /restorePersistentRecordStatus\(tid\)/, 'attach 释放链恢复持久基线');
+  assert.match(attach, /async function markRecordingInterrupted\(tid\)/,
+    'attach-service 定义 markRecordingInterrupted');
+  assert.match(attach, /if \(wasRecording\)[\s\S]{0,200}await markRecordingInterrupted\(tid\)/,
+    'detachTrajectoryLive 录制中释放时标 interrupted');
+  assert.match(attach, /if \(demoteLive && traj\.recordStatus === 'recording'\)[\s\S]{0,200}await markRecordingInterrupted\(tid\)/,
+    'cleanupPersistedTrajectoryResources 录制中清理时标 interrupted');
+
+  // DAO 层：remote_session 失效/被挤占时 recording 轨迹也标 interrupted。
+  const src = daoSource();
+  assert.match(src,
+    /demoteLive && row\.record_status === 'recording'[\s\S]{0,400}finishTransientRecording\(row\.id, 'failure', db\)/,
+    'clearMountByRemoteSessionId 对 recording 轨迹标 failed');
+  assert.match(src,
+    /if \(row\.recordStatus === 'recording'\)[\s\S]{0,400}finishTransientRecording\(row\.id, 'failure', db\)/,
+    'repairStaleRemoteMounts 对 recording 轨迹标 failed');
+  assert.match(src,
+    /failedKind:\s*'interrupted'[\s\S]{0,200}failReasonText\('interrupted'\)/,
+    'DAO 非终结释放记录 interrupted 原因');
+
+  // 批量回收不再恢复基线。
+  const batch = readFileSync(join(root, 'src/services/trajectory/trajectory-batch-service.js'), 'utf8');
+  assert.doesNotMatch(batch, /restorePersistentRecordStatus\(tid\)/,
+    '批量回收链不再恢复持久基线');
+}
+
+function testWiringRecordingInFlightPrepareGuard() {
+  // 录制进行中进入录制页会自动 prepare：不得重新登录、不得导航页面绑定、
+  // 不得新开执行机会话（会打断在录 agent）。
+  const runner = readFileSync(join(root, 'src/services/trajectory/trajectory-attach-runner.js'), 'utf8');
+  assert.match(runner, /const recordingInFlight = traj\?\.recordStatus === 'recording'/,
+    'attach-runner 计算 recordingInFlight');
+  assert.match(runner, /runtime\.skipDefaultLogin \|\| skipDefaultLogin \|\| recordingInFlight/,
+    '录制中跳过 prepare-time 默认登录');
+  assert.match(runner, /traj\?\.functionId && !recordingInFlight/,
+    '录制中跳过页面绑定导航（bindRecordingPageId 会点菜单打断录制）');
+
+  const attach = readFileSync(join(root, 'src/services/trajectory/trajectory-attach-service.js'), 'utf8');
+  assert.match(attach, /async function recoverLiveSessionForTrajectory\(tid, traj\)/,
+    'attach-service 定义 recoverLiveSessionForTrajectory');
+  assert.match(attach,
+    /if \(traj\.recordStatus === 'recording'\)[\s\S]{0,400}recoverLiveSessionForTrajectory\(tid, traj\)/,
+    '录制中优先恢复已有执行机会话而不是新开浏览器');
+  assert.match(attach, /status: 'unreachable'/,
+    '恢复函数区分执行机不可达（不确认即不乱开）');
+  assert.match(attach, /执行机暂不可达，无法确认录制会话状态/,
+    '执行机不可达返回可重试错误，不新开会话');
+  assert.match(attach, /markRecordingInterrupted\(tid\)\.catch/,
+    '会话确不存在时标记 interrupted');
+  assert.match(attach, /该交易的录制已中断/,
+    '会话确不存在时给出重新录制指引（不静默新开会话）');
 }
 
 function testWiringConfirmAndCasUsages() {
@@ -321,7 +367,8 @@ function main() {
     ['wiring: updateMetaIf 条件更新 whereIn record_status（CAS）', testWiringUpdateMetaIfCas],
     ['wiring: writeRecordStatusResilient 必写 record_status，persistent 缺列降级 warn', testWiringWriteRecordStatusResilient],
     ['wiring: 双状态字段 record_status + persistent_record_status（getRecordStatusRow）', testWiringDualStatusFields],
-    ['wiring: 调用链 显式结束→finishTransientRecording，非终结→restorePersistentRecordStatus', testWiringCallChains],
+    ['wiring: 调用链 显式结束→finishTransientRecording，非终结→markRecordingInterrupted/failed', testWiringCallChains],
+    ['wiring: 录制中 prepare 不登录/不导航页面绑定/不新开会话', testWiringRecordingInFlightPrepareGuard],
     ['wiring: 确认/取消确认 setPersistentRecordStatus + updateMetaIf CAS', testWiringConfirmAndCasUsages],
     ['wiring: 人工确认无状态闸，直接 completed', testWiringConfirmUnconditionalCompleted],
   ];

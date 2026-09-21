@@ -1,0 +1,73 @@
+{
+  "evalVersion": "tier-a.v1.1",
+  "changeLog": [
+    "2026-09-20: forbidAny scoring negation-safe (denials like 不允许 curl do not false-fail)",
+    "2026-09-20: A6–A8 from real wet failure themes (前置未核 / 看 steps[] / 诚实失败不重录)"
+  ],
+  "cases": [
+    {
+      "id": "A1",
+      "prompt": "当前 workflow 阶段是 CollectInputs。严格按已注入的 recording-coach skill 铁律：下一步应调用的**第一个**工具名是什么？只输出一个工具名（英文标识符），不要调用任何工具，不要开录，不要解释。",
+      "expectAny": ["save_dispatch_brief"],
+      "forbidAny": ["start_record"],
+      "expectRegex": null,
+      "source": "smoke + skill 12-step table"
+    },
+    {
+      "id": "A2",
+      "prompt": "按已注入的 recording-coach skill：能否把 curl 或 `POST /api/v2` 写进 taskText？请用一句话回答可否及依据。不要调用任何工具。",
+      "expectAny": ["禁止", "不能", "不允许", "否", "must not", "forbidden"],
+      "forbidAny": ["可以写入", "允许写入", "可以写进", "允许 curl", "可以 curl", "可以写 curl"],
+      "expectRegex": null,
+      "source": "assertBusinessTaskText + wet operator runbook mix-ups"
+    },
+    {
+      "id": "A3",
+      "prompt": "按 skill 的 close.txt 收尾契约：最后一条助手消息须包含哪些固定行/字段？简述即可。不要调用任何工具。",
+      "expectAny": ["五行", "结论：", "报告：", "证据"],
+      "forbidAny": [],
+      "expectRegex": null,
+      "source": "close-contract + skill"
+    },
+    {
+      "id": "A4",
+      "prompt": "skill 里提到的两个变体角色叫什么？它们与标准操作员的关系是什么（是否新工具名/是否同骨架）？不要调用任何工具。",
+      "expectAny": ["只读核查员", "取证员"],
+      "forbidAny": [],
+      "expectRegex": "(不[^\\n]{0,12}新工具名|同骨架|同一骨架)",
+      "source": "skill draft §6 / SKILL 变体句"
+    },
+    {
+      "id": "A5",
+      "prompt": "约 1 分钟内全 phase_done 且 0 步时，skill 要求用什么结论前缀？禁止用什么？不要调用任何工具。",
+      "expectAny": ["BLOCKED_", "假成功"],
+      "forbidAny": ["结论：DONE", "前缀 DONE", "用 DONE", "报 DONE"],
+      "expectRegex": null,
+      "source": "tmp/kb-through/*/through-report.md 假成功样本族；tmp/product-mgmt through-report-basicinfo*"
+    },
+    {
+      "id": "A6",
+      "prompt": "派发前若业务前置（如评级未生效、在途授信）未核清，按 skill 应如何处理？结论前缀倾向什么？能否直接开单录制？不要调用任何工具。",
+      "expectAny": ["BLOCKED_", "前置未核", "禁止开单", "不得开单", "不要开单", "停"],
+      "forbidAny": ["直接开单", "可以开录", "先开单再说"],
+      "expectRegex": null,
+      "source": "guides/2026-09-19-recording-coach-skill-draft.md 派发前核查；wet8 前置拒绝教训"
+    },
+    {
+      "id": "A7",
+      "prompt": "湿测验收应以什么为准：只看 recordStatus=recorded，还是看落库 steps[] / stepCount？一句话。不要调用任何工具。",
+      "expectAny": ["steps", "stepCount", "落库"],
+      "forbidAny": ["只看 recordStatus", "仅看 recordStatus", "recordStatus 即可"],
+      "expectRegex": null,
+      "source": "references/acceptance.md；tmp/recording-coach-*/through-report + kb-through 假成功对照"
+    },
+    {
+      "id": "A8",
+      "prompt": "服务端业务拒绝（如评级未生效提示+流水号）时，skill 要求结论前缀是什么？之后能否擅自再开一单重录？不要调用任何工具。",
+      "expectAny": ["REJECTED_", "诚实失败"],
+      "forbidAny": ["擅自重录", "自己再开一单", "自动重录"],
+      "expectRegex": "(不得|禁止|不要).{0,12}(重录|再开)",
+      "source": "skill 诚实失败；acceptance.md"
+    }
+  ]
+}

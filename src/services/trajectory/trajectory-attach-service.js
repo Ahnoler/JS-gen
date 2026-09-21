@@ -4,8 +4,10 @@
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as remoteSessionDao from '../../dao/remote-session-dao.js';
 import * as executorNodeDao from '../../dao/executor-node-dao.js';
+import { failReasonText } from '../../models/failure-reason.js';
 import * as execSession from '../../executor-session-client.js';
 import * as slotLease from '../../executor-slot-lease.js';
 import * as remoteSessionService from '../remote-session-service.js';
@@ -280,6 +282,78 @@ export async function prepareTrajectoryRecording(trajectoryId, opts = {}) {
 
 
 /**
+ * Recover a still-live executor session already recorded for a trajectory when the
+ * in-memory runtime is gone (e.g. control-plane restart mid-recording). Prevents
+ * opening a SECOND browser that would conflict with an in-flight recording.
+ * @param {number} tid trajectory DB id
+ * @param {object} traj trajectory row
+ * @returns {Promise<{status: 'recovered'|'unreachable'|'gone', result?: object}>}
+ *   recovered → reuse `result`; unreachable → executor cannot confirm (retryable);
+ *   gone → no live session exists (recording was interrupted)
+ */
+async function recoverLiveSessionForTrajectory(tid, traj) {
+  const remoteSessionId = traj?.remoteSessionId != null ? Number(traj.remoteSessionId) : null;
+  if (!Number.isFinite(remoteSessionId) || remoteSessionId <= 0) return { status: 'gone' };
+  const row = await remoteSessionDao.getById(remoteSessionId).catch(() => null);
+  if (!row || !row.agentSessionId) return { status: 'gone' };
+  if (row.status !== 'active' && row.status !== 'idle') return { status: 'gone' };
+  if (row.trajectoryId != null && Number(row.trajectoryId) !== Number(tid)) return { status: 'gone' };
+
+  const node = row.executorNodeId != null
+    ? await executorNodeDao.getById(row.executorNodeId).catch(() => null)
+    : null;
+  const nodeUuid = node?.nodeUuid || null;
+  if (!nodeUuid) return { status: 'gone' };
+
+  const sessions = await execSession.listExecutorSessions(nodeUuid, 8000).catch(() => null);
+  if (!Array.isArray(sessions)) {
+    // Executor unreachable — cannot confirm the session is gone. NEVER open a new
+    // browser here (might disturb a live recording); surface a retryable error.
+    return { status: 'unreachable' };
+  }
+  const live = sessions.find((s) => String(s?.sessionId) === String(row.agentSessionId));
+  if (!live) return { status: 'gone' };
+
+  const slotIndex = row.slotIndex ?? live.slotIndex ?? 0;
+  const runtime = registerTrajectorySession(tid, String(row.agentSessionId), {
+    nodeUuid,
+    slotIndex,
+    model: live.model || null,
+    cdpPort: live.cdpPort ?? null,
+    cdpReady: true,
+  }, { remoteSessionId: row.id });
+  if (traj?.recordStatus === 'recording') {
+    // Agent owns the page during an active recording — prepare must not re-login.
+    runtime.loginDone = true;
+  }
+  slotLease.confirmLease({
+    sessionId: String(row.agentSessionId),
+    nodeUuid,
+    slotIndex,
+    trajectoryId: tid,
+  });
+  bindTrajectoryManualPersist(tid, String(row.agentSessionId), runtime);
+  remoteSessionService.restoreLiveBindingFromRow(row, {
+    nodeUuid,
+    attached: row.status === 'active',
+  });
+  console.log(`[attach] recovered live executor session for traj #${tid} (agent=${row.agentSessionId})`);
+  return {
+    status: 'recovered',
+    result: {
+      trajectoryId: tid,
+      sessionId: String(row.agentSessionId),
+      executorNodeUuid: nodeUuid,
+      remoteSessionId: row.id,
+      status: await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null),
+      reused: true,
+      reusedChrome: true,
+      recovered: true,
+    },
+  };
+}
+
+/**
  * Acquire executor resources for a trajectory (agent session + optional BiB).
  * @param {number} trajectoryId trajectory DB id
  * @returns {Promise<object>} attach result (sessionId, executorNodeUuid, remoteSessionId, status, …)
@@ -317,6 +391,28 @@ export async function attachTrajectoryLive(trajectoryId) {
       reused: true,
       reusedChrome: false,
     };
+  }
+
+  // 录制进行中：内存 runtime 丢失（控制面重启）时，优先恢复已绑定的执行机会话，
+  // 而不是新开浏览器——否则会与正在进行的录制冲突并使其失败。
+  if (traj.recordStatus === 'recording') {
+    const rec = await recoverLiveSessionForTrajectory(tid, traj);
+    if (rec.status === 'recovered') return rec.result;
+    if (rec.status === 'unreachable') {
+      // 执行机暂不可达：无法确认会话是否还在，绝不新开浏览器（可能打断在录），
+      // 返回可重试错误，让用户稍后重试。
+      const err = new Error('执行机暂不可达，无法确认录制会话状态，请稍后重试');
+      err.statusCode = 503;
+      throw err;
+    }
+    // 执行机可达但会话确已不存在 → 录制已中断：标记 failed(interrupted)，
+    // 并给用户明确指引（此时状态已非 recording，点「重新录制」会正常开新会话）。
+    await markRecordingInterrupted(tid).catch(() => {});
+    const err = new Error(
+      '该交易的录制已中断（执行机会话已不存在），已标记为「录制异常」。如需继续请点击「重新录制」。',
+    );
+    err.statusCode = 409;
+    throw err;
   }
 
   slotLease.releaseByTrajectory(tid);
@@ -398,7 +494,8 @@ export async function attachTrajectoryLive(trajectoryId) {
 }
 
 /**
- * Disconnect stream only (浏览器置 idle，清 FK，录制中(非AI)→draft). Agent session kept.
+ * Disconnect stream only (浏览器置 idle，清 FK). Agent session kept.
+ * 只断画面，录制仍可在后台继续，因此不改变 record_status。
  * Idempotent when already disconnected.
  * @param {number} trajectoryId trajectory DB id
  * @returns {Promise<object>} detach result (trajectoryId, streamDetached, sessionKept, …)
@@ -459,6 +556,31 @@ export async function detachTrajectoryStream(trajectoryId) {
 }
 
 /**
+ * Mark a recording trajectory as failed due to interruption (non-explicit stop release).
+ * Idempotent: safe to call even when the trajectory is no longer recording.
+ * @param {number} tid trajectory DB id
+ * @returns {Promise<string|null>} resulting record status or null on error
+ */
+export async function markRecordingInterrupted(tid) {
+  try {
+    const row = await trajectoryDao.getRecordStatusRow(tid);
+    if (!row || row.recordStatus !== 'recording') return row?.recordStatus || null;
+    const next = await trajectoryDao.finishTransientRecording(tid, 'failure');
+    await trajectoryDao.markFailedReason(tid, {
+      failedKind: 'interrupted',
+      failedReason: failReasonText('interrupted'),
+    });
+    await trajectoryPhaseDao.updateRunningStatus(tid, 'failed').catch((err) => {
+      console.warn(`[detach] updateRunningStatus failed for #${tid}:`, err?.message || err);
+    });
+    return next;
+  } catch (err) {
+    console.warn(`[detach] markRecordingInterrupted failed for #${tid}:`, err?.message || err);
+    return null;
+  }
+}
+
+/**
  * Release executor resources: kill Chrome + Python + slot.
  * Only touches THIS trajectory's remote_session / agent session.
  * @param {number} trajectoryId trajectory DB id
@@ -477,9 +599,10 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     }
 
     const sessionId = runtime?.sessionId || null;
+    const wasRecording = traj?.recordStatus === 'recording';
     if (runtime) {
-      // Closing the browser also aborts any in-flight recording, but detach must not
-      // change recordStatus. Mark userStop so the aborted runner keeps the current status.
+      // Closing the browser aborts any in-flight recording. Mark abortRecording so the
+      // runner exits cleanly; we will mark the trajectory failed(interrupted) below.
       runtime.abortRecording = true;
       runtime.userStop = { success: false };
     }
@@ -551,8 +674,12 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     slotLease.releaseByTrajectory(tid);
     deleteTrajectoryRuntime(tid);
 
-    // V3：detach 是非终结性释放，后端已把 record_status 恢复到持久基线。
-    // 这里必须取清理后的最新状态（而不是 detach 前的 recording）返回/广播。
+    // V4：非用户显式 stop 的资源释放会中断录制。若 detach 前处于 recording，
+    // 则标为 failed + 录制中断（interrupted），而不是恢复旧基线。
+    if (wasRecording) {
+      await markRecordingInterrupted(tid);
+    }
+
     const freshTraj = await trajectoryDao.getById(tid).catch(() => null);
     const recordStatus = freshTraj?.recordStatus ?? traj?.recordStatus ?? null;
 
@@ -589,10 +716,11 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
 
 /**
  * Best-effort cleanup after control-plane restart using DB bindings only
- * (runtime map may be empty). 录制中(非AI)→draft；AI活跃→failed when requested.
+ * (runtime map may be empty). recording → failed(interrupted) when demoteLive.
  * @param {number} trajectoryId trajectory DB id
  * @param {object} [root0] options
- * @param {boolean} [root0.demoteLive] whether to demote recording → draft, default true
+ * @param {boolean} [root0.demoteLive] whether to mark recording → failed(interrupted),
+ *   default true
  * @param {string} [root0.reason] cleanup reason, default 'batch_recovery'
  * @returns {Promise<object>} cleanup result (trajectoryId, cleaned, via, …)
  */
@@ -665,8 +793,8 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
   slotLease.releaseByTrajectory(tid);
 
   if (demoteLive && traj.recordStatus === 'recording') {
-    // 清理/重启回收：非终结性恢复，回到录制前持久状态基线，不降级。
-    await trajectoryDao.restorePersistentRecordStatus(tid);
+    // 清理/重启回收：非用户显式 stop 的资源释放，标为 failed + 录制中断。
+    await markRecordingInterrupted(tid);
   } else if (traj.remoteSessionId) {
     await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
   }

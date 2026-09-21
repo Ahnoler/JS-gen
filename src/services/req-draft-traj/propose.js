@@ -36,6 +36,7 @@ import {
 } from './atom-depend.js';
 import { assertCapabilityCohesion, synthesizeFallbackProduceKey } from './capability-cohesion.js';
 import { buildChapterExcerpts, shrinkExcerptsToTotal } from './chapter-excerpt.js';
+import { loadSutSettledHints } from './sut-settled-hints.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_PATH = join(__dirname, '../../../scripts/prompts/req-draft-traj-atomize-prompt.md');
@@ -480,21 +481,43 @@ function foldEntryOnlyLlmAtoms(llmAtoms, chains) {
  * Build atomize user payload object with optional truncation for huge chains.
  * Truncation order: shrink `chapterExcerpts` (shortest chains first) → drop
  * `step.page` → hard slice with a truncated marker.
+ * `sutSettledHints` is kept through shrink (SUT wording overrides doc excerpts).
  * @param {import('./parse-through-chains.js').ThroughChain[]} chains Chains to serialize
  * @param {object[]} [flowCards] Relevant flow cards for LLM guidance
  * @param {import('./chapter-excerpt.js').ChapterExcerpt[]} [chapterExcerpts] Per-chain chapter windows
+ * @param {import('./sut-settled-hints.js').SutSettledHint[]} [sutSettledHints] Wet-test / sut-settled wording
  * @returns {string} JSON string for user payload
  */
-export function buildAtomizeUserPayload(chains, flowCards = [], chapterExcerpts = []) {
+export function buildAtomizeUserPayload(
+  chains,
+  flowCards = [],
+  chapterExcerpts = [],
+  sutSettledHints = [],
+) {
   const summarized = summarizeCardsForLlm(flowCards);
+  const hints = Array.isArray(sutSettledHints)
+    ? sutSettledHints.map((h) => ({ text: String(h.text || ''), source: String(h.source || '') }))
+      .filter((h) => h.text)
+    : [];
   let excerpts = Array.isArray(chapterExcerpts) ? chapterExcerpts.map((e) => ({ ...e })) : [];
   let chainsForPayload = chains;
   let truncated = false;
 
   const pack = (chainList, excerptList, isTruncated) => {
     const body = isTruncated
-      ? { chains: chainList, truncated: true, flowCards: summarized, chapterExcerpts: excerptList }
-      : { chains: chainList, flowCards: summarized, chapterExcerpts: excerptList };
+      ? {
+        chains: chainList,
+        truncated: true,
+        flowCards: summarized,
+        chapterExcerpts: excerptList,
+        sutSettledHints: hints,
+      }
+      : {
+        chains: chainList,
+        flowCards: summarized,
+        chapterExcerpts: excerptList,
+        sutSettledHints: hints,
+      };
     return JSON.stringify(body, null, 2);
   };
 
@@ -547,7 +570,14 @@ async function callAtomizeLlm(chains, moduleKey, llmFn, flowCards = [], chapters
     chaptersDir,
     maxPerExcerpt: 2800,
   });
-  const userPayload = buildAtomizeUserPayload(chains, flowCards, chapterExcerpts);
+  const modDir = chaptersDir ? dirname(chaptersDir) : '';
+  const sutSettledHints = modDir ? await loadSutSettledHints(modDir) : [];
+  const userPayload = buildAtomizeUserPayload(
+    chains,
+    flowCards,
+    chapterExcerpts,
+    sutSettledHints,
+  );
   const prompt = `${systemPrompt}\n\n---\n\nmoduleKey: ${moduleKey}\n\n${userPayload}`;
   const raw = await llmFn(prompt);
   const parsed = parseLlmJsonObject(raw);

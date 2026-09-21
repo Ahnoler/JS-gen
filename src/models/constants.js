@@ -51,14 +51,15 @@ export function isPersistentRecordStatus(status) {
 }
 
 /**
- * 计算录制会话结束后的持久状态（状态流转 V3）。
+ * 计算录制会话结束后的持久状态（状态流转 V4）。
  *
  * 核心规则：
- * - recording 是临时状态，不能覆盖持久状态（restore 时回到持久基线）。
- * - 但用户显式结束录制并选择结果时，结果可以覆盖持久状态：
+ * - recording 是临时状态，且唯一含义是「正在录制」。
+ * - 用户显式结束录制并选择结果时，结果覆盖持久状态：
  *   - outcome='success' → 一律 待确认(recorded)（未录制/待确认/已确认/录制异常 重录成功均进入待确认）
  *   - outcome='failure' → 一律 录制异常(failed)
- * - outcome='restore'（非终结性：关浏览器/断开/回收/重启中断）→ 恢复到录制前持久状态基线。
+ * - outcome='restore' 保留为兼容性入口，返回录制前持久基线；V4 中非用户显式 stop
+ *   的资源释放已改为标 failed(interrupted)，不再使用 restore。
  * @param {string} base 录制前的持久状态（persistent_record_status）
  * @param {'success'|'failure'|'restore'} outcome 录制结束结果
  * @returns {import('./constants.js').TrajectoryRecordStatus} 录制后的持久状态

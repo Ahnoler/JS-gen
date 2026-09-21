@@ -7,6 +7,7 @@ Also covers manual recorder → mapper parity for click_button.
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 
 sys.path.insert(0, ".")
@@ -18,8 +19,13 @@ from scripts.controller.actions._js_snippets import (
     JS_COLLECT_ICON_BUTTONS,
     JS_STAMP_ICON_ARIA_LABELS,
 )
+from scripts.controller.actions.js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from scripts.manual_recorder.js import JS_MANUAL_RECORDER
 from scripts.manual_recorder.mapper import _map_dom_event_to_action
+
+# U+241F (symbol for unit separator) — locator-snapshot tail delimiter shared
+# with JS_CLICK_ICON_BUTTON / _JS_CLICK_BUTTON_IN_CONTAINER / ClickEngine.
+SEP = "␟"
 
 HTML = """<!doctype html><html><head>
 <style>
@@ -112,7 +118,8 @@ async def main() -> int:
             }"""
         )
         r = await page.evaluate(JS_CLICK_ICON_BUTTON, "新增一级分类")
-        assert r == "ok", r
+        # 尾段追加不改首段：ok␟{locator json}（原断言 r == "ok" 因尾段追加放宽为首段判定）
+        assert r.startswith("ok"), r
         assert clicked == ["新增一级分类"], clicked
 
         # Noise header search must not appear
@@ -246,6 +253,129 @@ async def main() -> int:
         await page6.set_content(miss_html)
         r6 = await page6.evaluate(JS_CLICK_ICON_BUTTON, "更多")
         assert r6 == "err-icon-label-miss", r6
+
+        # ── 实验 C（离线化）：more-btn 点击命中时刻定位快照——伪造场景全链护栏 ──
+        # 生产定谳：click_button('更多') 落库 xpath 来自点击前的 _enrich_click_element
+        # （includes 文本匹配取最后命中），实际点击走 JS_CLICK_ICON_BUTTON more-toggle
+        # 兜底下钻内层 button——两链无一致性校验时，落库 xpath 可指向从未被点击的
+        # 节点；纯图标无 tooltip 时 enrich null → 落库无定位 → 回放 not-found。
+        # 此页注入可见假按钮 jsgen-forensic-fake + 真 more-toggle 结构，按 engine
+        # click_button 顺序（stamp → enrich → JS click）跑，listener 记录实际被点节点。
+        from scripts.controller.actions.click_action_engine import (
+            _apply_click_locator_snapshot,
+        )
+        from scripts.controller.actions._helpers import _enrich_click_element
+
+        forensic_html = """<!doctype html><html><head><style>
+          button.el-button { display: inline-block; min-width: 24px; height: 24px; }
+          span.tsscBtn.more-btn { display: inline-block; }
+        </style></head><body>
+        <div class="search-bar">
+          <div class="el-form-item"><label>客户名称</label><input id="kw"></div>
+          <button type="button" class="el-button">查询</button>
+          <button type="button" class="el-button">重置</button>
+          <span class="tsscBtn more-btn"><label><button id="more-icon" type="button"
+            class="el-button disableBtn el-button--primary el-button--small is-plain">
+            <i class="el-icon-caret-bottom"></i></button></label></span>
+        </div>
+        <div class="el-table">
+          <div class="el-table__body-wrapper"><table><tbody><tr><td>
+            <button id="jsgen-forensic-fake" type="button" class="el-button">更多操作</button>
+          </td></tr></tbody></table></div>
+        </div>
+        </body></html>"""
+
+        pageC = await browser.new_page()
+        await pageC.set_content(forensic_html)
+        clickedC: list[str] = []
+        await pageC.expose_function("onForensic", lambda name: clickedC.append(name))
+        # PAGE_LOCATOR_HELPERS 提供与 enrich 一致的 absXPath（被点节点身份比对）
+        await pageC.evaluate(
+            "(() => {" + PAGE_LOCATOR_HELPERS + " window.__absXPath = absXPath; })()"
+        )
+        await pageC.evaluate(
+            """() => {
+              document.getElementById('more-icon').addEventListener('click', () => {
+                window.__clickedAbs = window.__absXPath(document.getElementById('more-icon'));
+                window.onForensic('more-icon');
+              });
+              document.getElementById('jsgen-forensic-fake').addEventListener('click', () => {
+                window.__clickedAbs = window.__absXPath(document.getElementById('jsgen-forensic-fake'));
+                window.onForensic('jsgen-forensic-fake');
+              });
+            }"""
+        )
+        # engine click_button 顺序：stamp → enrich → JS click
+        await pageC.evaluate(JS_STAMP_ICON_ARIA_LABELS)
+        elementC = await _enrich_click_element(pageC, text='更多', target_kind='icon')
+        # 前置（缺陷复现守卫）：enrich 产物必须落在假按钮上
+        assert 'jsgen-forensic-fake' in str(elementC.get('xpath') or ''), (
+            f"forensic precondition broken, enrich xpath={elementC.get('xpath')!r}"
+        )
+        resultC = await pageC.evaluate(JS_CLICK_ICON_BUTTON, "更多")
+        assert resultC.startswith("ok-more-toggle"), resultC
+        assert clickedC == ["more-icon"], clickedC
+
+        # ① result 尾段可解析出 locator（U+241F 分隔，首段 ok-more-toggle 保持）
+        assert SEP in resultC, f"result missing locator tail: {resultC[:120]!r}"
+        locator = json.loads(resultC.split(SEP, 1)[1])
+        assert locator.get("xpath"), locator
+
+        # ② locator.xpath 在 DOM 命中，且命中节点 === listener 记录的被点节点
+        hit_abs = await pageC.evaluate(
+            """([xp]) => {
+              const n = document.evaluate(xp, document, null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+              return n ? window.__absXPath(n) : '';
+            }""",
+            [locator["xpath"]],
+        )
+        assert hit_abs, f"locator.xpath命中为空: {locator['xpath']!r}"
+        clicked_abs = await pageC.evaluate("() => window.__clickedAbs || ''")
+        assert clicked_abs, "listener 未记录被点节点"
+        assert hit_abs == clicked_abs, (
+            f"落库定位命中 {hit_abs!r}，实际被点 {clicked_abs!r}——伪造未修复"
+        )
+        assert "jsgen-forensic-fake" not in hit_abs, hit_abs
+
+        # ③ 最终落库 element（engine 经快照覆盖后）不含 fake 按钮 id
+        merged = _apply_click_locator_snapshot(resultC, dict(elementC))
+        assert "jsgen-forensic-fake" not in str(merged.get("xpath") or ""), merged.get("xpath")
+        assert "jsgen-forensic-fake" not in str(merged.get("xpath_smart") or ""), (
+            merged.get("xpath_smart")
+        )
+        assert merged.get("target_kind"), merged
+
+        # ③b icon_class 链闭合（A 修）：more-btn 的 el-icon 类在子 <i> 上、
+        # extractElIconClass 只看宿主 className 取不到——more-toggle 分支须显式
+        # 把 more-btn 信号写进快照 icon_class，engine 直写 element['icon_class']
+        # （不经 _element_info_from_locate），回放侧 replay_click 消费 el.icon_class。
+        assert "more-btn" in str(merged.get("icon_class") or ""), (
+            f"icon_class 链断裂: {merged.get('icon_class')!r}"
+        )
+
+        # ④ 纯图标（无 tooltip）场景快照非空
+        assert locator.get("xpath_full"), locator
+        assert str(locator.get("text") or "") == "更多", locator.get("text")
+
+        # ⑤ 歧义守卫：两个同文本 icon 宿主 → err-icon-label-ambiguous（不盲点）
+        ambig2_html = """<!doctype html><html><head><style>
+          a.el-tooltip { display: inline-block; width: 24px; height: 24px; }
+        </style></head><body>
+        <a class="el-tooltip el-icon-delete" tabindex="0"></a>
+        <a class="el-tooltip el-icon-delete" tabindex="0"></a>
+        </body></html>"""
+        pageC2 = await browser.new_page()
+        await pageC2.set_content(ambig2_html)
+        await pageC2.evaluate(
+            """() => {
+              for (const el of document.querySelectorAll('a.el-icon-delete')) {
+                el.__vue__ = { content: '删除', $props: { content: '删除' } };
+              }
+            }"""
+        )
+        rC2 = await pageC2.evaluate(JS_CLICK_ICON_BUTTON, "删除")
+        assert rC2.startswith("err-icon-label-ambiguous"), rC2
 
         await browser.close()
 

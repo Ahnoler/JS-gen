@@ -413,6 +413,45 @@ ${filler}
   const proposeMod = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose.js')).href);
   const { proposeDraftTrajectories, buildAtomizeUserPayload } = proposeMod;
   const { AppError } = await import(pathToFileURL(join(ROOT, 'src/http/app-error.js')).href);
+  const {
+    extractSutSettledHintsFromWetTest,
+    extractSutSettledHintsFromSettledFile,
+    mergeSutSettledHints,
+  } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/sut-settled-hints.js')).href);
+
+  run('extractSutSettledHintsFromWetTest pulls 预置疑点核对结论 rulings', () => {
+    const md = [
+      '### 预置疑点核对结论',
+      '',
+      '1. 占位无关项。',
+      '2. 【新增分类】vs【新增子分类】：**SUT 实际=【新增分类】**（tooltip 实证），文档步骤口径【新增子分类】为 wording drift。',
+      '3. 「可售」用词：SUT 页面全程未出现「可售」文案。',
+      '',
+      '### blocked 补测台账',
+      '',
+      '| 叶 | 成因 |',
+    ].join('\n');
+    const hints = extractSutSettledHintsFromWetTest(md);
+    assert.ok(hints.some((h) => /新增分类/.test(h.text)));
+    assert.ok(hints.every((h) => h.source.includes('wet-test')));
+  });
+
+  run('extractSutSettledHintsFromSettledFile reads bullet list', () => {
+    const hints = extractSutSettledHintsFromSettledFile(
+      '# x\n\n- SUT 实际=【新增分类】\n- 进入即自动加载\n\n正文忽略\n',
+    );
+    assert.equal(hints.length, 2);
+    assert.equal(hints[0].source, 'sut-settled.md');
+  });
+
+  run('mergeSutSettledHints prefers sut-settled.md order first', () => {
+    const merged = mergeSutSettledHints({
+      settledMarkdown: '- 手写定案【新增分类】\n',
+      wetTestMarkdown: '### 预置疑点核对结论\n\n1. **SUT 实际=【新增分类】** wording drift\n',
+    });
+    assert.ok(merged.length >= 1);
+    assert.equal(merged[0].source, 'sut-settled.md');
+  });
 
   run('buildAtomizeUserPayload exported for excerpt budget pins', () => {
     assert.equal(typeof buildAtomizeUserPayload, 'function');
@@ -426,6 +465,7 @@ ${filler}
     );
     const obj = JSON.parse(payload);
     assert.deepEqual(obj.chapterExcerpts, []);
+    assert.deepEqual(obj.sutSettledHints, []);
     assert.ok(Array.isArray(obj.chains));
   });
 
@@ -446,6 +486,26 @@ ${filler}
     assert.equal(obj.chapterExcerpts[0].chainId, 'chain-a');
     assert.match(obj.chapterExcerpts[0].excerpt, /pdNm 必填/);
     assert.equal(obj.chains[0].steps[0].page, '弹窗');
+    assert.deepEqual(obj.sutSettledHints, []);
+  });
+
+  run('buildAtomizeUserPayload embeds sutSettledHints beside chains', () => {
+    const payload = buildAtomizeUserPayload(
+      [{
+        chainId: 'chain-a',
+        title: '新增',
+        chapterHint: '§配置',
+        steps: [{ index: 1, action: '新增', page: '弹窗', zjjk: 'ZJJK00094361', buttons: '【新增子分类】' }],
+      }],
+      [],
+      [],
+      [{ text: 'SUT 实际=【新增分类】，无【新增子分类】', source: 'sut-settled.md' }],
+    );
+    assert.match(payload, /"sutSettledHints"/);
+    const obj = JSON.parse(payload);
+    assert.equal(obj.sutSettledHints.length, 1);
+    assert.match(obj.sutSettledHints[0].text, /新增分类/);
+    assert.equal(obj.sutSettledHints[0].source, 'sut-settled.md');
   });
 
   run('buildAtomizeUserPayload shrinks excerpts before dropping step.page', () => {
@@ -520,6 +580,7 @@ ${filler}
     assert.match(captured, /"chapterExcerpts"/);
     assert.match(captured, /产品库管理/);
     assert.match(captured, /ZJJK00094361|ZJJK00110131/);
+    assert.match(captured, /"sutSettledHints"/);
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -551,6 +612,42 @@ ${filler}
     });
     assert.ok(out && Array.isArray(out.atoms) && Array.isArray(out.rejected));
     assert.match(captured, /"chapterExcerpts"\s*:\s*\[\s*\]/);
+    assert.match(captured, /"sutSettledHints"\s*:\s*\[\s*\]/);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  await runAsync('propose atomize prompt injects sut-settled.md hints from module dir', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'req-draft-'));
+    cpSync(fixtureRoot, join(tmp, 'demo-mod'), { recursive: true });
+    writeFileSync(
+      join(tmp, 'demo-mod', 'sut-settled.md'),
+      '# demo\n\n- SUT 实际=【新增分类】，无【新增子分类】（wet-test 叶7）\n',
+      'utf8',
+    );
+    let captured = '';
+    const fakeLLM = async (prompt) => {
+      captured = String(prompt || '');
+      return JSON.stringify({
+        atoms: [{
+          chainId: 'chain-a',
+          stepIndexes: [2],
+          title: '新增分类',
+          taskDraft: '1、点击【新增分类】。\n\n来源：<sourceDoc> / <sourceChapter>\n',
+          phaseHints: ['x'],
+          produces: ['分类'],
+          dataDependsOn: [],
+        }],
+      });
+    };
+    await proposeDraftTrajectories({
+      moduleKey: 'demo-mod',
+      rootDir: tmp,
+      callLLM: fakeLLM,
+      listSystemsFn: async () => [],
+    });
+    assert.match(captured, /"sutSettledHints"/);
+    assert.match(captured, /新增分类/);
+    assert.match(captured, /sut-settled\.md/);
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -891,8 +988,8 @@ ${filler}
   });
 
   const { writeProposeCache, PROPOSE_CACHE_VERSION } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/propose-cache.js')).href);
-  run('PROPOSE_CACHE_VERSION is 11 (clone-copy residual / 待维护 noun / delete-success outcome cohesion)', () => {
-    assert.equal(PROPOSE_CACHE_VERSION, 11);
+  run('PROPOSE_CACHE_VERSION is 12 (sut-settled hints inject into atomize)', () => {
+    assert.equal(PROPOSE_CACHE_VERSION, 12);
   });
   const { commitDraftTrajectories } = await import(pathToFileURL(join(ROOT, 'src/services/req-draft-traj/commit.js')).href);
   const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');

@@ -21,6 +21,7 @@ import {
 } from './trajectory-runtime.js';
 import { classifyRegions } from '../region-classify.js';
 import { displayGroupOf, isTaxonomyRegionToken, uniquifyDisplayGroups } from '../../cdp/display-group.js';
+import { failReasonText } from '../../models/failure-reason.js';
 
 /**
  * 从轨迹的功能层级中解析所属系统 id。
@@ -311,6 +312,7 @@ async function probeLoggedInBeforeLogin(runtime, url) {
       // 探测失败不得中断 prepare：旧执行机没有 login_probe 动作时按未登录继续。
       stopOnFail: false,
       isReplay: true,
+      abortOnSessionTerminal: true,
     });
     const row = (Array.isArray(results) ? results : []).find((r) => r?.action === 'login_probe');
     const sig = /^ok-probe:(\S+)/.exec(String(row?.result || ''))?.[1] || '';
@@ -391,6 +393,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
         timeoutMs: 180000,
         stopOnFail: true,
         isReplay: true,
+        abortOnSessionTerminal: true,
       });
       const failed = Number(result?.failed || 0);
       const okCount = Number(result?.ok || 0);
@@ -418,6 +421,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
       timeoutMs: 180000,
       stopOnFail: true,
       isReplay: true,
+      abortOnSessionTerminal: true,
     });
     const failed = Number(result?.failed || 0);
     const okCount = Number(result?.ok || 0);
@@ -513,6 +517,15 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
     isDone: !!success,
     isSuccessful: !!success,
   });
+  // 人工结束且标记失败 → 记录「人工标记录制异常」（成功收官已被 finish 清除）。
+  if (!success) {
+    await trajectoryDao.markFailedReason(tid, {
+      failedKind: 'user_marked_failed',
+      failedReason: failReasonText('user_marked_failed'),
+    }).catch((err) => {
+      console.warn(`[record] failed_reason persist skipped for #${tid}:`, err?.message || err);
+    });
+  }
   // 清理 running 阶段：避免前端 aiActive（running 信号）在刷新后仍显示“录制中”导致二次结束。
   await trajectoryPhaseDao.updateRunningStatus(tid, success ? 'completed' : 'failed').catch((err) => {
     console.warn(`[record] updateRunningStatus failed for #${tid}:`, err?.message || err);
@@ -533,10 +546,12 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
  * @param {number} trajectoryId trajectory DB id
  * @param {object} [root0] options
  * @param {boolean} [root0.success] whether recording ended successfully (default false)
+ * @param {string} [root0.failedKind] failure kind persisted on a failure transition (default batch_failed)
  * @returns {Promise<{ trajectoryId: number, recordStatus: string, detached: boolean, tree: object }>} stop result with updated tree
  */
 export async function stopTrajectoryRecordingSafe(trajectoryId, {
   success = false,
+  failedKind = 'batch_failed',
 } = {}) {
   const tid = Number(trajectoryId);
   const runtime = getTrajectoryRuntime(tid);
@@ -588,6 +603,14 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
       isDone: !!success,
       isSuccessful: !!success,
     });
+    if (!success) {
+      await trajectoryDao.markFailedReason(tid, {
+        failedKind,
+        failedReason: failReasonText(failedKind),
+      }).catch((err) => {
+        console.warn(`[record] failed_reason persist skipped for #${tid}:`, err?.message || err);
+      });
+    }
     await trajectoryPhaseDao.updateRunningStatus(tid, success ? 'completed' : 'failed').catch((err) => {
       console.warn(`[record] updateRunningStatus failed for #${tid}:`, err?.message || err);
     });
