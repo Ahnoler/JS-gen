@@ -173,6 +173,7 @@ run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/c
 run "characterize-search-then-click-prompts" "$PY" scripts/characterization/cold/characterize-search-then-click-prompts.py
 run "characterize-idempotent-click-gate" "$PY" scripts/characterization/characterize-idempotent-click-gate.py
 run "characterize-sut-spin-guard" "$PY" scripts/characterization/characterize-sut-spin-guard.py
+run "characterize-chrome-proxy-flag" "$PY" scripts/characterization/characterize-chrome-proxy-flag.py
 run "characterize-fill-replay-engine" "$PY" scripts/characterization/cold/characterize-fill-replay-engine.py
 run "characterize-select-dispatch" "$PY" scripts/characterization/cold/characterize-select-dispatch.py
 run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/characterize-select-replay-engine.py
