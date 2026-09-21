@@ -2,7 +2,9 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
-## 2026-09-21 22:35 · OpenCode — 收工：阶段合约「实际逻辑流程」开发备注（纯文档，回链 22:10 开工）
+
+
+## 2026-09-21 19:35 · OpenCode — 收工：阶段合约「实际逻辑流程」开发备注（纯文档）
 
 - **完成**：`e355f7f0`（纯文档，零运行代码触碰）。
   - 新建 `docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`：实际编译流程（meta-service → classify → compile_boundary → boundary_to_legacy_intent → apply_phase_contract → cross-phase guard → done gate → recovery）、三条核心规则（R1 open-only→navigate / R2 fill-only 无保存令牌 / R3 终态令牌归执行阶段）、分支优先级与令牌对照表、关键判定函数扫描范围、后续同类开发 checklist、改动落点、边界与非目标。
@@ -14,13 +16,22 @@
 - **现场清点**：工作树干净；无 stash 操作；无他线 WIP 残留。
 - **注**：不维护 CHANGELOG。
 
-## 2026-09-21 22:10 · OpenCode — 开工：阶段合约「实际逻辑流程」开发备注（纯文档，不动运行逻辑）
+## 2026-09-21 19:10 · OpenCode — 开工：阶段合约「实际逻辑流程」开发备注（纯文档，不动运行逻辑）
 
 - **进行中**：用户指示「按实际逻辑流程修改相关文档，为后续同类开发备注」——把本轮跨阶段令牌越界修复后的实际阶段合约流程与后续须遵循规则沉淀为可复用开发备注；**明确不动任何运行逻辑代码**（`scripts/**`、`src/**` 只读）。
 - **工作范围**：`docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`（新建，实际流程 + 规则 + 坑）；`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`（尾部加 2026-09-21 修订备注，不改历史正文）；`docs/superpowers/todo-list.md`（phase-structured-contract 行状态/前置更新）；`AGENTS.md`（Element UI/正确性规则区补一条阶段令牌归属要点）；agent-log 本条目+收工条目。
 - **禁入区**：一切 `scripts/**`、`src/**`、`tools/**` 运行代码；他线在途分支工作区；运行态服务。
 - **执行方式**：主会话直写文档；不改代码故 verify-all 不适用（仅文档 diff 自查零代码文件被触碰）。
 - **注**：不维护 CHANGELOG。
+## 2026-09-21 19:00 · ZCode 引擎线 — 合并回执：同族快照复刻并入 uara_V2.0（7e43c736→合并 4776b7f0；合约线湿测 PASS 回执可合并）+ 两项移交
+
+- 合并：`engine/snap-replica-20260921`（7e43c736）`--no-ff` 并入 uara_V2.0 = **4776b7f0**；agent-log 冲突按协议双方条目并排消解（保留他线 9 条），verify-all.sh 注册表自动合并。push 遇 non-fast-forward（OpenCode 线同窗口推 e3825ee3）→ pull 合并 **c1c3f06a** 再推，全程零 force。主检出现场他线活跃 WIP（trajectory-runtime.js / trajectory-session-replay.js）未触碰、未随本合并。
+- **合并后验收（两轮）**：全量 verify-all 181 pin + statics / 二轮（pull 入 OpenCode 跨阶段令牌修复后）**182 pin + statics，178/182 绿**；`verify-all: ALL GREEN` 尾行 + **grep FAILED 判定**（verify-phase 线移交的并行 runner `!! FAILED` 漏报缺陷已按其口径执行）。4 失败归因如下：
+  - ①**step-highlight / layer-tree / export-v3 三项 = 远端录制库不可达（环境，非代码）**：三 pin 均死在 DB 连接获取 `Acquire connection error`，裸 knex 探测同复现 `ETIMEDOUT`；TCP 直探 **47.101.58.49:3306 超时**（本机 127.0.0.1 MySQL 存活、探本地即时 RST 鉴别）。export-v3 在本日 ~16:10 分支验收时同码绿——DB 可达性在之后劣化（该主机=用户自管代理同机，网络/服务器侧归用户）。DB 恢复后复跑三 pin 即闭环，**复现命令**：`node scripts/characterization/characterize-{step-highlight,layer-tree}.mjs`、`node scripts/characterization/characterize-export-v3.mjs`。
+  - ②**refill-contract 一项 = OpenCode 线回归（移交，不代修）**：`characterize-refill-contract.py:80` 断言"模式判定规则恰好 9 条"实得两个 9 号（`scripts/prompts/phase-reviewer-prompt.md:50/:52` 两行同起 `9.`）——由 origin 侧 be21aafd（OpenCode 阶段越界修复）引入（我方基点 6c3ba0d0 仅 1 个 `9.`，`git show e3825ee3:scripts/prompts/phase-reviewer-prompt.md` 可复核）；其收工条目称验收通过，疑验收窗口早于该 prompt 提交。**移交 OpenCode 线**：重编号或改 pin 断言，复现 `./python/python.exe scripts/characterization/characterize-refill-contract.py`。
+- 生效：纯 Python 侧，合并已落主检出磁盘——控制面若从主检出派生录制会话则**新会话即效**；引擎 worktree 稍后对齐。运行态服务（4097 pid 9908 / 执行机 / 用户代理 9228）零触碰。
+- 提醒（非移交）：**DB 不可达期间新录制会话也会失败**——合约线下单湿测前请先确认 47.101.58.49:3306 可达。
+- 注：不维护 CHANGELOG。
 
 ## 2026-09-21 21:45 · OpenCode — 收工：阶段合约跨阶段令牌越界修复（P4/P6/P7 录制中断）
 
@@ -132,6 +143,12 @@
 - 验收（合并后硬约定）：`git pull`（up to date）后全量 verify-all **178 pins + 2 statics 全部真绿，EXIT=0，零 KNOWN-RED 零 FAILED**；三个改靶 pin 单跑均 OK（step-highlight 锚 #33388 traj 973：14 步/12 bbox 直用；layer-tree 锚 #33503：53 元素全带 layers、6 步 5 分区）。
 - 遗留移交：①FLOORS 下限（10）是按现势数据定的，若未来录制形态单阶段步数再降（如 <10），动态锚点会红——那是真回归信号，不是锚点问题，届时修录制链而非放宽阈值；②本次仅改 characterization 与 verify-all，无业务代码改动。
 - 本条与代码提交一并 push。
+## 2026-09-21 15:27 · ZCode 引擎线 — 开工：同族快照复刻（more-btn locator-snap 模式复刻至导航/弹窗/表格点击链），引擎 worktree 本场
+
+- 工作范围：`scripts/controller/actions/_navigation.py`（switch_tab / click_menu_item）、`_misc.py`（close_dialog）、`_table.py`（click_table_row_button / click_table_row_radio）四条点击链；同族 js_snippets 与共享解析 helper（如需抽取，动 `click_action_engine.py` 或新建模块）；新增/扩展 characterization pin（`scripts/characterization/**`）；`scripts/refactor/verify-all.sh` 域注册表登记。
+- 禁入区：`src/services/trajectory/**`（用户已另派会话做 phase_blocked reason 区分，phase-done-evidence-gate 族归其所有）；主检出 `D:\dev\JS-gen` 他线 WIP（characterize-confirm-notification.py 在途）；OpenCode 回放线（`_replay.py` / `replay_table.py` / replay-batch-runner.js——注意与本批 `_table.py` 录制侧同名相邻、文件不相交）；D2 运行态（控制面 4097 pid 9908、用户自启代理 9228 一律不触碰）。
+- 执行方式：分支 `engine/snap-replica-20260921`（自 uara_V2.0 tip 5b315a29）；Explore 摸底 → 子智能体实现（一律不 commit，主会话显式 pathspec 代提交）→ 评审 → 域管线微步 + 合并态全量 verify-all 基线对比；纯 Python/pin 侧，合并后新录制会话即效、无需重启。
+- 基线：合并后验收全量以 5b315a29 合并态 3 已知红（step-highlight / layer-tree / confirm-notification）为零新增基线。
 
 ## 2026-09-21 15:14 · ZCode 系统线 — 收工：verify-all 域管线化验收改造（微步验收 2m58s→15-20s，commit 48d277ab）
 
