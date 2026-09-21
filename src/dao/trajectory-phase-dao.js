@@ -21,7 +21,11 @@ async function dirtyParent(trajectoryId, trx = null) {
  */
 export async function create(data, trx = null) {
   const db = trx || getDB();
-  const [id] = await db(TABLE).insert(toDbRow(data));
+  const row = toDbRow(data);
+  if (row.contract_json != null && typeof row.contract_json !== 'string') {
+    row.contract_json = JSON.stringify(row.contract_json);
+  }
+  const [id] = await db(TABLE).insert(row);
   await dirtyParent(data.trajectoryId, trx);
   return getById(id, trx);
 }
@@ -140,6 +144,14 @@ function parseCandidates(row) {
       /* keep string */
     }
   }
+  const contractRaw = obj.contractJson;
+  if (contractRaw != null && typeof contractRaw === 'string') {
+    try {
+      obj.contractJson = JSON.parse(contractRaw);
+    } catch {
+      obj.contractJson = null;
+    }
+  }
   obj.doneLogs = parseDoneLogs(obj.doneLogs);
   return obj;
 }
@@ -171,6 +183,11 @@ export async function update(phaseId, fields, trx = null) {
       ? raw
       : JSON.stringify(raw);
     delete patch.doneLogs;
+  }
+  if ('contractJson' in fields || 'contract_json' in fields) {
+    const raw = fields.contractJson ?? fields.contract_json ?? null;
+    patch.contract_json = raw == null || typeof raw === 'string' ? raw : JSON.stringify(raw);
+    delete patch.contractJson;
   }
   if (!Object.keys(patch).length) return getById(phaseId, trx);
   await db(TABLE).where({ id: phaseId }).update(patch);

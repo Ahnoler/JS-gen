@@ -249,6 +249,7 @@ export async function commitDraftTrajectories({
         name: atom.title,
         requirement: atom.taskDraft,
         phases: analyzed.phases,
+        phaseContracts: analyzed.phaseContracts,
         businessEntries: analyzed.businessEntries,
         systemAccountId,
         paasUserId,
