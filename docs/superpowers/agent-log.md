@@ -2,6 +2,13 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 15:27 · ZCode 引擎线 — 开工：同族快照复刻（more-btn locator-snap 模式复刻至导航/弹窗/表格点击链），引擎 worktree 本场
+
+- 工作范围：`scripts/controller/actions/_navigation.py`（switch_tab / click_menu_item）、`_misc.py`（close_dialog）、`_table.py`（click_table_row_button / click_table_row_radio）四条点击链；同族 js_snippets 与共享解析 helper（如需抽取，动 `click_action_engine.py` 或新建模块）；新增/扩展 characterization pin（`scripts/characterization/**`）；`scripts/refactor/verify-all.sh` 域注册表登记。
+- 禁入区：`src/services/trajectory/**`（用户已另派会话做 phase_blocked reason 区分，phase-done-evidence-gate 族归其所有）；主检出 `D:\dev\JS-gen` 他线 WIP（characterize-confirm-notification.py 在途）；OpenCode 回放线（`_replay.py` / `replay_table.py` / replay-batch-runner.js——注意与本批 `_table.py` 录制侧同名相邻、文件不相交）；D2 运行态（控制面 4097 pid 9908、用户自启代理 9228 一律不触碰）。
+- 执行方式：分支 `engine/snap-replica-20260921`（自 uara_V2.0 tip 5b315a29）；Explore 摸底 → 子智能体实现（一律不 commit，主会话显式 pathspec 代提交）→ 评审 → 域管线微步 + 合并态全量 verify-all 基线对比；纯 Python/pin 侧，合并后新录制会话即效、无需重启。
+- 基线：合并后验收全量以 5b315a29 合并态 3 已知红（step-highlight / layer-tree / confirm-notification）为零新增基线。
+
 ## 2026-09-21 15:14 · ZCode 系统线 — 收工：verify-all 域管线化验收改造（微步验收 2m58s→15-20s，commit 48d277ab）
 
 - 完成（用户指令：功能变大后不必每次改动跑全量 characterization，切管线验收 + 优化验收时间）：`scripts/refactor/verify-all.sh` 域管线化改造——**12 域注册表**（core/phase/fill/select/click/xpath/tree/kb/executor/ui/export/misc）+ 三种用法（无参=全量 / `verify-all.sh select,fill`=按域选 / `--changed`=git diff 自动映射选域，无映射兜底全量）+ 有限并发（`VERIFY_JOBS` 默认 4）+ 基线红显式标注（KNOWN-RED 不再令域管线误报回归）。
