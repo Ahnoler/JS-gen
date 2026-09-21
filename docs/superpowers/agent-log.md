@@ -1,6 +1,15 @@
 # Agent 协作日志
 
 
+## 2026-09-21 11:30 · OpenCode 系统线 — 开工：executor 未知会话终态快失败 + reconcile 清理残留内存绑定（用户已批）
+
+- 背景（用户实测 traj #969）：手动 prepare 报 503 `traj_lock_wait_timeout`，执行机日志刷 `session error: Unknown session 9b796f0b-…`。取证：`remote_session` 2157 状态 `crashed`、`agent_session_id` 正是该 uuid，traj 969 的 `remote_session_id` 仍指向它。机理：执行机重启/会话崩溃后，`reconcileRemoteSessions` 只关 DB 行，**不清 `state.sessions` / `trajectoryRuntimeMap` / `slotLease`**；残留绑定继续对执行机发 `attach_bib`/`bib_start` 等 → 执行机回 `session.error`；`attachLive` 只 race `bib_ready`/`bib_error`，不认 `session.error`，空等 45s；轨迹锁只等 30s，后到 prepare 先 503。前一个操作超时释放锁后重试即成功（复测 prepare 200，新建 rs 2158 active）。
+- 定案（用户批准，一次单元三改）：①executor `session.error` 带结构化 `code`（`Unknown session`→`unknown_session`，加法、老执行机无 code 保持旧行为）；②控制面 `attachLive`/`closeSession` 对**终态** code 快失败（新增 `waitForSessionEventWhere` 谓词监听，**只认 code 不认文案**；网络无事件/非终态 error 仍走原超时，不动容错语义）；③`reconcileRemoteSessions` 判执行机不存在该 session 时一并清 `state.sessions`/runtime/lease。
+- 范围（可写集）：`executor/agent.mjs`、`executor/session-manager.js`、`executor/session-handler.js`、`src/executor-event-hub.js`、`src/services/remote-session-service.js`、`src/services/executor-node-service.js`、`src/executor-session-client.js`、`config/config.js`、`scripts/characterization/`（新增 pin + `scripts/refactor/verify-all.sh` 注册）、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`
+- 禁入区：`src/services/trajectory/**`（他线热区）、`executor/ws-client.js` 与 `executor/config.js` 启动锁/双活逻辑（本单元不动）、`data/kb/**`、`scripts/controller/**`、前端另仓、SUT
+- 方式：主会话定 `code='unknown_session'` 契约 → 两个 general 子智能体（executor 侧 / 控制面侧，文件集不相交，均不 commit）→ 主线程补 pin 并注册 verify-all → 相关 pin 单跑 + 全量 verify-all → 收工条目
+- 注：**`git pull` 失败**（GitHub `Recv failure: Connection was reset`，重试 fetch 亦不可达），本条目与后续提交先本地落，push 待网络恢复；上游 `uara_V2.0`
+
 ## 2026-09-21 10:23 · ZCode 系统线 — 收工：docs/superpowers 按 mtime>7 天批量归档 133 件进 archive/（commit 68ab4fcb）
 
 - 完成（用户指令：修改时间 7 天前的文件都需要归档）：早于 2026-09-14 的非活文档 133 件 `git mv` 进 `archive/`（保历史）——specs 45 / plans 37 / reports 26（新建子目录，含根目录 code-review-2026-08-31、security-review-2026-09-05、重构交接-波次4-6）/ research 20（新建）/ guides 4（新建）/ samples 1（新建）；主区仅剩 agent-log.md / todo-list.md 及近期在途文档。
