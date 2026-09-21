@@ -6,6 +6,23 @@
 - 禁入区：不碰 D2 的 SUT 503 守卫文件；不碰 executor 侧。
 - 执行方式：代码改动 + pin + `bash scripts/refactor/verify-all.sh`；完成后 commit + push（网络若仍抖则本地 commit 待恢复 push）。
 
+## 2026-09-21 12:50 · OpenCode 系统线 — 收工：prepare 登录回放终态事件竞速释放轨迹锁（回链 12:30 开工，commit `4a282cbd`）
+
+- 完成（代码 `4a282cbd`，9 files / +362 −13）：
+  - **核心改动**：`src/services/replay-actions.js` 新增 `abortOnSessionTerminal` 选项；等待 `replay_done` 时同时监听 `session.process_exit` / `session.closed` / `session.bib_error` / `session.error`，任一终态事件命中立即抛错并带 `isTerminalReplayAbort=true` / `terminalType` / `terminalPayload`，避免死会话上的 prepare 白等 180s 占锁。
+  - **prepare 路径启用**：`trajectory-record-lifecycle.js`（登录前探测、组件/硬编码登录回放）、`trajectory-attach-runner.js`（冷启动沉降 `wait_for_loading`）、`recording-page-bind.js`（读页绑定）、`menu-navigation.js`（菜单导航）均传 `abortOnSessionTerminal: true`。
+  - **重试快速退出**：`prepare-login-retry.js` 捕获到 `isTerminalReplayAbort` 时直接结束重试，不再无意义指数退避。
+  - **结构性 pin 兼容**：保留 `Promise.race([` 字面量，修复 `characterize-special-element` wiring 断言（初次 `Promise.race(candidates)` 导致 regex 失配）。
+  - **新 pin**：`scripts/characterization/characterize-replay-terminal-abort.mjs` **7/7**（process_exit / session.error / 正常 replay_done / disabled 忽略 / 监听器清理 / helper wiring / prepare caller wiring），已注册 `verify-all.sh`。
+- 验收（本地状态；合并后验收因网络阻塞未能执行，见下）：
+  - 改动文件 `npx eslint` 0 error；pre-commit 钩子通过。
+  - 全量 `verify-all`（Git Bash @ `D:\Software\Git\bin\bash.exe`）红集与合并前基线一致，**零新增本线归属失败**：`eslint-core`（.venv + tools/recording-coach 既有 3343 errors）、`step-highlight`/`layer-tree`（DB 数据噪声）、`confirm-notification`（ markers 缺失）、`fill-err-with-scope`/`idempotent-click-gate`（GBK `UnicodeEncodeError`）、`tssc-route-conflict`（`ModuleNotFoundError: scripts.controller`）、`network-capture`（portable python 缺失）。
+  - 新增 pin 与受影响 pin 均绿：`characterize-replay-terminal-abort` 7/7、`characterize-special-element`、`characterize-menu-navigation`、`characterize-page-bind`。
+- 状态与遗留：
+  - **GitHub 网络仍抖**：`git pull origin uara_V2.0` 连续 `Recv failure: Connection was reset`，本次代码 commit `4a282cbd` 与 agent-log 收工条目目前均为**本地未 push**；网络恢复后将立即补 `pull --no-rebase` → 合并后重跑 verify-all → push。
+  - **生效**：Node 控制面侧 → 需重启控制面才 live；执行机无改动。本条目写入后将重启控制面（pid 5968）加载新代码。
+  - 不维护 CHANGELOG。
+
 ## 2026-09-21 11:20 · ZCode 引擎线 — 收工：more-btn xpath 伪造修复交付（点击命中时刻定位快照，分支未合并待批，回链 11:05 开工）
 
 - 完成：分支 `engine/locator-snap-20260921`（**9ee4af45**，已 push），**6 files +330/−16**。SDD 全流程：前置 Explore → 实现 → 任务评审（3 Important）→ 修复波次 → scoped re-review（代码 CLEAN）→ 修复后全量 verify-all。
