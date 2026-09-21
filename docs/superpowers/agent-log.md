@@ -1,5 +1,119 @@
 # Agent 协作日志
 
+# Agent 协作日志
+
+## 2026-09-21 11:25 · ZCode 引擎线 — 知会：unboundlocal-retest 可测（磁盘恢复已经我线独立核验）
+
+- 核验（回应 D2 线 12:05 回执，独立复核非盲信）：引擎 worktree 现检出 `engine/locator-snap-20260921` @ **93cef7ce**（locator-snap 线已对齐上游），**251c461b 为其祖先**（相对 origin/uara_V2.0 仅 docs 差异）；热修直验在场——`click_action_engine.py` 的 `button_text_identity = ''` 已在幂等门块之前（:416 vs 门块 :432）、`nav-reclick-budget` 尾缀 ×2、runner `await appendPhaseDoneLog(session?.activePhaseId` ×1。工作区干净，health 200。
+- **知会合约线：unboundlocal-retest（靶=#970 P2 同场景）即刻可开**——新录制会话磁盘加载即含全部修复；复测中若见 `[fill][tssc-route-conflict]`/`[nav-reclick]`/` | nav-reclick-budget` 均为预期留痕非异常。
+- Node 侧注：运行中控制面（pid 14224，39dadd7f 内存态）不含小批次 T1 的 runner await 修复（1568143a，251c461b 才并入）——**不影响本复测**（复测靶在 Python click 路径）；该增量随下次重启窗口生效。
+- 注：不维护 CHANGELOG；纯知会轮次
+
+
+## 2026-09-21 12:05 · ZCode 引擎线（D2 线） — 合并回执：D2 SUT 503 阶段空转守卫并入 V2.0（0cbcbd35，用户批）；⚠️运行磁盘已恢复（回应 11:05 前兄弟回执 db1b2abf）
+
+- 完成：用户指令「没有问题的话，去合并吧」→ D2 分支 `engine/d2-spin-guard-20260921`（fec9b5e3）**并入 uara_V2.0 = `0cbcbd35`**（主检出合并，--no-ff，**零冲突**）。合并序：D2 线为后合并方，按兄弟小批次线合并回执的预告核验——`service.py` 双方改动区域不同自动合流且**双方均 live**（D2 续跑 break :606 + 小批次 T1 overlayButtons 块），`verify-all.sh` 登记行并排，D2 六文件（recorder.py/recorder_emitters.py/守卫/pin/verify-all 注册/设计稿）与交付 tip `fec9b5e3` **逐字节一致**。
+- **⚠️运行磁盘已恢复**：引擎 worktree（D:\dev\JS-gen-engine）已对齐合并态 `75b75925`（d2 分支 merge 0cbcbd35 内容全集 = B 类① fill 收口 + 挂账小批次 T1/T2 + #970② 热修 + D2，已 push）——**新录制会话磁盘加载即载全部修复**，db1b2abf 所警示「新会话暂复现旧缺陷」状态自本条起解除。注：Node 侧增量（如小批次 T1 runner await 修复 `1568143a`）仍需下一重启窗口生效，归属用户/小批次线决策；Python 侧全部磁盘已 live。
+- **合并态验收**（内容=0cbcbd35，于引擎 worktree 75b75925 执行）：`characterize-sut-spin-guard` **91 断言全过**；全量 verify-all **193 过 / 失败集=3 已知红（step-highlight/layer-tree/confirm-notification）零新增**（193=前值 191+小批次新增两 pin 均过）；日志 `tmp/verify-all-d2-v2-merged-20260921.log`。D2 默认 off，合并零行为影响。
+- push 状态：`0cbcbd35` 系兄弟会话推 V2.0（db1b2abf）时连带发布（refs 共享）；本条目 commit 后随硬约定推送（连带携带 11:05 locator-snap 线在 V2.0 的开工条目 commit e4ce6212）。
+- 遗留移交：①**D2 湿测验收归合约线**（前置在线 SUT+执行机）：observation 档 #925 复现场景必须命中 + 正常长阶段（多轮填写/树搜索/分页）不得误杀 → 按湿测数据逐级升档，默认值升 hard 须 Lead 批（设计稿 §7/§12）；②locator-snap 线（11:05 开工，基点 251c461b）后合并方消解 verify-all.sh 相邻登记行；③D2 实施三裁定与幂等双键语义全文见设计稿 §12。
+- 注：不维护 CHANGELOG
+
+## 2026-09-21 11:05 · ZCode 引擎线 — 开工：more-btn 图标按钮 xpath「伪造」修复（系统线 L1c 取证移交，点击命中时刻定位快照）
+
+- **收件**：系统线取证报告 `docs/reports/2026-09-21-l1c-xpath-morebtn-forensics.md`（本地分发区）——L1c 已排除；根因实锤：`click_button('更多')` 落库 xpath 来自点击前 `_enrich_click_element` 文本匹配（includes 取最后命中），实际点击走 `JS_CLICK_ICON_BUTTON`（more-toggle class 兜底下钻内层 button），两选点链无一致性校验 → 落库 xpath 可指向从未被点击的节点（真机注入假按钮实锤）；纯图标无 tooltip 时 enrich null → 落库无定位、回放 not-found。
+- **修复方向（按报告 §六）**：①点击成功后对实际被点 el 当场 `buildLocatorSnap` 随 result 返回，落库以命中时刻快照为准（enrich 留 fallback）；②回放 `clickToolbarIcon` 补 more-btn class 信号（消费 ok-more-toggle 返回的 class）；③icon 宿主候选补歧义守卫（对齐同事仓 41992f0）。两处需知一并评估：空 xpath 时 locator_strategy 落空串（action.py:426-429）、合成 aria-label 盖章不对称。
+- 上游：uara_V2.0（251c461b）。分支 `engine/locator-snap-20260921`——**经临时 worktree 作业**（共享 worktree 仍由 D2 线占用，其单元进行中；本批与其文件集零交叠，仅 verify-all.sh 登记行惯例性相邻）。
+- 范围（可写集）：`scripts/controller/actions/click_action_engine.py`、enrich/icon 相关 js_snippets、`scripts/models/action.py`（如 locator_strategy 需动）、相关 characterization pin（`characterize-icon-buttons.py` 扩展 + RED 先行）、`scripts/refactor/verify-all.sh`、主检出 agent-log 本条目+收工条目
+- 禁入区：运行态服务零触碰（重启须先请示）；远端代理 9228（用户自管）；D2 线分支与其 worktree 现场（`engine/d2-spin-guard-20260921` 及其未提交 WIP 零触碰）；`fill_engine.py`/`select_engine.py`
+- 验收口径：pin 扩展（引擎全链 + click listener 对比，实验 C 离线化）RED→GREEN；全量 verify-all 3 已知红零新增；分支交付「未合并待批」，湿测验收归合约线（评级页录 more-btn→回放全链通）
+- 注：不维护 CHANGELOG
+
+
+## 2026-09-21 11:02 · ZCode 引擎线 — 合并回执：B 类① + 小批次 + #970② 热修并入 V2.0（02764a04/251c461b）；⚠️ 运行磁盘待 D2 交付后恢复
+
+- 完成：两段合并入 uara_V2.0——**02764a04**（B 类① tssc 路由互拒收口，#970 验收 PASS）+ **251c461b**（挂账小批次 T1 常态弹窗按钮清单/T2 nav-reclick 落库尾缀 + **#970② 热修**）。已 push。
+- **#970② 定谳与修复（7a8c41eb）**：`button_text_identity` UnboundLocalError = **wet9 两已合并修复的交互潜伏缺陷**（81a7f22 幂等白名单使点【查询】跳过整个门块 → 变量初始化被跳过；d2adf8e3 nav-reclick 记忆块在门块外无条件引用）——非 8d131f72 所致（该提交只动 fill_engine）。修复=初始化移至门块前无条件执行；RED 复现生产同源异常（引擎兜底转 click-failed），pin 扩至 61 ✓。任务评审 Approved。
+- 合并态验收：全量 verify-all **219 过、失败集=3 已知红零新增**；核心 pin 全绿（fill-tssc-downgrade/idempotent-click-gate/phase-overlay-buttons/step-number-integrity 27/27/stop-semantics 27/27/element-dedup-scope）。agent-log 两段冲突按协议双方条目并排时间序消解（首次消解脚本静默失败致标记短暂入树，已 reset 重做，远端未见污染）。
+- 分支清理（按既定归档惯例）：远端 `engine/tssc-route-fix-20260920`/`engine/small-batch-20260921` → `archive/engine-*-archived`，本地已删；临时 worktree JS-gen-engine-sb 已移除。
+- **⚠️ 运行态提示（要紧）**：共享引擎 worktree 当前在 **D2 线分支**（其单元进行中）——**新录制会话的 Python 子进程从该磁盘加载，尚不含本批修复（会复现 #970② click-failed）**；Node 侧仍为 4098e49c+。待 D2 收工、worktree 恢复到 V2.0 最新（251c461b）后全部生效——恢复动作届时按规执行/请示。
+- **转 OpenCode 线**（#970③）：天元弹窗补关严格口径未达成——合约线假设"弹窗异步出现于补关窗口之后"，建议核对口触发时机与弹窗出现时序（证据 wet-tssc/cdp-precheck-tssc.json 首拍原文）。
+- 注：不维护 CHANGELOG
+
+
+## 2026-09-21 10:35 · ZCode 引擎线 — 收工：小批次 T1/T2 交付（T3 前置否决转登记，分支未合并待批，回链 10:02 开工）
+
+- 完成：挂账候选小批次收口，分支 `engine/small-batch-20260921`（1568143a = T1 e07935de + T2 6a1ab47e + F1 修复，已 push）。SDD 模式全流程：前置 Explore → 每任务 fresh implementer + task review → 终审 → 修复波次 + scoped re-review。
+- **T1 常态弹窗按钮清单**（e07935de + F1 修复 1568143a）：phase_end payload 携带 `overlayButtons`（复用 `_probe_overlay_button_texts`，非空才置=无弹窗零输出）→ runner phase_end 分支 `await appendPhaseDoneLog('overlay buttons: [a][b]…')`。终审抓出 F1（P2）：初版漏 await——全文件唯一非原子落库与主 done 文本并发会丢条目，已修 + pin 3c 升级钉 await 形态；scoped re-review CLEAN。
+- **T2 nav-reclick 入流**（6a1ab47e）：预算内放行的落库行尾缀 ` | nav-reclick-budget`（台账自证）；agent 面保持裸 `ok-clicked-{index}`；回放 `_result_ok` 按 `' | '` 取头段天然兼容（评审实证 _replay.py:338）。pin 第 10 组行为断言 RED→GREEN。
+- **T3 tree-select 降级：前置否决，放弃**——调研实锤执行器 tree 判定面显著宽于 fill 探测（`walkVueForTssc` 沿 `__vue__.$parent` + `[class*="tssc"]`/`.my-popover`，fill 探测仅五类 CSS），盲降级复发 #696 型误直填；且 select 侧 `tree_engine` 对 `no-tree-component` 已自动降级 fill（`ok-fill-fallback`）单向自愈、不成死环。**转登记为带条件候选**（条件：fill 探测补 Vue 链负向判定，成本超出小批次，待生产证据再议）。
+- 验收：临时 worktree（D:\dev\JS-gen-engine-sb）全量 verify-all **217 过**；唯一增量失败 `characterize-export-v3` 经查系临时 worktree 缺未跟踪 `config/.env`（DB 口令），补后 exit=0 自证，与批次无关。两任务评审 + 终审 + scoped re-review 全部 Approved/CLEAN；deferrable minors 全部入台账可留。
+- **跨线协同记录**：批次中途 **D2 线（另一引擎线会话）将共享 worktree 切至 `engine/d2-spin-guard-20260921`** 并声明本批"暂停让位"（其可写集与本批 T1 的 service.py、T2 的 click_action_engine.py 存在交叠）。处置：共享 worktree 让予 D2 线（其现场已还原干净），本批经**临时 worktree 完成 T2 落库与验收**，零互扰。**合并顺序提示**：D2 与本批均改 `scripts/agent/service.py`（D2 续跑 break 一行 vs 本批 phase_end payload，区域不同预计可自动合并）+ `verify-all.sh`（登记行并排惯例），后合并方负责冲突消解。
+- 状态：**未合并待批**——等 B 类分支（tssc-route-fix）合约线 PASS 合并后，本批随栈序并入（small-batch 基于其上）。生效：纯 Python 侧，合并入引擎 worktree 后新录制会话即效。
+- 注：不维护 CHANGELOG；SDD 台账 `.superpowers/sdd/engine-small-batch-20260921/progress.md`
+
+## 2026-09-21 10:02 · ZCode 引擎线 — 开工：挂账候选小批次（probe 常态清单 + nav-reclick 入流 + tree-select 降级，SDD 模式）
+
+- 进行中：用户批"小事项完成"并点名 subagent-driven-development 技能。三任务：**T1** probe 常态弹窗按钮清单（#917④b：阶段收口常态输出，限存在可见弹窗时，doneLog 尾注形态）；**T2** nav-reclick 放行入流（台账级可查，替代行为学反推）；**T3** tree-select 同款降级（**前置**：须先证 fill live 探测的 tree 识别面 ≥ 执行器判定面，否则放弃——误降级即 #696 型误直填）。
+- 分支策略：**栈式** `engine/small-batch-20260921` ← `engine/tssc-route-fix-20260920`（4a9fad33）——T3 与 B 类同落 fill_engine 仲裁区，栈式避免冲突；B 类合约线 PASS 合并后本批随其后并入。
+- 模式：SDD（fresh implementer per task → task review → 终审；subagent 不 commit，主会话验收代提交；SDD 台账 `.superpowers/sdd/engine-small-batch-20260921/progress.md`）。
+- 范围（可写集）：`scripts/agent/recorder_emitters.py`/`scripts/session_runner.py`（T1 候选落点）、`scripts/controller/actions/click_action_engine.py`（T2）、`scripts/controller/actions/fill_engine.py`（T3，仅仲裁分支）、相关 pin（RED 先行）、`scripts/refactor/verify-all.sh`、本分支 agent-log 条目
+- 禁入区：运行态服务（刚重启的 14224/27920——T1/T2 属 Python 侧，**新录制会话即生效，无需再重启**）；远端代理 9228（用户自管）；`select_engine.py`/`select_dispatch.py`；他线在途文件
+- 注：不维护 CHANGELOG
+
+## 2026-09-21 09:54 · ZCode 引擎线 — 重启完成：运行基点 39dadd7f（B 类 fill 修复 + OpenCode recording-page-bind 均 live），合约线验收通过前不合并
+
+- 完成：按用户指令执行重启窗口。现场状态：**控制面/本地执行机原本已停**（health=000、无 4097 监听；今晨 9:06 起的 pid 9228 系**用户自启的远端代理执行机**，连接 47.101.58.49——判定身份后未触碰）→ 本次为全新启动：控制面 **pid 14224**（health 200，EADDRINUSE 0）+ 本地执行机 registered online（nodeId 11，uuid 不变），均从引擎 worktree **39dadd7f**（B 类交付分支 tip）启动。
+- **生效面（本窗口双项）**：①**B 类①修复（fill 侧 tssc 互拒收口，8d131f72）**——纯 Python 侧，新录制会话即载；②**OpenCode `53047dbb` Node 侧 `recording-page-bind.js`**（录制 prepare 天元弹窗 trusted 补关）——随本次控制面重启生效。运行态 = V2.0 全量（cf4c7ae7 lineage）+ B 类分支增量。
+- **合并纪律（用户指令）**：B 类分支 **暂不合并**——等合约线湿测验收通过后再并入 uara_V2.0。
+- **请合约线验收**（下单一）：①首选复测 B 类①场景（选择弹窗内 tssc 字段 fill/select 交互）：不应再出现 `err-use-tssc-multi-select ↔ no-tssc-multi-select` 互推；stderr 若见 `[fill][tssc-route-conflict] store kind=tssc-multi-select live=plain` 即为降级放行留痕（预期行为非异常）；②同时观察真 tssc 字段仍正常走 select_option 路由（#865 对照形态不退化）；③顺带观察录制 prepare 时天元弹窗不再残留致 agent 暂停（OpenCode 项）。
+- 注：不维护 CHANGELOG；运行态操作轮次
+
+## 2026-09-21 09:46 · ZCode 引擎线 — 收工：B 类移交处置交付（fill 侧 tssc 互拒收口 + analyze 粒度结论，分支未合并待批，回链 09:12 开工）
+
+- 完成：B 类报告三项处置完毕，commit 8d131f72，分支 `engine/tssc-route-fix-20260920`（已 push；主检出有 Cursor 未推送提交故本单元条目均落本分支）。**4 files +350/−80**（fill_engine.py / 新 cold pin / verify-all.sh 登记 / 专项报告 §6）。
+- **①TsscMultiSelect 互拒（traj #864）**：修复=fill 侧 live 探测升级**三态返回**（tssc/tree 命中 | `plain` 确定性否认 | `unresolved`/`ambiguous` 不可判定）+ store/live 仲裁——store 判 tssc 且 live=plain → 降级放行走正常 fill + `[fill][tssc-route-conflict]` stderr 留痕；live 命中仍硬拒（保 #696 护栏）；不可判定维持拒绝。record/replay 两段同码（pin 断言逐字节一致）。**select 侧（216b2688）零触碰**——至此链路闭合：任一侧确定性否认即放行/诚实失败，互拒死循环结构性不可能。worker 实现含 `_FakePage` 行为冒烟三场景（RED 15 failures → GREEN）。
+- **③analyze 粒度结论**（已写入 `docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md` §6）：**不写展开类硬规则、不做 create 自动拆分兜底**——27 轨量化主导偏差是过碎（Rule 9「能少则少」已在）、Rule 3/3.1 状态边界原则已覆盖该形态、机械拆点依赖业务语义不可判；干预走门闩（阶段描述点名"展开后确认字段集出现再填"）；候选措辞 3.2 备查未落库（启用需 wet 观察）；engine-workaround 两卡确认 `no-workaround`（对应缺陷已修 5dcbd955/cee623e1）。**②闭环记录无动作**（1a9ec7d9+cee623e1，#924 已验收）。
+- 验收证据：新 pin `characterize-fill-tssc-live-downgrade` RED→GREEN（源码 needle + 行为冒烟）；tssc 家族四 pin + fill-already-filled/fill-dispatch 回归全绿；全量 verify-all 失败集=**3 已知红零新增 219 过**（本分支基点含他线新 pin）。观察记录：新 pin 首跑曾偶发 exit=1——经用户说明系**其当时切换网络所致**（browser-use telemetry 首跑发网络请求，切网中断即非零退出；09-21 09:46 前后另有一次后台 verify-all 亦被用户暂停），连跑 3×exit=0 稳定，非 pin 缺陷；后续读表者遇 telemetry 网络类偶发可先排除环境再查代码。
+- 状态：**未合并待批**。生效：纯 Python 侧，**合并入引擎 worktree 后新录制会话即生效，无需重启**。
+- 遗留移交：①`tree-select` 未做同款降级（无生产证据，且同款 #696 护栏保护，登记候选）；②`lookup_field_kind` 取 `_scan_fields` 首条的多候选权威排序（调研 §2）未动——降级放行已使分歧无害化，登记候选；③另有一项**此前已批待办**：重启窗口使 OpenCode Node 侧 `recording-page-bind.js` 生效（等用户点名）。
+- 注：不维护 CHANGELOG
+
+## 2026-09-21 09:12 · ZCode 引擎线 — 开工：B 类移交处置（TsscMultiSelect 路由互拒 fill 侧收口 + analyze 粒度策略结论）
+
+- **收件**：合约线 B 类移交报告 `docs/reports/2026-09-20-b-class-handover-engine-line.md`（本地分发区，不入 git）三项——①TsscMultiSelect 路由互拒（traj #864，唯一需新动作）；②stepNumber 空号/同号双行（已闭环，仅记录）；③analyze 合并阶段（策略待确认）。
+- **①调研定谳（Explore 只读调研 + 现场复核）**：**select 侧半边已在库**（`216b2688` = 引擎线 B-1：执行器 live 复核否认 tssc 时 `[tssc-route-conflict]` 落日志并 fall through el-select，不再把 `no-tssc-multi-select` 回抛给 agent）；**残缺在 fill 侧**——`fill_engine.py` 的 kind「只升不降」：快照判 tssc 时，即使 live 探测**明确解析到字段项且无 tssc 后代**（确定性否认，区别于 `''` 歧义/未解析）仍硬拒 `err-use-tssc-multi-select` → 与 select 的旧行为构成互推（#864 7 步不收敛）；歧义源=同 label 多候选（查询区「客户名称」普通 input vs 向导抽屉真 tssc，`lookup_field_kind` 取 `_scan_fields` 首条）。
+- **①本单元修复**：fill 侧加「live 明确否认 → kind 降级为空 + `[fill][tssc-route-conflict]` 日志 + 继续正常 fill」；live 命中 tssc 仍硬拒（保 #696 防误直填护栏）；不动 `select_engine.py`/`select_dispatch.py`（216b2688 已单向化）；新增冷 pin 护栏（仿 `characterize-tssc-route-conflict` 的行为冒烟：store 判 tssc + live 否认 → 不返回 err；live 命中 tssc → 仍返回 err）。护栏基线=既有两枚冷 pin（`characterize-tssc-multi-select` / `characterize-tssc-field-resolution`）。
+- **③结论（引擎侧，随本单元写入专项报告）**：见 `docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md` 末尾「引擎线结论」节——**不写动作类型硬规则、不做 create 侧自动拆分兜底**，理由=27 轨量化（仅 4 条人工调整、净段数非判据）+ 既有提示词已含 3.1 状态边界硬原则与 Rule 9「能少则少」；给出可随时启用的候选措辞备查。
+- 上游：uara_V2.0（tip cf4c7ae7）。分支 `engine/tssc-route-fix-20260920`。
+- 范围（可写集）：`scripts/controller/actions/fill_engine.py`（fill 侧降级分支）、新 cold pin、`scripts/refactor/verify-all.sh`（登记）、`docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md`（追加引擎线结论节）、本分支 agent-log 本条目+收工条目
+- 禁入区：**运行态服务零触碰（重启须先请示）**；远端代理（用户自管）；`select_engine.py`/`select_dispatch.py`（216b2688 已收敛，勿动）；引擎 worktree 内他线未提交 WIP（`data/kb/flows/product_element.json`、`data/kb/req/product-mgmt/{through-chains.md,chapters/03-…}`——Cursor 线在途，不触碰）；主检出未推送的他线提交（Cursor 7bb27e9c/5cb2a999，其未批 push）——故本单元条目写在交付分支上，不落主检出。
+- 注：不维护 CHANGELOG
+
+## 2026-09-21 11:45 · ZCode 引擎线 — 收工：D2 SUT 503 阶段空转守卫交付（SDD 全流程，含终审阻断 F1 修复，分支未合并待批，回链 11:00 开工）
+
+- 完成：commit 链 `42246117`（开工）→ `c40bb502`（守卫实现+pin）→ `974c23f9`（终审 F1 修复：幂等改 phase+runId 双键）→ `18caffbe`（设计稿/todo 登记）→ `0f093176`（merge `0cbc19b2` 归档条目，agent-log 冲突按协议双方并排）。分支 `engine/d2-spin-guard-20260921`（自 `1bc5aa81` 切，不叠 B 类/小批次栈）。
+- **交付**：`scripts/agent/recorder_emitters.py` 新增 `_guard_spin_on_step_end`（A1 页面文本/A3 URL 错误页/A4 关键 DOM 缺失 × B 无进展三信号〔done 数增长/pathname 变化/新容器首开，重开不算〕双条件；`SUT_SPIN_GUARD_MODE` 四档**默认 off**，off 与 stall 未满窗两档零页面 I/O；soft/hard 触发=直发 `phase_error(reason='sut_unavailable_spin_guard', spinGuard{...})`+停 agent；**幂等=phase+runId 双键，重录/相位推进自动重武装**）；`recorder.py` on_step_end 接入（done 门禁前，自带 try/except）；`service.py` 续跑循环补 stopped break；pin `characterize-sut-spin-guard`（**91 断言**）入 verify-all。A2（网络 5xx）缓发——`network_capture` 只发内存事件 store 无读取路径（设计稿 §12 三裁定全文）。
+- **SDD 过程**：实现者（RED 18/21→GREEN）→ 任务评审规格✅+Approved（4 Minor/2 Info）→ 主会话验收 → 终审 **NO**（阻断 F1：重录路径〔runner :390-391 同 runtime 换 runId 再录、失败收尾不关 session〕存在同进程同 store 同相位重入，原「同阶段」幂等会 neuter 重录相位 on_step_end 尾段〔done 门禁/循环检测/CSS 补抓失效〕且守卫不再武装——**#925 本身即重录场景**，我此前 parked 裁定被代码证据推翻）→ 修复（resume 实现者，pin+18 断言 10a/10b/10c）→ 定向复审 F1/F4 ADDRESSED、**合并就绪 YES**。
+- 验收证据（合并态=`0f093176` 含 `0cbc19b2`）：pin 91 断言全过（主会话复跑 2 次）；py_compile 过；全量 verify-all **191 过 / 失败集=3 已知红（step-highlight/layer-tree/confirm-notification）零新增**（合并前 `tmp/verify-all-d2-20260921.log`、合并后 `tmp/verify-all-d2-merged-20260921.log` 两份）。
+- **F2 表述项（终审要求显式写明）**：`service.py:605-607` 的续跑 break **不受 mode 门控、是无条件行为变化**——影响既有 goal-loop stop/heal 空转 stop/cycle-deviate stop/cancel 四路径的预算续跑（效果=裁掉停止后的 0 步僵尸轮，属正向修复，verify-all 零新增红佐证）；「默认 off 零行为影响」承诺仅对守卫本体成立，他线归因时注意。
+- 生效面：纯 Python 录制侧；**默认 off 合并零行为影响**（守卫本体）；新录制会话磁盘加载即生效无需重启；人工录制（manual_recorder 不经此钩子）与回放不走 build_recording_hooks 均不受影响。
+- 状态：**未合并待批**（branch-only 交付）。
+- 遗留移交：①**湿测验收移交合约线**（前置在线 SUT+执行机，当前停机）：observation 档 #925 复现场景必须命中 + 正常长阶段（多轮填写/树搜索/分页）不得误杀 → 按湿测数据逐级升档（observation→soft→hard），默认值升 hard 须 Lead 批；②A2 网络 5xx 检测=条件候选（须先挂 memory writer 旁路）；③observation 期关注项：A3 `/error` 子串可能过匹配业务路由（终审 F5）、满窗后每步 stderr 一行、A3/A4 按探测步计数默认窗口下触发滞后放大（调参知会）；④小批次 SDD T1/T2 让位解除，可重启（其 T2 WIP 曾现于本 worktree 后被其会话收走，本单元与其零交集）。
+- 注：不维护 CHANGELOG
+
+## 2026-09-21 11:00 · ZCode 引擎线 — 开工：D2 SUT 503 阶段空转守卫实施（系统线已验证，设计稿三阶段，默认 off）
+
+- **收件**：系统线 2026-09-21 10:00 验证收工（`1bc5aa81`）——D2 问题真实、归属引擎线、按设计稿 `docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md` 实施；两勘误（①idle watchdog=「有落库动作才不触发」纯读操作空转 10min 反会触发使整 run 失败，观测模式以此为边界；②`phase_error` 现无 reason 字段，加法改动 Node 侧只读 message 兼容无破坏）已吸收进实现。
+- **本线前置复核（systematic-debugging Phase 1-2，独立复核非盲信）**：`ok-clicked` 落库无视错误页（click_action_engine.py:932-936）、Node watchdog 只喂三类落库事件（trajectory-recording-runner.js L53/L766-777）、agent 五出口无业务进展判断（service.py:593 续跑循环仅 cancel/done/工作完成三出口）、既有循环检测为何漏掉 #925（相邻周期匹配 `fps[-cycle_len*2:]`，#925 双轮间隔恰好不足 2×cycle_len 条目）——全部实锤与系统线一致。
+- **实施裁定（三点，随开工条目公示）**：①**A2（网络 5xx）缓发**——设计稿假设从 `business_data_store` 读网络状态，实查 `network_capture.py` 走 `emit_memory_event('network_captured')` 内存事件、store 无该键，读取路径不存在；A1（页面文本，#925 实证形态）+A3（URL 错误页）+A4（关键 DOM 缺失）先行，A2 留待湿测期评估是否值得挂 memory writer 旁路。②**soft/hard 进程内行为同构**——设计稿 §6.2 状态机读字面两者都是「emit phase_error(reason) + 停 agent」，真正的分级旋钮是环境默认档位（off→observation→soft/hard），进程内差异仅 mode 留痕字段。③**条件 B 进展信号取三**：task_list done 数增长 / URL pathname 变化 / 新容器（首次出现的 container；**重开已见容器不算进展**——防 #925 型「重开下拉」循环把容器翻转误计为进展）；设计稿第(4)项「成功保存」实践上必伴随前三者之一，不单设信号。守卫只在 B 窗口满（默认 N=6 步无进展）后才做 A 检测（一次 page.evaluate），正常步零页面 I/O。
+- **触发语义**：soft/hard 触发 = 守卫在 `on_step_end` 直发 `phase_error(reason='sut_unavailable_spin_guard', spinGuard={mode,sutSignal,progressWindow,stepsSinceProgress})`（Node 侧 errP :1061 消费、快失败）+ `agent.state.stopped=True` + `goal_tracker['stopped']=True`（防 service.py 续跑循环空转轮；顺带给该循环补一行 `goal_tracker.stopped` break——现有 goal-loop stop 路径同样受益）；observation 只打 `[spin-guard] observed` stderr 留痕。**默认 off，零行为影响**；off 档零页面 I/O。
+- **分支**：`engine/d2-spin-guard-20260921` 自 `origin/uara_V2.0`（tip `1bc5aa81`）新切——不叠在 B 类/小批次栈上，D2 与其零文件交集，交付解耦。**小批次 SDD（engine/small-batch-20260921）T1/T2 暂停让位**：该批无代码落地（工作区干净、无 commit），其声明可写集与本单元重叠 `recorder_emitters.py`，本单元优先，T1/T2 待本单元收工后重启。
+- 范围（可写集）：`scripts/agent/recorder_emitters.py`（新 `_guard_spin_on_step_end`）、`scripts/recorder.py`（on_step_end 调用点一行）、`scripts/agent/service.py`（续跑循环 break 一行）、新 pin `scripts/characterization/characterize-sut-spin-guard.py`、`scripts/refactor/verify-all.sh`（注册）、设计稿状态行、`docs/superpowers/todo-list.md`（D2 行）、agent-log 本条目+收工条目
+- 禁入区：运行态服务零触碰（远端代理 9228 用户自管）；`select_engine.py`/`select_dispatch.py`/`fill_engine.py`/`click_action_engine.py`（他线/在途热区）；`scripts/prompts/**`（设计稿非目标：不改 prompt）；`data/kb/**`；engine/small-batch-20260921 与 engine/tssc-route-fix-20260920 分支（暂停不废弃）
+- 方式：RED pin 先行（源码 needle + `_FakePage` 行为冒烟：off 零 I/O / observation 只观测 / A+B 双条件 / B 有进展不触发 / A 不成立不触发）→ 实现 → GREEN → pin 家族回归 + 全量 verify-all（3 已知红零新增）→ 合并后验收 → 收工条目。湿测（#925 复现命中 + 正常长阶段不误杀）前置在线 SUT+执行机，移交合约线，代码默认 off 不阻塞合并。
+- 附带两条系统线发现已吸收：a) #925 终态疑被批量作业覆写——归属 V2.0.1 状态归因改进，引擎线不动；b) 事发执行机 nodeId 8/7（非 10）——证据引用已按此校准。
+- 注：不维护 CHANGELOG
 
 ## 2026-09-21 11:55 · OpenCode 系统线 — 收工：executor 未知会话终态快失败 + reconcile 清理残留内存绑定（回链 11:30 开工，commit 255d15b2）
 
@@ -37,7 +151,6 @@
 - 验收：移动后主区 `find -mtime +7` 残留=0；提交面仅 `docs/superpowers/**` + `.gitignore` + `AGENTS.md`（137 文件）；零代码改动，无验收命令需重跑；`git pull` 合流态（Already up to date）。
 - 遗留移交：todo-list 归档行内历史链接已改指 archive/，agent-log 历史条目内旧路径按惯例不回改（archive/README 有路径口径说明）；`prompt-engineering/`、`decisions/` 等近期目录未动。
 - 注：不维护 CHANGELOG；本条与代码提交一并 push。
-
 
 ## 2026-09-21 10:00 · ZCode 系统线 — 收工：D2（SUT 503 阶段空转）问题真实性验证 + 三线归属裁决（只读，无代码变更，免开工声明按约补收工）
 

@@ -19,6 +19,9 @@ Fix pins (RED->GREEN):
      still rejected.
 """
 
+import asyncio
+import contextlib
+import io
 import re
 import sys
 from pathlib import Path
@@ -185,6 +188,213 @@ def main() -> None:
     check(first == 1 and again == 2 and third == 3, "budget counter bumps 1,2,3")
     other = _bump_nav_reclick(store2, "click://x/a[37]")
     check(other == 1, "budget is per-element, not shared across identities")
+
+    # 10. 合约线移交（2026-09-21）：预算内放行的 nav 重击在落库文案自证 ——
+    #     放行分支置 nav_reclick_pass 标志，落库点（普通点击的
+    #     _record_action('click_element_by_index') 那一处）result 尾缀
+    #     '| nav-reclick-budget'。stderr 文案 / already-operated 拒绝文案 /
+    #     预算常量与计数逻辑（上方 7–9 已钉）一律不动；其余 ok-clicked
+    #     构造（最终 _ok 返回、tree/radio 变体）不带尾缀。
+    check(
+        "nav_reclick_pass = True" in src,
+        "budget-allowed branch sets the nav_reclick_pass ledger flag",
+    )
+    check(
+        "nav_reclick_pass = False" in src,
+        "nav_reclick_pass defaults False in click_element_by_index scope",
+    )
+    suffix_hits = src.count("| nav-reclick-budget")
+    check(
+        suffix_hits == 1,
+        f"suffix '| nav-reclick-budget' wired at exactly one ok-clicked point "
+        f"(found {suffix_hits})",
+    )
+    rec_idx = src.find("_state._record_action('click_element_by_index'")
+    suffix_idx = src.find("| nav-reclick-budget")
+    check(
+        rec_idx >= 0 and suffix_idx > rec_idx and (suffix_idx - rec_idx) < 500,
+        "suffix sits at the plain-click record point "
+        "(_record_action('click_element_by_index'))",
+    )
+    check(
+        "return _ok(f'ok-clicked-{index}')" in src,
+        "agent-facing ok copy unchanged (final _ok stays bare ok-clicked-{index})",
+    )
+
+    from scripts import state as _state  # noqa: E402
+    from scripts.controller.actions.click_action_engine import ClickEngine  # noqa: E402
+
+    class _FakeElementNode:
+        tag_name = 'li'
+        xpath = '//li[@class="el-menu-item"]'
+        attributes = {'class': 'el-menu-item'}
+
+        def get_all_text_till_next_clickable_element(self):
+            return '产品库管理'
+
+    class _QueryButtonNode:
+        # #970 回执②：弹窗内【查询】按钮（幂等白名单 label）——修复前走
+        # 幂等旁路跳过整个门块，button_text_identity 未赋值即被收口记忆块
+        # 读取 → UnboundLocalError（click-failed，agent 被迫绕行）。
+        tag_name = 'button'
+        xpath = '//div[@class="query-bar"]/button[1]'
+        attributes = {'class': 'el-button el-button--primary'}
+
+        def get_all_text_till_next_clickable_element(self):
+            return '查询'
+
+    class _FakePage:
+        url = 'http://sut/app/list'
+
+        async def evaluate(self, _js, _arg=None):
+            # All gate probes (date-panel / dd-gate / search-ui / tree-node /
+            # overlay-title / loading) resolve falsy with this fixture.
+            return {}
+
+    class _FakeBrowserContext:
+        def __init__(self, page, node=None):
+            self._page = page
+            self._node = node if node is not None else _FakeElementNode()
+
+        async def get_current_page(self):
+            return self._page
+
+        async def get_dom_element_by_index(self, index):
+            return self._node
+
+        async def _click_element_node(self, _node):
+            return None
+
+    async def _nav_reclick_ledger_behavior():
+        identity = 'click:' + _FakeElementNode.xpath
+
+        # (a) 首次点击（非放行）：落库 result 不带尾缀、无 [nav-reclick] stderr。
+        _state._ACTION_LOG.clear()
+        store_a: dict = {}
+        engine_a = ClickEngine(_FakeBrowserContext(_FakePage()), store_a)
+        buf_a = io.StringIO()
+        with contextlib.redirect_stderr(buf_a):
+            await engine_a.click_element_by_index(1)
+        entry_a = _state._ACTION_LOG[-1] if _state._ACTION_LOG else {}
+        check(
+            entry_a.get('action') == 'click_element_by_index'
+            and entry_a.get('result') == 'ok-clicked-1',
+            f"first click records bare ok-clicked-1 (no suffix), got {entry_a.get('result')!r}",
+        )
+        check(
+            '[nav-reclick]' not in buf_a.getvalue(),
+            "first click emits no [nav-reclick] stderr",
+        )
+
+        # (b) 预算内放行（重复导航点击，used=1<=1）：落库 result 带尾缀；
+        #     [nav-reclick] stderr 保留；agent 返回文案不带尾缀。
+        _state._ACTION_LOG.clear()
+        store_b: dict = {}
+        remember_phase_operation_aliases(store_b, [identity], 'click_element_by_index')
+        engine_b = ClickEngine(_FakeBrowserContext(_FakePage()), store_b)
+        buf_b = io.StringIO()
+        with contextlib.redirect_stderr(buf_b):
+            res_b = await engine_b.click_element_by_index(1)
+        entry_b = _state._ACTION_LOG[-1] if _state._ACTION_LOG else {}
+        check(
+            '[nav-reclick]' in buf_b.getvalue(),
+            "budget-allowed pass keeps the [nav-reclick] stderr trace",
+        )
+        check(
+            entry_b.get('action') == 'click_element_by_index'
+            and entry_b.get('result') == 'ok-clicked-1 | nav-reclick-budget',
+            f"budget-allowed pass records ok-clicked-1 | nav-reclick-budget, "
+            f"got {entry_b.get('result')!r}",
+        )
+        check(
+            '| nav-reclick-budget' not in str(getattr(res_b, 'extracted_content', '')),
+            "agent-facing ok copy of the allowed pass carries no ledger suffix",
+        )
+
+        # (c) 预算耗尽（used=2>1）：拒绝文案原样、不带尾缀，且不再落库。
+        _state._ACTION_LOG.clear()
+        store_c: dict = {}
+        remember_phase_operation_aliases(store_c, [identity], 'click_element_by_index')
+        _bump_nav_reclick(store_c, identity)
+        engine_c = ClickEngine(_FakeBrowserContext(_FakePage()), store_c)
+        with contextlib.redirect_stderr(io.StringIO()):
+            res_c = await engine_c.click_element_by_index(1)
+        rc_text = str(getattr(res_c, 'extracted_content', res_c))
+        check(
+            rc_text.startswith('already-operated-this-phase')
+            and 'budget exhausted' in rc_text,
+            f"budget-exhausted rejection copy intact, got {rc_text[:60]!r}",
+        )
+        check(
+            '| nav-reclick-budget' not in rc_text,
+            "budget-exhausted rejection carries no ledger suffix",
+        )
+        check(
+            len(_state._ACTION_LOG) == 0,
+            f"budget-exhausted rejection records no new entry "
+            f"(got {len(_state._ACTION_LOG)})",
+        )
+
+    asyncio.run(_nav_reclick_ledger_behavior())
+
+    # 11. #970 回执②（2026-09-21）：幂等白名单 label（查询）跳过整个门块，
+    #     收口记忆块（门块之外、点击成功后无条件执行）读取
+    #     button_text_identity → UnboundLocalError（生产 5-6 次 click-failed）。
+    #     修复钉两点：门块之前无条件初始化（与 date_panel_click /
+    #     select_trigger_click 同区）；记忆块仍按 if button_text_identity:
+    #     追加——button 身份为空时 identities 仅为 click 身份，不追加别名。
+    async def _idempotent_query_button_remember_aliases():
+        _state._ACTION_LOG.clear()
+        store_q: dict = {}
+        engine_q = ClickEngine(
+            _FakeBrowserContext(_FakePage(), _QueryButtonNode()), store_q,
+        )
+        raised = ''
+        res_q = None
+        try:
+            res_q = await engine_q.click_element_by_index(1)
+        except Exception as exc:  # characterization: report, do not swallow
+            raised = f'{type(exc).__name__}: {exc}'
+        res_text = str(getattr(res_q, 'extracted_content', res_q)) if res_q is not None else ''
+        # RED 证据形态：引擎外层兜底把 UnboundLocalError 转成
+        # click-failed:cannot access local variable 'button_text_identity' ...
+        # （生产 #970 的 res=click-failed 同源）；GREEN 后必须回到 ok-clicked-1。
+        check(
+            not raised and res_text == 'ok-clicked-1',
+            f'query-button (idempotent) click succeeds as bare ok-clicked-1 '
+            f'without UnboundLocalError, got raised={raised!r} result={res_text!r}',
+        )
+        entry_q = _state._ACTION_LOG[-1] if _state._ACTION_LOG else {}
+        check(
+            entry_q.get('action') == 'click_element_by_index'
+            and entry_q.get('result') == 'ok-clicked-1',
+            f"query-button click records bare ok-clicked-1, got {entry_q.get('result')!r}",
+        )
+        # remember_phase_operation_aliases 把收到的每个 identity 写进
+        # _phase_ai_operations（键经 _operation_key 规范化）：断言收到的
+        # identities 仅为 click 身份——button: 别名未被追加。
+        ops_q = store_q.get('_phase_ai_operations') or {}
+        expected_key = 'click:' + _QueryButtonNode.xpath
+        check(
+            set(ops_q.keys()) == {expected_key},
+            f'remember received only the click identity (no button: alias), '
+            f'got {sorted(ops_q.keys())!r}',
+        )
+
+    asyncio.run(_idempotent_query_button_remember_aliases())
+
+    check(
+        'if button_text_identity:' in src,
+        "memory block still guards on button_text_identity "
+        "(button alias appended only when set)",
+    )
+    check(
+        src.count("button_text_identity = ''") == 1
+        and src.find("button_text_identity = ''")
+        < src.find("if not date_panel_click and not _is_idempotent_click_label("),
+        "button_text_identity initialized unconditionally before the gate block "
+        "(single init, outside the idempotent/date-panel bypass)",
+    )
 
     if failures:
         print(f"FAILED ({len(failures)})")

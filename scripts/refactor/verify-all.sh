@@ -172,6 +172,7 @@ run "characterize-fill-err-with-scope" "$PY" scripts/characterization/characteri
 run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/characterize-search-then-click-guard.py
 run "characterize-search-then-click-prompts" "$PY" scripts/characterization/cold/characterize-search-then-click-prompts.py
 run "characterize-idempotent-click-gate" "$PY" scripts/characterization/characterize-idempotent-click-gate.py
+run "characterize-sut-spin-guard" "$PY" scripts/characterization/characterize-sut-spin-guard.py
 run "characterize-fill-replay-engine" "$PY" scripts/characterization/cold/characterize-fill-replay-engine.py
 run "characterize-select-dispatch" "$PY" scripts/characterization/cold/characterize-select-dispatch.py
 run "characterize-select-replay-engine" "$PY" scripts/characterization/cold/characterize-select-replay-engine.py
@@ -179,6 +180,8 @@ run "characterize-radio-replay-engine" "$PY" scripts/characterization/cold/chara
 run "characterize-click-replay-engine" "$PY" scripts/characterization/cold/characterize-click-replay-engine.py
 run "characterize-tssc-multi-select" "$PY" scripts/characterization/cold/characterize-tssc-multi-select.py
 run "characterize-tssc-route-conflict" "$PY" scripts/characterization/characterize-tssc-route-conflict.py
+# traj 864 fill 侧收口：store kind=tssc + live 确定性否认（plain）→ 降级放行
+run "characterize-fill-tssc-live-downgrade" "$PY" scripts/characterization/cold/characterize-fill-tssc-live-downgrade.py
 run "characterize-picker-atomic-recording" "$PY" scripts/characterization/cold/characterize-picker-atomic-recording.py
 run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs
