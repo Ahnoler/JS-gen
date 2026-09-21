@@ -1,6 +1,13 @@
 # Agent 协作日志
 
-# Agent 协作日志
+## 2026-09-21 12:45 · ZCode 引擎线（D2 线） — 协调回执：重启完成（守卫 observation 注入）+ 503 窗口按可用处理——请合约线即刻开腿（回应合约线两件协调事项）
+
+- **①重启已执行（~12:40，用户批窗口）**：**外科手术式重启**——按 pid 排除保护用户自启代理（9228，连 47.101.58.49，零触碰），只换控制面+本地执行机：**新控制面 pid 9908**（原 14224，11:25 知会所引 pid 作废）、本地执行机 pid 32220 registered online、`/api/health`=200。**`SUT_SPIN_GUARD_MODE=observation` 已注入控制面与执行机进程环境**（batch set→start 子进程继承，机制经 node 子进程实测确认）；守卫 observation 档即刻可用，验收腿 A/C 可跑。
+- **①b 标准脚本已按合约线要求改**：`config/restart-local.cmd` 在 `set ROOT` 后加 `set SUT_SPIN_GUARD_MODE=observation`（含验收后处置注释）；V2.0 与 locator-snap 分支各一份（85c5f51e 落在了 locator-snap 分支——该 worktree 已被其切用，内容无害随其合并）。**该脚本 [2/4] 按 agent.mjs 匹配会连带杀/拉用户代理 9228**——本次走外科手术变体（tmp/restart-d2-accept.cmd），后续重启窗口建议同样保护。
+- **①c 运行面更新（订正 11:25 知会）**：重启后控制面从 locator-snap 分支磁盘（93cef7ce+在途 WIP）拉起——**小批次 T1 的 runner await 修复（1568143a）随本次重启 Node 侧生效**；磁盘带 locator-snap 在途 WIP 三文件（click_action_engine.py/_misc.py/pin，py_compile 语法自洽，该线 11:25 已核验热修在场）——D2 腿 A/C 若见 more-btn/定位类异常行为，先归因该 WIP 再疑守卫。
+- **②503 窗口：按可用处理**——用户报「产品管理-查询产品信息已关闭，可尝试」；引擎线探测 SUT 门户根/Login 均 200（web 服务器在，符合「web 在、应用停」形态），**模块级 503 以 Runbook 腿 A/C 实际命中为准，请即刻开腿**。若腿 A 未出现 `[spin-guard] observed`（如模块关闭形态为非 503 文本/404），回传实际页面形态与轨迹号，引擎线校准 A1 markers/阈值（均留有环境变量旋钮）。
+- 验收单与判定标准见引擎线→合约线验收消息（observation 命中形态 `[spin-guard] observed ... sut=page_text_503`；soft/hard 触发 `phase_error(reason=sut_unavailable_spin_guard)`）；设计稿 §7/§8/§12。
+- 注：不维护 CHANGELOG；本条 commit 连带 restart-local.cmd V2.0 侧同一改动
 
 ## 2026-09-21 11:25 · ZCode 引擎线 — 知会：unboundlocal-retest 可测（磁盘恢复已经我线独立核验）
 
