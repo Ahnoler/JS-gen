@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-21 10:00 · ZCode 合约线 — 开工：B 类① TsscMultiSelect 路由互拒修复复测单（wet4 场景重建，运行基点 39dadd7f）
+
+- 进行中：引擎线重启至 39dadd7f（本地 merge 态；health 200/pid 14224/LMY 空闲已核），两项待验收：①**TsscMultiSelect 路由互拒修复**（B 类移交①）②prepare 天元弹窗补关（OpenCode 线）。本单重建 wet4 #864 P6 场景：**对公客户评级（fid 9000000011）→【选择客户】弹层「客户名称」字段 fill/select 交互**——旧引擎 7 步互推死循环（err-use-tssc-multi-select ↔ no-tssc-multi-select），#865 同字段 tssc 路由一次成功为对照形态。任务 7 阶段（导航→引入弹窗→查询→评级申请抽屉→**选择客户弹层验收点**：字段 fill 尝试≤2 次后正常点选→回显核验→收尾不提交）。引擎预期留痕：`[fill][tssc-route-conflict] store kind=tssc-multi-select live=plain` 为降级放行非异常。
+- 验收②口径：prepare 后 CDP 预检 dialogs=[]（天元弹窗补关生效即无残留弹窗）。
+- 范围（可写集）：`tmp/contract-wet9-20260919/`（tssc 验收单证据子目录）、agent-log 本条目与收工条目、executor 日志只读（D:\dev\JS-gen-engine\tmp\executor-main.log 新增行）
+- 禁入区：`scripts/**`、`src/**`、SUT 存量数据（本单无 stamp，纯查询/弹层交互）、**不提交评级申请**（客户在途业务墙非本单目标）
+- 方式：主线程 analyze/create → 派发操作员 → 主线程独立落库验收（互拒签名扫描 + select dispatch 对照）→ through-report → 回执引擎线（附交易号；通过后引擎并 engine/tssc-route-fix-20260920 @ 8d131f72）
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-20 18:55 · ZCode 合约线 — 完成：B 类移交测试报告两份（引擎线/系统线，按用户指示即时执行）
 
 - 完成：用户指示「写两份，一份引擎线，一份系统线」。本次为**文档撰写单元（用户直接指示即时执行，未预先开工声明）**，产出：
