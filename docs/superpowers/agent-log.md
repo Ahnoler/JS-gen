@@ -17,6 +17,15 @@
 - **口径**：沿用粒度卡 `no-workaround` 纪律——已修复的引擎规避（fill 去重拆阶段等）标 `engine-side`，勿让 Cursor 写成 coach 铁律；卡面事实以 agent-log 原文为准。
 - 注：文档交付轮次，无代码改动
 
+## 2026-09-21 12:15 · ZCode 合约线 — 开工：D2 spin-guard 验收执行（observation 档 B 腿先行，运行基点 9ee4af45）
+
+- 进行中：前置四项核验通过——health 200/pid 9908（新重启）；引擎 worktree 实际在 **9ee4af45**（=75b75925 超集，另含 more-btn 图标按钮修复单元；D2 0cbcbd35 与 #970② 热修 251c461b 均为祖先、守卫代码在场——比引擎通报基线多一个已完成单元，属增量不影响验收）；restart-local.cmd:27 `set SUT_SPIN_GUARD_MODE=observation` 在场；LMY 空闲。**SUT 当前 200 正常态→先跑 B 腿（observation 零误报），A 腿等 503 窗口信号**。
+- B 腿双轨迹：**B1=评级弹层交互**（#970 配方复用，查询/弹层密集形态；注：unboundlocal-retest 已被并行会话 #971 核销 PASS，本轨不再携带该使命）+ **B2=产品库增删自清循环**（#924 配方复用，fill/树搜索覆盖）。两轨判据=全程 **0 条 `[spin-guard]` 日志**（observation 档零误报）+ 业务结果与基线一致。
+- 范围（可写集）：`tmp/contract-wet9-20260919/d2-acceptance/`（证据）、agent-log 本条目与收工条目、executor 日志只读（新增段）
+- 禁入区：`scripts/**`、`src/**`、SUT 存量数据（B2 仅动已删净的复用 stamp：wet9B3W/wet9阶段W-20260920）
+- 方式：单操作员顺序跑 B1→B2 → 主线程独立核验（[spin-guard] 扫描 + 步号/结果基线比对）→ A 腿等窗口 → soft 档换档重跑 → 汇总判定
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-21 11:55 · ZCode 合约线 — 收工：unboundlocal-retest PASS（traj 971，回链 11:42 开工）
 
 - 完成：#970 P2 弹窗【查询】点击路径复测全管线收口（`tmp/contract-wet9-20260919/wet-unboundlocal/` + `through-report-unboundlocal.md`；traj 971，fid 9000000011/acct 2，7 阶段 2623..2629，pid 9908 全程 5 采样未变）。
