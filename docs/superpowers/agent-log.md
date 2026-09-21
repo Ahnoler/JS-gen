@@ -1,5 +1,33 @@
 # Agent 协作日志
 
+## 2026-09-21 09:54 · ZCode 引擎线 — 重启完成：运行基点 39dadd7f（B 类 fill 修复 + OpenCode recording-page-bind 均 live），合约线验收通过前不合并
+
+- 完成：按用户指令执行重启窗口。现场状态：**控制面/本地执行机原本已停**（health=000、无 4097 监听；今晨 9:06 起的 pid 9228 系**用户自启的远端代理执行机**，连接 47.101.58.49——判定身份后未触碰）→ 本次为全新启动：控制面 **pid 14224**（health 200，EADDRINUSE 0）+ 本地执行机 registered online（nodeId 11，uuid 不变），均从引擎 worktree **39dadd7f**（B 类交付分支 tip）启动。
+- **生效面（本窗口双项）**：①**B 类①修复（fill 侧 tssc 互拒收口，8d131f72）**——纯 Python 侧，新录制会话即载；②**OpenCode `53047dbb` Node 侧 `recording-page-bind.js`**（录制 prepare 天元弹窗 trusted 补关）——随本次控制面重启生效。运行态 = V2.0 全量（cf4c7ae7 lineage）+ B 类分支增量。
+- **合并纪律（用户指令）**：B 类分支 **暂不合并**——等合约线湿测验收通过后再并入 uara_V2.0。
+- **请合约线验收**（下单一）：①首选复测 B 类①场景（选择弹窗内 tssc 字段 fill/select 交互）：不应再出现 `err-use-tssc-multi-select ↔ no-tssc-multi-select` 互推；stderr 若见 `[fill][tssc-route-conflict] store kind=tssc-multi-select live=plain` 即为降级放行留痕（预期行为非异常）；②同时观察真 tssc 字段仍正常走 select_option 路由（#865 对照形态不退化）；③顺带观察录制 prepare 时天元弹窗不再残留致 agent 暂停（OpenCode 项）。
+- 注：不维护 CHANGELOG；运行态操作轮次
+
+## 2026-09-21 09:46 · ZCode 引擎线 — 收工：B 类移交处置交付（fill 侧 tssc 互拒收口 + analyze 粒度结论，分支未合并待批，回链 09:12 开工）
+
+- 完成：B 类报告三项处置完毕，commit 8d131f72，分支 `engine/tssc-route-fix-20260920`（已 push；主检出有 Cursor 未推送提交故本单元条目均落本分支）。**4 files +350/−80**（fill_engine.py / 新 cold pin / verify-all.sh 登记 / 专项报告 §6）。
+- **①TsscMultiSelect 互拒（traj #864）**：修复=fill 侧 live 探测升级**三态返回**（tssc/tree 命中 | `plain` 确定性否认 | `unresolved`/`ambiguous` 不可判定）+ store/live 仲裁——store 判 tssc 且 live=plain → 降级放行走正常 fill + `[fill][tssc-route-conflict]` stderr 留痕；live 命中仍硬拒（保 #696 护栏）；不可判定维持拒绝。record/replay 两段同码（pin 断言逐字节一致）。**select 侧（216b2688）零触碰**——至此链路闭合：任一侧确定性否认即放行/诚实失败，互拒死循环结构性不可能。worker 实现含 `_FakePage` 行为冒烟三场景（RED 15 failures → GREEN）。
+- **③analyze 粒度结论**（已写入 `docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md` §6）：**不写展开类硬规则、不做 create 自动拆分兜底**——27 轨量化主导偏差是过碎（Rule 9「能少则少」已在）、Rule 3/3.1 状态边界原则已覆盖该形态、机械拆点依赖业务语义不可判；干预走门闩（阶段描述点名"展开后确认字段集出现再填"）；候选措辞 3.2 备查未落库（启用需 wet 观察）；engine-workaround 两卡确认 `no-workaround`（对应缺陷已修 5dcbd955/cee623e1）。**②闭环记录无动作**（1a9ec7d9+cee623e1，#924 已验收）。
+- 验收证据：新 pin `characterize-fill-tssc-live-downgrade` RED→GREEN（源码 needle + 行为冒烟）；tssc 家族四 pin + fill-already-filled/fill-dispatch 回归全绿；全量 verify-all 失败集=**3 已知红零新增 219 过**（本分支基点含他线新 pin）。观察记录：新 pin 首跑曾偶发 exit=1——经用户说明系**其当时切换网络所致**（browser-use telemetry 首跑发网络请求，切网中断即非零退出；09-21 09:46 前后另有一次后台 verify-all 亦被用户暂停），连跑 3×exit=0 稳定，非 pin 缺陷；后续读表者遇 telemetry 网络类偶发可先排除环境再查代码。
+- 状态：**未合并待批**。生效：纯 Python 侧，**合并入引擎 worktree 后新录制会话即生效，无需重启**。
+- 遗留移交：①`tree-select` 未做同款降级（无生产证据，且同款 #696 护栏保护，登记候选）；②`lookup_field_kind` 取 `_scan_fields` 首条的多候选权威排序（调研 §2）未动——降级放行已使分歧无害化，登记候选；③另有一项**此前已批待办**：重启窗口使 OpenCode Node 侧 `recording-page-bind.js` 生效（等用户点名）。
+- 注：不维护 CHANGELOG
+
+## 2026-09-21 09:12 · ZCode 引擎线 — 开工：B 类移交处置（TsscMultiSelect 路由互拒 fill 侧收口 + analyze 粒度策略结论）
+
+- **收件**：合约线 B 类移交报告 `docs/reports/2026-09-20-b-class-handover-engine-line.md`（本地分发区，不入 git）三项——①TsscMultiSelect 路由互拒（traj #864，唯一需新动作）；②stepNumber 空号/同号双行（已闭环，仅记录）；③analyze 合并阶段（策略待确认）。
+- **①调研定谳（Explore 只读调研 + 现场复核）**：**select 侧半边已在库**（`216b2688` = 引擎线 B-1：执行器 live 复核否认 tssc 时 `[tssc-route-conflict]` 落日志并 fall through el-select，不再把 `no-tssc-multi-select` 回抛给 agent）；**残缺在 fill 侧**——`fill_engine.py` 的 kind「只升不降」：快照判 tssc 时，即使 live 探测**明确解析到字段项且无 tssc 后代**（确定性否认，区别于 `''` 歧义/未解析）仍硬拒 `err-use-tssc-multi-select` → 与 select 的旧行为构成互推（#864 7 步不收敛）；歧义源=同 label 多候选（查询区「客户名称」普通 input vs 向导抽屉真 tssc，`lookup_field_kind` 取 `_scan_fields` 首条）。
+- **①本单元修复**：fill 侧加「live 明确否认 → kind 降级为空 + `[fill][tssc-route-conflict]` 日志 + 继续正常 fill」；live 命中 tssc 仍硬拒（保 #696 防误直填护栏）；不动 `select_engine.py`/`select_dispatch.py`（216b2688 已单向化）；新增冷 pin 护栏（仿 `characterize-tssc-route-conflict` 的行为冒烟：store 判 tssc + live 否认 → 不返回 err；live 命中 tssc → 仍返回 err）。护栏基线=既有两枚冷 pin（`characterize-tssc-multi-select` / `characterize-tssc-field-resolution`）。
+- **③结论（引擎侧，随本单元写入专项报告）**：见 `docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md` 末尾「引擎线结论」节——**不写动作类型硬规则、不做 create 侧自动拆分兜底**，理由=27 轨量化（仅 4 条人工调整、净段数非判据）+ 既有提示词已含 3.1 状态边界硬原则与 Rule 9「能少则少」；给出可随时启用的候选措辞备查。
+- 上游：uara_V2.0（tip cf4c7ae7）。分支 `engine/tssc-route-fix-20260920`。
+- 范围（可写集）：`scripts/controller/actions/fill_engine.py`（fill 侧降级分支）、新 cold pin、`scripts/refactor/verify-all.sh`（登记）、`docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md`（追加引擎线结论节）、本分支 agent-log 本条目+收工条目
+- 禁入区：**运行态服务零触碰（重启须先请示）**；远端代理（用户自管）；`select_engine.py`/`select_dispatch.py`（216b2688 已收敛，勿动）；引擎 worktree 内他线未提交 WIP（`data/kb/flows/product_element.json`、`data/kb/req/product-mgmt/{through-chains.md,chapters/03-…}`——Cursor 线在途，不触碰）；主检出未推送的他线提交（Cursor 7bb27e9c/5cb2a999，其未批 push）——故本单元条目写在交付分支上，不落主检出。
+- 注：不维护 CHANGELOG
 
 ## 2026-09-21 10:23 · ZCode 系统线 — 收工：docs/superpowers 按 mtime>7 天批量归档 133 件进 archive/（commit 68ab4fcb）
 
