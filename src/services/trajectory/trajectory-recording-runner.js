@@ -590,6 +590,16 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
    * @returns {Promise<void>}
    */
   const handleActionLogSync = async (payload) => {
+    // B（2026-09-20）归属守卫：旧 run 的订阅刻意活到 session close，被新 run 取代后其
+    // 迟到 action_log_sync 若照常落库，会跨 run 污染新 recording 轨迹（#925 实证：定稿后
+    // 仍追加 select_option/real_click 等步）。非 runtime 属主的 run 一律不落步。
+    if (!runStillOwnsRuntime()) {
+      console.warn(
+        `[record] stale run step persist skipped traj=${tid} myRunId=${myRunId}`
+        + ` liveRunId=${runtime.currentRunId}`,
+      );
+      return;
+    }
     const entries = Array.isArray(payload?.entries) ? payload.entries : [];
     const removedIds = Array.isArray(payload?.removedIds) ? payload.removedIds : [];
     // 服务器端 action_log 副本：full 覆盖 / delta 合并（syncMode）；legacy 无 syncMode=full。
@@ -1340,6 +1350,21 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     // P2-#6：failedPhases 统一报 phaseNumber——phaseOutcomes 以 phase.id /
     // phaseNumber 双键同写同一对象，collectFailedPhases 按 phase.id 取判定、
     // 报 phase.phaseNumber（避免把 DB id 混进载荷误导前端诊断）。
+    // A（2026-09-20）收尾归属守卫：循环自然走完到写终态之间，runtime 可能已被新 run
+    // 取代（用户「重新录制」/ 并发 start）。旧 run 若无条件 finishTransientRecording +
+    // 覆盖 isDone/isSuccessful + updateRunningStatus，会把正在录制的新 run 标成 recorded
+    //（#925 实证：录制中却无推流——前端只对 draft/recording 自动 prepare——且定稿后继续落步）。
+    // catch/finally 已有同类守卫；此处补齐成功/失败收尾前的守卫，被取代即抛出、不写任何终态。
+    if (!runStillOwnsRuntime()) {
+      console.warn(
+        `[record] stale recording finalize suppressed traj=${tid} myRunId=${myRunId}`
+        + ` liveRunId=${runtime.currentRunId}`,
+      );
+      const supersededErr = new Error('Recording run superseded by a newer run');
+      supersededErr.statusCode = 409;
+      supersededErr.code = 'run_superseded';
+      throw supersededErr;
+    }
     const failedOutcomeKeys = collectFailedPhases(runtime.phaseOutcomes, phases);
     const qualityFails = runtime.phaseQualityFails || [];
     // G3（PR #45）：整轨成败 = phaseOutcomes 聚合（任一显式 false → false）。

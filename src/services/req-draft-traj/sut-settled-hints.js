@@ -42,8 +42,8 @@ export function extractSutSettledHintsFromWetTest(markdown) {
   const seen = new Set();
 
   /**
-   * @param {string} text
-   * @param {string} source
+   * @param {string} text Hint body
+   * @param {string} source Provenance label (wet-test / settled file)
    */
   const push = (text, source) => {
     let t = String(text || '').replace(/\s+/g, ' ').trim();

@@ -1,12 +1,87 @@
 # Agent 协作日志
 
+
 ## 2026-09-21 09:05 · Cursor — 收工：draft-traj sutSettledHints 注入 + coach SOP skill（本会话）
 
 - 完成：propose/atomize 注入模块 `wet-test.md` / 可选 `sut-settled.md` → payload `sutSettledHints`；atomize prompt 真值顺序（定案 > 链/章节）；`PROPOSE_CACHE_VERSION` **11→12**；product-mgmt `sut-settled.md` + 链/章【新增分类】定案；`product_element` 精确查询 rule（不加死 pin）；旁路 `tools/draft-traj-coach/skill/` SOP + 设计 spec。
 - 范围：`src/services/req-draft-traj/{sut-settled-hints,propose,propose-cache,index}.js`、`scripts/prompts/req-draft-traj-atomize-prompt.md`、characterization pins、`tools/draft-traj-coach/**`、`data/kb/req/product-mgmt/{sut-settled.md,through-chains.md,chapters/03-…}`、`data/kb/flows/product_element.json`、相关 docs
 - 验收：`node scripts/characterization/characterize-req-draft-traj.mjs` OK 81；`characterize-atom-depend.mjs` / `characterize-capability-cohesion.mjs` all passed
-- 遗留：①旧 propose 缓存须重跑（v12）；②控制面若跑在 `JS-gen-engine` worktree 需对齐/重启才 live；③atomKey 碰撞未动；④未 push（用户仅批 commit）
-- 注：未单独写开工条目（会话续跑压实后直接收工）
+- 遗留：①旧 propose 缓存须重跑（v12）；②控制面若跑在 `JS-gen-engine` worktree 需对齐/重启才 live；③atomKey 碰撞未动；④本 commit 后已 `git pull` 合入远端 OpenCode D1/D2 等（agent-log 双方条目并排保留），合并态复跑 draft-traj pins
+- 注：未单独写开工条目（会话续跑压实后直接收工）；用户仅批 commit、未批 push
+
+
+## 2026-09-20 19:15 · OpenCode — 设计稿落地：D2 SUT 503 阶段空转守卫（#925 续）
+
+- 完成：`docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md` 已落地并提交。
+- 要点：双条件触发（SUT 不可达信号 + 最近 N 步无实质进展）、Python agent hook 点
+  （`scripts/recorder.py` 的 `on_step_end`）、`SUT_SPIN_GUARD_MODE` 环境变量四档
+  （off/observation/soft/hard）、独立 reason `sut_unavailable_spin_guard`、分三阶段
+  （观测 → 软门闑 → 硬门闑）落地、不影响人工录制与回放。
+- 与 D1 关系：D1 去重落库，D2 停止空转；两者互补，D2 触发时 already-matched 动作
+  仍会被 D1 正确去重。
+- 实施前置：在线 SUT + 执行机湿测，当前服务停机，暂不动代码；设计稿供后续实施评审。
+
+## 2026-09-20 18:55 · OpenCode — 收工：D1 already-matched select 跨阶段重复落库去重（回链 18:40 开工）
+
+- 完成：代码 `de18502d`（4 文件 / +143 -3）——`scripts/state.py` 新增只读 `has_recorded_field_action`（同 action + 同 `label_text` + 同 `option_text`/`value`）；`scripts/controller/actions/select_engine.py` 两个 already-matched 分支（预触发 xpath-only、下拉 no-items 回读）在 `_record_action` 前加守卫：**首次已匹配仍落库、后续同字段同值重访不追加**；新 pin `scripts/characterization/characterize-select-already-matched-dedup.py`；`scripts/refactor/verify-all.sh` 注册一行。
+- 修法取舍：取 todo 的**保守方案（同字段+同值跨阶段去重）**，非「已匹配一律不落库」——首次仍落库 → **回放保留该步**，只吞跨阶段重复空操作步。D2（SUT 5xx 空转）**未做**：前置需在线 SUT+执行机湿测（当前停机不可验收）且触及 agent 主循环/prompt，先出设计。
+- 与既有「同阶段」方案区别（用户问）：既有=`already-operated-this-phase` 阶段门（执行前**拦截动作**、按 identity **不分值**、每阶段清零）+ `state._record_action` **连续**同元素 coalesce；本次=**跨阶段**、**只跳过落库不拦截动作**、限定 **already-matched 同字段同值**。
+- 人工录制不受影响（用户问）：`scripts/manual_recorder/recorder.py:_record_mapped` 直连 `state._record_action(source='manual')`，**不经 SelectEngine**；回放 `is_replay` 早返回零改动。
+- 验收：select/state 域 **19 pin 全绿**（含新 pin）；引用 `state.py` 的 **13 pin 全绿**；node pin `replay-batch`/`ai-recording-boundaries` OK；`python -m py_compile` 通过；门禁口径 `npx eslint src/ executor/ scripts/` = **0 errors / 24 warnings**（与基线一致）。注：`npx eslint .` 报 3343 errors 系本地 `.venv/` 未被 eslint ignore 的**环境噪声**（错误全部来自 `.venv`，与本次改动无关）。
+- 生效面：Python 侧录制引擎 → **新录制会话磁盘加载即生效，无需重启控制面**。
+- 遗留移交：**D2**（SUT `Service Unavailable` → 同阶段空转到 `max_steps`；#925 实测 30min+/10 步）——候选=「阶段 N 步无新完成任务即 fail」或「SUT 5xx 快失败」，前置与设计已写入 `todo-list.md`；本次不维护 CHANGELOG。
+
+## 2026-09-20 18:40 · OpenCode — 开工：D1 already-matched select 跨阶段重复落库去重（用户会话内点名继续 D）
+
+- 说明：本开工条目与实现同批补写——用户在 D 登记后于同一会话直接指示「继续 D，改完直接提交」，非另起工作树；仍留痕以保证跨工具可见。
+- 范围（可写集）：`scripts/controller/actions/select_engine.py`（already-matched 两分支落库守卫）、`scripts/state.py`（只读 helper）、`scripts/characterization/characterize-select-already-matched-dedup.py`（新 pin）、`scripts/refactor/verify-all.sh`（注册）、`docs/superpowers/todo-list.md`、agent-log 本条目与收工条目
+- 禁入区：agent 主循环/prompts 与 D2 相关面（另单元）、`src/**`（A/B/C 已闭环不再动）、其它 characterization、`data/kb/**`、前端另仓、SUT
+- 方式：D 风险范围评估 → 取 D1 保守方案（同字段+同值跨阶段去重，先确认回放/人工不受影响）→ `state` 只读 helper + `select_engine` 两分支守卫 → 新 pin 注册 verify-all → select/state 域 pin 全量复跑 + `py_compile` + eslint 门禁口径 → commit；D2 因不可湿测不盲改，仅保留设计
+
+## 2026-09-20 18:15 · OpenCode — 收工：C 补 BiB 死亡事件清绑定（回链 18:10 开工）
+
+- 完成：代码 `ae7f1189`（`src/executor-ws.js` + `scripts/characterization/characterize-executor-orphan-reconcile.mjs`，+37 -1，已推 `a1e54dc8..ae7f1189`）——`handleMessage` 处理 `session.bib_detached`/`session.bib_error`：清该会话内存 live 绑定 + 清 RSCF 缓存帧 + 按 `remoteSessionUuid` 定向广播 `remote:status{attached:false}`（无 uuid 回退全量）；`bib_error` 另打 ERROR 告警。只清绑定+广播，**完全不动录制状态机**。
+- 根因：BiB 已死/已拆但控制面残留 `attached:true` → 前端 `ensureStream` 认为 `already=true` 不重附着，叠加无帧自愈未触发即永久「未推流」（血泪文档坑 #10）。
+- D 登记：`todo-list.md` 挂起表新增 **`recording-redundant-step`（P2）**——D1 引擎 `ok-already` select 去重、D2 SUT 服务端错误快失败/阶段无进展上限；含取舍与证据指引，建议独立单元。
+- 验收（合并态 = 上游无新提交，`git pull` Already up to date）：`characterize-executor-orphan-reconcile` **PASS**（新增 4 条 BiB detach/error pin）；`characterize-agent-llm-error` OK；A+B 未回归（`characterize-stop-semantics` 27/27、`characterize-record-status` OK）；`node --check` + `npx eslint src/executor-ws.js` 0 error。
+- 生效面：Node 侧（executor-ws）→ **需重启控制面生效**。
+- 遗留移交：①D 待另开单元（todo `recording-redundant-step`）；②#925 空转 agent 仍在（SUT `Service Unavailable` 致 phase3 不可达），建议停掉；③C 只覆盖执行机**显式** detach/error 事件，CDP 静默断连仍依赖前端无帧自愈（登记认知，本次不扩范围）；④不维护 CHANGELOG。
+
+## 2026-09-20 18:10 · OpenCode — 开工：C 补 BiB 死亡事件清绑定 + D 登记待办（用户批准）
+
+- 背景：接上一条收工，用户批准 C（后端补 `session.bib_detached`/`session.bib_error` 处理，清残留 `attached:true` 绑定）并把 D 登记为独立待办。
+- 范围（可写集）：`src/executor-ws.js`（C）、`scripts/characterization/`（C 的 pin，新增或并入既有）、`docs/superpowers/todo-list.md`（D 登记）、agent-log 本条目与收工条目
+- 禁入区：`src/services/trajectory/**`（A+B 已闭环不再动）、其它 characterization、`data/kb/**`、前端另仓、SUT
+- 方式：`executor-ws.js` 处理 `session.bib_detached`/`bib_error` → 清 live binding + 清 RSCF 缓存 + 定向广播 `remote:status{attached:false}`；补 pin；跑相关 characterization + eslint → commit+push（用户：改完直接提交）
+
+## 2026-09-20 18:20 · OpenCode — 收工：录制收尾/落步 run 归属守卫（回链 18:05 开工）
+
+- 完成：代码 `bef61b11`（3 文件 / +47 -3，已推 `59f34c60..bef61b11`）——
+  ①`trajectory-recording-runner.js` 循环末尾成功/失败收尾前补 `runStillOwnsRuntime()` 守卫（被新 run 取代→抛 `err.code='run_superseded'`，不写终态/不改 running 阶段）；
+  ②同文件 `handleActionLogSync` 顶部补同一归属守卫（非属主 run 不落步）；
+  ③`batch-record.js` 识别 `run_superseded`→`markItemFailed` 且**不 detach**（会话归新 run，避免拆掉在录会话）。
+- 根因（#925 实证）：旧 run 收尾覆写新 run 的 `recording` 终态为 `recorded` → 前端只对 draft/recording 自动 prepare → 录制中不连执行机无画面；且 persist 订阅无条件落步 → 「下一步之后又多录一条选择下拉」（#5/#8-10 晚于定稿）。
+- 验收（合并态 = 上游无新提交，`git pull` Already up to date）：`characterize-stop-semantics` **27/27 PASS**（4e pin 归属守卫 2→4 处 + 新增收尾/落步守卫断言）；`characterize-step-number-integrity` 27/27、`characterize-record-phase-finalize` all passed、`characterize-g3-runner-seam` 9/9、`characterize-run-event-ownership`/`characterize-traj-recon-logging`/`characterize-record-status`/`characterize-record-start-mutex` 全 PASS；改动文件 `npx eslint` 0 error。既有红基线未新增：`cold/characterize-batch-task-progress` 改动前即红（`trajectory-attach-runner.js` 的 stale `single-live` pin，与本次无关，已用 `git stash` 复验）。
+- 生效面：本次仅 Node 侧（runner/batch-record）→ **需重启控制面生效**；Python/数据侧未改动。
+- 遗留移交：①C（BiB 死亡事件 `session.bib_detached`/`bib_error` 控制面无处理→残留 `attached:true` 永久未推流）与 D（`select_option` ok-already 去重、SUT 服务端错误快失败）用户另行决策，登记待办；②#925 空转 agent 仍在（用户手动重录触发，SUT「Service Unavailable」致 phase3 无法达成），建议停掉；③本次不维护 CHANGELOG。
+
+## 2026-09-20 18:05 · OpenCode — 开工：录制收尾 run 归属守卫（修「录制中无推流 + 定稿后仍落步」）
+
+- 背景：用户报交易 #925 录制页无推流（刷新多次）+「下一步之后又录了一条选择下拉」。排查证据：同轨迹存在两个会话——第一轮 `577a391c`/remote_session 2109（3 阶段 phase_done 完毕）、第二轮 `a26cb9fc`/remote_session 2115（用户手动发起）；`record_status` 已为 `recorded`（`updated_at=09:40:17`）但第二轮 agent 仍在跑并**持续落步**（`trajectory_step` 从 7 条涨到 10 条，#5 select_option 与 #8–#10 均晚于定稿）。根因=循环末尾成功/失败收尾（`trajectory-recording-runner.js:1349-1377`）**缺 `runStillOwnsRuntime()` 守卫**，旧 run 收尾覆写新 run 的 `recording` 终态 → 前端只对 draft/recording 自动 prepare，故录制中不连执行机、无画面；且 persist 订阅无条件落步。
+- 范围（可写集）：`src/services/trajectory/trajectory-recording-runner.js`（A 收尾归属守卫 + B 落步归属守卫）、`src/services/trajectory/batch-record.js`（被取代的 run 不得 detach 新 run 的会话）、`scripts/characterization/characterize-stop-semantics.mjs`（4e pin 由恰 2 处更新为恰 4 处 + 新增守卫断言）、agent-log 本条目与收工条目
+- 禁入区：`src/routes/**`、其它 characterization pin、`data/kb/**`、前端另仓、SUT
+- 方式：runner 循环末尾 finalize 前加 `runStillOwnsRuntime()` 守卫（被取代→抛 `err.code='run_superseded'`）；`handleActionLogSync` 顶部加同一守卫；`batch-record.js` 识别 `run_superseded` → `markItemFailed` 且**不 detach**；扩 `characterize-stop-semantics`；跑相关 characterization 验收 → commit+push
+
+## 2026-09-20 17:40 · OpenCode — 文档：录制状态流程指南更新到 V4；修正「准备会话」过时语义
+
+- 完成：
+  - `docs/superpowers/guides/recording-status-flow.md` 全面重写为 **V4**：`recording` 仅表示「正在录制」；非显式 stop 释放一律 `failed(interrupted)`（含执行机离线/重启/无观众/空闲回收）；`prepare` 默认不进入 recording；新增「录制中非破坏性 prepare」（不重登录/不页面绑定导航/不新开会话；`recovered`/`unreachable(503)`/`gone(409+interrupted)` 三分支）；执行机离线标 `markNodeRecordingsInterrupted`；前端画面残留 attached 受限自愈；坑清单、门禁、历史条目同步。并修正行号引用与 `stream/detach` 不改状态等过时描述。
+  - `docs/README.md` 索引描述同步 V4 要点。
+  - `src/dashboard/api-docs/groups/recording.js`：修正 `stream/detach` 被误列为 `failed(interrupted)`；新增录制中 prepare 非破坏性与 503/409 说明。
+  - 前端另仓 `ui-auto-recording-agent-vue`：`detail/index.vue` 的「准备会话」按钮改为**始终默认 `preserveRecordStatus=true`**（此前对 `draft/recording` 传 false，会误把 `draft` 置为 `recording`，与 Plan A「prepare 不进入 recording」相悖）。
+- 验收：`npx eslint`（JS-gen 改动文件）0 errors；`characterize-agent-llm-error`（api-docs 契约）OK；前端 `npx vue-tsc --noEmit` 通过。
+- 影响面：文档 + 前端一处按钮传参修正；后端无行为改动（本次仅文档与前端）。前端需重新构建部署。
+- 注：不维护 CHANGELOG
 
 ## 2026-09-20 17:34 · ZCode 引擎线 — 同步回执②：已对齐 7d309095（含 OpenCode Node 侧改动）；**本次有需重启项**
 

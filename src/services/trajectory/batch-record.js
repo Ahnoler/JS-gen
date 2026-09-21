@@ -238,6 +238,22 @@ async function runRecord(item, token) {
     await maybeFinalizeJob(batchId);
   } catch (err) {
     const msg = String(err.message || err);
+    // run 被更新的一次录制取代（runner 收尾归属守卫抛 run_superseded）：本 worker 的 run
+    // 已非 runtime 属主，新 run 正持有执行机会话——只把本 item 标失败，绝不 detach
+    //（detach 会拆掉新 run 的会话，与 ALREADY_RECORDING 同理）。
+    if (err?.code === 'run_superseded'
+      && !(await batchDao.getJobById(batchId))?.status?.startsWith('cancel')) {
+      const fresh = await batchDao.getItemById(item.id);
+      await batchDao.markItemFailed(item.id, ['preparing', 'recording'], {
+        version: fresh?.version,
+        expectedWorkerToken: token,
+        errorCode: 'RUN_SUPERSEDED',
+        errorMessage: `Skipped: recording run superseded by a newer run (${msg.slice(0, 300)})`,
+      });
+      await emitProgress(batchId);
+      await maybeFinalizeJob(batchId);
+      return;
+    }
     // 409「已在录制」（startTrajectoryRecording: isAiRecordingActive）≠ 无空槽：
     // 同一轨迹在批次里出现两次 / 并发录制时，回 waiting_executor 重试只会 409 循环
     // 且轨迹被录两遍 —— 单独归类为跳过该 item（终态 failed + 明确 reason），不重试。

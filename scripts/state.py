@@ -937,6 +937,31 @@ def _entry_element_identity(entry: dict) -> str | None:
     )
 
 
+def has_recorded_field_action(action_name, label_text, value) -> bool:
+    """Whether the log already holds this field's action with the same value.
+    判断操作日志中是否已存在「同字段 + 同值」的同一操作。
+
+    SelectEngine 的 already-matched（空操作）分支用它抑制跨阶段重复的
+    ``select_option`` 步骤：首次已匹配仍落库（回放保留该步），后续对同字段
+    同值的重访不再追加空操作重复步（#925「下一步之后又多录一条选择下拉」）。
+    仅读日志、不做任何写入。
+    """
+    label = str(label_text or '').strip()
+    val = str(value or '').strip()
+    if not label or not val:
+        return False
+    for entry in reversed(_ACTION_LOG):
+        if not isinstance(entry, dict) or entry.get('action') != action_name:
+            continue
+        params = entry.get('params') or {}
+        if str(params.get('label_text') or '').strip() != label:
+            continue
+        recorded = str(params.get('option_text') or params.get('value') or '').strip()
+        if recorded == val:
+            return True
+    return False
+
+
 def _record_action(action_name, params, result, element=None, source=None):
     """Record a controller action call using ActionEntry model.
     使用 ActionEntry 模型记录控制器操作调用。
