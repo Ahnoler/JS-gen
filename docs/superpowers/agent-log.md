@@ -2,6 +2,15 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 15:40 · ZCode 引擎线 — 开工：phase_blocked reason 区分（#909 移交项②，用户点名），SDD 模式临时 worktree
+
+- 进行中：用户批「你做 phase_blocked reason 区分」。定谳落点=**Node 终局裁决**：`evaluateFinalVerdict`（`src/services/trajectory/phase-done-evidence-gate.js:168`）qualityFails 非空即判 `quality_failed`，不区分该阶段是否 agent 显式自报 `success=false`（诚实受阻上报）→ #909 P5 诚实 blocked 被误标「录制质量未达标」。区分规则（机械可判）：**失败全部来自显式 `success=false` 阶段，且质量标记仅 `missing_success_token`（受阻的必然推论）且全部附着于失败阶段 → failKind=`phase_blocked`**；含 `pending_fields:*`/`semantic_doubt_fields:*` 等真质量信号或标记附着于非显式失败阶段（#973 形态）→ 维持 `quality_failed`，零质量标记维持 `phase_failed`（3c 语义不变）。
+- 工作范围（临时 worktree `D:\dev\JS-gen-tmp-pblocked`，分支 `engine/phase-blocked-reason-20260921` 自 origin/uara_V2.0=**44164f30**）：`src/services/trajectory/phase-done-evidence-gate.js`（裁决函数+新纯 helper）、`src/models/failure-reason.js`（目录加 `phase_blocked: '阶段受阻'`）、`src/dashboard/api-docs/groups/trajectory.js`（failedReason 类别文案清单加「阶段受阻」）、三枚**既有** pin 扩展（`characterize-phase-done-evidence-gate.mjs` / `characterize-quality-final-gate.mjs` / `characterize-agent-llm-error.mjs`）；runner 零改动（persistFailReason 已按 failKind 泛化）。SDD：RED 先行 → 实现者子代理（不 commit）→ 任务评审 → 终审；台账 `.superpowers/sdd/engine-phase-blocked-reason-20260921/`。
+- 禁入区：**引擎 worktree `D:\dev\JS-gen-engine`（快照复刻线 15:27 声明占用——`_navigation.py`/`_misc.py`/`_table.py`/`click_action_engine.py`/js_snippets 及其新增 pin）**；`scripts/refactor/verify-all.sh`（本单元零新增 pin 不触碰，避其登记行冲突）；运行态服务（控制面 4097 pid 9908 / 执行机 32220 / 用户代理 9228）；OpenCode 回放线文件（`_replay.py`/`replay_table.py`/`replay-batch-runner.js`）；Cursor STC 文件集。
+- 验收基线（**已变**）：上游 `44164f30` 三基线红修复转绿、`KNOWN_BASELINE_RED` 清空——本单元验收=全量 verify-all **ALL GREEN 零已知红**。
+- 观察登记（不在本单元扩散）：runner catch 路径对一切 `phase_error` 落 `runner_error`——D2 守卫 soft/hard 触发的 `phase_error(reason=sut_unavailable_spin_guard)` 也将被标「录制执行异常」，reason 未透传到 failedKind；待 D2 湿测有真机命中后按需立单。
+- 注：不维护 CHANGELOG；子智能体一律不 commit，主会话显式 pathspec 代提交
+
 ## 2026-09-21 · ZCode 系统线 — 收工：3 项基线红全部修复转绿，KNOWN_BASELINE_RED 清空（用户指令：修 3 失败项，要么注释要么修复转绿）
 
 - 根因三判：①`characterize-confirm-notification`＝逻辑随 d9ca7990 迁入 ClickEngine 后 pin 仍读 `_misc.py` 旧标记（改靶不误判）；②`characterize-step-highlight`＝锚点 traj 181/shot 10615 被清库（历史第二次锚点死亡，traj 38→157→181）；③`characterize-layer-tree`＝锚点 traj 33 同因清库失效。
