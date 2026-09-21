@@ -2,6 +2,18 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 20:00 · OpenCode — 开工：阶段合约跨阶段令牌越界修复（P4/P6/P7 录制中断）
+
+- **工作范围**：
+  - 合约分析侧：`scripts/controller/actions/phase/{boundary_contract,classify,intent_contract,intent_gates}.py`
+  - prompt/评审器侧：`src/services/trajectory/trajectory-meta-service.js`、`scripts/prompts/phase-reviewer-prompt.md`
+  - 配套：相关 characterization pin 断言更新、`docs/superpowers/todo-list.md` 新增「阶段结构元数据」长期项
+- **与他线关系**：ZCode 引擎线 19:40 在途 `verify-phase-token` 门侧兜底（`scripts/agent/service.py` + `verification_gate.py`），本线**不进入 `scripts/agent/service.py`**，根因收口放在 boundary/intent 合约分析侧；若最终验收需合并后全量 verify-all，与 ZCode 线协调
+- **禁入区**：D2 A/C 代理加速件、`recording-redundant-step` 已闭区间、回放停止系统线 `stop-replay-system-line`、KB 召回算法；`scripts/agent/service.py`、`scripts/controller/actions/phase/verification_gate.py`
+- **执行方式**：主会话直改；子代理仅用于并行 characterization 验证；每步微改后跑相关 pin / `bash scripts/refactor/verify-all.sh --changed`；合并后验收跑全量 verify-all
+- **决策输入**：用户选定方案 C（合约引擎 + prompt + 评审器 prompt），并微调 L1a/L1b 口径：L1a 按实际任务动态分配类型（不 blanket navigate）；L1b 按实际任务推荐所需令牌（不无条件保存）
+- **前置**：已 `git pull origin uara_V2.0 --no-rebase` 到 `30cacdf9`
+
 ## 2026-09-21 19:40 · ZCode 引擎线 — 开工：verify-phase-token 第一步落地——门侧兜底（判定式 v1 冻结执行，用户「继续」=按设计稿推荐），SDD 临时 worktree
 
 - 进行中：设计稿 §5 三裁定按推荐执行（判定式 v1 四条冻结 / 先门侧兜底一个湿测窗口再议主收口 / mode='verify' 维持死值）。**本单元只落第一步**：`service.py:724-729` 核验型豁免（镜像 introduce_pick 例外）+ 判定式纯函数模块 + RED pin。主收口（apply_phase_contract+boundary 同笔清理）**不在本单元**——待门侧兜底湿测窗口无 FP 后另单。
