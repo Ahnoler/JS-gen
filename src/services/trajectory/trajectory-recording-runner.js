@@ -784,6 +784,16 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
             reasons: payload?.quality_failed_reasons || [],
           });
         }
+        if (type === 'phase_end' && Array.isArray(payload?.overlayButtons) && payload.overlayButtons.length > 0) {
+          // 常态收口弹窗按钮清单（#917④b）：phase_end 先于 phase_done 到达且此时
+          // session.activePhaseId 已置（与下方 fail 落库同源），直接落该阶段 doneLog，
+          // 台账不必等卡死收口即可见弹窗按钮。文本形态对齐 probe 收口 [a][b] 拼法；
+          // 空清单不落（防噪红线），.catch(() => {}) 包裹防落库噪声上抛。
+          appendPhaseDoneLog(session?.activePhaseId, {
+            text: 'overlay buttons: ' + payload.overlayButtons.map((b) => `[${b}]`).join(''),
+            source: 'agent',
+          }).catch(() => {});
+        }
         pushPhaseObservation(type, payload);
         return;
       }
