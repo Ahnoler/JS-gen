@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 22:10 · OpenCode — 开工：阶段合约「实际逻辑流程」开发备注（纯文档，不动运行逻辑）
+
+- **进行中**：用户指示「按实际逻辑流程修改相关文档，为后续同类开发备注」——把本轮跨阶段令牌越界修复后的实际阶段合约流程与后续须遵循规则沉淀为可复用开发备注；**明确不动任何运行逻辑代码**（`scripts/**`、`src/**` 只读）。
+- **工作范围**：`docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`（新建，实际流程 + 规则 + 坑）；`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`（尾部加 2026-09-21 修订备注，不改历史正文）；`docs/superpowers/todo-list.md`（phase-structured-contract 行状态/前置更新）；`AGENTS.md`（Element UI/正确性规则区补一条阶段令牌归属要点）；agent-log 本条目+收工条目。
+- **禁入区**：一切 `scripts/**`、`src/**`、`tools/**` 运行代码；他线在途分支工作区；运行态服务。
+- **执行方式**：主会话直写文档；不改代码故 verify-all 不适用（仅文档 diff 自查零代码文件被触碰）。
+- **注**：不维护 CHANGELOG。
+
 ## 2026-09-21 21:45 · OpenCode — 收工：阶段合约跨阶段令牌越界修复（P4/P6/P7 录制中断）
 
 - **完成**（回链 20:00 开工）：方案 C 合约引擎 + prompt + 评审器 prompt 已落地合并。
