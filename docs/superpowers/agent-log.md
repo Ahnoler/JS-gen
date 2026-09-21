@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-21 12:55 · ZCode 合约线 — 阶段：D2 spin-guard B 腿 PASS（observation 档零误报，A 腿待 503 窗口）
+
+- 完成：B 腿两条正常长轨迹收口（`tmp/contract-wet9-20260919/d2-acceptance/` + `d2-acceptance-report-b.md`；主线程独立复核：executor 日志**全文** `grep -c`）。**核心判据达成：`[spin-guard]` 0 条、`phase_error` 0 条**（两轨），业务结果与基线一致。
+  - **B1=#972**（评级弹层交互）：**recorded / is_successful=1**；步号 1..13 连续；tssc 对照 `err-use-tssc-multi-select` 1 次即降级 + `dispatch path=tssc` 跟进、无互推；`UnboundLocalError`/`button_text_identity` **0 处**（#970② 热修 live 复核，与并行会话 #971 结论一致）；弹窗【查询】点击 3 次全落库。
+  - **B2=#973**（产品库增删自清）：**业务完全达成**（wet9B3W 分类 + wet9阶段W 阶段 增→删→重搜消失，P6 三项核验均不存在=树干净）；步号 1..41 连续；终态 failed/**quality_failed（阶段 2）**——**归因已核与守卫无关**：P2 为纯核验阶段（无保存动作，doneLog 完整记录三次重搜「暂无数据」），质量门按契约索要 success token 即判 FAIL。属「核验型阶段 success token 口径」观察项（对照 #924 同配方 recorded，差异=P2 含删除动作），移交引擎/KB 评估。
+- 未覆盖：**A 腿**（503 场景 observation 命中）/ **C 腿**（soft 档快速失败+reason）——本窗口 SUT 全程 200，待 503 窗口（用户已协调）；C 腿另需换档重启。
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-21 12:35 · ZCode 合约线 — 收工：more-btn locator-snap 修复湿测验收 PASS（traj 974，回链 13:10 开工；可合并回执已发）
 
 - 完成：9ee4af45 三面验收全过（`tmp/contract-wet10-20260921/` + `through-report-morebtn.md`；traj 974，fid 9000000011/acct 2，4 阶段，pid 9908 全程未变；与同线 D2 B 腿并行零互扰）。
