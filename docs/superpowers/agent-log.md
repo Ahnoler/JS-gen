@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-21 10:35 · ZCode 引擎线 — 收工：小批次 T1/T2 交付（T3 前置否决转登记，分支未合并待批，回链 10:02 开工）
+
+- 完成：挂账候选小批次收口，分支 `engine/small-batch-20260921`（1568143a = T1 e07935de + T2 6a1ab47e + F1 修复，已 push）。SDD 模式全流程：前置 Explore → 每任务 fresh implementer + task review → 终审 → 修复波次 + scoped re-review。
+- **T1 常态弹窗按钮清单**（e07935de + F1 修复 1568143a）：phase_end payload 携带 `overlayButtons`（复用 `_probe_overlay_button_texts`，非空才置=无弹窗零输出）→ runner phase_end 分支 `await appendPhaseDoneLog('overlay buttons: [a][b]…')`。终审抓出 F1（P2）：初版漏 await——全文件唯一非原子落库与主 done 文本并发会丢条目，已修 + pin 3c 升级钉 await 形态；scoped re-review CLEAN。
+- **T2 nav-reclick 入流**（6a1ab47e）：预算内放行的落库行尾缀 ` | nav-reclick-budget`（台账自证）；agent 面保持裸 `ok-clicked-{index}`；回放 `_result_ok` 按 `' | '` 取头段天然兼容（评审实证 _replay.py:338）。pin 第 10 组行为断言 RED→GREEN。
+- **T3 tree-select 降级：前置否决，放弃**——调研实锤执行器 tree 判定面显著宽于 fill 探测（`walkVueForTssc` 沿 `__vue__.$parent` + `[class*="tssc"]`/`.my-popover`，fill 探测仅五类 CSS），盲降级复发 #696 型误直填；且 select 侧 `tree_engine` 对 `no-tree-component` 已自动降级 fill（`ok-fill-fallback`）单向自愈、不成死环。**转登记为带条件候选**（条件：fill 探测补 Vue 链负向判定，成本超出小批次，待生产证据再议）。
+- 验收：临时 worktree（D:\dev\JS-gen-engine-sb）全量 verify-all **217 过**；唯一增量失败 `characterize-export-v3` 经查系临时 worktree 缺未跟踪 `config/.env`（DB 口令），补后 exit=0 自证，与批次无关。两任务评审 + 终审 + scoped re-review 全部 Approved/CLEAN；deferrable minors 全部入台账可留。
+- **跨线协同记录**：批次中途 **D2 线（另一引擎线会话）将共享 worktree 切至 `engine/d2-spin-guard-20260921`** 并声明本批"暂停让位"（其可写集与本批 T1 的 service.py、T2 的 click_action_engine.py 存在交叠）。处置：共享 worktree 让予 D2 线（其现场已还原干净），本批经**临时 worktree 完成 T2 落库与验收**，零互扰。**合并顺序提示**：D2 与本批均改 `scripts/agent/service.py`（D2 续跑 break 一行 vs 本批 phase_end payload，区域不同预计可自动合并）+ `verify-all.sh`（登记行并排惯例），后合并方负责冲突消解。
+- 状态：**未合并待批**——等 B 类分支（tssc-route-fix）合约线 PASS 合并后，本批随栈序并入（small-batch 基于其上）。生效：纯 Python 侧，合并入引擎 worktree 后新录制会话即效。
+- 注：不维护 CHANGELOG；SDD 台账 `.superpowers/sdd/engine-small-batch-20260921/progress.md`
+
 ## 2026-09-21 10:02 · ZCode 引擎线 — 开工：挂账候选小批次（probe 常态清单 + nav-reclick 入流 + tree-select 降级，SDD 模式）
 
 - 进行中：用户批"小事项完成"并点名 subagent-driven-development 技能。三任务：**T1** probe 常态弹窗按钮清单（#917④b：阶段收口常态输出，限存在可见弹窗时，doneLog 尾注形态）；**T2** nav-reclick 放行入流（台账级可查，替代行为学反推）；**T3** tree-select 同款降级（**前置**：须先证 fill live 探测的 tree 识别面 ≥ 执行器判定面，否则放弃——误降级即 #696 型误直填）。
