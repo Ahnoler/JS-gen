@@ -2,6 +2,16 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 17:55 · ZCode 合约线 — 收工：同族快照复刻湿测验收 PASS（traj 975/976，回链 16:55 开工；回执「可合并」已发）
+
+- **结论：PASS（可合并）**。7e43c736 两单真机验收（`tmp/contract-wet11-20260921/` + `through-report-snapreplica.md`；控制面 pid 9908 全程未变）：
+  - **#975**（产品阶段管理页）：recorded/is_successful=1，4 步落库（click_menu_item + click_element_by_index + click_button×2），回放全链 **4/4 OK、confirmed 全 1**。断点=P3/P5 probe 收口——该页【新增阶段】为**右侧内联面板非 el-dialog**（agent doneLog 实证 visibleDialogCount=0），close_dialog 主靶未触发，**属合约方场景设计踩坑非引擎缺陷**；落库 4 步 element 均为命中时刻快照值（活页只读复刻 buildLocatorSnap 与 DB element 零值差异 + 键集与 `_element_info_from_locate` 映射吻合）。
+  - **#976**（补单，产品库管理页真 el-dialog）：四步落库全链验——**X 关闭步落库 `target_kind=dialog_close`、xpath 指向真实 headerbtn button 元素（非内层 i），回放 ok-aria-label 命中**；取消步落库 button 节点、回放 ok-xpath-smart；开弹窗步 ok-aria-label。**回放全链 4/4 OK、confirmed 全 1**。收口 failed/zero_step（阶段1 导航零点击步，引擎口径如实非缺陷）。
+  - **判据全过**：①回放全链通 ×2；②关闭控件落库=真实被点节点；③取消步不退化；④零 SUT 写操作（8 步全 click 类审计）；⑤快照链 live（`ok␟{xpath...}` 尾段落库可见）；⑥错误签名全 0（spin-guard/phase_error/UnboundLocal/ambiguous——D2 observation 常开红利首兑现）。
+- **移交两条（非阻塞）**：① close_dialog 专用函数未被 agent 直接调用（两单 agent 均选 index 点击关闭）——JS 链与 click_button/index 链同构同接线、pin 已覆盖逻辑面，如需专链真机湿测可点单（配方=能触发 close_dialog 动作的页面）；② 表格行按钮/单选两链未真机覆盖（选景为关弹窗），pin 覆盖逻辑面，同上可点单。
+- **代管闭合**：引擎 worktree 已还原 `engine/worktree` @ 014b4dfc（净，仅 .zcodeignore 未跟踪）。SUT 零残留（两弹窗未提交、DB 无新增节点）；remote_session 2187/2188/2189 全 detach、槽位释放。
+- 注：录制湿测轮次，无代码改动；证据目录 `tmp/contract-wet11-20260921/`（gitignore 本地）
+
 ## 2026-09-21 16:55 · ZCode 合约线 — 开工：同族快照复刻湿测验收（snap-replica 7e43c736，场景=关弹窗；引擎 worktree 临时切换代管）
 
 - **收件**：引擎线验收请求——同族快照复刻 @ `engine/snap-replica-20260921` **7e43c736**（未合并待批）：五类点击链（switch_tab/click_menu_item/close_dialog/click_table_row_button/click_table_row_radio）落库定位改为「实际被点节点命中时刻快照」（more-btn #974 同款，snap-before-fire 经 U+241F 尾段回传、Python 键级覆盖 element）。验收=任选一场景录制+回放全链通即 PASS；观察面：关弹窗落库 xpath 应命中真实关闭控件（旧行为误指 headerbtn/内层 i）、表格行按钮 xpath 不得指向从未被点的节点。
