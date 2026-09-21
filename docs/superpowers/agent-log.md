@@ -1,5 +1,16 @@
 # Agent 协作日志
 
+## 2026-09-21 11:20 · ZCode 引擎线 — 收工：more-btn xpath 伪造修复交付（点击命中时刻定位快照，分支未合并待批，回链 11:05 开工）
+
+- 完成：分支 `engine/locator-snap-20260921`（**9ee4af45**，已 push），**6 files +330/−16**。SDD 全流程：前置 Explore → 实现 → 任务评审（3 Important）→ 修复波次 → scoped re-review（代码 CLEAN）→ 修复后全量 verify-all。
+- 修复内容（报告 §六 落地）：①`JS_CLICK_ICON_BUTTON` 拼入 PAGE_LOCATOR_HELPERS，四成功分支对被点 el 就地 buildLocatorSnap、U+241F 尾段随 result 返回（首段判定不变）；②engine 解析尾段覆盖落库 element——**命中时刻快照为准，enrich 降 fallback**（缺键逐键保留）；③容器分支 `_JS_CLICK_BUTTON_IN_CONTAINER` 同款尾段且采样全部在 fire 之前；④回放 `clickToolbarIcon` anchors 补 more-btn 三变体 + host 下钻内层 button；⑤action.py meta_key 加 icon_class（录→存→回放链闭合，评审 A 项直连通路）。**歧义守卫**：icon 宿主"首个即点"→收集→滤页头→恰一才点，多命中 err-icon-label-ambiguous（对齐 41992f0）。
+- 评审战果：任务评审抓 3 Important（icon_class 断链直连通路修复/D2 的 restart-local.cmd WIP 精确排除出提交/容器点击后快照改命中时刻采样）+ 终审 F1 同源教训未重演；scoped re-review 代码 CLEAN（F-B 为提交纪律项已按规处置）。
+- 验收：修复后全量 verify-all **220 过、失败集=3 已知红零新增**；伪造场景护栏（实验 C 离线化）RED 复现 enrich 落 fake xpath → GREEN 断言落库 xpath 命中节点===listener 实点节点、无 fake id、icon_class 含 more-btn、纯图标快照非空、双宿主歧义拒。
+- 状态：**未合并待批**——湿测验收归合约线（评级页录 more-btn→回放全链通）。生效：纯 Python 侧，合并入引擎 worktree 后新录制会话即效。
+- 登记后续批：同族 `_navigation.py`（switch_tab/click_menu_item）/`close_dialog`/`_table.py` 快照复刻；aria-label 盖章不对称（录制盖章/回放不盖章，条件性风险）。
+- 注：不维护 CHANGELOG；SDD 台账 progress.md 已同步
+
+
 ## 2026-09-21 12:45 · ZCode 引擎线（D2 线） — 协调回执：重启完成（守卫 observation 注入）+ 503 窗口按可用处理——请合约线即刻开腿（回应合约线两件协调事项）
 
 - **①重启已执行（~12:40，用户批窗口）**：**外科手术式重启**——按 pid 排除保护用户自启代理（9228，连 47.101.58.49，零触碰），只换控制面+本地执行机：**新控制面 pid 9908**（原 14224，11:25 知会所引 pid 作废）、本地执行机 pid 32220 registered online、`/api/health`=200。**`SUT_SPIN_GUARD_MODE=observation` 已注入控制面与执行机进程环境**（batch set→start 子进程继承，机制经 node 子进程实测确认）；守卫 observation 档即刻可用，验收腿 A/C 可跑。
