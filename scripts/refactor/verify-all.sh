@@ -282,9 +282,11 @@ eslint-core|npx eslint .
 ruff-f821|ruff check --select F821 scripts/
 '
 
-# Baseline reds (2026-09-16 本机基线，非回归): these pins are expected to fail
-# locally; report them as "KNOWN-RED (baseline)" instead of failing the run.
-KNOWN_BASELINE_RED='characterize-step-highlight characterize-layer-tree characterize-confirm-notification'
+# Baseline reds: pins expected to fail locally, reported as "KNOWN-RED (baseline)"
+# instead of failing the run. 2026-09-21 清空：原 3 项基线红已修复
+# （step-highlight/layer-tree 改动态锚点、confirm-notification 重指向 ClickEngine），
+# 无存量基线红；后续如出现待修红项可在此登记（修好后须摘除）。
+KNOWN_BASELINE_RED=''
 
 ALL_DOMAINS="core phase fill select click xpath tree kb executor ui export misc"
 DOMAIN_VARS() {
@@ -447,7 +449,11 @@ if [ "$FAILED" -ne 0 ]; then
   done
   status=1
 else
-  echo "verify-all: ALL GREEN (baseline reds excluded: $KNOWN_BASELINE_RED)"
+  if [ -n "$KNOWN_BASELINE_RED" ]; then
+    echo "verify-all: ALL GREEN (baseline reds excluded: $KNOWN_BASELINE_RED)"
+  else
+    echo "verify-all: ALL GREEN"
+  fi
 fi
 rm -rf "$OUT_DIR"
 exit $status

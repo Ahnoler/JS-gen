@@ -2,6 +2,15 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 · ZCode 系统线 — 收工：3 项基线红全部修复转绿，KNOWN_BASELINE_RED 清空（用户指令：修 3 失败项，要么注释要么修复转绿）
+
+- 根因三判：①`characterize-confirm-notification`＝逻辑随 d9ca7990 迁入 ClickEngine 后 pin 仍读 `_misc.py` 旧标记（改靶不误判）；②`characterize-step-highlight`＝锚点 traj 181/shot 10615 被清库（历史第二次锚点死亡，traj 38→157→181）；③`characterize-layer-tree`＝锚点 traj 33 同因清库失效。
+- 修复：①confirm-notification pin 重指向——断言 A（notifications 收集器 rect 可见性判定）仍读 `_misc.py`，断言 B/C/回归改读 `click_action_engine.py`（JS_WATCH_SAVE_NOTIFICATIONS < err-notification: < toast_ok < confirm_click 时序、'状态更新成功'、engine.count 确认按钮唯一、btn_label 空白剔除守卫），断言语义全保留。②step-highlight + layer-tree **改动态锚点**：不再硬编码 traj/shot（本次已两次死于清库），每次运行从最近 40 张 phase_highlight 截图现场选锚——step-highlight 按「bbox 直用命中×步数」选优（FLOORS 下限 steps/json/bbox/solid≥10，按当前阶段化录制形态量级 ~15 步设定），layer-tree 优先选「全元素带 layers」的截图（选 #33503 traj 969，53/53）；step-highlight 的 byTraj/byPhase 断言从「=锚点」改为「=直查 DB 最新一张」对账（动态锚点未必是该 traj 最新，语义仍钉 loadPhaseData 倒序取第一条）。
+- verify-all.sh：`KNOWN_BASELINE_RED` 清空（注释留登记规则：待修红项可登记、修好须摘除），ALL GREEN 输出在无基线红时不再拖 "baseline reds excluded" 尾巴。
+- 验收（合并后硬约定）：`git pull`（up to date）后全量 verify-all **178 pins + 2 statics 全部真绿，EXIT=0，零 KNOWN-RED 零 FAILED**；三个改靶 pin 单跑均 OK（step-highlight 锚 #33388 traj 973：14 步/12 bbox 直用；layer-tree 锚 #33503：53 元素全带 layers、6 步 5 分区）。
+- 遗留移交：①FLOORS 下限（10）是按现势数据定的，若未来录制形态单阶段步数再降（如 <10），动态锚点会红——那是真回归信号，不是锚点问题，届时修录制链而非放宽阈值；②本次仅改 characterization 与 verify-all，无业务代码改动。
+- 本条与代码提交一并 push。
+
 ## 2026-09-21 15:14 · ZCode 系统线 — 收工：verify-all 域管线化验收改造（微步验收 2m58s→15-20s，commit 48d277ab）
 
 - 完成（用户指令：功能变大后不必每次改动跑全量 characterization，切管线验收 + 优化验收时间）：`scripts/refactor/verify-all.sh` 域管线化改造——**12 域注册表**（core/phase/fill/select/click/xpath/tree/kb/executor/ui/export/misc）+ 三种用法（无参=全量 / `verify-all.sh select,fill`=按域选 / `--changed`=git diff 自动映射选域，无映射兜底全量）+ 有限并发（`VERIFY_JOBS` 默认 4）+ 基线红显式标注（KNOWN-RED 不再令域管线误报回归）。

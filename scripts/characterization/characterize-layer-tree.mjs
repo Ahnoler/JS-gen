@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 /**
  * Characterize layer-tree-from-properties.mjs (元素分层工具).
- * 纯函数断言（合成数据）+ 真实 DB 数据断言（traj 33 phase 3 / screenshot #11426）+
- * HTML 交互结构源码断言（buildHtml 为模块内函数，未导出，做源码级检查）。
+ * 纯函数断言（合成数据）+ 真实 DB 数据断言（动态锚点：最近 40 张 phase_highlight
+ * 截图中元素带 layers 数最多的一张）+ HTML 交互结构源码断言（buildHtml 为模块内
+ * 函数，未导出，做源码级检查）。
+ *
+ * 注意：锚点不硬编码。历史锚点 traj 33 因 DB 数据清理失效（2026-09-21），
+ * 改为动态选锚，避免下次清库再红。
  */
 import { readFileSync } from 'node:fs';
 import { getDB } from '../../config/database.js';
@@ -158,25 +162,32 @@ function testHtmlSource() {
   check(src.includes('treeStat'), '统计节点存在');
 }
 
-// ── 真实数据（traj 33 phase 3 / screenshot #11426）──
+// ── 真实数据（动态锚点：最近 40 张 phase_highlight 中元素带 layers 数最多的一张）──
 async function testRealData() {
-  console.log('[real data] traj 33 latest phase_highlight');
+  console.log('[real data] dynamic anchor: latest phase_highlight with most layered elements');
   const db = getDB();
   try {
-    const stepPhaseRows = await db('trajectory_step')
-      .select('trajectory_phase_id')
-      .where({ trajectory_id: 33 })
-      .whereNotNull('trajectory_phase_id')
-      .distinct();
-    const stepPhaseIds = stepPhaseRows.map((r) => Number(r.trajectory_phase_id)).filter((n) => Number.isFinite(n) && n > 0);
-    const shot = stepPhaseIds.length
-      ? await db('screenshot')
-          .where({ trajectory_id: 33, kind: 'phase_highlight' })
-          .whereIn('trajectory_phase_id', stepPhaseIds)
-          .orderBy('id', 'desc')
-          .first()
-      : null;
-    check(!!shot, 'traj 33 存在有步骤的 phase_highlight 截图');
+    // 动态选锚：按「带 layers 的元素数」降序选第一张可用的 phase_highlight 截图
+    const shots = await db('screenshot')
+      .where({ kind: 'phase_highlight' })
+      .orderBy('id', 'desc')
+      .limit(40);
+    let shot = null;
+    let bestScore = 0;
+    for (const s of shots) {
+      const meta = typeof s.metadata_json === 'string' ? JSON.parse(s.metadata_json) : s.metadata_json;
+      const els = (meta?.elements || []).filter((e) => e && e.rect);
+      const layered = els.filter((e) => Array.isArray(e.layers) && e.layers.length).length;
+      if (!layered) continue;
+      // 优先选「全部元素带 layers」的截图（全量断言要求），同级取元素数最多
+      const score = layered === els.length ? 100000 + els.length : layered;
+      if (!shot || score > bestScore) {
+        shot = s;
+        bestScore = score;
+      }
+      if (bestScore >= 100000 + 10) break; // 足够断言即停，避免全表扫描
+    }
+    check(!!shot, `最近 40 张 phase_highlight 存在全元素带 layers 的截图（选 #${shot?.id} traj ${shot?.trajectory_id}，元素 ${bestScore >= 100000 ? bestScore - 100000 : bestScore}）`);
     if (!shot) return;
     const meta = typeof shot.metadata_json === 'string' ? JSON.parse(shot.metadata_json) : shot.metadata_json;
     const elements = (meta?.elements || []).filter((e) => e && e.rect);
@@ -189,7 +200,7 @@ async function testRealData() {
 
     // step 模式：旧数据无 layers/region_id → 多数未分区；新录制才会完整分层
     const phaseId = shot.trajectory_phase_id;
-    const steps = await db('trajectory_step').select('element_json').where({ trajectory_id: 33, trajectory_phase_id: phaseId }).limit(200);
+    const steps = await db('trajectory_step').select('element_json').where({ trajectory_id: shot.trajectory_id, trajectory_phase_id: phaseId }).limit(200);
     const normalized = [];
     for (const s of steps) {
       let el = null;

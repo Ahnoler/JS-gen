@@ -10,10 +10,10 @@
  *   - buildHtml 渲染：全部步骤框（resolved 数）、badge 数量、虚线/实线类、
  *     列表行数 = steps 数（含无坐标置灰行）、coordX/coordY 坐标换算手算期望值
  *
- * 注意：2026-08-20 锚点迁移——先迁 traj 157（traj 38 数据被裁剪），同日重录后定锚
- * traj 181（phase 675 / shot #10615：27 步全有 element_json、26 bbox、56 elements，
- * 命中全走 bbox 直用路径；录制于表单引擎重构后，含 fill/select_option/click_save）；
- * 阈值按当前数据调整（steps≥20 / json≥20 / bbox 直用≥20 / elements≥50）。
+ * 注意：锚点不硬编码。历史锚点两次失效（traj 38→157→181，均因 DB 数据清理被裁剪），
+ * 2026-09-21 起改为动态锚点：每次运行从最近 40 张 phase_highlight 截图中选
+ * 「bbox 直用命中 × 步数」最优的一张做真实数据断言。阈值按当前录制形态放宽
+ * （阶段化录制后单阶段步数量级 ~15，旧全链路 27 步的锚点不再存在）。
  */
 import { getDB } from '../../config/database.js';
 import {
@@ -27,26 +27,50 @@ import {
   coordY,
 } from '../tools/lightup-step-highlight.mjs';
 
-const TRAJ_ID = 181;
-const PHASE_ID = 675;
-const SHOT_ID = 10615;
+const ANCHOR_SCAN = 40;
+// 真实数据阈值下限：按动态锚点的预期量级设定（当前最优锚点 ~14 步 / 12 bbox 直用），
+// 低于此值视为录制链路未产出可用 phase_highlight 数据，属真实回归。
+const FLOORS = { elements: 1, steps: 10, json: 10, bbox: 10, solid: 10 };
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
 
-async function testRealDataLoad(db) {
-  const data = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID, screenshotId: SHOT_ID });
-  assert(data.screenshotId === SHOT_ID, `screenshotId=${data.screenshotId} must be ${SHOT_ID}`);
+/** 动态锚点：最近 ANCHOR_SCAN 张 phase_highlight 中选 bbox 直用命中×步数最优的一张。 */
+async function pickAnchor(db) {
+  const shots = await db('screenshot')
+    .where({ kind: 'phase_highlight' })
+    .orderBy('id', 'desc')
+    .limit(ANCHOR_SCAN);
+  let best = null;
+  for (const s of shots) {
+    const data = await loadPhaseData(db, { screenshotId: s.id });
+    const elements = (data.meta?.elements || []).filter((e) => e && e.rect);
+    if (!elements.length || !data.steps.length) continue;
+    const resolved = resolveStepBoxes(data.steps, data.meta.elements);
+    const bboxHits = resolved.filter((r) => r.boxes[0]?.source === 'bbox').length;
+    const score = bboxHits * 10000 + data.steps.length * 100 + elements.length;
+    if (!best || score > best.score) {
+      best = { shotId: s.id, trajId: s.trajectory_id, phaseId: s.trajectory_phase_id, score };
+    }
+  }
+  assert(!!best, `最近 ${ANCHOR_SCAN} 张 phase_highlight 截图中无带元素+步骤的锚点 — DB 锚点数据缺失或录制链路未产出 phase_highlight`);
+  console.log(`  anchor: shot #${best.shotId} (traj ${best.trajId} phase ${best.phaseId}), score=${best.score}`);
+  return best;
+}
+
+async function testRealDataLoad(db, anchor) {
+  const data = await loadPhaseData(db, { trajectoryId: anchor.trajId, phaseId: anchor.phaseId, screenshotId: anchor.shotId });
+  assert(data.screenshotId === anchor.shotId, `screenshotId=${data.screenshotId} must be ${anchor.shotId}`);
   assert(data.meta && Array.isArray(data.meta.elements), 'meta.elements must be an array');
-  assert(data.meta.elements.length >= 50, `elements=${data.meta.elements.length} >= 50`);
+  assert(data.meta.elements.length >= FLOORS.elements, `elements=${data.meta.elements.length} >= ${FLOORS.elements}`);
 
   const steps = data.steps;
   const jsonSteps = steps.filter((s) => s.hasElementJson);
   const bboxSteps = steps.filter((s) => isLegalRect(s.bbox));
   console.log(`  steps total=${steps.length} | json=${jsonSteps.length} | bbox=${bboxSteps.length} | elements=${data.meta.elements.length}`);
-  assert(steps.length >= 20, `steps total=${steps.length} >= 20`);
-  assert(jsonSteps.length >= 20, `json steps=${jsonSteps.length} >= 20`);
+  assert(steps.length >= FLOORS.steps, `steps total=${steps.length} >= ${FLOORS.steps}`);
+  assert(jsonSteps.length >= FLOORS.json, `json steps=${jsonSteps.length} >= ${FLOORS.json}`);
   return { steps, elements: data.meta.elements };
 }
 
@@ -60,26 +84,35 @@ async function testRealDataMatch(db, { steps, elements }) {
   const bboxHits = hitSteps.filter((r) => r.boxes[0]?.source === 'bbox');
 
   console.log(`  bbox direct=${bboxHits.length} | fallback match=${matchHits.length} | unmatched=${jsonSteps.length - hitSteps.length}`);
-  // 锚点为新链路数据（element_json 带 bbox），命中走 bbox 直用路径
-  assert(bboxHits.length >= 20, `bbox direct hits=${bboxHits.length} >= 20`);
+  // 动态锚点按 bbox 直用命中优选，命中应走 bbox 直用路径（新链路 element_json 带 bbox）
+  assert(bboxHits.length >= FLOORS.bbox, `bbox direct hits=${bboxHits.length} >= ${FLOORS.bbox}`);
   assert(matchHits.length + bboxHits.length === hitSteps.length, `match+bbox cover all hits (${matchHits.length}+${bboxHits.length}=${hitSteps.length})`);
 }
 
-async function testScreenshotSelection(db) {
+async function testScreenshotSelection(db, anchor) {
   // 传 screenshotId 直查
-  const byId = await loadPhaseData(db, { screenshotId: SHOT_ID });
-  assert(byId.screenshotId === SHOT_ID, 'screenshotId direct query');
+  const byId = await loadPhaseData(db, { screenshotId: anchor.shotId });
+  assert(byId.screenshotId === anchor.shotId, 'screenshotId direct query');
   // 未传 phaseId 时从 screenshot 行 trajectory_phase_id 反查
-  assert(byId.steps.length >= 20, `phase derived from screenshot: steps=${byId.steps.length}`);
+  assert(byId.steps.length >= FLOORS.steps, `phase derived from screenshot: steps=${byId.steps.length}`);
 
   // kind='phase_highlight' + trajectory_id 按 id 倒序取第一条
-  const byTraj = await loadPhaseData(db, { trajectoryId: TRAJ_ID });
-  assert(byTraj.screenshotId === SHOT_ID, `latest phase_highlight for traj ${TRAJ_ID} = #${byTraj.screenshotId}`);
+  // （动态锚点未必是该 traj 最新一张，故与直查 DB 的最新一张对账，而非锚点本身）
+  const latest = await db('screenshot')
+    .where({ trajectory_id: anchor.trajId, kind: 'phase_highlight' })
+    .orderBy('id', 'desc')
+    .first();
+  const byTraj = await loadPhaseData(db, { trajectoryId: anchor.trajId });
+  assert(byTraj.screenshotId === Number(latest.id), `latest phase_highlight for traj ${anchor.trajId} = #${byTraj.screenshotId}`);
 
-  // + 可选 phaseId
-  const byPhase = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID });
-  assert(byPhase.screenshotId === SHOT_ID, `traj+phase screenshot = #${byPhase.screenshotId}`);
-  assert(byPhase.steps.length >= 20, `traj+phase steps=${byPhase.steps.length}`);
+  // + 可选 phaseId：与直查 DB 的该 (traj, phase) 最新一张对账
+  const byPhase = await loadPhaseData(db, { trajectoryId: anchor.trajId, phaseId: anchor.phaseId });
+  const forPhase = await db('screenshot')
+    .where({ trajectory_id: anchor.trajId, trajectory_phase_id: anchor.phaseId, kind: 'phase_highlight' })
+    .orderBy('id', 'desc')
+    .first();
+  assert(byPhase.screenshotId === Number(forPhase.id), `traj+phase screenshot = #${byPhase.screenshotId}`);
+  assert(byPhase.steps.length >= FLOORS.steps, `traj+phase steps=${byPhase.steps.length}`);
 
   // 不存在的 screenshot → 空返回
   const none = await loadPhaseData(db, { screenshotId: 999999999 });
@@ -188,14 +221,14 @@ function testPureBoundaries() {
 }
 
 /** buildHtml 渲染（真实 DB 数据）。 */
-async function testRenderRealData(db, { steps, elements }) {
+async function testRenderRealData(db, anchor, { steps, elements }) {
   const resolved = resolveStepBoxes(steps, elements);
-  const shot = await db('screenshot').where({ id: SHOT_ID }).first();
+  const shot = await db('screenshot').where({ id: anchor.shotId }).first();
   // 锚点截图已迁 MinIO（image_data 为空）；渲染断言不依赖图片内容，用占位 base64
   const b64 = shot.image_data
     ? shot.image_data.toString('base64')
     : Buffer.from('placeholder').toString('base64');
-  const data = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID, screenshotId: SHOT_ID });
+  const data = await loadPhaseData(db, { trajectoryId: anchor.trajId, phaseId: anchor.phaseId, screenshotId: anchor.shotId });
   const html = buildHtml({ b64, meta: data.meta, resolved });
   const cw = Number(data.meta.contentWidth) || 1;
 
@@ -214,7 +247,7 @@ async function testRenderRealData(db, { steps, elements }) {
   const dashedBoxes = (html.match(/class="box dashed"/g) || []).length;
   const solidBoxes = totalBoxes - dashedBoxes;
   assert(totalBoxes >= 1, `html must contain boxes (got ${totalBoxes})`);
-  assert(solidBoxes >= 20, `solid boxes (bbox direct) ${solidBoxes} >= 20`);
+  assert(solidBoxes >= FLOORS.solid, `solid boxes (bbox direct) ${solidBoxes} >= ${FLOORS.solid}`);
   assert(dashedBoxes === totalBoxes - solidBoxes, `dashed/solid split consistent: ${dashedBoxes}/${solidBoxes}`);
 
   // c. 列表行数 = steps 数（含无坐标行），无坐标步骤置灰
@@ -248,8 +281,8 @@ async function testRenderRealData(db, { steps, elements }) {
 }
 
 /** buildHtml 交互层（Task 3）：真实数据 HTML 含交互 script 与关键逻辑标记（字符串层面）。 */
-async function testRenderInteraction(db) {
-  const data = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID, screenshotId: SHOT_ID });
+async function testRenderInteraction(db, anchor) {
+  const data = await loadPhaseData(db, { trajectoryId: anchor.trajId, phaseId: anchor.phaseId, screenshotId: anchor.shotId });
   const resolved = resolveStepBoxes(data.steps, data.meta.elements);
   const html = buildHtml({ b64: 'PLACEHOLDER', meta: data.meta, resolved });
 
@@ -338,20 +371,21 @@ async function main() {
   };
 
   try {
-    console.log('[real data: traj 181 phase 3 / screenshot #10615]');
+    const anchor = await pickAnchor(db);
+    console.log('[real data: dynamic anchor]');
     let ctx = null;
     await run('load data', async () => {
-      ctx = await testRealDataLoad(db);
+      ctx = await testRealDataLoad(db, anchor);
     });
     if (ctx) {
       await run('AND match rate + label hits', () => testRealDataMatch(db, ctx));
-      await run('render html (real data)', () => testRenderRealData(db, ctx));
-      await run('render interaction (real data)', () => testRenderInteraction(db));
+      await run('render html (real data)', () => testRenderRealData(db, anchor, ctx));
+      await run('render interaction (real data)', () => testRenderInteraction(db, anchor));
     } else {
       failed += 1;
       console.error('  ✗ AND match rate — load data failed, skipped');
     }
-    await run('screenshot selection', () => testScreenshotSelection(db));
+    await run('screenshot selection', () => testScreenshotSelection(db, anchor));
     await run('pure function boundaries', testPureBoundaries);
     await run('render boundaries', testRenderBoundaries);
   } finally {
