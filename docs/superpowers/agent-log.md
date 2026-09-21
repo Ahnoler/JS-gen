@@ -49,6 +49,31 @@
 - 禁入区：**运行态服务零触碰（重启须先请示）**；远端代理（用户自管）；`select_engine.py`/`select_dispatch.py`（216b2688 已收敛，勿动）；引擎 worktree 内他线未提交 WIP（`data/kb/flows/product_element.json`、`data/kb/req/product-mgmt/{through-chains.md,chapters/03-…}`——Cursor 线在途，不触碰）；主检出未推送的他线提交（Cursor 7bb27e9c/5cb2a999，其未批 push）——故本单元条目写在交付分支上，不落主检出。
 - 注：不维护 CHANGELOG
 
+## 2026-09-21 11:45 · ZCode 引擎线 — 收工：D2 SUT 503 阶段空转守卫交付（SDD 全流程，含终审阻断 F1 修复，分支未合并待批，回链 11:00 开工）
+
+- 完成：commit 链 `42246117`（开工）→ `c40bb502`（守卫实现+pin）→ `974c23f9`（终审 F1 修复：幂等改 phase+runId 双键）→ `18caffbe`（设计稿/todo 登记）→ `0f093176`（merge `0cbc19b2` 归档条目，agent-log 冲突按协议双方并排）。分支 `engine/d2-spin-guard-20260921`（自 `1bc5aa81` 切，不叠 B 类/小批次栈）。
+- **交付**：`scripts/agent/recorder_emitters.py` 新增 `_guard_spin_on_step_end`（A1 页面文本/A3 URL 错误页/A4 关键 DOM 缺失 × B 无进展三信号〔done 数增长/pathname 变化/新容器首开，重开不算〕双条件；`SUT_SPIN_GUARD_MODE` 四档**默认 off**，off 与 stall 未满窗两档零页面 I/O；soft/hard 触发=直发 `phase_error(reason='sut_unavailable_spin_guard', spinGuard{...})`+停 agent；**幂等=phase+runId 双键，重录/相位推进自动重武装**）；`recorder.py` on_step_end 接入（done 门禁前，自带 try/except）；`service.py` 续跑循环补 stopped break；pin `characterize-sut-spin-guard`（**91 断言**）入 verify-all。A2（网络 5xx）缓发——`network_capture` 只发内存事件 store 无读取路径（设计稿 §12 三裁定全文）。
+- **SDD 过程**：实现者（RED 18/21→GREEN）→ 任务评审规格✅+Approved（4 Minor/2 Info）→ 主会话验收 → 终审 **NO**（阻断 F1：重录路径〔runner :390-391 同 runtime 换 runId 再录、失败收尾不关 session〕存在同进程同 store 同相位重入，原「同阶段」幂等会 neuter 重录相位 on_step_end 尾段〔done 门禁/循环检测/CSS 补抓失效〕且守卫不再武装——**#925 本身即重录场景**，我此前 parked 裁定被代码证据推翻）→ 修复（resume 实现者，pin+18 断言 10a/10b/10c）→ 定向复审 F1/F4 ADDRESSED、**合并就绪 YES**。
+- 验收证据（合并态=`0f093176` 含 `0cbc19b2`）：pin 91 断言全过（主会话复跑 2 次）；py_compile 过；全量 verify-all **191 过 / 失败集=3 已知红（step-highlight/layer-tree/confirm-notification）零新增**（合并前 `tmp/verify-all-d2-20260921.log`、合并后 `tmp/verify-all-d2-merged-20260921.log` 两份）。
+- **F2 表述项（终审要求显式写明）**：`service.py:605-607` 的续跑 break **不受 mode 门控、是无条件行为变化**——影响既有 goal-loop stop/heal 空转 stop/cycle-deviate stop/cancel 四路径的预算续跑（效果=裁掉停止后的 0 步僵尸轮，属正向修复，verify-all 零新增红佐证）；「默认 off 零行为影响」承诺仅对守卫本体成立，他线归因时注意。
+- 生效面：纯 Python 录制侧；**默认 off 合并零行为影响**（守卫本体）；新录制会话磁盘加载即生效无需重启；人工录制（manual_recorder 不经此钩子）与回放不走 build_recording_hooks 均不受影响。
+- 状态：**未合并待批**（branch-only 交付）。
+- 遗留移交：①**湿测验收移交合约线**（前置在线 SUT+执行机，当前停机）：observation 档 #925 复现场景必须命中 + 正常长阶段（多轮填写/树搜索/分页）不得误杀 → 按湿测数据逐级升档（observation→soft→hard），默认值升 hard 须 Lead 批；②A2 网络 5xx 检测=条件候选（须先挂 memory writer 旁路）；③observation 期关注项：A3 `/error` 子串可能过匹配业务路由（终审 F5）、满窗后每步 stderr 一行、A3/A4 按探测步计数默认窗口下触发滞后放大（调参知会）；④小批次 SDD T1/T2 让位解除，可重启（其 T2 WIP 曾现于本 worktree 后被其会话收走，本单元与其零交集）。
+- 注：不维护 CHANGELOG
+
+## 2026-09-21 11:00 · ZCode 引擎线 — 开工：D2 SUT 503 阶段空转守卫实施（系统线已验证，设计稿三阶段，默认 off）
+
+- **收件**：系统线 2026-09-21 10:00 验证收工（`1bc5aa81`）——D2 问题真实、归属引擎线、按设计稿 `docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md` 实施；两勘误（①idle watchdog=「有落库动作才不触发」纯读操作空转 10min 反会触发使整 run 失败，观测模式以此为边界；②`phase_error` 现无 reason 字段，加法改动 Node 侧只读 message 兼容无破坏）已吸收进实现。
+- **本线前置复核（systematic-debugging Phase 1-2，独立复核非盲信）**：`ok-clicked` 落库无视错误页（click_action_engine.py:932-936）、Node watchdog 只喂三类落库事件（trajectory-recording-runner.js L53/L766-777）、agent 五出口无业务进展判断（service.py:593 续跑循环仅 cancel/done/工作完成三出口）、既有循环检测为何漏掉 #925（相邻周期匹配 `fps[-cycle_len*2:]`，#925 双轮间隔恰好不足 2×cycle_len 条目）——全部实锤与系统线一致。
+- **实施裁定（三点，随开工条目公示）**：①**A2（网络 5xx）缓发**——设计稿假设从 `business_data_store` 读网络状态，实查 `network_capture.py` 走 `emit_memory_event('network_captured')` 内存事件、store 无该键，读取路径不存在；A1（页面文本，#925 实证形态）+A3（URL 错误页）+A4（关键 DOM 缺失）先行，A2 留待湿测期评估是否值得挂 memory writer 旁路。②**soft/hard 进程内行为同构**——设计稿 §6.2 状态机读字面两者都是「emit phase_error(reason) + 停 agent」，真正的分级旋钮是环境默认档位（off→observation→soft/hard），进程内差异仅 mode 留痕字段。③**条件 B 进展信号取三**：task_list done 数增长 / URL pathname 变化 / 新容器（首次出现的 container；**重开已见容器不算进展**——防 #925 型「重开下拉」循环把容器翻转误计为进展）；设计稿第(4)项「成功保存」实践上必伴随前三者之一，不单设信号。守卫只在 B 窗口满（默认 N=6 步无进展）后才做 A 检测（一次 page.evaluate），正常步零页面 I/O。
+- **触发语义**：soft/hard 触发 = 守卫在 `on_step_end` 直发 `phase_error(reason='sut_unavailable_spin_guard', spinGuard={mode,sutSignal,progressWindow,stepsSinceProgress})`（Node 侧 errP :1061 消费、快失败）+ `agent.state.stopped=True` + `goal_tracker['stopped']=True`（防 service.py 续跑循环空转轮；顺带给该循环补一行 `goal_tracker.stopped` break——现有 goal-loop stop 路径同样受益）；observation 只打 `[spin-guard] observed` stderr 留痕。**默认 off，零行为影响**；off 档零页面 I/O。
+- **分支**：`engine/d2-spin-guard-20260921` 自 `origin/uara_V2.0`（tip `1bc5aa81`）新切——不叠在 B 类/小批次栈上，D2 与其零文件交集，交付解耦。**小批次 SDD（engine/small-batch-20260921）T1/T2 暂停让位**：该批无代码落地（工作区干净、无 commit），其声明可写集与本单元重叠 `recorder_emitters.py`，本单元优先，T1/T2 待本单元收工后重启。
+- 范围（可写集）：`scripts/agent/recorder_emitters.py`（新 `_guard_spin_on_step_end`）、`scripts/recorder.py`（on_step_end 调用点一行）、`scripts/agent/service.py`（续跑循环 break 一行）、新 pin `scripts/characterization/characterize-sut-spin-guard.py`、`scripts/refactor/verify-all.sh`（注册）、设计稿状态行、`docs/superpowers/todo-list.md`（D2 行）、agent-log 本条目+收工条目
+- 禁入区：运行态服务零触碰（远端代理 9228 用户自管）；`select_engine.py`/`select_dispatch.py`/`fill_engine.py`/`click_action_engine.py`（他线/在途热区）；`scripts/prompts/**`（设计稿非目标：不改 prompt）；`data/kb/**`；engine/small-batch-20260921 与 engine/tssc-route-fix-20260920 分支（暂停不废弃）
+- 方式：RED pin 先行（源码 needle + `_FakePage` 行为冒烟：off 零 I/O / observation 只观测 / A+B 双条件 / B 有进展不触发 / A 不成立不触发）→ 实现 → GREEN → pin 家族回归 + 全量 verify-all（3 已知红零新增）→ 合并后验收 → 收工条目。湿测（#925 复现命中 + 正常长阶段不误杀）前置在线 SUT+执行机，移交合约线，代码默认 off 不阻塞合并。
+- 附带两条系统线发现已吸收：a) #925 终态疑被批量作业覆写——归属 V2.0.1 状态归因改进，引擎线不动；b) 事发执行机 nodeId 8/7（非 10）——证据引用已按此校准。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-21 10:23 · ZCode 系统线 — 收工：docs/superpowers 按 mtime>7 天批量归档 133 件进 archive/（commit 68ab4fcb）
 
 - 完成（用户指令：修改时间 7 天前的文件都需要归档）：早于 2026-09-14 的非活文档 133 件 `git mv` 进 `archive/`（保历史）——specs 45 / plans 37 / reports 26（新建子目录，含根目录 code-review-2026-08-31、security-review-2026-09-05、重构交接-波次4-6）/ research 20（新建）/ guides 4（新建）/ samples 1（新建）；主区仅剩 agent-log.md / todo-list.md 及近期在途文档。
@@ -58,7 +83,6 @@
 - 验收：移动后主区 `find -mtime +7` 残留=0；提交面仅 `docs/superpowers/**` + `.gitignore` + `AGENTS.md`（137 文件）；零代码改动，无验收命令需重跑；`git pull` 合流态（Already up to date）。
 - 遗留移交：todo-list 归档行内历史链接已改指 archive/，agent-log 历史条目内旧路径按惯例不回改（archive/README 有路径口径说明）；`prompt-engineering/`、`decisions/` 等近期目录未动。
 - 注：不维护 CHANGELOG；本条与代码提交一并 push。
-
 
 ## 2026-09-21 10:00 · ZCode 系统线 — 收工：D2（SUT 503 阶段空转）问题真实性验证 + 三线归属裁决（只读，无代码变更，免开工声明按约补收工）
 

@@ -602,6 +602,9 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
             # 检查取消
             if cancel_flag_path.exists():
                 break
+            # 守卫/goal-loop 已置 stopped：不再续跑（避免 0 步空转轮）
+            if goal_tracker.get('stopped'):
+                break
             # 评估续跑条件
             from ..controller.actions._phase_intent import check_pending_write_gate, has_contract_success
             from ..controller.actions.section_scope import resolve_phase_section

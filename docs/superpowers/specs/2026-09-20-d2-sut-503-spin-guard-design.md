@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | 设计稿，**尚未实施** |
+| 状态 | **代码已实施（2026-09-21 引擎线，分支 `engine/d2-spin-guard-20260921`，默认 off，未合并待批）**；湿测验收（§8.1）待在线 SUT+执行机，实施记录见文末 §12 |
 | 前置条件 | 在线 SUT + 执行机，可复现 #925 类 `Service Unavailable` 场景 |
 | 关联 | D1（`de18502d`）已修复 already-matched `select_option` 跨阶段重复落库；D2 处理同一根因的另一面——目标不可达时 agent 仍持续空转 |
 | 目标读者 | 后续负责实施/评审 D2 的 Agent/工程师 |
@@ -273,3 +273,15 @@ stderr: [spin-guard] <mode> phase=<phase> step=<n_steps> reason=sut_unavailable_
 ---
 
 **结论**：D2 是有必要的，但必须在可观测、可灰度、可回滚的前提下分阶段实施。等执行机 + SUT 在线后，从阶段 1（观测模式）开始。
+
+## 12. 实施记录（2026-09-21 引擎线）
+
+代码已落地（分支 `engine/d2-spin-guard-20260921`，自 `origin/uara_V2.0` 切出；commit 见 agent-log 收工条目）：`scripts/agent/recorder_emitters.py` 新增 `_guard_spin_on_step_end`（A/B 判定+模式分发+`phase_error` 直发）、`scripts/recorder.py` on_step_end 调用点（位于 `_guard_done_on_step_end` 之前）、`scripts/agent/service.py` 续跑循环补 `goal_tracker['stopped']` break、pin `scripts/characterization/characterize-sut-spin-guard.py`（73 断言，RED→GREEN）入 verify-all。两个系统线勘误均已吸收（①纯读操作空转由 idle watchdog 兜底、观测模式以此为边界；②`reason` 字段纯加法）。实施中的三项裁定（设计稿授权范围内的实现选择）：
+
+1. **A2（网络 5xx）缓发**：§5.1 假设「通过 attach_network_capture 写入 business_data_store 的网络状态」可读——实查 `network_capture.py` 仅 `emit_memory_event('network_captured')` 内存事件、store 无该键，读取路径不存在。落地 A1+A3+A4（A1 覆盖 #925 实证形态）；A2 若湿测期需要，须先挂 memory writer 旁路再评估。
+2. **soft/hard 进程内同构**：§6.2 状态机读字面两者均为「emit phase_error(reason) + 停 agent」——照此实现；真正的分级旋钮是环境默认档位，进程内差异仅 payload 的 mode 字段与 `_spin_guard_soft_triggered` 标志（soft 档）。
+3. **条件 B 三信号**：task_list done 数增长 / URL pathname 变化 / 新容器首开（**重开已见容器不算进展**——防 #925 型「重开下拉」循环把容器翻转误计为进展）；§5.2 第(4)项「成功保存/提交」不单设信号（实践必伴随前三者之一）。
+
+补充语义（实施时固化，pin 已钉）：stall 窗口未满**零页面 I/O**（off 与未满窗两档）；进展发生时 A 计数与 stall 一并清零；阶段号变化自动重置全部状态；**触发幂等=phase+runId 双键作用域**（终审 F1 修正：重录路径〔runner 同 runtime 换 runId 再录、失败收尾不关 session〕存在同进程同 store 同相位重入，「同阶段作用域」会 neuter 重录相位的 on_step_end 尾段且守卫不再武装——重置条件含 runId 维度、重置块清触发戳重新武装，重录/阶段推进自动重武装，pin 10a/10b 钉死；runId=None 的 legacy 场景退化为按相位幂等，行为与初版一致）；observation 满窗后每步探测一次并覆写 `_spin_guard_observed_last`（持续观测误报率=设计意图）。
+
+**余下**：§8.1 湿测验收（#925 复现必须命中 observation 日志 + 正常长阶段不得误杀）待在线 SUT+执行机；按湿测数据逐级升档（observation→soft→hard），默认值升为 hard 前须 Lead 批准（§6.4 沿用）。
