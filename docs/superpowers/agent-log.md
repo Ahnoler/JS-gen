@@ -8,9 +8,10 @@
 - 计时实测：**全量 2m58s→1m08s**（并发 4；瓶颈是 176 个进程串行启动非单 pin 慢，逐 pin 计时基线在案）；**单域管线 15-20s**（kb 17s/phase 20s/ui 16s/select 未单测估同量级）。AGENTS.md 口径已更新：微步验收=域管线/--changed，**合并后验收=全量不变**，新 pin 须登记域注册表（跨域 pin 可登记多域防漏跑，拿不准进 core）。
 - 安全性审计（并发前提）：全部写入类 pin 用 mkdtemp 自隔离（req-draft-traj/kb-insights/network-capture 等逐一核验）；浏览器 pin（g3-live/field-label/login-fallback/tree-select/probe）各自 headless launch 无固定端口；DB 写仅 phase-group-shot（不在注册表）。调试竞态时可 `VERIFY_JOBS=1` 回严格串行。
 - 验收：两轮全量 177 项（175 pin + eslint + ruff）稳定 ALL GREEN，3 红与基线逐项一致零新增；175 pin 与旧口径 comm 核验零丢失；域抽样 kb(17s)/phase(31 green)/ui(含 3 基线红正确标注)；--changed 抽测映射正确（select_dispatch→select、js_snippets→xpath、trajectory-runner→ui+export+core、data/kb→kb、executor→executor）。
-- 遗留移交：①各线后续新 pin **登记进域注册表**（改 verify-all.sh 的热点冲突依旧存在，但注册表是显式清单、冲突好解）；②`--changed` 路径映射规则保守（未映射兜底全量），跑一段时间后可按实际 diff 命中情况微调规则；③并发度默认 4 是保守值，机器富裕可 `VERIFY_JOBS=6` 再压。
+- **push 冲突与合并回执（15:20）**：push 被 non-fast-forward 拒（远端同窗口 OpenCode 线 push 了回放三修复 d18604d5）→ pull 合并，verify-all.sh 冲突按注册表口径消解（保留域管线化，OpenCode 新增 2 replay pin **登记进 executor 域**——回放语义域与 replay-batch 同域），agent-log 双方条目并排保留；合并提交 `abe10f5e` 已推送。**合并后验收（硬约定）**：合并态全量 verify-all **180 项（178 pin+eslint+ruff）ALL GREEN**，3 红与基线逐项一致零新增，1m10s——OpenCode 回放三修复未破坏本线改造、本线改造也未破坏其 pin（2 新 pin 经注册表正常跑绿）。
+- 遗留移交：①各线后续新 pin **登记进域注册表**（本次 pull 冲突即为实例：OpenCode 加 run 行与我改注册表撞车，注册表化后此类冲突改为清单内追加、好解得多）；②`--changed` 路径映射规则保守（未映射兜底全量），跑一段时间后可按实际 diff 命中情况微调规则；③并发度默认 4 是保守值，机器富裕可 `VERIFY_JOBS=6` 再压。
 - 注：不维护 CHANGELOG；本条与代码提交一并 push。
-=======
+
 ## 2026-09-21 17:20 · OpenCode — 补记：回放三项修复合并后验收通过；push 因 GitHub 不可达待补
 
 - 代码 commit `d18604d5`；`git pull origin uara_V2.0 --no-rebase` 合入远端 `52f4adf3`（ZCode D2 回执/代理件条目 + todo 更新），仅 `agent-log.md` 冲突，按协议双方条目并排消解，零代码冲突。
