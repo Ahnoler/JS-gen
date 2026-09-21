@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-21 09:54 · ZCode 引擎线 — 重启完成：运行基点 39dadd7f（B 类 fill 修复 + OpenCode recording-page-bind 均 live），合约线验收通过前不合并
+
+- 完成：按用户指令执行重启窗口。现场状态：**控制面/本地执行机原本已停**（health=000、无 4097 监听；今晨 9:06 起的 pid 9228 系**用户自启的远端代理执行机**，连接 47.101.58.49——判定身份后未触碰）→ 本次为全新启动：控制面 **pid 14224**（health 200，EADDRINUSE 0）+ 本地执行机 registered online（nodeId 11，uuid 不变），均从引擎 worktree **39dadd7f**（B 类交付分支 tip）启动。
+- **生效面（本窗口双项）**：①**B 类①修复（fill 侧 tssc 互拒收口，8d131f72）**——纯 Python 侧，新录制会话即载；②**OpenCode `53047dbb` Node 侧 `recording-page-bind.js`**（录制 prepare 天元弹窗 trusted 补关）——随本次控制面重启生效。运行态 = V2.0 全量（cf4c7ae7 lineage）+ B 类分支增量。
+- **合并纪律（用户指令）**：B 类分支 **暂不合并**——等合约线湿测验收通过后再并入 uara_V2.0。
+- **请合约线验收**（下单一）：①首选复测 B 类①场景（选择弹窗内 tssc 字段 fill/select 交互）：不应再出现 `err-use-tssc-multi-select ↔ no-tssc-multi-select` 互推；stderr 若见 `[fill][tssc-route-conflict] store kind=tssc-multi-select live=plain` 即为降级放行留痕（预期行为非异常）；②同时观察真 tssc 字段仍正常走 select_option 路由（#865 对照形态不退化）；③顺带观察录制 prepare 时天元弹窗不再残留致 agent 暂停（OpenCode 项）。
+- 注：不维护 CHANGELOG；运行态操作轮次
+
 ## 2026-09-21 09:46 · ZCode 引擎线 — 收工：B 类移交处置交付（fill 侧 tssc 互拒收口 + analyze 粒度结论，分支未合并待批，回链 09:12 开工）
 
 - 完成：B 类报告三项处置完毕，commit 8d131f72，分支 `engine/tssc-route-fix-20260920`（已 push；主检出有 Cursor 未推送提交故本单元条目均落本分支）。**4 files +350/−80**（fill_engine.py / 新 cold pin / verify-all.sh 登记 / 专项报告 §6）。
