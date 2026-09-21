@@ -1,6 +1,20 @@
 # Agent 协作日志
 
 
+## 2026-09-21 10:00 · ZCode 系统线 — 收工：D2（SUT 503 阶段空转）问题真实性验证 + 三线归属裁决（只读，无代码变更，免开工声明按约补收工）
+
+- 任务：用户指令——带 agent team 按 systematic-debugging 纪律验证 D2 设计稿（`docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md`）所述问题真实存在，并裁决归属（系统线/合约线/引擎线）。
+- 方式：Explore 双路并行只读取证（A=#925 原始证据考古：tmp 留档/进程观察/DB 只读 SELECT；B=代码级机理逐条验证）。SUT 当前停机，活体复现不可行，验证=历史实证+机理现存两层。
+- **验证结论：问题真实存在（三层证据）**：
+  - **历史实证（DB 只读，js_gen@47.101.58.49）**：轨迹 #925 三事全实锤——①空转跨度：轨迹 09:29:00→末步 10:00:18=31m18s、round-2 会话（a26cb9fc/remote_session 2115）存活 31m56s、定稿（phase2 completed 09:40:17）→会话关闭 27m40s（纯落步活跃跨度 23m26s，「30min+」按会话/轨迹口径成立）；②落 10 步且重复：trajectory_step 恰 10 行，phase3 内 #6=#9、#7=#10 参数级完全重复（同一「选客户」循环空转两轮），phase3 永卡 running/done_logs 空；③SUT 503：phase2 done_logs 当时刻录「页面出现『异常信息 Service Unavailable』服务端通知…等待3秒复查及重新打开下拉均未触发模型带出」（页面级实锤；HTTP 状态码级无证据——09-20 控制面/执行机日志未留档）。
+  - **机理现存（当前代码逐条验证）**：SUT 5xx/错误页在录制主循环/动作层**零检测零快失败**（grep 全仓零业务命中）；agent 循环退出仅 done/max_steps/max_failures(5)/stopped/异常五出口、无业务进展判断；**关键机理=503 错误页上 DOM 点击仍「成功」并以硬编码 `ok-clicked-{index}` 落库（click_action_engine.py:932-936）→ 持续发 action_log_sync 喂 idle watchdog（watchdog 只认 action_log_sync/step_screenshot/page_level_screenshot 三事件，`trajectory-recording-runner.js:766-777`，PHASE_IDLE_TIMEOUT_MS=10min 硬编码 L53，stderr 不喂狗）→ 10min 门永远不触发**。§3 审计表五机制断言全属实（coalesce 只管相邻/阶段门按身份不分值失败可重试/max_steps 纯兜底+budget-extend 续跑/D1 只减落库不拦执行）。
+  - **活体复现**：不可行（SUT 停机+当日日志未留档+无 09-20 进程存活）——验证止于上述两层，实施前的湿测复现前置不变。
+- **归属裁决：引擎线（录制引擎 Python agent 层）**：缺陷本体=agent 动作循环缺「SUT 不可达且无业务进展」止损语义，修法落点全在引擎域（`scripts/recorder.py` hook + `controller/actions` + `state.py` + `session_runner.py`），与 D1（OpenCode 引擎线已闭）同域同族；设计稿 §11 决策记录也选了 Python agent hook。**非系统线**：控制面 idle watchdog 与 max_steps 均按设计工作、无基础设施缺陷（对照：今晨 B 类移交两项才是系统线域）；**非合约线**：湿测线是发现方与验收方（复现场景+不误杀湿测归其职责），非修复归属；**SUT 503 本身是外部被测系统故障**，不归属我方任何线（设计稿 §4.2 已列为非目标）。
+- **两个实施须吸收的勘误（已写回 todo D2 行）**：①idle watchdog 断言精确化=「有**落库动作**就不触发」——纯未落库读操作（如反复 get_page_state，state.py:61 跳截图）空转反而 10min 会触发 watchdog 使整 run 失败；设计稿 A4/观测模式应以此为边界。②`phase_error` 现无 `reason` 字段（三处 emitter payload 仅 phase/name/message/runId）——设计稿新增 reason 属加法改动，Node 侧只读 message（`trajectory-recording-runner.js:1054`），兼容无破坏。
+- **附带发现（不阻塞 D2，移交记录）**：①轨迹 #925 现值 record_status='recorded'/is_successful=1（非叙事中的 failed），updated_at 10:58:05 晚于末步 58min，疑被批量作业收尾覆写——与 V2.0.1 failed(interrupted) 状态归因改进相关，建议下次遇到同类比对 persistent_record_status 生成时序；②事故执行机为 nodeId 8/7（round-1 在 8、round-2 在 7），与 09-19 list-executors.json 的 nodeId=10 无关——D2 证据引用时注意；③OpenCode 两会话原文（577a391c/a26cb9fc）在本机 opencode.db 已不可达（疑被清理），本文 DB 证据为其替代锚点。
+- 范围实际改动：`docs/superpowers/todo-list.md`（D2 行追加验证结论+勘误）、agent-log 本条目；零代码改动
+- 注：不维护 CHANGELOG；push 仍待用户批准（本地领先远端 6 条）
+
 ## 2026-09-21 10:05 · ZCode 系统线 — 收工：B 类移交系统线侧两项处置闭环（回链 09:18 开工）
 
 - 完成：
