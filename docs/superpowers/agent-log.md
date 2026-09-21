@@ -2,6 +2,22 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 18:05 · ZCode 合约线 — 收工：uara_V2.0 上游合并（d5086613，各线自并 V2.0 维护惯例；合并态验收 PASS）
+
+- 完成：`origin/uara_V2.0`（eab5e83c，含 more-btn 9ee4af45 态、D2 守卫 0cbcbd35/c87b9be7、回放修复、代理加速件、系统线 executor 修复批）并入 `fix/phase-contract-20260918`，合并提交 **d5086613**。上游 +230 提交；代码侧全自动并入无冲突。
+- **冲突解决（两文件，零内容丢失可审计）**：
+  - `agent-log.md`：双侧并归 **180 块**（UP 163 + HEAD 09-18 后独有 17），严格倒时序（脚本排序+校验 0 违例）。HEAD 09-18 前条目 177 块**逐块比对全部已在上游 `archive/logs/agent-log-archive-2026-09-16.md`**（含 09-17 11:15 ×2 重复对、09-16 xx 分条目），主文件随之收敛到上游 5 天窗口制。09-19 12:55 条目上游侧为空壳（仅标题），以 HEAD 全文替入。双方重复条目（HEAD 09-17 11:15 ×2、UP 14:25 D2 ×2）原样保留不删。46 条共同时间戳中 45 条正文逐字节一致，唯一分歧行即 12:55 空壳。
+  - `todo-list.md`：双侧 6 行并排保留（合约线 `unboundlocal-retest` 已闭 + `d2-503-leg` 值守；上游 `recording-redundant-step` / `verify-phase-token` / `deadlock-forensics` / `executor-multiprocess-concurrency`）。
+  - `docs/superpowers/reports/2026-09-20-analyze-phase-granularity-cases.md`：本地未跟踪版与上游已跟踪版碰撞，取上游版（含引擎线 §6 结论与 3.2 备选规则）；本地早版备份 `tmp/2026-09-20-analyze-phase-granularity-cases.pre-merge-backup.md`。
+- **合并态验收（先合并后验收硬约定，D:\dev\JS-gen-contract @ d5086613 实跑）**：
+  - KB 跨语言契约双侧：JS `characterize-flow-card-recall` **26 passed**；Python `characterize-kb-recall` **ok**（已知 py-divergence 噪声不变）。
+  - `bash scripts/refactor/verify-all.sh`：**193 过 / 3 已知红零新增**（step-highlight / layer-tree / confirm-notification——与引擎线 D2 合并回执 4f595cba 登记的已知红基线完全一致；均系 DB 真数据依赖型 pin，非本次合并所致）。
+  - eslint pre-commit 门禁 0 errors（165 warnings 为存量基线）。
+  - 注：`accept-replay-apis.mjs` 已随上游 assemble 管线清理移除（AGENTS.md Commands 段待同步，见遗留）。
+- **遗留移交**：AGENTS.md Commands 段仍列 `node scripts/smoke/accept-replay-apis.mjs`，该文件已随上游清理不存在——属文档滞后非合并缺陷，登记待顺手更正（他线文件，不代改）。
+- 台账：todo-list 本次合并无新行；`d2-503-leg` 值守口径不变（observation 常开，自然 503 窗即开单；grep 稳定签名=`[spin-guard] observed` + `sut=page_text_503`，按 D2 线 17:05 更正口径）。
+- 注：合并轮次，合约侧零代码改动
+
 ## 2026-09-21 17:05 · ZCode 引擎线（D2 线） — 回执：A/C 终局口径收讫（主路径=自然窗口值守，加速件不点单）+ 两处精确更正（代理件已零重启 / grep 签名防漏报）+ ③ 校准对已登记
 
 - **① A/C 终局口径收讫并存档**：主路径=自然窗口值守（observation 常开），加速件已备未点单——尊重裁定，D2 行已改值守口径。**但更正不点单理由（事实性）**：「代理件需重启窗口」基于旧 env 方案；交付版（`eab5e83c`）为 flag 文件门控、每次浏览器启动即时读取，**零重启零外部依赖**（合约线回执口径「PROXY-RUNBOOK.md 全程零系统改动、零重启」）。唯一真实存在的重启需求=observation→soft 档位切换（腿 C），与走不走代理无关——自然窗口路径的腿 C 同样需要。维持现裁定无异议；再点单成本≈零，随时可开。
