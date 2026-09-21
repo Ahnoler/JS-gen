@@ -132,6 +132,7 @@ CREATE TABLE `trajectory_phase` (
   `trajectory_id`  BIGINT UNSIGNED NOT NULL COMMENT '外键 → trajectory.id',
   `phase_number`   INT UNSIGNED NOT NULL COMMENT '阶段序号（1-based）',
   `description`    TEXT COMMENT '阶段任务完整描述（执行阶段时下发的 task）',
+  `contract_json`  JSON NULL COMMENT '阶段合约 v1 {v,mode,refill,submitRequired,successWhen,source}；空则录制兜底',
   `special_element_candidates_json` JSON NULL COMMENT '阶段创建/同步时标记的候选特殊元素快照',
   `status`         ENUM('pending','running','completed','failed') DEFAULT 'pending',
   `component_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '预留 → operation_component.id；Phase1 业务不写入',

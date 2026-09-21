@@ -92,6 +92,8 @@ characterize-owned-wait-shape|node scripts/characterization/characterize-owned-w
 characterize-budget-extend|"$PY" scripts/characterization/characterize-budget-extend.py
 characterize-done-accept-reason|"$PY" scripts/characterization/characterize-done-accept-reason.py
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
+characterize-phase-contract|node scripts/characterization/characterize-phase-contract.mjs
+characterize-persisted-phase-contract|"$PY" scripts/characterization/characterize-persisted-phase-contract.py
 '
 PINS_FILL='
 characterize-form-rules|"$PY" scripts/characterization/characterize-form-rules.py

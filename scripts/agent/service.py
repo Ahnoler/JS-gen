@@ -242,59 +242,76 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     cur_phase = int(phase_for_preamble) if phase_for_preamble is not None else 0
                 except (TypeError, ValueError):
                     cur_phase = 0
-                from ..controller.actions.phase.reviewer import _get_reviewer_llm
-                reviewed = await review_phase_contract(
-                    task_text=phase_core,
-                    all_phases=all_phases if isinstance(all_phases, list) else [],
-                    current_phase_number=cur_phase,
-                    scenario_summary=scenario_summary,
-                    llm=_get_reviewer_llm(llm),
+                from ..controller.actions.phase.phase_contract_snapshot import (
+                    apply_persisted_phase_contract,
+                    persisted_contract_from_instruction,
                 )
-                if reviewed:
-                    # Use the deterministic rule-based boundary as the canonical shape;
-                    # the LLM contract supplies mode/refill/goal but the gate evidence
-                    # kinds (open_page / click_next / nav_next_clicked) must come from
-                    # the task text so they are actually recordable (sid 64c9044b:
-                    # phase 1 LLM said navigate url_change+page_opened but boundary
-                    # goals were empty → open-page fallback never ran; phase 3 LLM
-                    # omitted nav_next_clicked for 下一步 wizard step).
-                    from ..controller.actions._phase_boundary import compile_boundary
-                    boundary = compile_boundary(
-                        phase_core,
-                        all_phases=all_phases if isinstance(all_phases, list) else [],
-                        current_phase_number=cur_phase,
-                    )
-                    contract = apply_phase_contract(
-                        business_data_ref,
-                        reviewed,
-                        boundary_override=boundary,
-                        all_phases=all_phases if isinstance(all_phases, list) else [],
-                        current_phase_number=cur_phase,
-                    )
+                raw_snapshot = persisted_contract_from_instruction(instruction, heal_mode=False)
+                persisted = apply_persisted_phase_contract(business_data_ref, raw_snapshot)
+                if persisted:
+                    contract = persisted
                     mode = business_data_ref.get('_task_mode') or 'other'
-                    from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
-                        f"phase_reviewer ok task_mode={mode} "
-                        f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
-                        f"phase_intent=True {contract_debug_line(contract)}\n"
+                        "phase_contract=persisted "
+                        f"mode={persisted.get('mode')} "
+                        f"submit={bool((persisted.get('submit') or {}).get('required'))} "
+                        f"success_when={(business_data_ref.get('_phase_boundary') or {}).get('success_when')}\n"
                     )
                     sys.stderr.flush()
                 else:
-                    mode = apply_task_mode(business_data_ref, phase_core)
-                    contract = apply_phase_intent(
-                        business_data_ref,
-                        phase_core,
+                    from ..controller.actions.phase.reviewer import _get_reviewer_llm
+                    reviewed = await review_phase_contract(
+                        task_text=phase_core,
                         all_phases=all_phases if isinstance(all_phases, list) else [],
                         current_phase_number=cur_phase,
+                        scenario_summary=scenario_summary,
+                        llm=_get_reviewer_llm(llm),
                     )
-                    mode = business_data_ref.get('_task_mode') or mode
-                    from ..controller.actions.phase.reviewer import contract_debug_line
-                    sys.stderr.write(
-                        f"phase_reviewer fallback task_mode={mode} "
-                        f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
-                        f"phase_intent={bool(contract)} {contract_debug_line(contract)}\n"
-                    )
-                    sys.stderr.flush()
+                    if reviewed:
+                        # Use the deterministic rule-based boundary as the canonical shape;
+                        # the LLM contract supplies mode/refill/goal but the gate evidence
+                        # kinds (open_page / click_next / nav_next_clicked) must come from
+                        # the task text so they are actually recordable (sid 64c9044b:
+                        # phase 1 LLM said navigate url_change+page_opened but boundary
+                        # goals were empty → open-page fallback never ran; phase 3 LLM
+                        # omitted nav_next_clicked for 下一步 wizard step).
+                        from ..controller.actions._phase_boundary import compile_boundary
+                        boundary = compile_boundary(
+                            phase_core,
+                            all_phases=all_phases if isinstance(all_phases, list) else [],
+                            current_phase_number=cur_phase,
+                        )
+                        contract = apply_phase_contract(
+                            business_data_ref,
+                            reviewed,
+                            boundary_override=boundary,
+                            all_phases=all_phases if isinstance(all_phases, list) else [],
+                            current_phase_number=cur_phase,
+                        )
+                        mode = business_data_ref.get('_task_mode') or 'other'
+                        from ..controller.actions.phase.reviewer import contract_debug_line
+                        sys.stderr.write(
+                            f"phase_reviewer ok task_mode={mode} "
+                            f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
+                            f"phase_intent=True {contract_debug_line(contract)}\n"
+                        )
+                        sys.stderr.flush()
+                    else:
+                        mode = apply_task_mode(business_data_ref, phase_core)
+                        contract = apply_phase_intent(
+                            business_data_ref,
+                            phase_core,
+                            all_phases=all_phases if isinstance(all_phases, list) else [],
+                            current_phase_number=cur_phase,
+                        )
+                        mode = business_data_ref.get('_task_mode') or mode
+                        from ..controller.actions.phase.reviewer import contract_debug_line
+                        sys.stderr.write(
+                            f"phase_reviewer fallback task_mode={mode} "
+                            f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
+                            f"phase_intent={bool(contract)} {contract_debug_line(contract)}\n"
+                        )
+                        sys.stderr.flush()
         else:
             mode = 'other'
             contract = None
