@@ -110,6 +110,11 @@ export async function runReplayBatch({
   const skippedIds = new Set();
 
   emitReplay('replay:started', tid, { stepIds: orderedStepIds });
+  console.log(
+    `[replay-batch] traj=${tid} steps=${orderedStepIds.length} `
+    + `stepIds=[${orderedStepIds.join(',')}] `
+    + `actions=[${actions.map((a) => a.action).join(',')}]`,
+  );
 
   // ── 执行前菜单导航（同菜单跳过/空菜单直接执行/失败不阻断）──
   try {

@@ -682,6 +682,15 @@ async def replay_action_entries(
     try:
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
+        sys.stderr.write(
+            '[replay] batch start: '
+            + ', '.join(
+                f"{i + 1}:{e.get('action') or '?'}{f'(id={e.get('id')})' if e.get('id') is not None else ''}"
+                for i, e in enumerate(entries)
+            )
+            + '\n'
+        )
+        sys.stderr.flush()
 
         for i, entry in enumerate(entries):
             action_name = normalize_action_name(entry.get('action') or '')

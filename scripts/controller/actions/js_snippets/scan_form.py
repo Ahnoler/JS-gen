@@ -553,6 +553,9 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
                 rowText = 'row#' + domRowIndex;
             }
             const controls = collectTableControls(row);
+            // 仅含选择控件（单选/多选）的行是数据行，不是表单字段；
+            // 把业务编号等行文本当作字段名会导致回放时误判为表单结构变化。
+            if (controls.length && controls.every((c) => c.kind === 'radio' || c.kind === 'checkbox')) continue;
             for (let ci = 0; ci < controls.length; ci++) {
                 const ctrl = controls[ci];
                 const cell = ctrl.cell;
