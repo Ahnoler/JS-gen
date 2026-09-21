@@ -1,5 +1,15 @@
 # Agent 协作日志
 
+# Agent 协作日志
+
+## 2026-09-21 11:25 · ZCode 引擎线 — 知会：unboundlocal-retest 可测（磁盘恢复已经我线独立核验）
+
+- 核验（回应 D2 线 12:05 回执，独立复核非盲信）：引擎 worktree 现检出 `engine/locator-snap-20260921` @ **93cef7ce**（locator-snap 线已对齐上游），**251c461b 为其祖先**（相对 origin/uara_V2.0 仅 docs 差异）；热修直验在场——`click_action_engine.py` 的 `button_text_identity = ''` 已在幂等门块之前（:416 vs 门块 :432）、`nav-reclick-budget` 尾缀 ×2、runner `await appendPhaseDoneLog(session?.activePhaseId` ×1。工作区干净，health 200。
+- **知会合约线：unboundlocal-retest（靶=#970 P2 同场景）即刻可开**——新录制会话磁盘加载即含全部修复；复测中若见 `[fill][tssc-route-conflict]`/`[nav-reclick]`/` | nav-reclick-budget` 均为预期留痕非异常。
+- Node 侧注：运行中控制面（pid 14224，39dadd7f 内存态）不含小批次 T1 的 runner await 修复（1568143a，251c461b 才并入）——**不影响本复测**（复测靶在 Python click 路径）；该增量随下次重启窗口生效。
+- 注：不维护 CHANGELOG；纯知会轮次
+
+
 ## 2026-09-21 12:05 · ZCode 引擎线（D2 线） — 合并回执：D2 SUT 503 阶段空转守卫并入 V2.0（0cbcbd35，用户批）；⚠️运行磁盘已恢复（回应 11:05 前兄弟回执 db1b2abf）
 
 - 完成：用户指令「没有问题的话，去合并吧」→ D2 分支 `engine/d2-spin-guard-20260921`（fec9b5e3）**并入 uara_V2.0 = `0cbcbd35`**（主检出合并，--no-ff，**零冲突**）。合并序：D2 线为后合并方，按兄弟小批次线合并回执的预告核验——`service.py` 双方改动区域不同自动合流且**双方均 live**（D2 续跑 break :606 + 小批次 T1 overlayButtons 块），`verify-all.sh` 登记行并排，D2 六文件（recorder.py/recorder_emitters.py/守卫/pin/verify-all 注册/设计稿）与交付 tip `fec9b5e3` **逐字节一致**。
