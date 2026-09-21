@@ -10,7 +10,7 @@
 
 ## phaseIds
 
-- `start_record` 请求体 `phaseIds` **必须是数据库数字 id**（`trajectory_phase.id`），**传 UUID 必 400**。
+- `start_record` 请求体 `phaseIds` **必须是数据库数字 id**（`GET /api/v2/trajectories/:id` 的 `phases[].id`），**传 UUID 必 400**（#891）。
 - `acceptedPhases` 只用 `analyze_trajectory` 结果；模型传入的 phases 忽略。
 - 建单端点 `POST /api/v2/trajectories`（无 `/create` 后缀）；`create_trajectory` 参数必须是 `{}`（inputs 已由 `mark_inputs_ready` 锁定）。
 
@@ -34,7 +34,13 @@
 ## 值守与轮询
 
 - `start_record` 期间每 **60s** 写 `poll-N.json` 并追加 `progress.log`；操作员**不在**轮询间隙改页面或改任务。
-- 单次录制总长 **40 分钟**封顶；`start_record` 阻塞到全部阶段收口。
+- 单次录制总长 **40 分钟**封顶；`start_record` 是同步长连，**curl/客户端超时 ≠ 失败**。超时后先 GET 轨迹状态；已在 recording 则**禁止再 POST**（#971）。
+- 同一 action 参数级重复 ≥2 轮且当前阶段 `done_logs` 为空 → 立即 detach，结论 `BLOCKED_外部故障_SUT`（识别后移交引擎，不在此实现自旋守卫）。
+
+## 日志取证时点
+
+- **detach 前**：`GET /api/v2/recording/agent-stderr?trajectoryId=`（活跃期才有正文）。
+- **detach 后**：该 API 变空；直读引擎 worktree `tmp/executor-main.log`，按 sid 过滤，摘录带行号与时间界（#970/#971）。重启会轮转日志。
 
 ## 工具顺序（不可跳步）
 

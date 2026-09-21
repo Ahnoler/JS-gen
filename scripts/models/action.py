@@ -404,6 +404,11 @@ class ActionEntry(BaseModel):
                 'field_slot', 'display_label',
                 'locator_verified', 'locator_strategy', 'locator_fallback_reason',
                 'formLabel',
+                # icon_class：图标按钮的 el-icon-* 类（buildLocatorSnap kind==='icon'
+                # 时产出）。replay_click._JS_CLICK_DURABLE 的 clickToolbarIcon 以
+                # el.icon_class 做 class 优先匹配（replay_click.py:70）——补上后
+                # 录回全链通：录制快照 → element_json → 回放 opts.iconClass。
+                'icon_class',
             ):
                 if elem.get(meta_key) not in (None, '', False):
                     entry.element[meta_key] = elem[meta_key]
@@ -423,6 +428,11 @@ class ActionEntry(BaseModel):
                     k: bool(v) for k, v in elem['attr'].items()
                     if k in ('disabled', 'required', 'readonly')
                 }
+            # locator_strategy 空串兜底：快照（buildLocatorSnap）成功时必带
+            # locator_strategy（'xpath_smart' | 'xpath_full'），上方 meta_key
+            # 循环已写入，不进入本分支；仅当 element 无快照来源（纯 enrich 缺
+            # locator）且 xpath_smart/xpath_full 均为空时才会落空串——此时
+            # entry.target 也为空，回放走 text 优先路径，故逻辑维持不变。
             if not entry.element.get('locator_strategy'):
                 entry.element['locator_strategy'] = (
                     'xpath_smart' if xpath_smart else ('xpath_full' if (xpath_full or xpath) else '')

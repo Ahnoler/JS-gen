@@ -40,6 +40,8 @@
 服务端拒绝（评级未生效、在途授信等）是**合法终局**：照抄提示原文 + 全局流水号（记在 `doneLogs`），结论前缀 **`REJECTED_`**。
 
 - **不得擅自重录**：诚实失败后禁止再开一单，除非用户**本回合**明确要求重试。
+- **确定性拒绝限重试 1 次**：文案含「已存在 / 在途 / 无有效评级」一类，第 2 次同文案即 `REJECTED_` 收口并引用两次原文，不等阶段跑完（#895/#896）。
+- 操作员**不裁决**业务规则：该验证的对象未被观察到 → `BLOCKED_NOT-ADJUDICATED_<断点>`；核验通道当轮失灵 → `BLOCKED_UNVERIFIED_<原因>`。禁止写成「另有条件」或「已删净」。
 - 湿测路径默认 `honestReject.enabled: true`（`assert_steps` / `write_through_report`），除非调用方显式 `false`。
 
 ## assert_steps 要点

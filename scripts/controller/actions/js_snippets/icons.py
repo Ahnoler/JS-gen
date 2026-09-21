@@ -3,6 +3,8 @@ JS snippet constants: _JS_ICON_BUTTON_HELPERS, JS_STAMP_ICON_ARIA_LABELS, JS_COL
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 
+from ._locator_helpers_js import PAGE_LOCATOR_HELPERS as _PAGE_LOCATOR_HELPERS
+
 _JS_ICON_BUTTON_HELPERS = r'''
 function _iconNormText(s) { return (s || '').replace(/\s+/g, ' ').trim(); }
 function _iconShortLabel(text) {
@@ -200,7 +202,27 @@ JS_COLLECT_ICON_BUTTONS = r'''() => {
 
 
 JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
-''' + _JS_ICON_BUTTON_HELPERS + r'''
+''' + _JS_ICON_BUTTON_HELPERS + _PAGE_LOCATOR_HELPERS + r'''
+  // ══ 点击命中时刻定位快照（more-btn xpath 伪造修复）══
+  // 落库 xpath 此前只来自点击前的 _enrich_click_element（includes 文本匹配取最后
+  // 命中），实际被点节点可能不同（生产定谳：jsgen-forensic-fake）。四个成功分支
+  // 在点击当场对被点 el buildLocatorSnap，以 U+241F 尾段携带 JSON——首段判定
+  // （'ok' / startswith('ok-more-toggle') 等）不变，ClickEngine 解析尾段覆盖落库。
+  const LOC_SEP = '␟';
+  const snapLocator = (el, text, kindHint, overrides) => {
+    try {
+      const abs = absXPath(el);
+      const kind = kindHint || detectTargetKind(el);
+      const t = normalizeControlText(text) || cleanVisibleText(el);
+      const loc = buildLocatorSnap(el, t, abs, '', { targetKind: kind });
+      if (overrides) {
+        for (const k in overrides) {
+          if (overrides[k]) loc[k] = overrides[k];
+        }
+      }
+      return LOC_SEP + JSON.stringify(loc);
+    } catch (e) { return ''; }
+  };
   if (!buttonText) return 'button-text-empty';
   // ══ KB-I5 run5: 精确文本优先（原为 icon 宿主优先、文本兜底）══
   // 意见页「流程提交」「下一步」等是普通可见文本按钮——先在 button/文本元素中
@@ -227,17 +249,38 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
     // document order: ancestors precede descendants → last = innermost.
     const m = exact[exact.length - 1];
     m.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const tail = snapLocator(m.el, m.text);
     m.el.click();
-    return 'ok-text:' + m.text;
+    return 'ok-text:' + m.text + tail;
   }
+  // icon 宿主命中：收集全部命中（原为首个即点）→ 滤页头全局工具图标 →
+  // 恰剩一个才点；多个返回 err-icon-label-ambiguous 交 agent 判定，不盲点。
+  const iconHits = [];
   for (const el of _iconCandidates(document)) {
     if (!_iconIsVisible(el)) continue;
     const label = _iconResolveLabel(el);
     if (label === buttonText || (label && label.includes(buttonText))) {
-      el.scrollIntoView({ block: 'center', behavior: 'instant' });
-      el.click();
-      return 'ok';
+      iconHits.push({ el: el, text: label });
     }
+  }
+  if (iconHits.length) {
+    // 页头宿主（headerbox/navbar/header__action-item）多为全局工具图标，
+    // 与正文同标签时优先正文命中；滤后为空回退全量。
+    const nonHeader = iconHits.filter((h) => !(
+      h.el.closest && h.el.closest('.headerbox, .navbar, .header__action-item')));
+    const pool = nonHeader.length ? nonHeader : iconHits;
+    if (pool.length === 1) {
+      const h = pool[0];
+      h.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      const tail = snapLocator(h.el, h.text);
+      h.el.click();
+      return 'ok' + tail;
+    }
+    return 'err-icon-label-ambiguous:' + JSON.stringify({
+      wanted: buttonText,
+      reason: 'ambiguous',
+      iconHosts: pool.map((h) => ({ text: h.text, tag: h.el.tagName.toLowerCase() })),
+    });
   }
   // Generalized fallback: click a visible PLAIN text button sharing the label.
   // Toolbar buttons like 查询/修改/新增 are ordinary <button>s, not tooltip
@@ -275,8 +318,9 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
     if (pool.length === 1) {
       const m = pool[0];
       m.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      const tail = snapLocator(m.el, m.text);
       m.el.click();
-      return 'ok-text:' + m.text;
+      return 'ok-text:' + m.text + tail;
     }
     return 'err-icon-label-ambiguous:' + JSON.stringify({
       wanted: buttonText,
@@ -293,9 +337,21 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
     if (collapsed.length === 1) {
       const el = collapsed[0];
       el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      // 纯图标（无 tooltip）more-toggle：kind 显式 'icon'，回放侧
+      // clickToolbarIcon 的 more-btn 信号依赖 target_kind === 'icon' 门控。
+      // icon_class 直连（A 修）：more-btn 信号类在宿主链（span.tsscBtn.more-btn）
+      // 上、el-icon-* 在子 <i> 上，extractElIconClass 只看节点 className 取不到
+      // ——从最近 more-* 祖先类串显式提取，回放侧 replay_click 消费 el.icon_class。
+      const moreHost = el.closest
+        ? el.closest('[class*="more-btn"], [class*="moreBtn"], [class*="more_btn"]')
+        : null;
+      const moreSig = moreHost
+        ? ((String(moreHost.className || '').match(/[\w-]*more[\w-]*/i) || [''])[0])
+        : '';
+      const tail = snapLocator(el, want0, 'icon', moreSig ? { icon_class: moreSig } : null);
       el.click();
       const cls = typeof el.className === 'string' ? el.className.slice(0, 60) : '';
-      return 'ok-more-toggle:' + cls;
+      return 'ok-more-toggle:' + cls + tail;
     }
     if (collapsed.length > 1) {
       return 'err-more-toggle-ambiguous:' + JSON.stringify({
