@@ -49,6 +49,7 @@ from ._js_snippets import (
     JS_VERIFY_FORM_STRUCTURE,
 )
 from scripts.feature_flags import relative_xpath_primary_enabled
+from scripts.state import clear_cancel_flag, is_cancel_requested
 
 from .replay_js import (  # noqa: F401  (re-exported for compat)
     _JS_CLICK_DURABLE,
@@ -677,6 +678,7 @@ async def replay_action_entries(
     emit=None,
     stop_on_fail: bool = False,
     secret_values: list | None = None,
+    cancel_flag_path=None,
 ) -> dict:
     """
     Replay recorded steps sequentially (auto-fill style orchestration).
@@ -686,7 +688,16 @@ async def replay_action_entries(
     ``secret_values``: resolved auth credentials (account/password) to redact from
     the stderr step logs — never mutate the executed params themselves.
 
-    Returns {count, ok, failed, results, stoppedAt?}.
+    ``cancel_flag_path``: E1 replay-loop cancel awareness. The flag content is
+    checked at EVERY step boundary, BEFORE dispatching that step: when a cancel
+    request is observed, the batch aborts BEFORE executing that step (the step
+    is NOT executed), the flag is consumed (cleared to empty), and the return
+    gains ``aborted: True`` plus ``stoppedAt`` = the 1-based step number where
+    the cancel was observed. Note the difference vs ``stop_on_fail``'s
+    ``stoppedAt`` (which halts AFTER the failed step ran — that step IS in
+    ``results``); an aborted step never appears in ``results``/``count``.
+
+    Returns {count, ok, failed, results, stoppedAt?, aborted?}.
     """
     store = business_data_store if business_data_store is not None else {}
     prev_watcher = store.get('_watcher_mode')
@@ -697,6 +708,7 @@ async def replay_action_entries(
     fail_count = 0
     total = len(entries)
     stopped_at = None
+    aborted = False
 
     try:
         page = await browser_context.get_current_page()
@@ -715,6 +727,13 @@ async def replay_action_entries(
             action_name = normalize_action_name(entry.get('action') or '')
             params = _normalize_params(action_name, entry.get('params'))
             step_num = i + 1
+            if is_cancel_requested(cancel_flag_path):
+                aborted = True
+                stopped_at = step_num
+                clear_cancel_flag(cancel_flag_path)
+                sys.stderr.write(f'[replay] cancel requested at step {step_num}/{total} — aborting batch (step not executed)\n')
+                sys.stderr.flush()
+                break
             sys.stderr.write(
                 redact_secrets(f'[replay] [{step_num}/{total}] {action_name} {params}', secret_values)
                 + '\n'
@@ -871,6 +890,8 @@ async def replay_action_entries(
         }
         if stopped_at is not None:
             out['stoppedAt'] = stopped_at
+        if aborted:
+            out['aborted'] = True
         return out
     finally:
         if prev_watcher is None:

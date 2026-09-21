@@ -77,7 +77,14 @@ async function pickAnchor(db) {
     scanned += batch.length;
     if (scanned > ANCHOR_SCAN) backscanned = true;
     for (const s of batch) {
-      const r = await evaluate(s);
+      // 并行跑全量时远端 DB 偶发抖动会打死整个扫描——单候选查询失败跳过即可；
+      // DB 整体不可达时所有候选都失败，chosen 仍为空、下方 assert 照常红。
+      let r = null;
+      try {
+        r = await evaluate(s);
+      } catch (err) {
+        continue;
+      }
       if (!r) continue;
       if (!best || r.score > best.score) best = r;
       if (r.qualified && (!qualifiedBest || r.score > qualifiedBest.score)) qualifiedBest = r;

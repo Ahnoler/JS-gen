@@ -297,6 +297,17 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             emit_json({"event": "replay_done", "data": early})
             return 'continue'
 
+        # E1③: consume-then-clear —— 上次停止残留的 'cancel' 不得误中断新批次首步；
+        # 批内由 replay_action_entries 在步边界自行检测并消费该标志。
+        cancel_flag = None
+        try:
+            from .state import cancel_flag_path_for, clear_cancel_flag
+            if session_state.get('session_id') is not None:
+                cancel_flag = cancel_flag_path_for(session_state['session_id'])
+                clear_cancel_flag(cancel_flag)  # E1③: 上次停止残留的 'cancel' 不得误中断新批次首步
+        except Exception:
+            cancel_flag = None
+
         # 自修复 / 轨迹回放：通过 scripts/controller/actions/_replay.py 执行顺序操作
         #（表单 JS + 持久化点击 + 控制器）—— 非 LLM，非 Playwright assemble_partial。
         from .controller.service import build_controller
@@ -324,6 +335,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             emit=emit_json,
             stop_on_fail=stop_on_fail,
             secret_values=session_state.get('_replay_secret_values') or [],
+            cancel_flag_path=cancel_flag,
         )
 
         # 修复路径：用原始失败前的条目填充 ACTION_LOG，以便后续 agent 录制
@@ -359,6 +371,9 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         }
         if summary.get("stoppedAt") is not None:
             done_data["stoppedAt"] = summary["stoppedAt"]
+        if summary.get("aborted"):
+            # E1: 批次在步边界被 cancel 中断 —— 透传给控制面（非中止批次不带该键）。
+            done_data["aborted"] = True
         if replay_id:
             done_data["replayId"] = replay_id
         emit_json({"event": "replay_done", "data": done_data})
