@@ -28,6 +28,18 @@
  *   #11 超时 reject 之前补发 cancel_step（forwardStdin fire-and-forget + warn，
  *       对齐 replay-actions.js P1-6 模式），避免迟到 phase_done 污染下一轮等待
  *
+ * Task 3/6 — #4 超时×stop 竞态终态口径 + #12 中止步无终态事件：
+ * replay-batch-runner.js 的单步 catch 此前不读 runtime.abortReplay——stop 与步
+ * 超时撞车（runReplayActions 超时补发 cancel_step 后 reject）时，批级终态发
+ * replay:finished {error} 而非 aborted 收敛（#4，断言组 7）；步后 abort 检查点
+ * 直接丢弃已跑完的那一步且不发任何步终态事件，replay:step running 永久悬挂
+ * （#12，断言组 8）。空档核查结论（replay:step 发射点全集）：循环头中止分支
+ * 无空档——所有带 running 广播的 continue 路径（Type A 成功/失败、Type B 各
+ * 返回路径、heal skip/retry-ok）在 continue 前均已发步终态，循环头补发即死
+ * 代码；真实空档仅在步后 abort 检查点（status:'success' 发射点位于该检查之后，
+ * 中止时不可达）。故补发落在步后分支，循环头分支 pin 为「批次级收敛、无步级
+ * 补发」以固化核查结论、防冗余代码。
+ *
  * 全部为 read_text needle + 源码切片断言（零 import 被测模块——该模块 import
  * 副作用面含 ws-server / executor-session-client，无 ESM mock 能力下不做行为
  * 驱动；锚定为「函数名 + 语义行」切片，任一守卫被移除或移位即红）。
@@ -171,6 +183,67 @@ record('6c 补发为 fire-and-forget：try/catch 包裹 + console.warn 降级（
   /try \{\s*execSession\.forwardStdin\(\{[\s\S]*?\} catch \(err\) \{\s*console\.warn\(/.test(TIMER_SLICE));
 record('6d 超时 reject 语义保持：Timeout waiting for heal phase_done 仍在',
   TIMER_SLICE.includes('Timeout waiting for heal phase_done'));
+
+// ══ Task 3/6 — replay-batch-runner.js：#4 超时×stop 竞态终态 + #12 中止步终态 ══
+const RBR = readFileSync(join(ROOT, 'src/services/trajectory/replay-batch-runner.js'), 'utf8');
+
+// ── 切片定位：单步 catch 头 → batchResults 解析（#4 竞态收敛 + #12 步后中止分支） ─
+const CATCH_E = '} catch (e) {';
+const BATCH_RESULTS = 'const batchResults = Array.isArray(result?.results) ? result.results : [];';
+const catchEIdx = idx(RBR, CATCH_E, '单步 catch 头');
+const batchResultsIdx = idx(RBR, BATCH_RESULTS, 'batchResults 解析行');
+assert.ok(catchEIdx >= 0 && batchResultsIdx > catchEIdx, '单步 catch 应先于 batchResults 解析');
+const STEP_CATCH_SLICE = RBR.slice(catchEIdx, batchResultsIdx);
+
+// ── 7. #4：单步 catch 内先查 abortReplay，置位走 aborted 终态收敛 ──────────────
+const raceCheckIdx = STEP_CATCH_SLICE.indexOf('if (runtime.abortReplay)');
+const firstFinishedIdx = STEP_CATCH_SLICE.indexOf("emitReplay('replay:finished'");
+assert.ok(raceCheckIdx >= 0 && firstFinishedIdx > raceCheckIdx,
+  'catch 内竞态检查应先于非中止批级终态（replay:finished {error}）');
+const RACE_SLICE = STEP_CATCH_SLICE.slice(raceCheckIdx, firstFinishedIdx);
+
+record('7a 竞态检查先于终态判定：catch 内查 runtime.abortReplay 先于 replay:finished {error}',
+  raceCheckIdx >= 0 && raceCheckIdx < firstFinishedIdx);
+record('7b 竞态置位收敛为 aborted 批级终态：emitReplayAborted + aborted/reason=user_stop',
+  RACE_SLICE.includes('emitReplayAborted(tid, { successCount, failedStepIds })')
+  && RACE_SLICE.includes('aborted: true,') && RACE_SLICE.includes("reason: 'user_stop',"));
+record('7c 落库口径不变：markStepReplayFailed + failedStepIds.push 先于竞态检查（该步仍记失败）',
+  STEP_CATCH_SLICE.indexOf('markStepReplayFailed(stepId)') < raceCheckIdx
+  && STEP_CATCH_SLICE.indexOf('failedStepIds.push(stepId)') < raceCheckIdx);
+record('7d 步级 failed 终态先于批级收敛：running 步在竞态收敛前已有终态事件',
+  STEP_CATCH_SLICE.indexOf("status: 'failed'") < raceCheckIdx);
+
+// ── 8. #12：步后 abort 检查点补发当前步终态（真实空档；循环头无空档） ───────────
+const postAbortIdx = STEP_CATCH_SLICE.lastIndexOf('if (runtime.abortReplay)');
+assert.ok(postAbortIdx > raceCheckIdx, '步后中止分支应在 catch 内竞态检查之后');
+const POST_ABORT_SLICE = STEP_CATCH_SLICE.slice(postAbortIdx);
+const stepTermIdx = POST_ABORT_SLICE.indexOf("emitReplay('replay:step'");
+const batchAbortIdx = POST_ABORT_SLICE.indexOf('emitReplayAborted(');
+assert.ok(stepTermIdx >= 0 && batchAbortIdx > stepTermIdx,
+  '步后中止分支应先补发步终态再收敛批次终态');
+const STEP_TERMINAL_SLICE = POST_ABORT_SLICE.slice(stepTermIdx, batchAbortIdx);
+
+record('8a 步后中止分支补发当前步终态：replay:step failed + error=user_stop',
+  STEP_TERMINAL_SLICE.includes("emitReplay('replay:step'")
+  && STEP_TERMINAL_SLICE.includes("status: 'failed',")
+  && STEP_TERMINAL_SLICE.includes("error: 'user_stop',")
+  && STEP_TERMINAL_SLICE.includes('stepId,'));
+record('8b 补发带 aborted 标记（前端可区分 user_stop 与真实失败）',
+  STEP_TERMINAL_SLICE.includes('aborted: true,'));
+record('8c 补发先于批级 aborted 收敛（步终态 → emitReplayAborted → return）',
+  stepTermIdx < batchAbortIdx && POST_ABORT_SLICE.includes("reason: 'user_stop',"));
+record('8d 成功路径终态保留：步后中止分支之后 status:success 发射点仍在（补发不替代成功终态）',
+  RBR.indexOf("status: 'success'", batchResultsIdx) > -1);
+record('8e 循环头中止分支无步级补发（空档核查结论固化：continue 路径均已带终态，此处补发即死代码）',
+  (() => {
+    const loopHeadIdx = idx(RBR, 'for (let i = 0; i < actions.length; i += 1) {', '批循环头');
+    const entryIdx = idx(RBR, 'const entry = actions[i];', 'entry 声明');
+    assert.ok(entryIdx > loopHeadIdx, 'entry 声明应在循环头之后');
+    const LOOP_HEAD_SLICE = RBR.slice(loopHeadIdx, entryIdx);
+    return LOOP_HEAD_SLICE.includes('if (runtime.abortReplay)')
+      && LOOP_HEAD_SLICE.includes('emitReplayAborted(')
+      && !LOOP_HEAD_SLICE.includes("emitReplay('replay:step'");
+  })());
 
 const bad = results.filter((r) => !r.ok);
 console.log(`\ncharacterize-replay-stop-hardening: ${results.length - bad.length}/${results.length} passed`);

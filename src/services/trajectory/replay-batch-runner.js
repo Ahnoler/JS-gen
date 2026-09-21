@@ -326,6 +326,21 @@ export async function runReplayBatch({
           ok: false,
           id: entry.id,
         });
+        // #4 stop×步超时竞态：stop 置位与步超时撞车时（runReplayActions 已补发
+        // cancel_step 并 reject），用户预期终态是 aborted 而非 {error}——本步确已
+        // 失败，上方 markStepReplayFailed / failedStepIds / allResults 落库口径
+        // 不变，步级 failed 终态事件已发；这里只把批级终态收敛为 emitReplayAborted
+        // + aborted 载荷（对齐循环头中止分支的载荷形状）。
+        if (runtime.abortReplay) {
+          emitReplayAborted(tid, { successCount, failedStepIds });
+          return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
+            successCount,
+            failedCount: [...new Set(failedStepIds)].length,
+            failedStepIds: [...new Set(failedStepIds)],
+            aborted: true,
+            reason: 'user_stop',
+          });
+        }
         emitReplay('replay:finished', tid, {
           successCount,
           failedCount: failedStepIds.length,
@@ -340,6 +355,19 @@ export async function runReplayBatch({
       }
 
       if (runtime.abortReplay) {
+        // #12 中止步终态：本步 running 已广播、replay_done 已成功返回，但 abort
+        // 使下方 status:'success' 终态不可达——补发 failed 终态（error=user_stop
+        // + aborted 标记），前端条目不再悬挂在 running。结果按中止口径丢弃：不计
+        // successCount、不入 allResults/failedStepIds（对齐既有 mid-batch abort pin）。
+        emitReplay('replay:step', tid, {
+          stepId,
+          status: 'failed',
+          error: 'user_stop',
+          index: stepNum,
+          total: actions.length,
+          action: entry.action,
+          aborted: true,
+        });
         emitReplayAborted(tid, { successCount, failedStepIds });
         return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
           successCount,
