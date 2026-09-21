@@ -21,6 +21,11 @@ rem ============================================================
 set ROOT=%~dp0..
 cd /d %ROOT%
 
+rem D2 wet-test acceptance (2026-09-21, contract-line ask): spin guard observation
+rem mode. Post-acceptance finalize per design doc 2026-09-20-d2-sut-503-spin-guard
+rem §7 (soft->hard default needs Lead approval); remove this line or flip otherwise.
+set SUT_SPIN_GUARD_MODE=observation
+
 echo.
 echo [1/4] stopping existing control plane (server.mjs)...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\config\kill-node-match.ps1" -Match "server.mjs"
