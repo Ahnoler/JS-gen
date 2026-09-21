@@ -135,8 +135,10 @@
   - 全量 `verify-all`（Git Bash @ `D:\Software\Git\bin\bash.exe`，`PYTHON_EXE=/d/anaconda3/envs/browser_use/python.exe`）复跑：**新 pin 绿**；红集=既有环境/数据噪声，零新增本次归属——`eslint-core`（`.venv` 未 ignore，3343 errors，与 09-20 基线同量）、`step-highlight`/`layer-tree`（本机 DB 轨迹数据）、`confirm-notification`（读未触碰的 `_misc.py`）、`fill-err-with-scope`/`idempotent-click-gate`（GBK `UnicodeEncodeError`）、`tssc-route-conflict`（`ModuleNotFoundError: scripts.controller`）、`network-capture`（portable python 缺失）。
 - 生效面：全为 **Node 侧**（executor + 控制面 src + config）→ **需重启控制面/执行机才 live**；Python/数据侧零改动。
 - 遗留移交：
-  - **push 待网络**：`git pull`/`git push` 均因 GitHub `Recv failure: Connection was reset` / 无法连 443 失败（重试 fetch 同）；本线 2 条本地提交（`3e8672b7` 开工 + `255d15b2` 代码）待网络恢复补推，**无法做远端合并态复核**，如他线已改 `executor-session-client` 重导出或 `executor-node-service` reconcile，请以本线 pin 为准重跑。
+  - **push 已落地（补记 11:50）**：网络恢复后 `git pull --no-rebase` 两次（自动合并他线 `bc6bf63c`/`8e664e56`，含 `config/restart-local.cmd` + D2 守卫系列，零冲突）→ **push 成功，远端 tip `3b01d4cc`**（本线 3 条：`3e8672b7` 开工 + `255d15b2` 代码 + `32fda46` 收工，含双方合并提交）。合并态全量 `verify-all` 已复跑（他线新增 `characterize-sut-spin-guard` 91 passed、`characterize-fill-tssc-live-downgrade` 等均绿），红集与合并前一致，零新增。
+  - **运行态已重启（补记 11:50，用户批准）**：按 sanctioned `config/restart-local.cmd` 重启——**控制面 pid 6500（11:46:50 起，health 200）、本地执行机 pid 14908（11:46:56 起，nodeId 7 HZH/registered online）**；本次 Node 侧改动 + 合并态代码已 live；`SUT_SPIN_GUARD_MODE=observation` 随该脚本注入两进程（D2 验收档可用）。boot 日志 `tmp\server-main.log` / `tmp\executor-main.log`；boot sweep 已清 traj 969 的 stale mount（`[server] cleared 1 stale trajectory.remote_session_id mount(s): 969`）。**协调注意**：本机 4097 端口被本线 pid 6500 占用为当前真身；他线 agent-log 12:45 条目（log 时钟领先本机约 1h）所述 pid 9908/32220 在本机未监听——如他线需以其变体重启，请先核 `Get-NetTCPConnection -LocalPort 4097` 再动手，避免互相顶替。
   - **多实例并发缺口**：登记 todo 挂起项 `executor-multiprocess-concurrency`（P2）——slot 租约/轨迹锁/aiRecording claim 全为控制面单进程内存，多实例会重复分配同槽；候选=Redis/DB 外置锁、按 nodeUuid 归属、执行机侧分配 slotIndex。
+  - **proxy 守护生效留痕（非本线问题）**：`config\restart-local.cmd` 拉起的 local-server-proxy 因远端 47.101.58.49 已有同 uuid 现役（pid 9228）按 4001 守护自杀退出（`logs-executor-server-proxy.log`），符合双活防护预期。
   - 工作区 `config/.db-whitelist-seen` 为运行时白名单时间戳改动，非本线所为，未提交。
 - 注：不维护 CHANGELOG。
 
