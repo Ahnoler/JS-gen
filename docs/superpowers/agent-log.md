@@ -2,13 +2,17 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
-## 2026-09-21 20:15 · ZCode 引擎线 — 开工：D2 SUT 503 阶段空转守卫实施（SDD；分支 engine/d2-spin-guard-20260921）
+## 2026-09-21 20:20 · ZCode 引擎线 — 勘误：20:15「守卫开工」条目作废（重复声明）
 
-- 授权：实施计划已经用户批准（plan mode 产出）；设计稿 `docs/superpowers/specs/2026-09-20-d2-sut-503-spin-guard-design.md`（系统线 10:00 验证 #925 空转 31m/落 10 步归属引擎线）。
-- 工作范围：`scripts/agent/recorder_emitters.py`（新增 `_guard_spin_on_step_end`）、`scripts/recorder.py`（`on_step_end` 挂守卫约 3 行）、`scripts/agent/service.py`（续跑循环补 `goal_tracker['stopped']` break 1 行）、`scripts/characterization/characterize-sut-spin-guard.py`（新 pin，RED 先行）、`scripts/refactor/verify-all.sh`（仅注册 1 行）、上述设计稿状态行；agent-log/todo 条目。
-- 分支与场地：`engine/d2-spin-guard-20260921` 自 `origin/uara_V2.0`（=0988b7bd）新切（不叠 B 类/小批次栈），**branch-only 未合并待批**；场地=D:\dev\JS-gen-engine 主场（small-batch 分支无代码原地驻留零冲突）；默认 `SUT_SPIN_GUARD_MODE=off` 零行为影响，纯 Python 侧，新录制会话磁盘加载即生效，无需重启。
-- 禁入区（他线知悉）：`src/**` 全部（系统线刚收工待重启窗口；合约线 SPA stop 适配面）；`scripts/prompts/**`、`data/kb/**` 只读；`fill_engine.py`/`click_action_engine.py`/`select_engine.py` 他线热区。
-- 执行方式：SDD——worker-coder 实现（RED→GREEN）+ reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；湿测（#925 复现场景 observation 档必须命中 + 正常长阶段不误杀）移交合约线（SUT 当前停机，不阻塞合并）。
+- 20:15 条目系本会话上下文压缩后误读已完成计划的滞留计划文件所致。D2 SUT 503 空转守卫**早已交付**：10:52 收工（`fec9b5e3`，SDD 全流程+终审 F1 修复）、11:02 用户批合并（`0cbcbd35`）、13:50 组件级实测补强（`c9d89e43`，真实 chromium 23 断言全过）。无新开工，`recorder_emitters.py`/`recorder.py`/`service.py`/`verify-all.sh` 并未被该条占用，他线可正常使用。
+
+## 2026-09-21 20:25 · ZCode 引擎线 — 开工：停止回放引擎线侧 E1-E4 修复（SDD；分支 engine/replay-cancel-20260921）
+
+- 授权与来源：系统线 21:55 收工移交⑤；缺陷清单 `docs/reports/2026-09-21-stop-replay-defects-engine-line.md`（16 项取证拆线，根因/修法已给定：`_replay.py`/`event_dispatch.py` 全文零 cancel 感知=停止链路根缺陷）。
+- 工作范围：`scripts/controller/actions/_replay.py`（步边界消费 cancel 标志 + `replay_done` 带 aborted/stoppedAt）、`scripts/event_dispatch.py`（如需透传）、`scripts/session_runner.py`（回放分支入口消费+清标志，对齐录制分支先清再跑）、`scripts/agent/service.py`（E4 `_tasks` 死代码删除 + 协作式停止语义注明）、`scripts/recorder.py`（E3 `exists()`→内容=='cancel' 判定，:91/:251）、新 pin `scripts/characterization/characterize-replay-cancel-awareness.py`（RED 先行）、`scripts/refactor/verify-all.sh`（仅注册 1 行）；agent-log/todo 条目。
+- 分支与场地：`engine/replay-cancel-20260921` 自 `origin/uara_V2.0`（=7e0b9a2e）新切，**branch-only 未合并待批**；场地=D:\dev\JS-gen-engine 主场（worktree 对齐分支本地气泡不动）；纯 Python 侧，新会话磁盘加载即生效，无需重启。
+- 禁入区（他线知悉）：`src/**` 全部零改动（E2 的 Node 世代令牌系统线已交付；Node 侧消费 `aborted` 字段属可选后续、涉重启窗口，非本单元）；`scripts/prompts/**`、`data/kb/**` 只读；`fill_engine.py`/`click_action_engine.py`/`select_engine.py` 他线热区。
+- 执行方式：SDD——worker-coder 实现（RED→GREEN）+ reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；真机联测（回放第 N 步长动作期间 stop→本步完成后中断、后续步不执行、replay_done 带 aborted）移交湿测窗口/系统线（报告验收项），代码与 pin 不阻塞合并。
 
 ## 2026-09-21 21:55 · ZCode 系统线 — 收工：停止回放系统线 12 项缺陷全部修复合入（回链 18:05 开工；SDD 六任务 + 终审 + 修复波）
 
