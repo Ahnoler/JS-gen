@@ -405,6 +405,10 @@ class ClickEngine:
             # dd_gate），录制下来就是「点击元素 - 待发起审批中已撤销退回通过投决」
             # 这类垃圾步。点击照做，但不录制、不记忆、不当弹窗触发按钮。
             select_trigger_click = False
+            # nav-reclick 预算内放行的「台账级」标记：放行分支置 True，落库时
+            # 给 recorded result 加 nav-reclick-budget 尾缀自证（stderr 痕迹
+            # 不落库，回放侧只读不解析该文案）。
+            nav_reclick_pass = False
             if gate_xp:
                 try:
                     date_panel_click = bool(await page.evaluate('''(xpath) => {
@@ -456,6 +460,7 @@ class ClickEngine:
                     if _is_navigation_click_element(element_info, tag_name):
                         used = _bump_nav_reclick(self.business_data_store, click_identity)
                         if used <= _NAV_RECLICK_BUDGET:
+                            nav_reclick_pass = True
                             sys.stderr.write(
                                 f'[nav-reclick] budget used {used}/{_NAV_RECLICK_BUDGET} '
                                 f'index={index} identity={click_identity}\n'
@@ -933,7 +938,9 @@ class ClickEngine:
                         'index': index,
                         'tag_name': element_info.get('tag_name') if element_info else tag_name,
                         'text': record_text,
-                    }, f'ok-clicked-{index}', element=element_info)
+                    }, f'ok-clicked-{index}' + (
+                        ' | nav-reclick-budget' if nav_reclick_pass else ''
+                    ), element=element_info)
                 if self.business_data_store is not None:
                     from scripts.controller.actions.container_naming import remember_trigger_button
                     if not select_trigger_click:

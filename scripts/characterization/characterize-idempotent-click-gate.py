@@ -19,6 +19,9 @@ Fix pins (RED->GREEN):
      still rejected.
 """
 
+import asyncio
+import contextlib
+import io
 import re
 import sys
 from pathlib import Path
@@ -185,6 +188,142 @@ def main() -> None:
     check(first == 1 and again == 2 and third == 3, "budget counter bumps 1,2,3")
     other = _bump_nav_reclick(store2, "click://x/a[37]")
     check(other == 1, "budget is per-element, not shared across identities")
+
+    # 10. 合约线移交（2026-09-21）：预算内放行的 nav 重击在落库文案自证 ——
+    #     放行分支置 nav_reclick_pass 标志，落库点（普通点击的
+    #     _record_action('click_element_by_index') 那一处）result 尾缀
+    #     '| nav-reclick-budget'。stderr 文案 / already-operated 拒绝文案 /
+    #     预算常量与计数逻辑（上方 7–9 已钉）一律不动；其余 ok-clicked
+    #     构造（最终 _ok 返回、tree/radio 变体）不带尾缀。
+    check(
+        "nav_reclick_pass = True" in src,
+        "budget-allowed branch sets the nav_reclick_pass ledger flag",
+    )
+    check(
+        "nav_reclick_pass = False" in src,
+        "nav_reclick_pass defaults False in click_element_by_index scope",
+    )
+    suffix_hits = src.count("| nav-reclick-budget")
+    check(
+        suffix_hits == 1,
+        f"suffix '| nav-reclick-budget' wired at exactly one ok-clicked point "
+        f"(found {suffix_hits})",
+    )
+    rec_idx = src.find("_state._record_action('click_element_by_index'")
+    suffix_idx = src.find("| nav-reclick-budget")
+    check(
+        rec_idx >= 0 and suffix_idx > rec_idx and (suffix_idx - rec_idx) < 500,
+        "suffix sits at the plain-click record point "
+        "(_record_action('click_element_by_index'))",
+    )
+    check(
+        "return _ok(f'ok-clicked-{index}')" in src,
+        "agent-facing ok copy unchanged (final _ok stays bare ok-clicked-{index})",
+    )
+
+    from scripts import state as _state  # noqa: E402
+    from scripts.controller.actions.click_action_engine import ClickEngine  # noqa: E402
+
+    class _FakeElementNode:
+        tag_name = 'li'
+        xpath = '//li[@class="el-menu-item"]'
+        attributes = {'class': 'el-menu-item'}
+
+        def get_all_text_till_next_clickable_element(self):
+            return '产品库管理'
+
+    class _FakePage:
+        url = 'http://sut/app/list'
+
+        async def evaluate(self, _js, _arg=None):
+            # All gate probes (date-panel / dd-gate / search-ui / tree-node /
+            # overlay-title / loading) resolve falsy with this fixture.
+            return {}
+
+    class _FakeBrowserContext:
+        def __init__(self, page):
+            self._page = page
+
+        async def get_current_page(self):
+            return self._page
+
+        async def get_dom_element_by_index(self, index):
+            return _FakeElementNode()
+
+        async def _click_element_node(self, _node):
+            return None
+
+    async def _nav_reclick_ledger_behavior():
+        identity = 'click:' + _FakeElementNode.xpath
+
+        # (a) 首次点击（非放行）：落库 result 不带尾缀、无 [nav-reclick] stderr。
+        _state._ACTION_LOG.clear()
+        store_a: dict = {}
+        engine_a = ClickEngine(_FakeBrowserContext(_FakePage()), store_a)
+        buf_a = io.StringIO()
+        with contextlib.redirect_stderr(buf_a):
+            await engine_a.click_element_by_index(1)
+        entry_a = _state._ACTION_LOG[-1] if _state._ACTION_LOG else {}
+        check(
+            entry_a.get('action') == 'click_element_by_index'
+            and entry_a.get('result') == 'ok-clicked-1',
+            f"first click records bare ok-clicked-1 (no suffix), got {entry_a.get('result')!r}",
+        )
+        check(
+            '[nav-reclick]' not in buf_a.getvalue(),
+            "first click emits no [nav-reclick] stderr",
+        )
+
+        # (b) 预算内放行（重复导航点击，used=1<=1）：落库 result 带尾缀；
+        #     [nav-reclick] stderr 保留；agent 返回文案不带尾缀。
+        _state._ACTION_LOG.clear()
+        store_b: dict = {}
+        remember_phase_operation_aliases(store_b, [identity], 'click_element_by_index')
+        engine_b = ClickEngine(_FakeBrowserContext(_FakePage()), store_b)
+        buf_b = io.StringIO()
+        with contextlib.redirect_stderr(buf_b):
+            res_b = await engine_b.click_element_by_index(1)
+        entry_b = _state._ACTION_LOG[-1] if _state._ACTION_LOG else {}
+        check(
+            '[nav-reclick]' in buf_b.getvalue(),
+            "budget-allowed pass keeps the [nav-reclick] stderr trace",
+        )
+        check(
+            entry_b.get('action') == 'click_element_by_index'
+            and entry_b.get('result') == 'ok-clicked-1 | nav-reclick-budget',
+            f"budget-allowed pass records ok-clicked-1 | nav-reclick-budget, "
+            f"got {entry_b.get('result')!r}",
+        )
+        check(
+            '| nav-reclick-budget' not in str(getattr(res_b, 'extracted_content', '')),
+            "agent-facing ok copy of the allowed pass carries no ledger suffix",
+        )
+
+        # (c) 预算耗尽（used=2>1）：拒绝文案原样、不带尾缀，且不再落库。
+        _state._ACTION_LOG.clear()
+        store_c: dict = {}
+        remember_phase_operation_aliases(store_c, [identity], 'click_element_by_index')
+        _bump_nav_reclick(store_c, identity)
+        engine_c = ClickEngine(_FakeBrowserContext(_FakePage()), store_c)
+        with contextlib.redirect_stderr(io.StringIO()):
+            res_c = await engine_c.click_element_by_index(1)
+        rc_text = str(getattr(res_c, 'extracted_content', res_c))
+        check(
+            rc_text.startswith('already-operated-this-phase')
+            and 'budget exhausted' in rc_text,
+            f"budget-exhausted rejection copy intact, got {rc_text[:60]!r}",
+        )
+        check(
+            '| nav-reclick-budget' not in rc_text,
+            "budget-exhausted rejection carries no ledger suffix",
+        )
+        check(
+            len(_state._ACTION_LOG) == 0,
+            f"budget-exhausted rejection records no new entry "
+            f"(got {len(_state._ACTION_LOG)})",
+        )
+
+    asyncio.run(_nav_reclick_ledger_behavior())
 
     if failures:
         print(f"FAILED ({len(failures)})")
