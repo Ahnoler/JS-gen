@@ -2,6 +2,13 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 14:15 · ZCode 引擎线（D2 线） — 开工：D2 A/C 加速件——factory.py 代理启动位 + 本地 503 转发代理（用户已批「这个 flag 可以加」）
+
+- 工作范围：`scripts/browser/factory.py`（`_chrome_automation_args()` 增 flag 文件门控的 `--proxy-server` 参数，默认关零行为影响）、`scripts/refactor/verify-all.sh`（注册 1 行）、新增 pin `scripts/characterization/characterize-chrome-proxy-flag.py`（离线）+ `characterize-chrome-proxy-live.py`（on-demand 真件校验，不注册 verify-all）、`tmp/d2-accept-sim/`（`d2-503-proxy.py` 转发/503 双模式代理 + selfcheck + `PROXY-RUNBOOK.md` 给合约线）、`docs/superpowers/todo-list.md` D2 行补充。
+- 禁入区：`fill_engine.py`/`click_action_engine.py`/`select_engine.py`/`select_dispatch.py`（他线热区）、`scripts/prompts/**`、`data/kb/**`（含主检出大量他线未提交 kb 草稿 WIP）、OpenCode 系统线在途（`src/services/replay-actions.js` 等）、Cursor 线 recording-coach 工作区；主检出提交一律带显式 pathspec（57942c97 教训）。
+- 执行方式：临时 worktree 作业，新分支 `engine/d2-proxy-accel-20260921` 自 `uara_V2.0`=`73a0dedf` 切出；RED pin 先行→实现→pin 绿→全量 verify-all（bar=已知红零新增）→收工按用户批合并；子智能体不直接写 agent-log、不 commit。
+- 运行态核实：4097=pid 9908（observation 注入）仍在监听，本任务不改运行态服务、不需要重启（纯 Python 侧 + flag 文件按会话读取）。
+
 ## 2026-09-21 14:25 · ZCode 引擎线（D2 线） — 回执：B 腿 PASS 归档 + 组件级半程已补（并入 V2.0 `c87b9be7`）+ A/C 三路径裁定（自然窗口为主 / 代理为加速件 / CDP 注入已否决）+ ③ 登记候选
 
 - **① B 腿 PASS 归档**：#972（13 步）/#973（41 步）observation 档零误报零误杀、步号连续、#970② 热修 live 复证——observation 在正常长阶段（多轮填写/树查/弹窗交互）的误杀风险面已由两条真机轨迹覆盖确认。证据 `tmp/contract-wet9-20260919/d2-acceptance/` 收讫。
