@@ -1,6 +1,16 @@
 # Agent 协作日志
 
 
+## 2026-09-21 10:05 · ZCode 系统线 — 收工：B 类移交系统线侧两项处置闭环（回链 09:18 开工）
+
+- 完成：
+  - **第 1 项 executor 双进程互踢（traj #861）→ 判闭合，零代码改动**：Explore 调研证实结构性守护已由 `216b2688`（09-18 17:06，事故当天晚些时候）三层落地——①executor 启动锁 `executor/config.js:118-229`（`os.tmpdir()/js-gen-executor-<uuid8>.lock`，PID 探活+命令行身份核对+陈旧锁接管，第二实例打 `another executor process is running (same node-uuid), exiting` 后 exit 1）；②控制面同 uuid 异 pid 拒绝注册（`src/executor-registry.js:25-48`，回 `executor.error{code:'duplicate_node_uuid'}`+close 4001，agent 侧收 4001 自杀 exit 2，`executor/ws-client.js:114-116`）；③同 pid=合法重连走顶替、心跳 ack 只发 registry 现役 ws（`src/executor-ws.js:179-186`）。互踢机理=事故进程跑的是 hardened 前旧代码（注册 payload 无 pid → 双活判定短路 → 每次注册互顶替+被顶替方收不到 ack → 40s 半开循环）。**证据**：`216b2688` 经 `git merge-base --is-ancestor` 证实在 uara_V2.0 HEAD；pin `characterize-executor-duplicate-uuid` 本机复跑全绿；`logs-executor-server-proxy.log:1-12` 已见新锁实际拦截双开。**给湿测线的答复**：守护已在，人工逐拍盯 pid 可退役（前提=执行机跑 ≥216b2688 代码；建议执行机进程层补一条「启动后核对日志含 registered」的开场检查即可）。
+  - **第 2 项 deadlock（traj #865）→ 裁决：不盲改锁序，落「复发自动取证」插桩（`db0ea76f`）**。调研锚定：现存 09-17 日志三例（traj #855/#856/#850）牺牲语句恒为 `UPDATE trajectory SET is_export=0`（markExportDirty 父行更新，`src/dao/trajectory-step-dao.js:57`），锁模型高度指向快照显式事务（`form-snapshot-append.js:278-315`）持子表锁后 FK 父行 S→X 锁升级、与单步 autocommit 路径（INSERT step→UPDATE trajectory）交错；但无 InnoDB deadlock 打印原文、锁环未实锤，且 SUT 停机无法真机湿测锁序改动 → **根治押后等证据，先取证**。实现：`trajectory-recording-runner.js:682` retry catch 旁路接入新模块 `deadlock-forensics.js`——err 为 ER_LOCK_DEADLOCK/1213/ER_LOCK_WAIT_TIMEOUT/1205 时 best-effort 抓 `SHOW ENGINE INNODB STATUS` 的 LATEST DETECTED DEADLOCK 段落输出 console.error（带 trajectoryDbId/actionId 标注，3s 超时、8000 字截断、守卫后全吞永不影响 retry/broadcast）；成功路径与既有兜底语义零改动（runner 纯插入 2 行）。**根治待办**已登记 todo 挂起表 `deadlock-forensics`（P3）：下次复发取打印原文实锤锁环 → 最小锁序调整（候选=快照事务内 markExportDirty 时序，触及 form-snapshot-append.js 一处）+ 真机湿测（需在线 SUT）。当前兜底（retry+双失败广播）四例全自愈零丢数，wet5–wet9 未复发，可接受。
+- 范围实际改动：`src/services/trajectory/deadlock-forensics.js`（新增 90 行）、`trajectory-recording-runner.js`（+2 纯插入：import L31 + catch 调用 L682）、`scripts/characterization/characterize-deadlock-forensics.mjs`（新增 pin，15 断言）、`scripts/refactor/verify-all.sh`（注册 1 行）、`docs/superpowers/todo-list.md`（挂起表 1 行）、agent-log 两条目；**executor/**、src/executor-*.js、form-snapshot-append.js、dao 层零改动**
+- 验收（合并态 = `git pull` Already up to date，全量 verify-all 于合并态复跑）：新 pin 15/15 全绿（功能/过滤/自愈/接线四组）；`characterize-trajectory` OK；`characterize-executor-duplicate-uuid` OK；eslint 改动文件 0 error 0 warning；全量 verify-all **188 过 / 红集=3 存量零新增**（step-highlight / layer-tree / confirm-notification——均见于本机 09-16 基线 `tmp/verify-all-tssc.log` 红集〔该基线还含 export-v3，本次已自愈〕，且三 pin 均不引用本次改动文件，layer-tree 系本地 DB traj 33 实数据依赖）；全量日志 `tmp/verify-all-b-class-20260921.log`
+- 遗留移交：①deadlock 根治（等取证插桩抓到打印原文，方案与触及面已写 todo 挂起表）；②执行机（LMY nodeId=10 与第二执行机）**需重启控制面/执行机窗口使 `db0ea76f` 的 Node 侧取证插桩生效**（Python 零改动）；③建议湿测线把「执行机开场开场检查 registered 日志」写进操作员任务书替代人工盯 pid
+- 注：**未 push**——本地领先远端 5 条（今晨 Cursor 线 2 条仅批 commit 未批 push + 本线 3 条），push 待用户批准；不维护 CHANGELOG
+
 ## 2026-09-21 09:18 · ZCode 系统线 — 开工：B 类移交系统线侧两项（executor 双实例守护验证 + deadlock 复发取证插桩）
 
 - 背景：接合约线湿测 B 类移交报告（`docs/reports/2026-09-20-b-class-handover-system-line.md`）——①executor 僵死双进程互踢（traj #861）②MySQL deadlock 步持久化重试（traj #865），用户指示本线带 agent team 处置。
