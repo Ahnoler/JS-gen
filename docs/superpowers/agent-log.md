@@ -20,7 +20,8 @@
   - 新增 pin 与受影响 pin 均绿：`characterize-replay-terminal-abort` 7/7、`characterize-special-element`、`characterize-menu-navigation`、`characterize-page-bind`。
 - 状态与遗留：
   - **GitHub 网络仍抖**：`git pull origin uara_V2.0` 连续 `Recv failure: Connection was reset`，本次代码 commit `4a282cbd` 与 agent-log 收工条目目前均为**本地未 push**；网络恢复后将立即补 `pull --no-rebase` → 合并后重跑 verify-all → push。
-  - **生效**：Node 控制面侧 → 需重启控制面才 live；执行机无改动。本条目写入后将重启控制面（pid 5968）加载新代码。
+  - **生效**：Node 控制面侧 → 已重启控制面加载新代码：**旧 pid 5968 停止，新 pid 7156 @12:56 health 200**；执行机 pid 6500 自动重连（nodeId 7 online，inUse=1）。复测 traj 969 prepare → 200。
+  - **Push 仍被网络阻塞**：`git push origin uara_V2.0` 报 `Failed to connect to github.com:443`；本地 commits `4a282cbd`（代码）+ `2547774f`（agent-log 收工）待网络恢复后补推。
   - 不维护 CHANGELOG。
 
 ## 2026-09-21 11:20 · ZCode 引擎线 — 收工：more-btn xpath 伪造修复交付（点击命中时刻定位快照，分支未合并待批，回链 11:05 开工）
