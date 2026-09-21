@@ -95,6 +95,7 @@ function testFailureTaxonomy() {
   assert(failReasonText('llm_auth') === 'LLM 调用异常', 'llm category unified');
   assert(failReasonText('phase_failed') === '阶段执行失败', 'phase category');
   assert(failReasonText('quality_failed') === '录制质量未达标', 'quality category');
+  assert(failReasonText('phase_blocked') === '阶段受阻', 'phase_blocked category');
   assert(failReasonText('zero_step') === '未录制到步骤', 'zero_step category');
   assert(failReasonText('runner_error') === '录制执行异常', 'runner category');
   assert(failReasonText('user_marked_failed') === '人工标记录制异常', 'user category');

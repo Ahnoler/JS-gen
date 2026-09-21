@@ -72,6 +72,17 @@ function testRunnerGateOwnershipGuard() {
   );
 }
 
+function testFailureReasonCatalogHasPhaseBlocked() {
+  const failReasons = readFileSync(
+    join(root, 'src/models/failure-reason.js'), 'utf8');
+  // #909 移交项②：phase_blocked 必须在失败原因目录登记（防目录漂移），
+  // failReasonText 映射为「阶段受阻」，与 api-docs failedReason 类别清单对齐。
+  assert.ok(
+    failReasons.includes("phase_blocked: '阶段受阻'"),
+    'failure-reason catalog registers phase_blocked (阶段受阻)',
+  );
+}
+
 function testBatchConvergesFailure() {
   const batch = readFileSync(
     join(root, 'src/services/trajectory/batch-record.js'), 'utf8');
@@ -94,6 +105,7 @@ const steps = [
   testRunnerQualityCapture,
   testRunnerFinalGate,
   testRunnerGateOwnershipGuard,
+  testFailureReasonCatalogHasPhaseBlocked,
   testBatchConvergesFailure,
 ];
 let failed = 0;
