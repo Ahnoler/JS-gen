@@ -2,6 +2,16 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-21 19:00 · ZCode 引擎线 — 合并回执：同族快照复刻并入 uara_V2.0（7e43c736→合并 4776b7f0；合约线湿测 PASS 回执可合并）+ 两项移交
+
+- 合并：`engine/snap-replica-20260921`（7e43c736）`--no-ff` 并入 uara_V2.0 = **4776b7f0**；agent-log 冲突按协议双方条目并排消解（保留他线 9 条），verify-all.sh 注册表自动合并。push 遇 non-fast-forward（OpenCode 线同窗口推 e3825ee3）→ pull 合并 **c1c3f06a** 再推，全程零 force。主检出现场他线活跃 WIP（trajectory-runtime.js / trajectory-session-replay.js）未触碰、未随本合并。
+- **合并后验收（两轮）**：全量 verify-all 181 pin + statics / 二轮（pull 入 OpenCode 跨阶段令牌修复后）**182 pin + statics，178/182 绿**；`verify-all: ALL GREEN` 尾行 + **grep FAILED 判定**（verify-phase 线移交的并行 runner `!! FAILED` 漏报缺陷已按其口径执行）。4 失败归因如下：
+  - ①**step-highlight / layer-tree / export-v3 三项 = 远端录制库不可达（环境，非代码）**：三 pin 均死在 DB 连接获取 `Acquire connection error`，裸 knex 探测同复现 `ETIMEDOUT`；TCP 直探 **47.101.58.49:3306 超时**（本机 127.0.0.1 MySQL 存活、探本地即时 RST 鉴别）。export-v3 在本日 ~16:10 分支验收时同码绿——DB 可达性在之后劣化（该主机=用户自管代理同机，网络/服务器侧归用户）。DB 恢复后复跑三 pin 即闭环，**复现命令**：`node scripts/characterization/characterize-{step-highlight,layer-tree}.mjs`、`node scripts/characterization/characterize-export-v3.mjs`。
+  - ②**refill-contract 一项 = OpenCode 线回归（移交，不代修）**：`characterize-refill-contract.py:80` 断言"模式判定规则恰好 9 条"实得两个 9 号（`scripts/prompts/phase-reviewer-prompt.md:50/:52` 两行同起 `9.`）——由 origin 侧 be21aafd（OpenCode 阶段越界修复）引入（我方基点 6c3ba0d0 仅 1 个 `9.`，`git show e3825ee3:scripts/prompts/phase-reviewer-prompt.md` 可复核）；其收工条目称验收通过，疑验收窗口早于该 prompt 提交。**移交 OpenCode 线**：重编号或改 pin 断言，复现 `./python/python.exe scripts/characterization/characterize-refill-contract.py`。
+- 生效：纯 Python 侧，合并已落主检出磁盘——控制面若从主检出派生录制会话则**新会话即效**；引擎 worktree 稍后对齐。运行态服务（4097 pid 9908 / 执行机 / 用户代理 9228）零触碰。
+- 提醒（非移交）：**DB 不可达期间新录制会话也会失败**——合约线下单湿测前请先确认 47.101.58.49:3306 可达。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 21:45 · OpenCode — 收工：阶段合约跨阶段令牌越界修复（P4/P6/P7 录制中断）
 
 - **完成**（回链 20:00 开工）：方案 C 合约引擎 + prompt + 评审器 prompt 已落地合并。
