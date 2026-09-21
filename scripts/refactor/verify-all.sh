@@ -170,6 +170,8 @@ run "characterize-element-dedup-scope" "$PY" scripts/characterization/cold/chara
 run "characterize-fill-dispatch" "$PY" scripts/characterization/cold/characterize-fill-dispatch.py
 run "characterize-fill-err-with-scope" "$PY" scripts/characterization/characterize-fill-err-with-scope.py
 run "characterize-search-then-click-guard" "$PY" scripts/characterization/cold/characterize-search-then-click-guard.py
+run "characterize-replay-table-row-radio" "$PY" scripts/characterization/cold/characterize-replay-table-row-radio.py
+run "characterize-replay-secret-redaction" "$PY" scripts/characterization/cold/characterize-replay-secret-redaction.py
 run "characterize-search-then-click-prompts" "$PY" scripts/characterization/cold/characterize-search-then-click-prompts.py
 run "characterize-idempotent-click-gate" "$PY" scripts/characterization/characterize-idempotent-click-gate.py
 run "characterize-sut-spin-guard" "$PY" scripts/characterization/characterize-sut-spin-guard.py

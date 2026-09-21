@@ -45,17 +45,21 @@ async def _replay_table_row_radio(
         await page.wait_for_timeout(WAIT_400_MS)
         await _wait_if_loading(page)
         if _result_ok('click_table_row_radio', semantic):
-            prefix = f'{durable} | ' if durable else ''
             locate = 'semantic-fallback' if smart_xpath else 'semantic-row'
-            return f'{prefix}{semantic} | locate={locate}'
+            # Keep the SUCCESS head so _result_ok() reads ok: a leading failed
+            # xpath attempt used to flip an otherwise-successful step to failed
+            # (traj 969 step 5: xpath-first missed a fixed-column radio, the
+            # semantic first-row fallback clicked it, yet replay reported FAIL).
+            diag = f' | xpath-first-failed: {durable}' if durable else ''
+            return f'{semantic} | locate={locate}{diag}'
 
     # Legacy: no structural xpath — semantic first above, durable as last resort
     if not smart_xpath and (click_params.get('text') or _element_xpath_smart(entry)):
         if not durable:
             durable = await _replay_click_by_index(page, entry, click_params)
         if _result_ok('click_table_row_radio', durable):
-            prefix = f'{semantic} | ' if semantic else ''
-            return f'{prefix}{durable} | locate=durable-fallback'
+            diag = f' | semantic-failed: {semantic}' if semantic else ''
+            return f'{durable} | locate=durable-fallback{diag}'
         if semantic:
             return f'{semantic} | durable:{durable}'
         return durable
