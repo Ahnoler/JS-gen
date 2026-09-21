@@ -7,6 +7,7 @@ import * as registry from '../executor-registry.js';
 import * as slotLease from '../executor-slot-lease.js';
 import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import { listExecutorSessions, sendToExecutor } from '../executor-session-client.js';
+import { emitSessionEvent } from '../executor-event-hub.js';
 import { restoreLiveBindingFromRow } from './remote-session-state.js';
 import { clearTrajectoryRuntimesForNode, getAllTrajectoryRuntimes } from './trajectory-service.js';
 import { markRecordingInterrupted } from './trajectory/trajectory-attach-service.js';
@@ -25,6 +26,19 @@ function purgeNodeBindings(nodeUuid) {
   clearTrajectoryRuntimesForNode(nodeUuid);
   for (const [sessionId, session] of [...state.sessions.entries()]) {
     if (session?.executorNodeUuid === nodeUuid) {
+      // 节点失联/下线清绑定时，向该会话的 hub 补发终态事件：执行机整机失联后
+      // 不会再有 session.process_exit 从 executor-ws 路由进来，等待终态竞速的
+      // 调用方（replay-actions waitForTerminalSessionEvent）否则会等满超时。
+      // payload 对齐执行机侧 process_exit 摊平形态（code/sessionId/slotIndex 顶层），
+      // reason:'node_offline' 供日志区分失联补发与真实子进程退出。
+      try {
+        emitSessionEvent(sessionId, 'session.process_exit', {
+          code: null,
+          sessionId,
+          slotIndex: session?.executorSlotIndex ?? null,
+          reason: 'node_offline',
+        });
+      } catch {}
       if (session._persistUnsub) {
         try { session._persistUnsub(); } catch {}
       }

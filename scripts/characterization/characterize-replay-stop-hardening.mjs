@@ -74,6 +74,23 @@
  * fakes——保持既有总是复位）。Task 4 评审遗留顺带：accept 路径 .catch 兜底复位
  * 集补 `runtime.replayRunning = false;`，与 sync catch 字段集对称。
  *
+ * Task 6/6 — #9 detach 对在跑批次收敛 + 整机失联补发终态事件（断言组 11）：
+ * detachTrajectoryLive 此前只置 abortRecording——detach 一个正在跑回放批的
+ * trajectory 时，批循环收不到任何中止信号，只能等 closeSession 引发的下游报错
+ * 慢慢冒泡（或等满步超时）。修复：detach 在 closeSession 之前对
+ * runtime.replayRunning=true 的批次置 runtime.abortReplay=true，让批循环在
+ * 步边界/循环头/检查点快速收敛（session 即将关闭，无需 cancel_step）。
+ * executor-node-service.js 的 purgeNodeBindings（unregister / markOfflineAndCrash /
+ * sweepStale 三调用方共用，均在调用前已经 crashActiveSessions 判死会话）只清
+ * 内存绑定、不向 session hub emit 任何事件——执行机整机失联路径上，
+ * waitForTerminalSessionEvent（replay-actions.js 终态竞速）等不到
+ * session.process_exit 只能等满超时。修复：对每个被清除的该节点会话，向其
+ * session hub 同步 emitSessionEvent('session.process_exit', …)，payload 对齐
+ * 执行机侧 process_exit 摊平形态（code/sessionId/slotIndex 顶层）+ reason:
+ * 'node_offline' 供日志区分失联补发与真实子进程退出。emit 全文件恰一次且挂在
+ * purge 内（三调用方均为「节点失联/下线 → 会话判死」语义；reconcile 重连路径
+ * 走独立清理逻辑不经过 purge，无误伤面）。
+ *
  * 全部为 read_text needle + 源码切片断言（零 import 被测模块——该模块 import
  * 副作用面含 ws-server / executor-session-client，无 ESM mock 能力下不做行为
  * 驱动；锚定为「函数名 + 语义行」切片，任一守卫被移除或移位即红）。
@@ -411,6 +428,53 @@ record('10h Task 4 评审遗留：accept 路径 .catch 兜底复位集补 replay
       && CATCH_SLICE.includes('runtime.replayRunning = false;')
       && CATCH_SLICE.includes('if (session) session.busy = false;');
   })());
+
+// ══ Task 6/6 — #9 detach 对在跑批次收敛 + 整机失联补发终态事件（断言组 11） ══
+const TAS = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-attach-service.js'), 'utf8');
+const ENS = readFileSync(join(ROOT, 'src/services/executor-node-service.js'), 'utf8');
+
+// ── 切片定位：detachTrajectoryLive 函数体（止于下一函数的 JSDoc） ──────────────
+const DETACH_FN = "export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } = {}) {";
+const detachFnIdx = idx(TAS, DETACH_FN, 'detachTrajectoryLive 定义');
+const detachEndIdx = TAS.indexOf('/**', detachFnIdx);
+assert.ok(detachEndIdx > detachFnIdx, 'detach 函数体后应紧跟下一函数的 JSDoc');
+const DETACH_BODY = TAS.slice(detachFnIdx, detachEndIdx);
+
+// ── 11a detach 置 abortReplay：replayRunning 守卫 + 早于 deleteTrajectoryRuntime/closeSession ──
+record('11a detach 内 replayRunning 守卫置 abortReplay（if (runtime.replayRunning) runtime.abortReplay = true;）',
+  count(DETACH_BODY, 'if (runtime.replayRunning) runtime.abortReplay = true;') === 1);
+record('11b 置位在 deleteTrajectoryRuntime 之前（批循环在 runtime 销毁前拿到收敛信号）',
+  DETACH_BODY.indexOf('if (runtime.replayRunning) runtime.abortReplay = true;')
+  < DETACH_BODY.indexOf('deleteTrajectoryRuntime(tid);'));
+record('11c 置位在 closeSession 之前（越早越好：closeSession 即会话终态，批循环应在其前已收敛）',
+  DETACH_BODY.indexOf('if (runtime.replayRunning) runtime.abortReplay = true;')
+  < DETACH_BODY.indexOf('await execSession.closeSession({'));
+record('11d 置位带守卫（replayRunning=false 不误置 abortReplay——#5 诚实化口径：无批次不留 abortReplay 残留）',
+  DETACH_BODY.includes('if (runtime.replayRunning) runtime.abortReplay = true;'));
+
+// ── 切片定位：purgeNodeBindings 函数体（止于下一函数的 JSDoc） ─────────────────
+const PURGE_FN = 'function purgeNodeBindings(nodeUuid) {';
+const purgeFnIdx = idx(ENS, PURGE_FN, 'purgeNodeBindings 定义');
+const purgeEndIdx = ENS.indexOf('/**', purgeFnIdx);
+assert.ok(purgeEndIdx > purgeFnIdx, 'purge 函数体后应紧跟 markNodeRecordingsInterrupted 的 JSDoc');
+const PURGE_BODY = ENS.slice(purgeFnIdx, purgeEndIdx);
+
+// ── 11e 失联补发终态事件：purge 内 emitSessionEvent('session.process_exit') ────
+record('11e purgeNodeBindings 内 emitSessionEvent(\'session.process_exit\', …) 存在（整机失联路径补发终态，waitForTerminalSessionEvent 可命中）',
+  count(PURGE_BODY, "emitSessionEvent(sessionId, 'session.process_exit'") === 1);
+record('11f emit payload 对齐执行机侧摊平形态：code/sessionId/slotIndex 顶层 + reason:\'node_offline\' 供日志区分',
+  PURGE_BODY.includes('code: null,')
+  && PURGE_BODY.includes('sessionId,')
+  && PURGE_BODY.includes('slotIndex: session?.executorSlotIndex ?? null,')
+  && PURGE_BODY.includes("reason: 'node_offline',"));
+record('11g emit 调用全文件恰一次且只挂 purge（unregister/markOfflineAndCrash/sweepStale 三调用方共用；reconcile 重连路径不经过 purge，无误伤面）',
+  count(ENS, 'emitSessionEvent(') === 1);
+record('11h emit 位于 state.sessions.delete 之前（清绑定时该会话 hub 仍在，事件必达等待方）',
+  PURGE_BODY.indexOf("emitSessionEvent(sessionId, 'session.process_exit'")
+  < PURGE_BODY.indexOf('state.sessions.delete(sessionId);'));
+record('11i hub 导入单次（emitSessionEvent 恰好 import 一次，来自 executor-event-hub.js）',
+  count(ENS, "from '../executor-event-hub.js';") === 1
+  && ENS.includes("import { emitSessionEvent } from '../executor-event-hub.js';"));
 
 const bad = results.filter((r) => !r.ok);
 console.log(`\ncharacterize-replay-stop-hardening: ${results.length - bad.length}/${results.length} passed`);
