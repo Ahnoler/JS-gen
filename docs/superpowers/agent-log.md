@@ -1,5 +1,14 @@
 # Agent 协作日志
 
+## 2026-09-21 11:42 · ZCode 合约线 — 开工：unboundlocal-retest 执行（#970 P2 弹窗【查询】点击场景复测，引擎线 11:25 知会放行）
+
+- **放行依据**：引擎线知会（bc6bf63c）——引擎 worktree @ 93cef7ce（locator-snap 分支已对齐上游），251c461b 为其祖先、热修直验在场；我线复验：`button_text_identity=''` 初始化位于幂等门块前（click_action_engine.py:490 vs :506）、磁盘 WIP（locator-snap 6 文件）py_compile 全过、纯增量无删改，**运行态可测**。运行基点=控制面 pid 14224（39dadd7f 内存态，Node 侧）+ Python 子进程磁盘 93cef7ce（含热修）——复测靶在 Python click 路径，Node 增量不生效不影响本单。
+- **范围（可写集）**：`tmp/contract-wet9-20260919/wet-unboundlocal/`（新建证据目录）、`tmp/contract-wet9-20260919/through-report-unboundlocal.md`、agent-log 本条目+收工条目、todo-list 挂起项核销行。
+- **禁入区**：`scripts/**`、`src/**`（合约线惯例不改代码）；引擎 worktree 未提交 WIP（locator-snap 6 文件，click_action_engine.py 等）；远端代理 9228（用户自管）；OpenCode 天元弹窗线处置现场；`select_engine.py`/`fill_engine.py`。
+- **执行方式**：主线程直接执行 API 湿测管线（POST trajectories → record/prepare → CDP 预检 → record/start → 轮询 → detach → executor stderr 签名扫描 → MySQL 独立复核），无子智能体。任务文本沿用 #970 同款 7 阶段（fid 9000000011 / accountId=2），硬性门闩不变：禁点【确定】提交、fill 尝试 ≤2 次、诚实失败合格。
+- **验收判据**：executor stderr 中 `UnboundLocalError: cannot access local variable 'button_text_identity'` 应 **0 处**（#970 时 5-6 处 res=click-failed）；弹窗内【查询】点击应成功落库（ok-clicked / 幂等白名单路径）；`[nav-reclick]` / ` | nav-reclick-budget` 留痕属预期非异常；步号连续性顺带复核。预期轨迹名「unboundlocal-retest-20260921」。
+- 注：录制湿测轮次，无代码改动
+
 ## 2026-09-21 11:05 · ZCode 合约线 — 收工：D2 SUT 503 空转守卫验收 Runbook 编制（待重启窗口执行，回链同日引擎验收单收讫）
 
 - 完成：D2 验收单收讫并编制执行稿 `tmp/contract-wet9-20260919/d2-acceptance-runbook.md`。守卫实现已核（origin/uara_V2.0 `scripts/agent/recorder_emitters.py` `_guard_spin_on_step_end`：observation/soft/hard/off 四档；信号 page_text_503/url_error_page/dom_missing × 无进展窗 6 步双条件；observation 档 `[spin-guard] observed` 留痕不停车；阈值均有环境变量）。Runbook 四腿：A/B（observation：503 场景命中 / 正常长轨迹零误报）→ C/D（soft：~6 步快速失败+reason 可查 / 零误杀）；换档=改 restart-local.cmd 一行+重启；紧急回滚=off。
