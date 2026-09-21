@@ -29,6 +29,7 @@ for (const rel of [
   'references/pipeline-pits.md',
   'references/acceptance.md',
   'references/phase-granularity.md',
+  'references/operator-ops.md',
   'references/stc-anchors.md',
   'templates/dispatch-brief.md',
   'templates/task-text.md',
@@ -72,6 +73,15 @@ assert.match(phaseGranularity, /展开\/更多 = 状态边界/);
 assert.match(phaseGranularity, /禁止沉淀为铁律/);
 assert.match(phaseGranularity, /skillWorthy=no-workaround/);
 assert.match(skillMd, /phase-granularity\.md/);
+assert.match(skillMd, /operator-ops\.md/);
+
+const operatorOps = fs.readFileSync(path.join(skill, 'references/operator-ops.md'), 'utf8');
+assert.match(operatorOps, /执行操作员/);
+assert.match(operatorOps, /BLOCKED_NOT-ADJUDICATED_/);
+assert.match(operatorOps, /最多再试 \*\*1\*\* 次/);
+assert.match(operatorOps, /禁删除类探针/);
+assert.match(operatorOps, /勿再写入任务模板/);
+assert.match(operatorOps, /复制守卫/);
 
 assert.equal(
   assertBusinessTaskText('【硬性成功门闩——未满足不得 done】\n' + 'y'.repeat(80)),

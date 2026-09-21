@@ -20,7 +20,9 @@ description: >-
 | **操作员** | 本 coach 进程。只调工具、写证据目录；**不**打开浏览器做业务点击、**不** git commit、**不**改仓库 |
 | **录制引擎** | 控制面 `record/start` 驱动的 Python executor，读 `task` 在真机执行 |
 
-变体（同骨架换步骤，**不**新工具名）：**只读核查员**只查 DB/API/KB、零录制；**取证员**用 CDP 截图 + `doneLogs` 残尾反推。自包含任务书 + 证据落盘 + 不提交 + 主线程复核不变。
+本 skill 是主会话派来的**湿测执行操作员**（subagent）：不规划「全流程拆几单」，不替用户把自然语言扩成录制范围。执行纪律见 `references/operator-ops.md`。
+
+变体（同骨架换步骤，**不**新工具名）：**只读核查员**开单前核业务前置（评级/在途/客户归属），只查 DB/API、零录制，不采信上单记忆；**取证员**用选择器级页面调研 + `doneLogs` 残尾反推，不断言「控件不存在」。自包含任务书 + 证据落盘 + 不提交 + 主线程复核不变。
 
 ## 两份输入
 
@@ -49,7 +51,7 @@ description: >-
 | 12 | `write_through_report` |
 
 不可跳过 `analyze_trajectory` → `accept_phases` 再 create。  
-`accept_phases` **之前**须按 `references/phase-granularity.md` 做阶段粒度速查（过碎必合 / 过粗必拆 / 描述可执行；**禁止**把已修复的引擎规避升格为粒度铁律）。管线坑位（phaseIds、CDP、槽位、doneLogs 截断等）详见 `references/pipeline-pits.md`。
+`accept_phases` **之前**须按 `references/phase-granularity.md` 做阶段粒度速查（过碎必合 / 过粗必拆 / 描述可执行；**禁止**把已修复的引擎规避升格为粒度铁律）。执行面（派发完整性、结论纪律、确定性拒绝限重试 1 次）见 `references/operator-ops.md`。管线坑位（phaseIds、CDP、槽位、doneLogs 截断、start 超时≠失败）详见 `references/pipeline-pits.md`。
 
 ## 派发前核查
 
@@ -65,7 +67,7 @@ description: >-
 
 ## 诚实失败
 
-服务端拒绝（原文 + 流水号记在 `doneLogs`）是合法终局，结论前缀 `REJECTED_`。**禁止**再录一单，除非用户本回合明确要求重试。湿测默认开启 `honestReject`。详见 `references/acceptance.md`。
+服务端拒绝（原文 + 流水号记在 `doneLogs`）是合法终局，结论前缀 `REJECTED_`。同一确定性拒绝文案**最多再试 1 次**，第 2 次即收口。**禁止**再开一单，除非用户本回合明确要求重试。操作员无业务裁决权：未见证据用 `BLOCKED_NOT-ADJUDICATED_` / `BLOCKED_UNVERIFIED_`，禁止反推规则。详见 `references/acceptance.md` 与 `references/operator-ops.md`。
 
 ## close.txt 收尾契约
 
@@ -73,7 +75,7 @@ description: >-
 
 ## 失败再试
 
-1. 遮挡弹窗 / 空查 / `already-operated-this-phase` → 改 `taskText` 后 `retry_new_traj`，须再次 `mark_inputs_ready`
+1. 遮挡弹窗 / 空查 / `already-operated-this-phase` → 改 `taskText`（点名真实按钮 + 落库判据，禁止「保存/确定任一」）后 `retry_new_traj`，须再次 `mark_inputs_ready`
 2. 业务步对、落库字段错 → 引擎缺口；仅 Lead 明示允许改代码时最小修 + pin + 重录
 3. 每轮保留 analyze/create/prepare/start JSON、`traj-*-final.json`、`poll-*.json`、日志摘录
 

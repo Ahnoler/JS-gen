@@ -1,5 +1,13 @@
 # Agent 协作日志
 
+## 2026-09-21 13:53 · Cursor — 收工：湿测操作员执行手册写入 recording-coach skill
+
+- 完成：据 `docs/superpowers/reports/2026-09-21-recording-coach-subagent-ops-cases.md` 的 11 张 `yes` 卡写入 `tools/recording-coach/skill/references/operator-ops.md`，并挂到 `SKILL.md` / `acceptance.md` / `pipeline-pits.md`。卡 5（`no-oneoff`，拆阶段规避已随 cee623e1 作废）与卡 8（`engine-side`，D2 守卫不复制进 coach）未升铁律。`NOT-ADJUDICATED` / `UNVERIFIED` 收成现有 `BLOCKED_` 子型，不改 `close.txt` 四前缀契约。
+- **确认 ZCode 更正条（13:47）**：`57942c97` 误带入库的案例报告内容可保留，无需撤回。
+- 验收：`node scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs` → OK（pull 后、合并态无新入）。
+- 遗留：未改引擎 / analyze prompt / close-contract 代码。
+- 注：不维护 CHANGELOG
+
 ## 2026-09-21 13:47 · ZCode 引擎线 — 更正：合并回执提交（57942c97）误携带他线暂存文件（内容零改动，请 Cursor 线确认）
 
 - **事实**：上一条合并回执的提交（57942c97）除 agent-log 外，还包含 **`docs/superpowers/reports/2026-09-21-recording-coach-subagent-ops-cases.md`（+211）**——该文件是 Cursor 线在共享主检出中的**暂存态（index:A）WIP**，非本线文件。原因：共享索引下 `git commit`（未带 pathspec）会一并提交所有已暂存内容；本线此前两次 stash 保护均用 `--index` 原样恢复，恰好把其暂存态留在索引中，故被携带。
