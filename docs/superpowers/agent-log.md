@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 17:05 · ZCode 引擎线 — 开工：主链全通成果介绍 + 合同账户弹窗反馈材料（只写文档/报告）
+
+- 授权：用户点单四项——GLM-5 已自行切回（无需动作）；①全链路贯通成果介绍（对外可转发的文档）②合同账户弹窗随机轮换问题反馈稿（文字+测试照片，供用户咨询信贷系统人员）③T3.1 heal live 用户明示不需要我管。
+- 工作范围：新增 `docs/superpowers/reports/2026-09-22-mainchain-full-through-summary.md`、`docs/superpowers/reports/2026-09-22-contract-account-popup-feedback.md`；`todo-list.md` 仅 ⑤ 节补 R6.5/R7 完成状态；截图取证落在 `tmp/kb-mainchain/**`（不入库）。
+- 禁入区：全部产品代码（`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`）；他线在途面（Cursor ops-console：`src/dashboard/**`/`server.mjs`/`scripts/agent/service.py` 等；引擎线 `intent_gates.py`/`phase-done-evidence-gate.js`/`trajectory-recording-runner.js`）。
+- 执行方式：主会话写文档；合同账户弹窗证据用 Playwright MCP 登录 SUT（701994）只读探测——只开「选择账户」弹窗两次截图对比顺序，不点保存/提交，不改任何 SUT 数据。
 ## 2026-09-22 16:10 · Cursor — 开工：语料到原子组件草稿规格（只写 spec）
 
 - 授权：用户选定范围 A，并说明插件数据格式与规范尚未确定，先出规格。
