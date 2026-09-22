@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 11:29 · ZCode 引擎线 — 合并回执：今日两笔交付并入 uara_V2.0_dev（用户批「可以」；meta-step-filter f6f2c0aa + verify-token 主收口 516ca27b，零冲突）——合并态全量 187 pin ALL GREEN
+
+- 合并：`engine/meta-step-filter-pin-20260922`（f2b5cf77）→ **f6f2c0aa**、`engine/verify-token-downgrade-20260922`（3d9c2a7f）→ **516ca27b**，均 `--no-ff` 零冲突；已推 origin（8aed468c..516ca27b）。两分支至此闭环，「branch-only 待并入 dev」全部清零。
+- 合并后验收（硬约定）：主检出 dev 合并态**全量 verify-all 187 唯一 pin + statics ALL GREEN 零 FAILED**（186+meta-step-filter 入列，两笔叠加吻合）。
+- 生效面：meta-step-filter=纯 pin+注册行（verify-all 域管束生效）；verify-token 主收口=纯 Python 侧，**新录制会话磁盘加载即效**（注意：本地控制面仍待重启窗口，Node 侧不下发 `phase_contract` 快照时走文本分类兜底，降级函数在 fallback 路径由门侧豁免覆盖——重启后才挂到 persisted 主路径）。
+- 引擎线在途清零；挂账不变：D2 自然窗口值守 / 历史盘点（湿测后）/ step-highlight（触发式）/ 控制面重启（等用户窗口）。
+
 ## 2026-09-22 11:15 · ZCode 引擎线 — 收工：verify-phase-token 第二步主收口交付（持久化合约消费点纯文本降级；3d9c2a7f 已推送，branch-only 待并入 dev）
 
 - 完成（`3d9c2a7f`，5 文件 +344/−15）：**刀 2 后主收口落地**——`phase_contract_snapshot.py` 新增 `downgrade_contract_for_verification`（复用 verification_gate 冻结词表 v1 单源 import，纯文本三条件全中才降级 `submit.required/kinds/boundary.success_when`，boundary role 不动，`source='persisted_verify_downgraded'` 可辨识；FP 零容忍）；`service.py` persisted 分支 8 行接线（判定文本=`phase_core`），stderr 留痕 `phase_contract=verify_downgraded`；fallback 两路径零改动（第一步门侧豁免 c55cc849 继续兜底）。设计依据=设计稿 §6（随开工条目 4245a456 入库）：刀 2 后分析 LLM 直产合约，误标纯核验阶段→收尾误杀+recovery 强推 click_save+8 步下限，而第一步豁免对该形态失效（条件④ mode 否决恰含被误标值）。
