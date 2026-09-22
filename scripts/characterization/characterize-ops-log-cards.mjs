@@ -1,14 +1,13 @@
-import { readFileSync } from 'fs';
 import { parseAgentLog } from '../../src/dashboard/ops-console/log-cards.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
 
-const sample = readFileSync(
-  'logs/agent-stderr/700fced0-2bd9-4137-aa3a-1733ef87a23a.log',
-  'utf8',
-);
+const sample = `[slot:0 sid:700fced0] [replay] [1/5] go_to_url {'url': 'http://test.creditv5p2.tansun.com.cn/#/login'}
+[slot:0 sid:700fced0] [replay] [1/5] OK → ok | locate=ok
+[slot:0 sid:700fced0] Phase 1: 关闭「天元相关配置」欢迎弹窗（若有，点击确定）。预期结果：欢迎弹窗关闭或当前页面无该弹窗。 (max_steps=300)
+[slot:0 sid:700fced0] [step 2] done=no stopped=no | goal=点击「确 定」按钮关闭「天元相关配置」欢迎弹窗，然后终检确认当前页面已无该弹窗。 | act={"click_element_by_index": {"index": 1}} | res=ok-clicked-1`;
 const blocks = parseAgentLog(sample);
 assert(blocks.some((b) => b.kind === 'phase' && b.phase === 1), 'phase 1 header');
 assert(
