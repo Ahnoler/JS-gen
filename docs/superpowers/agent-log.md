@@ -1,6 +1,15 @@
 # Agent 协作日志
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
+> 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
+
+## 2026-09-22 10:15 · ZCode 引擎线 — 开工：meta-step-filter 孤儿 pin 修复 + misc 域登记（系统线移交④；SDD）
+
+- 授权与来源：系统线 09-21 21:55 收工移交④（`cold/characterize-meta-step-filter.mjs` 孤儿失效，未登记任何域）；实测确认红——函数 `filterMetaSteps` 仍在导出（行为断言可过），坏在源码 needle：`trajectory-query-service.js` 已改用 `filterProductSteps`（08-12 `7b5945a3` 起含工程步过滤语义），`assert.match(querySrc, /filterMetaSteps/)` 失败。
+- 工作范围：`scripts/characterization/cold/characterize-meta-step-filter.mjs`（needle 同步当前现实 + 补 `filterProductSteps` 行为断言 + 头部注释路径更正）、`scripts/refactor/verify-all.sh`（仅 PINS_MISC 注册 1 行）；agent-log/todo 条目。**`src/**` 零改动**（pin 只读断言 src 现实）。
+- 分支与场地：`engine/meta-step-filter-pin-20260922` 自 `origin/uara_V2.0_dev`（=73a173a6）新切（按 22:51 dev/test 定盘），branch-only 待并入 dev；场地=D:\dev\JS-gen-engine 主场（自 engine/replay-cancel 切换——该分支他会话单元已合并收工且已推 origin）。**运行态披露**：控制面/执行机 22:29 起自该 worktree 运行，切到 dev tip 后磁盘新增方案 D 刀 2 的 Python 侧（Node 未重启不下发合约快照→Python 走文本分类兜底，录制行为不变；Node 侧仍待重启窗口），本单元自身仅 pin+注册行零运行面。
+- 禁入区（他线知悉）：`src/**`、`scripts/prompts/**`、`data/kb/**` 只读；`fill_engine.py`/`click_action_engine.py`/`select_engine.py` 他线热区。
+- 执行方式：SDD——worker-coder 实现（RED→GREEN）+ reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；合并后验收=合并 `origin/uara_V2.0_dev` 入分支重跑全量 verify-all。
 
 ## 2026-09-21 22:51 · Cursor — 定盘：V2.0 拆成稳定 test 与开发 dev
 
