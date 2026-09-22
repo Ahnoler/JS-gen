@@ -1,8 +1,5 @@
-/**
- * Slot / executor occupancy monitor for /api/docs.
- * Data: GET /api/v2/executors + GET /api/v2/recording/agent-stderr/active
- * Actions: stream/detach · hard detach · paste-export stderr
- */
+/* global document, window, fetch, navigator, setInterval, clearInterval */
+import { renderLogCards } from './log-cards.js';
 
 /**
  * A DOM element or document used as query scope.
@@ -18,6 +15,11 @@
  */
 const $ = (sel, el = document) => el.querySelector(sel);
 
+/**
+ * Escape HTML for safe interpolation.
+ * @param {string} str raw string
+ * @returns {string} escaped HTML
+ */
 function escapeHtml(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
@@ -55,6 +57,11 @@ async function apiJson(url, options = {}) {
   return parsed;
 }
 
+/**
+ * Shorten UUID for table display.
+ * @param {string} u uuid
+ * @returns {string} shortened id
+ */
 function shortUuid(u) {
   if (!u) return '—';
   const s = String(u);
@@ -158,7 +165,6 @@ function buildViewModel(executorsPayload, activePayload) {
       });
     }
 
-    // Orphan occupied indexes beyond capacity (shouldn't happen often)
     for (const [idx, lease] of occupiedByIndex) {
       if (idx >= 0 && idx < capacity) continue;
       const active = (lease?.sessionId && bySession.get(String(lease.sessionId)))
@@ -197,52 +203,78 @@ function buildViewModel(executorsPayload, activePayload) {
   return { nodes: enriched, freeCount, occupiedCount, activeRows };
 }
 
+/**
+ * Status badge HTML for a slot row.
+ * @param {string|null} remoteStatus remote session status
+ * @param {string|null} recordStatus record status
+ * @param {boolean} occupied whether slot is occupied
+ * @returns {string} badge HTML
+ */
 function statusBadge(remoteStatus, recordStatus, occupied) {
   if (!occupied) {
-    return '<span class="mon-badge mon-badge-free">空闲</span>';
+    return '<span class="ops-badge ops-badge-free">空闲</span>';
   }
   const rs = remoteStatus || 'occupied';
   const rec = recordStatus || '';
-  let cls = 'mon-badge-busy';
-  if (rs === 'active') cls = 'mon-badge-active';
-  else if (rs === 'idle') cls = 'mon-badge-idle';
-  return `<span class="mon-badge ${cls}">${escapeHtml(rs)}${rec ? ` · ${escapeHtml(rec)}` : ''}</span>`;
+  let cls = 'ops-badge-busy';
+  if (rs === 'active') cls = 'ops-badge-active';
+  else if (rs === 'idle') cls = 'ops-badge-idle';
+  return `<span class="ops-badge ${cls}">${escapeHtml(rs)}${rec ? ` · ${escapeHtml(rec)}` : ''}</span>`;
 }
 
+/**
+ * One slot table row HTML.
+ * @param {object} node executor node
+ * @param {object} slot slot view model
+ * @returns {string} table row HTML
+ */
 function renderSlotRow(node, slot) {
   const trajLabel = slot.trajectoryId != null
     ? `#${slot.trajectoryId}${slot.trajectoryName ? ` ${slot.trajectoryName}` : ''}`
     : '—';
+  const stderrRow = slot.occupied && slot.trajectoryId != null;
   const actions = slot.occupied && slot.trajectoryId != null
     ? `
-      <button type="button" class="btn mon-btn" data-act="stream-detach" data-tid="${slot.trajectoryId}">断开画面</button>
-      <button type="button" class="btn mon-btn" data-act="stream-attach" data-tid="${slot.trajectoryId}">推流画面</button>
-      <button type="button" class="btn mon-btn mon-btn-danger" data-act="detach" data-tid="${slot.trajectoryId}">释放浏览器</button>
-      <button type="button" class="btn mon-btn" data-act="stderr" data-tid="${slot.trajectoryId}"
+      <button type="button" class="btn ops-btn" data-act="stream-detach" data-tid="${slot.trajectoryId}">断开画面</button>
+      <button type="button" class="btn ops-btn" data-act="stream-attach" data-tid="${slot.trajectoryId}">推流画面</button>
+      <button type="button" class="btn ops-btn ops-btn-danger" data-act="detach" data-tid="${slot.trajectoryId}">释放浏览器</button>
+      <button type="button" class="btn ops-btn" data-act="stderr" data-tid="${slot.trajectoryId}"
         data-session="${escapeHtml(slot.sessionId || '')}"
         data-sid="${escapeHtml(slot.sid || '')}"
         data-slot="${slot.slotIndex}">日志</button>
-      <button type="button" class="btn mon-btn" data-act="clear-log" data-tid="${slot.trajectoryId}"
+      <button type="button" class="btn ops-btn" data-act="clear-log" data-tid="${slot.trajectoryId}"
         data-session="${escapeHtml(slot.sessionId || '')}"
         data-sid="${escapeHtml(slot.sid || '')}"
         title="仅清空该 session 的控面 stderr 文件">清空日志</button>
     `
     : (slot.occupied && slot.sessionId
-        ? `<button type="button" class="btn mon-btn mon-btn-danger" data-act="orphan-close" data-node="${escapeHtml(node.nodeUuid)}" data-session="${escapeHtml(slot.sessionId)}">关闭会话</button>`
-        : '<span class="mon-muted">—</span>');
+        ? `<button type="button" class="btn ops-btn ops-btn-danger" data-act="orphan-close" data-node="${escapeHtml(node.nodeUuid)}" data-session="${escapeHtml(slot.sessionId)}">关闭会话</button>`
+        : '<span class="ops-muted">—</span>');
+
+  const rowExtra = stderrRow
+    ? ` data-act="stderr" data-tid="${slot.trajectoryId}"
+        data-session="${escapeHtml(slot.sessionId || '')}"
+        data-sid="${escapeHtml(slot.sid || '')}"`
+    : '';
 
   return `
-    <tr class="${slot.occupied ? 'mon-row-occ' : 'mon-row-free'}" data-node="${escapeHtml(node.nodeUuid)}" data-slot="${slot.slotIndex}">
-      <td><code>slot ${slot.slotIndex}</code>${slot.overflow ? ' <span class="mon-muted">(溢)</span>' : ''}</td>
+    <tr class="${slot.occupied ? 'ops-row-occ' : 'ops-row-free'}${stderrRow ? ' ops-row-stderr' : ''}" data-node="${escapeHtml(node.nodeUuid)}" data-slot="${slot.slotIndex}"${rowExtra}>
+      <td><code>slot ${slot.slotIndex}</code>${slot.overflow ? ' <span class="ops-muted">(溢)</span>' : ''}</td>
       <td>${statusBadge(slot.remoteStatus, slot.recordStatus, slot.occupied)}</td>
-      <td class="mon-traj">${escapeHtml(trajLabel)}</td>
-      <td><code class="mon-mono">${escapeHtml(shortUuid(slot.sessionId))}</code></td>
-      <td><code class="mon-mono">${slot.cdpPort != null ? escapeHtml(String(slot.cdpPort)) : '—'}</code></td>
-      <td class="mon-actions">${actions}</td>
+      <td class="ops-traj">${escapeHtml(trajLabel)}</td>
+      <td><code class="ops-mono">${escapeHtml(shortUuid(slot.sessionId))}</code></td>
+      <td><code class="ops-mono">${slot.cdpPort != null ? escapeHtml(String(slot.cdpPort)) : '—'}</code></td>
+      <td class="ops-actions">${actions}</td>
     </tr>
   `;
 }
 
+/**
+ * Executor node card HTML.
+ * @param {object} node enriched node
+ * @param {string} filter slot filter (all|occupied|free)
+ * @returns {string} card HTML or empty
+ */
 function renderNodeCard(node, filter) {
   let slots = node.slots || [];
   if (filter === 'occupied') slots = slots.filter((s) => s.occupied);
@@ -252,23 +284,23 @@ function renderNodeCard(node, filter) {
   }
 
   const conn = node.connected ? '在线' : '离线';
-  const connCls = node.connected ? 'mon-online' : 'mon-offline';
+  const connCls = node.connected ? 'ops-online' : 'ops-offline';
 
   return `
-    <article class="mon-node" data-node-uuid="${escapeHtml(node.nodeUuid)}">
-      <header class="mon-node-head">
+    <article class="ops-node" data-node-uuid="${escapeHtml(node.nodeUuid)}">
+      <header class="ops-node-head">
         <div>
           <strong>${escapeHtml(node.name || node.nodeUuid)}</strong>
-          <span class="mon-muted"> · ${escapeHtml(shortUuid(node.nodeUuid))}</span>
+          <span class="ops-muted"> · ${escapeHtml(shortUuid(node.nodeUuid))}</span>
         </div>
-        <div class="mon-node-meta">
+        <div class="ops-node-meta">
           <span class="${connCls}">${conn}</span>
-          <span class="mon-muted">${escapeHtml(node.status || '')}</span>
+          <span class="ops-muted">${escapeHtml(node.status || '')}</span>
           <span>占用 <strong>${node.occupiedSlots}</strong> / 容量 <strong>${node.capacity}</strong>（空闲 ${node.freeSlots}）</span>
         </div>
       </header>
-      <div class="mon-table-wrap">
-        <table class="mon-table">
+      <div class="ops-table-wrap">
+        <table class="ops-table">
           <thead>
             <tr>
               <th>槽位</th>
@@ -280,7 +312,7 @@ function renderNodeCard(node, filter) {
             </tr>
           </thead>
           <tbody>
-            ${slots.map((s) => renderSlotRow(node, s)).join('') || '<tr><td colspan="6" class="mon-muted">无匹配槽位</td></tr>'}
+            ${slots.map((s) => renderSlotRow(node, s)).join('') || '<tr><td colspan="6" class="ops-muted">无匹配槽位</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -289,58 +321,84 @@ function renderNodeCard(node, filter) {
 }
 
 /**
- * Mount the slot-monitor panel into the given wrapper element.
- * @param {DomRoot} wrap container element to render the monitor into
+ * Copy text to clipboard with fallback.
+ * @param {string} text text to copy
+ * @returns {Promise<void>}
+ */
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+}
+
+/**
+ * Mount executor slots and log cards into the ops exec panel.
+ * @param {DomRoot} wrap container (#ops-panel-exec)
  * @returns {void}
  */
-export function mountSlotMonitor(wrap) {
+export function mountExecutorPanel(wrap) {
   wrap.innerHTML = `
-    <h2 class="docs-section-title">执行机监视</h2>
-    <p class="docs-section-desc">按执行机（路由）拆分槽位：谁占用、哪笔交易、CDP 端口、能否断开画面或释放浏览器。数据来自 <code>/api/v2/executors</code> 与 <code>/api/v2/recording/agent-stderr/active</code>（含实时 <code>slotPorts</code>）。「清空日志」只删该 session 的控面 <code>logs/agent-stderr/{sessionId}.log</code>。</p>
-    <div class="mon-panel">
-      <div class="mon-toolbar">
-        <button type="button" class="btn btn-primary mon-refresh">刷新</button>
-        <label class="mon-check"><input type="checkbox" class="mon-auto" /> 每 5s 自动刷新</label>
-        <label class="mon-check"><input type="checkbox" class="mon-show-offline" /> 显示离线执行机</label>
-        <label class="mon-label">节点
-          <select class="mon-filter-node">
-            <option value="all">全部</option>
-          </select>
-        </label>
-        <label class="mon-label">槽位
-          <select class="mon-filter-slot">
-            <option value="all">全部</option>
-            <option value="occupied" selected>仅占用</option>
-            <option value="free">仅空闲</option>
-          </select>
-        </label>
-        <span class="mon-summary mon-muted">—</span>
+    <div class="ops-exec-layout">
+      <div class="ops-exec-slots">
+        <p class="ops-intro">按执行机拆分槽位；数据来自 <code>/api/v2/executors</code> 与 <code>/api/v2/recording/agent-stderr/active</code>。</p>
+        <div class="ops-slot-panel">
+          <div class="ops-toolbar">
+            <button type="button" class="btn btn-primary ops-refresh">刷新</button>
+            <label class="ops-check"><input type="checkbox" class="ops-auto" /> 每 5s 自动刷新</label>
+            <label class="ops-check"><input type="checkbox" class="ops-show-offline" /> 显示离线执行机</label>
+            <label class="ops-label">节点
+              <select class="ops-filter-node">
+                <option value="all">全部</option>
+              </select>
+            </label>
+            <label class="ops-label">槽位
+              <select class="ops-filter-slot">
+                <option value="all">全部</option>
+                <option value="occupied" selected>仅占用</option>
+                <option value="free">仅空闲</option>
+              </select>
+            </label>
+            <span class="ops-summary ops-muted">—</span>
+          </div>
+          <div class="ops-status" hidden></div>
+          <div class="ops-body"><div class="ops-muted">加载中…</div></div>
+        </div>
       </div>
-      <div class="mon-status" hidden></div>
-      <div class="mon-body"><div class="mon-muted">加载中…</div></div>
-      <details class="mon-log-box" hidden>
-        <summary class="mon-log-summary">
-          <span>最近一次 stderr 导出</span>
-          <button type="button" class="btn mon-btn mon-copy-log" title="复制日志全文">复制</button>
-          <button type="button" class="btn mon-btn mon-clear-last-log" title="清空刚才查看的 session 日志文件">清空该会话日志</button>
-        </summary>
-        <pre class="ep-pre mon-log-pre"></pre>
-      </details>
+      <div class="ops-log-shell">
+        <div class="ops-log-toolbar">
+          <button type="button" class="btn ops-btn ops-scroll-bottom">回到底部</button>
+          <button type="button" class="btn ops-btn ops-copy-log">复制全文</button>
+          <button type="button" class="btn ops-btn ops-clear-last-log" title="清空刚才查看的 session 日志文件">清空该会话日志</button>
+        </div>
+        <div class="ops-log"></div>
+      </div>
     </div>
   `;
 
-  const body = $('.mon-body', wrap);
-  const statusEl = $('.mon-status', wrap);
-  const summary = $('.mon-summary', wrap);
-  const nodeSel = $('.mon-filter-node', wrap);
-  const slotSel = $('.mon-filter-slot', wrap);
-  const showOffline = $('.mon-show-offline', wrap);
-  const logBox = $('.mon-log-box', wrap);
-  const logPre = $('.mon-log-pre', wrap);
+  const body = $('.ops-body', wrap);
+  const statusEl = $('.ops-status', wrap);
+  const summary = $('.ops-summary', wrap);
+  const nodeSel = $('.ops-filter-node', wrap);
+  const slotSel = $('.ops-filter-slot', wrap);
+  const showOffline = $('.ops-show-offline', wrap);
+  const logEl = $('.ops-log', wrap);
+  const followState = { stickToBottom: true };
   let timer = null;
   let lastModel = null;
-  /** sessionId of last successful stderr export (for panel「清空该会话日志」). */
   let lastLogSessionId = '';
+  /** Raw stderr string last passed to renderLogCards (for copy-full). */
+  let lastLogRawText = '';
+  /** Highlighted trajectory id for selected log row. */
+  let selectedTrajId = null;
 
   function setStatus(msg, isErr = false) {
     if (!msg) {
@@ -349,7 +407,7 @@ export function mountSlotMonitor(wrap) {
       return;
     }
     statusEl.hidden = false;
-    statusEl.className = `mon-status ${isErr ? 'mon-status-err' : 'mon-status-ok'}`;
+    statusEl.className = `ops-status ${isErr ? 'ops-status-err' : 'ops-status-ok'}`;
     statusEl.textContent = msg;
   }
 
@@ -377,6 +435,13 @@ export function mountSlotMonitor(wrap) {
     else nodeSel.value = 'all';
   }
 
+  function markSelectedRow() {
+    wrap.querySelectorAll('.ops-row-selected').forEach((el) => el.classList.remove('ops-row-selected'));
+    if (selectedTrajId == null) return;
+    const row = wrap.querySelector(`tr[data-tid="${selectedTrajId}"]`);
+    row?.classList.add('ops-row-selected');
+  }
+
   function paint() {
     if (!lastModel) return;
     const onlineOrAll = visibleNodes();
@@ -392,7 +457,8 @@ export function mountSlotMonitor(wrap) {
     summary.textContent = `占用 ${occ} · 空闲 ${free} · 节点 ${paintNodes.length}`
       + (hiddenOffline > 0 ? ` · 已隐藏离线 ${hiddenOffline}` : '');
     body.innerHTML = paintNodes.map((n) => renderNodeCard(n, slotFilter)).filter(Boolean).join('')
-      || '<div class="mon-muted">没有可显示的槽位（换筛选条件、勾选「显示离线执行机」或刷新）</div>';
+      || '<div class="ops-muted">没有可显示的槽位（换筛选条件、勾选「显示离线执行机」或刷新）</div>';
+    markSelectedRow();
   }
 
   async function refresh() {
@@ -406,7 +472,7 @@ export function mountSlotMonitor(wrap) {
       paint();
     } catch (err) {
       setStatus(`刷新失败：${err.message}`, true);
-      body.innerHTML = `<div class="mon-muted">无法加载（控面是否已启动？）</div>`;
+      body.innerHTML = '<div class="ops-muted">无法加载（控面是否已启动？）</div>';
     }
   }
 
@@ -470,6 +536,10 @@ export function mountSlotMonitor(wrap) {
     const sid = btn.dataset.sid || '';
     const slot = btn.dataset.slot;
     const trajectoryId = Number(btn.dataset.tid);
+    if (Number.isFinite(trajectoryId)) {
+      selectedTrajId = trajectoryId;
+      markSelectedRow();
+    }
     const bodyObj = {
       slotIndex: slot !== '' ? Number(slot) : undefined,
       sid: sid || undefined,
@@ -485,19 +555,17 @@ export function mountSlotMonitor(wrap) {
         body: JSON.stringify(bodyObj),
       });
       const text = await res.text();
-      logBox.hidden = false;
-      logBox.open = true;
       if (!res.ok) {
         let msg = text;
         try {
           const j = JSON.parse(text);
           msg = j.message || j.error || (j.data && JSON.stringify(j.data)) || text;
         } catch { /* plain */ }
-        logPre.textContent = msg;
+        lastLogRawText = msg;
+        renderLogCards(logEl, msg, followState);
         setStatus(`日志失败 HTTP ${res.status}`, true);
         return;
       }
-      // text/plain bypasses envelope; json would be enveloped
       let display = text;
       try {
         const j = JSON.parse(text);
@@ -505,10 +573,11 @@ export function mountSlotMonitor(wrap) {
           display = j.data.lines.join('\n');
         }
       } catch { /* keep text */ }
-      logPre.textContent = display || '(空日志)';
+      const show = display || '(空日志)';
+      lastLogRawText = show;
       lastLogSessionId = sessionId || '';
+      renderLogCards(logEl, show, followState);
       setStatus(`日志 ${display ? `${display.split('\n').filter(Boolean).length} 行` : '空'}`);
-      logBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (err) {
       setStatus(`日志失败：${err.message}`, true);
     }
@@ -543,7 +612,8 @@ export function mountSlotMonitor(wrap) {
       const cleared = result?.cleared;
       const sid = result?.sessionId || bodyObj.sessionId || '';
       if (sid && sid === lastLogSessionId) {
-        logPre.textContent = '(已清空)';
+        lastLogRawText = '(已清空)';
+        renderLogCards(logEl, lastLogRawText, followState);
       }
       setStatus(cleared ? `已清空 ${sid}` : `无文件可清（${sid || 'unknown'}）`);
     } catch (err) {
@@ -552,60 +622,58 @@ export function mountSlotMonitor(wrap) {
   }
 
   wrap.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-act]');
-    if (!btn) return;
-    const act = btn.dataset.act;
-    const tid = Number(btn.dataset.tid);
-    if (act === 'stream-detach' && Number.isFinite(tid)) callDetach(tid, false);
-    if (act === 'stream-attach' && Number.isFinite(tid)) callAttach(tid);
-    if (act === 'detach' && Number.isFinite(tid)) callDetach(tid, true);
-    if (act === 'stderr') fetchStderr(btn);
-    if (act === 'clear-log') clearStderr(btn);
-    if (act === 'orphan-close') closeOrphanSession(btn);
+    if (e.target.closest('button')) {
+      const btn = e.target.closest('[data-act]');
+      if (!btn) return;
+      const act = btn.dataset.act;
+      const tid = Number(btn.dataset.tid);
+      if (act === 'stream-detach' && Number.isFinite(tid)) callDetach(tid, false);
+      if (act === 'stream-attach' && Number.isFinite(tid)) callAttach(tid);
+      if (act === 'detach' && Number.isFinite(tid)) callDetach(tid, true);
+      if (act === 'stderr') fetchStderr(btn);
+      if (act === 'clear-log') clearStderr(btn);
+      if (act === 'orphan-close') closeOrphanSession(btn);
+      return;
+    }
+    const row = e.target.closest('tr.ops-row-stderr');
+    if (row) {
+      fetchStderr(row);
+    }
   });
 
-  $('.mon-refresh', wrap)?.addEventListener('click', () => refresh());
+  $('.ops-refresh', wrap)?.addEventListener('click', () => refresh());
   nodeSel.addEventListener('change', () => paint());
   slotSel.addEventListener('change', () => paint());
   showOffline?.addEventListener('change', () => paint());
-  $('.mon-copy-log', wrap)?.addEventListener('click', async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const text = logPre?.textContent || '';
+
+  $('.ops-copy-log', wrap)?.addEventListener('click', async () => {
+    const text = lastLogRawText || '';
     if (!text) {
       setStatus('没有可复制的日志', true);
       return;
     }
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       setStatus(`已复制 ${text.split('\n').filter(Boolean).length} 行`);
-    } catch {
-      // Fallback for non-secure context
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        ta.remove();
-        setStatus(`已复制 ${text.split('\n').filter(Boolean).length} 行`);
-      } catch (err) {
-        setStatus(`复制失败：${err.message || err}`, true);
-      }
+    } catch (err) {
+      setStatus(`复制失败：${err.message || err}`, true);
     }
   });
-  $('.mon-clear-last-log', wrap)?.addEventListener('click', async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+
+  $('.ops-scroll-bottom', wrap)?.addEventListener('click', () => {
+    followState.stickToBottom = true;
+    logEl.scrollTop = logEl.scrollHeight;
+  });
+
+  $('.ops-clear-last-log', wrap)?.addEventListener('click', async () => {
     if (!lastLogSessionId) {
       setStatus('请先点「日志」拉取一次，再清空该会话文件', true);
       return;
     }
     await clearStderr(lastLogSessionId);
   });
-  $('.mon-auto', wrap)?.addEventListener('change', (e) => {
+
+  $('.ops-auto', wrap)?.addEventListener('change', (e) => {
     if (timer) {
       clearInterval(timer);
       timer = null;
