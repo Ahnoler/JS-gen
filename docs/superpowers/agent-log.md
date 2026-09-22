@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 10:45 · ZCode Lead（主链跑车线，fork 会话恢复）— 开工：R6 用信续做（信贷确认 701994 有客户经理权限）
+- 开工：10:45（fork 自昨晚主链会话恢复；距上次跑车 16 天，环境剧变重盘）。用户指令：信贷同事（吴建成）确认 701994 有客户经理权限——R6 流程提交重试；失败则 MCP 截图取证。
+- **环境重盘**：①当前分支已切 **uara_V2.0_dev**（版本双线 56d96859；阶段合约方案 D 79b4b8ba 已并入——录制行为可能变化，本棒即最新开发态验证）；②控制面+执行机已重启（LLM 默认模型已变 /Qwen3.8-27B，原 GLM-5——agent 质量影响观察中）；③后端 09-22 发版（73a173a6）。
+- **G8 已派发（进行中）**：SUT 三单现状重盘（PJ20260907016009/DGSX20260907056033+批复 DGSXPF20260907020005/YXPC20260907012045）→决策树续做（在则修改提交；不在则从批复重发；被拒则截图取证+切候选重试）。
+- 禁入：commit、影像/OCR、其他客户单据、他线 WIP（AGENTS.md/CLAUDE.md 修改、product-mgmt 备份）。
+
 ## 2026-09-22 10:30 · ZCode 引擎线 — 收工：meta-step-filter 孤儿 pin 修复 + misc 域登记（回链 10:15 开工；f2b5cf77 已推送，branch-only 待并入 dev）
 
 - 完成（`f2b5cf77`，2 文件 +25/−2）：pin `:45` needle `/filterMetaSteps/`→`/filterProductSteps/`（08-12 `7b5945a3` 起 query-service 改用产品步双滤，旧 needle 必红）；新增 `filterProductSteps` 行为断言（混合数组双滤 + `includeMeta` 回含 + 与 `filterMetaSteps` 的工程步差异钉——回退单滤必红）；其余 9 条源码 needle 逐条核对成立一字未动；头部 Run 路径补 `cold/`；`verify-all.sh` PINS_MISC 登记 1 行（该 pin 因未登记脱管数月，入域后受门禁约束）。`src/**` 零改动。
