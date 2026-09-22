@@ -3,6 +3,14 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 11:05 · ZCode 引擎线 — 回执存档：停止链路联测 #978 三腿+三对照全 PASS，E1-E4 根缺陷真机闭环（交付线=引擎树sub 会话，本会话代存回执）
+
+- 合约线 #978 联测（证据 `tmp/contract-wet12-20260921/`）确认 8e0dd470（E1-E4 Python 侧）+ 系统线 Node 12 项双侧生效：长动作步回放成立、停止 API 双侧 `{stopped:true, batchWasRunning:true, cancelStepDelivered:true}`、步边界中断双证（WS 补发终态帧 `aborted:true` 不悬挂 running + `replay:finished {aborted:true, reason:'user_stop'}`，Python 侧零后续步下发）、干净批次 payload 形状不变（④ 对照成立）。R2 实证协作式封顶=最坏单步时长；E1③ 实证 R2 残留 cancel 标志被 R3 首步清零（event_dispatch 入口清残留逻辑真机验证）。
+- **结构披露存档（引擎线确认，非缺陷）**：attached 逐步回放（单条下发、无菜单导航批）下，Python 侧 `cancel requested at step N/M / replay_done aborted+stoppedAt` 结构性不可达（该形态=整批预批经 Python `replay_action_entries` 循环才可达；逐步模式边界中断落 Node 循环边界）——与 E1 交付设计一致；单测 Python 边界须选含菜单导航预批的轨迹。
+- spin-guard 值守更新：全会话 0 签名（observation 常开零误报）；Stop requested 回放腿恰 2（符合触发面）。D2 A/C 自然窗口值守口径不变。
+- 遗留：#977 分类「合约停测cat0921」残留待有效会话/DB 补清（合约线自留，非引擎线）；#978 六自测阶段已清零残留、18 存量节点无损。
+- 引擎线在途为零；meta-step-filter 分支（f2b5cf77）仍 branch-only 待并入 dev。
+
 ## 2026-09-22 10:45 · ZCode Lead（主链跑车线，fork 会话恢复）— 开工：R6 用信续做（信贷确认 701994 有客户经理权限）
 - 开工：10:45（fork 自昨晚主链会话恢复；距上次跑车 16 天，环境剧变重盘）。用户指令：信贷同事（吴建成）确认 701994 有客户经理权限——R6 流程提交重试；失败则 MCP 截图取证。
 - **环境重盘**：①当前分支已切 **uara_V2.0_dev**（版本双线 56d96859；阶段合约方案 D 79b4b8ba 已并入——录制行为可能变化，本棒即最新开发态验证）；②控制面+执行机已重启（LLM 默认模型已变 /Qwen3.8-27B，原 GLM-5——agent 质量影响观察中）；③后端 09-22 发版（73a173a6）。
