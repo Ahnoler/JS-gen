@@ -12,12 +12,12 @@ function stripLinePrefix(line) {
 
 /**
  * Derive step card status from step fields.
- * @param {boolean} done
- * @param {boolean} stopped
- * @param {string} act
- * @param {string} res
- * @param {string} err
- * @returns {'fail'|'done'|'empty'|'ok'}
+ * @param {boolean} done whether the step ended with done=yes
+ * @param {boolean} stopped whether the step ended with stopped=yes
+ * @param {string} act serialized action payload from the log line
+ * @param {string} res result text from the log line
+ * @param {string} err error text from the log line
+ * @returns {'fail'|'done'|'empty'|'ok'} UI status derived from fields
  */
 export function stepStatus(done, stopped, act, res, err) {
   if (String(err).length > 0 || stopped) {
@@ -40,7 +40,7 @@ const STEP_HEADER_RE = /^\[step (\d+)\] done=(yes|no) stopped=(yes|no) \| goal=(
 /**
  * @param {string} dictStr Python-style dict fragment after the action name
  * @param {string} key key to read
- * @returns {string|null}
+ * @returns {string|null} quoted value for key, or null when absent
  */
 function pyDictString(dictStr, key) {
   if (!dictStr) {
@@ -74,7 +74,7 @@ function replayGoal(operation, paramsStr) {
 /**
  * @param {string} s source string
  * @param {number} start index of opening quote
- * @returns {{ value: string, next: number }}
+ * @returns {{ value: string, next: number }} decoded string and index after closing quote
  */
 function readJsonStringAt(s, start) {
   let i = start + 1;
@@ -94,7 +94,7 @@ function readJsonStringAt(s, start) {
 
 /**
  * @param {string} rest substring after `goal=`
- * @returns {{ goal: string, act: string, res: string, err: string }}
+ * @returns {{ goal: string, act: string, res: string, err: string }} parsed step fields
  */
 function parseJsonStepFields(rest) {
   let pos = 0;
@@ -194,7 +194,7 @@ function parseStepLine(line) {
 
 /**
  * @param {string} line stripped card line
- * @returns {object|null}
+ * @returns {object|null} info block, malformed-card other stub, or null when not a card line
  */
 function parseCardLine(line) {
   if (!line.startsWith('[card] ')) {
