@@ -3,6 +3,16 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 13:08 · ZCode 引擎线 — 收工：A/B 遗留两候选修复交付（kind 同族互认 + 零步 navigate 豁免；fe7a3a27 已推送，branch-only 待并入 dev）
+
+- 完成（`fe7a3a27`，6 文件 +430/−17，回链 12:16 开工条目）：
+  - **①744 修（Python，新录制会话磁盘加载即效）**：`intent_gates.py` 新增 `_SAVE_FAMILY`/`_INTRODUCE_FAMILY` 冻结元组（与 `boundary_gates.py:33-35` 镜像先例逐字一致）+ `_same_family` 助手（同名精确优先→族内互认→未知 kind 精确自匹配）；`has_contract_success` 三处消费点（`_last_save_ok` 分支改族内 any、introduce 分支、`_success_tokens` 循环）按证据等价类判；`done_accept_reason` 同族同步扩展（评审裁定正当，避免门过但 reason 撕裂）。**红线不松**：无族内证据 missing_success_token 照发、跨族不互认、`service.py` 质量门零改动、词表/`PHASE_CONTRACT_KINDS` 冻结清单零改动。
+  - **②零步修（Node，需控制面重启窗口才生效）**：`evaluatePhaseOutcome` 增可选 `phaseIsNavigateOnly` 参数（默认 false=逐字原行为）；`evaluateFinalizeGate` 主体零改动（既有 34 断言 pin 钉死）、v1.5 total==0 兜底**不豁免**；豁免在 runner 登记面三处（v3 perRun 登记/v2 嫌疑快照/门日志），新导出 `isNavigateOnlyPhase`（mode navigate/other 且无 14 词写动词才 true，保守向）+ 误豁免探针日志 `[record] phase #N navigate-only zero-step success`。登录回放代导航等合法零步阶段不再被 v3 假成功门整轨降级（733/741/742）。
+- 流程：SDD——worker-coder 两 pin RED→GREEN（15/15+30/30）+ reviewer 评审 **Spec ✅、0 Critical、0 Important、6 Minor 均不阻塞**（两披露偏离均裁定守住承诺：gate 主体逐字不变+三参 needle 保留；done_accept_reason 扩展正当）。
+- 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev`（带入 Cursor ops-console 3 docs commits，零冲突）→ **合并态全量 verify-all 189 pins（187+2 新登记），唯一 FAILED=characterize-layer-tree**（traj 980 phase_highlight 截图 91 元素仅 80 带 layers，落库数据态；实施者已用 stash 在 BASE 复现同红，预存非本 diff 所致）。
+- 遗留移交（评审 Minor 记档，均不阻塞）：①M1 角可选补 pin——introduce 合约 kinds 单值 `['confirm_click']` 不再被 legacy 分支识别（静态证明不可达：两 flag 写点必先落同名 token；legacy 编译器恒成对输出；persisted 走 boundary 路径），如需可补一条 pin；②M3——pin② 与既有 gate pin 同登 phase 域，`--changed` 对仅改 runner 的 diff 有盲区（继承惯例非本单元引入），后续加固可补登 ui/core；③M4——mode=other+描述无写动词的误豁免面属设计级残余，湿测期 grep `[record] phase #N navigate-only zero-step success` 作探针；④layer-tree 预存红数据态归因共享——他线触碰 traj 980 相关数据时注意。
+- 分支与生效面：`engine/ab-gate-fixes-20260922` 已推 origin，branch-only **待并入 dev**；①合并 dev 后新录制会话即效；②等控制面重启窗口（与 verify-token persisted 主路径同一窗口）。
+
 ## 2026-09-22 12:40 · Cursor — 续：执行机与日志页实现计划（仍不改产品代码）
 
 - 授权：用户评审 spec `75054337` 后回复「没问题，继续」。
