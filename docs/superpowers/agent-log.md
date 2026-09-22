@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 17:12 · Cursor — 开工：录制本步反馈实现（分支 cursor/recording-step-feedback-20260922）
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-22-recording-step-feedback.md`。
+- 工作范围：`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/agent/recorder_emitters.py`、`scripts/recorder.py`、`scripts/session_runner.py`、`scripts/controller/actions/_observe.py`、`scripts/controller/actions/_misc.py`、`scripts/controller/actions/_js_snippets.py`、`scripts/controller/actions/js_snippets/step_notice.py`、`src/models/meta-step-actions.js`、`scripts/prompts/agent-tools-common.md`、`scripts/prompts/agent-tools-form.md`、`scripts/prompts/agent-tools-table.md`、`scripts/prompts/agent-core.md`、`scripts/prompts/planner-prompt.md`、`scripts/characterization/cold/characterize-step-feedback.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`scripts/characterization/cold/characterize-error-notify.py`、`scripts/characterization/cold/characterize-xhr-log.py`、`scripts/characterization/characterize-save-section.py`、`scripts/refactor/verify-all.sh`。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/state.py` 的折叠逻辑、`docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`。不把反馈写入轨迹、阶段或交易。
+- 执行方式：主会话按任务派实现子智能体，每任务独立评审。子智能体可 commit，不 push。
+
 ## 2026-09-22 16:56 · Cursor — 开工：录制本步反馈实现计划（只写 plan）
 
 - 授权：用户对规格回复「继续」。
