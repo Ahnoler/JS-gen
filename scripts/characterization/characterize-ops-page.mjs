@@ -29,4 +29,14 @@ assert(shots.includes('/api/v2/screenshots/pending'), 'pending list');
 assert(shots.includes('/pending/upload'), 'upload all');
 assert(shots.includes("method: 'DELETE'"), 'delete');
 
+const docsApp = readFileSync('src/dashboard/api-docs/app.js', 'utf8');
+assert(!docsApp.includes('slot-monitor.js') && !docsApp.includes('pending-screenshots.js'), 'docs still imports boards');
+const catalog = readFileSync('src/dashboard/api-docs/catalog.js', 'utf8');
+assert(!catalog.includes('...GROUP_SLOT_MONITOR') && !catalog.includes('...GROUP_PENDING_SCREENSHOTS'), 'catalog still lists boards');
+const verify = readFileSync('scripts/refactor/verify-all.sh', 'utf8');
+assert(verify.includes('characterize-ops-log-cards'), 'log pin not registered');
+assert(verify.includes('characterize-ops-step-line'), 'step pin not registered');
+assert(verify.includes('characterize-ops-card-line'), 'card pin not registered');
+assert(verify.includes('characterize-ops-page'), 'page pin not registered');
+
 console.log('characterize-ops-page: OK');
