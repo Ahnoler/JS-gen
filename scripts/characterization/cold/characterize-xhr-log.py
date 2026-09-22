@@ -1,6 +1,6 @@
 """Pin the read_xhr_log action contract (KB-I5 run12 缺口①): XHR/fetch hook
-snippet, window.__xhr_log buffer, action registration in _observe.py,
-aggregator import. Fails non-zero on mismatch."""
+snippet, window.__xhr_log buffer, aggregator import. _observe no longer registers
+read_xhr_log. Fails non-zero on mismatch."""
 
 import sys
 from pathlib import Path
@@ -13,6 +13,15 @@ def needle(path, *texts):
     for t in texts:
         if t not in src:
             print("MISSING %s :: %r" % (path, t))
+            return False
+    return True
+
+
+def anti_needle(path, *texts):
+    src = (ROOT / path).read_text(encoding="utf-8")
+    for t in texts:
+        if t in src:
+            print("UNWANTED %s :: %r" % (path, t))
             return False
     return True
 
@@ -33,15 +42,6 @@ checks = [
         "urlFilter",
         "requestBody",
     )),
-    ("scripts/controller/actions/_observe.py", (
-        "read_xhr_log",
-        "JS_XHR_HOOK",
-        "JS_XHR_RECENT",
-        "add_init_script",
-        "__xhr_log_installed",
-        "historyTraced",
-        "url_filter",
-    )),
     ("scripts/controller/actions/_js_snippets.py", ("xhr_log",)),
     ("scripts/prompts/agent-tools-common.md", (
         "read_xhr_log(url_filter='NextCheck')",
@@ -56,6 +56,8 @@ def main():
     for path, texts in checks:
         if not needle(path, *texts):
             failed = True
+    if not anti_needle("scripts/controller/actions/_observe.py", "async def read_xhr_log"):
+        failed = True
     if failed:
         print("FAIL characterize-xhr-log")
         return 1

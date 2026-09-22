@@ -90,6 +90,17 @@ def main() -> int:
     assert_true("_step_feedback_xhr_cursor" in agent_notice_src, "MISSING xhr cursor store key")
     assert_true("omit_api_if_ui" in agent_notice_src, "MISSING omit_api_if_ui in scan")
 
+    observe = (ROOT / "scripts/controller/actions/_observe.py").read_text(encoding="utf-8")
+    assert_true("async def read_step_feedback" in observe, "action registered")
+    assert_true("does not scan the page" in observe, "tool description")
+    assert_true("async def read_error_notify" not in observe, "error notify gone")
+    assert_true("async def read_xhr_log" not in observe, "xhr log action gone")
+    body = observe.split("async def read_step_feedback", 1)[1].split("async def ", 1)[0]
+    assert_true("page.evaluate" not in body and "_record_action" not in body, "no page scan")
+    meta = (ROOT / "src/models/meta-step-actions.js").read_text(encoding="utf-8")
+    assert_true("'read_step_feedback'" in meta, "engineering list")
+    assert_true("'read_error_notify'" not in meta and "'read_xhr_log'" not in meta, "old names dropped")
+
     print("characterize-step-feedback: OK")
     return 0
 
