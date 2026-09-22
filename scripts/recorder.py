@@ -38,30 +38,16 @@ from .agent.recorder_emitters import (  # noqa: E402
 _ACTION_LOG = []
 
 
-def _compact_last_result(_last_result, max_chars=120):
-    """
-    将 ActionResult（单条或列表）压缩为一行 res=/err= 摘要。
-
-    避免长 JSON 刷屏，完整 tool 结果仍在模型上下文里，
-    日志侧只需关键信号与首段预览。
-
-    参数：
-        _last_result: 最后的结果对象（单条或列表）
-        max_chars (int): 每个部分的最大字符数，默认为 120
-
-    返回：
-        str: 压缩后的摘要字符串
-    """
-    results = _last_result if isinstance(_last_result, list) else ([_last_result] if _last_result else [])
-    parts = []
-    for r in results:
-        text = (getattr(r, 'extracted_content', None) or '').strip()
-        err = (getattr(r, 'error', None) or '').strip()
-        if text:
-            parts.append(f'res={text[:max_chars]}')
-        if err:
-            parts.append(f'err={err[:max_chars]}')
-    return ' | '.join(parts) if parts else 'res=None'
+def format_step_stderr_line(n_steps, done, stopped, goal, act, res, err):
+    """One physical stderr line. Fields are JSON strings so newlines and pipes stay inside."""
+    return (
+        f"[step {n_steps}] "
+        f"done={'yes' if done else 'no'} stopped={'yes' if stopped else 'no'} | "
+        f"goal={json.dumps(goal if goal is not None else '', ensure_ascii=False)} | "
+        f"act={json.dumps(act if act is not None else '', ensure_ascii=False)} | "
+        f"res={json.dumps(res if res is not None else '', ensure_ascii=False)} | "
+        f"err={json.dumps(err if err is not None else '', ensure_ascii=False)}"
+    )
 
 
 def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_data_store=None):
@@ -203,14 +189,30 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
                 _actions.append(json.dumps(active, ensure_ascii=False, default=str))
             except Exception:
                 _actions.append(str(a))
-        # 每步一行紧凑格式：步骤号 + done/stopped 状态 + goal + 动作 + 结果摘要
-        # （goal/actions/res 均截断防刷屏；完整 tool 结果在模型上下文内）
+        _results = _last_result if isinstance(_last_result, list) else ([_last_result] if _last_result else [])
+        _res_parts = []
+        _err_parts = []
+        for _r in _results:
+            _text = (getattr(_r, 'extracted_content', None) or '').strip()
+            _err = (getattr(_r, 'error', None) or '').strip()
+            if _text:
+                _res_parts.append(_text)
+            if _err:
+                _err_parts.append(_err)
+        _res_text = '\n'.join(_res_parts)
+        _err_text = '\n'.join(_err_parts)
+        _act_text = ', '.join(_actions) if _actions else ''
         sys.stderr.write(
-            f"[step {agent.state.n_steps}] "
-            f"done={'yes' if _done else 'no'} stopped={'yes' if _stopped else 'no'} | "
-            f"goal={(_next_goal or '-')[:200]} | "
-            f"act={(', '.join(_actions))[:500] if _actions else '-'} | "
-            f"{_compact_last_result(_last_result)}\n"
+            format_step_stderr_line(
+                agent.state.n_steps,
+                _done,
+                _stopped,
+                _next_goal or '',
+                _act_text,
+                _res_text,
+                _err_text,
+            )
+            + '\n'
         )
         sys.stderr.flush()
         # Empty-act cue is internal steering only — never abort on_step_end / agent.run
