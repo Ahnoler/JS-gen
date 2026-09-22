@@ -90,3 +90,24 @@ JS_SCAN_STEP_SURFACE = r'''() => {
   }
   return { forms, overlays };
 }'''
+
+JS_TAKE_API_ERROR_TEXTS = r'''(cursor) => {
+  const log = Array.isArray(window.__xhr_log) ? window.__xhr_log : [];
+  const start = Math.max(0, Number(cursor) || 0);
+  const texts = [];
+  const clip = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 200);
+  for (let i = start; i < log.length; i++) {
+    const rec = log[i] || {};
+    const status = rec.status;
+    const httpFail = typeof status === 'number' && (status < 200 || status >= 400);
+    let payload = null;
+    try { payload = JSON.parse(rec.responseBody || ''); } catch (e) { payload = null; }
+    if (!payload || typeof payload !== 'object') continue;
+    const code = payload.code;
+    const bizFail = code != null && String(code) !== '0' && String(code) !== '200' && code !== 0 && code !== 200;
+    if (!httpFail && !bizFail) continue;
+    const text = clip(payload.description || payload.message || payload.msg || payload.error);
+    if (text) texts.push(text);
+  }
+  return { len: log.length, texts };
+}'''

@@ -67,6 +67,29 @@ def main() -> int:
     assert_true(extract_api_error_text('{"code":200,"description":"操作成功"}', 200) == "", "success ignored")
     assert_true(extract_api_error_text("not-json", 500) == "", "no sentence")
     assert_true("http" not in extract_api_error_text('{"code":100,"description":"证件重复","url":"/x"}', 400), "no url")
+
+    step_notice_js = (
+        ROOT / "scripts/controller/actions/js_snippets/step_notice.py"
+    ).read_text(encoding="utf-8")
+    assert_true("JS_TAKE_API_ERROR_TEXTS" in step_notice_js, "MISSING JS_TAKE_API_ERROR_TEXTS")
+    assert_true("description" in step_notice_js, "MISSING description in api snippet")
+    assert_true(
+        "return { len: log.length, texts }" in step_notice_js,
+        "MISSING api error return shape",
+    )
+    xhr_snip_start = step_notice_js.find("JS_TAKE_API_ERROR_TEXTS")
+    xhr_snip_end = step_notice_js.find("'''", xhr_snip_start + 1)
+    xhr_snip = step_notice_js[xhr_snip_start:xhr_snip_end] if xhr_snip_start >= 0 else ""
+    assert_true("responseBody:" not in xhr_snip, "responseBody must not be returned field")
+
+    runner_src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
+    assert_true("JS_XHR_HOOK" in runner_src, "MISSING JS_XHR_HOOK in session_runner")
+    assert_true("add_init_script" in runner_src, "MISSING add_init_script for xhr hook")
+
+    agent_notice_src = (ROOT / "scripts/agent/step_notice.py").read_text(encoding="utf-8")
+    assert_true("_step_feedback_xhr_cursor" in agent_notice_src, "MISSING xhr cursor store key")
+    assert_true("omit_api_if_ui" in agent_notice_src, "MISSING omit_api_if_ui in scan")
+
     print("characterize-step-feedback: OK")
     return 0
 

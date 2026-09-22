@@ -249,6 +249,21 @@ async def scan_and_emit_step_notices(
             "text": row.get("text", ""),
         })
 
+    try:
+        from scripts.controller.actions._js_snippets import JS_TAKE_API_ERROR_TEXTS
+        xhr_cursor = int(business_data_store.get("_step_feedback_xhr_cursor") or 0)
+        api_raw = await page.evaluate(JS_TAKE_API_ERROR_TEXTS, xhr_cursor)
+        api_data = _as_dict(api_raw)
+        if int(api_data.get("len") or 0) >= xhr_cursor:
+            business_data_store["_step_feedback_xhr_cursor"] = int(api_data.get("len") or 0)
+        for text in api_data.get("texts") or []:
+            clipped = clip_text(text)
+            if clipped:
+                feedback_items.append({"kind": "api", "text": clipped})
+    except Exception as e:
+        sys.stderr.write(f"[recorder] step-feedback api scan failed: {e}\n")
+        sys.stderr.flush()
+
     feedback_items = omit_api_if_ui(feedback_items)
     if not feedback_items:
         return []
