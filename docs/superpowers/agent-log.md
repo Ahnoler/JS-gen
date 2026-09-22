@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 17:32 · ZCode 引擎线 — 开工变更：用户带回挡板定性，扩围改 KB 卡 + 更新两报告
+
+- 授权：用户转达信贷侧答复——合同账户接口 `searchEnqrCoreAccinfByCustNumb` 当前为**挡板（mock）**，现场正式环境调行方接口按客户号查行内可用账户。反馈方向定为「mock 随机轮换实现方式对自动化不友好」。
+- 工作范围（在 16:27 声明基础上扩围）：`data/kb/flows/duigong_contract_sign.json`（仅「合同账户弹窗随机轮换」规则追加根因一句）；两报告（feedback/summary）按新事实改写相应段；agent-log 本条。
+- 禁入区不变：其余产品代码、`data/kb/**` 其余文件、他线在途面。
+- 执行方式：主会话改文案；卡面改字后复跑召回两侧 characterization + verify-all（金样例/评测门禁防绊）。
 ## 2026-09-22 17:12 · Cursor — 开工：录制本步反馈实现（分支 cursor/recording-step-feedback-20260922）
 
 - 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-22-recording-step-feedback.md`。
