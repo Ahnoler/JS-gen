@@ -96,6 +96,8 @@ characterize-ai-recording-boundaries|node scripts/characterization/cold/characte
 characterize-phase-contract|node scripts/characterization/characterize-phase-contract.mjs
 characterize-persisted-phase-contract|"$PY" scripts/characterization/characterize-persisted-phase-contract.py
 characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
+characterize-kind-family-alias|"$PY" scripts/characterization/characterize-kind-family-alias.py
+characterize-navigate-zero-step-exemption|node scripts/characterization/cold/characterize-navigate-zero-step-exemption.mjs
 '
 PINS_FILL='
 characterize-form-rules|"$PY" scripts/characterization/characterize-form-rules.py

@@ -18,6 +18,26 @@ from .intent_contract import (
     phase_intent_active,
 )
 
+# 证据等价类（A/B 移交 744：校验时同族互认——按证据等价类判，不按名判）。
+# 成员与 boundary_gates.record_evidence 的族镜像 / observed_kinds 展开清单
+# 逐字一致（只读复用该归一先例，不改 boundary_gates.py）；只归组既有 kind，
+# 不新增 kind 值（名字与 PHASE_CONTRACT_KINDS 冻结清单一致）。其余 kind
+# （query_clicked / page_opened / nav_next_clicked 等）各自单元素族，不互认。
+_SAVE_FAMILY = ('toast_ok', 'url_change', 'saved_navigation')
+_INTRODUCE_FAMILY = ('picker_closed', 'dialog_confirmed', 'introduced_backfilled')
+
+def _same_family(kind_a: Any, kind_b: Any) -> bool:
+    """True when two kinds fall in the same evidence-equivalence class.
+
+    保存族 / 引入族成员按序互认；未知 kind 只与自身相等（精确匹配不变）。
+    """
+    if kind_a == kind_b:
+        return True
+    for family in (_SAVE_FAMILY, _INTRODUCE_FAMILY):
+        if kind_a in family and kind_b in family:
+            return True
+    return False
+
 def contract_allows_form_assistant(business_data_store: dict | None) -> bool:
     """Whether the form assistant may run under the current phase intent.
 
@@ -256,15 +276,15 @@ def has_contract_success(business_data_store: dict | None) -> bool:
     kinds = (c.get('success') or {}).get('kinds') or []
     if not kinds:
         return True
-    if business_data_store.get('_last_save_ok') and ('toast_ok' in kinds or 'url_change' in kinds):
+    if business_data_store.get('_last_save_ok') and any(k in kinds for k in _SAVE_FAMILY):
         return True
-    if business_data_store.get('_last_introduce_ok') and (
-        'confirm_click' in kinds or 'picker_closed' in kinds
+    if business_data_store.get('_last_introduce_ok') and any(
+        k in kinds for k in _INTRODUCE_FAMILY
     ):
         return True
     tokens = business_data_store.get('_success_tokens') or []
     for tok in tokens:
-        if isinstance(tok, dict) and tok.get('kind') in kinds:
+        if isinstance(tok, dict) and any(_same_family(tok.get('kind'), k) for k in kinds):
             return True
     return False
 
@@ -284,9 +304,9 @@ def done_accept_reason(
     kinds = ((contract or {}).get('success') or {}).get('kinds') or []
     if not isinstance(kinds, (list, tuple)):
         kinds = []
-    if save_ok and {'toast_ok', 'url_change'} & set(kinds):
+    if save_ok and set(_SAVE_FAMILY) & set(kinds):
         return 'navigation' if navigated_ok else 'save-ok'
-    if introduce_ok and {'confirm_click', 'picker_closed'} & set(kinds):
+    if introduce_ok and set(_INTRODUCE_FAMILY) & set(kinds):
         return 'introduce'
     if introduce_ok:
         return 'introduce'
