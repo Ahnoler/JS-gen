@@ -101,6 +101,12 @@ def main() -> int:
     assert_true("'read_step_feedback'" in meta, "engineering list")
     assert_true("'read_error_notify'" not in meta and "'read_xhr_log'" not in meta, "old names dropped")
 
+    service_src = (ROOT / "scripts/controller/service.py").read_text(encoding="utf-8")
+    assert_true(
+        "_register_observe_actions(controller, browser_context, business_data_store)" in service_src,
+        "observe actions must receive business_data_store",
+    )
+
     print("characterize-step-feedback: OK")
     return 0
 
