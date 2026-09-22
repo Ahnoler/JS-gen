@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 12:22 · Cursor — 开工：执行机与日志页设计稿（/ops MVP，只写 spec）
+
+- 授权：用户在 brainstorming 里逐段确认（布局 C 两标签、独立静态页、步骤卡+弹窗全文、阶段任务与注入卡、recorder 三处截断直接去掉、验收五条）。
+- 工作范围：本单元只新增 `docs/superpowers/specs/2026-09-22-ops-console-design.md` 与本开工条目。**不改** `scripts/recorder.py`、`scripts/agent/service.py`、`src/dashboard/**`。
+- 禁入区：引擎线 12:16 开工声明的文件（`intent_gates.py`、`phase-done-evidence-gate.js`、`trajectory-recording-runner.js` 及该条禁入区）；`data/kb/**`；主链跑车数据。`recorder.py` / `service.py` 留到设计稿评审通过后的实现单元再声明。
+- 执行方式：主会话写设计稿并自检；用户评审 spec 之前不写实现计划、不改页面代码。
+
 ## 2026-09-22 12:16 · ZCode 引擎线 — 开工：A/B 遗留两候选修复（①质量门 kind 别名互认 Python 侧 ②零步 navigate 豁免 Node 侧；SDD 两笔同批）
 
 - 授权：用户点单（「可以，我明白了，请开始吧」——方案经讨论确认为「校验时同族互认」，非加词表值/非统一凭证）。来源=KB 价值 A/B 线移交（报告 §6/§8：744 门伪 + 733/741/742 零步降级，归引擎线按 P1 排期）。
