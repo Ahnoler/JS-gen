@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 11:35 · ZCode 系统线 — 代提交：同事的 AGENTS.md / CLAUDE.md 未提交修改同步入库（用户指令「同步一下」）
+
+- 完成：同事在主检出（uara_V2.0_dev）的未提交改动今日 10:07 落盘——`AGENTS.md` 全文中文化（头部新增 Cursor 适用）+ 实质新增**「适用范围」节**（研发任务守全套开工/收工流程；**联调测试不改 tracked 文件免写 agent-log 条目**，结论走会话/他线收工「联测回执」交代；边界=联调中要改代码立即切研发任务先补开工声明）+ 开场三件事降为「建议做」；`CLAUDE.md` 同步中文化，CHANGELOG 表述对齐 09-19 例外。版本双线条款实质未变。
+- 代提交说明：本次 commit 系按用户指令将同事工作区改动入库（非 ZCode 线代码改动），纯文档/约定无代码影响，不触发 verify-all。已在 commit message 注明代提交。
+- 排查记录：`.gitignore`/`README.md` 本身**无**改动（工作区干净、远端各分支亦无相关提交）；用户口述「忽略规则」未找到对应落点，如同事的忽略规则改动在别处（未保存/他仓），待指认后另行同步。
+- 本条与代码提交一并 push。
+
 ## 2026-09-22 11:20 · ZCode 引擎线 — 开工：verify-phase-token 第二步主收口（持久化合约消费点纯文本降级；SDD）
 
 - 授权：挂账清单推进（用户「继续」）；设计稿 §6 已补刀 2 后落点重推导（`docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md` §6，本 commit 一并入库）。核心裁定：方案 D 刀 2（`79b4b8ba`）后合约主路径=持久化快照（分析 LLM 直产 mode/submitRequired），①原判定式条件④（mode 侧证）对持久化误标形态失效、②submit.required 误标危害升级（recovery 强推 click_save+8 步下限+四族消费方）、③判定文本仍可得 → 主收口落点从 `apply_phase_contract` 收窄为 **persisted 消费点**：纯文本三条件（冻结词表 v1 条件①②③，弃条件④）降级 `submit.required/kinds/boundary.success_when`；fallback 两路径不动（第一步门侧豁免 c55cc849 已兜底）。
