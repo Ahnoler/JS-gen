@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 12:45 · Cursor — 开工：执行机与日志页实现（分支 cursor/ops-console-20260922）
+
+- 授权：用户选择按计划分任务实现。计划 `docs/superpowers/plans/2026-09-22-ops-console.md`（`285f8a8f`）。
+- 场地：`D:\dev\JS-gen\.worktrees\ops-console`，分支 `cursor/ops-console-20260922`（自 `uara_V2.0_dev` `5dcc8fd1`）。
+- 工作范围：`src/dashboard/ops-console/**`、`server.mjs`（仅 `GET /ops`）、`api-docs.html`（侧栏链接）、`src/dashboard/api-docs/app.js`、`src/dashboard/api-docs/catalog.js`、删除 `slot-monitor.js` 与 `pending-screenshots.js`、`scripts/recorder.py`（仅 `[step]` 行）、`scripts/agent/stderr_cards.py`、`scripts/agent/service.py`（阶段标题与 `[card]`）、`scripts/controller/actions/_scenario_describer.py`（追加 `[card]`）、四个 characterization、`scripts/refactor/verify-all.sh`（登记 pin）。
+- 禁入区：引擎线 `intent_gates.py`、`phase-done-evidence-gate.js`、`trajectory-recording-runner.js`、`boundary_*`、`_replay.py`、`data/kb/**`。不改 `_ACTION_LOG` 切片、`flow_summary_text` 的 800 字、`_PREAMBLE_TOTAL_MAX`、`agent_utils.py` 的 `next_goal[:200]`、`api-docs.css`。
+
 ## 2026-09-22 12:40 · Cursor — 续：执行机与日志页实现计划（仍不改产品代码）
 
 - 授权：用户评审 spec `75054337` 后回复「没问题，继续」。
