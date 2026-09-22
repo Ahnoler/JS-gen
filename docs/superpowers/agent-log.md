@@ -3,6 +3,14 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 11:20 · ZCode 引擎线 — 开工：verify-phase-token 第二步主收口（持久化合约消费点纯文本降级；SDD）
+
+- 授权：挂账清单推进（用户「继续」）；设计稿 §6 已补刀 2 后落点重推导（`docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md` §6，本 commit 一并入库）。核心裁定：方案 D 刀 2（`79b4b8ba`）后合约主路径=持久化快照（分析 LLM 直产 mode/submitRequired），①原判定式条件④（mode 侧证）对持久化误标形态失效、②submit.required 误标危害升级（recovery 强推 click_save+8 步下限+四族消费方）、③判定文本仍可得 → 主收口落点从 `apply_phase_contract` 收窄为 **persisted 消费点**：纯文本三条件（冻结词表 v1 条件①②③，弃条件④）降级 `submit.required/kinds/boundary.success_when`；fallback 两路径不动（第一步门侧豁免 c55cc849 已兜底）。
+- 工作范围：`scripts/controller/actions/phase/phase_contract_snapshot.py`（新增纯函数 `downgrade_contract_for_verification`，不碰 `normalize_phase_contract`——Cursor pin 零扰动）、`scripts/agent/service.py`（persisted 分支成功后 3-5 行接线+stderr 留痕 `phase_contract=verify_downgraded`）、新 pin `scripts/characterization/characterize-verify-token-downgrade.py`（RED 先行）、`scripts/refactor/verify-all.sh`（仅注册 1 行）；agent-log/todo 条目。
+- 分支与场地：`engine/verify-token-downgrade-20260922` 自 `origin/uara_V2.0_dev` 新切，branch-only 待并入 dev；场地=D:\dev\JS-gen-engine 主场（worktree 在 dev tip 基上的 meta-step-filter 分支，切走后运行态=meta-step-filter 磁盘，两分支仅差 pin 行、运行面零差异）。
+- 禁入区：`normalize_phase_contract`/Cursor 新 pin `characterize-persisted-phase-contract.py`（其断言面不得放宽）；`src/**`、`scripts/prompts/**`、`data/kb/**` 只读；`fill_engine.py`/`click_action_engine.py`/`select_engine.py` 他线热区。主链线 R6 在途（其范围=真机跑车与轨迹数据，与上述文件零交集）。
+- 执行方式：SDD——worker-coder RED→GREEN + reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；合并后验收=合并 dev 重跑全量 verify-all。
+
 ## 2026-09-22 11:05 · ZCode 引擎线 — 回执存档：停止链路联测 #978 三腿+三对照全 PASS，E1-E4 根缺陷真机闭环（交付线=引擎树sub 会话，本会话代存回执）
 
 - 合约线 #978 联测（证据 `tmp/contract-wet12-20260921/`）确认 8e0dd470（E1-E4 Python 侧）+ 系统线 Node 12 项双侧生效：长动作步回放成立、停止 API 双侧 `{stopped:true, batchWasRunning:true, cancelStepDelivered:true}`、步边界中断双证（WS 补发终态帧 `aborted:true` 不悬挂 running + `replay:finished {aborted:true, reason:'user_stop'}`，Python 侧零后续步下发）、干净批次 payload 形状不变（④ 对照成立）。R2 实证协作式封顶=最坏单步时长；E1③ 实证 R2 残留 cancel 标志被 R3 首步清零（event_dispatch 入口清残留逻辑真机验证）。
