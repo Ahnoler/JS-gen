@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 16:53 · Cursor — 开工：录制本步反馈规格（只写 spec）
+
+- 授权：用户逐段确认后，放弃把失败原因写入阶段 `done_logs`、交易或步骤，改回会话内反馈这一版。
+- 工作范围：新增 `docs/superpowers/specs/2026-09-22-recording-step-feedback-design.md`；本开工条目。
+- 禁入区：`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`；不改 `docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`。不实现采集、不改录制代码。
+- 执行方式：主会话写规格并自检。用户评审 spec 之前不写实现计划、不改产品代码。
+
 ## 2026-09-22 17:40 · ZCode 引擎线 — 收工：主链成果介绍 + 合同账户弹窗反馈材料交付
 
 - 回链 16:27 开工（b15ac51c）。GLM-5 已由用户自行切回（本单元零配置改动）；T3.1 heal live 用户明示移出本线不再跟进。
