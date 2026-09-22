@@ -1,0 +1,66 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f4f6f8;
+  color: #1a1a1a;
+}
+
+.ops-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.ops-header h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.ops-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #d0d5dd;
+}
+
+.ops-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  color: #4a5568;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.ops-tab:hover {
+  color: #1a1a1a;
+}
+
+.ops-tab.is-active,
+.ops-tab[aria-selected='true'] {
+  color: #1565c0;
+  border-bottom-color: #1565c0;
+  font-weight: 600;
+}
+
+.ops-panel {
+  min-height: 12rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.ops-panel[hidden] {
+  display: none;
+}
