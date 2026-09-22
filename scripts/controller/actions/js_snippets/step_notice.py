@@ -91,13 +91,17 @@ JS_SCAN_STEP_SURFACE = r'''() => {
   return { forms, overlays };
 }'''
 
-JS_TAKE_API_ERROR_TEXTS = r'''(cursor) => {
+JS_TAKE_API_ERROR_TEXTS = r'''(lastSeq) => {
   const log = Array.isArray(window.__xhr_log) ? window.__xhr_log : [];
-  const start = Math.max(0, Number(cursor) || 0);
+  const since = Math.max(0, Number(lastSeq) || 0);
   const texts = [];
   const clip = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 200);
-  for (let i = start; i < log.length; i++) {
+  let newestSeq = since;
+  for (let i = 0; i < log.length; i++) {
     const rec = log[i] || {};
+    const seq = Number(rec.seq) || 0;
+    if (seq <= since) continue;
+    if (seq > newestSeq) newestSeq = seq;
     const status = rec.status;
     const httpFail = typeof status === 'number' && (status < 200 || status >= 400);
     let payload = null;
@@ -109,5 +113,5 @@ JS_TAKE_API_ERROR_TEXTS = r'''(cursor) => {
     const text = clip(payload.description || payload.message || payload.msg || payload.error);
     if (text) texts.push(text);
   }
-  return { len: log.length, texts };
+  return { seq: newestSeq, len: log.length, texts };
 }'''

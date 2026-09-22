@@ -74,13 +74,30 @@ def main() -> int:
     assert_true("JS_TAKE_API_ERROR_TEXTS" in step_notice_js, "MISSING JS_TAKE_API_ERROR_TEXTS")
     assert_true("description" in step_notice_js, "MISSING description in api snippet")
     assert_true(
-        "return { len: log.length, texts }" in step_notice_js,
+        "return { seq: newestSeq, len: log.length, texts }" in step_notice_js,
         "MISSING api error return shape",
     )
-    xhr_snip_start = step_notice_js.find("JS_TAKE_API_ERROR_TEXTS")
-    xhr_snip_end = step_notice_js.find("'''", xhr_snip_start + 1)
-    xhr_snip = step_notice_js[xhr_snip_start:xhr_snip_end] if xhr_snip_start >= 0 else ""
+    xhr_hdr = "JS_TAKE_API_ERROR_TEXTS"
+    xhr_snip_start = step_notice_js.find(xhr_hdr)
+    q_open = step_notice_js.find("'''", xhr_snip_start + len(xhr_hdr)) if xhr_snip_start >= 0 else -1
+    q_close = step_notice_js.find("'''", q_open + 3) if q_open >= 0 else -1
+    xhr_snip = step_notice_js[q_open + 3 : q_close] if q_open >= 0 and q_close > q_open else ""
+    assert_true("rec.seq" in xhr_snip, "MISSING seq filter in api snippet")
     assert_true("responseBody:" not in xhr_snip, "responseBody must not be returned field")
+
+    from scripts.agent.step_notice import rewind_xhr_cursor_if_shrunk
+
+    xhr_store = {"_step_feedback_xhr_cursor": 55, "_step_feedback_xhr_log_len": 20}
+    assert_true(
+        rewind_xhr_cursor_if_shrunk(xhr_store, 8) is True,
+        "xhr log shrink → rewind seq",
+    )
+    assert_true(xhr_store.get("_step_feedback_xhr_cursor") == 0, "xhr seq reset")
+    xhr_store2 = {"_step_feedback_xhr_cursor": 10, "_step_feedback_xhr_log_len": 15}
+    assert_true(
+        rewind_xhr_cursor_if_shrunk(xhr_store2, 20) is False,
+        "xhr log grew → no rewind",
+    )
 
     runner_src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
     assert_true("JS_XHR_HOOK" in runner_src, "MISSING JS_XHR_HOOK in session_runner")
@@ -111,7 +128,7 @@ def main() -> int:
     start = misc.find("async def close_notification")
     end = misc.find("async def close_dialog")
     body = misc[start:end]
-    assert_true("ok-closed" in body, "closed token")
+    assert_true("return _ok('ok-closed')" in body, "closed token")
     assert_true("no-notification" in body, "empty token")
     assert_true("ok-notification" not in body, "text return removed")
     assert_true("notif_text" not in body, "text not read for return")

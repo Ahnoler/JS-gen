@@ -82,6 +82,20 @@ def rewind_notify_cursor_if_shrunk(business_data_store: dict | None, log_len: in
     return True
 
 
+def rewind_xhr_cursor_if_shrunk(business_data_store: dict | None, log_len: int) -> bool:
+    """Reset xhr seq cursor when ``__xhr_log`` shrank (ring buffer full or navigation).
+
+    Length-based cursors stall at MAX=20; seq tracks every push even when the buffer shifts.
+    """
+    if business_data_store is None:
+        return False
+    prev_len = int(business_data_store.get("_step_feedback_xhr_log_len") or 0)
+    if int(log_len or 0) >= prev_len:
+        return False
+    business_data_store["_step_feedback_xhr_cursor"] = 0
+    return True
+
+
 def format_notice_cue(items: list[dict]) -> str:
     """HumanMessage body for new notices."""
     if not items:
@@ -160,17 +174,20 @@ async def scan_and_emit_step_notices(
         pass
 
     cursor = int(business_data_store.get("_step_notice_log_cursor") or 0)
+    items: list = []
+    log_len = 0
     try:
         from scripts.controller.actions._js_snippets import JS_SCAN_STEP_NOTICES
         raw = await page.evaluate(JS_SCAN_STEP_NOTICES, cursor)
+        data = _as_dict(raw)
+        items = data.get("items") if isinstance(data.get("items"), list) else []
+        log_len = int(data.get("notify_log_len") or 0)
     except Exception as e:
         sys.stderr.write(f"[recorder] step-notice scan failed: {e}\n")
         sys.stderr.flush()
-        return []
+        items = []
+        log_len = 0
 
-    data = _as_dict(raw)
-    items = data.get("items") if isinstance(data.get("items"), list) else []
-    log_len = int(data.get("notify_log_len") or 0)
     if rewind_notify_cursor_if_shrunk(business_data_store, log_len):
         business_data_store.pop("_step_feedback_form_seen", None)
         business_data_store.pop("_step_feedback_overlay_seen", None)
@@ -184,7 +201,8 @@ async def scan_and_emit_step_notices(
         except Exception as e:
             sys.stderr.write(f"[recorder] step-notice rescan after rewind failed: {e}\n")
             sys.stderr.flush()
-            return []
+            items = []
+            log_len = 0
     if log_len >= cursor:
         business_data_store["_step_notice_log_cursor"] = log_len
 
@@ -251,11 +269,17 @@ async def scan_and_emit_step_notices(
 
     try:
         from scripts.controller.actions._js_snippets import JS_TAKE_API_ERROR_TEXTS
-        xhr_cursor = int(business_data_store.get("_step_feedback_xhr_cursor") or 0)
-        api_raw = await page.evaluate(JS_TAKE_API_ERROR_TEXTS, xhr_cursor)
+        xhr_seq = int(business_data_store.get("_step_feedback_xhr_cursor") or 0)
+        api_raw = await page.evaluate(JS_TAKE_API_ERROR_TEXTS, xhr_seq)
         api_data = _as_dict(api_raw)
-        if int(api_data.get("len") or 0) >= xhr_cursor:
-            business_data_store["_step_feedback_xhr_cursor"] = int(api_data.get("len") or 0)
+        xhr_log_len = int(api_data.get("len") or 0)
+        if rewind_xhr_cursor_if_shrunk(business_data_store, xhr_log_len):
+            xhr_seq = 0
+            api_raw = await page.evaluate(JS_TAKE_API_ERROR_TEXTS, 0)
+            api_data = _as_dict(api_raw)
+            xhr_log_len = int(api_data.get("len") or 0)
+        business_data_store["_step_feedback_xhr_log_len"] = xhr_log_len
+        business_data_store["_step_feedback_xhr_cursor"] = int(api_data.get("seq") or xhr_seq)
         for text in api_data.get("texts") or []:
             clipped = clip_text(text)
             if clipped:
