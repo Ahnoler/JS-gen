@@ -3,6 +3,15 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 11:15 · ZCode 引擎线 — 收工：verify-phase-token 第二步主收口交付（持久化合约消费点纯文本降级；3d9c2a7f 已推送，branch-only 待并入 dev）
+
+- 完成（`3d9c2a7f`，5 文件 +344/−15）：**刀 2 后主收口落地**——`phase_contract_snapshot.py` 新增 `downgrade_contract_for_verification`（复用 verification_gate 冻结词表 v1 单源 import，纯文本三条件全中才降级 `submit.required/kinds/boundary.success_when`，boundary role 不动，`source='persisted_verify_downgraded'` 可辨识；FP 零容忍）；`service.py` persisted 分支 8 行接线（判定文本=`phase_core`），stderr 留痕 `phase_contract=verify_downgraded`；fallback 两路径零改动（第一步门侧豁免 c55cc849 继续兜底）。设计依据=设计稿 §6（随开工条目 4245a456 入库）：刀 2 后分析 LLM 直产合约，误标纯核验阶段→收尾误杀+recovery 强推 click_save+8 步下限，而第一步豁免对该形态失效（条件④ mode 否决恰含被误标值）。
+- 流程：SDD——worker-coder RED（11/18 失败）→GREEN（35/35）+ reviewer 任务评审 **Spec ✅、0 Critical、1 Important（I1 计数证据）+4 Minor**。I1 主会话实跑裁决：全量 `pins=186` 与精确算术吻合（222 注册−36 双登=186 唯一；改前 185——**meta-step-filter f2b5cf77 branch-only 未并入 dev 故不在基线，我开工 brief 里"基线 186"注释系我写错**，实现者报告的 186=185+1 正确）；M1（接线 10 行超 2 行）/M3（no-op 重赋值，对未来返回新对象稳健）/M4（报告数字小误差）记档无害；**M2 记台账下次触碰顺手修**：降级留痕行 `mode={mode}` 用的是 `_task_mode`（form_modify）与上一行 persisted 日志的合约 mode（modify）字段名撞车，排查时可读性差。
+- 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev`（带入主链线 R6 日志，c8c06fbd 零冲突）→ **全量 verify-all 186 唯一 pin + statics ALL GREEN 零 FAILED**；新 pin 35/35、gate pin 40/40（helper 纯重构行为逐字不变）、Cursor persisted pin+Node phase-contract 全绿；改动面=恰 5 文件。
+- 分支与生效面：`engine/verify-token-downgrade-20260922` 已推 origin，branch-only **待并入 dev**（与 meta-step-filter f2b5cf77 同批待批）；纯 Python+pin 侧，合并 dev 后新录制会话磁盘加载即效、无需重启。**湿测观察点**：#973 型形态（分析侧误标纯核验阶段）预期 stderr 出现 `phase_contract=verify_downgraded` 且终局不再 quality_failed/missing_success_token；合约线湿测窗口顺手 grep 即可，零新增流程。
+- 遗留移交：无新移交。历史盘点（设计稿 §4.1）维持挂账：判定式经刀 2 落点修订（§6）后待湿测零 FP 证据再定稿盘点。
+- 台账：`.superpowers/sdd/verify-token-downgrade-20260922/progress.md`；注：不维护 CHANGELOG。
+
 ## 2026-09-22 11:35 · ZCode 系统线 — 代提交：同事的 AGENTS.md / CLAUDE.md 未提交修改同步入库（用户指令「同步一下」）
 
 - 完成：同事在主检出（uara_V2.0_dev）的未提交改动今日 10:07 落盘——`AGENTS.md` 全文中文化（头部新增 Cursor 适用）+ 实质新增**「适用范围」节**（研发任务守全套开工/收工流程；**联调测试不改 tracked 文件免写 agent-log 条目**，结论走会话/他线收工「联测回执」交代；边界=联调中要改代码立即切研发任务先补开工声明）+ 开场三件事降为「建议做」；`CLAUDE.md` 同步中文化，CHANGELOG 表述对齐 09-19 例外。版本双线条款实质未变。
