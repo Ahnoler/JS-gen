@@ -3,6 +3,15 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 12:16 · ZCode 引擎线 — 开工：A/B 遗留两候选修复（①质量门 kind 别名互认 Python 侧 ②零步 navigate 豁免 Node 侧；SDD 两笔同批）
+
+- 授权：用户点单（「可以，我明白了，请开始吧」——方案经讨论确认为「校验时同族互认」，非加词表值/非统一凭证）。来源=KB 价值 A/B 线移交（报告 §6/§8：744 门伪 + 733/741/742 零步降级，归引擎线按 P1 排期）。
+- **①744 修**：`has_contract_success`（`scripts/controller/actions/phase/intent_gates.py:235`）legacy 路径精确匹配缺同族归一——录到 `saved_navigation` 而合约要求 `url_change/toast_ok` 被误杀（744 实证；刀 2 后分析 LLM 直产 successWhen 同族误配面更宽）。修法=证据族等价类互认（保存族 saved_navigation↔toast_ok↔url_change；引入族 picker_closed↔dialog_confirmed↔introduced_backfilled），对齐 boundary 路径 `observed_kinds` 既有归一（`boundary_gates.py:47-52`）；词表/`PHASE_CONTRACT_KINDS` 冻结清单零改动，匹配按类判不按名判，假成功防线不松（无族内证据照样拦）。
+- **②零步修**：`evaluatePhaseOutcome`/`evaluateFinalizeGate`（`src/services/trajectory/phase-done-evidence-gate.js`）对「登录回放代导航」合法零步形态误降级（733/741/742 实证）。修法=零步判定加 navigate-only 豁免（阶段无写动作线索且合约/文本判 navigate → 零步不登记嫌疑）；**v3 假成功防线不动**（非 navigate 阶段零步仍降级；self-reported success 语义不变）。
+- 工作范围：①`intent_gates.py`（互认逻辑+新 pin）②`phase-done-evidence-gate.js`（豁免参数+判定）+`trajectory-recording-runner.js`（接线传参）+新 pin（2 个，RED 先行）；verify-all 注册；agent-log/todo。**禁入区**：`boundary_gates.py`/`boundary_contract.py`/`phase_contract_snapshot.py`（昨日刚交付面，只读复用）；`_replay.py`/`event_dispatch.py`/`session_runner.py`/`recorder.py`/`service.py`（他会话 E1-E4 与我线主收口刚落地，避连带）；`scripts/prompts/**`、`data/kb/**` 只读。
+- 分支与场地：`engine/ab-gate-fixes-20260922` 自 `origin/uara_V2.0_dev`（=ee285043）新切，branch-only 待并入 dev；场地=D:\dev\JS-gen-engine。①Python 新会话即效；②Node 侧**需控制面重启窗口才生效**（本单元不改运行态）。
+- 执行方式：SDD——worker-coder（RED→GREEN）+ reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；合并后验收=合并 dev 重跑全量 verify-all。
+
 ## 2026-09-22 11:29 · ZCode 引擎线 — 合并回执：今日两笔交付并入 uara_V2.0_dev（用户批「可以」；meta-step-filter f6f2c0aa + verify-token 主收口 516ca27b，零冲突）——合并态全量 187 pin ALL GREEN
 
 - 合并：`engine/meta-step-filter-pin-20260922`（f2b5cf77）→ **f6f2c0aa**、`engine/verify-token-downgrade-20260922`（3d9c2a7f）→ **516ca27b**，均 `--no-ff` 零冲突；已推 origin（8aed468c..516ca27b）。两分支至此闭环，「branch-only 待并入 dev」全部清零。
