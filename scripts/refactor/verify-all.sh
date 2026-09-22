@@ -284,6 +284,7 @@ characterize-recording-coach-assert|node scripts/characterization/cold/character
 characterize-recording-coach-operator|node scripts/characterization/cold/characterize-recording-coach-operator.mjs
 characterize-recording-coach-skill-pack|node scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs
 characterize-recording-coach-tier-a-score|node scripts/characterization/cold/characterize-recording-coach-tier-a-score.mjs
+characterize-meta-step-filter|node scripts/characterization/cold/characterize-meta-step-filter.mjs
 '
 # eslint/ruff run in every invocation (cheap, catches merge-orphan defects).
 PINS_STATIC='
