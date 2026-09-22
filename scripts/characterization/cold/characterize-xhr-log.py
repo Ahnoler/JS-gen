@@ -43,11 +43,6 @@ checks = [
         "requestBody",
     )),
     ("scripts/controller/actions/_js_snippets.py", ("xhr_log",)),
-    ("scripts/prompts/agent-tools-common.md", (
-        "read_xhr_log(url_filter='NextCheck')",
-        "historyTraced",
-        "saveOrUpdate",
-    )),
 ]
 
 

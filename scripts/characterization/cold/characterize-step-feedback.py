@@ -116,6 +116,22 @@ def main() -> int:
     assert_true("ok-notification" not in body, "text return removed")
     assert_true("notif_text" not in body, "text not read for return")
 
+    common = (ROOT / "scripts/prompts/agent-tools-common.md").read_text(encoding="utf-8")
+    assert_true("read_error_notify" not in common, "common dropped error notify")
+    assert_true("read_xhr_log" not in common, "common dropped xhr log")
+    assert_true("[step-feedback]" in common and "read_step_feedback" in common, "common points at session feedback")
+    assert_true("ok-closed" in common, "close token documented")
+    form = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
+    assert_true("read_xhr_log" not in form and "read_error_notify" not in form, "form prompt")
+    assert_true("ok-notification" not in form, "form dropped text token")
+    table = (ROOT / "scripts/prompts/agent-tools-table.md").read_text(encoding="utf-8")
+    assert_true("read_error_notify" not in table, "table prompt")
+    core = (ROOT / "scripts/prompts/agent-core.md").read_text(encoding="utf-8")
+    assert_true("read_error_notify" not in core and "read_xhr_log" not in core, "core prompt")
+    planner = (ROOT / "scripts/prompts/planner-prompt.md").read_text(encoding="utf-8")
+    assert_true("ok-notification" not in planner, "planner")
+    assert_true("[step-feedback]" in planner, "planner cue")
+
     print("characterize-step-feedback: OK")
     return 0
 
