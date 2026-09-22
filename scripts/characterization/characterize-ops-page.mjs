@@ -15,4 +15,11 @@ assert(html.includes('ops.css') && html.includes('app.js'), 'assets');
 const docs = readFileSync('api-docs.html', 'utf8');
 assert(docs.includes('href="/ops"'), 'docs link');
 
+const app = readFileSync('src/dashboard/ops-console/app.js', 'utf8');
+assert(app.includes('mountExecutorPanel'), 'executor mount');
+const cards = readFileSync('src/dashboard/ops-console/log-cards.js', 'utf8');
+assert(cards.includes('export function renderLogCards'), 'renderLogCards');
+const css = readFileSync('src/dashboard/ops-console/ops.css', 'utf8');
+assert(css.includes('.ops-modal') && css.includes('.ops-card-fail'), 'modal and fail color');
+
 console.log('characterize-ops-page: OK');

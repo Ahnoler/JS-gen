@@ -1,3 +1,5 @@
+/* global document, requestAnimationFrame */
+
 /**
  * Strip slot/session prefix from a stderr log line (same rules as agent-stderr-log-service).
  * @param {string} line raw line
@@ -316,3 +318,228 @@ export function parseAgentLog(text) {
 
   return blocks;
 }
+
+/** @type {WeakMap<object, { blocks: object[], rawText: string }>} */
+const renderStore = new WeakMap();
+
+/**
+ * Escape HTML for safe text interpolation.
+ * @param {string} str raw string
+ * @returns {string} escaped HTML
+ */
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * First line of multiline text.
+ * @param {string} s source
+ * @returns {string} first line
+ */
+function firstLine(s) {
+  const i = String(s).indexOf('\n');
+  return i === -1 ? String(s) : String(s).slice(0, i);
+}
+
+/**
+ * Short label for step action JSON on card face.
+ * @param {string} act serialized action
+ * @returns {string} human-readable operation
+ */
+function formatStepAct(act) {
+  const raw = String(act ?? '');
+  if (!raw || raw === '{}' || raw === '-') {
+    return '—';
+  }
+  try {
+    const o = JSON.parse(raw);
+    const keys = Object.keys(o);
+    if (!keys.length) {
+      return '—';
+    }
+    const name = keys[0];
+    const params = o[name];
+    if (name === 'click_element_by_index' && params && params.index != null) {
+      return `点击元素 ${params.index}`;
+    }
+    if (name === 'fill_form_field' && params && params.label_text) {
+      return `填写「${params.label_text}」`;
+    }
+    return name;
+  } catch {
+    return raw.length > 120 ? `${raw.slice(0, 120)}…` : raw;
+  }
+}
+
+/**
+ * Full modal body text for a parsed block.
+ * @param {object} block parseAgentLog block
+ * @returns {string} modal pre content
+ */
+function modalBodyForBlock(block) {
+  if (block.kind === 'step') {
+    return [
+      `目标:\n${block.goal}`,
+      `操作:\n${block.act}`,
+      `结果:\n${block.res}`,
+      `错误:\n${block.err}`,
+    ].join('\n\n');
+  }
+  if (block.kind === 'info') {
+    const head = block.title ? `${block.title}\n\n` : '';
+    return head + block.text;
+  }
+  if (block.kind === 'replay') {
+    return block.raw || `${block.goal}\n${block.result}`;
+  }
+  return (block.lines || []).join('\n');
+}
+
+/** @type {object|null} */
+let sharedModal = null;
+
+/**
+ * Ensure the singleton log detail modal exists on document.body.
+ * @returns {object} modal root element
+ */
+function ensureModal() {
+  if (sharedModal) {
+    return sharedModal;
+  }
+  sharedModal = document.createElement('div');
+  sharedModal.className = 'ops-modal';
+  sharedModal.innerHTML = `
+    <div class="ops-modal-backdrop"></div>
+    <div class="ops-modal-dialog" role="dialog" aria-modal="true">
+      <button type="button" class="btn ops-modal-close">关闭</button>
+      <pre class="ops-modal-body"></pre>
+    </div>
+  `;
+  const close = () => sharedModal?.classList.remove('open');
+  sharedModal.querySelector('.ops-modal-backdrop')?.addEventListener('click', close);
+  sharedModal.querySelector('.ops-modal-close')?.addEventListener('click', close);
+  document.body.appendChild(sharedModal);
+  return sharedModal;
+}
+
+/**
+ * Open the shared modal with full card text.
+ * @param {string} body preformatted body
+ * @returns {void}
+ */
+function openLogModal(body) {
+  const modal = ensureModal();
+  const pre = modal.querySelector('.ops-modal-body');
+  if (pre) {
+    pre.textContent = body;
+  }
+  modal.classList.add('open');
+}
+
+/**
+ * Build one ellipsis line for card face.
+ * @param {string} label face label
+ * @param {string} value face value
+ * @returns {string} HTML snippet
+ */
+function faceLine(label, value) {
+  return `<span class="ops-card-line"><span class="ops-card-label">${escapeHtml(label)}</span> ${escapeHtml(value)}</span>`;
+}
+
+/**
+ * Render parsed stderr into card buttons inside container; reuse one modal.
+ * @param {object} container scrollable log host element
+ * @param {string} text raw stderr string (also used for copy-full)
+ * @param {{ stickToBottom: boolean }} state follow-bottom flag (mutated on scroll)
+ * @returns {void}
+ */
+export function renderLogCards(container, text, state) {
+  const blocks = parseAgentLog(text);
+  renderStore.set(container, { blocks, rawText: text });
+
+  const parts = [];
+  blocks.forEach((block, idx) => {
+    if (block.kind === 'phase') {
+      parts.push(
+        `<h3 class="ops-phase-title">Phase ${block.phase}: ${escapeHtml(block.title)}</h3>`,
+      );
+      return;
+    }
+    if (block.kind === 'other') {
+      const joined = (block.lines || []).join('\n');
+      parts.push(
+        `<details class="ops-other"><summary>其他（${block.lines?.length || 0} 行）</summary>`
+        + `<pre class="ops-other-pre">${escapeHtml(joined)}</pre></details>`,
+      );
+      return;
+    }
+    if (block.kind === 'info') {
+      const kb = block.cardKind === 'kb' ? ' ops-card-kb' : '';
+      const face = block.cardKind === 'kb' && block.score != null
+        ? `${escapeHtml(block.title)} · score ${block.score}`
+        : `${escapeHtml(block.title)} · ${escapeHtml(firstLine(block.text))}`;
+      parts.push(
+        `<button type="button" class="ops-card ops-card-info${kb}" data-block-idx="${idx}">`
+        + `<span class="ops-card-face">${face}</span></button>`,
+      );
+      return;
+    }
+    if (block.kind === 'step') {
+      const st = block.status;
+      parts.push(
+        `<button type="button" class="ops-card ops-card-${st}" data-block-idx="${idx}">`
+        + `<span class="ops-card-face">`
+        + faceLine('目标', block.goal)
+        + faceLine('操作', formatStepAct(block.act))
+        + faceLine('结果', firstLine(block.res))
+        + `</span></button>`,
+      );
+      return;
+    }
+    if (block.kind === 'replay') {
+      const st = block.status;
+      parts.push(
+        `<button type="button" class="ops-card ops-card-${st}" data-block-idx="${idx}">`
+        + `<span class="ops-card-face">`
+        + faceLine('目标', block.goal)
+        + faceLine('操作', block.operation)
+        + faceLine('结果', firstLine(block.result || '—'))
+        + `</span></button>`,
+      );
+    }
+  });
+
+  container.innerHTML = parts.join('');
+
+  if (!container.dataset.opsLogBound) {
+    container.dataset.opsLogBound = '1';
+    container.addEventListener('scroll', () => {
+      const dist = container.scrollHeight - container.scrollTop - container.clientHeight;
+      state.stickToBottom = dist <= 24;
+    });
+    container.addEventListener('click', (e) => {
+      const card = e.target.closest('[data-block-idx]');
+      if (!card) {
+        return;
+      }
+      const store = renderStore.get(container);
+      const i = Number(card.dataset.blockIdx);
+      const block = store?.blocks?.[i];
+      if (!block) {
+        return;
+      }
+      openLogModal(modalBodyForBlock(block));
+    });
+  }
+
+  if (state.stickToBottom) {
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+  }
+}
+

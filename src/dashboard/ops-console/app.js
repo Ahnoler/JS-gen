@@ -1,4 +1,6 @@
 /* global document */
+import { mountExecutorPanel } from './executor-panel.js';
+
 const tabExec = document.getElementById('ops-tab-exec');
 const tabShots = document.getElementById('ops-tab-shots');
 const panelExec = document.getElementById('ops-panel-exec');
@@ -23,3 +25,5 @@ function selectOpsTab(which) {
 
 tabExec.addEventListener('click', () => selectOpsTab('exec'));
 tabShots.addEventListener('click', () => selectOpsTab('shots'));
+
+mountExecutorPanel(panelExec);

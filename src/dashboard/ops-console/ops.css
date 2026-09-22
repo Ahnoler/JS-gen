@@ -64,3 +64,275 @@ body {
 .ops-panel[hidden] {
   display: none;
 }
+
+/* Buttons (from api-docs try-it, hex tokens) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e3e6eb;
+  background: #fff;
+  color: #1f2937;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover { background: #f9fafb; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn-primary {
+  background: #1a6fb5;
+  border-color: #1a6fb5;
+  color: #fff;
+}
+.btn-primary:hover { filter: brightness(1.05); background: #1a6fb5; }
+
+.ops-intro {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #667085;
+}
+
+.ops-exec-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .ops-exec-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Slot / executor monitor (from api-docs .mon-*) */
+.ops-slot-panel {
+  background: #ffffff;
+  border: 1px solid #e3e6eb;
+  border-radius: 12px;
+  padding: 14px 16px 18px;
+}
+.ops-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.ops-label {
+  font-size: 12px;
+  color: #667085;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ops-label select {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #e3e6eb;
+  background: #fff;
+}
+.ops-check {
+  font-size: 12px;
+  color: #667085;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ops-summary { font-size: 12px; margin-left: auto; }
+.ops-status {
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.ops-status-ok { background: #ecfdf5; color: #047857; }
+.ops-status-err { background: #fef2f2; color: #b91c1c; }
+.ops-node {
+  border: 1px solid #e3e6eb;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.ops-node-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e3e6eb;
+  font-size: 13px;
+}
+.ops-node-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: #667085;
+  align-items: center;
+}
+.ops-online { color: #059669; font-weight: 700; }
+.ops-offline { color: #dc2626; font-weight: 700; }
+.ops-table-wrap { overflow: auto; }
+.ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.ops-table th, .ops-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f2f5;
+  vertical-align: middle;
+}
+.ops-table th {
+  background: #fafbfc;
+  color: #667085;
+  font-weight: 600;
+}
+.ops-row-free { background: #f9fafb; }
+.ops-row-occ { background: #fff; }
+.ops-row-stderr { cursor: pointer; }
+.ops-row-selected { outline: 2px solid #1a6fb5; outline-offset: -2px; }
+.ops-traj { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ops-mono { font-size: 11px; }
+.ops-muted { color: #667085; font-size: 12px; }
+.ops-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ops-btn { padding: 4px 8px; font-size: 11px; }
+.ops-btn-danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+.ops-btn-danger:hover { background: #fee2e2; }
+.ops-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.ops-badge-free { background: #f3f4f6; color: #6b7280; }
+.ops-badge-busy { background: #ffedd5; color: #c2410c; }
+.ops-badge-active { background: #dcfce7; color: #15803d; }
+.ops-badge-idle { background: #e0f2fe; color: #0369a1; }
+
+.ops-log-shell {
+  border: 1px solid #e3e6eb;
+  border-radius: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  max-height: calc(100vh - 180px);
+}
+.ops-log-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e3e6eb;
+  background: #f8fafc;
+}
+.ops-log {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ops-phase-title {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.ops-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e3e6eb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.ops-card:hover { background: #f8fafc; }
+.ops-card-face {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.ops-card-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ops-card-label {
+  color: #667085;
+  font-weight: 600;
+}
+.ops-card-ok { border-left: 3px solid #059669; }
+.ops-card-done { border-left: 3px solid #15803d; background: #f0fdf4; }
+.ops-card-fail { border-left: 3px solid #dc2626; background: #fef2f2; }
+.ops-card-empty { border-left: 3px solid #ea580c; background: #fff7ed; }
+.ops-card-info { border-left: 3px solid #1a6fb5; }
+.ops-card-kb { border-left-color: #7c3aed; }
+
+.ops-other {
+  font-size: 12px;
+  color: #667085;
+}
+.ops-other-pre {
+  margin: 6px 0 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.ops-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.ops-modal.open { display: flex; }
+.ops-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+.ops-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 92vw);
+  max-height: 85vh;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ops-modal-close { align-self: flex-end; }
+.ops-modal-body {
+  margin: 0;
+  flex: 1;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  font-family: ui-monospace, Consolas, monospace;
+}
