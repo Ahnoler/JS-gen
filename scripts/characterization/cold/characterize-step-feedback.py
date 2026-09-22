@@ -107,6 +107,15 @@ def main() -> int:
         "observe actions must receive business_data_store",
     )
 
+    misc = (ROOT / "scripts/controller/actions/_misc.py").read_text(encoding="utf-8")
+    start = misc.find("async def close_notification")
+    end = misc.find("async def close_dialog")
+    body = misc[start:end]
+    assert_true("ok-closed" in body, "closed token")
+    assert_true("no-notification" in body, "empty token")
+    assert_true("ok-notification" not in body, "text return removed")
+    assert_true("notif_text" not in body, "text not read for return")
+
     print("characterize-step-feedback: OK")
     return 0
 
