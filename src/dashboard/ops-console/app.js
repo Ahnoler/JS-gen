@@ -1,5 +1,6 @@
 /* global document */
 import { mountExecutorPanel } from './executor-panel.js';
+import { mountScreenshotsPanel } from './screenshots-panel.js';
 
 const tabExec = document.getElementById('ops-tab-exec');
 const tabShots = document.getElementById('ops-tab-shots');
@@ -27,3 +28,4 @@ tabExec.addEventListener('click', () => selectOpsTab('exec'));
 tabShots.addEventListener('click', () => selectOpsTab('shots'));
 
 mountExecutorPanel(panelExec);
+mountScreenshotsPanel(document.querySelector('#ops-panel-shots'));

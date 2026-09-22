@@ -336,3 +336,27 @@ body {
   white-space: pre-wrap;
   font-family: ui-monospace, Consolas, monospace;
 }
+
+/* Pending screenshots tab */
+.ops-shots-panel {
+  background: #fff;
+  border: 1px solid #e8ecf0;
+  border-radius: 12px;
+  padding: 14px 16px 18px;
+}
+.ops-shots-body { min-height: 60px; }
+.ops-shots-empty { padding: 28px 12px; text-align: center; }
+.ops-shots-table .ops-shots-row:hover { background: #f8fafc; }
+.ops-btn-link {
+  text-decoration: none;
+  border: 1px solid #e8ecf0;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+.ops-btn-link:hover { background: #f8fafc; }
+.ops-badge-before { background: #e0f2fe; color: #0369a1; }
+.ops-badge-after { background: #dcfce7; color: #15803d; }
+.ops-badge-page_level { background: #fff0f6; color: #c41d7f; }
+.ops-badge-phase_highlight { background: #ede9fe; color: #6d28d9; }
+.ops-badge-unknown { background: #f3f4f6; color: #6b7280; }

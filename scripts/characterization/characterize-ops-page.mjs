@@ -22,4 +22,11 @@ assert(cards.includes('export function renderLogCards'), 'renderLogCards');
 const css = readFileSync('src/dashboard/ops-console/ops.css', 'utf8');
 assert(css.includes('.ops-modal') && css.includes('.ops-card-fail'), 'modal and fail color');
 
+const appShots = readFileSync('src/dashboard/ops-console/app.js', 'utf8');
+assert(appShots.includes('mountScreenshotsPanel'), 'screenshots mount');
+const shots = readFileSync('src/dashboard/ops-console/screenshots-panel.js', 'utf8');
+assert(shots.includes('/api/v2/screenshots/pending'), 'pending list');
+assert(shots.includes('/pending/upload'), 'upload all');
+assert(shots.includes("method: 'DELETE'"), 'delete');
+
 console.log('characterize-ops-page: OK');
