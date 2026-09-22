@@ -3,6 +3,14 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 10:30 · ZCode 引擎线 — 收工：meta-step-filter 孤儿 pin 修复 + misc 域登记（回链 10:15 开工；f2b5cf77 已推送，branch-only 待并入 dev）
+
+- 完成（`f2b5cf77`，2 文件 +25/−2）：pin `:45` needle `/filterMetaSteps/`→`/filterProductSteps/`（08-12 `7b5945a3` 起 query-service 改用产品步双滤，旧 needle 必红）；新增 `filterProductSteps` 行为断言（混合数组双滤 + `includeMeta` 回含 + 与 `filterMetaSteps` 的工程步差异钉——回退单滤必红）；其余 9 条源码 needle 逐条核对成立一字未动；头部 Run 路径补 `cold/`；`verify-all.sh` PINS_MISC 登记 1 行（该 pin 因未登记脱管数月，入域后受门禁约束）。`src/**` 零改动。
+- 流程：SDD——worker-coder RED→GREEN + reviewer 任务评审（覆盖全分支 diff）**Spec ✅ / PASS（0 Critical，0 Important，2 Minor 非阻断：①:70 whereNotIn 单点覆盖属既有口径 ②报告行文行号瑕疵）**；主会话复跑闭环全部 Cannot-verify 项（pin 单跑/misc 域/改动面=恰 2 文件）。
+- 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev` 入分支（already up to date）→ **全量 verify-all 186 唯一 pin + statics ALL GREEN 零 FAILED**（186=改前 185+本单元 1，去重计数他线新 pin 已归因）；misc 域 29 pins ALL GREEN。
+- 分支与生效面：`engine/meta-step-filter-pin-20260922` 已推 origin，branch-only **待并入 dev**（按 dev/test 定盘，后续 dev 合 `uara_V2.0` 时进稳定线）；纯 pin+注册行，零运行面。运行态披露同开工条目（worktree 磁盘已在 dev tip 基上，刀 2 Python 侧对新会话生效、Node 未重启不下发合约快照行为不变）。
+- 遗留移交：无。系统线 21:55 收工移交④至此闭环；移交③（step-highlight FLOORS 脆弱性）仍按「形态再红再修录制链」挂账。
+
 ## 2026-09-22 10:15 · ZCode 引擎线 — 开工：meta-step-filter 孤儿 pin 修复 + misc 域登记（系统线移交④；SDD）
 
 - 授权与来源：系统线 09-21 21:55 收工移交④（`cold/characterize-meta-step-filter.mjs` 孤儿失效，未登记任何域）；实测确认红——函数 `filterMetaSteps` 仍在导出（行为断言可过），坏在源码 needle：`trajectory-query-service.js` 已改用 `filterProductSteps`（08-12 `7b5945a3` 起含工程步过滤语义），`assert.match(querySrc, /filterMetaSteps/)` 失败。
