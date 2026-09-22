@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 12:40 · Cursor — 续：执行机与日志页实现计划（仍不改产品代码）
+
+- 授权：用户评审 spec `75054337` 后回复「没问题，继续」。
+- 工作范围：新增 `docs/superpowers/plans/2026-09-22-ops-console.md`。实现按该计划另开工；本条仍不改 `scripts/recorder.py`、`scripts/agent/service.py`、`src/dashboard/**`。
+- 禁入区：同 12:22 开工条目。
+
 ## 2026-09-22 12:22 · Cursor — 开工：执行机与日志页设计稿（/ops MVP，只写 spec）
 
 - 授权：用户在 brainstorming 里逐段确认（布局 C 两标签、独立静态页、步骤卡+弹窗全文、阶段任务与注入卡、recorder 三处截断直接去掉、验收五条）。
