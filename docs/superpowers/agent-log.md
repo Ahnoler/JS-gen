@@ -1801,3 +1801,9 @@ erify-all.sh 默认集
 - 禁入区：`boundary_contract.py`/`recorder_emitters.py`/其他 phase 模块（本轮不动）、他线 WIP（`characterize-phase-done-validate.py` 等）、`scripts/prompts/**`、`config/`、SPA
 - 方式：主线程内联，先 RED pin（本案真实文本 + 真查询反例防过度排除）再一行分类修正；回归=classify/boundary 既有 pin 全跑 + ruff F821 + py_compile；全量 verify-all 基线比对（3 红基线）后收工
 
+
+## 2026-09-22 09:55 · ZCode — 收工：后端发版 20260922-095101
+- uara_V2.0 @ 56d96859 → /data/app/JS-gen-releases/20260922-095101；batch 48 跑 1 个 migration（含方案 D 第 2 刀 79b4b8ba 的分析落库合约迁移）
+- 验证：/api/docs 200（4097 直连 + 经 3000 nginx 双路）、server.log 干净启动、发版时无活跃录制
+- 执行机：发版时无一在线。local-server-proxy 进程 09-21 18:32(+08) 后已死（非本次重启所致，服务器未重启），需要录制时请自行拉起；LMY/HZX PC 执行机本就不在线
+- 回滚：ln -sfn /data/app/JS-gen-releases/20260919-085907 /data/app/JS-gen && 重启 node server.mjs
