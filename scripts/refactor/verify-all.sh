@@ -32,6 +32,10 @@ resolve_python() {
 cd "$(dirname "$0")/../.."
 resolve_python || exit 1
 
+# Python Playwright pins one browser revision. Launch uses any installed
+# directory with the default prefix (chromium_headless_shell- / chromium-).
+export PYTHONPATH="$(pwd)/scripts/characterization/_pyhook${PYTHONPATH:+:$PYTHONPATH}"
+
 # ---------------------------------------------------------------------------
 # Domain registry: pipeline name → pin entries.
 # Entry format:  <name>|<command...>

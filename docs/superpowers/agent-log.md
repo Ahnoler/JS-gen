@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 15:32 · Cursor — 收工：执行机与日志页合入 uara_V2.0_dev
+
+- 回链 12:45 开工。分支 `cursor/ops-console-20260922`。用户指令「继续，合入 uara_V2.0_dev」。
+- 完成：`GET /ops` 独立页（执行机槽位、待上传截图、步骤/回放/注入卡片与全文弹窗）；`[step]` 去掉 200/500/120 截断；`[card]` 写入阶段任务与每次注入全文；文档页不再挂这两块面板。另按用户要求，Python Playwright 按目录前缀 `chromium_headless_shell-` / `chromium-` 找已安装浏览器，不再要求修订号 1217。
+- 验收：四条 ops pin 通过；此前因缺 1217 失败的 Python 浏览器检查，改前缀后 8 条通过。全量 verify-all 仍有与本次无关的失败：`characterize-network-capture`、`characterize-tssc-route-conflict`（`scripts.controller` 导入）、`characterize-layer-tree`（分层数据 80/91）。`/ops` 未在 4097 上做浏览器湿测（控制面不是该 worktree）。
+- 遗留：上述三条无关失败；浏览器湿测留到控制面切到含 `/ops` 的代码后。
+
 ## 2026-09-22 12:45 · Cursor — 开工：执行机与日志页实现（分支 cursor/ops-console-20260922）
 
 - 授权：用户选择按计划分任务实现。计划 `docs/superpowers/plans/2026-09-22-ops-console.md`（`285f8a8f`）。
