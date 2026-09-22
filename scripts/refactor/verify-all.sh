@@ -245,6 +245,7 @@ characterize-before-close-screenshots|"$PY" scripts/characterization/characteriz
 characterize-phase-group-shot|"$PY" scripts/characterization/characterize-phase-group-shot.py
 characterize-step-region-bbox|"$PY" scripts/characterization/characterize-step-region-bbox.py
 characterize-step-notice-scan|"$PY" scripts/characterization/cold/characterize-step-notice-scan.py
+characterize-step-feedback|"$PY" scripts/characterization/cold/characterize-step-feedback.py
 characterize-step-move|node scripts/characterization/characterize-step-move.mjs
 characterize-sys-msg|node scripts/characterization/characterize-sys-msg.mjs
 characterize-batch-import|node scripts/characterization/characterize-batch-import.mjs
