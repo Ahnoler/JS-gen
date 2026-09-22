@@ -50,7 +50,7 @@ check(svcSrc.includes('s.ready === true'), 'ready guard protects in-flight sessi
 check(svcSrc.includes("listByNode(node.id, ['active', 'idle'])"), 'known set built from active|idle rows');
 const routeSrc = readFileSync(join(ROOT, 'src', 'routes', 'v2', 'executor.js'), 'utf-8');
 check(routeSrc.includes('/api/v2/executors/:nodeUuid/sessions/:sessionId/close'), 'executor route exposes orphan session close');
-const monSrc = readFileSync(join(ROOT, 'src', 'dashboard', 'api-docs', 'slot-monitor.js'), 'utf-8');
+const monSrc = readFileSync(join(ROOT, 'src', 'dashboard', 'ops-console', 'executor-panel.js'), 'utf-8');
 check(monSrc.includes('data-act="orphan-close"') && monSrc.includes('closeOrphanSession'), 'slot monitor renders orphan close button');
 
 if (failures) { console.error(`FAIL: ${failures} assertion(s) failed`); process.exit(1); }
