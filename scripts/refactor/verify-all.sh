@@ -59,6 +59,7 @@ characterize-step-number-integrity|node scripts/characterization/characterize-st
 characterize-agent-llm-error|node scripts/characterization/characterize-agent-llm-error.mjs
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
 characterize-verification-phase-gate|"$PY" scripts/characterization/characterize-verification-phase-gate.py
+characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
 '
 PINS_PHASE='
 characterize-phase-section-scope|"$PY" scripts/characterization/characterize-phase-section-scope.py
@@ -94,6 +95,7 @@ characterize-done-accept-reason|"$PY" scripts/characterization/characterize-done
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
 characterize-phase-contract|node scripts/characterization/characterize-phase-contract.mjs
 characterize-persisted-phase-contract|"$PY" scripts/characterization/characterize-persisted-phase-contract.py
+characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
 '
 PINS_FILL='
 characterize-form-rules|"$PY" scripts/characterization/characterize-form-rules.py

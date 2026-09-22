@@ -244,6 +244,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     cur_phase = 0
                 from ..controller.actions.phase.phase_contract_snapshot import (
                     apply_persisted_phase_contract,
+                    downgrade_contract_for_verification,
                     persisted_contract_from_instruction,
                 )
                 raw_snapshot = persisted_contract_from_instruction(instruction, heal_mode=False)
@@ -258,6 +259,18 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                         f"success_when={(business_data_ref.get('_phase_boundary') or {}).get('success_when')}\n"
                     )
                     sys.stderr.flush()
+                    # 纯核验型文本降级（设计稿 §6 主收口）：分析侧误标 submitRequired=true
+                    # 时清掉保存令牌要求（持久化 mode 是被怀疑误标的对象，不作条件④侧证）。
+                    contract, boundary_after, downgraded = downgrade_contract_for_verification(
+                        contract, business_data_ref.get('_phase_boundary'), phase_core)
+                    if downgraded:
+                        business_data_ref['_phase_boundary'] = boundary_after
+                        sys.stderr.write(
+                            f"phase_contract=verify_downgraded mode={mode} "
+                            f"submit={bool((contract.get('submit') or {}).get('required'))} "
+                            f"success_when={(boundary_after or {}).get('success_when')}\n"
+                        )
+                        sys.stderr.flush()
                 else:
                     from ..controller.actions.phase.reviewer import _get_reviewer_llm
                     reviewed = await review_phase_contract(
