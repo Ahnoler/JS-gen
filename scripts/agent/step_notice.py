@@ -39,6 +39,33 @@ def take_new_notices(business_data_store: dict | None, items: list[dict]) -> lis
     return fresh
 
 
+def _take_new_surface_keys(
+    business_data_store: dict | None,
+    store_key: str,
+    keys: list[str],
+) -> list[str]:
+    """Return unseen surface keys; remember on the store (capped like toast fingerprints)."""
+    if business_data_store is None:
+        return list(keys)
+    seen_raw = business_data_store.get(store_key)
+    if isinstance(seen_raw, set):
+        seen = seen_raw
+    elif isinstance(seen_raw, list):
+        seen = set(seen_raw)
+    else:
+        seen = set()
+    fresh: list[str] = []
+    for key in keys:
+        if not key or key == "|" or key in seen:
+            continue
+        seen.add(key)
+        fresh.append(key)
+    if len(seen) > 80:
+        seen = set(list(seen)[-60:])
+    business_data_store[store_key] = seen
+    return fresh
+
+
 def rewind_notify_cursor_if_shrunk(business_data_store: dict | None, log_len: int) -> bool:
     """Reset cursor + seen when in-page ``__notify_log`` shrank (navigation / new document).
 
@@ -80,7 +107,7 @@ def format_notice_cue(items: list[dict]) -> str:
     body = "；".join(parts)
     cue = f"【页面通知】{body}"
     if has_err:
-        cue += " | 存在错误/警告通知：勿 done(success=true)；先处理或 close_notification / 按校验补填。"
+        cue += " | 存在错误/警告通知：勿 done(success=true)；错误文案已在 [step-feedback]。"
     elif has_ok:
         cue += " | 已见成功类提示：若阶段目标即保存/确认，可据此 done(success=true)（勿再盲点确定）。"
     return cue
@@ -97,9 +124,22 @@ def _as_dict(raw: Any) -> dict:
     return {}
 
 
-async def scan_and_emit_step_notices(agent, business_data_store: dict | None) -> list[dict]:
-    """Scan page notices, inject cue, stamp toast_ok on success. Returns fresh items."""
+async def scan_and_emit_step_notices(
+    agent,
+    business_data_store: dict | None,
+    *,
+    step: int = 0,
+    raw_actions=None,
+) -> list[dict]:
+    """Scan page feedback, inject [step-feedback] cue, stamp toast_ok on success."""
     from scripts.feature_flags import step_notice_scan_enabled
+    from scripts.agent.step_feedback import (
+        append_step_feedback,
+        business_action_names,
+        clip_text,
+        format_step_feedback_cue,
+        omit_api_if_ui,
+    )
 
     if not step_notice_scan_enabled():
         return []
@@ -132,6 +172,8 @@ async def scan_and_emit_step_notices(agent, business_data_store: dict | None) ->
     items = data.get("items") if isinstance(data.get("items"), list) else []
     log_len = int(data.get("notify_log_len") or 0)
     if rewind_notify_cursor_if_shrunk(business_data_store, log_len):
+        business_data_store.pop("_step_feedback_form_seen", None)
+        business_data_store.pop("_step_feedback_overlay_seen", None)
         # Re-scan from 0 — first evaluate used a stale cursor past the new log head.
         cursor = 0
         try:
@@ -146,11 +188,74 @@ async def scan_and_emit_step_notices(agent, business_data_store: dict | None) ->
     if log_len >= cursor:
         business_data_store["_step_notice_log_cursor"] = log_len
 
-    fresh = take_new_notices(business_data_store, items)
-    if not fresh:
+    fresh_toasts = take_new_notices(business_data_store, items)
+    feedback_items: list[dict] = []
+    for it in fresh_toasts:
+        feedback_items.append({
+            "kind": "toast",
+            "level": str(it.get("level") or "info"),
+            "text": clip_text(it.get("text")),
+        })
+
+    try:
+        from scripts.controller.actions._js_snippets import JS_SCAN_STEP_SURFACE
+        surface_raw = await page.evaluate(JS_SCAN_STEP_SURFACE)
+    except Exception as e:
+        sys.stderr.write(f"[recorder] step-feedback scan failed: {e}\n")
+        sys.stderr.flush()
+        surface_raw = {}
+
+    surface = _as_dict(surface_raw)
+    forms = surface.get("forms") if isinstance(surface.get("forms"), list) else []
+    overlays = surface.get("overlays") if isinstance(surface.get("overlays"), list) else []
+
+    form_keys: list[str] = []
+    form_by_key: dict[str, dict] = {}
+    for f in forms:
+        if not isinstance(f, dict):
+            continue
+        label = clip_text(f.get("label"))
+        text = clip_text(f.get("text"))
+        if not text:
+            continue
+        key = f"{label}|{text}"
+        form_keys.append(key)
+        form_by_key[key] = {"label": label, "text": text}
+    for key in _take_new_surface_keys(business_data_store, "_step_feedback_form_seen", form_keys):
+        row = form_by_key.get(key) or {}
+        feedback_items.append({
+            "kind": "form",
+            "label": row.get("label", ""),
+            "text": row.get("text", ""),
+        })
+
+    overlay_keys: list[str] = []
+    overlay_by_key: dict[str, dict] = {}
+    for ov in overlays:
+        if not isinstance(ov, dict):
+            continue
+        surface_name = str(ov.get("surface") or "dialog")
+        text = clip_text(ov.get("text"))
+        if not text:
+            continue
+        key = f"{surface_name}|{text}"
+        overlay_keys.append(key)
+        overlay_by_key[key] = {"surface": surface_name, "text": text}
+    for key in _take_new_surface_keys(business_data_store, "_step_feedback_overlay_seen", overlay_keys):
+        row = overlay_by_key.get(key) or {}
+        feedback_items.append({
+            "kind": "dialog",
+            "surface": row.get("surface", "dialog"),
+            "text": row.get("text", ""),
+        })
+
+    feedback_items = omit_api_if_ui(feedback_items)
+    if not feedback_items:
         return []
 
-    cue = format_notice_cue(fresh)
+    actions = business_action_names(raw_actions)
+    append_step_feedback(business_data_store, step, actions, feedback_items)
+    cue = format_step_feedback_cue(actions, feedback_items)
     if cue:
         try:
             from langchain_core.messages import HumanMessage
@@ -160,17 +265,17 @@ async def scan_and_emit_step_notices(agent, business_data_store: dict | None) ->
             sys.stderr.flush()
 
     # Stamp success token when a success toast is newly seen (helps introduce_pick / save)
-    if any(str(it.get("level")) == "success" for it in fresh):
+    if any(str(it.get("level")) == "success" for it in fresh_toasts):
         try:
             from scripts.controller.actions._phase_intent import record_success_token
             ok_text = next(
-                (str(it.get("text") or "") for it in fresh if str(it.get("level")) == "success"),
+                (str(it.get("text") or "") for it in fresh_toasts if str(it.get("level")) == "success"),
                 "toast",
             )
             record_success_token(business_data_store, "toast_ok", ok_text)
         except Exception:
             pass
 
-    sys.stderr.write(f"[recorder] step-notice: {cue[:140]}\n")
+    sys.stderr.write(f"[recorder] step-feedback: {cue[:140]}\n")
     sys.stderr.flush()
-    return fresh
+    return feedback_items

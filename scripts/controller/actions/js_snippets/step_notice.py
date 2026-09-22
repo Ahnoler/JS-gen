@@ -53,3 +53,40 @@ JS_SCAN_STEP_NOTICES = r'''(cursor) => {
   }
   return { items, notify_log_len: log.length };
 }'''
+
+JS_SCAN_STEP_SURFACE = r'''() => {
+  const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 200);
+  const visible = (el) => {
+    try {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+    } catch (e) { return false; }
+  };
+  const forms = [];
+  const seen = new Set();
+  for (const el of document.querySelectorAll('.el-form-item__error')) {
+    if (!visible(el)) continue;
+    const text = norm(el.textContent);
+    if (!text) continue;
+    const item = el.closest('.el-form-item');
+    const label = norm(item && item.querySelector('.el-form-item__label') && item.querySelector('.el-form-item__label').textContent);
+    const key = label + '|' + text;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    forms.push({ label, text });
+  }
+  const overlays = [];
+  for (const d of document.querySelectorAll('.el-dialog')) {
+    if (!visible(d)) continue;
+    const text = norm(d.querySelector('.el-dialog__title') && d.querySelector('.el-dialog__title').textContent);
+    if (text) overlays.push({ surface: 'dialog', text });
+  }
+  for (const d of document.querySelectorAll('.el-drawer')) {
+    if (!visible(d)) continue;
+    const text = norm(d.getAttribute('aria-label') || (d.querySelector('.el-drawer__header') && d.querySelector('.el-drawer__header').textContent));
+    if (text) overlays.push({ surface: 'drawer', text });
+  }
+  return { forms, overlays };
+}'''

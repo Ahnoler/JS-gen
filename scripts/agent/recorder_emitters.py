@@ -1263,11 +1263,13 @@ def _emit_navigation_cue(business_data_store, agent):
         sys.stderr.flush()
 
 
-async def _emit_step_notice_scan(agent, business_data_store) -> None:
-    """Per-step toast/notification scan → 【页面通知】cue (steering-only)."""
+async def _emit_step_notice_scan(agent, business_data_store, step: int = 0, raw_actions=None) -> None:
+    """Per-step page feedback → [step-feedback] (steering-only, session memory)."""
     try:
         from scripts.agent.step_notice import scan_and_emit_step_notices
-        await scan_and_emit_step_notices(agent, business_data_store)
+        await scan_and_emit_step_notices(
+            agent, business_data_store, step=step, raw_actions=raw_actions,
+        )
     except Exception as e:
         sys.stderr.write(f'[recorder] step-notice skipped: {e}\n')
         sys.stderr.flush()
