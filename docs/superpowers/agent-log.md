@@ -3,6 +3,14 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 20:40 · Cursor — 开工：非 JSON 错误页、toast 旁保留接口错误、去掉接线中
+
+- 授权：用户确认补上次对照的第 2、3、5 点。第 1、4、6 点（谁来读、原生弹窗文案、network_capture 新 tab）下一步再做。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/step-feedback-api-prompt-20260923`（自 `origin/uara_V2.0_dev` `2d1739e8`）。
+- 工作范围：`scripts/controller/actions/js_snippets/step_notice.py`、`scripts/agent/step_feedback.py`、`scripts/prompts/agent-tools-common.md`、`scripts/characterization/cold/characterize-step-feedback.py`、本条目。
+- 禁入区：回放线、`scripts/agent/service.py`、`data/kb/**`、主检出未提交的识图四件套、原生 dialog 文案、`network_capture`。不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话先改 pin 再实现。微步 `bash scripts/refactor/verify-all.sh ui`。
+
 ## 2026-09-23 18:20 · ZCode — 收工：识图旁路 LLM 独立配置四件套
 
 - 回链 17:20 开工。完成：识图专用 LLM 可独立配置——`config/.env` 新增 `AI_RECORD_VISION_LLM_MODEL/_BASE_URL/_API_KEY/_TIMEOUT_MS` 四键（语义同 FORM_LLM_*：MODEL 未设完全回落录制主 Agent 的 `agent.llm` 不建独立实例；BASE_URL/API_KEY 回落主 `LLM_*`；TIMEOUT_MS 回落 `LLM_TIMEOUT_MS` 再回落 20000，探活超时仍 15s）。Python 端 `feature_flags.record_vision_llm_config()` + `record_vision._get_vision_llm()`（按配置缓存、改配置重建）+ `ask_vision` 改走专用实例；控制面 `src/runtime/agent-process.js` 与执行机 `executor/config.js` 双侧透传（MODEL 未设不透传）。
