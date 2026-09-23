@@ -408,7 +408,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     sys.stderr.write("kb_flow hash unavailable, keyword-only\n")
                 card, score = find_flow_for_task(kb_store.load_flows(), match_text, page_hash=page_hash or None)
                 if card:
-                    summary = flow_summary_text(card)
+                    summary = flow_summary_text(card, limit=None)
                     # 特殊元素空候选兜底：候选管线没注入（loaded: 0）但任务含「引入」时，
                     # 把沉淀的操作组提示追加进摘要，让 LLM 看到正确入口不走盲点弯路。
                     _se_empty = (

@@ -9,6 +9,12 @@
 - 验收：`characterize-step-notice-scan`、`characterize-step-feedback`、`characterize-xhr-log`、`characterize-error-notify`、`characterize-phase-done-runid`、`characterize-replay-cancel-awareness`、`characterize-llm-role-env`、`characterize-probe-donelog-and-suspect-noise`、`characterize-runid-bridge` 均 OK。`verify-all.sh ui` 除 `characterize-step-highlight` 与 `characterize-layer-tree` 外通过；这两条是工作区没有数据库口令（`root@localhost` Access denied），与本次 diff 无关。
 - 遗留：未做真机 console.error 湿测。P1（非 JSON 错误体、omit_api 口径、prompt「接线中」）按开工范围未做。`network_capture` 仍只挂启动时的 page。
 
+## 2026-09-23 16:53 · Cursor — 收工：运维页历史日志与知识库全文
+
+- 完成：`5afd4ba4`。顶栏增加「历史日志」；标签切换时未选面板隐藏；已落盘的截断知识库卡片按流程名取全文，新注入调用 `flow_summary_text(..., limit=None)`。
+- 验收：`GET /api/v2/kb/flow-summary?flow=产品库管理（新增/启用）` 返回 200，正文 3554 字且无「截断」；浏览器打开该历史卡片，弹窗可滚到阶段删除规则。
+- 遗留：工作区仍有未纳入的 `data/kb/flows/product_library.json` 与 product-mgmt 草稿。
+
 ## 2026-09-23 16:47 · Cursor — 开工：录制逐步反馈补 console 与新 tab
 
 - 授权：用户确认调研报告后开工。范围是 P0-A（console/pageerror 进入 `[step-feedback]`）和 P0-B（新 page 复挂 xhr / console / dialog）。P1 非 JSON 错误体、omit_api 口径、prompt「接线中」文案不在本单元。
@@ -37,6 +43,14 @@
 - 禁入区：`data/kb/**`、`migrations/**`、`scripts/state.py`、回放与 heal 判定、`use_vision` 仍保持关闭。识图失败不中断阶段，否决不写入轨迹步骤。
 - 执行方式：主会话按层实现。第 1 层每步一行门禁；第 3 层结束复核；第 2 层高风险点击落步前否决。
 
+## 2026-09-23 14:26 · Cursor — 开工：同表单项多控件扫描与保存否定句
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-23-same-family-scan-and-save-negation.md`。
+- 场地：`D:\dev\JS-gen\.worktrees\same-family-scan`，分支 `cursor/same-family-scan-20260923`（自 `878032bb`）。
+- 工作范围：`src/cdp/page-locator-helpers.js`、`scripts/controller/actions/js_snippets/scan_form.py`、生成物 `_locator_helpers_js.py`、`scripts/controller/actions/same_family.py`、`fill_engine.py`、`select_engine.py`、`scripts/controller/actions/phase/boundary_contract.py`、`reviewer.py`、对应 characterization、`scripts/refactor/verify-all.sh`、本条目。
+- 禁入区：`data/kb/**`、主检出未提交的 ops-console / product_library。不改模型 500 与空闲看门狗。
+- 执行方式：主会话派实现子智能体，每任务评审。子智能体可 commit，不 push。
+
 ## 2026-09-22 19:05 · ZCode 引擎线 — 收工：三条 SUT 实证知识落流程卡（e0dd6e35）
 
 - 回链 18:40 开工。完成：session_login +2（按钮文案空格比对/二级菜单双 DOM）+ credit_usage +1（日期弹层 pickerVisible=false）；欢迎弹窗按用户澄清定性为「登录后自动读取天元配置的预期行为」不进卡。
@@ -49,6 +63,7 @@
 - 工作范围：`data/kb/flows/session_login.json`（+2 规则：空格按钮/双菜单）、`data/kb/flows/credit_usage.json`（+1 规则：日期弹层关闭）；agent-log 开收工条目。
 - 禁入区：`product_library.json`（他线未提交 WIP 在工作区，绝不触碰）；其余产品代码、`scripts/**`。
 - 执行方式：主会话改卡；改后同 commit 复跑金样例双侧（characterize-flow-card-recall + characterize-kb-recall.py）+ recall-eval 与基线对齐 + JSON 校验。
+
 ## 2026-09-23 14:21 · Cursor — 实现计划：同表单项多控件扫描与保存否定句
 
 - 授权：用户确认设计稿 `cb851289` 无问题。

@@ -351,6 +351,102 @@ PAGE_LOCATOR_HELPERS = r'''
     if (i < 1 || i > 26) return '';
     return String.fromCharCode(64 + i);
   }
+  function scanFamilyOf(kind) {
+    if (kind === 'select' || kind === 'tssc-multi-select') return 'dropdown';
+    return kind;
+  }
+  function leafDisabledForScan(node, kind) {
+    if (!node) return false;
+    if (kind === 'input') {
+      if (node.disabled) return true;
+      return !!(node.closest && node.closest('.is-disabled'));
+    }
+    const host = node;
+    if (host.classList && host.classList.contains('is-disabled')) return true;
+    const inp = host.querySelector && host.querySelector('input');
+    if (inp && inp.disabled) return true;
+    return false;
+  }
+  function leafCurrentValueForScan(node, kind) {
+    if (!node) return '';
+    if (kind === 'input') return String(node.value || '').trim();
+    const tags = node.querySelectorAll
+      ? node.querySelectorAll('.el-select__tags-text, .el-tag__content')
+      : [];
+    if (tags && tags.length) {
+      const parts = [];
+      for (let ti = 0; ti < tags.length; ti++) {
+        const t = String((tags[ti].textContent || '')).replace(/\s+/g, ' ').trim();
+        if (t) parts.push(t);
+      }
+      if (parts.length) return parts.join(',');
+    }
+    const inp = node.querySelector && node.querySelector('input:not([type="hidden"])');
+    return String((inp && inp.value) || '').trim();
+  }
+  function listFormItemScanFields(item) {
+    if (!item || !item.querySelector) return [];
+    const content = item.querySelector('.el-form-item__content');
+    if (!content) return [];
+    const labelEl = item.querySelector('.el-form-item__label, label');
+    const label = normalizeControlText(labelEl ? labelEl.textContent : '');
+    const nonPlainHost =
+      '.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"],'
+      + ' .el-radio, .el-radio-group, .el-checkbox, .el-checkbox-group,'
+      + ' .el-cascader, .el-tree-select, .tsscTree, .tree-popover, [class*="tsscmultitree"]';
+    const leaves = [];
+    const nodes = content.querySelectorAll('input:not([type="hidden"]), .el-select');
+    for (let i = 0; i < nodes.length; i++) {
+      const el = nodes[i];
+      if (el.matches && el.matches('.el-select')) {
+        if (el.closest('.el-select-dropdown')) continue;
+        if (el.closest(nonPlainHost)) continue;
+        const kind = el.closest('.tssc-multi-select') ? 'tssc-multi-select' : 'select';
+        leaves.push({ node: el, kind });
+      } else if (el.matches && el.matches('input')) {
+        const t = String(el.type || '').toLowerCase();
+        if (t === 'radio' || t === 'checkbox') continue;
+        if (el.closest('.el-select')) continue;
+        if (el.closest(nonPlainHost)) continue;
+        leaves.push({ node: el, kind: 'input' });
+      }
+    }
+    if (!leaves.length) return [];
+    const famCounts = {};
+    for (let j = 0; j < leaves.length; j++) {
+      const fam = scanFamilyOf(leaves[j].kind);
+      famCounts[fam] = (famCounts[fam] || 0) + 1;
+    }
+    const famIndex = {};
+    const rows = [];
+    for (let j = 0; j < leaves.length; j++) {
+      const leaf = leaves[j];
+      const k = leaf.kind;
+      const fam = scanFamilyOf(k);
+      const n = (famIndex[fam] = (famIndex[fam] || 0) + 1);
+      const field_slot = (famCounts[fam] >= 2) ? fieldSlotLetter(n) : '';
+      const display_label = (field_slot && label) ? (label + '-' + field_slot) : '';
+      const node = leaf.node;
+      let placeholder = '';
+      if (k === 'input') {
+        placeholder = (node.getAttribute && node.getAttribute('placeholder')) || '';
+      } else {
+        const inp = node.querySelector && node.querySelector('input:not([type="hidden"])');
+        placeholder = (inp && inp.getAttribute && inp.getAttribute('placeholder')) || '';
+      }
+      rows.push({
+        label,
+        kind: k,
+        field_slot,
+        display_label,
+        xpath_smart: formFieldXpathSmartOf(node, label) || '',
+        placeholder,
+        disabled: leafDisabledForScan(node, k),
+        currentValue: leafCurrentValueForScan(node, k),
+      });
+    }
+    return rows;
+  }
   function pinFormFieldFamily(expr, host) {
     const base = String(expr || '');
     if (!base || !host) return { xpath: base, occurrence: 0 };

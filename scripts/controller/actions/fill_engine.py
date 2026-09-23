@@ -26,8 +26,9 @@ from .form_scan_utils import (
     _is_query_mode, _with_submit_cue,
     field_values_equivalent, enrich_field_value_check,
     _JS_READ_CERT_TYPE,
-    _resolve_control, lookup_field_kind, _task_done_impl,
+    ResolvedControl, _resolve_control, lookup_field_kind, _task_done_impl,
 )
+from .same_family import format_same_family_candidates, resolve_same_family_target
 from .form_engine_base import (
     _FormActionEngineBase,
     _ReplayAutofillStub,
@@ -239,16 +240,40 @@ class FillEngine(_FormActionEngineBase):
             sys.stderr.flush()
             kind = ''
         if kind == 'tssc-multi-select':
-            nxt = (
-                f'select_option(label_text="{resolved.label or label_text}", '
-                f'option_text="first" 或表行中文名原文)'
+            _sf = resolve_same_family_target(
+                self.business_data_store.get('_scan_fields') or [],
+                label=resolved.label or label_text,
+                xpath_smart=(resolved.xpath_smart or xpath_smart or '').strip(),
+                action='fill',
             )
-            return err_with(
-                "err-use-tssc-multi-select",
-                "「要素名称」类字段是 TsscMultiSelect（弹层表格行选），禁止 fill_form_field 文本直填",
-                observed=f"label={resolved.label or label_text} kind=tssc-multi-select",
-                next_action=nxt,
-            )
+            if not _sf.get('ok'):
+                _cands = _sf.get('candidates') or []
+                _nxt = format_same_family_candidates(_cands)
+                return err_with(
+                    _sf.get('error') or 'err-ambiguous-field-slot',
+                    '同标签多控件须带 xpath_smart 指定槽位',
+                    observed=f"label={resolved.label or label_text} candidates={len(_cands)}",
+                    next_action=_nxt,
+                )
+            if (_sf.get('kind') or '') == 'input' and (_sf.get('xpath_smart') or '').strip():
+                xpath_smart = (_sf.get('xpath_smart') or '').strip()
+                resolved = ResolvedControl(
+                    xpath_smart=xpath_smart,
+                    label=resolved.label or label_text,
+                    error='',
+                )
+                kind = 'input'
+            else:
+                nxt = (
+                    f'select_option(label_text="{resolved.label or label_text}", '
+                    f'option_text="first" 或表行中文名原文)'
+                )
+                return err_with(
+                    "err-use-tssc-multi-select",
+                    "「要素名称」类字段是 TsscMultiSelect（弹层表格行选），禁止 fill_form_field 文本直填",
+                    observed=f"label={resolved.label or label_text} kind=tssc-multi-select",
+                    next_action=nxt,
+                )
         if kind == 'tree-select':
             nxt = recommend_action_for_kind(kind).replace(
                 '<此字段label>', resolved.label or label_text,
@@ -259,6 +284,29 @@ class FillEngine(_FormActionEngineBase):
                 observed=f"label={resolved.label or label_text} kind=tree-select",
                 next_action=nxt,
             )
+        if kind != 'tssc-multi-select':
+            _sf2 = resolve_same_family_target(
+                self.business_data_store.get('_scan_fields') or [],
+                label=resolved.label or label_text,
+                xpath_smart=(resolved.xpath_smart or xpath_smart or '').strip(),
+                action='fill',
+            )
+            if not _sf2.get('ok'):
+                _cands2 = _sf2.get('candidates') or []
+                _nxt2 = format_same_family_candidates(_cands2)
+                return err_with(
+                    _sf2.get('error') or 'err-ambiguous-field-slot',
+                    '同标签多控件须带 xpath_smart 指定槽位',
+                    observed=f"label={resolved.label or label_text} candidates={len(_cands2)}",
+                    next_action=_nxt2,
+                )
+            if (_sf2.get('kind') or '') == 'input' and (_sf2.get('xpath_smart') or '').strip():
+                xpath_smart = (_sf2.get('xpath_smart') or '').strip()
+                resolved = ResolvedControl(
+                    xpath_smart=xpath_smart,
+                    label=resolved.label or label_text,
+                    error='',
+                )
 
         from .fill_dispatch import resolve_fill_attempt_order
 
@@ -587,9 +635,35 @@ class FillEngine(_FormActionEngineBase):
             sys.stderr.flush()
             kind = ''
         if kind == 'tssc-multi-select':
-            return 'err-use-tssc-multi-select'
+            _sf_r = resolve_same_family_target(
+                self.business_data_store.get('_scan_fields') or [],
+                label=label_text,
+                xpath_smart=(xpath_smart or '').strip(),
+                action='fill',
+            )
+            if not _sf_r.get('ok'):
+                _err_r = _sf_r.get('error') or 'err-ambiguous-field-slot'
+                return f'{_err_r} | {format_same_family_candidates(_sf_r.get("candidates"))}'
+            if (_sf_r.get('kind') or '') == 'input' and (_sf_r.get('xpath_smart') or '').strip():
+                xpath_smart = (_sf_r.get('xpath_smart') or '').strip()
+                kind = 'input'
+            else:
+                return 'err-use-tssc-multi-select'
         if kind == 'tree-select':
             return 'err-use-select-tree-option'
+
+        if kind != 'tssc-multi-select':
+            _sf_r2 = resolve_same_family_target(
+                self.business_data_store.get('_scan_fields') or [],
+                label=label_text,
+                xpath_smart=(xpath_smart or '').strip(),
+                action='fill',
+            )
+            if not _sf_r2.get('ok'):
+                _err_r2 = _sf_r2.get('error') or 'err-ambiguous-field-slot'
+                return f'{_err_r2} | {format_same_family_candidates(_sf_r2.get("candidates"))}'
+            if (_sf_r2.get('kind') or '') == 'input' and (_sf_r2.get('xpath_smart') or '').strip():
+                xpath_smart = (_sf_r2.get('xpath_smart') or '').strip()
 
         use_relative = relative_xpath_primary_enabled()
         entry = {'element': element} if isinstance(element, dict) else {}

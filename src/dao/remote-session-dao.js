@@ -266,3 +266,15 @@ export async function crashOccupiedOnOfflineNodes() {
 export async function remove(id) {
   return getDB()(TABLE).where({ id }).del();
 }
+
+/**
+ * Fetch remote sessions whose agent session id is in the given list.
+ * @param {string[]} agentSessionIds agent session UUIDs
+ * @returns {Promise<object[]>} matching session entities (possibly more than one per id)
+ */
+export async function listByAgentSessionIds(agentSessionIds) {
+  const ids = (agentSessionIds || []).map((id) => String(id)).filter(Boolean);
+  if (!ids.length) return [];
+  const rows = await getDB()(TABLE).whereIn('agent_session_id', ids);
+  return fromDbRows(rows);
+}

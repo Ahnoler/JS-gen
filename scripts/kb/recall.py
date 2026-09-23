@@ -111,7 +111,10 @@ def find_flow_for_task(flows, task_text, page_hash=None):
 
 
 def flow_summary_text(card, limit=800):
-    """流程卡 → 紧凑文本摘要（前置闸门/节点/状态×动作/规则），截断到 limit。"""
+    """流程卡 → 紧凑文本摘要（前置闸门/节点/状态×动作/规则）。
+
+    limit 为 None 或 <=0 时不截断。
+    """
     lines = ['【KB 流程知识】' + str(card.get('flow') or '')]
     for p in card.get('preconditions') or []:
         lines.append('前置闸门：' + str(p))
@@ -133,8 +136,8 @@ def flow_summary_text(card, limit=800):
             if isinstance(se, dict):
                 lines.append('特殊元素：{} — {}'.format(se.get('tag', ''), se.get('note', '')))
     text = '\n'.join(lines)
-    if len(text) > limit:
-        text = text[:limit] + '\n…(截断)'
+    if limit is not None and int(limit) > 0 and len(text) > int(limit):
+        text = text[:int(limit)] + '\n…(截断)'
     return text
 
 

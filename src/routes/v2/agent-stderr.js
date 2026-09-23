@@ -78,6 +78,15 @@ export default function registerAgentStderr(app) {
     }
   });
 
+  /** List on-disk stderr logs, including sessions that no longer occupy a slot. */
+  app.get('/api/v2/recording/agent-stderr/history', async (_req, res) => {
+    try {
+      res.json({ files: await svc.listStderrHistory() });
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
   /** Get filtered agent stderr lines (requires slot/sid/sessionId/trajectoryId). */
   app.get('/api/v2/recording/agent-stderr', async (req, res) => {
     try {

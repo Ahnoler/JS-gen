@@ -290,6 +290,21 @@ export const GROUP_RECORDING = [
         ],
       },
       {
+        method: 'GET', path: '/api/v2/recording/agent-stderr/history',
+        summary: '历史 Agent stderr 文件',
+        desc: '列出控面 logs/agent-stderr/*.log，含已释放槽位的会话。按文件修改时间新到旧。能关联 remote_session 时附上 trajectoryId / trajectoryName。打开正文仍用 POST /recording/agent-stderr，body 传 sessionId。',
+        respExample: J({
+          files: [{
+            sessionId: '72d5d9b4-9fad-4d96-956f-af44e9f7b4ee',
+            sid: '72d5d9b4',
+            bytes: 12040,
+            mtime: '2026-09-22T03:00:00.000Z',
+            trajectoryId: 33,
+            trajectoryName: '1对公客户转正',
+          }],
+        }),
+      },
+      {
         method: 'POST', path: '/api/v2/recording/agent-stderr',
         summary: '粘贴 /active 行导出 Agent stderr（推荐）',
         desc: '请求体直接粘贴 `GET .../agent-stderr/active` 返回的 rows[] 中一行（多余字段忽略）。优先用 `sessionId` 打开落盘文件，再用 `slotIndex`/`sid` 滤行。默认 `format=text` → `text/plain`；可在 body 加 `"format":"json"`。',
