@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import tempfile
+import weakref
 from pathlib import Path
 
 from browser_use import Browser
@@ -17,7 +18,8 @@ from ..cdp_ports import _pick_free_cdp_port
 # and forgets, and asyncio only weakly references tasks — without this set the
 # task can be garbage-collected mid-accept.
 _dialog_task_refs: set[asyncio.Task] = set()
-_dialog_bound_pages: set[int] = set()
+_dialog_bound_pages: weakref.WeakSet = weakref.WeakSet()
+_dialog_bound_ids: set[int] = set()
 
 
 class _Ipv4BrowserTypeProxy:
@@ -378,10 +380,16 @@ def attach_native_dialog_accept(page) -> None:
     if page is None:
         return
     target = getattr(page, "page", page)
-    pid = id(target)
-    if pid in _dialog_bound_pages:
-        return
-    _dialog_bound_pages.add(pid)
+    try:
+        if target in _dialog_bound_pages:
+            return
+    except TypeError:
+        if id(target) in _dialog_bound_ids:
+            return
+    try:
+        _dialog_bound_pages.add(target)
+    except TypeError:
+        _dialog_bound_ids.add(id(target))
 
     async def _on_dialog(dialog):
         try:
@@ -400,7 +408,10 @@ def attach_native_dialog_accept(page) -> None:
     try:
         target.on('dialog', _on_dialog_event)
     except Exception as e:
-        _dialog_bound_pages.discard(pid)
+        try:
+            _dialog_bound_pages.discard(target)
+        except TypeError:
+            _dialog_bound_ids.discard(id(target))
         sys.stderr.write(f'WARN: dialog handler setup failed: {e}\n')
         sys.stderr.flush()
 

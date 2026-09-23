@@ -3,17 +3,44 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import weakref
 
-_attached_pages: set[int] = set()
-_xhr_contexts: set[int] = set()
+# Page/context objects, not id(). A closed page can be collected and its id reused.
+# id() fallback is only for objects that cannot be weak-referenced.
+_attached_pages: weakref.WeakSet = weakref.WeakSet()
+_attached_ids: set[int] = set()
+_console_bound: weakref.WeakSet = weakref.WeakSet()
+_console_ids: set[int] = set()
+_xhr_contexts: weakref.WeakSet = weakref.WeakSet()
+_xhr_context_ids: set[int] = set()
+_page_hook_tasks: set[asyncio.Task] = set()
 
 
 def _target(page):
     return getattr(page, "page", page)
 
 
-def _bind_console(target, store) -> None:
+def _seen(bucket: weakref.WeakSet, fallback: set[int], obj) -> bool:
+    try:
+        if obj in bucket:
+            return True
+    except TypeError:
+        return id(obj) in fallback
+    return False
+
+
+def _remember(bucket: weakref.WeakSet, fallback: set[int], obj) -> None:
+    try:
+        bucket.add(obj)
+    except TypeError:
+        fallback.add(id(obj))
+
+
+def _bind_console(target, store) -> bool:
     from scripts.agent.console_feedback import push_console_line
+
+    if _seen(_console_bound, _console_ids, target):
+        return True
 
     def on_console(msg):
         try:
@@ -36,17 +63,19 @@ def _bind_console(target, store) -> None:
     except Exception as exc:
         sys.stderr.write(f"[step-feedback] console hook failed: {exc}\n")
         sys.stderr.flush()
+        return False
+    _remember(_console_bound, _console_ids, target)
+    return True
 
 
 async def _attach_page(page, xhr_hook: str, store) -> None:
     if page is None:
         return
     target = _target(page)
-    pid = id(target)
-    if pid in _attached_pages:
+    if _seen(_attached_pages, _attached_ids, target):
         return
-    _attached_pages.add(pid)
-    _bind_console(target, store)
+    if not _bind_console(target, store):
+        return
     try:
         from scripts.browser.factory import attach_native_dialog_accept
         attach_native_dialog_accept(target)
@@ -59,6 +88,8 @@ async def _attach_page(page, xhr_hook: str, store) -> None:
     except Exception as exc:
         sys.stderr.write(f"[step-feedback] xhr hook failed: {exc}\n")
         sys.stderr.flush()
+        return
+    _remember(_attached_pages, _attached_ids, target)
 
 
 async def install_recording_page_hooks(browser_context, business_data_store=None) -> None:
@@ -69,9 +100,7 @@ async def install_recording_page_hooks(browser_context, business_data_store=None
     ctx = getattr(session, "context", None) if session else None
     pages = []
     if ctx is not None:
-        cid = id(ctx)
-        if cid not in _xhr_contexts:
-            _xhr_contexts.add(cid)
+        if not _seen(_xhr_contexts, _xhr_context_ids, ctx):
             try:
                 await ctx.add_init_script(JS_XHR_HOOK)
             except Exception as exc:
@@ -80,9 +109,11 @@ async def install_recording_page_hooks(browser_context, business_data_store=None
 
             def _on_page(new_page):
                 try:
-                    asyncio.get_running_loop().create_task(
+                    task = asyncio.get_running_loop().create_task(
                         _attach_page(new_page, JS_XHR_HOOK, business_data_store)
                     )
+                    _page_hook_tasks.add(task)
+                    task.add_done_callback(_page_hook_tasks.discard)
                 except Exception as exc:
                     sys.stderr.write(f"[step-feedback] new page hook failed: {exc}\n")
                     sys.stderr.flush()
@@ -92,6 +123,8 @@ async def install_recording_page_hooks(browser_context, business_data_store=None
             except Exception as exc:
                 sys.stderr.write(f"[step-feedback] page listener failed: {exc}\n")
                 sys.stderr.flush()
+            else:
+                _remember(_xhr_contexts, _xhr_context_ids, ctx)
         try:
             pages = list(ctx.pages or [])
         except Exception:
