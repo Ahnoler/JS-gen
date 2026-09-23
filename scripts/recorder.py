@@ -73,8 +73,17 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
             sys.stderr.flush()
 
         if business_data_store is not None:
+            # introduce_pick: picker confirm is the phase success. Do not push parent save.
+            if business_data_store.get('_introduce_done_ready'):
+                business_data_store['_introduce_done_ready'] = False
+                business_data_store.pop('_submit_ready', None)
+                from .controller.actions._phase_intent import INTRODUCE_DONE_CUE
+                msg = HumanMessage(content=INTRODUCE_DONE_CUE)
+                agent._message_manager._add_message_with_tokens(msg)
+                sys.stderr.write('[recorder] Injected introduce-done cue\n')
+                sys.stderr.flush()
             # After auto-fill / empty pending: force agent toward 保存 — never on query UI
-            if business_data_store.get('_task_mode') == 'query' or business_data_store.get('_query_task') or business_data_store.get('_query_ui'):
+            elif business_data_store.get('_task_mode') == 'query' or business_data_store.get('_query_task') or business_data_store.get('_query_ui'):
                 business_data_store.pop('_submit_ready', None)
                 business_data_store.pop('_query_ready', None)
             elif business_data_store.get('_submit_ready'):

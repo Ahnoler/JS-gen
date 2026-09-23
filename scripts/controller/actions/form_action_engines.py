@@ -340,6 +340,10 @@ class FillEngine(_FormActionEngineBase):
 
 
     async def fill_form_field(self, label_text: str, value: str, xpath_smart: str = ""):
+        from scripts.controller.actions._phase_intent import introduce_done_block_message
+        blocked = introduce_done_block_message(self.business_data_store)
+        if blocked:
+            return blocked
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
@@ -1005,6 +1009,10 @@ class SelectEngine(_FormActionEngineBase):
             raise
 
     async def _select_option_impl(self, label_text: str, option_text: str, xpath_smart: str = ""):
+        from scripts.controller.actions._phase_intent import introduce_done_block_message
+        blocked = introduce_done_block_message(self.business_data_store)
+        if blocked:
+            return blocked
         # N4 paged fallback budgets itself against the select_option action
         # budget measured from here (session_runner enforces the same budget
         # via asyncio.wait_for — overrun = budget-timeout).

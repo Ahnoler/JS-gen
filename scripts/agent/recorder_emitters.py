@@ -664,6 +664,7 @@ def _guard_done_accept_success(agent, business_data_store, contract, done_succes
             business_data_store.pop('task_list', None)
             business_data_store.pop('_scan_fields', None)
             business_data_store.pop('_submit_ready', None)
+            business_data_store.pop('_introduce_done_ready', None)
             business_data_store.pop('_query_ready', None)
             business_data_store.pop('_query_ui', None)
             business_data_store.pop('_autofill_summary', None)

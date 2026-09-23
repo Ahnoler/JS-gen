@@ -29,7 +29,15 @@ from .replay_timing import WAIT_150_MS
 
 class SaveEngine(_FormActionEngineBase):
     async def click_save(self, button_text: str = '保存', section: str = '', region: str = ''):
-        from ._phase_intent import check_pending_write_gate, contract_force_refill, record_success_token
+        from ._phase_intent import (
+            INTRODUCE_DONE_BLOCK,
+            arm_introduce_done,
+            check_pending_write_gate,
+            contract_force_refill,
+            introduce_phase_confirmed,
+            record_success_token,
+            should_arm_parent_save_after_picker,
+        )
         from .section_scope import (
             clear_phase_section,
             remember_phase_section,
@@ -98,6 +106,21 @@ class SaveEngine(_FormActionEngineBase):
             f'query_ui={query_ui} picker_confirm={is_picker_confirm}\n'
         )
         sys.stderr.flush()
+        # introduce_pick never saves the parent form. Only the open picker's 确认
+        # is in scope; clicking the parent 确认 records a later phase's step and
+        # pulls its required fields into this phase.
+        if (
+            not should_arm_parent_save_after_picker(self.business_data_store)
+            and not (is_picker_confirm and query_ui)
+        ):
+            if introduce_phase_confirmed(self.business_data_store):
+                arm_introduce_done(self.business_data_store)
+                return _err(INTRODUCE_DONE_BLOCK, include_in_memory=True)
+            return _err(
+                'introduce-phase-picker-only | 本阶段只在客户选择窗口选行并点确认，'
+                '不要 click_save 父表单。父弹窗的确认/保存属于后续阶段。',
+                include_in_memory=True,
+            )
         if query_ui and not is_picker_confirm:
             return _err(
                 'not-form-save | query/filter UI — NOT a form-fill submit. '
@@ -462,14 +485,22 @@ class SaveEngine(_FormActionEngineBase):
                         self.business_data_store.pop('_query_ui', None)
                 sys.stderr.write('[click_save] SUCCESS picker confirm (dialog closed)\n')
                 sys.stderr.flush()
-                if self.business_data_store is not None:
-                    # Parent form still needs final 保存 after introduce (toast_ok).
-                    self.business_data_store['_submit_ready'] = True
-                    self.business_data_store.pop('_query_ui', None)
+                if should_arm_parent_save_after_picker(self.business_data_store):
+                    if self.business_data_store is not None:
+                        # Nested picker inside create/modify: parent still needs click_save.
+                        self.business_data_store['_submit_ready'] = True
+                        self.business_data_store.pop('_query_ui', None)
+                    return _ok(
+                        'ok-introduce-confirm | Picker confirmed; introduce fields should be backfilled. '
+                        'Call click_save(button_text="保存") NOW on the parent form. '
+                        'Do NOT only check_field_value.',
+                        include_in_memory=True,
+                    )
+                arm_introduce_done(self.business_data_store)
                 return _ok(
                     'ok-introduce-confirm | Picker confirmed; introduce fields should be backfilled. '
-                    'Call click_save(button_text="保存") NOW on the parent form. '
-                    'Do NOT only check_field_value.',
+                    'This phase ends here. Call done(success=true) NOW. '
+                    'Do NOT click_save() on the parent form and do NOT fill later-phase fields.',
                     include_in_memory=True,
                 )
 

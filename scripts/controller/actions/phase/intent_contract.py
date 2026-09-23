@@ -81,6 +81,7 @@ def clear_phase_intent(business_data_store: dict | None) -> None:
         '_cycle_prescribed',
         '_recovery_active',
         '_last_introduce_ok',
+        '_introduce_done_ready',
         '_quality_failed',
         '_quality_failed_reasons',
         '_phase_section',
