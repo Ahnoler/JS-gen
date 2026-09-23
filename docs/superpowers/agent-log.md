@@ -37,6 +37,45 @@
 - 验收：`characterize-step-notice-scan`、`characterize-step-feedback`、`characterize-xhr-log`、`characterize-error-notify`、`characterize-phase-done-runid`、`characterize-replay-cancel-awareness`、`characterize-llm-role-env`、`characterize-probe-donelog-and-suspect-noise`、`characterize-runid-bridge` 均 OK。`verify-all.sh ui` 除 `characterize-step-highlight` 与 `characterize-layer-tree` 外通过；这两条是工作区没有数据库口令（`root@localhost` Access denied），与本次 diff 无关。
 - 遗留：未做真机 console.error 湿测。P1（非 JSON 错误体、omit_api 口径、prompt「接线中」）按开工范围未做。`network_capture` 仍只挂启动时的 page。
 
+## 2026-09-23 18:55 · Cursor — 收工：阶段判定文档与提示词对齐（回链 18:40 开工）
+
+- 完成：`e712b4dc`。令牌归属说明、结构化合约对照、阶段评审提示词、需求分析合约对照改成与 `f1bdb174` 相同的口径：控件结构遮罩，动作子句写明的点击不交出，查询/保存/下一步/登录/引入按下一阶段消歧。分类代码未改。
+- 验收：`characterize-refill-contract`、`characterize-phase-save-cue-promote`、`cold/characterize-search-then-click-prompts` OK。`characterize-phase-contract` 与 `characterize-analyze-case-data` 因本机无 `node_modules`（缺 knex）未跑；所钉的提示词原文仍在。
+- 遗留：无
+
+## 2026-09-23 18:40 · Cursor — 开工：阶段判定文档与提示词对齐动作子句消歧
+
+- 开工：18:40。`f1bdb174` 已改分类，设计说明和评审/拆分提示词仍按旧口径写令牌归属。只改文档与提示词对照，不改分类代码。
+- 范围：`docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`、`docs/superpowers/specs/2026-09-21-phase-structured-contract-design.md`、`scripts/prompts/phase-reviewer-prompt.md`、`src/services/trajectory/trajectory-meta-service.js`（仅合约对照与 3.3 一句）、本文件
+- 禁入：`scripts/controller/actions/phase/*.py`、`data/kb/**`、点击录制与回放、他线 WIP
+- 方式：主会话直接改说明；先开工声明提交
+
+## 2026-09-23 18:34 · Cursor — 收工：各操作类型按本阶段动作与下一阶段消歧（回链 18:22 开工）
+
+- 完成：`f1bdb174`。去掉查询字段名黑名单。下拉/输入框/日期控件整段遮住后再判查询和引入。本阶段写明的点击查询、点击保存/确认、点击下一步、登录保持原判。本阶段没写该动作、下一阶段写了，则查询、保存、下一步、登录令牌交给下一阶段。修改只认动作子句。保存按钮仍按动作子句最后一次点击取文案。
+- 验收：`characterize-query-field-not-query` OK；`characterize-reset-phase-not-query` / `characterize-case-data` / `characterize-cross-phase-token-guard` / `cold/characterize-phase-boundary` / `cold/characterize-phase-intent` / `characterize-phase-runtime` / `characterize-phase-reviewer` / `characterize-phase-save-cue-promote` / `characterize-contract-arbitration-circuit-breaker` / `characterize-phase-reviewer-flow` OK
+- 遗留：未做执行机湿测。`characterize-g3-done-gate-live` 本机缺 Playwright 浏览器，未跑
+
+## 2026-09-23 18:22 · Cursor — 开工：各操作类型按本阶段动作与下一阶段消歧
+
+- 开工：18:22。撤掉查询字段名黑名单。本阶段动作子句写明的查询/引入/保存/下一步/登录保持原判；只有本阶段没写该动作时，才用阶段目录把令牌交给下一阶段。控件操作按「下拉/输入框/日期控件」结构遮罩，不按字段名。
+- 范围：`scripts/controller/actions/phase/classify.py`、`scripts/controller/actions/phase/boundary_contract.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/characterization/characterize-query-field-not-query.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、点击录制与回放、他线 WIP
+- 方式：主会话直接改；先开工声明提交。既有重置/开页/查询条件后点击查询/引入打开窗口等特征化必须仍通过
+
+## 2026-09-23 17:55 · Cursor — 收工：阶段7确认未录（回链 17:43 开工）
+
+- 完成：`670adba3`。`查询事由`/`查询类型`/`查询原因`/`征信查询` 不再把填写阶段签成 query；阶段6为纯填写（`success_when=[]`，弹窗可保持打开后 done）。阶段7动作子句点击【确认】时，保存合同按钮为「确认」，`click_save` 能匹配到该按钮并入轨迹。`verify-all.sh` 接入新 pin。
+- 验收：`characterize-query-field-not-query` OK；`characterize-reset-phase-not-query` / `characterize-case-data` / `cold/characterize-phase-boundary` / `characterize-phase-runtime` / `characterize-phase-reviewer` / `characterize-phase-save-cue-promote` / `cold/characterize-phase-intent` OK
+- 遗留：未做执行机湿测。`characterize-g3-done-gate-live` 本机缺 Playwright 浏览器，未跑。`phase_reviewer` 空异常仍走 rules_fallback，本缺陷根因是 fallback 把阶段6判成 query
+
+## 2026-09-23 17:43 · Cursor — 开工：阶段7确认未录（阶段6被查询字段名误判）
+
+- 开工：17:43。执行机 sid 6038ecfa：阶段5/6操作步骤已录上，阶段6被 `查询事由`/`查询类型` 判成 query，`done()` 因缺少 `query_clicked` 被拒，阶段7的【确认】从未执行。阶段7若起步，create 合同按钮写死「保存」，点不到弹窗【确认】。
+- 范围：`scripts/controller/actions/phase/classify.py`、`scripts/controller/actions/phase/boundary_contract.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/characterization/characterize-query-field-not-query.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、他线 WIP
+- 方式：主会话直接改；先开工声明提交，再改分类与保存按钮，并加特征化
+
 ## 2026-09-23 16:53 · Cursor — 收工：运维页历史日志与知识库全文
 
 - 完成：`5afd4ba4`。顶栏增加「历史日志」；标签切换时未选面板隐藏；已落盘的截断知识库卡片按流程名取全文，新注入调用 `flow_summary_text(..., limit=None)`。

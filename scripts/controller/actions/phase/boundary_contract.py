@@ -19,7 +19,7 @@ from .._phase_context import (
     is_query_task,
     is_wizard_nav_task,
 )
-from .classify import _action_clause
+from .classify import _action_clause, mask_widget_ops
 
 Role = Literal['maintain', 'query', 'introduce', 'navigate', 'other']
 CompletionEvidence = Literal[
@@ -90,6 +90,36 @@ def _has_save_terminal(task_text: str) -> bool:
     return bool(_SAVE_TERMINAL_RE.search(stripped))
 
 
+def action_owns_save(task_text: str) -> bool:
+    """动作子句里是否有本阶段自己的保存/确认点击。
+
+    预期结果里的「保存成功」不算。没有阶段目录时仍由 _has_save_terminal
+    保留「预期即要保存」的旧行为。
+    """
+    action = _action_clause(task_text or '')
+    action = _NEGATED_TERMINAL_RE.sub('', action)
+    return bool(_SAVE_TERMINAL_RE.search(action))
+
+
+_ACTION_SUBMIT_BTN_RE = re.compile(
+    r'点击\s*[【\[「『]?\s*(确认|确定|保存|提交)'
+)
+
+
+def maintain_submit_button(task_text: str, *, modify: bool = False) -> str:
+    """保存阶段要点的按钮文案。动作子句里最后一次点击优先，否则按模式默认。
+
+    create 默认「保存」、modify 默认「确认」。弹窗终态常写「点击【确认】」，
+    若合同仍写死「保存」，click_save 的文案针匹配不到【确认】，该步不会入轨迹。
+    """
+    action = _action_clause(task_text or '')
+    hits = list(_ACTION_SUBMIT_BTN_RE.finditer(action))
+    if hits:
+        word = hits[-1].group(1)
+        return word
+    return '确认' if modify else '保存'
+
+
 def _terminal_action_in_later_phase(
     task_text: str,
     all_phases: list,
@@ -128,6 +158,27 @@ def _terminal_action_in_later_phase(
     return False
 
 
+def _later_phase_is_login(all_phases: list, current_phase_number: int) -> bool:
+    """后续阶段是否才执行登录。"""
+    try:
+        cur = int(current_phase_number)
+    except (TypeError, ValueError):
+        return False
+    for p in all_phases:
+        if not isinstance(p, dict):
+            continue
+        n = p.get('phaseNumber') if p.get('phaseNumber') is not None else p.get('phase_number')
+        try:
+            if n is None or int(n) <= cur:
+                continue
+        except (TypeError, ValueError):
+            continue
+        desc = str(p.get('description') or p.get('title') or p.get('name') or '').strip()
+        if desc and is_login_task(desc):
+            return True
+    return False
+
+
 def _is_open_only_dialog_or_page(
     task_text: str,
     all_phases: list | None = None,
@@ -146,8 +197,11 @@ def _is_open_only_dialog_or_page(
     if _has_terminal_action(t):
         return False
     # 有全阶段目录时，要求后续阶段确实含终态动作，避免单阶段流程被误判。
+    # 下一阶段才登录时，本阶段「打开登录页」仍是开页。
     if all_phases is not None and current_phase_number is not None:
-        return _terminal_action_in_later_phase(t, all_phases, current_phase_number)
+        if _terminal_action_in_later_phase(t, all_phases, current_phase_number):
+            return True
+        return _later_phase_is_login(all_phases, current_phase_number)
     return True
 
 
@@ -195,7 +249,8 @@ def _is_introduce_primary(
     t = (task_text or '').strip()
     if not t or is_login_task(t):
         return False
-    if not _INTRODUCE_RE.search(t):
+    # 「选择客户类型下拉」是控件，不是选人。遮罩后再认引入词。
+    if not _INTRODUCE_RE.search(mask_widget_ops(t)):
         return False
     if _CRUD_PHASE_RE.search(t):
         return False
@@ -310,7 +365,7 @@ def compile_boundary(
         goals = ['navigate_or_misc']
         success_when = []
         forbid_index = False
-        picker_allowed = bool(_INTRODUCE_RE.search(t))
+        picker_allowed = bool(_INTRODUCE_RE.search(mask_widget_ops(t)))
 
     return {
         'role': role,
@@ -320,10 +375,16 @@ def compile_boundary(
         'forbid_index_submit': forbid_index,
         'picker_allowed': picker_allowed,
         'requires_introduce_then_save': needs_intro_then_save,
+        'task_text': t,
         'task_text_excerpt': t[:200],
         'explicit_all_fields': explicit_all,
         'container_kind': container_kind or '',
         'task_mode': task_mode,
+        'submit_button': (
+            maintain_submit_button(t, modify=(task_mode == 'form_modify'))
+            if role == 'maintain' and success_when
+            else ''
+        ),
     }
 
 
@@ -360,7 +421,10 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
     if role == 'maintain':
         mode = 'create' if boundary.get('task_mode') != 'form_modify' else 'modify'
         refill = 'all_editable' if boundary.get('requires_write_all_editable') else 'none'
-        btn = '确认' if mode == 'modify' else '保存'
+        btn = str(
+            boundary.get('submit_button')
+            or ('确认' if mode == 'modify' else '保存')
+        )
         boundary_success_when = list(boundary.get('success_when') or [])
         success_kinds = []
         if any(k in boundary_success_when for k in ('toast_ok',)):
@@ -511,7 +575,13 @@ def contract_summary_hint_boundary(boundary: dict[str, Any] | None) -> str:
     if boundary.get('requires_introduce_then_save'):
         lines.append('- 收口：须完成引入（确认/弹窗关闭/回填）且最终保存成功（toast 或跳转）。')
     elif role == 'maintain':
-        lines.append('- 收口：保存成功 = 操作成功提示 或 保存后页面跳转。')
+        if boundary.get('success_when'):
+            lines.append('- 收口：保存成功 = 操作成功提示 或 保存后页面跳转。')
+        else:
+            lines.append(
+                '- 收口：本阶段只填写/选择字段，填完后 done(success=true)。'
+                '不要点确认/保存，弹窗保持打开。'
+            )
     elif role == 'introduce':
         lines.append('- 收口：选人确认 / 弹窗关闭即可，不要求操作成功 toast。')
     elif role == 'query':
