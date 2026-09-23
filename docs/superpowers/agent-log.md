@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 13:53 · ZCode 引擎线 — 合并回执：A/B 两候选修复并入 uara_V2.0_dev（用户批「合入吧」）——唯一红 sso-auth 系他线 d15482c6 预存回归，非本 diff
+
+- 合并：`engine/ab-gate-fixes-20260922`（fe7a3a27 + 收工条目 7cdf680b + 他线合流 4b2e97b5）→ `uara_V2.0_dev`，`--no-ff` 零冲突。他线 40+ 提交（ops-console 页面/录制本步反馈/KB/`d15482c6` 交易名称查询改名）已先在功能分支合流解冲突（agent-log 并排保留双方条目）。
+- 场地说明：主检出 D:\dev\JS-gen 工作区有他线未提交改动（ops-console/KB/agent-log），本合并改走临时 worktree（../JS-gen-tmp-abmerge），全程零触碰他线工作区；合并后清理。
+- 合并后验收（硬约定）：合并态（dev + 本线 = 4b2e97b5 同树）**全量 verify-all 194 pins（他线新增 5 登记后），唯一 FAILED=characterize-sso-auth**——归因实锤为他线 `d15482c6`（黄正祥，09-23 11:29「修复交易名称查询」）把 `trajectory-dao.js` `keyword` 过滤改 `name`（:724/:769 两调用点同步改名）但未同步 sso-auth pin 的调用形态断言（pin :222-224 仍字面要求 `keyword, recordStatus`）；该红在 origin dev 上即存在，**他线所致不修**，遗留移交见下。`characterize-layer-tree` 本轮绿（动态锚点选到新落库截图，traj 980 数据态红自愈）。后续仅追加 docs 条目，pin 相关文件树逐字节一致，不重复跑。
+- 生效面：①kind 同族互认=Python 侧，**新录制会话磁盘加载即效**；②零步 navigate 豁免=Node 侧，**等控制面重启窗口**（与 verify-token persisted 主路径同一窗口）。branch-only 待并入 dev 清零。
+
 ## 2026-09-22 13:08 · ZCode 引擎线 — 收工：A/B 遗留两候选修复交付（kind 同族互认 + 零步 navigate 豁免；fe7a3a27 已推送，branch-only 待并入 dev）
 
 - 完成（`fe7a3a27`，6 文件 +430/−17，回链 12:16 开工条目）：
