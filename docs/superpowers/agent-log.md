@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 17:05 · Cursor — 收工：录制逐步反馈补 console 与新 tab（d4030f1c）
+
+- 回链 16:47 开工。完成：`d4030f1c`。console.error 与 pageerror 写入会话环形缓冲（最多 20 条），下一步 cue 为 `console:err:` / `console:pageerror:`。`ctx.on('page')` 给之后打开的 page 复挂 xhr init script、console/pageerror 和原生弹窗自动接受。未恢复 `read_xhr_log` / `read_error_notify`。
+- 验收：`characterize-step-notice-scan`、`characterize-step-feedback`、`characterize-xhr-log`、`characterize-error-notify`、`characterize-phase-done-runid`、`characterize-replay-cancel-awareness`、`characterize-llm-role-env`、`characterize-probe-donelog-and-suspect-noise`、`characterize-runid-bridge` 均 OK。`verify-all.sh ui` 除 `characterize-step-highlight` 与 `characterize-layer-tree` 外通过；这两条是工作区没有数据库口令（`root@localhost` Access denied），与本次 diff 无关。
+- 遗留：未做真机 console.error 湿测。P1（非 JSON 错误体、omit_api 口径、prompt「接线中」）按开工范围未做。`network_capture` 仍只挂启动时的 page。
+
 ## 2026-09-23 16:47 · Cursor — 开工：录制逐步反馈补 console 与新 tab
 
 - 授权：用户确认调研报告后开工。范围是 P0-A（console/pageerror 进入 `[step-feedback]`）和 P0-B（新 page 复挂 xhr / console / dialog）。P1 非 JSON 错误体、omit_api 口径、prompt「接线中」文案不在本单元。
