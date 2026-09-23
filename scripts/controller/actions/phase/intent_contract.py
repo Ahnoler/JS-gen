@@ -23,6 +23,7 @@ from .boundary_contract import (
     _has_save_terminal,
     _is_open_only_dialog_or_page,
     _terminal_action_in_later_phase,
+    maintain_submit_button,
 )
 
 RefillMode = Literal['none', 'touched', 'all_editable']
@@ -192,7 +193,11 @@ def compile_phase_intent(
         refill = 'all_editable'
         # 2026-09-21：保存/提交终态动作在本阶段才给保存令牌；否则为纯填写阶段
         if has_save_terminal:
-            submit = {'required': True, 'via': 'click_save', 'button_text': '保存'}
+            submit = {
+                'required': True,
+                'via': 'click_save',
+                'button_text': maintain_submit_button(t, modify=False),
+            }
             success = {
                 'kinds': ['toast_ok', 'url_change'],
                 'evidence': ['ok-save-success', 'post_save_navigation'],
@@ -204,7 +209,11 @@ def compile_phase_intent(
         mode = 'modify'
         refill = 'all_editable'
         if has_save_terminal:
-            submit = {'required': True, 'via': 'click_save', 'button_text': '确认'}
+            submit = {
+                'required': True,
+                'via': 'click_save',
+                'button_text': maintain_submit_button(t, modify=True),
+            }
             success = {
                 'kinds': ['toast_ok', 'url_change'],
                 'evidence': ['ok-save-success', 'post_save_navigation'],
@@ -226,10 +235,8 @@ def compile_phase_intent(
     # told to click_save. A non-submit phase (login/query/other/fill-only) prescribed
     # click_save made the agent fabricate a 确定/保存 click on pages/regions that have
     # none (sid 4460cf2a).
-    if mode == 'modify' and submit.get('required'):
-        next_action = 'click_save(button_text="确认")'
-    elif mode == 'create' and submit.get('required'):
-        next_action = 'click_save(button_text="保存")'
+    if mode in ('modify', 'create') and submit.get('required'):
+        next_action = f'click_save(button_text="{submit.get("button_text") or "保存"}")'
     elif mode == 'query':
         next_action = 'click_element_by_index on 查询/搜索, then done(success=true)'
     elif mode == 'login':

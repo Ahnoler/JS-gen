@@ -26,6 +26,10 @@ _FORCE_REFILL_RE = re.compile(
 _QUERY_TASK_RE = re.compile(r'查询|搜索|查找')
 _RESET_PHASE_RE = re.compile(r'重置|清空|恢复默认')
 _QUERY_ACTION_RE = re.compile(r'点击查询|点击搜索|执行查询|执行搜索|查询按钮|搜索按钮')
+# 字段名里的「查询」不是列表查询动作。剥掉后再判 query，否则
+# 「选择查询事由/查询类型。预期结果：表单字段填写完成」会签出 query_clicked，
+# done 永远等不到该令牌，下一阶段的确认点击不会开始（sid 6038ecfa 阶段6→7）。
+_QUERY_FIELD_LABEL_RE = re.compile(r'查询事由|查询类型|查询原因|征信查询')
 # 2026-09-18 冲突普查 S3：补 维护/更新/变更（_MODIFY_TASK_RE 已有 维护）——
 # 「维护客户信息：查询定位后修改」族否则被判 query，且 is_modify_task 被
 # is_query_task 先否决（从菜单直进详情的维护不点查询 → done 死循环）。
@@ -205,15 +209,22 @@ def is_open_page_task(task_text: str) -> bool:
     return bool(_OPEN_PAGE_EXPECT_RE.search(t))
 
 
+def _without_query_field_labels(task_text: str) -> str:
+    """Drop form-field names that contain 查询 but are not a search action."""
+    return _QUERY_FIELD_LABEL_RE.sub('', task_text or '')
+
+
 def is_query_task(task_text: str) -> bool:
     """True when the phase is a search/filter task (no form-save semantics).
 
     Matches「查询产品信息」etc. Excludes mixed CRUD tasks that also mention 查询
     (e.g. 查询后新增 / 修改并保存) — those still use form-save when a dialog opens.
     Also excludes wizard copy like「客户名称搜索为…，点击下一步」(set field + next).
-    Main-page query toolbars are additionally detected via DOM (有查询无保存).
+    Field labels 查询事由/查询类型/查询原因/征信查询 are removed first so a fill
+    phase is not signed as query. Main-page query toolbars are additionally
+    detected via DOM (有查询无保存).
     """
-    t = classification_task_text(task_text)
+    t = _without_query_field_labels(classification_task_text(task_text))
     if not _QUERY_TASK_RE.search(t):
         return False
     if _RESET_PHASE_RE.search(t) and not _QUERY_ACTION_RE.search(t):

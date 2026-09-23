@@ -87,6 +87,7 @@ characterize-phase-save-cue-promote|"$PY" scripts/characterization/characterize-
 characterize-phase-end-pending-refresh|"$PY" scripts/characterization/characterize-phase-end-pending-refresh.py
 characterize-record-phase-finalize|node scripts/characterization/characterize-record-phase-finalize.mjs
 characterize-reset-phase-not-query|"$PY" scripts/characterization/characterize-reset-phase-not-query.py
+characterize-query-field-not-query|"$PY" scripts/characterization/characterize-query-field-not-query.py
 characterize-reset-button-guard|"$PY" scripts/characterization/characterize-reset-button-guard.py
 characterize-contract-arbitration-circuit-breaker|"$PY" scripts/characterization/characterize-contract-arbitration-circuit-breaker.py
 characterize-probe-donelog-and-suspect-noise|"$PY" scripts/characterization/characterize-probe-donelog-and-suspect-noise.py

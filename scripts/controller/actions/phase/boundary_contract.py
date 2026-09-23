@@ -90,6 +90,25 @@ def _has_save_terminal(task_text: str) -> bool:
     return bool(_SAVE_TERMINAL_RE.search(stripped))
 
 
+_ACTION_SUBMIT_BTN_RE = re.compile(
+    r'点击\s*[【\[「『]?\s*(确认|确定|保存|提交)'
+)
+
+
+def maintain_submit_button(task_text: str, *, modify: bool = False) -> str:
+    """保存阶段要点的按钮文案。动作子句里最后一次点击优先，否则按模式默认。
+
+    create 默认「保存」、modify 默认「确认」。弹窗终态常写「点击【确认】」，
+    若合同仍写死「保存」，click_save 的文案针匹配不到【确认】，该步不会入轨迹。
+    """
+    action = _action_clause(task_text or '')
+    hits = list(_ACTION_SUBMIT_BTN_RE.finditer(action))
+    if hits:
+        word = hits[-1].group(1)
+        return word
+    return '确认' if modify else '保存'
+
+
 def _terminal_action_in_later_phase(
     task_text: str,
     all_phases: list,
@@ -324,6 +343,11 @@ def compile_boundary(
         'explicit_all_fields': explicit_all,
         'container_kind': container_kind or '',
         'task_mode': task_mode,
+        'submit_button': (
+            maintain_submit_button(t, modify=(task_mode == 'form_modify'))
+            if role == 'maintain' and success_when
+            else ''
+        ),
     }
 
 
@@ -360,7 +384,10 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
     if role == 'maintain':
         mode = 'create' if boundary.get('task_mode') != 'form_modify' else 'modify'
         refill = 'all_editable' if boundary.get('requires_write_all_editable') else 'none'
-        btn = '确认' if mode == 'modify' else '保存'
+        btn = str(
+            boundary.get('submit_button')
+            or ('确认' if mode == 'modify' else '保存')
+        )
         boundary_success_when = list(boundary.get('success_when') or [])
         success_kinds = []
         if any(k in boundary_success_when for k in ('toast_ok',)):
@@ -511,7 +538,13 @@ def contract_summary_hint_boundary(boundary: dict[str, Any] | None) -> str:
     if boundary.get('requires_introduce_then_save'):
         lines.append('- 收口：须完成引入（确认/弹窗关闭/回填）且最终保存成功（toast 或跳转）。')
     elif role == 'maintain':
-        lines.append('- 收口：保存成功 = 操作成功提示 或 保存后页面跳转。')
+        if boundary.get('success_when'):
+            lines.append('- 收口：保存成功 = 操作成功提示 或 保存后页面跳转。')
+        else:
+            lines.append(
+                '- 收口：本阶段只填写/选择字段，填完后 done(success=true)。'
+                '不要点确认/保存，弹窗保持打开。'
+            )
     elif role == 'introduce':
         lines.append('- 收口：选人确认 / 弹窗关闭即可，不要求操作成功 toast。')
     elif role == 'query':
