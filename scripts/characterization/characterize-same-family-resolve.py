@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Pin same-family fill/select dispatch: resolve_same_family_target."""
+"""Pin same-family fill/select dispatch: resolve_same_family_target.
+
+Also pins xpath-targeted TsscMultiSelect: evaluate passes xpath into
+JS_TSSC_MULTI_SELECT; the snippet resolves the leaf, scopes host/disabled to it.
+"""
 from __future__ import annotations
 
 import sys
@@ -10,6 +14,61 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.controller.actions.same_family import resolve_same_family_target  # noqa: E402
+
+TSSC_SNIPPET = (
+    ROOT / "scripts/controller/actions/js_snippets/tssc_multi_select.py"
+).read_text(encoding="utf-8")
+SELECT_ENGINE = (ROOT / "scripts/controller/actions/select_engine.py").read_text(
+    encoding="utf-8",
+)
+
+pin_failures: list[str] = []
+
+
+def need(needle: str, where: str, *, haystack: str) -> None:
+    if needle not in haystack:
+        pin_failures.append(f"MISSING {where} :: {needle!r}")
+
+
+def pin_xpath_targeted_tssc() -> None:
+    """Task 2 review: same-family xpath must reach live tssc host scoping."""
+    need(
+        "async ([label, option, xpath]) => {",
+        "JS_TSSC_MULTI_SELECT third param",
+        haystack=TSSC_SNIPPET,
+    )
+    need(
+        "const xp = String(xpath == null ? '' : xpath).trim();",
+        "snippet reads xpath arg",
+        haystack=TSSC_SNIPPET,
+    )
+    need("const resolveNodeByXpath = (expr) => {", "xpath resolver", haystack=TSSC_SNIPPET)
+    need(
+        "anchor = resolveNodeByXpath(xp);",
+        "non-empty xpath resolves anchor",
+        haystack=TSSC_SNIPPET,
+    )
+    need("hostFromAnchor(anchor)", "xpath anchor scopes host", haystack=TSSC_SNIPPET)
+    need(
+        "// Disabled / opener scoped to the chosen host (xpath leaf), not a sibling.",
+        "disabled scoped to host comment",
+        haystack=TSSC_SNIPPET,
+    )
+    need(
+        "const scope = host || fieldItem || anchor;",
+        "disabled scope includes host",
+        haystack=TSSC_SNIPPET,
+    )
+    need(
+        "if (isDisabled(triggerInput, null, fieldItem || scope)) return 'disabled';",
+        "isDisabled uses host scope not label-only form-item",
+        haystack=TSSC_SNIPPET,
+    )
+    need(
+        "JS_TSSC_MULTI_SELECT, [label_text, option_text, xp or ''],",
+        "select_engine evaluate passes xpath third arg",
+        haystack=SELECT_ENGINE,
+    )
 
 FIELDS = [
     {'label': '保证金比例', 'kind': 'input', 'field_slot': 'A', 'xpath_smart': '(//input)[1]'},
@@ -63,6 +122,12 @@ def main() -> int:
         missing.get('error') == 'err-ambiguous-field-slot',
         f'missing xpath error, got {missing!r}',
     )
+
+    pin_xpath_targeted_tssc()
+    if pin_failures:
+        for msg in pin_failures:
+            print(msg, file=sys.stderr)
+        return 1
 
     print('ok: characterize-same-family-resolve')
     return 0
