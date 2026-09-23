@@ -17,11 +17,12 @@ option_text was 服务ID.
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER
 
-JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
+JS_TSSC_MULTI_SELECT = '''async ([label, option, xpath]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const container = ''' + JS_GET_CONTAINER + ''';
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
+    const xp = String(xpath == null ? '' : xpath).trim();
 
     // 字段解析：精确匹配优先，包含匹配仅在全局唯一时兜底。
     // 包含匹配会错位：找「要素名称」命中「组件要素名称」（includes 为真且 DOM
@@ -50,29 +51,70 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         return null;
     };
 
+    const resolveNodeByXpath = (expr) => {
+        if (!expr) return null;
+        try {
+            const snap = document.evaluate(
+                expr, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null,
+            );
+            let fallback = null;
+            for (let i = 0; i < snap.snapshotLength; i++) {
+                const n = snap.snapshotItem(i);
+                if (!n || n.nodeType !== 1) continue;
+                if (!fallback) fallback = n;
+                if (n.offsetParent !== null || n.getClientRects().length > 0) return n;
+            }
+            return fallback;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const hostFromAnchor = (el) => {
+        if (!el) return null;
+        if (el.matches && el.matches('.tssc-multi-select')) return el;
+        const tssc = el.closest && el.closest('.tssc-multi-select');
+        if (tssc) return tssc;
+        if (el.matches && el.matches('.el-select')) return el;
+        const sel = el.closest && el.closest('.el-select');
+        if (sel) return sel;
+        if (el.querySelector) {
+            return el.querySelector('.tssc-multi-select')
+                || el.querySelector('.el-select')
+                || null;
+        }
+        return null;
+    };
+
     let fieldItem = null;
-    {
+    let anchor = null;
+    if (xp) {
+        // Same-family / inventory: operate the exact leaf, not the first label match.
+        anchor = resolveNodeByXpath(xp);
+        if (!anchor) return 'xpath-not-found';
+        fieldItem = (anchor.closest && anchor.closest('.el-form-item')) || null;
+    } else {
         const hit = findFieldItem(container, label);
         if (hit && hit.ambiguous) {
             return 'ambiguous-label:' + label + ' | 候选: ' + hit.ambiguous.join(' / ')
                 + ' — 请提供完整字段名以消歧';
         }
         fieldItem = hit ? hit.item : null;
-    }
-    if (!fieldItem) {
-        // KB-I5: 弹窗/抽屉的 form-item 在页面容器之外——补扫可见 dialog/drawer
-        for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
-            if (dlg.offsetParent === null) continue;
-            const hit = findFieldItem(dlg, label);
-            if (hit && hit.ambiguous) {
-                return 'ambiguous-label:' + label + ' | 候选: ' + hit.ambiguous.join(' / ')
-                    + ' — 请提供完整字段名以消歧';
+        if (!fieldItem) {
+            // KB-I5: 弹窗/抽屉的 form-item 在页面容器之外——补扫可见 dialog/drawer
+            for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+                if (dlg.offsetParent === null) continue;
+                const hit = findFieldItem(dlg, label);
+                if (hit && hit.ambiguous) {
+                    return 'ambiguous-label:' + label + ' | 候选: ' + hit.ambiguous.join(' / ')
+                        + ' — 请提供完整字段名以消歧';
+                }
+                if (hit && hit.item) { fieldItem = hit.item; break; }
             }
-            if (hit && hit.item) { fieldItem = hit.item; break; }
         }
+        if (!fieldItem) return 'label-not-found';
     }
-    if (!fieldItem) return 'label-not-found';
-    fieldItem.scrollIntoView({ block: 'center', behavior: 'instant' });
+    (fieldItem || anchor).scrollIntoView({ block: 'center', behavior: 'instant' });
 
     const isTssc = (v) => !!(v && v.$options && v.$options.name
         && String(v.$options.name).includes('TsscMultiSelect'));
@@ -84,16 +126,38 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         }
         return null;
     };
-    let host = fieldItem.querySelector('.tssc-multi-select');
+    let host = null;
     let vm = null;
-    if (host && host.__vue__) vm = walkVueForTssc(host.__vue__);
-    if (!vm) {
-        for (const el of fieldItem.querySelectorAll('.tssc-multi-select, [class*="tssc"], .el-select, input')) {
-            if (!el.__vue__) continue;
-            vm = walkVueForTssc(el.__vue__);
-            if (vm) {
-                host = host || el.closest('.tssc-multi-select') || el;
-                break;
+    if (anchor) {
+        host = hostFromAnchor(anchor);
+        if (host && host.__vue__) vm = walkVueForTssc(host.__vue__);
+        if (!vm && host) {
+            for (const el of host.querySelectorAll(
+                '.tssc-multi-select, [class*="tssc"], .el-select, input',
+            )) {
+                if (!el.__vue__) continue;
+                vm = walkVueForTssc(el.__vue__);
+                if (vm) {
+                    host = hostFromAnchor(el) || host;
+                    break;
+                }
+            }
+        }
+    }
+    if (!host && fieldItem) {
+        // Label-only: single dropdown in the form-item (first match OK).
+        host = fieldItem.querySelector('.tssc-multi-select');
+        if (host && host.__vue__) vm = walkVueForTssc(host.__vue__);
+        if (!vm) {
+            for (const el of fieldItem.querySelectorAll(
+                '.tssc-multi-select, [class*="tssc"], .el-select, input',
+            )) {
+                if (!el.__vue__) continue;
+                vm = walkVueForTssc(el.__vue__);
+                if (vm) {
+                    host = host || el.closest('.tssc-multi-select') || el;
+                    break;
+                }
             }
         }
     }
@@ -101,9 +165,12 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         return 'no-tssc-multi-select | Not TsscMultiSelect. Use select_option for plain el-select, or report.';
     }
 
-    const triggerInput = fieldItem.querySelector('.el-select .el-input__inner')
-        || fieldItem.querySelector('input:not([type="hidden"])');
-    if (isDisabled(triggerInput, null, fieldItem)) return 'disabled';
+    // Disabled / opener scoped to the chosen host (xpath leaf), not a sibling.
+    const scope = host || fieldItem || anchor;
+    const triggerInput = scope.querySelector('.el-select .el-input__inner')
+        || scope.querySelector('input:not([type="hidden"])')
+        || (anchor && anchor.matches && anchor.matches('input') ? anchor : null);
+    if (isDisabled(triggerInput, null, fieldItem || scope)) return 'disabled';
     if (vm && (vm.disabled === true || (vm.$props && vm.$props.disabled === true))) return 'disabled';
 
     const readback = () => {
@@ -137,7 +204,8 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option]) => {
         if (readbackMatches(cur, optNorm)) return 'ok-already:' + cur;
     }
 
-    const elSelect = fieldItem.querySelector('.el-select');
+    const elSelect = (host && host.matches && host.matches('.el-select') ? host : null)
+        || scope.querySelector('.el-select');
     let opener = triggerInput || elSelect || host;
     if (triggerInput && triggerInput.readOnly && elSelect) opener = elSelect;
     if (opener) opener.click();

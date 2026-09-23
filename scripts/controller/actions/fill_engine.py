@@ -28,7 +28,7 @@ from .form_scan_utils import (
     _JS_READ_CERT_TYPE,
     ResolvedControl, _resolve_control, lookup_field_kind, _task_done_impl,
 )
-from .same_family import resolve_same_family_target
+from .same_family import format_same_family_candidates, resolve_same_family_target
 from .form_engine_base import (
     _FormActionEngineBase,
     _ReplayAutofillStub,
@@ -248,10 +248,7 @@ class FillEngine(_FormActionEngineBase):
             )
             if not _sf.get('ok'):
                 _cands = _sf.get('candidates') or []
-                _nxt = '; '.join(
-                    f"field_slot={c.get('field_slot')!r} xpath_smart={c.get('xpath_smart')!r}"
-                    for c in _cands
-                ) or 'scan_form_fields 后带 xpath_smart 重试'
+                _nxt = format_same_family_candidates(_cands)
                 return err_with(
                     _sf.get('error') or 'err-ambiguous-field-slot',
                     '同标签多控件须带 xpath_smart 指定槽位',
@@ -296,10 +293,7 @@ class FillEngine(_FormActionEngineBase):
             )
             if not _sf2.get('ok'):
                 _cands2 = _sf2.get('candidates') or []
-                _nxt2 = '; '.join(
-                    f"field_slot={c.get('field_slot')!r} xpath_smart={c.get('xpath_smart')!r}"
-                    for c in _cands2
-                ) or 'scan_form_fields 后带 xpath_smart 重试'
+                _nxt2 = format_same_family_candidates(_cands2)
                 return err_with(
                     _sf2.get('error') or 'err-ambiguous-field-slot',
                     '同标签多控件须带 xpath_smart 指定槽位',
@@ -648,7 +642,8 @@ class FillEngine(_FormActionEngineBase):
                 action='fill',
             )
             if not _sf_r.get('ok'):
-                return _sf_r.get('error') or 'err-ambiguous-field-slot'
+                _err_r = _sf_r.get('error') or 'err-ambiguous-field-slot'
+                return f'{_err_r} | {format_same_family_candidates(_sf_r.get("candidates"))}'
             if (_sf_r.get('kind') or '') == 'input' and (_sf_r.get('xpath_smart') or '').strip():
                 xpath_smart = (_sf_r.get('xpath_smart') or '').strip()
                 kind = 'input'
@@ -665,7 +660,8 @@ class FillEngine(_FormActionEngineBase):
                 action='fill',
             )
             if not _sf_r2.get('ok'):
-                return _sf_r2.get('error') or 'err-ambiguous-field-slot'
+                _err_r2 = _sf_r2.get('error') or 'err-ambiguous-field-slot'
+                return f'{_err_r2} | {format_same_family_candidates(_sf_r2.get("candidates"))}'
             if (_sf_r2.get('kind') or '') == 'input' and (_sf_r2.get('xpath_smart') or '').strip():
                 xpath_smart = (_sf_r2.get('xpath_smart') or '').strip()
 

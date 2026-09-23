@@ -26,7 +26,7 @@ from .form_scan_utils import (
     match_select_option_candidate,
     _resolve_control, lookup_field_kind, resolve_select_fallback, _task_done_impl,
 )
-from .same_family import resolve_same_family_target
+from .same_family import format_same_family_candidates, resolve_same_family_target
 from .form_engine_base import (
     _FormActionEngineBase,
     _ReplayAutofillStub,
@@ -548,14 +548,12 @@ class SelectEngine(_FormActionEngineBase):
         )
         if not _sf_sel.get('ok'):
             _cands = _sf_sel.get('candidates') or []
+            _nxt = format_same_family_candidates(_cands)
+            _err = _sf_sel.get('error') or 'err-ambiguous-field-slot'
             if is_replay:
-                return _sf_sel.get('error') or 'err-ambiguous-field-slot'
-            _nxt = '; '.join(
-                f"field_slot={c.get('field_slot')!r} xpath_smart={c.get('xpath_smart')!r}"
-                for c in _cands
-            ) or 'scan_form_fields 后带 xpath_smart 重试'
+                return f'{_err} | {_nxt}'
             return err_with(
-                _sf_sel.get('error') or 'err-ambiguous-field-slot',
+                _err,
                 '同标签多控件须带 xpath_smart 指定槽位',
                 observed=f'label={label_text} candidates={len(_cands)}',
                 next_action=_nxt,
@@ -1141,7 +1139,9 @@ class SelectEngine(_FormActionEngineBase):
             captured = await _capture_element(
                 page, label_text, target_kind='form_tssc_multi_select', xpath_smart=xp,
             )
-        result = await page.evaluate(JS_TSSC_MULTI_SELECT, [label_text, option_text])
+        result = await page.evaluate(
+            JS_TSSC_MULTI_SELECT, [label_text, option_text, xp or ''],
+        )
         if _is_ok_result(result):
             if is_replay:
                 return str(result)

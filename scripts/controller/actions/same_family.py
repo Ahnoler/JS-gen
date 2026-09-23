@@ -10,6 +10,16 @@ def _norm_label(label: str) -> str:
     return s
 
 
+def format_same_family_candidates(candidates: list | None) -> str:
+    """Same listing used by record ``err_with`` next_action and replay ambiguous returns."""
+    parts = [
+        f"field_slot={c.get('field_slot')!r} xpath_smart={c.get('xpath_smart')!r}"
+        for c in (candidates or [])
+        if isinstance(c, dict)
+    ]
+    return "; ".join(parts) or "scan_form_fields 后带 xpath_smart 重试"
+
+
 def resolve_same_family_target(
     fields: list,
     *,
