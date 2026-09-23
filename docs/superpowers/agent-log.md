@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-23 08:40 · Cursor — 开工声明：阶段5引入确认后误录父表单步骤
+- 开工：08:40。录制阶段5（客户选择窗口选人并确认）在 picker 关闭后被 `_submit_ready` 推去 `click_save` 父弹窗，把阶段6字段与父表单确认录进本阶段，阶段无法 done，阶段6不起步
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/phase/boundary_gates.py`、`scripts/controller/actions/_misc.py`、`scripts/controller/actions/form_save.py`、`scripts/controller/actions/form_action_engines.py`、`scripts/controller/actions/_table.py`、`scripts/recorder.py`、`scripts/agent/recorder_emitters.py`、`scripts/characterization/characterize-phase-intent.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、他线 WIP
+- 方式：主会话直接改；先开工声明提交，再改代码与特征化
+
 ## 2026-09-05 19:35 · Cursor Lead — 收工：需求导入 KB 实现 T1–T4（回链 19:16 开工）
 - 完成：Skill `req-doc-to-kb`；服务+pin OK 11；`/api/v2/kb/req-modules*` + 501 上传 stub；`product-mgmt` registered；`verify-all` 接入 pin
 - 提交链：`9681934` → `dc4f84d` → `25a75c2` → `9e345e8` → `c05e99f`
