@@ -3,6 +3,14 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 16:47 · Cursor — 开工：录制逐步反馈补 console 与新 tab
+
+- 授权：用户确认调研报告后开工。范围是 P0-A（console/pageerror 进入 `[step-feedback]`）和 P0-B（新 page 复挂 xhr / console / dialog）。P1 非 JSON 错误体、omit_api 口径、prompt「接线中」文案不在本单元。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/step-feedback-console-20260923`（自 `origin/uara_V2.0_dev` `79631d3b`）。主检出有他线未提交改动，本线不碰。
+- 工作范围：`scripts/agent/console_feedback.py`、`scripts/agent/page_feedback_hooks.py`、`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/session_runner.py`、`scripts/browser/factory.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`scripts/characterization/cold/characterize-step-feedback.py`、`docs/superpowers/reports/2026-09-23-step-feedback-console-gap-research.md`、本条目。
+- 禁入区：回放线（`_replay.py` 与各 Engine）、`scripts/agent/service.py`、`data/kb/**`、主检出未提交的 ops-console / product_library、引擎 worktree。不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话先写失败 pin 再实现。微步用 `bash scripts/refactor/verify-all.sh ui`（`--changed` 不会自动选中 ui 域）。
+
 ## 2026-09-23 16:15 · Cursor — 开工：识图辅助开关写入配置文件
 
 - 授权：用户要求把大模型识图辅助做成配置文件里的开关。
