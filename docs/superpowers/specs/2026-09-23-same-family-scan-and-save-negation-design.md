@@ -1,7 +1,7 @@
 # Design: 同表单项多控件扫描分发，与保存否定句
 
 **日期**：2026-09-23  
-**状态**：待用户审阅书面稿  
+**状态**：已审阅（2026-09-23 用户确认）。实现计划：`docs/superpowers/plans/2026-09-23-same-family-scan-and-save-negation.md`  
 **触发**：轨迹 985 阶段 5。未启用产品「林业贷（对公-流动资金）[V-1.0.1]」的「保证金比例」已可见且非禁用，仍没有 `field_slot` 落库。  
 **证据**：`logs/agent-stderr/a17ef65d-5d93-40cd-98be-2d62e47c661f.log`；Playwright `tmp/field-slot-playwright-20260923.md`。  
 **相关**：`docs/superpowers/specs/2026-09-16-form-field-intra-slot-xpath-design.md`（点到控件之后的 xpath 消歧，本设计不重做）。
