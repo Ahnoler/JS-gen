@@ -366,6 +366,31 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         const textarea = item.querySelector('textarea');
         const trigger = item.querySelector('.el-select .el-input__inner');
         if (!label && !input && !textarea && !trigger) continue;
+        const split = (typeof listFormItemScanFields === 'function')
+            ? listFormItemScanFields(item) : null;
+        // Split only when at least one family has >= 2 leaves (field_slot set).
+        // Singleton input/date/radio/select keep classify / readValue / options path.
+        const useSplit = !!(split && split.length && split.some(function (r) { return !!r.field_slot; }));
+        if (useSplit) {
+            for (const row of split) {
+                const field = {
+                    label: row.label,
+                    kind: row.kind,
+                    currentValue: row.currentValue || '',
+                    options: [],
+                    placeholder: row.placeholder || '',
+                    required: false,
+                    disabled: !!row.disabled,
+                    selected: false,
+                    hasButton: '',
+                    xpath_smart: row.xpath_smart || '',
+                    field_slot: row.field_slot || '',
+                    display_label: row.display_label || '',
+                };
+                pushField(field);
+            }
+            continue;
+        }
         const kind = classify(item);
         const inputEl = input || textarea;
         let currentValue = readValue(inputEl, trigger, item);

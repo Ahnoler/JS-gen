@@ -122,6 +122,8 @@ characterize-form-engine-wiring|"$PY" scripts/characterization/characterize-form
 characterize-form-assistant|"$PY" scripts/characterization/characterize-form-assistant.py
 characterize-form-snapshot-trigger|node scripts/characterization/characterize-form-snapshot-trigger.mjs
 characterize-form-field-intra-slot|node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
+characterize-same-family-scan|node scripts/characterization/cold/characterize-same-family-scan.mjs
+characterize-same-family-resolve|"$PY" scripts/characterization/characterize-same-family-resolve.py
 characterize-form-structure-container|node scripts/characterization/cold/characterize-form-structure-container.mjs
 characterize-form-rules|"$PY" scripts/characterization/characterize-form-rules.py
 characterize-date-range-recording|"$PY" scripts/characterization/cold/characterize-date-range-recording.py
@@ -292,6 +294,8 @@ characterize-backfill|node scripts/characterization/characterize-backfill.mjs
 characterize-refill-contract|"$PY" scripts/characterization/characterize-refill-contract.py
 characterize-system-import-json|node scripts/characterization/characterize-system-import-json.mjs
 characterize-form-field-intra-slot|node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
+characterize-same-family-scan|node scripts/characterization/cold/characterize-same-family-scan.mjs
+characterize-same-family-resolve|"$PY" scripts/characterization/characterize-same-family-resolve.py
 characterize-form-structure-container|node scripts/characterization/cold/characterize-form-structure-container.mjs
 characterize-recording-coach-assert|node scripts/characterization/cold/characterize-recording-coach-assert.mjs
 characterize-recording-coach-operator|node scripts/characterization/cold/characterize-recording-coach-operator.mjs

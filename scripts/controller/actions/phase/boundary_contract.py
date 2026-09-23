@@ -67,6 +67,10 @@ _SAVE_TERMINAL_RE = re.compile(
     r'点击\s*(?:保存|提交|确认|确定)|(?:保存|提交|确认|确定)\s*按钮|'
     r'保存成功|提交成功|保存并|提交并|并保存|并提交|保存后|提交后|保存|提交|确认|确定'
 )
+_NEGATED_TERMINAL_RE = re.compile(
+    r'(?:不要(?:点|点击)?|不点|勿点|禁止(?:点击)?|勿)\s*[「“"\']?'
+    r'(?:保存|提交|确认|确定)'
+)
 
 
 def _has_terminal_action(task_text: str) -> bool:
@@ -81,7 +85,9 @@ def _has_introduce_terminal(task_text: str) -> bool:
 
 def _has_save_terminal(task_text: str) -> bool:
     """本阶段是否含保存/提交终态动作（动作子句或预期结果）。"""
-    return bool(_SAVE_TERMINAL_RE.search(task_text))
+    raw = task_text or ''
+    stripped = _NEGATED_TERMINAL_RE.sub('', raw)
+    return bool(_SAVE_TERMINAL_RE.search(stripped))
 
 
 def _terminal_action_in_later_phase(

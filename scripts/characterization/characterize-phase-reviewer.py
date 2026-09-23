@@ -238,6 +238,17 @@ def main() -> None:
     assert m_c['mode'] == 'modify'
     assert 'click_save' in (m_c['recovery']['next_action'] or ''), m_c['recovery']['next_action']
 
+    # 源码针：超时与通用失败日志分开；TimeoutError 分支须早于 except Exception
+    reviewer_src = (
+        ROOT / 'scripts' / 'controller' / 'actions' / 'phase' / 'reviewer.py'
+    ).read_text(encoding='utf-8')
+    assert '[phase_reviewer] timeout' in reviewer_src, 'reviewer must log [phase_reviewer] timeout'
+    timeout_idx = reviewer_src.find('except asyncio.TimeoutError')
+    failed_idx = reviewer_src.find("except Exception as e:\n        sys.stderr.write(f'[phase_reviewer] failed:")
+    assert timeout_idx >= 0, 'TimeoutError branch missing'
+    assert failed_idx >= 0, 'generic Exception branch for phase_reviewer failed missing'
+    assert timeout_idx < failed_idx, 'TimeoutError must precede generic except Exception'
+
     print('PASS characterize-phase-reviewer')
 
 
