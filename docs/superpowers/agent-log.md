@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 15:05 · Cursor — 开工：录制旁路门禁说明与按需识图
+
+- 授权：用户确认旁路方案后，要求按建议建任务树并开发。
+- 工作范围：`scripts/agent/record_sidepath.py`、`scripts/agent/record_vision.py`、`scripts/feature_flags.py`、`scripts/recorder.py`（仅步骤开始注入门禁）、`scripts/agent/recorder_emitters.py`（仅 done 通过后门禁后的识图复核）、`scripts/agent/service.py`（仅点击否决包装）、`scripts/prompts/agent-core.md`、`executor/config.js`（仅把两个开关传入 Python）、`config/.env.example`、`executor/.env.example`、`scripts/characterization/cold/characterize-record-sidepath.py`、`scripts/refactor/verify-all.sh`（core 与 phase 登记）、本开工条目。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/state.py`、回放与 heal 判定、`use_vision` 仍保持关闭。识图失败不中断阶段，否决不写入轨迹步骤。
+- 执行方式：主会话按层实现。第 1 层每步一行门禁；第 3 层结束复核；第 2 层高风险点击落步前否决。
+
 ## 2026-09-22 19:05 · ZCode 引擎线 — 收工：三条 SUT 实证知识落流程卡（e0dd6e35）
 
 - 回链 18:40 开工。完成：session_login +2（按钮文案空格比对/二级菜单双 DOM）+ credit_usage +1（日期弹层 pickerVisible=false）；欢迎弹窗按用户澄清定性为「登录后自动读取天元配置的预期行为」不进卡。
@@ -44,6 +51,7 @@
 - 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev`（带入 Cursor ops-console 3 docs commits，零冲突）→ **合并态全量 verify-all 189 pins（187+2 新登记），唯一 FAILED=characterize-layer-tree**（traj 980 phase_highlight 截图 91 元素仅 80 带 layers，落库数据态；实施者已用 stash 在 BASE 复现同红，预存非本 diff 所致）。
 - 遗留移交（评审 Minor 记档，均不阻塞）：①M1 角可选补 pin——introduce 合约 kinds 单值 `['confirm_click']` 不再被 legacy 分支识别（静态证明不可达：两 flag 写点必先落同名 token；legacy 编译器恒成对输出；persisted 走 boundary 路径），如需可补一条 pin；②M3——pin② 与既有 gate pin 同登 phase 域，`--changed` 对仅改 runner 的 diff 有盲区（继承惯例非本单元引入），后续加固可补登 ui/core；③M4——mode=other+描述无写动词的误豁免面属设计级残余，湿测期 grep `[record] phase #N navigate-only zero-step success` 作探针；④layer-tree 预存红数据态归因共享——他线触碰 traj 980 相关数据时注意。
 - 分支与生效面：`engine/ab-gate-fixes-20260922` 已推 origin，branch-only **待并入 dev**；①合并 dev 后新录制会话即效；②等控制面重启窗口（与 verify-token persisted 主路径同一窗口）。
+
 ## 2026-09-23 11:32 · Cursor — 收工：录制本步页面反馈合入 uara_V2.0_dev
 
 - 回链 17:12 开工。用户指令合入开发分支并告一段落。
