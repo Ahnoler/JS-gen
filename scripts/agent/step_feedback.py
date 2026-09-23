@@ -51,10 +51,19 @@ def business_action_names(raw_actions) -> list[str]:
 
 
 def omit_api_if_ui(items: list[dict]) -> list[dict]:
-    has_ui = any(it.get("kind") in ("toast", "form") for it in items or [])
+    """Keep api errors next to toast or form text.
+
+    An api row is dropped only when it is marked level=success and the step
+    already has toast or form feedback. Rows without a level stay.
+    """
+    rows = list(items or [])
+    has_ui = any(it.get("kind") in ("toast", "form") for it in rows)
     if not has_ui:
-        return list(items or [])
-    return [it for it in items if it.get("kind") != "api"]
+        return rows
+    return [
+        it for it in rows
+        if not (it.get("kind") == "api" and str(it.get("level") or "") == "success")
+    ]
 
 
 def format_step_feedback_cue(actions: list[str], items: list[dict]) -> str:
