@@ -2,6 +2,14 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-23 14:30 · ZCode 合约线 — 开工：KB 配方「授信/评级硬前置语义细化」落地（用户批，入 credit_application.json）
+
+- **收件**：用户批准 09-23 流程卡证据扫描报告的推荐项①（授权范围仅此一条；推荐项②产品库删除机制**未批，不动**）。落地内容=把 wet7/wet8 湿测实证的硬前置判据语义写进既有「确认/startProcess」规则：①「有效评级」=审批「通过」终态（待发起/审批中/打回均不算，wet7/wet8 实证服务端拒「查询不到客户有效评级」）；②「在途授信」含打回态（wet8 实证审批中在途拒绝 + 资源申请期打回态复证）。
+- **范围（可写集）**：`data/kb/flows/credit_application.json`（仅 rules 数组追加 1 条，单规则粒度）、agent-log 本条目+收工条目
+- **禁入区**：其余 flows json（推荐项②未批）；`scripts/**`、`src/**`；他线在途（引擎线新一轮修复）；SUT
+- **执行方式**：单行规则追加 → 同 commit 复跑双侧金样例（JS characterize-flow-card-recall + Python characterize-kb-recall）→ recall-eval 与基线 diff（召回零影响证明）→ commit → 自并 uara_V2.0（用户已批「合入 uara V2.0 dev 主开发分支」）→ 合并态验收 → push + 收工条目
+- 注：纯 KB 数据+文档轮次，无代码改动
+
 ## 2026-09-21 17:55 · ZCode 合约线 — 收工：同族快照复刻湿测验收 PASS（traj 975/976，回链 16:55 开工；回执「可合并」已发）
 
 - **结论：PASS（可合并）**。7e43c736 两单真机验收（`tmp/contract-wet11-20260921/` + `through-report-snapreplica.md`；控制面 pid 9908 全程未变）：
