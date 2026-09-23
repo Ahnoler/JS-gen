@@ -28,7 +28,11 @@ def main() -> int:
         remember_click_judgement,
     )
     from scripts.agent.record_vision import model_blocks_vision
-    from scripts.feature_flags import record_gate_cue_enabled, record_vision_enabled
+    from scripts.feature_flags import (
+        dotenv_value,
+        record_gate_cue_enabled,
+        record_vision_enabled,
+    )
 
     assert_true(format_gate_line(None) == '', 'no store')
     assert_true(format_gate_line({'_heal_mode': True, '_phase_intent': {'mode': 'create'}}) == '', 'heal silent')
@@ -122,6 +126,19 @@ def main() -> int:
         assert_true(record_vision_enabled(), 'vision default on')
         os.environ['AI_RECORD_VISION'] = '0'
         assert_true(not record_vision_enabled(), 'vision off')
+        os.environ['AI_RECORD_VISION'] = 'false'
+        assert_true(not record_vision_enabled(), 'vision false')
+        os.environ.pop('AI_RECORD_VISION', None)
+        sample = (ROOT / 'config' / '.env.example').read_text(encoding='utf-8')
+        active = [
+            line.strip() for line in sample.splitlines()
+            if line.strip().startswith('AI_RECORD_VISION=')
+        ]
+        assert_true(active == ['AI_RECORD_VISION=true'], f'config switch {active}')
+        sample_text = "# AI_RECORD_VISION=true\nAI_RECORD_VISION=false\n"
+        assert_true(dotenv_value(sample_text, 'AI_RECORD_VISION') == 'false', 'file wins over comment')
+        assert_true(dotenv_value('AI_RECORD_VISION=0\n', 'AI_RECORD_VISION') == '0', 'zero is a value')
+        assert_true(dotenv_value('', 'AI_RECORD_VISION') is None, 'missing key')
     finally:
         if saved_gate is None:
             os.environ.pop('AI_RECORD_GATE_CUE', None)

@@ -129,6 +129,10 @@ export function spawnAgent(args, extraEnv = {}) {
   if (headless && !env.CHROME_HEADLESS) {
     env.CHROME_HEADLESS = headless;
   }
+  const recordVision = resolveConfig('AI_RECORD_VISION', '');
+  if (recordVision && !env.AI_RECORD_VISION) {
+    env.AI_RECORD_VISION = recordVision;
+  }
   return spawn(PYTHON_EXE, ['-m', 'scripts.main', ...args], {
     cwd: PROJECT_DIR,
     stdio: ['pipe', 'pipe', 'pipe'],
