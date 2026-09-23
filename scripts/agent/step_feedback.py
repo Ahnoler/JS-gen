@@ -77,6 +77,9 @@ def format_step_feedback_cue(actions: list[str], items: list[dict]) -> str:
             parts.append(f"{surface}:{text}")
         elif kind == "api":
             parts.append(f"api:{text}")
+        elif kind == "console":
+            level = "pageerror" if str(it.get("level") or "") == "pageerror" else "err"
+            parts.append(f"console:{level}:{text}")
     if not parts:
         return ""
     return f"[step-feedback] {head} | " + "；".join(parts)

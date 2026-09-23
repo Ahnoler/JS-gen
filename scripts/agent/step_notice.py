@@ -288,6 +288,14 @@ async def scan_and_emit_step_notices(
         sys.stderr.write(f"[recorder] step-feedback api scan failed: {e}\n")
         sys.stderr.flush()
 
+    try:
+        from scripts.agent.console_feedback import take_console_feedback
+        for row in take_console_feedback(business_data_store):
+            feedback_items.append(row)
+    except Exception as e:
+        sys.stderr.write(f"[recorder] step-feedback console scan failed: {e}\n")
+        sys.stderr.flush()
+
     feedback_items = omit_api_if_ui(feedback_items)
     if not feedback_items:
         return []

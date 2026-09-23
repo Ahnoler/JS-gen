@@ -369,14 +369,11 @@ async def run_session(args):
         sys.stderr.flush()
 
     try:
-        from scripts.controller.actions._js_snippets import JS_XHR_HOOK
-        _page_for_xhr = await browser_context.get_current_page()
-        if _page_for_xhr is not None:
-            await _page_for_xhr.add_init_script(JS_XHR_HOOK)
-            await _page_for_xhr.evaluate(JS_XHR_HOOK)
+        from scripts.agent.page_feedback_hooks import install_recording_page_hooks
+        await install_recording_page_hooks(browser_context, business_data_store)
     except Exception as _xhr_err:
         sys.stderr.write(
-            f"[step-feedback] xhr hook install failed (ignored): {type(_xhr_err).__name__}: {_xhr_err}\n"
+            f"[step-feedback] page hook install failed (ignored): {type(_xhr_err).__name__}: {_xhr_err}\n"
         )
         sys.stderr.flush()
 

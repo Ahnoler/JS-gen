@@ -52,6 +52,40 @@ def main() -> int:
     assert_true("【页面通知】" not in cue, cue)
     assert_true(format_step_feedback_cue(["click_save"], []) == "", "empty cue")
 
+    console_cue = format_step_feedback_cue(
+        ["click_save"],
+        [
+            {"kind": "console", "level": "error", "text": "Cannot read properties of undefined"},
+            {"kind": "console", "level": "pageerror", "text": "x is not defined"},
+        ],
+    )
+    assert_true("console:err:Cannot read properties of undefined" in console_cue, console_cue)
+    assert_true("console:pageerror:x is not defined" in console_cue, console_cue)
+    mixed = omit_api_if_ui([
+        {"kind": "toast", "level": "error", "text": "保存失败"},
+        {"kind": "console", "level": "error", "text": "TypeError"},
+        {"kind": "api", "text": "闸门"},
+    ])
+    assert_true(all(it["kind"] != "api" for it in mixed), "toast still drops api")
+    assert_true(any(it["kind"] == "console" for it in mixed), "console survives toast suppression")
+
+    from scripts.agent.console_feedback import RING_MAX, push_console_line, take_console_feedback
+
+    cstore: dict = {}
+    push_console_line(cstore, level="error", text=" boom ")
+    push_console_line(cstore, level="pageerror", text="长" * 250)
+    rows = take_console_feedback(cstore)
+    assert_true(len(rows) == 2, f"console rows {rows}")
+    assert_true(rows[0] == {"kind": "console", "level": "error", "text": "boom"}, rows[0])
+    assert_true(rows[1]["level"] == "pageerror" and len(rows[1]["text"]) == 200, rows[1])
+    assert_true(take_console_feedback(cstore) == [], "console cursor advanced")
+    for i in range(30):
+        push_console_line(cstore, level="error", text=f"e{i}")
+    assert_true(len(cstore["_step_console_ring"]) == RING_MAX, "ring cap 20")
+    taken = take_console_feedback(cstore)
+    assert_true(len(taken) == RING_MAX, f"unread window {len(taken)}")
+    assert_true(taken[0]["text"] == "e10" and taken[-1]["text"] == "e29", taken)
+
     store: dict = {}
     append_step_feedback(store, 3, ["click_save"], [{"kind": "toast", "level": "error", "text": "x"}])
     append_step_feedback(store, 4, ["click_button"], [])
@@ -100,8 +134,12 @@ def main() -> int:
     )
 
     runner_src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
-    assert_true("JS_XHR_HOOK" in runner_src, "MISSING JS_XHR_HOOK in session_runner")
-    assert_true("add_init_script" in runner_src, "MISSING add_init_script for xhr hook")
+    assert_true("install_recording_page_hooks" in runner_src, "runner installs page hooks")
+    hooks_src = (ROOT / "scripts/agent/page_feedback_hooks.py").read_text(encoding="utf-8")
+    assert_true("JS_XHR_HOOK" in hooks_src, "MISSING JS_XHR_HOOK")
+    assert_true("add_init_script" in hooks_src, "MISSING add_init_script for xhr hook")
+    assert_true("pageerror" in hooks_src, "MISSING pageerror listener")
+    assert_true("on('page'" in hooks_src, "MISSING new-page rebind")
 
     agent_notice_src = (ROOT / "scripts/agent/step_notice.py").read_text(encoding="utf-8")
     assert_true("_step_feedback_xhr_cursor" in agent_notice_src, "MISSING xhr cursor store key")

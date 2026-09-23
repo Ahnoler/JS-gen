@@ -1,0 +1,107 @@
+"""Rebind recording observers onto every page, including tabs opened later."""
+from __future__ import annotations
+
+import asyncio
+import sys
+
+_attached_pages: set[int] = set()
+_xhr_contexts: set[int] = set()
+
+
+def _target(page):
+    return getattr(page, "page", page)
+
+
+def _bind_console(target, store) -> None:
+    from scripts.agent.console_feedback import push_console_line
+
+    def on_console(msg):
+        try:
+            if getattr(msg, "type", "") != "error":
+                return
+            text = msg.text if hasattr(msg, "text") else str(msg)
+        except Exception:
+            return
+        push_console_line(store, level="error", text=text)
+
+    def on_pageerror(err):
+        try:
+            push_console_line(store, level="pageerror", text=getattr(err, "message", None) or str(err))
+        except Exception:
+            return
+
+    try:
+        target.on("console", on_console)
+        target.on("pageerror", on_pageerror)
+    except Exception as exc:
+        sys.stderr.write(f"[step-feedback] console hook failed: {exc}\n")
+        sys.stderr.flush()
+
+
+async def _attach_page(page, xhr_hook: str, store) -> None:
+    if page is None:
+        return
+    target = _target(page)
+    pid = id(target)
+    if pid in _attached_pages:
+        return
+    _attached_pages.add(pid)
+    _bind_console(target, store)
+    try:
+        from scripts.browser.factory import attach_native_dialog_accept
+        attach_native_dialog_accept(target)
+    except Exception as exc:
+        sys.stderr.write(f"[step-feedback] dialog hook failed: {exc}\n")
+        sys.stderr.flush()
+    try:
+        await target.add_init_script(xhr_hook)
+        await target.evaluate(xhr_hook)
+    except Exception as exc:
+        sys.stderr.write(f"[step-feedback] xhr hook failed: {exc}\n")
+        sys.stderr.flush()
+
+
+async def install_recording_page_hooks(browser_context, business_data_store=None) -> None:
+    """Install xhr, console/pageerror, and dialog accept on current and future pages."""
+    from scripts.controller.actions._js_snippets import JS_XHR_HOOK
+
+    session = getattr(browser_context, "session", None)
+    ctx = getattr(session, "context", None) if session else None
+    pages = []
+    if ctx is not None:
+        cid = id(ctx)
+        if cid not in _xhr_contexts:
+            _xhr_contexts.add(cid)
+            try:
+                await ctx.add_init_script(JS_XHR_HOOK)
+            except Exception as exc:
+                sys.stderr.write(f"[step-feedback] context xhr init failed: {exc}\n")
+                sys.stderr.flush()
+
+            def _on_page(new_page):
+                try:
+                    asyncio.get_running_loop().create_task(
+                        _attach_page(new_page, JS_XHR_HOOK, business_data_store)
+                    )
+                except Exception as exc:
+                    sys.stderr.write(f"[step-feedback] new page hook failed: {exc}\n")
+                    sys.stderr.flush()
+
+            try:
+                ctx.on('page', _on_page)
+            except Exception as exc:
+                sys.stderr.write(f"[step-feedback] page listener failed: {exc}\n")
+                sys.stderr.flush()
+        try:
+            pages = list(ctx.pages or [])
+        except Exception:
+            pages = []
+    if not pages:
+        try:
+            current = await browser_context.get_current_page()
+        except Exception:
+            current = None
+        if current is not None:
+            pages = [current]
+    for page in pages:
+        await _attach_page(page, JS_XHR_HOOK, business_data_store)

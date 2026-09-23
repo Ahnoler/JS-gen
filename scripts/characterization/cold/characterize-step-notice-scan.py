@@ -124,6 +124,7 @@ def test_scan_source_rewinds_before_advancing_cursor() -> None:
     assert_true("format_step_feedback_cue" in body, "scan uses step-feedback cue")
     assert_true("append_step_feedback" in body, "scan appends step-feedback history")
     assert_true("【页面通知】" not in body, "scan path dropped old header")
+    assert_true("take_console_feedback" in src, "scan consumes console ring")
 
 
 def test_recorder_wires_step_end() -> None:
@@ -135,6 +136,20 @@ def test_recorder_wires_step_end() -> None:
         or "_emit_step_notice_scan" in emitters,
         "emitter defines step notice",
     )
+
+
+def test_scan_reads_console_and_pages_rebind() -> None:
+    src = (ROOT / "scripts/agent/step_notice.py").read_text(encoding="utf-8")
+    idx = src.find("async def scan_and_emit_step_notices")
+    body = src[idx:]
+    assert_true("take_console_feedback" in body, "scan drains console buffer")
+    hooks = (ROOT / "scripts/agent/page_feedback_hooks.py").read_text(encoding="utf-8")
+    assert_true("pageerror" in hooks, "pageerror listener")
+    assert_true("on('page'" in hooks or 'on("page"' in hooks, "new page rebind")
+    assert_true("add_init_script" in hooks and "JS_XHR_HOOK" in hooks, "xhr hook rebind")
+    assert_true("attach_native_dialog_accept" in hooks, "dialog accept rebind")
+    runner = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
+    assert_true("install_recording_page_hooks" in runner, "runner installs page hooks")
 
 
 def test_reexport_js() -> None:
@@ -150,6 +165,7 @@ def main() -> int:
     test_rewind_when_notify_log_shrinks()
     test_scan_source_rewinds_before_advancing_cursor()
     test_recorder_wires_step_end()
+    test_scan_reads_console_and_pages_rebind()
     test_reexport_js()
     print("characterize-step-notice-scan: OK")
     return 0

@@ -17,6 +17,7 @@ from ..cdp_ports import _pick_free_cdp_port
 # and forgets, and asyncio only weakly references tasks — without this set the
 # task can be garbage-collected mid-accept.
 _dialog_task_refs: set[asyncio.Task] = set()
+_dialog_bound_pages: set[int] = set()
 
 
 class _Ipv4BrowserTypeProxy:
@@ -372,26 +373,43 @@ async def _fit_browser_window(browser_context, width: int = 1600, height: int = 
         sys.stderr.flush()
 
 
+def attach_native_dialog_accept(page) -> None:
+    """Auto-accept alert/confirm/prompt on one page. A second call on the same page is a no-op."""
+    if page is None:
+        return
+    target = getattr(page, "page", page)
+    pid = id(target)
+    if pid in _dialog_bound_pages:
+        return
+    _dialog_bound_pages.add(pid)
+
+    async def _on_dialog(dialog):
+        try:
+            sys.stderr.write(f'Auto-accept JS dialog: {dialog.type} {dialog.message[:80]!r}\n')
+            sys.stderr.flush()
+            await dialog.accept()
+        except Exception:
+            pass
+
+    def _on_dialog_event(d):
+        """启动自动接受 dialog 的任务并持有强引用（即发即弃防护）。"""
+        task = asyncio.create_task(_on_dialog(d))
+        _dialog_task_refs.add(task)
+        task.add_done_callback(_dialog_task_refs.discard)
+
+    try:
+        target.on('dialog', _on_dialog_event)
+    except Exception as e:
+        _dialog_bound_pages.discard(pid)
+        sys.stderr.write(f'WARN: dialog handler setup failed: {e}\n')
+        sys.stderr.flush()
+
+
 async def _dismiss_native_js_dialogs(browser_context) -> None:
     """Auto-accept in-page alert/confirm/prompt — agents struggle with modal JS dialogs."""
     try:
         page = await browser_context.get_current_page()
-
-        async def _on_dialog(dialog):
-            try:
-                sys.stderr.write(f'Auto-accept JS dialog: {dialog.type} {dialog.message[:80]!r}\n')
-                sys.stderr.flush()
-                await dialog.accept()
-            except Exception:
-                pass
-
-        def _on_dialog_event(d):
-            """启动自动接受 dialog 的任务并持有强引用（即发即弃防护）。"""
-            task = asyncio.create_task(_on_dialog(d))
-            _dialog_task_refs.add(task)
-            task.add_done_callback(_dialog_task_refs.discard)
-
-        page.on('dialog', _on_dialog_event)
+        attach_native_dialog_accept(page)
     except Exception as e:
         sys.stderr.write(f'WARN: dialog handler setup failed: {e}\n')
         sys.stderr.flush()
