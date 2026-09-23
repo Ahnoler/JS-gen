@@ -50,7 +50,7 @@ export const GROUP_TRAJECTORY = [
           { name: 'page', type: 'number', in: 'query', example: '1' },
           { name: 'pageSize', type: 'number', in: 'query', example: '20' },
           { name: 'functionId', type: 'number', in: 'query', desc: '按功能筛选', example: '3' },
-          { name: 'keyword', type: 'string', in: 'query', desc: '名称模糊' },
+          { name: 'name', type: 'string', in: 'query', desc: '按交易名称模糊筛选（仅匹配 trajectory.name；LIKE %值%）', example: '开户交易' },
           {
             name: 'recordStatus', type: 'string', in: 'query',
             desc: '按录制状态筛选；支持单个或逗号分隔多值：draft | recording | failed | recorded | completed。别名 status。stats 统计与行查询同基准（含本筛选：选中某状态时其余状态计数为 0，total=当前筛选行数）。',
