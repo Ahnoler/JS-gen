@@ -223,15 +223,15 @@ function statusBadge(remoteStatus, recordStatus, occupied) {
 }
 
 /**
- * One slot table row HTML.
+ * One slot card for the sidebar list.
  * @param {object} node executor node
  * @param {object} slot slot view model
- * @returns {string} table row HTML
+ * @returns {string} slot card HTML
  */
 function renderSlotRow(node, slot) {
   const trajLabel = slot.trajectoryId != null
     ? `#${slot.trajectoryId}${slot.trajectoryName ? ` ${slot.trajectoryName}` : ''}`
-    : '—';
+    : '空闲槽位';
   const stderrRow = slot.occupied && slot.trajectoryId != null;
   const actions = slot.occupied && slot.trajectoryId != null
     ? `
@@ -249,23 +249,28 @@ function renderSlotRow(node, slot) {
     `
     : (slot.occupied && slot.sessionId
         ? `<button type="button" class="btn ops-btn ops-btn-danger" data-act="orphan-close" data-node="${escapeHtml(node.nodeUuid)}" data-session="${escapeHtml(slot.sessionId)}">关闭会话</button>`
-        : '<span class="ops-muted">—</span>');
+        : '');
 
   const rowExtra = stderrRow
     ? ` data-act="stderr" data-tid="${slot.trajectoryId}"
         data-session="${escapeHtml(slot.sessionId || '')}"
         data-sid="${escapeHtml(slot.sid || '')}"`
-    : '';
+    : (slot.trajectoryId != null ? ` data-tid="${slot.trajectoryId}"` : '');
+  const sessionLine = [
+    slot.sessionId ? `session ${shortUuid(slot.sessionId)}` : '',
+    slot.cdpPort != null ? `CDP ${slot.cdpPort}` : '',
+  ].filter(Boolean).join(' · ');
 
   return `
-    <tr class="${slot.occupied ? 'ops-row-occ' : 'ops-row-free'}${stderrRow ? ' ops-row-stderr' : ''}" data-node="${escapeHtml(node.nodeUuid)}" data-slot="${slot.slotIndex}"${rowExtra}>
-      <td><code>slot ${slot.slotIndex}</code>${slot.overflow ? ' <span class="ops-muted">(溢)</span>' : ''}</td>
-      <td>${statusBadge(slot.remoteStatus, slot.recordStatus, slot.occupied)}</td>
-      <td class="ops-traj">${escapeHtml(trajLabel)}</td>
-      <td><code class="ops-mono">${escapeHtml(shortUuid(slot.sessionId))}</code></td>
-      <td><code class="ops-mono">${slot.cdpPort != null ? escapeHtml(String(slot.cdpPort)) : '—'}</code></td>
-      <td class="ops-actions">${actions}</td>
-    </tr>
+    <article class="ops-slot ${slot.occupied ? 'ops-row-occ' : 'ops-row-free'}${stderrRow ? ' ops-row-stderr' : ''}" data-node="${escapeHtml(node.nodeUuid)}" data-slot="${slot.slotIndex}"${rowExtra}>
+      <div class="ops-slot-top">
+        <strong>槽 ${slot.slotIndex}</strong>${slot.overflow ? ' <span class="ops-muted">溢出</span>' : ''}
+        ${statusBadge(slot.remoteStatus, slot.recordStatus, slot.occupied)}
+      </div>
+      <div class="ops-slot-traj">${escapeHtml(trajLabel)}</div>
+      ${sessionLine ? `<div class="ops-slot-meta">${escapeHtml(sessionLine)}</div>` : ''}
+      ${actions ? `<div class="ops-slot-actions">${actions}</div>` : ''}
+    </article>
   `;
 }
 
@@ -289,32 +294,18 @@ function renderNodeCard(node, filter) {
   return `
     <article class="ops-node" data-node-uuid="${escapeHtml(node.nodeUuid)}">
       <header class="ops-node-head">
-        <div>
+        <div class="ops-node-title">
           <strong>${escapeHtml(node.name || node.nodeUuid)}</strong>
-          <span class="ops-muted"> · ${escapeHtml(shortUuid(node.nodeUuid))}</span>
+          <span class="${connCls}">${conn}</span>
         </div>
         <div class="ops-node-meta">
-          <span class="${connCls}">${conn}</span>
-          <span class="ops-muted">${escapeHtml(node.status || '')}</span>
-          <span>占用 <strong>${node.occupiedSlots}</strong> / 容量 <strong>${node.capacity}</strong>（空闲 ${node.freeSlots}）</span>
+          <span>占用 ${node.occupiedSlots} / ${node.capacity}</span>
+          <span class="ops-muted">空闲 ${node.freeSlots}</span>
+          <span class="ops-muted">${escapeHtml(shortUuid(node.nodeUuid))}</span>
         </div>
       </header>
-      <div class="ops-table-wrap">
-        <table class="ops-table">
-          <thead>
-            <tr>
-              <th>槽位</th>
-              <th>状态</th>
-              <th>交易</th>
-              <th>session</th>
-              <th title="Chrome remote-debugging 端口（执行机本地）">CDP</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${slots.map((s) => renderSlotRow(node, s)).join('') || '<tr><td colspan="6" class="ops-muted">无匹配槽位</td></tr>'}
-          </tbody>
-        </table>
+      <div class="ops-slot-list">
+        ${slots.map((s) => renderSlotRow(node, s)).join('') || '<div class="ops-muted ops-slot-empty">无匹配槽位</div>'}
       </div>
     </article>
   `;
@@ -349,7 +340,6 @@ export function mountExecutorPanel(wrap) {
   wrap.innerHTML = `
     <div class="ops-exec-layout">
       <div class="ops-exec-slots">
-        <p class="ops-intro">按执行机拆分槽位；数据来自 <code>/api/v2/executors</code> 与 <code>/api/v2/recording/agent-stderr/active</code>。</p>
         <div class="ops-slot-panel">
           <div class="ops-toolbar">
             <button type="button" class="btn btn-primary ops-refresh">刷新</button>
@@ -370,7 +360,7 @@ export function mountExecutorPanel(wrap) {
             <span class="ops-summary ops-muted">—</span>
           </div>
           <div class="ops-status" hidden></div>
-          <div class="ops-body"><div class="ops-muted">加载中…</div></div>
+          <div class="ops-node-list"><div class="ops-muted">加载中…</div></div>
         </div>
       </div>
       <div class="ops-log-shell">
@@ -384,7 +374,7 @@ export function mountExecutorPanel(wrap) {
     </div>
   `;
 
-  const body = $('.ops-body', wrap);
+  const body = $('.ops-node-list', wrap);
   const statusEl = $('.ops-status', wrap);
   const summary = $('.ops-summary', wrap);
   const nodeSel = $('.ops-filter-node', wrap);
@@ -438,7 +428,7 @@ export function mountExecutorPanel(wrap) {
   function markSelectedRow() {
     wrap.querySelectorAll('.ops-row-selected').forEach((el) => el.classList.remove('ops-row-selected'));
     if (selectedTrajId == null) return;
-    const row = wrap.querySelector(`tr[data-tid="${selectedTrajId}"]`);
+    const row = wrap.querySelector(`.ops-slot[data-tid="${selectedTrajId}"]`);
     row?.classList.add('ops-row-selected');
   }
 
@@ -635,7 +625,7 @@ export function mountExecutorPanel(wrap) {
       if (act === 'orphan-close') closeOrphanSession(btn);
       return;
     }
-    const row = e.target.closest('tr.ops-row-stderr');
+    const row = e.target.closest('.ops-slot.ops-row-stderr');
     if (row) {
       fetchStderr(row);
     }
