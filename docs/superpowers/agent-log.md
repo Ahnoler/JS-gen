@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 20:55 · Cursor — 收工：非 JSON 错误页、toast 旁保留接口错误、去掉接线中（4c3e6c11）
+
+- 回链 20:40 开工。完成：`4c3e6c11`。HTTP 失败且响应不是 JSON 时，逐步反馈写成 `HTTP <状态> <路径>`（200 的 HTML 仍不记）。toast/表单旁边保留接口错误；只有标明 `level=success` 的接口行才在有界面反馈时丢掉。`list_todo_cards`、`wf_submit_guard`、`verify_context` 去掉「接线中」。
+- 验收：`characterize-step-feedback`（含 node 探针：503 HTML → `HTTP 503 /api/save`，JSON 业务错误仍在）、`characterize-step-notice-scan`、real-click / search-then-click / close-dialog / set-vue-model / strip-dialogs / field-value-match 均 OK。`verify-all.sh ui` 仅 `layer-tree`、`step-highlight` 因本机无 `DB_PASS` 失败，与本次 diff 无关。
+- 遗留：未合入 `uara_V2.0_dev`。第 1、4、6 点未做。未做 503 真机湿测。
+
 ## 2026-09-23 20:40 · Cursor — 开工：非 JSON 错误页、toast 旁保留接口错误、去掉接线中
 
 - 授权：用户确认补上次对照的第 2、3、5 点。第 1、4、6 点（谁来读、原生弹窗文案、network_capture 新 tab）下一步再做。
