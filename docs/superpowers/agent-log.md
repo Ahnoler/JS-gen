@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 18:22 · Cursor — 开工：各操作类型按本阶段动作与下一阶段消歧
+
+- 开工：18:22。撤掉查询字段名黑名单。本阶段动作子句写明的查询/引入/保存/下一步/登录保持原判；只有本阶段没写该动作时，才用阶段目录把令牌交给下一阶段。控件操作按「下拉/输入框/日期控件」结构遮罩，不按字段名。
+- 范围：`scripts/controller/actions/phase/classify.py`、`scripts/controller/actions/phase/boundary_contract.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/characterization/characterize-query-field-not-query.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、点击录制与回放、他线 WIP
+- 方式：主会话直接改；先开工声明提交。既有重置/开页/查询条件后点击查询/引入打开窗口等特征化必须仍通过
+
 ## 2026-09-23 17:55 · Cursor — 收工：阶段7确认未录（回链 17:43 开工）
 
 - 完成：`670adba3`。`查询事由`/`查询类型`/`查询原因`/`征信查询` 不再把填写阶段签成 query；阶段6为纯填写（`success_when=[]`，弹窗可保持打开后 done）。阶段7动作子句点击【确认】时，保存合同按钮为「确认」，`click_save` 能匹配到该按钮并入轨迹。`verify-all.sh` 接入新 pin。
