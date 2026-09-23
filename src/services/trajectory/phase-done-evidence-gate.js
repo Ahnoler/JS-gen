@@ -78,14 +78,22 @@ export function aggregateTrajectorySuccessful(phaseOutcomes) {
  *   （仅显式 true/false，缺失 → null unknown）。
  * - text 字段：zeroStep 时加 `[0步完成] ` 前缀；文本源优先级 text/summary →
  *   （success 缺失时 name）→ '见页面当前状态'，与旧内联三元逐字一致。
- * @param {{ explicitSuccess: boolean|null, phaseStepCount: number, donePayload?: object|null }} args
+ *
+ * 零步 navigate 豁免（A/B 移交 ②，733/741/742 登录回放代导航）：`phaseIsNavigateOnly`
+ * 为 true 且 zeroStep && explicitSuccess===true 时该阶段视为正常成功——不降级
+ * （success 保持 true）、text 不加 `[0步完成] ` 前缀（避免前端误读）、
+ * registerPerRun=false（不进 perRun 嫌疑清单）。默认 false=现行为逐字不变；
+ * 豁免面仅限该 flag 三条件同真，非 navigate 零步仍降级（假成功防线不松）。
+ * @param {{ explicitSuccess: boolean|null, phaseStepCount: number, donePayload?: object|null, phaseIsNavigateOnly?: boolean }} args
  *   explicitSuccess = phase_done 负载解析出的显式成败（缺失为 null）；phaseStepCount =
- *   本阶段已落库业务步数（runtime.phaseStepCounts 真源）；donePayload = phase_done 事件负载。
+ *   本阶段已落库业务步数（runtime.phaseStepCounts 真源）；donePayload = phase_done 事件负载；
+ *   phaseIsNavigateOnly = 本阶段是否为 navigate-only（登录回放代导航合法零步形态）。
  * @returns {{ success: boolean|null, text: string, zeroStepPhase: boolean, registerPerRun: boolean }} outcome shape + flags
  */
-export function evaluatePhaseOutcome({ explicitSuccess, phaseStepCount, donePayload }) {
+export function evaluatePhaseOutcome({ explicitSuccess, phaseStepCount, donePayload, phaseIsNavigateOnly = false }) {
   const zeroStepPhase = Number(phaseStepCount) === 0;
-  const downgraded = zeroStepPhase && explicitSuccess === true;
+  const navigateExempt = zeroStepPhase && explicitSuccess === true && phaseIsNavigateOnly === true;
+  const downgraded = zeroStepPhase && explicitSuccess === true && !navigateExempt;
   const textFromDone = String(donePayload?.text || donePayload?.summary || '').trim();
   const fallbackText = (explicitSuccess == null
     ? '见页面当前状态'
@@ -93,7 +101,7 @@ export function evaluatePhaseOutcome({ explicitSuccess, phaseStepCount, donePayl
     || '见页面当前状态';
   return {
     success: downgraded ? null : explicitSuccess,
-    text: zeroStepPhase ? `[0步完成] ${textFromDone || fallbackText}` : (textFromDone || fallbackText),
+    text: zeroStepPhase && !navigateExempt ? `[0步完成] ${textFromDone || fallbackText}` : (textFromDone || fallbackText),
     zeroStepPhase,
     registerPerRun: downgraded,
   };
