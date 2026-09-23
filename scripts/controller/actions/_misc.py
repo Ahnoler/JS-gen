@@ -386,6 +386,10 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         'Use get_page_state().iconButtons to discover true icon labels.'
     )
     async def click_button(button_text: str):
+        from scripts.controller.actions._phase_intent import introduce_done_block_message
+        blocked = introduce_done_block_message(business_data_store)
+        if blocked:
+            return _err(blocked, include_in_memory=True)
         bt = str(button_text or '').strip()
         if _is_form_submit_label(bt):
             # 统一保存入口：保存/提交类一律走 click_save（outcome 校验 + 可导出落库）
@@ -618,6 +622,10 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
     @controller.action('Click element by its [] index.')
     async def click_element_by_index(index: int):
         """Replacement for default click_element_by_index."""
+        from scripts.controller.actions._phase_intent import introduce_done_block_message
+        blocked = introduce_done_block_message(business_data_store)
+        if blocked:
+            return _err(blocked, include_in_memory=True)
         page = await browser_context.get_current_page()
         try:
             element_node = await browser_context.get_dom_element_by_index(index)
@@ -793,6 +801,30 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 if compact.startswith(('保存', '提交')) and is_picker_ui:
                     block = True
 
+                # introduce_pick: 确认 on the parent form is a later phase.
+                # Picker 确认 (is_picker_ui) stays allowed and is recorded once.
+                if (
+                    not block
+                    and compact.startswith(('确认', '确定'))
+                    and not is_picker_ui
+                    and contract is not None
+                ):
+                    from scripts.controller.actions._phase_intent import (
+                        INTRODUCE_DONE_BLOCK,
+                        arm_introduce_done,
+                        introduce_phase_confirmed,
+                        is_introduce_phase,
+                    )
+                    if is_introduce_phase(contract):
+                        if introduce_phase_confirmed(business_data_store):
+                            arm_introduce_done(business_data_store)
+                            return _err(INTRODUCE_DONE_BLOCK, include_in_memory=True)
+                        return _err(
+                            'introduce-phase-picker-only | 本阶段只在客户选择窗口选行并点确认，'
+                            '不要点父弹窗的确认。父弹窗的确认/保存属于后续阶段。',
+                            include_in_memory=True,
+                        )
+
                 if block:
                     if compact.startswith(('保存', '提交')) and is_picker_ui:
                         return _err(
@@ -955,12 +987,23 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                             business_data_store, still_query_ui=still, parent_container=parent,
                         )
                         if not still:
-                            # Parent maintain form still needs toast_ok via click_save.
-                            business_data_store['_submit_ready'] = True
                             business_data_store.pop('_query_ui', None)
-                            sys.stderr.write(
-                                '[click] picker confirm closed → submit-ready for parent save\n'
+                            from scripts.controller.actions._phase_intent import (
+                                arm_introduce_done,
+                                should_arm_parent_save_after_picker,
                             )
+                            if should_arm_parent_save_after_picker(business_data_store):
+                                # Nested picker inside create/modify: parent still needs click_save.
+                                business_data_store['_submit_ready'] = True
+                                sys.stderr.write(
+                                    '[click] picker confirm closed → submit-ready for parent save\n'
+                                )
+                            else:
+                                # introduce_pick ends here. Parent 确认/填表 belongs to later phases.
+                                arm_introduce_done(business_data_store)
+                                sys.stderr.write(
+                                    '[click] picker confirm closed → introduce phase complete, done() next\n'
+                                )
                             sys.stderr.flush()
                 except Exception:
                     sys.stderr.write("[click] picker confirm record/close helper failed" + '\n')

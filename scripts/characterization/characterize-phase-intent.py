@@ -300,6 +300,57 @@ def main() -> int:
         'seeded query mode denied',
     )
 
+    # introduce_pick ends at picker confirm — do not arm parent click_save or
+    # record later-phase fills (phase 5 was swallowing phase 6).
+    from scripts.controller.actions._phase_intent import (  # noqa: E402
+        INTRODUCE_DONE_BLOCK,
+        arm_introduce_done,
+        introduce_done_block_message,
+        introduce_phase_confirmed,
+        should_arm_parent_save_after_picker,
+    )
+
+    intro_task = '在客户选择窗口中搜索并选中目标客户，点击确定。预期结果：客户信息自动回填。'
+    store_intro: dict = {}
+    apply_phase_contract(store_intro, compile_phase_intent(intro_task))
+    assert_true(is_introduce_phase(store_intro.get('_phase_intent')), 'customer picker is introduce_pick')
+    assert_true(
+        should_arm_parent_save_after_picker(store_intro) is False,
+        'introduce_pick must not arm parent save',
+    )
+    assert_true(introduce_phase_confirmed(store_intro) is False, 'not confirmed yet')
+    assert_true(introduce_done_block_message(store_intro) is None, 'writes allowed before confirm')
+
+    store_intro['_submit_ready'] = True
+    store_intro['_last_introduce_ok'] = True
+    blocked = introduce_done_block_message(store_intro)
+    assert_true(bool(blocked) and 'done(success=true)' in blocked, f'block after confirm: {blocked}')
+    assert_true(blocked == INTRODUCE_DONE_BLOCK, 'stable block text')
+    assert_true(store_intro.get('_submit_ready') is None, 'confirm disarms parent save inject')
+    assert_true(store_intro.get('_introduce_done_ready') is True, 'done cue armed')
+    hint_intro = next_action_hint(store_intro)
+    assert_true('done(success=true)' in hint_intro, f'introduce hint is done: {hint_intro}')
+    assert_true('NEXT_ACTION: click_save()' not in hint_intro, f'introduce hint must not save: {hint_intro}')
+
+    store_intro['_introduce_done_ready'] = True
+    apply_phase_contract(store_intro, compile_phase_intent(intro_task))
+    assert_true('_introduce_done_ready' not in store_intro, 'new phase clears introduce-done flag')
+    assert_true('_last_introduce_ok' not in store_intro, 'new phase clears introduce token')
+
+    store_create: dict = {}
+    apply_phase_contract(store_create, compile_phase_intent('新增客户并保存'))
+    assert_true(
+        should_arm_parent_save_after_picker(store_create) is True,
+        'create phase still arms parent save after nested picker',
+    )
+    store_create['_last_introduce_ok'] = True
+    assert_true(
+        introduce_done_block_message(store_create) is None,
+        'create phase may still write after nested introduce',
+    )
+    arm_introduce_done(store_create)
+    assert_true(store_create.get('_introduce_done_ready') is True, 'arm helper sets flag')
+
     print('characterize-phase-intent: OK')
     return 0
 

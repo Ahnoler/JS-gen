@@ -147,6 +147,10 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
 
     @controller.action('Click the radio button in an el-table row, identified by row text. Clicks label.el-radio > .el-radio__inner. Supports Element UI fixed columns.')
     async def click_table_row_radio(row_text: str):
+        from scripts.controller.actions._phase_intent import introduce_done_block_message
+        blocked = introduce_done_block_message(business_data_store)
+        if blocked:
+            return _err(blocked, include_in_memory=True)
         page = await browser_context.get_current_page()
         # Pre-strip stale dialog wrappers (tsscMutilDialog 关闭残留) so real
         # clicks reach the row radio; idempotent, <10ms.
