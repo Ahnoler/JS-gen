@@ -3,6 +3,14 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 14:26 · Cursor — 开工：同表单项多控件扫描与保存否定句
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-23-same-family-scan-and-save-negation.md`。
+- 场地：`D:\dev\JS-gen\.worktrees\same-family-scan`，分支 `cursor/same-family-scan-20260923`（自 `878032bb`）。
+- 工作范围：`src/cdp/page-locator-helpers.js`、`scripts/controller/actions/js_snippets/scan_form.py`、生成物 `_locator_helpers_js.py`、`scripts/controller/actions/same_family.py`、`fill_engine.py`、`select_engine.py`、`scripts/controller/actions/phase/boundary_contract.py`、`reviewer.py`、对应 characterization、`scripts/refactor/verify-all.sh`、本条目。
+- 禁入区：`data/kb/**`、主检出未提交的 ops-console / product_library。不改模型 500 与空闲看门狗。
+- 执行方式：主会话派实现子智能体，每任务评审。子智能体可 commit，不 push。
+
 ## 2026-09-23 14:21 · Cursor — 实现计划：同表单项多控件扫描与保存否定句
 
 - 授权：用户确认设计稿 `cb851289` 无问题。
