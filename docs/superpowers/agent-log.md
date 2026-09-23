@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 14:17 · Cursor — 设计稿：同表单项多控件扫描分发与保存否定句
+
+- 授权：用户确认引擎段与合约段（扫描拆条、调用带定位、否则歧义；「不点保存」不算保存终态）。
+- 工作范围：`docs/superpowers/specs/2026-09-23-same-family-scan-and-save-negation-design.md`、本条目。不改产品代码。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`（产品库流程卡的未提交改动不纳入本提交）。
+- 状态：书面稿待用户审阅后再写实现计划。
+
 ## 2026-09-23 13:53 · ZCode 引擎线 — 合并回执：A/B 两候选修复并入 uara_V2.0_dev（用户批「合入吧」）——唯一红 sso-auth 系他线 d15482c6 预存回归，非本 diff
 
 - 合并：`engine/ab-gate-fixes-20260922`（fe7a3a27 + 收工条目 7cdf680b + 他线合流 4b2e97b5）→ `uara_V2.0_dev`，`--no-ff` 零冲突。他线 40+ 提交（ops-console 页面/录制本步反馈/KB/`d15482c6` 交易名称查询改名）已先在功能分支合流解冲突（agent-log 并排保留双方条目）。
@@ -25,6 +32,19 @@
 - 完成：`dfe46abd`（`--no-ff`）将 `cursor/recording-step-feedback-20260922` 合入 `uara_V2.0_dev`。每步新出现的 toast、校验红字、对话框标题写入当次会话，并以 `[step-feedback]` 交给下一步模型；`read_step_feedback` 只读这段历史。`read_error_notify`、`read_xhr_log` 不再注册。`close_notification` 只关闭通知。页面错误不写入步骤、阶段或交易。agent-log 冲突并排保留引擎线挡板定性条目（含误落本分支的 `8c7c7b81`）。
 - 验收（合并后）：`characterize-step-feedback`、`characterize-step-notice-scan`、`characterize-error-notify`、`characterize-xhr-log`、`characterize-save-section` 均 OK。
 - 遗留：`verify-all.sh ui` 的 `characterize-layer-tree`（80/91）与本次无关，未修。步骤上落错误描述仍不做。
+
+## 2026-09-23 11:05 · Cursor — 收工：产品库流程卡补公共要素可填条件（回链 10:57 开工）
+
+- 完成：`data/kb/flows/product_library.json` 写入未启用版本才可填公共要素、启用态点产品修改不就地放开、保证金比例同一行四个控件、树节点带版本、筛树点放大镜。未改召回关键词大表以外的规则词「产品公共要素」「保证金比例」。
+- 验收：JSON 可解析；`node scripts/characterization/characterize-flow-card-recall.mjs` 26 passed（含 golden 24 条）。本机无 `python`/`py`，Python 侧 `characterize-kb-recall.py` 未跑。
+- 遗留：启用产品点「产品修改」是否另出新版本，本次未核，已写入 exceptions。未 commit。
+
+## 2026-09-23 10:57 · Cursor — 开工：产品库流程卡补公共要素可填条件
+
+- 授权：用户确认把 2026-09-23 湿测经验写入流程卡（先汇报后落卡）。
+- 工作范围：`data/kb/flows/product_library.json`、本条目。
+- 禁入区：录制本步反馈线声明的 `scripts/**`、`src/**`、`prompts/**`；其余 `data/kb/**`。
+- 执行方式：主会话改卡面文案。证据=轨迹 984 只读详情 + Playwright 对林业贷 V-1.0.1 填入 `9`、左下拉选项 `<`/`≤`。
 
 ## 2026-09-22 17:55 · ZCode 引擎线 — 收工：挡板定性落地（4fc2efd0）+ 主检出被他线切分支的现场处置记录
 
