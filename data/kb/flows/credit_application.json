@@ -437,6 +437,11 @@
       "rule": "风险阻断页「确认」= POST creditLimitFlow/workflow/startProcess；双重硬前置：①客户有效评级 ②无在途授信申请，失败 code:100 BizException、无 toast 仅 console error"
     },
     {
+      "keyword": "硬前置语义",
+      "rule": "硬前置判据语义（wet7/wet8 湿测实证，派发前只读核查员必查）：①「客户有效评级」=评级审批「通过」终态——待发起/审批中/打回均不算有效，服务端按 findAndSetRating 实时判定（wet7/wet8 实证：任务上下文称「评级已生效」仍被拒「查询不到客户有效评级」，以服务端判定为准，勿信上下文）；②「在途授信申请」含打回态（打回单仍占在途）——同经办人同授信性质存在审批中/打回申请均被拒，拒绝原文带在途编号，照实记录+全局流水号即合法终局",
+      "source": "wet7 2026-09-18 / wet8 2026-09-19（tmp/contract-wet7-20260919/、tmp/contract-wet8-20260919/through-report-b.md）"
+    },
+    {
       "keyword": "保存",
       "rule": "授信方案页「保存」= saveLimitInfo；额度分项/征信/调查报告/风险报告均可为空"
     },
