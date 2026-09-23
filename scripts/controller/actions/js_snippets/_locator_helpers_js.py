@@ -351,6 +351,65 @@ PAGE_LOCATOR_HELPERS = r'''
     if (i < 1 || i > 26) return '';
     return String.fromCharCode(64 + i);
   }
+  function leafDisabledForScan(node, kind) {
+    if (!node) return false;
+    if (kind === 'input') {
+      if (node.disabled) return true;
+      return !!(node.closest && node.closest('.is-disabled'));
+    }
+    const host = node;
+    if (host.classList && host.classList.contains('is-disabled')) return true;
+    const inp = host.querySelector && host.querySelector('input');
+    if (inp && inp.disabled) return true;
+    return !!(host.closest && host.closest('.is-disabled') === host);
+  }
+  function listFormItemScanFields(item) {
+    if (!item || !item.querySelector) return [];
+    const content = item.querySelector('.el-form-item__content');
+    if (!content) return [];
+    const labelEl = item.querySelector('.el-form-item__label, label');
+    const label = normalizeControlText(labelEl ? labelEl.textContent : '');
+    const leaves = [];
+    const nodes = content.querySelectorAll('input:not([type="hidden"]), .el-select');
+    for (let i = 0; i < nodes.length; i++) {
+      const el = nodes[i];
+      if (el.matches && el.matches('.el-select')) {
+        if (el.closest('.el-select-dropdown')) continue;
+        const kind = el.closest('.tssc-multi-select') ? 'tssc-multi-select' : 'select';
+        leaves.push({ node: el, kind });
+      } else if (el.matches && el.matches('input')) {
+        if (el.closest('.el-select')) continue;
+        leaves.push({ node: el, kind: 'input' });
+      }
+    }
+    if (!leaves.length) return [];
+    const kindCounts = {};
+    for (let j = 0; j < leaves.length; j++) {
+      const k = leaves[j].kind;
+      kindCounts[k] = (kindCounts[k] || 0) + 1;
+    }
+    const kindIndex = {};
+    const rows = [];
+    for (let j = 0; j < leaves.length; j++) {
+      const leaf = leaves[j];
+      const k = leaf.kind;
+      const n = (kindIndex[k] = (kindIndex[k] || 0) + 1);
+      const field_slot = (kindCounts[k] >= 2) ? fieldSlotLetter(n) : '';
+      const display_label = (field_slot && label) ? (label + '-' + field_slot) : '';
+      const node = leaf.node;
+      const placeholder = (node.getAttribute && node.getAttribute('placeholder')) || '';
+      rows.push({
+        label,
+        kind: k,
+        field_slot,
+        display_label,
+        xpath_smart: formFieldXpathSmartOf(node, label) || '',
+        placeholder,
+        disabled: leafDisabledForScan(node, k),
+      });
+    }
+    return rows;
+  }
   function pinFormFieldFamily(expr, host) {
     const base = String(expr || '');
     if (!base || !host) return { xpath: base, occurrence: 0 };
