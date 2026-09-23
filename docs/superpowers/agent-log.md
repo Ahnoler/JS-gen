@@ -42,6 +42,15 @@
 - **E2 联测话术（可直接转发系统线/合约线）**：【联测请求】E1-E4 已落地分支 `engine/replay-cancel-20260921`（4b7829a9），未合并待批。请联测一条链：「回放批次执行中 → 控制面 stop（或步超时补发 cancel_step）→ Python 在当前步完成后的下一个步边界中断 → replay_done 带 aborted:true + stoppedAt=中断步号 → 后续步不执行」。注意：①停止语义=协作式，cancel 在步边界生效，步内长动作（click_save 后 idle 等待）仍会跑完当前步；②replay_done 无 aborted 键=正常跑完，SPA 前端无需强制适配（可选用 aborted 做停止态展示）；③建议与 Node 侧 12 项修复同窗重启后联测。
 - 注：不维护 CHANGELOG。
 
+## 2026-09-21 22:00 · ZCode 系统线 — 收工：3 项基线红全部修复转绿，KNOWN_BASELINE_RED 清空（用户指令：修 3 失败项，要么注释要么修复转绿）
+
+- 根因三判：①`characterize-confirm-notification`＝逻辑随 d9ca7990 迁入 ClickEngine 后 pin 仍读 `_misc.py` 旧标记（改靶不误判）；②`characterize-step-highlight`＝锚点 traj 181/shot 10615 被清库（历史第二次锚点死亡，traj 38→157→181）；③`characterize-layer-tree`＝锚点 traj 33 同因清库失效。
+- 修复：①confirm-notification pin 重指向——断言 A（notifications 收集器 rect 可见性判定）仍读 `_misc.py`，断言 B/C/回归改读 `click_action_engine.py`（JS_WATCH_SAVE_NOTIFICATIONS < err-notification: < toast_ok < confirm_click 时序、'状态更新成功'、engine.count 确认按钮唯一、btn_label 空白剔除守卫），断言语义全保留。②step-highlight + layer-tree **改动态锚点**：不再硬编码 traj/shot（本次已两次死于清库），每次运行从最近 40 张 phase_highlight 截图现场选锚——step-highlight 按「bbox 直用命中×步数」选优（FLOORS 下限 steps/json/bbox/solid≥10，按当前阶段化录制形态量级 ~15 步设定），layer-tree 优先选「全元素带 layers」的截图（选 #33503 traj 969，53/53）；step-highlight 的 byTraj/byPhase 断言从「=锚点」改为「=直查 DB 最新一张」对账（动态锚点未必是该 traj 最新，语义仍钉 loadPhaseData 倒序取第一条）。
+- verify-all.sh：`KNOWN_BASELINE_RED` 清空（注释留登记规则：待修红项可登记、修好须摘除），ALL GREEN 输出在无基线红时不再拖 "baseline reds excluded" 尾巴。
+- 验收（合并后硬约定）：`git pull`（up to date）后全量 verify-all **178 pins + 2 statics 全部真绿，EXIT=0，零 KNOWN-RED 零 FAILED**；三个改靶 pin 单跑均 OK（step-highlight 锚 #33388 traj 973：14 步/12 bbox 直用；layer-tree 锚 #33503：53 元素全带 layers、6 步 5 分区）。
+- 遗留移交：①FLOORS 下限（10）是按现势数据定的，若未来录制形态单阶段步数再降（如 <10），动态锚点会红——那是真回归信号，不是锚点问题，届时修录制链而非放宽阈值；②本次仅改 characterization 与 verify-all，无业务代码改动。
+- 本条与代码提交一并 push。
+
 ## 2026-09-21 21:55 · ZCode 系统线 — 收工：停止回放系统线 12 项缺陷全部修复合入（回链 18:05 开工；SDD 六任务 + 终审 + 修复波）
 
 - 完成（代码 8 提交 `35ac10fe→c7f8ffcf`，+831/−40，全量 verify-all 182 pins + statics **EXIT=0 ALL GREEN 零 FAILED**）：
@@ -1971,12 +1980,3 @@ erify-all.sh 默认集
 - 范围（可写集）：`scripts/controller/actions/phase/classify.py`、新 pin `scripts/characterization/characterize-reset-phase-not-query.py`、`scripts/refactor/verify-all.sh`（仅主线程注册）、本协作日志；若既有 pin 钉了受影响分类行为，同 commit 修订并注明
 - 禁入区：`boundary_contract.py`/`recorder_emitters.py`/其他 phase 模块（本轮不动）、他线 WIP（`characterize-phase-done-validate.py` 等）、`scripts/prompts/**`、`config/`、SPA
 - 方式：主线程内联，先 RED pin（本案真实文本 + 真查询反例防过度排除）再一行分类修正；回归=classify/boundary 既有 pin 全跑 + ruff F821 + py_compile；全量 verify-all 基线比对（3 红基线）后收工
-
-## 2026-09-21 22:00 · ZCode 系统线 — 收工：3 项基线红全部修复转绿，KNOWN_BASELINE_RED 清空（用户指令：修 3 失败项，要么注释要么修复转绿）
-
-- 根因三判：①`characterize-confirm-notification`＝逻辑随 d9ca7990 迁入 ClickEngine 后 pin 仍读 `_misc.py` 旧标记（改靶不误判）；②`characterize-step-highlight`＝锚点 traj 181/shot 10615 被清库（历史第二次锚点死亡，traj 38→157→181）；③`characterize-layer-tree`＝锚点 traj 33 同因清库失效。
-- 修复：①confirm-notification pin 重指向——断言 A（notifications 收集器 rect 可见性判定）仍读 `_misc.py`，断言 B/C/回归改读 `click_action_engine.py`（JS_WATCH_SAVE_NOTIFICATIONS < err-notification: < toast_ok < confirm_click 时序、'状态更新成功'、engine.count 确认按钮唯一、btn_label 空白剔除守卫），断言语义全保留。②step-highlight + layer-tree **改动态锚点**：不再硬编码 traj/shot（本次已两次死于清库），每次运行从最近 40 张 phase_highlight 截图现场选锚——step-highlight 按「bbox 直用命中×步数」选优（FLOORS 下限 steps/json/bbox/solid≥10，按当前阶段化录制形态量级 ~15 步设定），layer-tree 优先选「全元素带 layers」的截图（选 #33503 traj 969，53/53）；step-highlight 的 byTraj/byPhase 断言从「=锚点」改为「=直查 DB 最新一张」对账（动态锚点未必是该 traj 最新，语义仍钉 loadPhaseData 倒序取第一条）。
-- verify-all.sh：`KNOWN_BASELINE_RED` 清空（注释留登记规则：待修红项可登记、修好须摘除），ALL GREEN 输出在无基线红时不再拖 "baseline reds excluded" 尾巴。
-- 验收（合并后硬约定）：`git pull`（up to date）后全量 verify-all **178 pins + 2 statics 全部真绿，EXIT=0，零 KNOWN-RED 零 FAILED**；三个改靶 pin 单跑均 OK（step-highlight 锚 #33388 traj 973：14 步/12 bbox 直用；layer-tree 锚 #33503：53 元素全带 layers、6 步 5 分区）。
-- 遗留移交：①FLOORS 下限（10）是按现势数据定的，若未来录制形态单阶段步数再降（如 <10），动态锚点会红——那是真回归信号，不是锚点问题，届时修录制链而非放宽阈值；②本次仅改 characterization 与 verify-all，无业务代码改动。
-- 本条与代码提交一并 push。
