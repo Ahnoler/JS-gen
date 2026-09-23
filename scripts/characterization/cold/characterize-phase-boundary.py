@@ -346,6 +346,21 @@ def main() -> int:
     ok_nav_ev, _ = phase_done_ok(store_nav_ev)
     assert_true(ok_nav_ev, 'page_opened satisfies open_page done')
 
+    # --- 否定句：不点保存不得签成必须保存；肯定句仍要 toast_ok ---
+    no_save = '在「保证金比例」同一行填写数字 9。全程不点「保存」或「启用」。预期结果：左数字显示 9。'
+    b_no = compile_boundary(no_save)
+    assert_true(b_no['success_when'] == [], '不点保存 → 无保存令牌')
+    assert_true('save_form' not in b_no['goals'], '不点保存 → goals 不含 save_form')
+
+    yes_save = '填写保证金比例后点击保存。预期结果：保存成功。'
+    b_yes = compile_boundary(yes_save)
+    assert_true('toast_ok' in b_yes['success_when'], '点击保存 → 仍要 toast_ok')
+    assert_true('save_form' in b_yes['goals'], '点击保存 → goals 含 save_form')
+
+    both = '不要点保存。填写后点击保存。'
+    b_both = compile_boundary(both)
+    assert_true('save_form' in b_both['goals'], '否定句与肯定句并存时肯定优先')
+
     print('characterize-phase-boundary: OK')
     return 0
 
