@@ -341,5 +341,9 @@ export function buildPythonSubprocessEnv(extraEnv = {}) {
   if (headless && !env.CHROME_HEADLESS) {
     env.CHROME_HEADLESS = headless;
   }
+  for (const key of ['AI_RECORD_GATE_CUE', 'AI_RECORD_VISION']) {
+    const value = resolve(key, '');
+    if (value && !env[key]) env[key] = value;
+  }
   return { ...env, ...extraEnv };
 }

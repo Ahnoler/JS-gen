@@ -15,6 +15,33 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+_CONFIG_ENV = Path(__file__).resolve().parents[1] / 'config' / '.env'
+
+
+def dotenv_value(text: str, name: str) -> str | None:
+    """Return the last assignment of name in dotenv text, ignoring comments."""
+    prefix = name + '='
+    found = None
+    for line in str(text or '').splitlines():
+        trimmed = line.strip()
+        if not trimmed or trimmed.startswith('#') or not trimmed.startswith(prefix):
+            continue
+        value = trimmed[len(prefix):].strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+            value = value[1:-1].strip()
+        found = value
+    return found
+
+
+def _config_env_value(name: str) -> str | None:
+    """Read one key from config/.env. Missing file or key returns None."""
+    try:
+        text = _CONFIG_ENV.read_text(encoding='utf-8')
+    except OSError:
+        return None
+    return dotenv_value(text, name)
 
 
 def _env_flag(name: str, default: bool = True) -> bool:
@@ -250,3 +277,32 @@ def step_notice_scan_enabled() -> bool:
     MutationObserver 架构。去重确保同一 toast 不会被重复注入。
     """
     return _env_flag('AI_STEP_NOTICE_SCAN', True)
+
+
+def record_gate_cue_enabled() -> bool:
+    """
+    检查录制门禁一行提示是否启用。
+
+    环境变量：AI_RECORD_GATE_CUE（默认开启）
+
+    启用时，每个录制步骤开始前注入一行 [门禁] 结论。不看图，不改 done 判定。
+    """
+    return _env_flag('AI_RECORD_GATE_CUE', True)
+
+
+def record_vision_enabled() -> bool:
+    """
+    检查录制旁路识图是否启用。
+
+    配置：config/.env 的 AI_RECORD_VISION（true 开，false 关）。
+    进程环境变量同名键优先于文件。两处都没有时默认开启。
+
+    启用时，结束复核与高风险点击在落步前可以单独看一张视口。调用失败则当没看。
+    不看图的 [门禁] 一行由 AI_RECORD_GATE_CUE 单独控制。
+    """
+    raw = os.environ.get('AI_RECORD_VISION')
+    if raw is None or str(raw).strip() == '':
+        raw = _config_env_value('AI_RECORD_VISION')
+    if raw is None or str(raw).strip() == '':
+        return True
+    return str(raw).strip().lower() not in ('0', 'false', 'no', 'off')

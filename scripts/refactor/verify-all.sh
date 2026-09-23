@@ -68,8 +68,10 @@ characterize-ops-page|node scripts/characterization/characterize-ops-page.mjs
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
 characterize-verification-phase-gate|"$PY" scripts/characterization/characterize-verification-phase-gate.py
 characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
+characterize-record-sidepath|"$PY" scripts/characterization/cold/characterize-record-sidepath.py
 '
 PINS_PHASE='
+characterize-record-sidepath|"$PY" scripts/characterization/cold/characterize-record-sidepath.py
 characterize-phase-section-scope|"$PY" scripts/characterization/characterize-phase-section-scope.py
 characterize-phase-runtime|"$PY" scripts/characterization/characterize-phase-runtime.py
 characterize-recorder-phase-reset|"$PY" scripts/characterization/characterize-recorder-phase-reset.py

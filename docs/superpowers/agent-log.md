@@ -3,6 +3,32 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 16:53 · Cursor — 收工：运维页历史日志与知识库全文
+
+- 完成：`5afd4ba4`。顶栏增加「历史日志」；标签切换时未选面板隐藏；已落盘的截断知识库卡片按流程名取全文，新注入调用 `flow_summary_text(..., limit=None)`。
+- 验收：`GET /api/v2/kb/flow-summary?flow=产品库管理（新增/启用）` 返回 200，正文 3554 字且无「截断」；浏览器打开该历史卡片，弹窗可滚到阶段删除规则。
+- 遗留：工作区仍有未纳入的 `data/kb/flows/product_library.json` 与 product-mgmt 草稿。
+
+## 2026-09-23 16:15 · Cursor — 开工：识图辅助开关写入配置文件
+
+- 授权：用户要求把大模型识图辅助做成配置文件里的开关。
+- 工作范围：`config/.env.example`、`executor/.env.example`、`scripts/feature_flags.py`、`src/runtime/agent-process.js`、`scripts/characterization/cold/characterize-record-sidepath.py`、本条目。
+- 禁入区：`data/kb/**`、`migrations/**`、门禁一行 `AI_RECORD_GATE_CUE` 的默认行为、回放与 heal。不改识图判定本身。
+- 执行方式：主会话把 `AI_RECORD_VISION` 写成可改的配置项，并让执行机与控制面拉起的 Python 都读到它。
+
+## 2026-09-23 15:40 · Cursor — 收工：录制旁路门禁说明与按需识图
+
+- 回链 15:05 开工。完成：`51b4360c`（变基后；原 `51480bc6`）。主模型 `use_vision` 仍为关闭。每步注入 `[门禁]`；门禁已通过的 `done(success=true)` 才单独看视口，看见错误文案才拒绝，同一阶段最多两次；高风险点击在 `multi_act` 前可否决且不写入轨迹，同一阶段最多两次，不确定或调用失败则放行。
+- 验收：`python3 scripts/characterization/cold/characterize-record-sidepath.py` OK。未做真实录制湿测，也未对当前网关做识图探活。
+- 遗留：执行机若主模型不接受图片，进程内探活失败后识图自动关闭，门禁一行仍在。湿测看 stderr 的 `[record-sidepath]` / `[record-vision]`。
+
+## 2026-09-23 15:05 · Cursor — 开工：录制旁路门禁说明与按需识图
+
+- 授权：用户确认旁路方案后，要求按建议建任务树并开发。
+- 工作范围：`scripts/agent/record_sidepath.py`、`scripts/agent/record_vision.py`、`scripts/feature_flags.py`、`scripts/recorder.py`（仅步骤开始注入门禁）、`scripts/agent/recorder_emitters.py`（仅 done 通过后门禁后的识图复核）、`scripts/agent/service.py`（仅点击否决包装）、`scripts/prompts/agent-core.md`、`executor/config.js`（仅把两个开关传入 Python）、`config/.env.example`、`executor/.env.example`、`scripts/characterization/cold/characterize-record-sidepath.py`、`scripts/refactor/verify-all.sh`（core 与 phase 登记）、本开工条目。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/state.py`、回放与 heal 判定、`use_vision` 仍保持关闭。识图失败不中断阶段，否决不写入轨迹步骤。
+- 执行方式：主会话按层实现。第 1 层每步一行门禁；第 3 层结束复核；第 2 层高风险点击落步前否决。
+
 ## 2026-09-23 14:26 · Cursor — 开工：同表单项多控件扫描与保存否定句
 
 - 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-23-same-family-scan-and-save-negation.md`。
@@ -53,6 +79,7 @@
 - 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev`（带入 Cursor ops-console 3 docs commits，零冲突）→ **合并态全量 verify-all 189 pins（187+2 新登记），唯一 FAILED=characterize-layer-tree**（traj 980 phase_highlight 截图 91 元素仅 80 带 layers，落库数据态；实施者已用 stash 在 BASE 复现同红，预存非本 diff 所致）。
 - 遗留移交（评审 Minor 记档，均不阻塞）：①M1 角可选补 pin——introduce 合约 kinds 单值 `['confirm_click']` 不再被 legacy 分支识别（静态证明不可达：两 flag 写点必先落同名 token；legacy 编译器恒成对输出；persisted 走 boundary 路径），如需可补一条 pin；②M3——pin② 与既有 gate pin 同登 phase 域，`--changed` 对仅改 runner 的 diff 有盲区（继承惯例非本单元引入），后续加固可补登 ui/core；③M4——mode=other+描述无写动词的误豁免面属设计级残余，湿测期 grep `[record] phase #N navigate-only zero-step success` 作探针；④layer-tree 预存红数据态归因共享——他线触碰 traj 980 相关数据时注意。
 - 分支与生效面：`engine/ab-gate-fixes-20260922` 已推 origin，branch-only **待并入 dev**；①合并 dev 后新录制会话即效；②等控制面重启窗口（与 verify-token persisted 主路径同一窗口）。
+
 ## 2026-09-23 11:32 · Cursor — 收工：录制本步页面反馈合入 uara_V2.0_dev
 
 - 回链 17:12 开工。用户指令合入开发分支并告一段落。
