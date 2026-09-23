@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 18:40 · ZCode 引擎线 — 开工：三条 SUT 实证知识落流程卡（用户批准前三点；欢迎弹窗定性为自动读配置不进卡）
+
+- 授权：用户批准将记忆中三条测试有用的 SUT 操作级知识写入流程卡：①按钮文案内部空格（「取 消」不剔空白会误点「确 定」→关弹窗变保存）②Element UI 日期弹层须置 pickerVisible=false 否则 popper 重绘复现 ③SUT 双菜单 DOM（二级 li[data-id] 恒隐藏，可见性点击必败，用可见 flyout 链接/data-url）。用户澄清：欢迎弹窗是登录后自动读取天元配置的预期行为，不进卡。
+- 工作范围：`data/kb/flows/session_login.json`（+2 规则：空格按钮/双菜单）、`data/kb/flows/credit_usage.json`（+1 规则：日期弹层关闭）；agent-log 开收工条目。
+- 禁入区：`product_library.json`（他线未提交 WIP 在工作区，绝不触碰）；其余产品代码、`scripts/**`。
+- 执行方式：主会话改卡；改后同 commit 复跑金样例双侧（characterize-flow-card-recall + characterize-kb-recall.py）+ recall-eval 与基线对齐 + JSON 校验。
 ## 2026-09-23 14:21 · Cursor — 实现计划：同表单项多控件扫描与保存否定句
 
 - 授权：用户确认设计稿 `cb851289` 无问题。
