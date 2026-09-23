@@ -376,7 +376,7 @@ export const PAGE_LOCATOR_HELPERS = `
     if (tags && tags.length) {
       const parts = [];
       for (let ti = 0; ti < tags.length; ti++) {
-        const t = String((tags[ti].textContent || '')).replace(/\s+/g, ' ').trim();
+        const t = String((tags[ti].textContent || '')).replace(/\\s+/g, ' ').trim();
         if (t) parts.push(t);
       }
       if (parts.length) return parts.join(',');
