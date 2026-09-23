@@ -368,12 +368,15 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         if (!label && !input && !textarea && !trigger) continue;
         const split = (typeof listFormItemScanFields === 'function')
             ? listFormItemScanFields(item) : null;
-        if (split && split.length) {
+        // Split only when at least one family has >= 2 leaves (field_slot set).
+        // Singleton input/date/radio/select keep classify / readValue / options path.
+        const useSplit = !!(split && split.length && split.some(function (r) { return !!r.field_slot; }));
+        if (useSplit) {
             for (const row of split) {
                 const field = {
                     label: row.label,
                     kind: row.kind,
-                    currentValue: '',
+                    currentValue: row.currentValue || '',
                     options: [],
                     placeholder: row.placeholder || '',
                     required: false,
