@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 17:20 · ZCode — 开工：识图旁路 LLM 独立配置（⑥ 识图角色四件套）
+
+- 授权：用户要求识图模型可单独配置（不复用录制主 Agent 的 LLM）。
+- 工作范围：`scripts/feature_flags.py`（新增 record_vision_llm_config 四键解析）、`scripts/agent/record_vision.py`（_get_vision_llm 缓存实例 + ask_vision 接线）、`config/.env.example`、`executor/.env.example`、`src/runtime/agent-process.js`（仅转发 4 键）、`executor/config.js`（仅 buildPythonSubprocessEnv 传播 4 键）、`scripts/characterization/cold/characterize-record-sidepath.py` 与 `characterize-llm-role-env.py`（pin 增补）、本条目。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/agent/record_sidepath.py` 判定逻辑、`AI_RECORD_VISION`/`AI_RECORD_GATE_CUE` 开关语义、回放与 heal、`src/routes/setup.js`。
+- 执行方式：主会话直接实现；键名 `AI_RECORD_VISION_LLM_MODEL/_BASE_URL/_API_KEY/_TIMEOUT_MS`，未设 MODEL 完全回落 agent.llm（fail-open），语义同 FORM_LLM_*。
+
 ## 2026-09-23 16:53 · Cursor — 收工：运维页历史日志与知识库全文
 
 - 完成：`5afd4ba4`。顶栏增加「历史日志」；标签切换时未选面板隐藏；已落盘的截断知识库卡片按流程名取全文，新注入调用 `flow_summary_text(..., limit=None)`。
