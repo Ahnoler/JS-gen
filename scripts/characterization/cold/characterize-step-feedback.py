@@ -1,0 +1,157 @@
+"""Pin session step-feedback: clip, cue, history, api-vs-ui. No browser."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+
+def assert_true(cond: bool, msg: str) -> None:
+    if not cond:
+        raise AssertionError(msg)
+
+
+def main() -> int:
+    from scripts.agent.step_feedback import (
+        append_step_feedback,
+        business_action_names,
+        clip_text,
+        extract_api_error_text,
+        format_step_feedback_cue,
+        omit_api_if_ui,
+        read_step_feedback_rows,
+    )
+
+    assert_true(len(clip_text("错" * 250)) == 200, "clip 200")
+    assert_true(clip_text("  a\nb  ") == "a b", "collapse space")
+
+    names = business_action_names([
+        {"click_save": {"button_text": "保存"}, "done": None},
+        {"read_step_feedback": {"last": 5}},
+    ])
+    assert_true(names == ["click_save"], f"names {names}")
+
+    items = [
+        {"kind": "toast", "level": "error", "text": "利率不能为空"},
+        {"kind": "form", "label": "利率", "text": "不能为空"},
+        {"kind": "dialog", "surface": "dialog", "text": "流程选人"},
+        {"kind": "api", "text": "不应出现"},
+    ]
+    kept = omit_api_if_ui(items)
+    assert_true(all(it["kind"] != "api" for it in kept), "drop api when ui present")
+    assert_true(len(omit_api_if_ui([{"kind": "api", "text": "闸门拒绝"}])) == 1, "keep api alone")
+
+    cue = format_step_feedback_cue(["click_save"], kept)
+    assert_true(cue.startswith("[step-feedback] click_save | "), cue)
+    assert_true("toast:err:利率不能为空" in cue, cue)
+    assert_true("form:利率:不能为空" in cue, cue)
+    assert_true("dialog:流程选人" in cue, cue)
+    assert_true("【页面通知】" not in cue, cue)
+    assert_true(format_step_feedback_cue(["click_save"], []) == "", "empty cue")
+
+    store: dict = {}
+    append_step_feedback(store, 3, ["click_save"], [{"kind": "toast", "level": "error", "text": "x"}])
+    append_step_feedback(store, 4, ["click_button"], [])
+    assert_true(len(store["_step_feedback"]) == 1, "skip empty")
+    for i in range(45):
+        append_step_feedback(store, 100 + i, ["click_button"], [{"kind": "toast", "level": "info", "text": str(i)}])
+    assert_true(len(store["_step_feedback"]) == 40, "cap 40")
+    rows = read_step_feedback_rows(store, 5)
+    assert_true(len(rows) == 5, "last 5")
+    assert_true(read_step_feedback_rows({}, 5) == [], "missing store")
+
+    assert_true(extract_api_error_text('{"code":100,"description":"证件重复"}', 200) == "证件重复", "biz text")
+    assert_true(extract_api_error_text('{"code":200,"description":"操作成功"}', 200) == "", "success ignored")
+    assert_true(extract_api_error_text("not-json", 500) == "", "no sentence")
+    assert_true("http" not in extract_api_error_text('{"code":100,"description":"证件重复","url":"/x"}', 400), "no url")
+
+    step_notice_js = (
+        ROOT / "scripts/controller/actions/js_snippets/step_notice.py"
+    ).read_text(encoding="utf-8")
+    assert_true("JS_TAKE_API_ERROR_TEXTS" in step_notice_js, "MISSING JS_TAKE_API_ERROR_TEXTS")
+    assert_true("description" in step_notice_js, "MISSING description in api snippet")
+    assert_true(
+        "return { seq: newestSeq, len: log.length, texts }" in step_notice_js,
+        "MISSING api error return shape",
+    )
+    xhr_hdr = "JS_TAKE_API_ERROR_TEXTS"
+    xhr_snip_start = step_notice_js.find(xhr_hdr)
+    q_open = step_notice_js.find("'''", xhr_snip_start + len(xhr_hdr)) if xhr_snip_start >= 0 else -1
+    q_close = step_notice_js.find("'''", q_open + 3) if q_open >= 0 else -1
+    xhr_snip = step_notice_js[q_open + 3 : q_close] if q_open >= 0 and q_close > q_open else ""
+    assert_true("rec.seq" in xhr_snip, "MISSING seq filter in api snippet")
+    assert_true("responseBody:" not in xhr_snip, "responseBody must not be returned field")
+
+    from scripts.agent.step_notice import rewind_xhr_cursor_if_shrunk
+
+    xhr_store = {"_step_feedback_xhr_cursor": 55, "_step_feedback_xhr_log_len": 20}
+    assert_true(
+        rewind_xhr_cursor_if_shrunk(xhr_store, 8) is True,
+        "xhr log shrink → rewind seq",
+    )
+    assert_true(xhr_store.get("_step_feedback_xhr_cursor") == 0, "xhr seq reset")
+    xhr_store2 = {"_step_feedback_xhr_cursor": 10, "_step_feedback_xhr_log_len": 15}
+    assert_true(
+        rewind_xhr_cursor_if_shrunk(xhr_store2, 20) is False,
+        "xhr log grew → no rewind",
+    )
+
+    runner_src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
+    assert_true("JS_XHR_HOOK" in runner_src, "MISSING JS_XHR_HOOK in session_runner")
+    assert_true("add_init_script" in runner_src, "MISSING add_init_script for xhr hook")
+
+    agent_notice_src = (ROOT / "scripts/agent/step_notice.py").read_text(encoding="utf-8")
+    assert_true("_step_feedback_xhr_cursor" in agent_notice_src, "MISSING xhr cursor store key")
+    assert_true("omit_api_if_ui" in agent_notice_src, "MISSING omit_api_if_ui in scan")
+
+    observe = (ROOT / "scripts/controller/actions/_observe.py").read_text(encoding="utf-8")
+    assert_true("async def read_step_feedback" in observe, "action registered")
+    assert_true("does not scan the page" in observe, "tool description")
+    assert_true("async def read_error_notify" not in observe, "error notify gone")
+    assert_true("async def read_xhr_log" not in observe, "xhr log action gone")
+    body = observe.split("async def read_step_feedback", 1)[1].split("async def ", 1)[0]
+    assert_true("page.evaluate" not in body and "_record_action" not in body, "no page scan")
+    meta = (ROOT / "src/models/meta-step-actions.js").read_text(encoding="utf-8")
+    assert_true("'read_step_feedback'" in meta, "engineering list")
+    assert_true("'read_error_notify'" not in meta and "'read_xhr_log'" not in meta, "old names dropped")
+
+    service_src = (ROOT / "scripts/controller/service.py").read_text(encoding="utf-8")
+    assert_true(
+        "_register_observe_actions(controller, browser_context, business_data_store)" in service_src,
+        "observe actions must receive business_data_store",
+    )
+
+    misc = (ROOT / "scripts/controller/actions/_misc.py").read_text(encoding="utf-8")
+    start = misc.find("async def close_notification")
+    end = misc.find("async def close_dialog")
+    body = misc[start:end]
+    assert_true("return _ok('ok-closed')" in body, "closed token")
+    assert_true("no-notification" in body, "empty token")
+    assert_true("ok-notification" not in body, "text return removed")
+    assert_true("notif_text" not in body, "text not read for return")
+
+    common = (ROOT / "scripts/prompts/agent-tools-common.md").read_text(encoding="utf-8")
+    assert_true("read_error_notify" not in common, "common dropped error notify")
+    assert_true("read_xhr_log" not in common, "common dropped xhr log")
+    assert_true("[step-feedback]" in common and "read_step_feedback" in common, "common points at session feedback")
+    assert_true("ok-closed" in common, "close token documented")
+    form = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
+    assert_true("read_xhr_log" not in form and "read_error_notify" not in form, "form prompt")
+    assert_true("ok-notification" not in form, "form dropped text token")
+    table = (ROOT / "scripts/prompts/agent-tools-table.md").read_text(encoding="utf-8")
+    assert_true("read_error_notify" not in table, "table prompt")
+    core = (ROOT / "scripts/prompts/agent-core.md").read_text(encoding="utf-8")
+    assert_true("read_error_notify" not in core and "read_xhr_log" not in core, "core prompt")
+    planner = (ROOT / "scripts/prompts/planner-prompt.md").read_text(encoding="utf-8")
+    assert_true("ok-notification" not in planner, "planner")
+    assert_true("[step-feedback]" in planner, "planner cue")
+
+    print("characterize-step-feedback: OK")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

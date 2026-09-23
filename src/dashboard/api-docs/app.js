@@ -3,8 +3,6 @@
  * Open: /api/docs
  */
 import { API_GROUPS, ENUMS, RECORDING_FLOW, BATCH_RECORDING_FLOW } from './catalog.js';
-import { mountSlotMonitor } from './slot-monitor.js';
-import { mountPendingScreenshots } from './pending-screenshots.js';
 import { mountAuthRecordingPanel } from './auth-recording-panel.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -286,17 +284,11 @@ function renderGroup(group) {
     return wrap;
   }
 
-  if (group.monitor || group.id === 'slot-monitor') {
-    if (group.id === 'pending-screenshots') {
-      mountPendingScreenshots(wrap);
-      return wrap;
-    }
+  if (group.monitor) {
     if (group.id === 'auth-recording-panel') {
       mountAuthRecordingPanel(wrap);
       return wrap;
     }
-    mountSlotMonitor(wrap);
-    return wrap;
   }
 
   wrap.innerHTML = `

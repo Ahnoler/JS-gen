@@ -104,9 +104,7 @@ run_form_assistant(region='系统评级结论')
 ```
 
 # 🚨 EL-NOTIFICATION 规则（关键）
-在执行操作前若页面已有可见 el-notification，先 `close_notification()` 读取文本。
-- **`"ok-notification: ..."`**：服务端错误 → 修复字段后调用 `click_save()`。
-- **`"no-notification"`**：当前没有弹窗 — **不等于保存成功**。保存成功只看 `click_save()` 返回码（见『校验与提交规则』§2）。
+通知挡住下一步时调用 close_notification()。文案已经在 [step-feedback]，不要为了读文字去关。
 
 # 🚨 EL-SELECT 规则（关键 — 不可忽略）
 1. 对于 el-select 下拉框，必须使用 `select_option(label_text, option_text)`。
@@ -126,19 +124,18 @@ run_form_assistant(region='系统评级结论')
    - `ok-save-no-feedback:...` → 已点击且无校验错误/错误 toast/跳转 → **静默保存成功** → `done(success=true)`，**勿重试** click_save。
    - `err-save-validation:[...]` → 前端校验失败（已扫描全页 `.el-form-item__error`）→ 按标签修字段 → 再次 `click_save()`。可用 `scroll_to_first_error()` / `sync_tasks_from_errors()`。
    - `err-save-notification:...` → 服务端错误 toast → 按文案修字段 → 再次 `click_save()`。
-   - `err-save-button-not-found` / `err-save-ambiguous` → **不是成功**。关干扰弹窗（`close_dialog`）或补 `region=` 后重试。**禁止**仅因 `close_notification`→`no-notification` 而 `done(success=true)`（`no-notification` 仅表示当前无弹窗，绝不等于操作成功）。
+   - `err-save-button-not-found` / `err-save-ambiguous` → **不是成功**。关干扰弹窗（`close_dialog`）或补 `region=` 后重试。**禁止**把 close_notification 的 ok-closed 或 no-notification 当成保存成功。
 3. **如果发生服务端错误（el-notification 弹窗）且你未走 `click_save`：**
-   - 先 `close_notification()` 读错误文本，修字段后 **`click_save()`**。
+   - 按 [step-feedback] 里的错误文案修字段后 **`click_save()`**。
 4. **如果服务端错误提示"已存在""重复"等：** `match_form_rule` 重新生成冲突字段值，填写后再次 `click_save()`。不要改无关字段。
 5. 不要回退重新选择或填写已返回 "ok-already:XXX"、"ok" 或 `err-field-disabled` 的字段。
-6. **成功通知会在2-3秒内自动消失** — 故必须用 `click_save()`（内部轮询捕获），不要先点索引再慢慢 `close_notification()` 指望还在。
+6. **成功通知会在2-3秒内自动消失** — 故必须用 `click_save()`（内部轮询捕获）。
 7. **在任意弹窗/抽屉交互后**（如法人引入、客户搜索等），向导表单可能已被刷新/重置——仍须对每个可编辑字段执行写动作（同核心纪律）。
 8. **录制质量：** 表单维护类保存优先 `click_save`；引入/选人可用索引点「确认」。维护类成功判据同上 §2（`ok-save-*` 三码）。
 
 # 🚨 保存规则（统一入口）
 - 所有保存（主表单 / 弹窗 / 抽屉 / **分区**）一律 `click_save(button_text=…)`：
   - 分区保存：`click_save(button_text="保存", region="<分区标题原文>")`——标题来自 semantic_snapshot，勿臆造；引擎会按标题找最近容器内的 enabled 保存按钮。
-  - 保存后紧跟 `read_xhr_log(url_filter='saveOrUpdate')` 核对请求体关键字段（见 common）。
   - `err-save-validation` → 修字段再 click_save；`err-save-button-not-found` → 从 semantic_snapshot 核对分区标题原文重试，最多 1 次。
 - `save_section` 动作已移除，不要再调用：历史轨迹中的 save_section 步骤由回放引擎映射为 click_save 回放。
 - 禁止用 `click_button` / `click_element_by_index` / `real_click` 点"保存/提交"——click_button 现在会直接返回 err-use-click-save 引导。

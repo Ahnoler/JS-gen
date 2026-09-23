@@ -1,13 +1,4 @@
-/**
- * Pending (local, not-yet-uploaded) screenshots board for /api/docs.
- * Data: GET /api/v2/screenshots/pending
- * Actions: 一键上传全部 (POST /api/v2/screenshots/pending/upload)
- *          单行上传 (POST /api/v2/screenshots/:id/upload)
- *          删除 (DELETE /api/v2/screenshots/:id)
- *
- * These endpoints return plain JSON (no { code, data } envelope), so apiJson
- * returns the parsed body as-is.
- */
+/* global document, window, fetch, setInterval, clearInterval */
 
 /**
  * A DOM element or document used as query scope.
@@ -23,6 +14,11 @@
  */
 const $ = (sel, el = document) => el.querySelector(sel);
 
+/**
+ * Escape HTML for safe interpolation.
+ * @param {string} str raw string
+ * @returns {string} escaped HTML
+ */
 function escapeHtml(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
@@ -60,6 +56,11 @@ async function apiJson(url, options = {}) {
   return parsed;
 }
 
+/**
+ * Format byte count for display.
+ * @param {number} n byte count
+ * @returns {string} human-readable size
+ */
 function formatBytes(n) {
   const n0 = Number(n) || 0;
   if (n0 < 1024) return `${n0} B`;
@@ -67,6 +68,11 @@ function formatBytes(n) {
   return `${(n0 / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+/**
+ * Format ISO date/time for display.
+ * @param {string} val date value
+ * @returns {string} localized or escaped string
+ */
 function formatDateTime(val) {
   if (!val) return '—';
   const d = new Date(val);
@@ -81,17 +87,27 @@ const KIND_LABEL = {
   page_level: '页面级',
 };
 
+/**
+ * Render kind badge HTML.
+ * @param {string} kind screenshot kind
+ * @returns {string} HTML fragment
+ */
 function kindBadge(kind) {
   const label = KIND_LABEL[kind] || escapeHtml(kind || '—');
-  return `<span class="ps-badge ps-badge-${escapeHtml(kind || 'unknown')}">${label}</span>`;
+  return `<span class="ops-badge ops-badge-${escapeHtml(kind || 'unknown')}">${label}</span>`;
 }
 
+/**
+ * Render one pending-screenshot table row.
+ * @param {object} item row from GET /api/v2/screenshots/pending
+ * @returns {string} HTML fragment
+ */
 function renderRow(item) {
   const id = Number(item.id);
   const retry = Number(item.retryCount) || 0;
   const retryTag = retry > 0
-    ? `<span class="ps-muted" title="已重试 ${retry} 次">重试 ${retry}</span>`
-    : '<span class="ps-muted">—</span>';
+    ? `<span class="ops-muted" title="已重试 ${retry} 次">重试 ${retry}</span>`
+    : '<span class="ops-muted">—</span>';
   const traj = item.trajectoryId != null ? `#${item.trajectoryId}` : '—';
   const step = item.trajectoryStepId != null
     ? `步骤 #${item.trajectoryStepId}`
@@ -100,49 +116,49 @@ function renderRow(item) {
   const mime = escapeHtml(item.mimeType || 'image/png');
 
   return `
-    <tr class="ps-row" data-id="${id}">
+    <tr class="ops-shots-row" data-id="${id}">
       <td><code>#${id}</code></td>
       <td>${kindBadge(item.kind)}</td>
-      <td class="ps-traj"><code>${escapeHtml(traj)}</code> <span class="ps-muted">${escapeHtml(step)}</span></td>
-      <td><code class="ps-mono">${mime}</code></td>
-      <td class="ps-muted">${escapeHtml(size)}</td>
-      <td class="ps-muted">${retryTag}</td>
-      <td class="ps-muted">${formatDateTime(item.lastRetryAt)}</td>
-      <td class="ps-muted">${formatDateTime(item.createdAt)}</td>
-      <td class="ps-actions">
-        <button type="button" class="btn ps-btn" data-act="upload-one" data-id="${id}">上传</button>
-        <a class="btn ps-btn ps-btn-link" target="_blank" rel="noopener"
+      <td class="ops-traj"><code>${escapeHtml(traj)}</code> <span class="ops-muted">${escapeHtml(step)}</span></td>
+      <td><code class="ops-mono">${mime}</code></td>
+      <td class="ops-muted">${escapeHtml(size)}</td>
+      <td class="ops-muted">${retryTag}</td>
+      <td class="ops-muted">${formatDateTime(item.lastRetryAt)}</td>
+      <td class="ops-muted">${formatDateTime(item.createdAt)}</td>
+      <td class="ops-actions">
+        <button type="button" class="btn ops-btn" data-act="upload-one" data-id="${id}">上传</button>
+        <a class="btn ops-btn ops-btn-link" target="_blank" rel="noopener"
            href="/api/v2/screenshots/${id}/image">预览</a>
-        <button type="button" class="btn ps-btn ps-btn-danger" data-act="delete" data-id="${id}">删除</button>
+        <button type="button" class="btn ops-btn ops-btn-danger" data-act="delete" data-id="${id}">删除</button>
       </td>
     </tr>
   `;
 }
 
 /**
- * Mount the pending-screenshots board into the given wrapper element.
- * @param {DomRoot} wrap container element to render the board into
+ * Mount the pending-screenshots board into the ops console shots tab panel.
+ * @param {DomRoot} wrap container (#ops-panel-shots)
  * @returns {void}
  */
-export function mountPendingScreenshots(wrap) {
+export function mountScreenshotsPanel(wrap) {
+  const retryMin = Math.round((Number(import.meta.env?.SCREENSHOT_RETRY_INTERVAL_MS) || 180000) / 60000);
   wrap.innerHTML = `
-    <h2 class="docs-section-title">待上传截图</h2>
-    <p class="docs-section-desc">尚未上传到 MinIO 的本地暂存截图（<code>storage_type='local'</code>，文件在 <code>tmp/pending-screenshots/</code>）。数据来自 <code>GET /api/v2/screenshots/pending</code>。「一键上传」调用 <code>POST /api/v2/screenshots/pending/upload</code>，立即把全部待传项推送到 MinIO 并更新数据库；后台每 ${Math.round((Number(import.meta.env?.SCREENSHOT_RETRY_INTERVAL_MS) || 180000) / 60000)} 分钟也会自动重试一次。</p>
-    <div class="mon-panel ps-panel">
-      <div class="mon-toolbar">
-        <button type="button" class="btn btn-primary ps-upload-all">一键上传全部</button>
-        <button type="button" class="btn mon-refresh">刷新</button>
-        <label class="mon-check"><input type="checkbox" class="ps-auto" /> 每 5s 自动刷新</label>
-        <span class="mon-summary ps-summary mon-muted">—</span>
+    <p class="ops-intro">尚未上传到 MinIO 的本地暂存截图（<code>storage_type='local'</code>）。数据来自 <code>GET /api/v2/screenshots/pending</code>；「一键上传全部」调用 <code>POST /api/v2/screenshots/pending/upload</code>。后台约每 ${retryMin} 分钟自动重试。</p>
+    <div class="ops-shots-panel">
+      <div class="ops-toolbar">
+        <button type="button" class="btn btn-primary ops-upload-all">一键上传全部</button>
+        <button type="button" class="btn ops-refresh">刷新</button>
+        <label class="ops-check"><input type="checkbox" class="ops-auto" /> 每 5s 自动刷新</label>
+        <span class="ops-summary ops-muted">—</span>
       </div>
-      <div class="mon-status ps-status" hidden></div>
-      <div class="ps-body"><div class="mon-muted">加载中…</div></div>
+      <div class="ops-status" hidden></div>
+      <div class="ops-shots-body"><div class="ops-muted">加载中…</div></div>
     </div>
   `;
 
-  const body = $('.ps-body', wrap);
-  const statusEl = $('.ps-status', wrap);
-  const summary = $('.ps-summary', wrap);
+  const body = $('.ops-shots-body', wrap);
+  const statusEl = $('.ops-status', wrap);
+  const summary = $('.ops-summary', wrap);
   let timer = null;
   let lastList = null;
   let busy = false;
@@ -154,7 +170,7 @@ export function mountPendingScreenshots(wrap) {
       return;
     }
     statusEl.hidden = false;
-    statusEl.className = `mon-status ps-status ${isErr ? 'mon-status-err' : 'mon-status-ok'}`;
+    statusEl.className = `ops-status ${isErr ? 'ops-status-err' : 'ops-status-ok'}`;
     statusEl.textContent = msg;
   }
 
@@ -163,14 +179,14 @@ export function mountPendingScreenshots(wrap) {
     summary.textContent = list.length ? `待上传 ${list.length} 项` : '无待上传项';
     if (!list.length) {
       body.innerHTML = `
-        <div class="ps-empty">
-          <div class="mon-muted">没有待上传的截图 🎉（MinIO 已配置，新截图会直接上传）</div>
+        <div class="ops-shots-empty">
+          <div class="ops-muted">没有待上传的截图 🎉（MinIO 已配置，新截图会直接上传）</div>
         </div>`;
       return;
     }
     body.innerHTML = `
-      <div class="mon-table-wrap">
-        <table class="mon-table ps-table">
+      <div class="ops-table-wrap">
+        <table class="ops-table ops-shots-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -197,7 +213,7 @@ export function mountPendingScreenshots(wrap) {
       paint();
     } catch (err) {
       setStatus(`刷新失败：${err.message}`, true);
-      body.innerHTML = `<div class="mon-muted">无法加载（控面是否已启动？）</div>`;
+      body.innerHTML = '<div class="ops-muted">无法加载（控面是否已启动？）</div>';
     }
   }
 
@@ -210,7 +226,7 @@ export function mountPendingScreenshots(wrap) {
     }
     if (!window.confirm(`确认把 ${count} 项待上传截图全部推送到 MinIO（bucket: ${escapeHtml('uara-step-phase-picture')}）？`)) return;
     busy = true;
-    const btn = $('.ps-upload-all', wrap);
+    const btn = $('.ops-upload-all', wrap);
     if (btn) { btn.disabled = true; btn.textContent = '上传中…'; }
     setStatus('正在上传…');
     try {
@@ -280,9 +296,9 @@ export function mountPendingScreenshots(wrap) {
     if (act === 'delete' && Number.isFinite(id)) deleteOne(id);
   });
 
-  $('.ps-upload-all', wrap)?.addEventListener('click', () => uploadAll());
-  $('.mon-refresh', wrap)?.addEventListener('click', () => refresh());
-  $('.ps-auto', wrap)?.addEventListener('change', (e) => {
+  $('.ops-upload-all', wrap)?.addEventListener('click', () => uploadAll());
+  $('.ops-refresh', wrap)?.addEventListener('click', () => refresh());
+  $('.ops-auto', wrap)?.addEventListener('change', (e) => {
     if (timer) {
       clearInterval(timer);
       timer = null;

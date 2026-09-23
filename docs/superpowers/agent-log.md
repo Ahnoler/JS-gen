@@ -12,6 +12,81 @@
 - 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev`（带入 Cursor ops-console 3 docs commits，零冲突）→ **合并态全量 verify-all 189 pins（187+2 新登记），唯一 FAILED=characterize-layer-tree**（traj 980 phase_highlight 截图 91 元素仅 80 带 layers，落库数据态；实施者已用 stash 在 BASE 复现同红，预存非本 diff 所致）。
 - 遗留移交（评审 Minor 记档，均不阻塞）：①M1 角可选补 pin——introduce 合约 kinds 单值 `['confirm_click']` 不再被 legacy 分支识别（静态证明不可达：两 flag 写点必先落同名 token；legacy 编译器恒成对输出；persisted 走 boundary 路径），如需可补一条 pin；②M3——pin② 与既有 gate pin 同登 phase 域，`--changed` 对仅改 runner 的 diff 有盲区（继承惯例非本单元引入），后续加固可补登 ui/core；③M4——mode=other+描述无写动词的误豁免面属设计级残余，湿测期 grep `[record] phase #N navigate-only zero-step success` 作探针；④layer-tree 预存红数据态归因共享——他线触碰 traj 980 相关数据时注意。
 - 分支与生效面：`engine/ab-gate-fixes-20260922` 已推 origin，branch-only **待并入 dev**；①合并 dev 后新录制会话即效；②等控制面重启窗口（与 verify-token persisted 主路径同一窗口）。
+## 2026-09-23 11:32 · Cursor — 收工：录制本步页面反馈合入 uara_V2.0_dev
+
+- 回链 17:12 开工。用户指令合入开发分支并告一段落。
+- 完成：`dfe46abd`（`--no-ff`）将 `cursor/recording-step-feedback-20260922` 合入 `uara_V2.0_dev`。每步新出现的 toast、校验红字、对话框标题写入当次会话，并以 `[step-feedback]` 交给下一步模型；`read_step_feedback` 只读这段历史。`read_error_notify`、`read_xhr_log` 不再注册。`close_notification` 只关闭通知。页面错误不写入步骤、阶段或交易。agent-log 冲突并排保留引擎线挡板定性条目（含误落本分支的 `8c7c7b81`）。
+- 验收（合并后）：`characterize-step-feedback`、`characterize-step-notice-scan`、`characterize-error-notify`、`characterize-xhr-log`、`characterize-save-section` 均 OK。
+- 遗留：`verify-all.sh ui` 的 `characterize-layer-tree`（80/91）与本次无关，未修。步骤上落错误描述仍不做。
+
+## 2026-09-22 17:55 · ZCode 引擎线 — 收工：挡板定性落地（4fc2efd0）+ 主检出被他线切分支的现场处置记录
+
+- 回链 17:32 开工变更。完成：反馈稿焦点改写（挡板实现对自动化不友好+两条建议）/成果介绍难题④遗留①补挡板背景/duigong_contract_sign 卡弹窗规则补根因句；门禁=金样例 26 passed+recall-eval 门禁 6 passed+指标与基线逐位一致（Acc@1 0.74）。
+- **现场处置**：17:32 条目 commit 时发现主检出已被他线切到 cursor/recording-step-feedback-20260922（工作区有他线未提交改动 _observe.py 等 5 文件）——本线改动改走 worktree（../JS-gen-mockdoc，检出 uara_V2.0_dev），全程零触碰他线工作区；该条目本身误落 cursor 分支（8c7c7b81，纯 agent-log 文本，合流并排即可）。
+- dev 误动疑云澄清：reflog 实证 cursor 线把 4 个 spec/plan 提交直接打在 dev（6efa5952→e4cbf156）并推送，我线 009dbce2 为其祖先，无任何丢失。
+- 遗留：①全图导航待命——SUT 登录态已过期，用户要拍时重新登录导到弹窗/表单各拍摄点；②主检出的 agent-log 收工条目随他线分支合流时并排入库（本条在 dev 侧已含）。
+
+## 2026-09-22 17:32 · ZCode 引擎线 — 开工变更：用户带回挡板定性，扩围改 KB 卡 + 更新两报告
+
+- 授权：用户转达信贷侧答复——合同账户接口 `searchEnqrCoreAccinfByCustNumb` 当前为**挡板（mock）**，现场正式环境调行方接口按客户号查行内可用账户。反馈方向定为「mock 随机轮换实现方式对自动化不友好」。
+- 工作范围（在 16:27 声明基础上扩围）：`data/kb/flows/duigong_contract_sign.json`（仅「合同账户弹窗随机轮换」规则追加根因一句）；两报告（feedback/summary）按新事实改写相应段；agent-log 本条。
+- 禁入区不变：其余产品代码、`data/kb/**` 其余文件、他线在途面。
+- 执行方式：主会话改文案；卡面改字后复跑召回两侧 characterization + verify-all（金样例/评测门禁防绊）。
+
+## 2026-09-22 17:12 · Cursor — 开工：录制本步反馈实现（分支 cursor/recording-step-feedback-20260922）
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-22-recording-step-feedback.md`。
+- 工作范围：`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/agent/recorder_emitters.py`、`scripts/recorder.py`、`scripts/session_runner.py`、`scripts/controller/actions/_observe.py`、`scripts/controller/actions/_misc.py`、`scripts/controller/actions/_js_snippets.py`、`scripts/controller/actions/js_snippets/step_notice.py`、`src/models/meta-step-actions.js`、`scripts/prompts/agent-tools-common.md`、`scripts/prompts/agent-tools-form.md`、`scripts/prompts/agent-tools-table.md`、`scripts/prompts/agent-core.md`、`scripts/prompts/planner-prompt.md`、`scripts/characterization/cold/characterize-step-feedback.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`scripts/characterization/cold/characterize-error-notify.py`、`scripts/characterization/cold/characterize-xhr-log.py`、`scripts/characterization/characterize-save-section.py`、`scripts/refactor/verify-all.sh`。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/state.py` 的折叠逻辑、`docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`。不把反馈写入轨迹、阶段或交易。
+- 执行方式：主会话按任务派实现子智能体，每任务独立评审。子智能体可 commit，不 push。
+
+## 2026-09-22 16:56 · Cursor — 开工：录制本步反馈实现计划（只写 plan）
+
+- 授权：用户对规格回复「继续」。
+- 工作范围：新增 `docs/superpowers/plans/2026-09-22-recording-step-feedback.md`；本开工条目。
+- 禁入区：`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`；不改 `docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md` 与 `2026-09-22-recording-step-feedback-design.md`。不实现采集、不改录制代码。
+- 执行方式：主会话按 writing-plans 写计划并自检。用户选定执行方式之前不改产品代码。
+
+## 2026-09-22 16:53 · Cursor — 开工：录制本步反馈规格（只写 spec）
+
+- 授权：用户逐段确认后，放弃把失败原因写入阶段 `done_logs`、交易或步骤，改回会话内反馈这一版。
+- 工作范围：新增 `docs/superpowers/specs/2026-09-22-recording-step-feedback-design.md`；本开工条目。
+- 禁入区：`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`；不改 `docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`。不实现采集、不改录制代码。
+- 执行方式：主会话写规格并自检。用户评审 spec 之前不写实现计划、不改产品代码。
+
+## 2026-09-22 17:40 · ZCode 引擎线 — 收工：主链成果介绍 + 合同账户弹窗反馈材料交付
+
+- 回链 16:27 开工（b15ac51c）。GLM-5 已由用户自行切回（本单元零配置改动）；T3.1 heal live 用户明示移出本线不再跟进。
+- 完成：①`docs/superpowers/reports/2026-09-22-mainchain-full-through-summary.md`（主链七环节全通成果介绍：结论/单据链/三能力实测证据/计分板/六难题/沉淀资产/遗留建议，面向汇报）；②`docs/superpowers/reports/2026-09-22-contract-account-popup-feedback.md`（合同账户弹窗随机轮换反馈稿：可直接转发的文字 + 复现步骤 + 两次列表对照 + 接口报文 + 建议改法）。③todo ⑤ 节更新为全通态（R6.5/R7 行补入，09-07 挂起记录留档）。
+- 取证（MCP 有头浏览器，全程只读）：701994 登录 SUT → 合同 9881020048004【发起签订】→「合同账户信息」弹窗连开两次（均点【取消】，表单亦【取消】退出，零数据变更）。实锤：两批 10 账号零重叠，且均不含合同上已保存的 1155232889/1077022879；接口 `rtlContAccInf/searchEnqrCoreAccinfByCustNumb` 同参两次调用均报 total=10/pages=1/hasNextPage=false 但内容完全不同（服务端随机 + 假分页元信息）。截图 `tmp/kb-mainchain/R7-contract/popup-evidence-open{1,2}.png`（tmp 不入库，转发时随反馈文档附上）。
+- 验收：纯文档交付+只读取证，无代码改动，无 verify-all 义务。
+- 遗留移交：①弹窗轮换待信贷侧回复（材料 §五给了三条期望）②合同生效路线（纸质影像 vs 电子签）等产品排期 ③主链系列测试单据建议按引擎线口径保留。
+## 2026-09-22 17:05 · ZCode 引擎线 — 开工：主链全通成果介绍 + 合同账户弹窗反馈材料（只写文档/报告）
+
+- 授权：用户点单四项——GLM-5 已自行切回（无需动作）；①全链路贯通成果介绍（对外可转发的文档）②合同账户弹窗随机轮换问题反馈稿（文字+测试照片，供用户咨询信贷系统人员）③T3.1 heal live 用户明示不需要我管。
+- 工作范围：新增 `docs/superpowers/reports/2026-09-22-mainchain-full-through-summary.md`、`docs/superpowers/reports/2026-09-22-contract-account-popup-feedback.md`；`todo-list.md` 仅 ⑤ 节补 R6.5/R7 完成状态；截图取证落在 `tmp/kb-mainchain/**`（不入库）。
+- 禁入区：全部产品代码（`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`）；他线在途面（Cursor ops-console：`src/dashboard/**`/`server.mjs`/`scripts/agent/service.py` 等；引擎线 `intent_gates.py`/`phase-done-evidence-gate.js`/`trajectory-recording-runner.js`）。
+- 执行方式：主会话写文档；合同账户弹窗证据用 Playwright MCP 登录 SUT（701994）只读探测——只开「选择账户」弹窗两次截图对比顺序，不点保存/提交，不改任何 SUT 数据。
+## 2026-09-22 16:10 · Cursor — 开工：语料到原子组件草稿规格（只写 spec）
+
+- 授权：用户选定范围 A，并说明插件数据格式与规范尚未确定，先出规格。
+- 工作范围：新增 `docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`；本开工条目。
+- 禁入区：`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`。不实现接入、不改组件库代码、不改录制/回放。
+- 执行方式：主会话写规格并自检。用户评审 spec 之前不写实现计划、不改产品代码。
+
+## 2026-09-22 15:32 · Cursor — 收工：执行机与日志页合入 uara_V2.0_dev
+
+- 回链 12:45 开工。分支 `cursor/ops-console-20260922`。用户指令「继续，合入 uara_V2.0_dev」。
+- 完成：`GET /ops` 独立页（执行机槽位、待上传截图、步骤/回放/注入卡片与全文弹窗）；`[step]` 去掉 200/500/120 截断；`[card]` 写入阶段任务与每次注入全文；文档页不再挂这两块面板。另按用户要求，Python Playwright 按目录前缀 `chromium_headless_shell-` / `chromium-` 找已安装浏览器，不再要求修订号 1217。
+- 验收：四条 ops pin 通过；此前因缺 1217 失败的 Python 浏览器检查，改前缀后 8 条通过。全量 verify-all 仍有与本次无关的失败：`characterize-network-capture`、`characterize-tssc-route-conflict`（`scripts.controller` 导入）、`characterize-layer-tree`（分层数据 80/91）。`/ops` 未在 4097 上做浏览器湿测（控制面不是该 worktree）。
+- 遗留：上述三条无关失败；浏览器湿测留到控制面切到含 `/ops` 的代码后。
+
+## 2026-09-22 12:45 · Cursor — 开工：执行机与日志页实现（分支 cursor/ops-console-20260922）
+
+- 授权：用户选择按计划分任务实现。计划 `docs/superpowers/plans/2026-09-22-ops-console.md`（`285f8a8f`）。
+- 场地：`D:\dev\JS-gen\.worktrees\ops-console`，分支 `cursor/ops-console-20260922`（自 `uara_V2.0_dev` `5dcc8fd1`）。
+- 工作范围：`src/dashboard/ops-console/**`、`server.mjs`（仅 `GET /ops`）、`api-docs.html`（侧栏链接）、`src/dashboard/api-docs/app.js`、`src/dashboard/api-docs/catalog.js`、删除 `slot-monitor.js` 与 `pending-screenshots.js`、`scripts/recorder.py`（仅 `[step]` 行）、`scripts/agent/stderr_cards.py`、`scripts/agent/service.py`（阶段标题与 `[card]`）、`scripts/controller/actions/_scenario_describer.py`（追加 `[card]`）、四个 characterization、`scripts/refactor/verify-all.sh`（登记 pin）。
+- 禁入区：引擎线 `intent_gates.py`、`phase-done-evidence-gate.js`、`trajectory-recording-runner.js`、`boundary_*`、`_replay.py`、`data/kb/**`。不改 `_ACTION_LOG` 切片、`flow_summary_text` 的 800 字、`_PREAMBLE_TOTAL_MAX`、`agent_utils.py` 的 `next_goal[:200]`、`api-docs.css`。
 
 ## 2026-09-22 12:40 · Cursor — 续：执行机与日志页实现计划（仍不改产品代码）
 
@@ -73,6 +148,21 @@
 - spin-guard 值守更新：全会话 0 签名（observation 常开零误报）；Stop requested 回放腿恰 2（符合触发面）。D2 A/C 自然窗口值守口径不变。
 - 遗留：#977 分类「合约停测cat0921」残留待有效会话/DB 补清（合约线自留，非引擎线）；#978 六自测阶段已清零残留、18 存量节点无损。
 - 引擎线在途为零；meta-step-filter 分支（f2b5cf77）仍 branch-only 待并入 dev。
+
+## 2026-09-22 16:20 · ZCode Lead — 收官：主链七环节全通（R7 合同签订止于已保存态达成）+ G10 回报
+- **G10 完成（R7=PASS，主链七环节全通）**：合同 9881020048004（一般流动资金贷款，关联用信批复 DGYXPF202609220016013）签订信息维护完成——份数 2/银行四件套/送达三件套/公证否/**合同账户 2 行（1155232889 放款+1077022879 还款主，saveCtrAccinf 200）**/saveSignContInfo 200——终态：合同状态=待签订、流程状态=待发起、**ctrSt=1 已保存态**（产品裁定的成功标准）。本次保存无闸门拦截（不提交故「担保合同期限」闸门未触发）。
+- 管线：轨迹 982（recorded/18 步，phase 1-8 完成）；phase 8-10 因 SUT 登录到期自停+LLM 504 转主会话 MCP 手工完成并从服务端读回核验（URL ctrSt=1/updateTime 15:26:19 佐证）。
+- 卡面 +1 规则（656a1a9d）：合同账户弹窗后端随机轮换账户集合（同客户 4 组互不重叠、无查询框固定 10 行）——按行位置选勿按账号数字；Qwen 小模型 504/analyze 500 超时与登录 1h 到期坑。
+- **主链终盘计分板（轨迹链）**：R1=595 → R2=604+607 → R3=605+608 → R4=606/607/608 → R5=613 → R6=615/616+续棒 → R6.5=979/980/981 → **R7=982+MCP 手工收尾**。业务链：客户（预客户 KB主链R1+正式客户贯通验证企业190416）→评级（PJ20260907016009 生效）→授信（DGSX20260907056033 通过→批复 DGSXPF20260907020005 生效）→用信（YXPC20260907012045 通过→用信批复 DGYXPF202609220016013 生效）→合同（9881020048004 已保存态）。
+- **遗留移交**：①T3.1 heal live 验收未做（独立验证项）；②卡面配方债务：账户弹窗随机轮换的根因（后端实现）值得向 SUT 团队反馈；③R7 合同最终提交受担保合同期限+影像上传封死（产品已知，待产品排期）；④SUT 测试数据残留清单（KB主链系列客户/评级/授信/用信/合同单据，口径=引擎线业务数据保留）。
+- 提交：656a1a9d（卡面）已推送。
+
+## 2026-09-22 14:50 · ZCode Lead — R6.5 用信审批三节点全通（979/980/981，批复 DGYXPF202609220016013 生效）+ G10 派发（R7 合同签订收官棒）
+- **G9 完成（R6.5，全链贯通）**：轨迹 A=979（WN0001 节点 2 二次调查，17 步）→ B=980（**135292 张某某** 节点 3 审查，15 步）→ C=981（WN0001 节点 4 终批，20 步）——YXPC20260907012045 状态=**通过**，**用信批复 DGYXPF202609220016013 自动生成已生效**（R7 输入；前缀实为 DGYXPF 非 YXDGP，与授信批复 DGSXPF 同族）。
+- **实质偏离披露（G9，处置正确）**：轨迹 A 选人时 agent 选了张某某为节点 3 处理人（下节点归属由前节点选人决定）；实证 701994 无法处理节点 3（待办范围过滤查无）后，按纪律改用 135292（/1 凭证探测成功，新建 systemAccountId=31）跑轨迹 B，并在 B 选人显式勾选黄亮保住节点 4 预设——C 按预设跑通。
+- **G9 坑位沉淀**：审批节点「流程操作」无「同意」选项（只有下一步/退回，文案须写「同意，若无则选下一步」）；下节点归属由前节点选人决定（选人树须用「岗位-姓名(账号)」全格式文本）；record/start 客户端 UND_ERR_HEADERS_TIMEOUT 300s 但服务端继续录制（以日志为准不重试 HTTP）；Qwen3.8-27B 下 agent 偶发空 act+LLM idle 10 分钟超时（轨迹 C 首轮 failed 重跑成功）；流程轨迹节点 2 意见显示系统模板非所填原文（核验口径注意）。
+- **G10 已派发（R7 合同签订收官棒，进行中）**：DGYXPF202609220016013 对应主合同（自动创建）签订——签订信息维护+分区保存，**止于已保存态（ctrSt=1，产品裁定）**；「担保合同期限不能为空」闸门为已知预期终点。
+- 主链计分板：R1-R6 全 ✅（595/604/607/608/613/605+608/979/980/981）→ **R7 进行中（最后一棒）**。
 
 ## 2026-09-22 12:00 · ZCode Lead — G7 完成（与 G8 并发同单操作，结果一致无脏数据）+ 税E贷裁定不恢复
 - **G7（fork 前派发）完成**：R6 流程提交亦成功（submitProcess 200「流程提交成功！」，nextNodeAprvPsn=WN0001-9881-X0018）；**workflowTree 实返 4 个 X0018 客户经理**（张某某/黄亮/黄磊明/李克）——X0018 权限修复确凿。截图存 tmp/kb-mainchain/R6-usage-apply/evidence-submit-success-workflow-trail.png 等（成功证据非失败取证）。
