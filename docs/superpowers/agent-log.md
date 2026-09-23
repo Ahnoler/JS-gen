@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 17:20 · Cursor — 验收：逐步反馈 console 分支可合入 uara_V2.0_dev
+
+- 集成：`ac27d1a4` 合入 `origin/uara_V2.0_dev`（agent-log 双方条目并排）。挂载修复 `e7a2226d`：新 page 的 `create_task` 持有强引用，挂载失败不记成已完成，页面身份用弱引用。
+- 评审：P0-A/P0-B 与开工范围一致；两处 Important（任务被回收、失败后不再重试）已修。
+- 全量 `verify-all.sh` 197 pins。本功能 pin（step-notice-scan、step-feedback）在集成态 OK。7 条红均非本 diff：`fill-err-with-scope`、`idempotent-click-gate` 是控制台 GBK 无法打印 ✓，`PYTHONUTF8=1` 重跑通过；`export-v3`、`layer-tree`、`step-highlight` 是本机无 `DB_PASS`；`network-capture` 的 Python 探针因工作区没有自带 `python/python.exe`（接线断言已过）；`sso-auth` 仍是 `d15482c6` 把 `keyword` 改成 `name`，pin 还在找 `keyword`。
+- 遗留：未做真机 `console.error` 湿测。P1 三项不在本分支。
+
 ## 2026-09-23 17:05 · Cursor — 收工：录制逐步反馈补 console 与新 tab（d4030f1c）
 
 - 回链 16:47 开工。完成：`d4030f1c`。console.error 与 pageerror 写入会话环形缓冲（最多 20 条），下一步 cue 为 `console:err:` / `console:pageerror:`。`ctx.on('page')` 给之后打开的 page 复挂 xhr init script、console/pageerror 和原生弹窗自动接受。未恢复 `read_xhr_log` / `read_error_notify`。
