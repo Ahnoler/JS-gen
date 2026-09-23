@@ -2,6 +2,18 @@
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 
+## 2026-09-23 18:20 · Cursor Automation — 收工：2026-09-22 试用期工作日报（cron 日报助手）
+
+- 完成：`docs/report/2026-09-22.md` + `docs/report/README.md` 索引行；统计窗北京 2026-09-22，50 条非 merge 提交；对照 09-21 遗留与 agent-log 主链/引擎条目。
+- 验收：git log `--since=2026-09-21 16:00 --until=2026-09-22 16:00` 与日报提交表一致。
+- 禁入区：无代码/运行态改动。
+
+## 2026-09-23 18:16 · Cursor Automation — 开工：2026-09-22 试用期工作日报（cron）
+
+- 工作范围：`docs/report/2026-09-22.md`、`docs/report/README.md`、`docs/superpowers/agent-log.md`（本收工条目）。
+- 禁入区：`src/**`、`scripts/**`（除 agent-log）、运行态服务。
+- 执行方式：git log + agent-log + 前日日报遗留对照，只写文档。
+
 ## 2026-09-21 22:47 · Cursor — 收工：方案 D 第 2 刀并入 uara_V2.0（回链 21:05）
 
 - 完成：功能分支 `cursor/phase-structured-contract-20260921` 代码 `ea0ca6af`，`--no-ff` 并入 `uara_V2.0` = **79b4b8ba**（已在远端）。分析输出等长 `phaseContracts`，写入 `trajectory_phase.contract_json`；录制下发有效快照时执行机直接落阶段意图，不再跑 `compile_boundary` / `compile_phase_intent` / `review_phase_contract` / `_apply_cross_phase_token_guard`。缺失、非法或 heal 仍走文本分类。改描述清空合约。核验型阶段主收口未做。
