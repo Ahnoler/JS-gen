@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 11:32 · Cursor — 收工：录制本步页面反馈合入 uara_V2.0_dev
+
+- 回链 17:12 开工。用户指令合入开发分支并告一段落。
+- 完成：`dfe46abd`（`--no-ff`）将 `cursor/recording-step-feedback-20260922` 合入 `uara_V2.0_dev`。每步新出现的 toast、校验红字、对话框标题写入当次会话，并以 `[step-feedback]` 交给下一步模型；`read_step_feedback` 只读这段历史。`read_error_notify`、`read_xhr_log` 不再注册。`close_notification` 只关闭通知。页面错误不写入步骤、阶段或交易。agent-log 冲突并排保留引擎线挡板定性条目（含误落本分支的 `8c7c7b81`）。
+- 验收（合并后）：`characterize-step-feedback`、`characterize-step-notice-scan`、`characterize-error-notify`、`characterize-xhr-log`、`characterize-save-section` 均 OK。
+- 遗留：`verify-all.sh ui` 的 `characterize-layer-tree`（80/91）与本次无关，未修。步骤上落错误描述仍不做。
+
 ## 2026-09-22 17:55 · ZCode 引擎线 — 收工：挡板定性落地（4fc2efd0）+ 主检出被他线切分支的现场处置记录
 
 - 回链 17:32 开工变更。完成：反馈稿焦点改写（挡板实现对自动化不友好+两条建议）/成果介绍难题④遗留①补挡板背景/duigong_contract_sign 卡弹窗规则补根因句；门禁=金样例 26 passed+recall-eval 门禁 6 passed+指标与基线逐位一致（Acc@1 0.74）。
