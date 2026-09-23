@@ -39,15 +39,15 @@
 
 1. **进入/打开…页面**（导航到列表/菜单，无表单填写）：`mode=navigate`，`allow_form_assistant=false`，`refill=none`。不要把后续阶段的「点修改」「新增」放进 `in_scope`。
 2. **新增/创建/录入**（完整表单维护）：`mode=create`，`allow_form_assistant=true`，`refill=all_editable`。（例：「新增一个信贷潜在客户…，点击保存。预期结果：页面跳转至客户基本信息填写页或提示保存成功。」→ mode=create，submit.required=true，success.kinds 含 saved_navigation。）
-3. **修改/编辑**（完整改所有可编辑项）：`mode=modify`，`allow_form_assistant=true`，`refill=all_editable`。
+3. **修改/编辑**（完整改所有可编辑项）：`mode=modify`，`allow_form_assistant=true`，`refill=all_editable`。修改、编辑、维护必须写在动作子句里。只在预期结果里出现「修改成功」时，不要把本阶段判成 modify。
 4. **部分修改**（阶段文案或业务数据**逐个点名**了要改的字段）：`mode=modify`，`allow_form_assistant=false`，`refill=touched`（点名要求含糊、无法构成字段集合时才可用 `none`）。
-5. **查询/检索**：`mode=query`，`allow_form_assistant=false`，`refill=none`。
-6. **引入/选人/客户选择弹窗**：`mode=introduce_pick`，`allow_form_assistant=false`，`refill=none`，`submit.required=true`，`success.kinds` 含 `confirm_click`/`picker_closed`。但**仅当本阶段完成搜索/选择/确认/回填时才用 introduce_pick**；若本阶段只是"点击引入按钮 → 打开客户选择窗口"，而搜索/选择/确定由下一阶段完成，则按**navigate**处理（`submit.required=false`，`success.kinds=[]`），以窗口打开为完成条件。
-7. **登录**：`mode=login`，`allow_form_assistant=false`，`refill=none`，**必须** `submit.required=false`，`success.kinds=[]`（登录不走表单保存 token）。
+5. **查询/检索**：只有本阶段动作是在执行查询时才用 `mode=query`，`allow_form_assistant=false`，`refill=none`。包括动作子句写明点击查询/搜索、执行查询/搜索、查询按钮/搜索按钮，或在搜索框中输入并搜索。字段名里的「查询」不是查询：下拉框、输入框、日期控件上的选择或填写（如查询事由、查询类型）按规则 9 的填写处理。「按查询类型筛选」且本阶段自己要筛出结果时，仍是查询。本阶段只设置条件、点击查询写在后续阶段时，用 `mode=other`，不要提前点击查询。
+6. **引入/选人/客户选择弹窗**：`mode=introduce_pick`，`allow_form_assistant=false`，`refill=none`，`submit.required=true`，`success.kinds` 含 `confirm_click`/`picker_closed`。但**仅当本阶段完成搜索/选择/确认/回填时才用 introduce_pick**；若本阶段只是"点击引入按钮 → 打开客户选择窗口"，而搜索/选择/确定由下一阶段完成，则按**navigate**处理（`submit.required=false`，`success.kinds=[]`），以窗口打开为完成条件。选择某个下拉字段（如「选择客户类型下拉」）不是引入。
+7. **登录**：本阶段动作是登录系统、使用账号登录、输入账号或密码、点击登录时，`mode=login`，`allow_form_assistant=false`，`refill=none`，**必须** `submit.required=false`，`success.kinds=[]`（登录不走表单保存 token）。「打开登录页面」且登录动作在后续阶段时用 `mode=navigate`，以页面打开为完成条件，本阶段不输入账号密码。
 8. **navigate / query / other**：同样 **必须** `submit.required=false`，`success.kinds=[]`（完成条件用 `done_when` 自然语言即可，不要填 toast_ok/url_change，也不要自造 `step_change` 之类 token——它们无法被录制证据满足，会让 `done()` 反复被拒）；阶段文本含「点击保存/保存成功/点击提交/提交成功」时禁止 navigate/query——「预期结果：页面跳转至…或提示保存成功」中的页面跳转是保存成功的形态（saved_navigation），属于 create/modify 的成功证据而非导航。
-   - 向导「点击【下一步】」且预期只是切换步骤（非打开新页面/弹窗）时用 `navigate`（可留空 kinds，运行时会默认按 `nav_next_clicked`/`url_change`/`page_opened` 收口）；确无保存/确认/查询/导航语义才用 `other`。
+   - 向导「点击【下一步】」且预期只是切换步骤（非打开新页面/弹窗）时用 `navigate`（可留空 kinds，运行时会默认按 `nav_next_clicked`/`url_change`/`page_opened` 收口）；确无保存/确认/查询/导航语义才用 `other`。动作子句没有点击下一步/上一步、后续阶段才点击时，用 `other`，本阶段不要提前点下一步。动作子句已经写明点击下一步的，仍是 navigate。
    - **仅打开选择器/弹窗/窗口**（如"点击【引入】按钮，打开客户选择窗口"）且终态动作在下一阶段时，用 `navigate`，`success.kinds=[]`，不得设置 introduce_pick 令牌。
-9. **纯填写/选择阶段（保存动作在下一阶段）**：若阶段只含填写/选择字段、没有保存/提交/确认动作，而保存/提交/确认明确在后续阶段，则 `mode` 可保持 `create`/`modify` 以允许 `run_form_assistant` 采集元素，但**必须** `submit.required=false`、`success.kinds=[]`，`done_when` 写成"字段填写完成"。禁止把下一阶段的保存成功预期写入本阶段。
+9. **纯填写/选择阶段（保存或查询点击在下一阶段）**：若阶段只含填写/选择字段、动作子句没有保存/提交/确认/查询点击，而保存/提交/确认或点击查询明确在后续阶段，则 `mode` 可保持 `create`/`modify` 以允许 `run_form_assistant` 采集元素，但**必须** `submit.required=false`、`success.kinds=[]`，`done_when` 写成"字段填写完成"。下拉框、输入框、日期控件上的字段即使名叫「查询事由」「查询类型」，也属于本规则。预期结果只写「保存成功」、动作子句没有点击保存/确认，且后续阶段才点击时，同样不索要保存令牌。没有后续阶段时，预期结果中的保存成功仍算本阶段要保存。动作子句已经写明点击保存/确认的，即使后续阶段也有保存，本阶段仍要保存。禁止把下一阶段的保存成功预期写入本阶段。
 
 10. **泛指 vs 点名判定基准**（规则 3 与规则 4 的分界）：
    - 阶段文案对填写范围是**泛指**（如「填写…信息」「完善…资料」「维护表单」），且未列出具体字段清单时，即使提到「修改」，也按整表维护处理：新增类走规则 2、修改类走规则 3——即 `refill=all_editable`、`allow_form_assistant=true`。
@@ -58,6 +58,7 @@
 ## submit / success 约束
 
 - 仅 `create` / `modify`（本阶段**确实需要**保存/提交/确认）或 `introduce_pick`（本阶段完成选择+确认）才应设置 `submit.required=true` 与非空 `success.kinds`。
+- `submit.button_text` 取动作子句里最后一次「点击确认/确定/保存/提交」的那个词。写的是「点击【确认】」就填「确认」，不要一律填「保存」。本阶段不保存时留空。
 - `create` / `modify` 阶段若**只填写/选择字段、保存动作在下一阶段**，则必须 `submit.required=false`、`success.kinds=[]`，否则 agent 会被 recovery 处方强推 click_save，导致下一阶段动作被提前执行。
 - `login` / `navigate` / `query` / `other`：**禁止** `submit.required=true`，**禁止** `success.kinds` 非空（`toast_ok` / `url_change` / `saved_navigation` 尤其禁止，自造 token 同样禁止）。
 
