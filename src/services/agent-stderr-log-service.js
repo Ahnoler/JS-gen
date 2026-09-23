@@ -8,6 +8,7 @@ import {
   appendFileSync,
   readdirSync,
   readFileSync,
+  statSync,
   unlinkSync,
 } from 'fs';
 import path from 'path';
@@ -144,6 +145,74 @@ function listLogFilePaths() {
   return readdirSync(dir)
     .filter((name) => name.endsWith('.log'))
     .map((name) => path.join(dir, name));
+}
+
+/**
+ * List on-disk stderr logs, newest first, with trajectory when a remote session row exists.
+ * Disk listing still returns when the database lookup fails.
+ * @returns {Promise<object[]>} history rows
+ */
+export async function listStderrHistory() {
+  const dir = resolveLogDir();
+  if (!existsSync(dir)) return [];
+  const rows = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.log')) continue;
+    const sessionId = name.slice(0, -'.log'.length);
+    if (!sessionId) continue;
+    const filePath = path.join(dir, name);
+    let st;
+    try {
+      st = statSync(filePath);
+    } catch {
+      continue;
+    }
+    if (!st.isFile()) continue;
+    rows.push({
+      sessionId,
+      sid: shortSid(sessionId),
+      bytes: st.size,
+      mtime: st.mtime.toISOString(),
+    });
+  }
+  rows.sort((a, b) => (a.mtime < b.mtime ? 1 : a.mtime > b.mtime ? -1 : 0));
+
+  let bySession = new Map();
+  try {
+    const sessions = await remoteSessionDao.listByAgentSessionIds(rows.map((r) => r.sessionId));
+    bySession = new Map();
+    for (const session of sessions) {
+      const key = session.agentSessionId ? String(session.agentSessionId) : '';
+      if (!key) continue;
+      const prev = bySession.get(key);
+      if (!prev || Number(session.id) > Number(prev.id)) bySession.set(key, session);
+    }
+  } catch {
+    bySession = new Map();
+  }
+
+  const names = new Map();
+  const trajectoryIds = [...new Set(
+    [...bySession.values()].map((s) => s.trajectoryId).filter((id) => id != null),
+  )];
+  await Promise.all(trajectoryIds.map(async (id) => {
+    try {
+      const trajectory = await trajectoryDao.getById(id);
+      if (trajectory?.name) names.set(id, trajectory.name);
+    } catch {
+      /* name stays absent */
+    }
+  }));
+
+  return rows.map((row) => {
+    const session = bySession.get(row.sessionId);
+    const trajectoryId = session?.trajectoryId ?? null;
+    return {
+      ...row,
+      trajectoryId,
+      trajectoryName: trajectoryId != null ? (names.get(trajectoryId) || null) : null,
+    };
+  });
 }
 
 /**

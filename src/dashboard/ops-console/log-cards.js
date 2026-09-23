@@ -1,4 +1,4 @@
-/* global document, requestAnimationFrame */
+/* global document, requestAnimationFrame, fetch */
 
 /**
  * Strip slot/session prefix from a stderr log line (same rules as agent-stderr-log-service).
@@ -426,10 +426,13 @@ function ensureModal() {
   return sharedModal;
 }
 
+/** @type {number} */
+let modalToken = 0;
+
 /**
  * Open the shared modal with full card text.
  * @param {string} body preformatted body
- * @returns {void}
+ * @returns {number} token so a late fetch does not overwrite a newer modal
  */
 function openLogModal(body) {
   const modal = ensureModal();
@@ -438,6 +441,28 @@ function openLogModal(body) {
     pre.textContent = body;
   }
   modal.classList.add('open');
+  modalToken += 1;
+  return modalToken;
+}
+
+/**
+ * If a stored KB card was cut at 800 chars, replace the open modal with the full flow card.
+ * @param {object} block info block
+ * @param {number} token modal token from openLogModal
+ * @returns {Promise<void>}
+ */
+async function expandTruncatedKb(block, token) {
+  if (block.cardKind !== 'kb' || !String(block.text || '').includes('…(截断)') || !block.title) return;
+  try {
+    const res = await fetch(`/api/v2/kb/flow-summary?flow=${encodeURIComponent(block.title)}`);
+    const parsed = await res.json();
+    const text = parsed?.data?.text || parsed?.text;
+    if (!text || token !== modalToken) return;
+    const pre = sharedModal?.querySelector('.ops-modal-body');
+    if (pre && sharedModal.classList.contains('open')) pre.textContent = text;
+  } catch {
+    /* keep the stored text */
+  }
 }
 
 /**
@@ -532,7 +557,8 @@ export function renderLogCards(container, text, state) {
       if (!block) {
         return;
       }
-      openLogModal(modalBodyForBlock(block));
+      const token = openLogModal(modalBodyForBlock(block));
+      expandTruncatedKb(block, token);
     });
   }
 

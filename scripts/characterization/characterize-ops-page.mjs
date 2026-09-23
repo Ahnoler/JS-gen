@@ -10,6 +10,7 @@ assert(server.includes('ops-console/index.html') || server.includes("ops-console
 
 const html = readFileSync('src/dashboard/ops-console/index.html', 'utf8');
 assert(html.includes('id="ops-tab-exec"') && html.includes('id="ops-tab-shots"'), 'tabs');
+assert(html.includes('id="ops-tab-history"'), 'history tab');
 assert(html.includes('ops.css') && html.includes('app.js'), 'assets');
 
 const docs = readFileSync('api-docs.html', 'utf8');
