@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 18:34 · Cursor — 收工：各操作类型按本阶段动作与下一阶段消歧（回链 18:22 开工）
+
+- 完成：`f1bdb174`。去掉查询字段名黑名单。下拉/输入框/日期控件整段遮住后再判查询和引入。本阶段写明的点击查询、点击保存/确认、点击下一步、登录保持原判。本阶段没写该动作、下一阶段写了，则查询、保存、下一步、登录令牌交给下一阶段。修改只认动作子句。保存按钮仍按动作子句最后一次点击取文案。
+- 验收：`characterize-query-field-not-query` OK；`characterize-reset-phase-not-query` / `characterize-case-data` / `characterize-cross-phase-token-guard` / `cold/characterize-phase-boundary` / `cold/characterize-phase-intent` / `characterize-phase-runtime` / `characterize-phase-reviewer` / `characterize-phase-save-cue-promote` / `characterize-contract-arbitration-circuit-breaker` / `characterize-phase-reviewer-flow` OK
+- 遗留：未做执行机湿测。`characterize-g3-done-gate-live` 本机缺 Playwright 浏览器，未跑
+
 ## 2026-09-23 18:22 · Cursor — 开工：各操作类型按本阶段动作与下一阶段消歧
 
 - 开工：18:22。撤掉查询字段名黑名单。本阶段动作子句写明的查询/引入/保存/下一步/登录保持原判；只有本阶段没写该动作时，才用阶段目录把令牌交给下一阶段。控件操作按「下拉/输入框/日期控件」结构遮罩，不按字段名。
