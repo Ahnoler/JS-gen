@@ -365,6 +365,17 @@ def main() -> int:
     assert_true('toast_ok' in b_yes['success_when'], '点击保存 → 仍要 toast_ok')
     assert_true('save_form' in b_yes['goals'], '点击保存 → goals 含 save_form')
 
+    unsure_save = '若不确定则填写后点击保存。'
+    b_unsure = compile_boundary(unsure_save)
+    assert_true(
+        'toast_ok' in b_unsure['success_when'],
+        '不确定不误判否定 → toast_ok',
+    )
+    assert_true(
+        'save_form' in b_unsure['goals'],
+        '不确定不误判否定 → save_form',
+    )
+
     both = '不要点保存。填写后点击保存。'
     b_both = compile_boundary(both)
     assert_true('save_form' in b_both['goals'], '否定句与肯定句并存时肯定优先')
