@@ -98,6 +98,13 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
             sys.stderr.write(f"[recorder] scenario_describer error: {e}\n")
             sys.stderr.flush()
 
+        try:
+            from .agent.record_sidepath import emit_gate_cue
+            emit_gate_cue(agent, business_data_store)
+        except Exception as e:
+            sys.stderr.write(f"[recorder] gate cue error: {e}\n")
+            sys.stderr.flush()
+
         if business_data_store is not None:
             # After auto-fill / empty pending: force agent toward 保存 — never on query UI
             if business_data_store.get('_task_mode') == 'query' or business_data_store.get('_query_task') or business_data_store.get('_query_ui'):

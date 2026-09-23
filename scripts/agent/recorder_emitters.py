@@ -1227,6 +1227,10 @@ async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> b
                 navigated_ok, save_ok, introduce_ok,
             ):
                 return True
+            if done_success:
+                from .record_sidepath import reject_done_if_viewport_error
+                if await reject_done_if_viewport_error(agent, business_data_store):
+                    return True
             _guard_done_accept_success(
                 agent, business_data_store, contract, done_success,
                 save_ok, introduce_ok, navigated_ok,

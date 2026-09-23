@@ -250,3 +250,25 @@ def step_notice_scan_enabled() -> bool:
     MutationObserver 架构。去重确保同一 toast 不会被重复注入。
     """
     return _env_flag('AI_STEP_NOTICE_SCAN', True)
+
+
+def record_gate_cue_enabled() -> bool:
+    """
+    检查录制门禁一行提示是否启用。
+
+    环境变量：AI_RECORD_GATE_CUE（默认开启）
+
+    启用时，每个录制步骤开始前注入一行 [门禁] 结论。不看图，不改 done 判定。
+    """
+    return _env_flag('AI_RECORD_GATE_CUE', True)
+
+
+def record_vision_enabled() -> bool:
+    """
+    检查录制旁路识图是否启用。
+
+    环境变量：AI_RECORD_VISION（默认开启）
+
+    启用时，结束复核与高风险点击在落步前可以单独看一张视口。调用失败则当没看。
+    """
+    return _env_flag('AI_RECORD_VISION', True)
