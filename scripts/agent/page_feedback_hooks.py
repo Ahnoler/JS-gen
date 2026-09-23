@@ -74,8 +74,7 @@ async def _attach_page(page, xhr_hook: str, store) -> None:
     target = _target(page)
     if _seen(_attached_pages, _attached_ids, target):
         return
-    if not _bind_console(target, store):
-        return
+    console_ok = _bind_console(target, store)
     try:
         from scripts.browser.factory import attach_native_dialog_accept
         attach_native_dialog_accept(target)
@@ -89,7 +88,8 @@ async def _attach_page(page, xhr_hook: str, store) -> None:
         sys.stderr.write(f"[step-feedback] xhr hook failed: {exc}\n")
         sys.stderr.flush()
         return
-    _remember(_attached_pages, _attached_ids, target)
+    if console_ok:
+        _remember(_attached_pages, _attached_ids, target)
 
 
 async def install_recording_page_hooks(browser_context, business_data_store=None) -> None:
