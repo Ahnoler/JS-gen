@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 17:52 · Cursor — 合并回执：逐步反馈 console / 新 tab 合入 uara_V2.0_dev
+
+- 合并：`cursor/step-feedback-console-20260923`（`55424ca0`）→ `uara_V2.0_dev`，`--no-ff`。agent-log 与识图旁路开工条目并排保留。主检出未提交的识图四件套 WIP 未触碰。
+- 生效：新开的录制会话即可。`console.error` / `pageerror` 进入下一步 `[step-feedback]`（`console:err:` / `console:pageerror:`）；新 tab 复挂 xhr、console 与原生弹窗接受。
+- 测试：触发一次 `console.error`，看下一步记忆是否出现 `console:err:`；再开一个标签页，确认接口错误和页面报错仍进反馈。未做这次湿测。
+
 ## 2026-09-23 17:20 · ZCode — 开工：识图旁路 LLM 独立配置（⑥ 识图角色四件套）
 
 - 授权：用户要求识图模型可单独配置（不复用录制主 Agent 的 LLM）。
@@ -10,11 +16,32 @@
 - 禁入区：`data/kb/**`、`migrations/**`、`scripts/agent/record_sidepath.py` 判定逻辑、`AI_RECORD_VISION`/`AI_RECORD_GATE_CUE` 开关语义、回放与 heal、`src/routes/setup.js`。
 - 执行方式：主会话直接实现；键名 `AI_RECORD_VISION_LLM_MODEL/_BASE_URL/_API_KEY/_TIMEOUT_MS`，未设 MODEL 完全回落 agent.llm（fail-open），语义同 FORM_LLM_*。
 
+## 2026-09-23 17:20 · Cursor — 验收：逐步反馈 console 分支可合入 uara_V2.0_dev
+
+- 集成：`ac27d1a4` 合入 `origin/uara_V2.0_dev`（agent-log 双方条目并排）。挂载修复 `e7a2226d`：新 page 的 `create_task` 持有强引用，挂载失败不记成已完成，页面身份用弱引用。
+- 评审：P0-A/P0-B 与开工范围一致；两处 Important（任务被回收、失败后不再重试）已修。
+- 全量 `verify-all.sh` 197 pins。本功能 pin（step-notice-scan、step-feedback）在集成态 OK。7 条红均非本 diff：`fill-err-with-scope`、`idempotent-click-gate` 是控制台 GBK 无法打印 ✓，`PYTHONUTF8=1` 重跑通过；`export-v3`、`layer-tree`、`step-highlight` 是本机无 `DB_PASS`；`network-capture` 的 Python 探针因工作区没有自带 `python/python.exe`（接线断言已过）；`sso-auth` 仍是 `d15482c6` 把 `keyword` 改成 `name`，pin 还在找 `keyword`。
+- 遗留：未做真机 `console.error` 湿测。P1 三项不在本分支。
+
+## 2026-09-23 17:05 · Cursor — 收工：录制逐步反馈补 console 与新 tab（d4030f1c）
+
+- 回链 16:47 开工。完成：`d4030f1c`。console.error 与 pageerror 写入会话环形缓冲（最多 20 条），下一步 cue 为 `console:err:` / `console:pageerror:`。`ctx.on('page')` 给之后打开的 page 复挂 xhr init script、console/pageerror 和原生弹窗自动接受。未恢复 `read_xhr_log` / `read_error_notify`。
+- 验收：`characterize-step-notice-scan`、`characterize-step-feedback`、`characterize-xhr-log`、`characterize-error-notify`、`characterize-phase-done-runid`、`characterize-replay-cancel-awareness`、`characterize-llm-role-env`、`characterize-probe-donelog-and-suspect-noise`、`characterize-runid-bridge` 均 OK。`verify-all.sh ui` 除 `characterize-step-highlight` 与 `characterize-layer-tree` 外通过；这两条是工作区没有数据库口令（`root@localhost` Access denied），与本次 diff 无关。
+- 遗留：未做真机 console.error 湿测。P1（非 JSON 错误体、omit_api 口径、prompt「接线中」）按开工范围未做。`network_capture` 仍只挂启动时的 page。
+
 ## 2026-09-23 16:53 · Cursor — 收工：运维页历史日志与知识库全文
 
 - 完成：`5afd4ba4`。顶栏增加「历史日志」；标签切换时未选面板隐藏；已落盘的截断知识库卡片按流程名取全文，新注入调用 `flow_summary_text(..., limit=None)`。
 - 验收：`GET /api/v2/kb/flow-summary?flow=产品库管理（新增/启用）` 返回 200，正文 3554 字且无「截断」；浏览器打开该历史卡片，弹窗可滚到阶段删除规则。
 - 遗留：工作区仍有未纳入的 `data/kb/flows/product_library.json` 与 product-mgmt 草稿。
+
+## 2026-09-23 16:47 · Cursor — 开工：录制逐步反馈补 console 与新 tab
+
+- 授权：用户确认调研报告后开工。范围是 P0-A（console/pageerror 进入 `[step-feedback]`）和 P0-B（新 page 复挂 xhr / console / dialog）。P1 非 JSON 错误体、omit_api 口径、prompt「接线中」文案不在本单元。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/step-feedback-console-20260923`（自 `origin/uara_V2.0_dev` `79631d3b`）。主检出有他线未提交改动，本线不碰。
+- 工作范围：`scripts/agent/console_feedback.py`、`scripts/agent/page_feedback_hooks.py`、`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/session_runner.py`、`scripts/browser/factory.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`scripts/characterization/cold/characterize-step-feedback.py`、`docs/superpowers/reports/2026-09-23-step-feedback-console-gap-research.md`、本条目。
+- 禁入区：回放线（`_replay.py` 与各 Engine）、`scripts/agent/service.py`、`data/kb/**`、主检出未提交的 ops-console / product_library、引擎 worktree。不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话先写失败 pin 再实现。微步用 `bash scripts/refactor/verify-all.sh ui`（`--changed` 不会自动选中 ui 域）。
 
 ## 2026-09-23 16:15 · Cursor — 开工：识图辅助开关写入配置文件
 
