@@ -36,13 +36,15 @@ export async function upsertPhaseDescription(trajectoryDbId, phaseNumber, descri
     .first();
 
   if (existing) {
+    const patch = {
+      description: desc,
+      status: 'running',
+      completed_at: null,
+    };
+    if (String(existing.description || '') !== desc) patch.contract_json = null;
     await db('trajectory_phase')
       .where({ id: existing.id })
-      .update({
-        description: desc,
-        status: 'running',
-        completed_at: null,
-      });
+      .update(patch);
     await trajectoryDao.markExportDirty(tid);
     return existing.id;
   }
@@ -368,13 +370,15 @@ export async function syncTrajectoryPhaseDescriptions(trajectoryDbId, descriptio
 
     if (phaseRow) {
       const oldPn = Number(phaseRow.phaseNumber) || 0;
+      const patch = {
+        description,
+        phase_number: phaseNumber,
+        special_element_candidates_json: candidatesJson,
+      };
+      if (String(phaseRow.description || '') !== description) patch.contract_json = null;
       await db('trajectory_phase')
         .where({ id: phaseRow.id })
-        .update({
-          description,
-          phase_number: phaseNumber,
-          special_element_candidates_json: candidatesJson,
-        });
+        .update(patch);
       await db('trajectory_step')
         .where({ trajectory_phase_id: phaseRow.id })
         .update({ phase_number: phaseNumber });

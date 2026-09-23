@@ -61,6 +61,23 @@ function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
 }
 
 /**
+ * 用 `***` 替换文本中出现的凭据明文（auth 轨迹的账号/密码）。与
+ * `maskTrajectoryStepSecrets` 同口径：按精确值替换，不做正则猜测。
+ * @param {string} text 原始文本
+ * @param {Array<string>} secrets 需掩码的明文值列表
+ * @returns {string} 掩码后的文本
+ */
+function redactSecrets(text, secrets) {
+  let out = String(text ?? '');
+  for (const s of secrets || []) {
+    const v = String(s ?? '');
+    if (v.length < 2 || !out.includes(v)) continue;
+    out = out.split(v).join('***');
+  }
+  return out;
+}
+
+/**
  * 汇总单条回放动作的可读描述（动作名 + 关键参数），用于回放计划日志。
  * @param {object} entry 动作条目
  * @param {number} index 0-based 下标
@@ -98,10 +115,14 @@ function describeReplayStep(entry, index) {
  * @param {Array<number>} orderedStepIds 有序步骤 ID
  * @param {Array<object>} actions 动作条目
  * @param {object} runtime 带执行机会话标识的交易运行时
+ * @param {Array<string>} [secretValues] 需掩码的凭据明文（auth 轨迹账号/密码）
  * @returns {void}
  */
-function logReplayPlan(tid, orderedStepIds, actions, runtime) {
-  const lines = actions.map((a, i) => describeReplayStep(a, i));
+function logReplayPlan(tid, orderedStepIds, actions, runtime, secretValues = []) {
+  // Mask resolved auth credentials: prepareReplayBatch restores
+  // __AUTH_PASSWORD__ before the plan is built, so raw params would leak the
+  // plaintext password to the control-plane console and executor stderr.
+  const lines = actions.map((a, i) => redactSecrets(describeReplayStep(a, i), secretValues));
   console.log(
     `[replay-batch] traj=${tid} 共 ${actions.length} 步 stepIds=[${orderedStepIds.join(',')}]\n`
     + lines.map((l) => `  ${l}`).join('\n'),
@@ -112,7 +133,8 @@ function logReplayPlan(tid, orderedStepIds, actions, runtime) {
       nodeUuid: runtime.executorNodeUuid,
       sessionId: runtime.sessionId,
       event: 'replay_plan',
-      data: { trajectoryId: tid, steps: lines },
+      // secretValues lets the executor redact its per-step stderr log too.
+      data: { trajectoryId: tid, steps: lines, secretValues: secretValues || [] },
     });
   } catch (err) {
     console.warn(`[replay-batch] replay_plan forward failed: ${err?.message || err}`);
@@ -149,6 +171,10 @@ async function forwardReplayEntry(runtime, entry, doSuppress) {
  * @param {Array<object>} root0.actions action entries to replay
  * @param {Array<object>} root0.rows DB step rows
  * @param {Map<number, object>} root0.snapshotsByTrigger form snapshots keyed by trigger step id
+ * @param {Array<string>} [root0.secretValues] resolved auth credentials to redact from logs
+ * @param {number|null} [root0.seq] 批次世代令牌（起跑时 runtime.replayBatchSeq 的值）；
+ *   finally 仅当 runtime.replayBatchSeq 仍等于本批 seq 才整体复位运行标志（null =
+ *   未版本化调用方，保持既有总是复位）
  * @returns {Promise<object>} replay batch result with success/failed counts
  */
 export async function runReplayBatch({
@@ -160,6 +186,8 @@ export async function runReplayBatch({
   actions,
   rows,
   snapshotsByTrigger,
+  secretValues = [],
+  seq = null,
 }) {
   const allResults = [];
   const healed = [];
@@ -169,7 +197,8 @@ export async function runReplayBatch({
   const skippedIds = new Set();
 
   emitReplay('replay:started', tid, { stepIds: orderedStepIds });
-  logReplayPlan(tid, orderedStepIds, actions, runtime);
+  runtime.replayRunning = true;
+  logReplayPlan(tid, orderedStepIds, actions, runtime, secretValues);
 
   // ── 执行前菜单导航（同菜单跳过/空菜单直接执行/失败不阻断）──
   try {
@@ -302,6 +331,21 @@ export async function runReplayBatch({
           ok: false,
           id: entry.id,
         });
+        // #4 stop×步超时竞态：stop 置位与步超时撞车时（runReplayActions 已补发
+        // cancel_step 并 reject），用户预期终态是 aborted 而非 {error}——本步确已
+        // 失败，上方 markStepReplayFailed / failedStepIds / allResults 落库口径
+        // 不变，步级 failed 终态事件已发；这里只把批级终态收敛为 emitReplayAborted
+        // + aborted 载荷（对齐循环头中止分支的载荷形状）。
+        if (runtime.abortReplay) {
+          emitReplayAborted(tid, { successCount, failedStepIds });
+          return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
+            successCount,
+            failedCount: [...new Set(failedStepIds)].length,
+            failedStepIds: [...new Set(failedStepIds)],
+            aborted: true,
+            reason: 'user_stop',
+          });
+        }
         emitReplay('replay:finished', tid, {
           successCount,
           failedCount: failedStepIds.length,
@@ -316,6 +360,19 @@ export async function runReplayBatch({
       }
 
       if (runtime.abortReplay) {
+        // #12 中止步终态：本步 running 已广播、replay_done 已成功返回，但 abort
+        // 使下方 status:'success' 终态不可达——补发 failed 终态（error=user_stop
+        // + aborted 标记），前端条目不再悬挂在 running。结果按中止口径丢弃：不计
+        // successCount、不入 allResults/failedStepIds（对齐既有 mid-batch abort pin）。
+        emitReplay('replay:step', tid, {
+          stepId,
+          status: 'failed',
+          error: 'user_stop',
+          index: stepNum,
+          total: actions.length,
+          action: entry.action,
+          aborted: true,
+        });
         emitReplayAborted(tid, { successCount, failedStepIds });
         return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
           successCount,
@@ -623,11 +680,19 @@ export async function runReplayBatch({
       failedStepIds: uniqueFailed,
     });
   } finally {
-    runtime.suppressStepPersist = false;
-    runtime.isReplay = false;
-    runtime.formStructureHealLabels = null;
-    runtime.abortReplay = false;
-    if (session) session.busy = false;
+    // #7 批次世代守卫：仅当本批仍是该 runtime 的最新批次才整体复位运行标志。
+    // busy 已在 prepareReplayBatch 尾部原子置位，同一 runtime 同时至多一个批次
+    // 在跑，守卫正常恒真（零行为变化）；seq == null 的未版本化调用方（离线
+    // characterization fakes）保持既有总是复位。防御未来再引入并发批次时，先
+    // 结束的旧批次误复位新批次的 abortReplay/suppressStepPersist/busy 等标志。
+    if (seq == null || runtime.replayBatchSeq === seq) {
+      runtime.suppressStepPersist = false;
+      runtime.isReplay = false;
+      runtime.formStructureHealLabels = null;
+      runtime.abortReplay = false;
+      runtime.replayRunning = false;
+      if (session) session.busy = false;
+    }
   }
 }
 

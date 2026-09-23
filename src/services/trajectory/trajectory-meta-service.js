@@ -18,6 +18,7 @@ import {
   BUSINESS_DATA_SECTION_RE,
   extractBusinessEntriesFromRequirement,
 } from './trajectory-text-extract.js';
+import { normalizePhaseContract } from './phase-contract.js';
 
 export {
   stripBusinessDataBlock,
@@ -77,16 +78,44 @@ function extractPhaseElementsLoose(arrText) {
 }
 
 /**
+ * 把分析响应里的一个阶段元素收成描述 + 可选合约。
+ * 字符串元素没有合约。对象缺描述则丢弃。合约字段非法时保留描述、合约为 null。
+ * @param {unknown} p 阶段元素
+ * @returns {{ description: string, contract: object|null } | null} 描述与合约；缺描述时为 null
+ */
+function phaseRowFromElement(p) {
+  if (typeof p === 'string') {
+    const description = p.trim();
+    if (!description) return null;
+    return { description, contract: null };
+  }
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+  const description = String(p.description ?? '').trim();
+  if (!description) return null;
+  return {
+    description,
+    contract: normalizePhaseContract({
+      v: 1,
+      mode: p.mode,
+      refill: p.refill,
+      submitRequired: p.submitRequired,
+      successWhen: p.successWhen,
+      source: 'analyze',
+    }),
+  };
+}
+
+/**
  * 使用严格 JSON 解析和容错回退解析 LLM 分析响应。
  * @param {string} raw 原始模型响应
- * @returns {{phases: string[]}} 提取出的阶段描述，可能为空
+ * @returns {{ phases: Array<{ description: string, contract: object|null }> }} 阶段行，可能为空
  */
 function parseAnalyzePayload(raw) {
   const text = String(raw || '').trim();
   const tryObj = (obj) => {
     if (!obj || typeof obj !== 'object') return null;
     const phases = Array.isArray(obj.phases)
-      ? obj.phases.map((p) => String(p).trim()).filter(Boolean)
+      ? obj.phases.map(phaseRowFromElement).filter(Boolean)
       : null;
     if (phases) return { phases };
     return null;
@@ -110,7 +139,9 @@ function parseAnalyzePayload(raw) {
   const arrMatch = text.match(/"phases"\s*:\s*\[([\s\S]*)\]/);
   if (arrMatch) {
     const loose = extractPhaseElementsLoose(arrMatch[1]);
-    if (loose.length) return { phases: loose };
+    if (loose.length) {
+      return { phases: loose.map((s) => ({ description: s, contract: null })) };
+    }
   }
 
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -126,7 +157,7 @@ function parseAnalyzePayload(raw) {
     if (/^businessEntries?\s*[:=]/i.test(cleaned)) continue;
     if (BUSINESS_DATA_SECTION_RE.test(cleaned)) continue;
     if (/^[\]}]+,?$/.test(cleaned)) continue;
-    phases.push(cleaned.replace(/,$/, ''));
+    phases.push({ description: cleaned.replace(/,$/, ''), contract: null });
   }
 
   return { phases };
@@ -137,11 +168,11 @@ export { parseAnalyzePayload };
 /**
  * Analyze a requirement into phases. Business-data block is NOT split into businessEntries;
  * the raw block is appended to every phase for the agent to use when filling forms.
- * Returns { phases, businessEntries }. Does not persist.
+ * Returns { phases, phaseContracts, businessEntries }. Does not persist.
  * @param {object} opts 选项
  * @param {string} opts.description 需求描述
  * @param {string} [opts.model] 模型名
- * @returns {Promise<{ phases: string[], businessEntries: Array<{ fieldKey: string, fieldValue: string }> }>} 阶段列表 + 需求业务数据 KV 投影
+ * @returns {Promise<{ phases: string[], phaseContracts: Array<object|null>, businessEntries: Array<{ fieldKey: string, fieldValue: string }> }>} 阶段描述、等长合约（null 表示录制兜底）与业务数据 KV
  */
 export async function analyzeRequirementToPhases({
   description,
@@ -159,6 +190,8 @@ export async function analyzeRequirementToPhases({
     '2. 识别编号格式如「1、」「1.」「1)」「（1）」等作为步骤边界参考，但不强制每条编号一个阶段——属于同一操作单元的步骤即使跨编号也应合并。',
     '3. 必须单独成阶段的情况：页面跳转/导航类操作（如"点击菜单进入XX页面"）应独立为阶段，因为它是后续操作的前置条件；涉及不同页面/弹窗的操作应分不同阶段（但同一次删除/提交等产生的「确认/提示弹窗」按 3.1 处理——打开弹窗的动作留在触发所在阶段，确认弹窗内的按钮操作才归下一阶段）。',
     '3.1 状态边界原则（硬性，优先于规则 3 对「确认/提示弹窗」的处理）：阶段边界必须落在「稳定、可判定的页面状态」上，且相邻阶段不得共享同一瞬态弹窗的触发与确认。具体：(a) 若某阶段的预期结果是「打开某确认弹窗/提示弹窗」，则该阶段必须完整包含把弹窗打开的全部动作（如「在列表中选中该行」+「点击【删除】按钮」），并在此终止；弹窗内按钮的点击（如「点击【确定】」）只归下一阶段。(b) 禁止把同一动作单元（如"选中行→点删除"）拆到两个阶段，也禁止让下一阶段承担上一阶段未完成的动作——下一阶段的每个动作都必须在上阶段预期结果已成立的前提下才可能执行。(c) 例外（仅在必要时）：只有当触发动作依赖不稳定的中间态（异步校验、可能失败、需等待刷新）以致「弹窗一定会打开」不可保证时，才把「触发 → 确认」合并为一个阶段，且该合并阶段的预期结果必须写成最终状态（如「删除完成并刷新列表」）；不得为省事而合并。',
+    '3.2 仅打开选择器/弹窗的中间阶段（与 3.1 配套）：若某阶段只负责打开选择窗口/弹窗（如"点击【引入】按钮，打开客户选择窗口"），而真正的搜索/选择/确认/回填由下一阶段完成，则该阶段预期结果必须使用"打开 / 进入 / 弹出 … 弹窗 / 窗口 / 页面"的措辞，且不得含"完成选择 / 确认 / 保存 / 回填"等终态词。系统会将其识别为 navigate 阶段，以窗口打开为完成条件，不会越界索要下一阶段的确认令牌。',
+    '3.3 纯填写/选择阶段（保存动作在下一阶段）：若连续多个填写/选择操作后，保存/提交/确认动作明确在下一阶段（如先填所有字段，再单独点【确认】保存），则本阶段只写"填写 / 选择 … 完成"，预期结果不得含"保存成功 / 提交成功 / 返回列表 / 提示成功"等终态词；系统会将其识别为无保存令牌的填写阶段，避免把下一阶段的保存动作提前执行。',
     '4. 「业务数据 / 关键数据 / 测试数据」等段落不是操作步骤，不要计入 phases、不要拆成键值对。',
     '5. 「硬性成功门闩/门槛」「禁止…」等约束性规则行（如【硬性成功门闩——…】、【禁止点击…】）是全局约束，不是操作步骤：既不计入 phases，也不要把这类文字复制进任何 phase 字符串（系统会在录制时作为全局约束另行下发给执行端）。',
     '6. 每个阶段必须是简短、可执行的中文操作描述，避免"分析/思考/总结"等元话术。合并后的阶段用逗号或顿号连接各操作，保持一行。',
@@ -256,8 +289,41 @@ export async function analyzeRequirementToPhases({
     '"在"您确定删除这条记录吗?"确认提示中点击【确定】按钮。预期结果：删除完成并刷新列表，该记录从列表中消失。"',
     ']}',
     '',
-    '输出必须是严格 JSON（不要 Markdown，不要解释），格式：{"phases":[...字符串...]}。',
-    'JSON 字符串值内禁止出现换行：每个 phase 字符串必须写在一行内，长句也不要折行。',
+    '【示例7：仅打开选择窗口（触发与确认分属相邻阶段）】',
+    '输入：',
+    '1. 点击"客户名称"右侧的【引入】按钮，弹出客户选择窗口。',
+    '2. 在客户选择窗口中搜索并选中目标客户，点击【确定】。',
+    '输出示例（打开窗口为本阶段；搜索/选择/确定归下一阶段；不得把"完成引入/回填"提前到本阶段）：',
+    '{"phases":[',
+    '"点击"客户名称"右侧的【引入】按钮。预期结果：打开客户选择窗口。",',
+    '"在客户选择窗口中搜索并选中目标客户，点击【确定】。预期结果：客户名称、客户类型、证件类型、证件号码等信息自动回填。"',
+    ']}',
+    '',
+    '【示例8：纯填写阶段与保存阶段分离】',
+    '输入：',
+    '1. 在"证件到期日"日期控件中选择一个日期。',
+    '2. 在"授权日期"日期控件中选择一个日期。',
+    '3. 点击"查询事由"下拉框，选择查询事由值。',
+    '4. 点击"查询类型"下拉框，选择查询类型值。',
+    '5. 点击【确认】按钮，保存新增的征信查询客户信息并返回列表。',
+    '输出示例（步骤1-4合并为纯填写阶段，步骤5单独为保存阶段；填写阶段预期结果不写"保存成功"）：',
+    '{"phases":[',
+    '"在"证件到期日"日期控件中选择一个日期，在"授权日期"日期控件中选择一个日期，点击"查询事由"下拉框选择查询事由值，点击"查询类型"下拉框选择查询类型值。预期结果：表单字段填写完成。",',
+    '"点击【确认】按钮。预期结果：保存新增的征信查询客户信息并返回列表。"',
+    ']}',
+    '',
+    '【阶段合约 — 与描述一起输出】',
+    '每个阶段是对象，不是纯字符串。description 仍遵守上文全部规则。另外给出 mode、refill、submitRequired、successWhen，取值只能来自下面对照，禁止发明：',
+    '- 仅打开选择器/弹窗/页面 → mode=navigate，refill=none，submitRequired=false，successWhen=["url_change","page_opened"]',
+    '- 纯填写/选择且保存或确认在后续阶段 → mode=create 或 modify，refill=all_editable，submitRequired=false，successWhen=[]',
+    '- 本阶段确有保存/确认 → mode=create 或 modify，refill=all_editable，submitRequired=true，successWhen=["toast_ok","url_change"]',
+    '- 查询 → mode=query，refill=none，submitRequired=false，successWhen=["query_clicked"]',
+    '- 引入并在本阶段确认或回填 → mode=introduce_pick，refill=none，submitRequired=true，successWhen 从 picker_closed、confirm_click、dialog_confirmed、introduced_backfilled 里点名，至少一个',
+    '- 登录 → mode=login，refill=none，submitRequired=false，successWhen=[]',
+    '- 其余 → mode=other，refill=none，submitRequired=false，successWhen=[]',
+    '',
+    '输出必须是严格 JSON（不要 Markdown，不要解释），格式：{"phases":[{"description":"…一行…","mode":"navigate","refill":"none","submitRequired":false,"successWhen":["url_change","page_opened"]}]}。',
+    'JSON 字符串值内禁止出现换行：每个 phase 的 description 必须写在一行内，长句也不要折行。',
     '',
     '需求描述：',
     desc,
@@ -269,10 +335,11 @@ export async function analyzeRequirementToPhases({
 
   // Drop phases that are just business-data echoes
   let phases = (parsed.phases || [])
-    .filter((p) => !BUSINESS_DATA_SECTION_RE.test(p))
-    .filter((p) => !/^(案例数据|关键数据)/.test(p))
+    .filter((row) => row && row.description)
+    .filter((row) => !BUSINESS_DATA_SECTION_RE.test(row.description))
+    .filter((row) => !/^(案例数据|关键数据)/.test(row.description))
     // 门槛/门闩/禁止类约束行不是操作步骤（执行侧由 boundary gates + success_gates_block 处理），兜底剔除
-    .filter((p) => !/^【?\s*(硬性成功门[槛闩]|禁止|不得|严禁)/.test(p));
+    .filter((row) => !/^【?\s*(硬性成功门[槛闩]|禁止|不得|严禁)/.test(row.description));
 
   // 业务数据不再逐条追加进 phase.description（落库保持干净目标文本）；
   // 录制时由执行机 format_business_data_hint 在需要的阶段的任务文本后统一注入一次。
@@ -282,7 +349,11 @@ export async function analyzeRequirementToPhases({
   // 这是用户需求业务数据的 KV 投影，不是 system_ref（目标系统回写参考值）。
   // 禁止把本结果写入 system_ref_data / system_ref_entry。
   // 注意：必须是 KV 数组（normalizeBusinessEntries 对非数组返回 []）。
-  return { phases, businessEntries: extractBusinessEntriesFromRequirement(desc) };
+  return {
+    phases: phases.map((row) => row.description),
+    phaseContracts: phases.map((row) => row.contract),
+    businessEntries: extractBusinessEntriesFromRequirement(desc),
+  };
 }
 
 /**
@@ -330,6 +401,7 @@ export async function createEmptyTrajectory({
  * @param {string} [opts.name] 轨迹名称
  * @param {string} [opts.requirement] 需求描述
  * @param {Array<string|{description: string}>} [opts.phases] 阶段列表
+ * @param {Array<object|null>} [opts.phaseContracts] 与 phases 等长的合约；缺省或非法则该阶段不存合约
  * @param {string} [opts.model] 模型名
  * @param {number|null} [opts.systemAccountId] 系统账号 id
  * @param {Array} [opts.businessEntries] 业务数据 KV
@@ -354,6 +426,7 @@ export async function createTransactionWithPhases({
   name = '',
   requirement = '',
   phases = [],
+  phaseContracts = [],
   model = '',
   systemAccountId = null,
   businessEntries = undefined,
@@ -437,6 +510,7 @@ export async function createTransactionWithPhases({
           candidates = [];
         }
       }
+      const rawContract = Array.isArray(phaseContracts) ? phaseContracts[i] : null;
       await trajectoryPhaseDao.create({
         phaseId: randomUUID(),
         phaseNumber: i + 1,
@@ -444,6 +518,7 @@ export async function createTransactionWithPhases({
         status: 'pending',
         description: parsed[i],
         specialElementCandidatesJson: candidates?.length ? JSON.stringify(candidates) : null,
+        contractJson: normalizePhaseContract(rawContract),
       }, client);
     }
 

@@ -306,6 +306,56 @@ async function testStepSuccessAggregation() {
   }
 }
 
+/**
+ * Auth trajectories: prepareReplayBatch restores real credentials before the
+ * plan is built, so the plan must redact exact secrets (control-plane console +
+ * replay_plan to the executor) while the executed replay_actions keep the real
+ * params (the executor needs them to log in).
+ */
+async function testReplayPlanRedactsSecrets() {
+  if (!sutAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const node = fakeExecutorNode();
+  node.attach('rb-char-node-redact');
+  const runtime = makeRuntime({
+    sessionId: 'rb-char-redact',
+    executorNodeUuid: 'rb-char-node-redact',
+  });
+  const session = { busy: true };
+  const SECRET = 'P@ssw0rd-93x';
+  const actions = [
+    { id: 'a', action: 'fill_form_field', params: { label_text: '密码', value: SECRET } },
+  ];
+  try {
+    const p = runReplayBatch({
+      tid: TID, orderedStepIds: [1], doSuppress: true, runtime, session,
+      actions, rows: [{ id: 11 }], snapshotsByTrigger: new Map(),
+      secretValues: [SECRET],
+    });
+    await waitSubscribeAndEmit('rb-char-redact', 'replay_done',
+      { ok: 1, failed: 0, results: [{ ok: true, result: 'ok' }] }, 'redact step');
+    await waitSubscribeAndEmit('rb-char-redact', 'get_action_log_result',
+      { entries: [] }, 'redact mark');
+    await withTimeout(p, 30000, 'redact');
+
+    const plan = node.sent.find((m) => m.payload?.event === 'replay_plan');
+    assert.ok(plan, 'replay_plan sent for auth batch');
+    const stepText = plan.payload.data.steps[0];
+    assert.ok(!stepText.includes(SECRET), 'plan step must not contain plaintext secret');
+    assert.ok(stepText.includes('***'), 'plan step masks the secret value');
+    assert.equal(plan.payload.data.secretValues.length, 1, 'secretValues forwarded to executor');
+    assert.equal(plan.payload.data.secretValues[0], SECRET, 'forwarded list is the resolved secret');
+
+    // The executed params themselves must stay unmasked (login needs the value).
+    const forwards = node.sent.filter((m) => m.payload?.event === 'replay_actions');
+    assert.equal(forwards.length, 1, 'one replay_actions forward');
+    assert.equal(forwards[0].payload.data.actions[0].params.value, SECRET,
+      'replay_actions keeps the real credential for execution');
+  } finally {
+    hub.removeSessionHub('rb-char-redact');
+    node.detach('rb-char-node-redact');
+  }
+}
+
 async function testAbortMidBatchDropsExecutedStep() {
   if (!sutAvailable) { console.log('    (skipped: SUT not importable)'); return; }
   const node = fakeExecutorNode();
@@ -566,9 +616,9 @@ function testStructureReplayPlan() {
   const src = readFileSync(join(root, SUT), 'utf8');
   assert.match(src, /function logReplayPlan\(/, 'batch runner defines logReplayPlan');
   assert.match(src, /event: 'replay_plan'/, 'plan forwarded to executor as replay_plan event');
-  assert.match(src, /logReplayPlan\(tid, orderedStepIds, actions, runtime\)/,
-    'plan logged once at batch start');
-  const planCall = src.indexOf('logReplayPlan(tid, orderedStepIds, actions, runtime)');
+  assert.match(src, /logReplayPlan\(tid, orderedStepIds, actions, runtime, secretValues\)/,
+    'plan logged once at batch start (carries secretValues for redaction)');
+  const planCall = src.indexOf('logReplayPlan(tid, orderedStepIds, actions, runtime, secretValues)');
   const firstForward = src.indexOf('await runReplayActions({');
   assert.ok(planCall !== -1 && firstForward !== -1 && planCall < firstForward,
     'plan is emitted before the first replay forward');
@@ -600,6 +650,7 @@ async function main() {
     ['runReplayBatch: empty actions completes (count 0, runtime reset)', testEmptyActionsCompletes],
     ['runReplayBatch: abort at start → aborted/user_stop, nothing executed', testAbortAtStart],
     ['runReplayBatch: two ok steps → successCount 2 + replay_actions forwards', testStepSuccessAggregation],
+    ['runReplayBatch: auth plan redacts secrets, replay keeps real params', testReplayPlanRedactsSecrets],
     ['runReplayBatch: meta checkpoint success not counted (business count only)', testMetaStepSuccessNotCounted],
     ['runReplayBatch: save_form_snapshot skip-success not counted', testFormSnapshotSkipNotCounted],
     ['runReplayBatch: abort mid-batch drops the executed step', testAbortMidBatchDropsExecutedStep],

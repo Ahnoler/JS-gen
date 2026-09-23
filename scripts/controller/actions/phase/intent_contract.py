@@ -18,6 +18,12 @@ from .._phase_context import (
     is_login_task,
     is_query_task,
 )
+from .boundary_contract import (
+    _has_introduce_terminal,
+    _has_save_terminal,
+    _is_open_only_dialog_or_page,
+    _terminal_action_in_later_phase,
+)
 
 RefillMode = Literal['none', 'touched', 'all_editable']
 ContractMode = Literal[
@@ -117,14 +123,16 @@ def phase_intent_active(business_data_store: dict | None) -> bool:
     return get_phase_intent(business_data_store) is not None
 
 
-def _is_introduce_task(task_text: str) -> bool:
-    """True when introduce/pick is the *primary* phase goal.
+def _is_introduce_task(
+    task_text: str,
+    all_phases: list | None = None,
+    current_phase_number: int | None = None,
+) -> bool:
+    """True when introduce/pick is the *complete* primary phase goal.
 
-    Mixed create+conditional-introduce tasks (「新增…如果出现引入按钮…」) return False
-    so compile keeps mode=create with refill=all_editable.
-
-    Does **not** defer to ``is_query_task`` — picker phases routinely contain「查询」;
-    compile_phase_intent checks introduce before query.
+    2026-09-21：与 boundary_contract 对齐——单纯"打开选择窗口"的阶段不归入
+    introduce_task；必须动作子句含选中/确定/回填等终态动作，或文本显式表达
+    "完成引入"。
     """
     t = (task_text or '').strip()
     if not t or is_login_task(t):
@@ -134,23 +142,32 @@ def _is_introduce_task(task_text: str) -> bool:
     # Form maintain verbs win over nested introduce instructions.
     if _CRUD_PHASE_RE.search(t):
         return False
-    return True
+    # 纯开弹窗/页面阶段 → navigate
+    if _is_open_only_dialog_or_page(t, all_phases, current_phase_number):
+        return False
+    return _has_introduce_terminal(t)
 
 
-def compile_phase_intent(task_text: str) -> dict[str, Any]:
+def compile_phase_intent(
+    task_text: str,
+    all_phases: list | None = None,
+    current_phase_number: int | None = None,
+) -> dict[str, Any]:
     """Rule-based compiler (synonym table + task_mode). Returns contract dict."""
     from .._phase_context import classification_task_text
 
     t = classification_task_text(task_text).strip()
     task_mode = classify_task_mode(t)
+    has_save_terminal = _has_save_terminal(t)
 
     if is_login_task(t):
         mode: ContractMode = 'login'
         refill: RefillMode = 'none'
         submit = {'required': False, 'via': 'any', 'button_text': ''}
         success = {'kinds': [], 'evidence': []}
-    elif _is_introduce_task(t):
-        # Before query/form_fill: picker phases often contain「填写」「查询」words.
+    elif _is_introduce_task(t, all_phases, current_phase_number):
+        # Complete introduce/pick phase must win over query (picker phases often
+        # contain「查询/填写」words), same as compile_boundary.
         mode = 'introduce_pick'
         refill = 'none'
         submit = {'required': True, 'via': 'any', 'button_text': '确认'}
@@ -159,26 +176,42 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
             'evidence': ['ok-introduce-confirm', 'picker-dialog-closed'],
         }
     elif is_query_task(t):
+        # Query wins over open-page expectation, same as compile_boundary.
         mode = 'query'
         refill = 'none'
         submit = {'required': False, 'via': 'any', 'button_text': '查询'}
         success = {'kinds': ['query_clicked'], 'evidence': ['ok-query-clicked']}
+    elif _is_open_only_dialog_or_page(t, all_phases, current_phase_number):
+        # 纯打开弹窗/页面阶段：navigate，不索要终态令牌
+        mode = 'navigate'
+        refill = 'none'
+        submit = {'required': False, 'via': 'any', 'button_text': ''}
+        success = {'kinds': [], 'evidence': []}
     elif task_mode == 'form_fill':
         mode = 'create'
         refill = 'all_editable'
-        submit = {'required': True, 'via': 'click_save', 'button_text': '保存'}
-        success = {
-            'kinds': ['toast_ok', 'url_change'],
-            'evidence': ['ok-save-success', 'post_save_navigation'],
-        }
+        # 2026-09-21：保存/提交终态动作在本阶段才给保存令牌；否则为纯填写阶段
+        if has_save_terminal:
+            submit = {'required': True, 'via': 'click_save', 'button_text': '保存'}
+            success = {
+                'kinds': ['toast_ok', 'url_change'],
+                'evidence': ['ok-save-success', 'post_save_navigation'],
+            }
+        else:
+            submit = {'required': False, 'via': 'any', 'button_text': ''}
+            success = {'kinds': [], 'evidence': []}
     elif task_mode == 'form_modify':
         mode = 'modify'
         refill = 'all_editable'
-        submit = {'required': True, 'via': 'click_save', 'button_text': '确认'}
-        success = {
-            'kinds': ['toast_ok', 'url_change'],
-            'evidence': ['ok-save-success', 'post_save_navigation'],
-        }
+        if has_save_terminal:
+            submit = {'required': True, 'via': 'click_save', 'button_text': '确认'}
+            success = {
+                'kinds': ['toast_ok', 'url_change'],
+                'evidence': ['ok-save-success', 'post_save_navigation'],
+            }
+        else:
+            submit = {'required': False, 'via': 'any', 'button_text': ''}
+            success = {'kinds': [], 'evidence': []}
     else:
         mode = 'other'
         refill = 'none'
@@ -189,12 +222,13 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
     if mode in ('create', 'modify') and explicit_all:
         refill = 'all_editable'
 
-    # Mode-aware recovery: only maintain phases may be told to click_save. A
-    # non-submit phase (login/query/other) prescribed click_save made the agent
-    # fabricate a 确定/保存 click on pages/regions that have none (sid 4460cf2a).
-    if mode == 'modify':
+    # Mode-aware recovery: only maintain phases that actually require save may be
+    # told to click_save. A non-submit phase (login/query/other/fill-only) prescribed
+    # click_save made the agent fabricate a 确定/保存 click on pages/regions that have
+    # none (sid 4460cf2a).
+    if mode == 'modify' and submit.get('required'):
         next_action = 'click_save(button_text="确认")'
-    elif mode == 'create':
+    elif mode == 'create' and submit.get('required'):
         next_action = 'click_save(button_text="保存")'
     elif mode == 'query':
         next_action = 'click_element_by_index on 查询/搜索, then done(success=true)'
@@ -266,11 +300,110 @@ def _clear_phase_form_state(business_data_store: dict | None, *, mode: str, task
         business_data_store.pop(key, None)
 
 
+def _later_phase_has_terminal(
+    all_phases: list,
+    current_phase_number: int,
+    matcher,
+) -> bool:
+    """后续阶段描述是否命中给定的终态动作判定函数。"""
+    try:
+        cur = int(current_phase_number)
+    except (TypeError, ValueError):
+        return False
+    for p in all_phases:
+        if not isinstance(p, dict):
+            continue
+        n = p.get('phaseNumber') if p.get('phaseNumber') is not None else p.get('phase_number')
+        try:
+            if n is None or int(n) <= cur:
+                continue
+        except (TypeError, ValueError):
+            continue
+        desc = str(p.get('description') or p.get('title') or p.get('name') or '').strip()
+        if desc and matcher(desc):
+            return True
+    return False
+
+
+def _apply_cross_phase_token_guard(
+    contract: dict[str, Any],
+    boundary: dict[str, Any],
+    all_phases: list | None,
+    current_phase_number: int | None,
+) -> None:
+    """L1c 跨阶段令牌归属兜底：当前阶段文本不含终态动作、后续阶段含时，
+
+    清空当前阶段的终态令牌要求，避免 agent 被 recovery 处方推过阶段边界。
+    直接修改 contract/boundary（无返回值）。
+    """
+    if not all_phases or current_phase_number is None:
+        return
+    mode = contract.get('mode')
+    cur_text = str(
+        contract.get('task_text_excerpt') or boundary.get('task_text_excerpt') or ''
+    ).strip()
+    if mode == 'introduce_pick':
+        if (
+            not _has_introduce_terminal(cur_text)
+            and _later_phase_has_terminal(
+                all_phases, current_phase_number, _has_introduce_terminal
+            )
+        ):
+            sys.stderr.write(
+                f"[contract] cross-phase guard: introduce token owned by later phase "
+                f"(phase={current_phase_number}) → downgrade to navigate/no-token\n"
+            )
+            sys.stderr.flush()
+            contract['mode'] = 'navigate'
+            contract['refill'] = 'none'
+            contract['submit'] = {'required': False, 'via': 'any', 'button_text': ''}
+            contract['success'] = {'kinds': [], 'evidence': []}
+            contract['recovery'] = {
+                'next_action': (
+                    'done(success=true) once the target dialog/page appears '
+                    '(no save/confirm step in this phase)'
+                ),
+                'forbid_reopen_modify_cycle': False,
+                'on_cycle': 'prescribe_once_then_stop_if_deviate',
+                'deviate_actions': [],
+                'allow': ['wait', 'get_page_state', 'wait_for_loading', 'click_element_by_index'],
+            }
+            boundary['role'] = 'navigate'
+            boundary['success_when'] = []
+            boundary['requires_write_all_editable'] = False
+            boundary['goals'] = ['open_page']
+    elif mode in ('create', 'modify'):
+        if (
+            not _has_save_terminal(cur_text)
+            and _later_phase_has_terminal(
+                all_phases, current_phase_number, _has_save_terminal
+            )
+        ):
+            sys.stderr.write(
+                f"[contract] cross-phase guard: save token owned by later phase "
+                f"(phase={current_phase_number}) → drop submit requirement\n"
+            )
+            sys.stderr.flush()
+            contract['submit'] = {'required': False, 'via': 'any', 'button_text': ''}
+            contract['success'] = {'kinds': [], 'evidence': []}
+            contract['recovery'] = {
+                'next_action': '填写/选择字段完成后调用 done(success=true)（本阶段无保存动作）',
+                'forbid_reopen_modify_cycle': True,
+                'on_cycle': 'prescribe_once_then_stop_if_deviate',
+                'deviate_actions': ['reselect_row', 'reopen_modify', 'reopen_maintain_dialog'],
+                'allow': ['wait', 'get_page_state', 'wait_for_loading', 'click_element_by_index'],
+            }
+            boundary['success_when'] = []
+            # role stays 'maintain', requires_write_all_editable stays True
+
+
 def apply_phase_contract(
     business_data_store: dict | None,
     contract: dict[str, Any],
     *,
     boundary_override: dict[str, Any] | None = None,
+    all_phases: list | None = None,
+    current_phase_number: int | None = None,
 ) -> dict[str, Any]:
     """Authoritative write of task_mode + force_refill + boundary + intent."""
     clear_phase_intent(business_data_store)  # also clears boundary via existing clear
@@ -318,6 +451,13 @@ def apply_phase_contract(
             'forbid_index_submit': mode in ('create', 'modify'),
             'picker_allowed': mode in ('create', 'modify', 'introduce_pick'),
         }
+    # L1c 跨阶段令牌归属兜底：在此之后 mode/role 可能被修正，需重新计算。
+    _apply_cross_phase_token_guard(c, boundary, all_phases, current_phase_number)
+    mode = c.get('mode') or 'other'
+    role = _MODE_TO_ROLE.get(mode, 'other')
+    refill = c.get('refill') or 'none'
+    requires_write = refill == 'all_editable'
+    task_mode = _MODE_TO_TASK.get(mode, 'other')
     if boundary_override is not None and mode == 'login':
         # login: never require evidence tokens (prepare/replay_done path).
         boundary['success_when'] = []
@@ -405,7 +545,12 @@ def apply_phase_contract(
     return c
 
 
-def apply_phase_intent(business_data_store: dict | None, task_text: str) -> dict[str, Any] | None:
+def apply_phase_intent(
+    business_data_store: dict | None,
+    task_text: str,
+    all_phases: list | None = None,
+    current_phase_number: int | None = None,
+) -> dict[str, Any] | None:
     """Clear old contract, compile if flag on, write store. Returns contract or None.
 
     When AI_PHASE_BOUNDARY is on, compiles PhaseBoundary first and adapts it
@@ -421,7 +566,11 @@ def apply_phase_intent(business_data_store: dict | None, task_text: str) -> dict
             boundary_to_legacy_intent,
             compile_boundary,
         )
-        boundary = compile_boundary(task_text)
+        boundary = compile_boundary(
+            task_text,
+            all_phases=all_phases,
+            current_phase_number=current_phase_number,
+        )
         contract = boundary_to_legacy_intent(boundary)
         if not contract:
             clear_phase_intent(business_data_store)
@@ -437,7 +586,13 @@ def apply_phase_intent(business_data_store: dict | None, task_text: str) -> dict
         contract['source'] = 'rules_fallback'
         if boundary.get('goals'):
             contract.setdefault('in_scope', list(boundary['goals']))
-        return apply_phase_contract(business_data_store, contract, boundary_override=boundary)
+        return apply_phase_contract(
+            business_data_store,
+            contract,
+            boundary_override=boundary,
+            all_phases=all_phases,
+            current_phase_number=current_phase_number,
+        )
 
     enabled = phase_intent_contract_enabled()
     if not enabled:

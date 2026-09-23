@@ -140,8 +140,19 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, heal
     if (runtime.abortReplay || sawAgentStopped) rejectP(makeUserAbortError());
     else rejectP(new Error(payload?.message || 'phase_error'));
   });
-  const unsubStopped = execSession.onSessionEvent(runtime.sessionId, 'agent_stopped', () => {
+  const unsubStopped = execSession.onSessionEvent(runtime.sessionId, 'agent_stopped', (payload) => {
     if (settled) return;
+    // P1-#3：按 data.reason 分流（Python 侧恒带 reason：'cancel_step' | 'new_step_arrived'，
+    // 见 scripts/agent/service.py；旧执行机可能不带 payload——向后兼容按用户中断收敛）。
+    // new_step_arrived = 新一轮步骤到达抢占本轮 heal，不是用户停止：不置
+    // abortReplay/sawAgentStopped，以普通 Error reject → 消费方（healErr）走非
+    // user-abort 分支，本轮 heal 按普通失败收场而不是整批中止。
+    if (payload?.reason === 'new_step_arrived') {
+      cleanup();
+      rejectP(new Error('agent_stopped(new_step_arrived): heal superseded by newly arrived step'));
+      return;
+    }
+    // 'cancel_step'（用户停止）与缺失/未知 reason 均按用户中断收敛——与修复前行为一致。
     sawAgentStopped = true;
     runtime.abortReplay = true;
     cleanup();
@@ -149,6 +160,18 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, heal
   });
   const timer = setTimeout(() => {
     if (settled) return;
+    // P1-#11：heal 超时补发 cancel_step（fire-and-forget，对齐 replay-actions.js
+    // P1-6 超时补发模式）——不叫停的话迟到的 phase_done 可能污染下一轮等待。
+    try {
+      execSession.forwardStdin({
+        nodeUuid: runtime.executorNodeUuid,
+        sessionId: runtime.sessionId,
+        event: 'cancel_step',
+        data: {},
+      });
+    } catch (err) {
+      console.warn('[replay] heal timeout cancel_step dispatch failed:', err?.message || err);
+    }
     cleanup();
     rejectP(new Error('Timeout waiting for heal phase_done'));
   }, HEAL_TIMEOUT_MS);

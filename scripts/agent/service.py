@@ -24,7 +24,7 @@ from ..agent_utils import (
     make_step_callback,
     resolve_max_actions_per_step,
 )
-from ..state import get_current_phase
+from ..state import get_current_phase, is_cancel_requested
 
 _last_agent = None
 
@@ -32,11 +32,6 @@ _last_agent = None
 def _close_agent():
     global _last_agent
     if _last_agent is not None:
-        try:
-            for t in getattr(_last_agent, '_tasks', []):
-                t.cancel()
-        except Exception:
-            pass
         _last_agent = None
 
 
@@ -45,6 +40,9 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
 
     Cooperative: browser-use honors agent.state.stopped at the next step boundary.
     Also writes cancel_flag_path so on_step_start/end hooks reinforce the stop.
+    停止为协作式语义——当前 LLM 步/动作完成后生效；历史 ``agent._tasks`` 取消循环
+    为死代码（browser_use Agent 无该属性）已于 2026-09-21 移除，若未来 browser_use
+    暴露可取消协程集合再接回。
     """
     global _last_agent
     try:
@@ -62,14 +60,6 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
         try:
             if getattr(agent, 'state', None) is not None:
                 agent.state.stopped = True
-        except Exception:
-            pass
-        try:
-            for t in getattr(agent, '_tasks', []) or []:
-                try:
-                    t.cancel()
-                except Exception:
-                    pass
         except Exception:
             pass
 
@@ -252,46 +242,76 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     cur_phase = int(phase_for_preamble) if phase_for_preamble is not None else 0
                 except (TypeError, ValueError):
                     cur_phase = 0
-                from ..controller.actions.phase.reviewer import _get_reviewer_llm
-                reviewed = await review_phase_contract(
-                    task_text=phase_core,
-                    all_phases=all_phases if isinstance(all_phases, list) else [],
-                    current_phase_number=cur_phase,
-                    scenario_summary=scenario_summary,
-                    llm=_get_reviewer_llm(llm),
+                from ..controller.actions.phase.phase_contract_snapshot import (
+                    apply_persisted_phase_contract,
+                    persisted_contract_from_instruction,
                 )
-                if reviewed:
-                    # Use the deterministic rule-based boundary as the canonical shape;
-                    # the LLM contract supplies mode/refill/goal but the gate evidence
-                    # kinds (open_page / click_next / nav_next_clicked) must come from
-                    # the task text so they are actually recordable (sid 64c9044b:
-                    # phase 1 LLM said navigate url_change+page_opened but boundary
-                    # goals were empty → open-page fallback never ran; phase 3 LLM
-                    # omitted nav_next_clicked for 下一步 wizard step).
-                    from ..controller.actions._phase_boundary import compile_boundary
-                    boundary = compile_boundary(phase_core)
-                    contract = apply_phase_contract(
-                        business_data_ref, reviewed, boundary_override=boundary
-                    )
+                raw_snapshot = persisted_contract_from_instruction(instruction, heal_mode=False)
+                persisted = apply_persisted_phase_contract(business_data_ref, raw_snapshot)
+                if persisted:
+                    contract = persisted
                     mode = business_data_ref.get('_task_mode') or 'other'
-                    from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
-                        f"phase_reviewer ok task_mode={mode} "
-                        f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
-                        f"phase_intent=True {contract_debug_line(contract)}\n"
+                        "phase_contract=persisted "
+                        f"mode={persisted.get('mode')} "
+                        f"submit={bool((persisted.get('submit') or {}).get('required'))} "
+                        f"success_when={(business_data_ref.get('_phase_boundary') or {}).get('success_when')}\n"
                     )
                     sys.stderr.flush()
                 else:
-                    mode = apply_task_mode(business_data_ref, phase_core)
-                    contract = apply_phase_intent(business_data_ref, phase_core)
-                    mode = business_data_ref.get('_task_mode') or mode
-                    from ..controller.actions.phase.reviewer import contract_debug_line
-                    sys.stderr.write(
-                        f"phase_reviewer fallback task_mode={mode} "
-                        f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
-                        f"phase_intent={bool(contract)} {contract_debug_line(contract)}\n"
+                    from ..controller.actions.phase.reviewer import _get_reviewer_llm
+                    reviewed = await review_phase_contract(
+                        task_text=phase_core,
+                        all_phases=all_phases if isinstance(all_phases, list) else [],
+                        current_phase_number=cur_phase,
+                        scenario_summary=scenario_summary,
+                        llm=_get_reviewer_llm(llm),
                     )
-                    sys.stderr.flush()
+                    if reviewed:
+                        # Use the deterministic rule-based boundary as the canonical shape;
+                        # the LLM contract supplies mode/refill/goal but the gate evidence
+                        # kinds (open_page / click_next / nav_next_clicked) must come from
+                        # the task text so they are actually recordable (sid 64c9044b:
+                        # phase 1 LLM said navigate url_change+page_opened but boundary
+                        # goals were empty → open-page fallback never ran; phase 3 LLM
+                        # omitted nav_next_clicked for 下一步 wizard step).
+                        from ..controller.actions._phase_boundary import compile_boundary
+                        boundary = compile_boundary(
+                            phase_core,
+                            all_phases=all_phases if isinstance(all_phases, list) else [],
+                            current_phase_number=cur_phase,
+                        )
+                        contract = apply_phase_contract(
+                            business_data_ref,
+                            reviewed,
+                            boundary_override=boundary,
+                            all_phases=all_phases if isinstance(all_phases, list) else [],
+                            current_phase_number=cur_phase,
+                        )
+                        mode = business_data_ref.get('_task_mode') or 'other'
+                        from ..controller.actions.phase.reviewer import contract_debug_line
+                        sys.stderr.write(
+                            f"phase_reviewer ok task_mode={mode} "
+                            f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
+                            f"phase_intent=True {contract_debug_line(contract)}\n"
+                        )
+                        sys.stderr.flush()
+                    else:
+                        mode = apply_task_mode(business_data_ref, phase_core)
+                        contract = apply_phase_intent(
+                            business_data_ref,
+                            phase_core,
+                            all_phases=all_phases if isinstance(all_phases, list) else [],
+                            current_phase_number=cur_phase,
+                        )
+                        mode = business_data_ref.get('_task_mode') or mode
+                        from ..controller.actions.phase.reviewer import contract_debug_line
+                        sys.stderr.write(
+                            f"phase_reviewer fallback task_mode={mode} "
+                            f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
+                            f"phase_intent={bool(contract)} {contract_debug_line(contract)}\n"
+                        )
+                        sys.stderr.flush()
         else:
             mode = 'other'
             contract = None
@@ -599,8 +619,8 @@ async def _run_agent_step_agent(instruction, step_index, session_id, llm, browse
             if business_data_ref is None:
                 break
             done_fired = business_data_ref.get('_done_fired', False)
-            # 检查取消
-            if cancel_flag_path.exists():
+            # 检查取消（E3 口径统一：内容判定，exists() 会把清残留空文件误判为取消）
+            if is_cancel_requested(cancel_flag_path):
                 break
             # 守卫/goal-loop 已置 stopped：不再续跑（避免 0 步空转轮）
             if goal_tracker.get('stopped'):
@@ -726,7 +746,15 @@ async def _run_agent_step_post(step_index, task_text, business_data_ref,
                 # has_contract_success already respects success.kinds — do not waive
                 # missing toast_ok just because an introduce picker confirmed.
                 if contract and contract.get('mode') not in ('introduce_pick',):
-                    mark_quality_failed(business_data_ref, 'missing_success_token')
+                    from ..controller.actions.phase.verification_gate import (
+                        is_verification_phase_task,
+                    )
+                    # 纯核验型阶段（重搜确认已删对象不存在，无保存动作）产不出
+                    # 保存令牌，保守豁免 missing_success_token（镜像 introduce_pick
+                    # 豁免；FP 零容忍——判定拿不准一律不豁免）。见
+                    # docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md §4.3。
+                    if not is_verification_phase_task(task_text, contract):
+                        mark_quality_failed(business_data_ref, 'missing_success_token')
             doubts = business_data_ref.get('_semantic_doubts')
             if doubts and business_data_ref.get('_quality_failed'):
                 mark_quality_failed(

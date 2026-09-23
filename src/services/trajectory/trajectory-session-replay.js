@@ -82,12 +82,22 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
   isReplay = true,
 } = {}) {
   const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
-  const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
+  const {
+    tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger,
+    secretValues,
+  } = prepared;
 
   runtime.abortReplay = false;
   runtime.suppressStepPersist = doSuppress;
   runtime.isReplay = doSuppress;
   if (session) session.busy = true;
+
+  // #7 批次世代令牌：prepare 成功后起跑前递增，本批 seq 随批传入 runReplayBatch；
+  // 其 finally 仅当 runtime.replayBatchSeq 仍等于本批 seq 才复位运行标志，防止
+  // 先结束的旧批次复位后到批次的 abortReplay/suppressStepPersist/busy 等标志。
+  // （busy 原子化后同一 runtime 同时至多一个批次，守卫为防御性设计。）
+  runtime.replayBatchSeq = (runtime.replayBatchSeq || 0) + 1;
+  const batchSeq = runtime.replayBatchSeq;
 
   const accepted = {
     trajectoryId: tid,
@@ -106,6 +116,8 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
       actions,
       rows,
       snapshotsByTrigger,
+      secretValues,
+      seq: batchSeq,
     }).catch((err) => {
       const msg = err?.message || String(err);
       console.error(`[steps/replay] background batch failed traj=${tid}:`, msg);
@@ -121,6 +133,7 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
         runtime.suppressStepPersist = false;
         runtime.isReplay = false;
         runtime.abortReplay = false;
+        runtime.replayRunning = false;
         if (session) session.busy = false;
       } catch { /* ignore */ }
     });
@@ -139,12 +152,20 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
  */
 export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isReplay = true } = {}) {
   const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
-  const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
+  const {
+    tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger,
+    secretValues,
+  } = prepared;
 
   runtime.abortReplay = false;
   runtime.suppressStepPersist = doSuppress;
   runtime.isReplay = doSuppress;
   if (session) session.busy = true;
+
+  // #7 批次世代令牌（与 accept 路径同口径）：prepare 成功后起跑前递增并随批传入
+  // runReplayBatch，供其 finally 做世代守卫复位。
+  runtime.replayBatchSeq = (runtime.replayBatchSeq || 0) + 1;
+  const batchSeq = runtime.replayBatchSeq;
 
   try {
     return await runReplayBatch({
@@ -156,7 +177,34 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
       actions,
       rows,
       snapshotsByTrigger,
+      secretValues,
+      seq: batchSeq,
     });
+  } catch (err) {
+    // #13 sync busy 泄漏：runReplayBatch 的 finally 只覆盖其主 try 段；若批在
+    // 进入主 try 前抛出（replay:started 广播 / 计划日志 / 菜单导航段），其
+    // finally 不会执行，busy/replayRunning 只能由本 catch 兜底复位。字段集对齐
+    // accept 路径的 .catch 兜底（suppressStepPersist/isReplay/abortReplay +
+    // session.busy=false，另含本任务新增的 replayRunning），并补发
+    // replay:finished error 终态——sync 调用方同样以前端 WS 收尾信号为准，
+    // 缺失会让条目悬挂。随后原样 rethrow，保持同步调用方的错误语义不变。
+    const msg = err?.message || String(err);
+    try {
+      emitReplay('replay:finished', tid, {
+        successCount: 0,
+        failedCount: orderedStepIds.length,
+        failedStepIds: orderedStepIds,
+        error: msg,
+      });
+    } catch { /* ignore */ }
+    try {
+      runtime.suppressStepPersist = false;
+      runtime.isReplay = false;
+      runtime.abortReplay = false;
+      runtime.replayRunning = false;
+      if (session) session.busy = false;
+    } catch { /* ignore */ }
+    throw err;
   } finally {
     // runReplayBatch also clears busy in finally
   }
@@ -164,9 +212,13 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
 
 /**
  * Stop an in-flight steps/replay batch (including Type A/B heal).
- * Does not change recordStatus. Idempotent if no batch is running.
+ * Does not change recordStatus. Honest when no batch is running: returns
+ * stopped:false without touching abortReplay or forwarding cancel_step —
+ * this covers both idle leftovers (#16) and AI-recording occupancy (#8:
+ * session.busy is true while recording but runtime.replayRunning is false,
+ * so stop can no longer kill the recording agent via cancel_step).
  * @param {number} trajectoryId trajectory DB id
- * @returns {Promise<{ trajectoryId: number, trajectoryDbId: number, stopped: boolean }>} stop result
+ * @returns {Promise<{ trajectoryId: number, trajectoryDbId: number, stopped: boolean, batchWasRunning: boolean, cancelStepDelivered?: boolean, reason?: string }>} stop result
  */
 export async function stopTrajectoryStepsReplay(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -177,7 +229,21 @@ export async function stopTrajectoryStepsReplay(trajectoryId) {
     throw err;
   }
 
+  // #5/#8/#16 诚实化：仅当回放批真正在跑（runtime.replayRunning，由
+  // runReplayBatch 置位/复位）才置 abortReplay 并下发 cancel_step；录制期
+  // （busy=true 但 replayRunning=false）与空闲期一律早退返回诚实结果。
+  if (!runtime.replayRunning) {
+    return {
+      trajectoryId: tid,
+      trajectoryDbId: tid,
+      stopped: false,
+      batchWasRunning: false,
+      reason: 'no_replay_batch_running',
+    };
+  }
+
   runtime.abortReplay = true;
+  let cancelStepDelivered = true;
   try {
     execSession.forwardStdin({
       nodeUuid: runtime.executorNodeUuid,
@@ -186,6 +252,7 @@ export async function stopTrajectoryStepsReplay(trajectoryId) {
       data: {},
     });
   } catch (err) {
+    cancelStepDelivered = false;
     console.warn('[steps/replay/stop] cancel_step failed:', err?.message || err);
   }
 
@@ -193,6 +260,8 @@ export async function stopTrajectoryStepsReplay(trajectoryId) {
     trajectoryId: tid,
     trajectoryDbId: tid,
     stopped: true,
+    batchWasRunning: true,
+    cancelStepDelivered,
   };
 }
 
@@ -285,11 +354,17 @@ async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true 
       for (const id of droppedIds) selectedIdSet?.delete?.(id);
     }
   }
+  // Resolved auth credentials are redacted from replay logs (plan + executor
+  // per-step stderr) so manual replay of auth trajectories never prints the
+  // plaintext password / account.
+  const secretValues = [];
   if (trajRow?.system_account_id) {
     const accountRow = await db('system_account')
       .where('id', Number(trajRow.system_account_id))
       .first();
     if (accountRow && (accountRow.account || accountRow.password)) {
+      if (accountRow.account) secretValues.push(String(accountRow.account));
+      if (accountRow.password) secretValues.push(String(accountRow.password));
       const { resolveAuthPlaceholdersDeep } =
         await import('../operation-component-service.js');
       for (const r of rows) {
@@ -338,21 +413,35 @@ async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true 
   }
 
   const session = state.sessions.get(runtime.sessionId);
+  // #6 busy 检查-置位原子化：检查通过与置位之间不得有 await——两者同处一个同步
+  // 段，Node 单线程事件循环下，并发第二个 accept/sync 的 continuation 无法插入
+  // 「检查已通过、置位未发生」的窗口，双开批回放（TOCTOU）被堵死。此前置位延迟
+  // 到 accept/sync 的 continuation，与检查之间隔着 prepare 返回 + 微任务调度，
+  // 构成竞窗（A、B 都 await 在 prepare 的 DB 段时，A 的置位排在 B 的检查之后）。
   if (session?.busy) {
     const err = new Error('Session is busy (AI recording in progress)');
     err.statusCode = 409;
     throw err;
   }
-
-  const doSuppress = isReplay !== false;
-  return {
-    tid,
-    orderedStepIds,
-    doSuppress,
-    runtime,
-    session,
-    actions,
-    rows,
-    snapshotsByTrigger,
-  };
+  if (session) session.busy = true;
+  // 置位后本函数剩余段（纯同步对象装配，现无 throw 点）以 try/catch 兜底：任何
+  // 意外抛出必须先复位 busy 再原样 rethrow，否则 4xx/5xx 错误响应会把 session
+  // 卡死成永久 busy（后续所有回放 409）。
+  try {
+    const doSuppress = isReplay !== false;
+    return {
+      tid,
+      orderedStepIds,
+      doSuppress,
+      runtime,
+      session,
+      actions,
+      rows,
+      snapshotsByTrigger,
+      secretValues,
+    };
+  } catch (err) {
+    if (session) session.busy = false;
+    throw err;
+  }
 }

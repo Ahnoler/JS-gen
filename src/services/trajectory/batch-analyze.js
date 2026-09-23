@@ -117,6 +117,7 @@ async function runAnalyze(item, token) {
 
     const analysis = {
       phases,
+      phaseContracts: Array.isArray(result.phaseContracts) ? result.phaseContracts : [],
       businessEntries: Array.isArray(result.businessEntries) ? result.businessEntries : [],
     };
     const fresh = await batchDao.getItemById(item.id);
@@ -198,6 +199,7 @@ async function createDraftFromAnalyzed(item) {
         name: item.name,
         requirement: item.requirement,
         phases,
+        phaseContracts: analysis.phaseContracts || [],
         businessEntries: analysis.businessEntries || [],
         model: job.model || '',
         systemAccountId: Number(job.systemAccountId),

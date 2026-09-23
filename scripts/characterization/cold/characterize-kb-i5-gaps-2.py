@@ -97,9 +97,12 @@ def main():
         "matchedCount",
     ])
     # ...and the original hit / failure branches remain.
+    # locator-snap 复刻（2026-09-21）：row-button JS 三个成功分支改为
+    # 「快照后点、ok 尾接 U+241F 快照尾段」，裸 "return 'ok';" 字面随之消亡；
+    # 针改为钉新的尾接 return（尾段拼接字面稳定）。
     _pin("N2-orig", TABLE, [
         "clickSel(radio);",
-        "return 'ok';",
+        "return 'ok' + tail;",
         "radio-not-found-in-row",
         "err-table-row-not-found",
         "button-not-found-in-row",

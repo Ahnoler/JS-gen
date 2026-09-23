@@ -10,26 +10,208 @@
 - **执行方式**：单行规则追加 → 同 commit 复跑双侧金样例（JS characterize-flow-card-recall + Python characterize-kb-recall）→ recall-eval 与基线 diff（召回零影响证明）→ commit → 自并 uara_V2.0（用户已批「合入 uara V2.0 dev 主开发分支」）→ 合并态验收 → push + 收工条目
 - 注：纯 KB 数据+文档轮次，无代码改动
 
-## 2026-09-21 17:55 · ZCode 合约线 — 收工：同族快照复刻湿测验收 PASS（traj 975/976，回链 16:55 开工；回执「可合并」已发）
+## 2026-09-21 22:47 · Cursor — 收工：方案 D 第 2 刀并入 uara_V2.0（回链 21:05）
 
-- **结论：PASS（可合并）**。7e43c736 两单真机验收（`tmp/contract-wet11-20260921/` + `through-report-snapreplica.md`；控制面 pid 9908 全程未变）：
-  - **#975**（产品阶段管理页）：recorded/is_successful=1，4 步落库（click_menu_item + click_element_by_index + click_button×2），回放全链 **4/4 OK、confirmed 全 1**。断点=P3/P5 probe 收口——该页【新增阶段】为**右侧内联面板非 el-dialog**（agent doneLog 实证 visibleDialogCount=0），close_dialog 主靶未触发，**属合约方场景设计踩坑非引擎缺陷**；落库 4 步 element 均为命中时刻快照值（活页只读复刻 buildLocatorSnap 与 DB element 零值差异 + 键集与 `_element_info_from_locate` 映射吻合）。
-  - **#976**（补单，产品库管理页真 el-dialog）：四步落库全链验——**X 关闭步落库 `target_kind=dialog_close`、xpath 指向真实 headerbtn button 元素（非内层 i），回放 ok-aria-label 命中**；取消步落库 button 节点、回放 ok-xpath-smart；开弹窗步 ok-aria-label。**回放全链 4/4 OK、confirmed 全 1**。收口 failed/zero_step（阶段1 导航零点击步，引擎口径如实非缺陷）。
-  - **判据全过**：①回放全链通 ×2；②关闭控件落库=真实被点节点；③取消步不退化；④零 SUT 写操作（8 步全 click 类审计）；⑤快照链 live（`ok␟{xpath...}` 尾段落库可见）；⑥错误签名全 0（spin-guard/phase_error/UnboundLocal/ambiguous——D2 observation 常开红利首兑现）。
-- **移交两条（非阻塞）**：① close_dialog 专用函数未被 agent 直接调用（两单 agent 均选 index 点击关闭）——JS 链与 click_button/index 链同构同接线、pin 已覆盖逻辑面，如需专链真机湿测可点单（配方=能触发 close_dialog 动作的页面）；② 表格行按钮/单选两链未真机覆盖（选景为关弹窗），pin 覆盖逻辑面，同上可点单。
-- **代管闭合**：引擎 worktree 已还原 `engine/worktree` @ 014b4dfc（净，仅 .zcodeignore 未跟踪）。SUT 零残留（两弹窗未提交、DB 无新增节点）；remote_session 2187/2188/2189 全 detach、槽位释放。
-- 注：录制湿测轮次，无代码改动；证据目录 `tmp/contract-wet11-20260921/`（gitignore 本地）
+- 完成：功能分支 `cursor/phase-structured-contract-20260921` 代码 `ea0ca6af`，`--no-ff` 并入 `uara_V2.0` = **79b4b8ba**（已在远端）。分析输出等长 `phaseContracts`，写入 `trajectory_phase.contract_json`；录制下发有效快照时执行机直接落阶段意图，不再跑 `compile_boundary` / `compile_phase_intent` / `review_phase_contract` / `_apply_cross_phase_token_guard`。缺失、非法或 heal 仍走文本分类。改描述清空合约。核验型阶段主收口未做。
+- 验收（合并态 `79b4b8ba`）：`characterize-phase-contract`、`characterize-persisted-phase-contract`、`characterize-phase-reviewer`、`characterize-phase-boundary` 均 OK。全量 `bash scripts/refactor/verify-all.sh` 报 3 红，复跑归因均为本机环境、与本次 diff 无关：`characterize-fill-err-with-scope` 与 `characterize-idempotent-click-gate` 在 Git Bash 默认 GBK 下打印 `✓` 抛 `UnicodeEncodeError`，`PYTHONIOENCODING=utf-8` 单跑 OK；`characterize-network-capture` 在 Git Bash 把 `TMPDIR=/tmp` 解析成不存在的 `D:\tmp`，PowerShell 去掉该变量后单跑 OK 5。
+- 遗留移交：①迁移 `migrations/20260921120000_phase_contract_json.js` **尚未对现网库执行**，`contract_json` 列不存在时创建轨迹会失败，需另批跑迁移；②Node 录制 runner 下发 `phase_contract` 要**再重启一次控制面 4097** 才生效（22:29 那次重启早于本合并）；Python 新会话从磁盘加载 `service.py`，新录制会话即带持久化签合同；③核验型阶段主收口仍等湿测窗口，不在本刀。
+- 注：不维护 CHANGELOG。
 
-## 2026-09-21 16:55 · ZCode 合约线 — 开工：同族快照复刻湿测验收（snap-replica 7e43c736，场景=关弹窗；引擎 worktree 临时切换代管）
+## 2026-09-21 22:45 · ZCode 引擎线 — 合并回执：E1-E4 并入 uara_V2.0（4b7829a9→合并 8e0dd470 + 抗抖加固 06613851，用户批合并）；全量 183 pin ALL GREEN 零 FAILED
 
-- **收件**：引擎线验收请求——同族快照复刻 @ `engine/snap-replica-20260921` **7e43c736**（未合并待批）：五类点击链（switch_tab/click_menu_item/close_dialog/click_table_row_button/click_table_row_radio）落库定位改为「实际被点节点命中时刻快照」（more-btn #974 同款，snap-before-fire 经 U+241F 尾段回传、Python 键级覆盖 element）。验收=任选一场景录制+回放全链通即 PASS；观察面：关弹窗落库 xpath 应命中真实关闭控件（旧行为误指 headerbtn/内层 i）、表格行按钮 xpath 不得指向从未被点的节点。
-- **选景：关弹窗（产品阶段管理页，fid 9000000740 / acct 2）**——4 阶段：①菜单进入 mntPdStg（顺带覆盖 click_menu_item 链）→②【新增阶段】开弹窗→③弹窗右上角 X 关闭（**close_dialog 链=新逻辑主靶**）→④再开弹窗点「取 消」关闭（click_button 链=未改动对照）。**零 SUT 写操作**（全程不点保存/确定，弹窗只开只关）。
-- **磁盘态已核 + 临时切换（代管声明）**：引擎 worktree 原在 `engine/worktree` @ 014b4dfc（不含修复，工作区净仅 .zcodeignore 未跟踪）；已切至 `engine/snap-replica-20260921` @ 7e43c736（py_compile 5 文件全过 + `buildLocatorSnap` 四文件在场 grep 实证）。**测毕还原回 engine/worktree @ 014b4dfc**。服务 pid 9908 / health 200 不变；纯 Python 侧新录制会话即载，无需重启。
-- **范围（可写集）**：`tmp/contract-wet11-20260921/`、agent-log 本条目+收工条目。
-- **禁入区**：`scripts/**`、`src/**`、`tools/recording-coach/**`；引擎 worktree 写操作（除上述一次性 branch switch，测毕即还原）；远端代理 9228 与 D2 线证据目录；SUT 存量数据。
-- **执行方式**：主线程直接执行——create→prepare→CDP 预检→record/start（后台+60s 轮询）→**不 detach**→回放全链（steps/replay 202 异步，confirmed 判定）→DB 步级复核（close 步落库 element/xpath 结构 + 实际被点节点交叉比对）→detach→executor 日志 grep（本单 sid 界定）。
-- **验收判据**：①回放全链 confirmed；②X 关闭步落库 xpath 命中真实被点关闭控件（非未点节点）；③取消步（对照链）不退化；④零 SUT 写操作复核（steps 全审计）。
-- 注：录制湿测轮次，无代码改动
+- 合并：`engine/replay-cancel-20260921`（4b7829a9）`--no-ff` 并入 uara_V2.0 = **8e0dd470**，零冲突。push 前重跑合并态全量验收：首跑 step-highlight 一红——单跑 3/3 绿归因=回溯扫描（≤400 查询）在 VERIFY_JOBS=4 并行下被远端 DB（47.101.58.49）偶发抖动打死一次；**加固 06613851**：单候选查询失败跳过不炸整针（DB 整体不可达时 assert 照常红，语义不变）。加固后重跑全量：**183 pin + statics ALL GREEN，`!! FAILED` 零行**（新 failed.list 判定机制并行验证无误）。已 push（280abdd2→06613851）。
+- 生效面：本批纯 Python 侧，合并已落主检出磁盘，**新录制/回放会话即效**；但停止链路的控制面侧 12 项修复是 Node 侧（7 个 src 文件，系统线 21:55 交付）**仍需重启控制面窗口**——建议尽快安排一次重启，之后按 E2 联测话术（收工条目 22:15 ④）跑「超时→补发 cancel_step→Python 步边界中断」链闭环整条停止线。
+- 引擎 worktree 随后对齐（engine/replay-cancel-20260921 快进至 06613851）。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 22:29 · ZCode 引擎线 — 运行态：控制面+本地执行机重启（用户批；E1-E4 合并后双载生效），E2 联测话术交合约线
+
+- 重启（外科手术式，非 restart-local.cmd——该脚本会连带拉起用户自管代理 9228）：发现 4097/32220/9228 本就全部未监听（用户此前已停），故为全新启动、零误杀面。从引擎 worktree（=uara_V2.0 tip ae0988cb，**Node 12 项修复 + Python E1-E4 双侧同载**）PowerShell Start-Process 分离拉起：控制面（`npm start`，SUT_SPIN_GUARD_MODE=observation 注入）+ 本地执行机（`npm run executor` 同 env）。
+- 验证：`/api/health` 200（skillDir=D:\dev\JS-gen-engine\... 证实在跑引擎 worktree 新态）；执行机 LMY online、connected:true、心跳实时（/api/v2/executors）。**用户自管代理 9228 未触碰未拉起**（按惯例由用户自启）；observation 常开（D2 自然窗口值守口径），grep 签名 `[spin-guard] observed` + `sut=page_text_503`（A3 形态；生产 6 步窗）。
+- **E2 联测话术（请合约线执行）**：
+  > 【停止链路联测】控制面已重启，Node 12 项修复 + Python E1-E4 双侧生效。请跑一条链验证根缺陷闭环：①起一批含长动作步（如 click_save 后 idle 等待）的回放；②回放执行中在控制面点停止（或等步超时自动补发 cancel_step）；③预期：Python 侧在**当前步完成后的下一个步边界**中断，replay_done 带 `aborted:true` + `stoppedAt=中断步号`，后续步不执行；④对照：正常跑完的批次 replay_done **无** aborted 键（payload 形状不变，SPA 前端无需强制适配）。注意停止语义=协作式，步内长动作（含 click_save 后 idle 等待）仍会跑完当前步——但这已封顶在单步时长内，不再是旧链路的最坏 300s/步叠加 12 分钟级。顺带：spin-guard observation 常开，正常回放/录制流程预期零新 stderr 签名。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 22:15 · ZCode 引擎线 — 收工：E1-E4 停止回放 Python 侧闭环交付（回链 20:28 承接；分支 4b7829a9 已推送，未合并待批）
+
+- 完成（代码 `4b7829a9`，7 文件 +333/−19）：**E1 根缺陷闭环**——`replay_action_entries` 步边界（步号赋值后、动作分发前）读 cancel 标志内容=='cancel' 即中断：该步不执行、不进 results/count，返回条件性带 `aborted:true`+`stoppedAt`（与 stop_on_fail 的 stoppedAt 文档化区分）；event_dispatch 回放分支入口先清标志（残留不得误中断新批次首步）+ aborted 透传 replay_done（非中止批次 payload 形状不变）。**E3**——recorder :91/:251 与 service.py:606 统一 `is_cancel_requested` 内容判定（exists() 会把「先清再跑」空文件误判为取消）；共享纯函数三枚落 state.py。**E4**——`_tasks` 死代码 ×2 删除 + 协作式语义注明；`agent_stopped` payload `{reason}` 逐字未动（控制面只认 'cancel_step'）。**E2 随 E1 自动闭合**（控制面步超时补发 cancel_step 即可真正杀掉 Python 僵尸回放）。session_runner.py:471-476 先清再跑零改动（兼容）。
+- 流程：worker-coder 实现（会话中断但代码已完整落地，主会话接手验证）→ reviewer 全清单 **CLEAN/APPROVE**（5 Minor）→ 修复波 M1（pin 跨域登记 PINS_CORE+PINS_EXECUTOR，防 --changed 漏跑）/M2（针断言收紧到循环头段）/M4（service.py:606 残留 exists() 一并统一）；M3/M4 分析结论入下。
+- 验收（分支态）：全量 verify-all **183 pin + statics ALL GREEN 零 FAILED**；新 pin `characterize-replay-cancel-awareness`（helper 行为 ×3 场景 fake-context 循环行为 + 源针）OK；executor 域 16 pin、core/click/ui/phase/fill/select 107 pin 全绿；ruff 零新增。
+- 遗留移交：①**E2 联测链**（超时→补发 cancel_step→Python 步边界中断→replay_done aborted）归系统线/合约线，话术见下；②M3：`_special_element.py:109` 嵌套回放与 `run_traj56_cdp_replay.py:171` 调试脚本未接 cancel_flag_path（默认 None=无循环内中断）——协作语义下停录制步边界即可覆盖，特此说明供系统线知悉；③M5：`docs/reports/2026-09-21-stop-replay-*.md` 三份报告在主检出仍未入库（untracked），系统线可自行 commit；④Node 侧 12 项修复需重启控制面生效——建议与合并本批同窗重启，一次载双侧后联测 E2。
+- 生效面：纯 Python+pin 侧，并入 V2.0 后新录制/回放会话磁盘加载即效、无需重启。
+- **E2 联测话术（可直接转发系统线/合约线）**：【联测请求】E1-E4 已落地分支 `engine/replay-cancel-20260921`（4b7829a9），未合并待批。请联测一条链：「回放批次执行中 → 控制面 stop（或步超时补发 cancel_step）→ Python 在当前步完成后的下一个步边界中断 → replay_done 带 aborted:true + stoppedAt=中断步号 → 后续步不执行」。注意：①停止语义=协作式，cancel 在步边界生效，步内长动作（click_save 后 idle 等待）仍会跑完当前步；②replay_done 无 aborted 键=正常跑完，SPA 前端无需强制适配（可选用 aborted 做停止态展示）；③建议与 Node 侧 12 项修复同窗重启后联测。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 21:55 · ZCode 系统线 — 收工：停止回放系统线 12 项缺陷全部修复合入（回链 18:05 开工；SDD 六任务 + 终审 + 修复波）
+
+- 完成（代码 8 提交 `35ac10fe→c7f8ffcf`，+831/−40，全量 verify-all 182 pins + statics **EXIT=0 ALL GREEN 零 FAILED**）：
+  - `35ac10fe` #2：Type B 自愈删步三守卫（G1 扫描后/G2 每轮 removeById 前/G3 记账后），stop 后不可逆删步关闭；新 pin `characterize-replay-stop-hardening.mjs`（系列 pin，executor 域注册）
+  - `d8463214` #3/#11：heal 等待 agent_stopped 按 reason 分流（new_step_arrived 不再误判用户中断/不置 abortReplay；旧执行机无 reason 向后兼容）+ heal 超时补发 cancel_step（僵尸 heal Agent 不再按 max_steps 继续驾驶浏览器）
+  - `641d7857` #4/#12：stop×步超时竞态终态走 aborted（前端不再把用户停止读成失败）+ 中止步终态事件补发（running 条目不悬挂）
+  - `2baf88ac` #5/#8/#13/#16：stop 端点诚实化（`stopped/batchWasRunning/cancelStepDelivered/reason`，无批次早退不置标志不发 cancel_step——一并关闭录制期误砍录制 Agent 与空闲期残留）+ sync 路径 busy 泄漏补 catch + api-docs stop 段同步
+  - `dba82de8` #6/#7：busy 检查-置位同同步段原子化（双开批堵死）+ replayBatchSeq 世代令牌（finally 复位按批归属，stop 静默丢失窗口收敛）+ accept .catch 补 replayRunning 对称行
+  - `c2669046` #9：detach 对在跑批次置 abortReplay 快速收敛 + purgeNodeBindings 补发 session.process_exit（reason:node_offline，整机失联路径终态竞速可达）
+  - `f2203b51` 终审修复波：**F-1（P2）** purge 循环前移到 clearTrajectoryRuntimesForNode 之前（原顺序带 runtime 会话先被摘除、补发事件覆盖不到 #9② 主要消费方；顺带修 _persistUnsub 被 clear 掏空漏清的既有缝）+ detach 注释措辞避让 stop-semantics 3b needle（该断言钉 detach 段不含 cancel_step 字样，我行注释字面撞上致 26/27）
+  - `c7f8ffcf` **verify-all 域管线 bug 修复（全体线相关）**：run_one 后台子 shell 内 FAILED=1 丢失→父 shell 恒读 0，任何真红都判 ALL GREEN（本次实跑 5 红仍判全绿才暴露）；改 failed.list 落盘判定并输出 failed pins 清单
+- 流程：SDD 六任务（worker-coder 实现 + reviewer 评审逐任务 Approved，子智能体零 commit，主线程显式 pathspec 代提交）→ 终审（五场景端到端推演，NEEDS FIXES 仅 F-1 一项 P2）→ 修复波 scoped re-review **MERGE READY**。台账 `.superpowers/sdd/2026-09-21-stop-replay-system-line/progress.md`（挂账 minor 全量在案，终审 triage 无一达必修线）。
+- 验收（合并后硬约定）：`git pull` up to date 后全量 `verify-all.sh` **182 pins + statics EXIT=0 ALL GREEN**（DB 走 127.0.0.1:13306 隧道 env 覆盖跑，未改 .env；隧道为本单元拉起，留用）；系列 pin 57/57、stop-semantics 27/27、replay-batch/terminal-abort 绿；eslint 改动文件全 0 error。勘误：本轮自查所见 step-highlight/refill-contract 红系引擎线 20:30（f484110f）修复前后时序差与本机 DB 隧道未开所致，非彼时存量。
+- 遗留移交：①**Node 改动需重启控制面 4097 生效**（本轮 7 个 src 文件）；②SPA 侧 stop 响应 stopped 可为 false + 新字段（batchWasRunning/cancelStepDelivered/reason）——请合约线按 api-docs recording.js stop 段适配前端；③step-highlight 动态锚点 FLOORS≥10 脆弱性仍在（引擎线 20:30 已代收口一次，形态再变仍会红）；④cold pin `characterize-meta-step-filter` 孤儿失效（filterMetaSteps→filterProductSteps 未同步、未登记任何域）待其线登记/修靶；⑤引擎线 E1-E4（回放循环 cancel 感知等 4 项）未动，见 docs/reports/2026-09-21-stop-replay-defects-engine-line.md；本线清单 docs/reports/2026-09-21-stop-replay-defects-system-line.md 已标注收工状态。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 21:45 · OpenCode — 收工：阶段合约跨阶段令牌越界修复（P4/P6/P7 录制中断）
+
+- **完成**（回链 20:00 开工）：方案 C 合约引擎 + prompt + 评审器 prompt 已落地合并。
+  - 代码 commit：`be21aafd`；与远端 ZCode 引擎线 verify-phase-token 第一步合并后 commit：`5639541c`。
+  - 改动文件：`scripts/controller/actions/phase/{classify,boundary_contract,intent_contract,intent_gates}.py`、`scripts/agent/service.py`（仅追加 all_phases/current_phase_number 透传，未触碰门侧豁免代码）、`src/services/trajectory/trajectory-meta-service.js`、`scripts/prompts/phase-reviewer-prompt.md`、新 pin `scripts/characterization/characterize-cross-phase-token-guard.py`、`scripts/refactor/verify-all.sh`（PINS_PHASE 注册 1 行）。
+  - 核心修复：开弹窗/选择器-only 阶段识别为 navigate（不索要 introduce_pick 令牌）；纯填写/选择阶段识别为 maintain 但 `submit.required=false`/`success.kinds=[]`；保存/确认动作真正所在的阶段才持有终态令牌；recovery 处方不再对无保存阶段强推 `click_save`。
+- **合并后验收**：`git pull` 与 ZCode 引擎线 verify-phase-token 第一步（`verification_gate.py` + `service.py:724-729` 门侧豁免）自动合并无冲突；复跑关键 pins 全部通过：
+  - `characterize-cross-phase-token-guard.py` OK
+  - `characterize-verification-phase-gate.py` OK（40 passed）
+  - `cold/characterize-phase-boundary.py` OK、`cold/characterize-phase-intent.py` OK
+  - `characterize-phase-reviewer.py` OK、`characterize-phase-reviewer-flow.py` OK
+  - `characterize-g3-done-gate-live.py` OK、`characterize-contract-arbitration-circuit-breaker.py` OK
+  - `characterize-phase-save-cue-promote.py` OK、`characterize-phase-done-runid.py` OK
+  - `characterize-quality-final-gate.mjs` 5/5、`characterize-stop-semantics.mjs` 27/27
+  - `characterize-record-phase-finalize.mjs` OK、`characterize-trajectory.mjs` OK
+  - `characterize-runid-bridge.mjs` 4/4、`characterize-run-event-ownership.mjs` OK
+  - `characterize-done-accept-reason.py` OK
+  - eslint 对改动 JS 文件无新增 warning；Python 改动文件 `py_compile` 通过。
+- **与他线关系**：本线未进入 `scripts/agent/service.py:724-729` 门侧豁免区，仅在其上游透传参数；合并后未破坏 ZCode 引擎线 verify-phase-token 第一步功能。
+- **遗留移交**：长期项「阶段结构元数据（方案 D）」已登记在 `docs/superpowers/todo-list.md`，待后续排期；本次未动 `CHANGELOG.md`。
+- **现场清点**：工作树干净，无 stash 操作，无他线 WIP 残留。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 21:10 · ZCode 引擎线 — 收工：verify-phase-token 第一步（门侧豁免）已并入 V2.0（回链 19:40 开工；`2e4c24fe`→合并 `c55cc849`，设计稿推荐节奏执行）
+
+- 完成：核验型阶段门侧兜底交付并合并。**`scripts/controller/actions/phase/verification_gate.py`**（新）：`is_verification_phase_task` 四条件机械判定（词表 v1 冻结逐字采用；±16 字共现窗口；**黑名单扫描前掩蔽宾语状态词**——「已删除」是状态补语非动作故 #973 阳性不杀，裸「删除」仍命中故 #924 对照不豁免；FP 零容忍=拿不准一律 False）。**`service.py` 收尾门**：introduce_pick 豁免后追加核验型豁免（纯 8 行插入，lazy import；pending_fields/semantic_doubt 路径原样）。新 pin `characterize-verification-phase-gate`（40 断言，入 core 域）。
+- SDD 证据链：worker-coder RED→GREEN（40 断言；RED 11/12 先行）→ reviewer **Approved**（0 Critical/Important；词表六清单与 plan 逐字比对一致；掩蔽机制=计划内矛盾〔字面黑名单与 #973 校准对互斥〕的必要解、双向 pin 钉死）→ 主会话补验 reviewer Cannot-verify 项（pin 复跑 40/40、py_compile、ruff F821、`git diff 30cacdf9` 范围=恰 4 文件、禁改文件零 diff）→ 5 Minor 全裁决记账（「不存在」根词自共现/死参 boundary_role/pin 鲁棒性=第三项 parked 至第二步校准批）。
+- 合并：`--no-ff` 并入 uara_V2.0 = **`c55cc849`**（零冲突；系统线 stop-replay 系提交 35ac10fe/d8463214/2baf88ac 均 src Node 侧，文件集零交叠）。**合并后验收**：全量 verify-all 202 ok，判定 ALL GREEN；layer-tree/step-highlight 两红经 **BASE stash 往返**归因=共享录制库数据漂移（系统线今日湿测写库所致），非本线——临时 worktree 与主检出合并态同红，本线文件零交叠。已 push。
+- 生效：纯 Python 侧，**合并已落磁盘，新录制会话即效、无需重启**。Node 侧零改动。
+- 遗留移交：①**verify-all.sh 并行 runner 缺陷**——`run_one &` 置 FAILED=1 于后台子 shell，并行 pin 失败不阻退出（exit 0 但有 `!! FAILED` 行），影响系统级验收语义，建议系统线或另单修复；②条件②「不存在」根词自共现（根=宾语同词，含「不存在」即过条件②）——词表冻结的机械推论，FP 面被①③条件兜住，**第二步校准批复核**；③第二步主收口（apply_phase_contract+boundary 同笔清 success_when/role→other）**待门侧兜底湿测窗口零 FP 后点单**；④历史核验型阶段盘点待判定式第二步定稿后。
+- 现场清点：临时 worktree 保留（junctions+.env，合并验收后可删）；stash@{0} 仍系他线旧条目未触碰；本线零 tracked WIP 残留。
+- 注：不维护 CHANGELOG
+
+## 2026-09-21 21:05 · Cursor — 开工：方案 D 第 2 刀（阶段结构元数据持久化并在有效时跳过文本重签）
+
+- 进行中：按已审规格与计划实施。规格 `docs/superpowers/specs/2026-09-21-phase-structured-contract-design.md`，计划 `docs/superpowers/plans/2026-09-21-phase-structured-contract.md`。Task 1–6、8 本会话直做；Task 7（`scripts/agent/service.py`）等 E1–E4 合入后再接。
+- 场地：`D:\dev\JS-gen-phase-contract`。分支 `cursor/phase-structured-contract-20260921`（自 `uara_V2.0` `280abdd2`）。branch-only，未合并。
+- 工作范围：`src/services/trajectory/phase-contract.js`（新）、`trajectory-meta-service.js`、`trajectory-phase-service.js`、`trajectory-recording-runner.js`、`src/dao/trajectory-phase-dao.js`、`migrations/20260921120000_phase_contract_json.js`、`schemas/init.sql`、`src/dashboard/api-docs/groups/trajectory.js`、`scripts/controller/actions/phase/phase_contract_snapshot.py`（新）、`scripts/characterization/characterize-phase-contract.mjs`、`characterize-persisted-phase-contract.py`、`scripts/refactor/verify-all.sh` 的 `PINS_PHASE` 两行、上述规格与计划。
+- 禁入区：`D:\dev\JS-gen-engine` 与 `engine/replay-cancel-20260921` 文件集（`scripts/agent/service.py`、`_replay.py`、`event_dispatch.py`、`state.py`、`recorder.py`）；运行态 4097 与执行机；本单元不重启。
+- 执行方式：本会话按计划逐步实现。代码提交等用户要求；开工声明按仓库约定先推送。
+
+## 2026-09-21 20:30 · ZCode 引擎线 — 收工：两笔挂账红代收口（用户令「解决一下」；f484110f）——全量 182 pin ALL GREEN 零 FAILED
+
+- 授权与范围：用户 20:10「解决一下」——对本日 19:00/20:05 两条目的两笔移交（OpenCode prompt 双 9 号 / 系统线 step-highlight 锚池数据面红）代收口。他线工作区已清空、local==remote 时动手，两线如有异议可在 agent-log 提出，可回退各自文件。
+- **refill-contract 修复**：`scripts/prompts/phase-reviewer-prompt.md` 第 10 条「泛指 vs 点名判定基准」（be21aafd 引入）到货时编号与既有 9 号撞车，重编号 `10.`（内容零改动）；`characterize-refill-contract.py` 断言同步 1..9→1..10 + tie-breaker needle 改 10 号。规则语义与 prompt 运行面零变化，纯编号连续性修复。单跑 OK。
+- **step-highlight 修复**：动态锚点改两段式选优——近 40 张内优先取达 FLOORS 锚（评分序不变）；近窗被小步数轨迹（4 步纯 click 湿测验收单）稀释至无一达标时，**有界回溯（≤400 张）**取达标富锚评分最优者；回溯到底仍无达标仍判「录制链真回归」。**FLOORS 阈值一个未动**（尊重系统线移交①「不放宽阈值」的前提，只解决锚池稀释这一形态）。本机实测回溯至第 140 张命中 shot #33014（traj 944，31 步/30 bbox 直用），全部断言过。
+- 验收：两 pin 单跑 OK；**合并态全量 verify-all 182 pin + statics ALL GREEN 零 FAILED**（grep 判定，顺带验证系统线 c7f8ffcf 新 failed.list 机制并行无误）。本日至此闭环：快照复刻批次（湿测 PASS + 合并 4776b7f0）+ DB 恢复复跑 + 两笔挂账代收，V2.0 无已知红。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 20:28 · ZCode 引擎线 — 声明更正/承接：E1-E4 由本会话按用户指令执行（20:25 他会话自认领作废）；沿其分支 engine/replay-cancel-20260921 与引擎 worktree
+
+- 授权：用户 20:2x 将系统线移交的 **E1-E4 明确移交本会话**（「请你带领 agent team（reviewer 和 worker-coder）完成」，含缺陷清单与三条协同注意）。20:25 他会话对 E1-E4 的自认领（a3ef03df）**由本会话承接作废**——该分支 engine/replay-cancel-20260921 = tip 零代码落地，无在途工作可冲突；该会话本日已有 20:15 D2 误声明（20:20 自勘误），疑似上下文压缩后状态混乱，**请其停止 E1-E4 相关动作**，用户侧已同步知会。
+- 承接后的工作范围（在其 20:25 清单上加细）：`scripts/controller/actions/_replay.py`（步边界消费 cancel 标志 + 返回 aborted/stoppedAt）、`scripts/event_dispatch.py`（replay 分支入口消费+清标志 + replay_done 透传 aborted）、`scripts/state.py`（新增 `is_cancel_requested(path)` 内容判定纯函数——recorder/_replay/event_dispatch 共用，防环导入）、`scripts/recorder.py`（E3 :91/:251 exists()→内容=='cancel'）、`scripts/agent/service.py`（E4 删 `_close_agent`/`_request_agent_stop` 内 `_tasks` 死代码循环 ×2 + 协作式停止语义注明；**agent_stopped 的 payload.reason 字段保持原样**——控制面只认 'cancel_step'）、`scripts/session_runner.py` 零改动只读参照（先清再跑顺序保持）；新 pin `scripts/characterization/characterize-replay-cancel-awareness.py`（含 tmp 目录行为断言）+ `scripts/refactor/verify-all.sh` executor 域注册 1 行。
+- 场地：`D:\dev\JS-gen-engine`（本分支已检出于此，干净）；分支 `engine/replay-cancel-20260921`（基点 a3ef03df）；branch-only 未合并待批。纯 Python+pin 侧，合并后新录制/回放会话即效。
+- 禁入区：`src/**`（系统线已收工待重启窗口）、`scripts/prompts/**`、`data/kb/**`、运行态服务（控制面 4097 pid 9908 / 用户代理 9228 一律不触碰）；E2 联测（超时→补发→Python 中断链）交系统线/合约线执行，本线交付联测话术。
+- 执行方式：SDD——worker-coder 实现（零 commit）+ reviewer 评审 + 修复波 + 主会话显式 pathspec 代提交；验收=新 pin + executor 域 + 全量 verify-all（基线 182 pin ALL GREEN）。
+
+## 2026-09-21 20:05 · ZCode 引擎线 — 补记：DB 恢复，合并回执移交项①复跑闭环（layer-tree / export-v3 转绿）；step-highlight 转数据面红归因移交系统线
+
+- 用户 19:43 起开启 47.101.58.49 白名单同步窗口（IP 白名单机制，此前本机 IP 不在册即合并回执归因的 TCP 超时根因）。复跑回执移交项①三 pin（合并态 e6f072d3 主检出）：
+  - **layer-tree OK、export-v3 OK——两项闭环**，连接超时归因成立（同码同机，DB 通即绿）。
+  - **step-highlight 仍 FAILED (3)，但失败面已从"连接超时"变为"真数据断言"**：动态锚点选中 shot #34045（traj 956），steps total=6 < FLOORS 下限 10 → 「load data ≥10」+ 两个下游断言连带。**归因=录制库锚池数据面漂移，非代码回归**——本日合约线湿测单（#975/#976 快照复刻验收单）均为 4 步纯 click 小轨迹入库，把「最近 40 张」锚池的最优步数拉到 6。这正是系统线收工条目（3 红修复转绿）**移交①预告的原样**：「FLOORS(10) 按现势数据定，未来单阶段步数再降动态锚点会红——届时修录制链而非放宽阈值」。**移交系统线**处置（复现 `node scripts/characterization/characterize-step-highlight.mjs`），引擎线不改其 pin 口径。
+  - 回执移交项②（refill-contract 双 9 号）**仍红未修**（19:00 移交后 OpenCode 未动），继续挂账 OpenCode 线。
+- 结论：合并态 e6f072d3 的 182 pin 现势=**179 绿 + step-highlight（系统线数据面口径）/ refill-contract（OpenCode prompt 双 9 号）两挂账，均他线归属、零本线回归**。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 20:00 · OpenCode — 开工：阶段合约跨阶段令牌越界修复（P4/P6/P7 录制中断）
+
+- **工作范围**：
+  - 合约分析侧：`scripts/controller/actions/phase/{boundary_contract,classify,intent_contract,intent_gates}.py`
+  - prompt/评审器侧：`src/services/trajectory/trajectory-meta-service.js`、`scripts/prompts/phase-reviewer-prompt.md`
+  - 配套：相关 characterization pin 断言更新、`docs/superpowers/todo-list.md` 新增「阶段结构元数据」长期项
+- **与他线关系**：ZCode 引擎线 19:40 在途 `verify-phase-token` 门侧兜底（`scripts/agent/service.py` + `verification_gate.py`），本线**不进入 `scripts/agent/service.py`**，根因收口放在 boundary/intent 合约分析侧；若最终验收需合并后全量 verify-all，与 ZCode 线协调
+- **禁入区**：D2 A/C 代理加速件、`recording-redundant-step` 已闭区间、回放停止系统线 `stop-replay-system-line`、KB 召回算法；`scripts/agent/service.py`、`scripts/controller/actions/phase/verification_gate.py`
+- **执行方式**：主会话直改；子代理仅用于并行 characterization 验证；每步微改后跑相关 pin / `bash scripts/refactor/verify-all.sh --changed`；合并后验收跑全量 verify-all
+- **决策输入**：用户选定方案 C（合约引擎 + prompt + 评审器 prompt），并微调 L1a/L1b 口径：L1a 按实际任务动态分配类型（不 blanket navigate）；L1b 按实际任务推荐所需令牌（不无条件保存）
+- **前置**：已 `git pull origin uara_V2.0 --no-rebase` 到 `30cacdf9`
+
+## 2026-09-21 19:40 · ZCode 引擎线 — 开工：verify-phase-token 第一步落地——门侧兜底（判定式 v1 冻结执行，用户「继续」=按设计稿推荐），SDD 临时 worktree
+
+- 进行中：设计稿 §5 三裁定按推荐执行（判定式 v1 四条冻结 / 先门侧兜底一个湿测窗口再议主收口 / mode='verify' 维持死值）。**本单元只落第一步**：`service.py:724-729` 核验型豁免（镜像 introduce_pick 例外）+ 判定式纯函数模块 + RED pin。主收口（apply_phase_contract+boundary 同笔清理）**不在本单元**——待门侧兜底湿测窗口无 FP 后另单。
+- 判定式 v1 冻结（设计稿 §2，实施取保守面）：纯函数 `is_verification_phase_task(task_text, contract, boundary_active_role)` 四条件全满足才 True——①task_text 无保存线索词；②核验词根（核验/验证/确认/检查/复核/是否存在/不存在）与「已删除/已删/不存在/无数据/是否生效/是否还存」宾语共现（近邻窗口 ≤16 字）；③写动词黑名单零命中（保存/提交/填写/输入/勾选/上传/新增/编辑/修改/删除/启用/停用/导入/确定(动词语境从宽=含即拒)）；④合约 mode∈{query,other,navigate}（create/modify/introduce_pick/login 硬排除；boundary role 同规则侧证、role 未知不否决——保守面=漏豁免可容忍，误豁免零容忍）。
+- 工作范围（临时 worktree `D:\dev\JS-gen-tmp-pblocked` 复用，分支 `engine/verify-phase-gate-20260921` 自 origin/uara_V2.0=**d8463214** 新切）：`scripts/controller/actions/phase/verification_gate.py`（新建，判定式纯函数）、`scripts/agent/service.py`（:724-729 豁免接线，约 5 行）、新 pin `scripts/characterization/characterize-verification-phase-gate.py`（校准对 #973/#924 行为断言 + 词表边界 + source needle）、`scripts/refactor/verify-all.sh`（core 域注册表追加 1 行）；design 稿状态行更新。
+- 禁入区：引擎 worktree（快照复刻线在途）；系统线 stop-replay 范围（`src/services/trajectory/**` 全部、`replay-heal-shared.js` 等——其 6 任务在途，git 已见其 35ac10fe/d8463214 两提交）；`scripts/prompts/**`、`data/kb/**`；`fill_engine.py`/`click_action_engine.py`/`select_engine.py`；运行态服务（4097 pid 9908 / 执行机 32220 / 用户代理 9228）
+- 验收基线：d8463214 全量 ALL GREEN 零已知红（上游 202 项口径 + 系统线新增 pin）；门侧豁免纯 Python，合并后新录制会话即效、无需重启。
+- 注：不维护 CHANGELOG；子智能体一律不 commit
+
+## 2026-09-21 19:35 · OpenCode — 收工：阶段合约「实际逻辑流程」开发备注（纯文档）
+
+- **完成**：`e355f7f0`（纯文档，零运行代码触碰）。
+  - 新建 `docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`：实际编译流程（meta-service → classify → compile_boundary → boundary_to_legacy_intent → apply_phase_contract → cross-phase guard → done gate → recovery）、三条核心规则（R1 open-only→navigate / R2 fill-only 无保存令牌 / R3 终态令牌归执行阶段）、分支优先级与令牌对照表、关键判定函数扫描范围、后续同类开发 checklist、改动落点、边界与非目标。
+  - `2026-09-18-phase-contract-conflict-survey.md` 追加 §6 修订备注（不改历史正文），指向新 spec 并说明与 #858 纯填写 query 外溢、R 清单的关系。
+  - `todo-list.md` 的 `phase-structured-contract`（方案 D）行更新前置状态：方案 C 已落地跑稳（`be21aafd`/`5639541c`），方案 D 目标=运行时文本分类退化为 fallback。
+  - `AGENTS.md` Element UI/正确性规则区补一条阶段令牌归属要点（作为 agent 单一事实源，指向 spec 与 pin）。
+- **验收**：`git diff --stat` 仅 4 个文档文件（+171/−1），零 `scripts/**`、`src/**`、`tools/**` 改动；无运行逻辑影响，verify-all 不适用。
+- **遗留移交**：无（方案 D 仍为 todo-list 长期项，前置已更新）。
+- **现场清点**：工作树干净；无 stash 操作；无他线 WIP 残留。
+- **注**：不维护 CHANGELOG。
+
+## 2026-09-21 19:15 · ZCode 引擎线 — 收工：verify-phase-token 判定式草案 v1 落稿（纯设计零代码，回链 18:50 开工）
+
+- 完成：设计稿 `docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md`。核心：①**判定式 v1 四条机械条件**（无保存线索 / 核验词根+宾语共现 / brief_plan 无写动词 / mode∈{query,other,navigate} 硬排除）——校准对应用钉死：#973（重搜确认已删节点不存在）判核验型不再产 submit.required/kinds，#924（核验+删除混合）③命中写动词不豁免；②**主收口=apply_phase_contract 唯一汇合写点**（`intent_contract.py:269-405`，LLM/规则双路径同归；Explore 证实 LLM create/modify 直通无降级路径、规则侧 `校验`→form_fill 而 `删除` 堵 query 逃生门=双路径均可误产 token 合约），且**须同笔清 boundary.success_when+role→other**（has_contract_success 优先读 boundary，单改合约不完整）；③mode='verify' 死值维持不启用（LLM 侧会被 normalize 拒收、全链需锁步，爆炸半径不成比例）；④**纪律**：判定式冻结后才盘点历史集、禁按错分样本回改词表（防反向拟合）、FP 零容忍 FN 可容忍、黑名单从严配置；⑤默认节奏=先门侧兜底（service.py:724-729 镜像 introduce_pick 豁免）一个湿测窗口无 FP 再升主收口。
+- 关键调研锚点（Explore，只读）：合约写点唯一性、`_QUERY_EXCLUDE_RE` 含「删除」与 `_FILL_TASK_RE` 含「校验」= #973 形态双路径误产 token 的机理、needs_token 消费族 5 处 blast radius、#973/#924 无既有特判（确认零基础）。
+- 与 phase_blocked（38637409）正交性已在设计稿 §4.4 记录：两修不冲突不重复。
+- 台账：todo verify-phase-token 行补判定式状态（python utf-8 替换 count-guard）；本条 commit+push。
+- **待用户裁定（设计稿 §5）**：①判定式四条取舍；②节奏（一次到位 vs 先兜底后收口——推荐后者）；③mode='verify' 维持死值确认。
+- 遗留：判定式批准后按 §4.3 落地（两步各自 RED pin 先行 + 全量验收）；历史核验型阶段盘点**待判定式冻结后**点单。
+- 注：不维护 CHANGELOG；纯设计单元零代码改动，verify-all 不适用（无代码面）。
+
+## 2026-09-21 19:10 · OpenCode — 开工：阶段合约「实际逻辑流程」开发备注（纯文档，不动运行逻辑）
+
+- **进行中**：用户指示「按实际逻辑流程修改相关文档，为后续同类开发备注」——把本轮跨阶段令牌越界修复后的实际阶段合约流程与后续须遵循规则沉淀为可复用开发备注；**明确不动任何运行逻辑代码**（`scripts/**`、`src/**` 只读）。
+- **工作范围**：`docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`（新建，实际流程 + 规则 + 坑）；`docs/superpowers/reports/2026-09-18-phase-contract-conflict-survey.md`（尾部加 2026-09-21 修订备注，不改历史正文）；`docs/superpowers/todo-list.md`（phase-structured-contract 行状态/前置更新）；`AGENTS.md`（Element UI/正确性规则区补一条阶段令牌归属要点）；agent-log 本条目+收工条目。
+- **禁入区**：一切 `scripts/**`、`src/**`、`tools/**` 运行代码；他线在途分支工作区；运行态服务。
+- **执行方式**：主会话直写文档；不改代码故 verify-all 不适用（仅文档 diff 自查零代码文件被触碰）。
+- **注**：不维护 CHANGELOG。
+
+## 2026-09-21 19:00 · ZCode 引擎线 — 合并回执：同族快照复刻并入 uara_V2.0（7e43c736→合并 4776b7f0；合约线湿测 PASS 回执可合并）+ 两项移交
+
+- 合并：`engine/snap-replica-20260921`（7e43c736）`--no-ff` 并入 uara_V2.0 = **4776b7f0**；agent-log 冲突按协议双方条目并排消解（保留他线 9 条），verify-all.sh 注册表自动合并。push 遇 non-fast-forward（OpenCode 线同窗口推 e3825ee3）→ pull 合并 **c1c3f06a** 再推，全程零 force。主检出现场他线活跃 WIP（trajectory-runtime.js / trajectory-session-replay.js）未触碰、未随本合并。
+- **合并后验收（两轮）**：全量 verify-all 181 pin + statics / 二轮（pull 入 OpenCode 跨阶段令牌修复后）**182 pin + statics，178/182 绿**；`verify-all: ALL GREEN` 尾行 + **grep FAILED 判定**（verify-phase 线移交的并行 runner `!! FAILED` 漏报缺陷已按其口径执行）。4 失败归因如下：
+  - ①**step-highlight / layer-tree / export-v3 三项 = 远端录制库不可达（环境，非代码）**：三 pin 均死在 DB 连接获取 `Acquire connection error`，裸 knex 探测同复现 `ETIMEDOUT`；TCP 直探 **47.101.58.49:3306 超时**（本机 127.0.0.1 MySQL 存活、探本地即时 RST 鉴别）。export-v3 在本日 ~16:10 分支验收时同码绿——DB 可达性在之后劣化（该主机=用户自管代理同机，网络/服务器侧归用户）。DB 恢复后复跑三 pin 即闭环，**复现命令**：`node scripts/characterization/characterize-{step-highlight,layer-tree}.mjs`、`node scripts/characterization/characterize-export-v3.mjs`。
+  - ②**refill-contract 一项 = OpenCode 线回归（移交，不代修）**：`characterize-refill-contract.py:80` 断言"模式判定规则恰好 9 条"实得两个 9 号（`scripts/prompts/phase-reviewer-prompt.md:50/:52` 两行同起 `9.`）——由 origin 侧 be21aafd（OpenCode 阶段越界修复）引入（我方基点 6c3ba0d0 仅 1 个 `9.`，`git show e3825ee3:scripts/prompts/phase-reviewer-prompt.md` 可复核）；其收工条目称验收通过，疑验收窗口早于该 prompt 提交。**移交 OpenCode 线**：重编号或改 pin 断言，复现 `./python/python.exe scripts/characterization/characterize-refill-contract.py`。
+- 生效：纯 Python 侧，合并已落主检出磁盘——控制面若从主检出派生录制会话则**新会话即效**；引擎 worktree 稍后对齐。运行态服务（4097 pid 9908 / 执行机 / 用户代理 9228）零触碰。
+- 提醒（非移交）：**DB 不可达期间新录制会话也会失败**——合约线下单湿测前请先确认 47.101.58.49:3306 可达。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 18:50 · ZCode 引擎线 — 合并回执：phase_blocked 并入 uara_V2.0（38637409，用户批「先并入主的 worktree」）+ 新开工：verify-phase-token 判定式草案
+
+- **合并回执**（回链 18:25 收工）：`engine/phase-blocked-reason-20260921`（b2f39f1b）`--no-ff` 并入 uara_V2.0 = **38637409**，零冲突（6 文件与系统线 stop-replay 范围、快照复刻线范围零交叠；主检出系统线在途 WIP `form-structure-heal.js` 未触碰不随本合并）。**合并后验收**：全量 verify-all **202 项 ALL GREEN 零红**（主检出执行，含系统线 WIP 共盘——其文件涉 pin 无涉，零归因疑点）。已 push（f1b402a8..38637409）。**生效面**：纯 Node 判定改动——合并已落磁盘，`phase_blocked` 判定随**下一控制面重启窗口**生效（运行态 pid 9908 未触碰，重启时机归用户）；Python 侧零改动即时无涉。
+- **新开工：verify-phase-token（P2 候选）判定式草案**（用户指令「继续下一项」，候选序列第一项）：交付=**纯设计不动代码**——「核验型阶段」机械可判定式（治本=分析/编译侧对核验型阶段不产出 `submit.required`/kinds；门侧 `verify` 豁免保守兜底）+ 校准对应用（阳性 #973 阶段2 须判核验型 / 对照 #924 阶段2 因含删除动作须不判）+ 验证计划（判定式冻结后才盘点历史集，防反向拟合）。设计稿落 `docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md`。
+- 工作范围（本单元）：`docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md`（新建）、`docs/superpowers/todo-list.md`（verify-phase-token 行补判定式状态）、agent-log 本条目+收工条目；**scripts/src 全部只读**（Explore 调研契约生成链）
+- 禁入区：引擎 worktree（快照复刻线在途）；系统线在途文件（form-structure-heal.js 等 stop-replay 范围）；`scripts/prompts/**`、`data/kb/**` 只读不写；运行态服务（4097 pid 9908 / 执行机 32220 / 用户代理 9228）；OpenCode 回放线文件
+- 注：不维护 CHANGELOG；纯设计单元，无代码改动、无运行态影响
+
+## 2026-09-21 18:25 · ZCode 引擎线 — 收工：phase_blocked 独立失败原因交付（分支未合并待批，回链 15:40 开工；SDD 全流程）
+
+- 完成：#909 移交项②定谳落地——**诚实 blocked 收口不再误标「录制质量未达标」**。commit `b2f39f1b`，分支 `engine/phase-blocked-reason-20260921`（已 push，基点 origin/uara_V2.0=44164f30）。**6 files +91/−3**，runner/verify-all 零改动。
+- 改动：①`phase-done-evidence-gate.js` 新增纯函数 `isBlockedOnlyFailure`（三条件全满足才降级：failedPhases 非空 / qualityFails reasons **全为精确** `missing_success_token` / 标记附着 phase 全在失败阶段内）+ `evaluateFinalVerdict` 接线 blocked 形态→`failKind='phase_blocked'`，既有 3c-3f 分支逐字不变；②`failure-reason.js` 目录加 `phase_blocked: '阶段受阻'`；③api-docs failedReason 类别清单补「阶段受阻」；④三枚既有 pin 扩展 RED→GREEN（3g-3j 终局形态 + 纯函数直测 + 目录/防内联 needle）。
+- 判定语义（机械可判）：受阻推论=保存动作做了但收不到 success token 且 agent 诚实自报 success=false → `阶段受阻`；含 `pending_fields:*`/`semantic_doubt_fields:*` 任一真质量信号、或标记附着于非显式失败阶段（**#973 纯核验形态仍判 quality_failed 不变**，verify-phase-token 另单）→ 维持 `quality_failed`；零质量标记维持 `phase_failed`（3c 语义不变）。
+- SDD 证据链：实现者 RED→GREEN（三 pin：gate 34 断言 / quality-final-gate 5/5 / agent-llm-error 8 查）→ 任务评审 **Spec ✅ / Approved**（3 Minor 均裁决记账：JSDoc 契约行=文档真值同步采纳；pin 尾标签计数=沿基旧口径不动；空 reasons 保守面=预期行为）→ 终审 **READY**（端到端链 gate→runner persistFailReason else 分支→DAO 无白名单→目录→api-docs 核验；src/ 无 failKind 穷举消费方；与 snap-replica/OpenCode 回放线**文件集零交叠**）→ 交付前独立验证 **VERIFY-PASS**（worker-coder 全量复跑）。
+- 合并后验收：全量 verify-all **202 项 ALL GREEN 两轮零红**（曾现 3 项红系临时 worktree 缺未跟踪 `config/.env` 的 DB 口令环境差异——主检出对照定谳，补 .env 后全绿，非本线改动）；eslint 3 src 文件零新 warning。
+- 状态：**未合并待批**（用户批后 `--no-ff` 并入 V2.0）。生效：纯 Node 判定改动，**合并后需控制面重启生效**；Python 侧零改动。`'phase_blocked'`（13 字符）可落 `failed_kind` VARCHAR(48)。
+- 遗留移交：①runner catch 路径对一切 `phase_error` 落 `runner_error`——D2 守卫 soft/hard 触发的 `phase_error(reason=sut_unavailable_spin_guard)` 亦被标「录制执行异常」，reason 未透传 failedKind，待 D2 湿测真机命中后按需立单；②#973 纯核验误杀（quality_failed）不在本单元范围，verify-phase-token 待评审排期。
+- 现场清点：临时 worktree `D:\dev\JS-gen-tmp-pblocked` 保留（junctions 两枚，含 config/.env 副本——合并验收后可删）；stash@{0} 系他线旧条目未触碰；主检出无本线 tracked WIP 残留。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 18:05 · ZCode 系统线 — 开工：停止回放系统线 12 项缺陷修复（SDD 模式，6 任务串行）
+
+- 进行中：用户批「完成系统线相关的缺陷」。范围=docs/reports/2026-09-21-stop-replay-defects-system-line.md 全部 12 项（#2/#3/#4/#5/#6/#7/#8/#9/#11/#12/#13+#16 随 #5）。
+- 工作范围：`src/services/trajectory/form-structure-heal.js`、`replay-heal-shared.js`、`replay-batch-runner.js`、`trajectory-session-replay.js`、`trajectory-runtime.js`、`trajectory-attach-service.js`、`src/services/executor-node-service.js`、`src/dashboard/api-docs/groups/recording.js`（仅 stop 端点段）、`src/services/replay-actions.js`（如需只读参照）；新增/扩展 pin（stop-semantics 系）+ `scripts/refactor/verify-all.sh`（仅 executor 域注册表**追加行**）；计划文件 `docs/superpowers/plans/2026-09-21-stop-replay-system-line.md`。
+- 禁入区：D2 线在途（phase-done-evidence-gate.js / src/models/failure-reason.js / api-docs/groups/trajectory.js / characterize-phase-done-evidence-gate·quality-final-gate·agent-llm-error / 临时 worktree `D:\dev\JS-gen-tmp-pblocked`）；引擎线 E1-E4 范围（scripts/ 全部：_replay.py / replay_table.py / agent/ / session_runner.py / event_dispatch.py）；OpenCode 刚交付的 redactSecrets/replay_plan 逻辑段（replay-batch-runner.js 内只读不改动）；运行态服务（4097 pid 9908 / 执行机 32220 / 用户代理 9228）；data/kb/**。
+- 执行方式：SDD——每任务一个 worker-coder 子智能体（不 commit）+ reviewer 评审 + 主线程显式 pathspec 代提交；台账 `.superpowers/sdd/stop-replay-system-line-20260921/`；每任务 pin 单跑绿 + eslint 0 error，收工合并后全量 verify-all（基线=ALL GREEN 零已知红）。
+- 注：不维护 CHANGELOG。
 
 ## 2026-09-21 18:05 · ZCode 合约线 — 收工：uara_V2.0 上游合并（d5086613，各线自并 V2.0 维护惯例；合并态验收 PASS）
 
@@ -47,6 +229,41 @@
 - 台账：todo-list 本次合并无新行；`d2-503-leg` 值守口径不变（observation 常开，自然 503 窗即开单；grep 稳定签名=`[spin-guard] observed` + `sut=page_text_503`，按 D2 线 17:05 更正口径）。
 - 注：合并轮次，合约侧零代码改动
 
+## 2026-09-21 17:55 · ZCode 合约线 — 收工：同族快照复刻湿测验收 PASS（traj 975/976，回链 16:55 开工；回执「可合并」已发）
+
+- **结论：PASS（可合并）**。7e43c736 两单真机验收（`tmp/contract-wet11-20260921/` + `through-report-snapreplica.md`；控制面 pid 9908 全程未变）：
+  - **#975**（产品阶段管理页）：recorded/is_successful=1，4 步落库（click_menu_item + click_element_by_index + click_button×2），回放全链 **4/4 OK、confirmed 全 1**。断点=P3/P5 probe 收口——该页【新增阶段】为**右侧内联面板非 el-dialog**（agent doneLog 实证 visibleDialogCount=0），close_dialog 主靶未触发，**属合约方场景设计踩坑非引擎缺陷**；落库 4 步 element 均为命中时刻快照值（活页只读复刻 buildLocatorSnap 与 DB element 零值差异 + 键集与 `_element_info_from_locate` 映射吻合）。
+  - **#976**（补单，产品库管理页真 el-dialog）：四步落库全链验——**X 关闭步落库 `target_kind=dialog_close`、xpath 指向真实 headerbtn button 元素（非内层 i），回放 ok-aria-label 命中**；取消步落库 button 节点、回放 ok-xpath-smart；开弹窗步 ok-aria-label。**回放全链 4/4 OK、confirmed 全 1**。收口 failed/zero_step（阶段1 导航零点击步，引擎口径如实非缺陷）。
+  - **判据全过**：①回放全链通 ×2；②关闭控件落库=真实被点节点；③取消步不退化；④零 SUT 写操作（8 步全 click 类审计）；⑤快照链 live（`ok␟{xpath...}` 尾段落库可见）；⑥错误签名全 0（spin-guard/phase_error/UnboundLocal/ambiguous——D2 observation 常开红利首兑现）。
+- **移交两条（非阻塞）**：① close_dialog 专用函数未被 agent 直接调用（两单 agent 均选 index 点击关闭）——JS 链与 click_button/index 链同构同接线、pin 已覆盖逻辑面，如需专链真机湿测可点单（配方=能触发 close_dialog 动作的页面）；② 表格行按钮/单选两链未真机覆盖（选景为关弹窗），pin 覆盖逻辑面，同上可点单。
+- **代管闭合**：引擎 worktree 已还原 `engine/worktree` @ 014b4dfc（净，仅 .zcodeignore 未跟踪）。SUT 零残留（两弹窗未提交、DB 无新增节点）；remote_session 2187/2188/2189 全 detach、槽位释放。
+- 注：录制湿测轮次，无代码改动；证据目录 `tmp/contract-wet11-20260921/`（gitignore 本地）
+
+## 2026-09-21 17:20 · OpenCode — 补记：回放三项修复合并后验收通过；push 因 GitHub 不可达待补
+
+- 代码 commit `d18604d5`；`git pull origin uara_V2.0 --no-rebase` 合入远端 `52f4adf3`（ZCode D2 回执/代理件条目 + todo 更新），仅 `agent-log.md` 冲突，按协议双方条目并排消解，零代码冲突。
+- **合并后验收**：合并态 11 枚相关 characterization 全绿（replay-batch / replay-terminal-abort / menu-navigation / special-element / replay-table-row-radio / replay-secret-redaction / search-then-click-guard / fill·select·radio·click-replay-engine）；合并提交 `1190c068`。
+- **push 状态**：`git push origin uara_V2.0` 连续 2 次失败（`Failed to connect to github.com:443` / `Recv failure: Connection was reset`）；本线 `d18604d5` + `1190c068` 为**本地未推送**，网络恢复后按硬约定补推（无需再合并，远端已在其中）。
+- `config/.db-whitelist-seen` 运行时改动未提交。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-21 17:10 · OpenCode — 收工：修复首行单选回放假失败 + 回放日志凭据掩码 + 回放模块 Python 3.10 兼容
+
+- 收件（用户 review 两条 + 同批日志实证一条）：
+  - **凭据泄漏**（`2e9b33b3`）：`describeReplayStep` 白名单含 `value`，而 `prepareReplayBatch` 在打计划前已把 `__AUTH_PASSWORD__` 还原为真实密码 → auth 轨迹人工回放时明文密码同时进控制面 console 与执行机 stderr，违背凭据掩码先例。
+  - **Python 版本**（`244af4f7`）：`_replay.py` batch start 日志用嵌套同引号 f-string（PEP 701，3.12+），README 承诺 3.10+，低版本执行机会导致整个回放模块 import 失败。
+  - **首行单选假失败**（用户日志 traj 969 step 5）：`_replay_table_row_radio` 在 xpath-first 失败、语义首行兜底成功（`ok|scope=`）时，把失败的 `click-failed` 前缀拼到成功结果前，`_result_ok` 只读头段 → 判 FAIL 并进单步自愈。
+- 改动：
+  - `scripts/controller/actions/replay_table.py`：语义兜底成功时把成功结果置头，失败的 xpath 尝试降为尾段诊断 `xpath-first-failed:`；durable-fallback 成功分支同修（成功段置头）。
+  - `src/services/trajectory/replay-batch-runner.js`：新增 `redactSecrets`；`logReplayPlan` 按精确凭据值把计划行掩码为 `***`，并在 `replay_plan` 事件携带 `secretValues`。
+  - `src/services/trajectory/trajectory-session-replay.js`：`prepareReplayBatch` 收集 auth 还原出的账号/密码为 `secretValues`，经两个调用方传入 `runReplayBatch`。
+  - `scripts/event_dispatch.py`：`replay_plan` 缓存 `secretValues` 到 `session_state` 并掩码打印；`replay_actions` 透传 `secretValues`。
+  - `scripts/controller/actions/_replay.py`：新增 `redact_secrets`；逐步 params/result 日志掩码；batch start 日志改用循环拼接，删除 PEP 701 嵌套 f-string。
+  - 新 pin：`characterize-replay-table-row-radio`（语义兜底不成假失败）、`characterize-replay-secret-redaction`（`redact_secrets` + 接线 + `ast.parse(feature_version=(3,10))` 兼容闸）；`characterize-replay-batch` 增计划掩码行为断言（执行用 params 仍为真值）。
+- 验收：三枚相关 pin 全绿；定向 characterization 9/9 PASS；全量 `verify-all` 失败集与本机前次基线一致（eslint-core / step-highlight / layer-tree / confirm-notification / fill-err-with-scope / idempotent-click-gate / tssc-route-conflict / network-capture），**零新增本线归属**。
+- 生效：Node 侧需重启控制面；执行机 Python 随新会话子进程加载（`event_dispatch.py` / `_replay.py`）。
+- 注：不维护 CHANGELOG。
+
 ## 2026-09-21 17:05 · ZCode 引擎线（D2 线） — 回执：A/C 终局口径收讫（主路径=自然窗口值守，加速件不点单）+ 两处精确更正（代理件已零重启 / grep 签名防漏报）+ ③ 校准对已登记
 
 - **① A/C 终局口径收讫并存档**：主路径=自然窗口值守（observation 常开），加速件已备未点单——尊重裁定，D2 行已改值守口径。**但更正不点单理由（事实性）**：「代理件需重启窗口」基于旧 env 方案；交付版（`eab5e83c`）为 flag 文件门控、每次浏览器启动即时读取，**零重启零外部依赖**（合约线回执口径「PROXY-RUNBOOK.md 全程零系统改动、零重启」）。唯一真实存在的重启需求=observation→soft 档位切换（腿 C），与走不走代理无关——自然窗口路径的腿 C 同样需要。维持现裁定无异议；再点单成本≈零，随时可开。
@@ -55,6 +272,17 @@
 - **③ verify-phase-token 校准对已登记**（todo verify-phase-token 行）：阳性 #973 阶段2 / 对照 #924 阶段2，同日同实现、差异仅 P2 动作构成——机械判定式（治本=分析侧不产出 submit.required/kinds）的第一组校准点。更大校准集暂不点单（前置=机械判定式定稿后再盘点，避免反向拟合）。
 - 台账：D2 行改「自然窗口值守」终局口径（含更正），verify-phase-token 行补校准对；本条 commit+push。
 - 注：不维护 CHANGELOG
+
+## 2026-09-21 16:55 · ZCode 合约线 — 开工：同族快照复刻湿测验收（snap-replica 7e43c736，场景=关弹窗；引擎 worktree 临时切换代管）
+
+- **收件**：引擎线验收请求——同族快照复刻 @ `engine/snap-replica-20260921` **7e43c736**（未合并待批）：五类点击链（switch_tab/click_menu_item/close_dialog/click_table_row_button/click_table_row_radio）落库定位改为「实际被点节点命中时刻快照」（more-btn #974 同款，snap-before-fire 经 U+241F 尾段回传、Python 键级覆盖 element）。验收=任选一场景录制+回放全链通即 PASS；观察面：关弹窗落库 xpath 应命中真实关闭控件（旧行为误指 headerbtn/内层 i）、表格行按钮 xpath 不得指向从未被点的节点。
+- **选景：关弹窗（产品阶段管理页，fid 9000000740 / acct 2）**——4 阶段：①菜单进入 mntPdStg（顺带覆盖 click_menu_item 链）→②【新增阶段】开弹窗→③弹窗右上角 X 关闭（**close_dialog 链=新逻辑主靶**）→④再开弹窗点「取 消」关闭（click_button 链=未改动对照）。**零 SUT 写操作**（全程不点保存/确定，弹窗只开只关）。
+- **磁盘态已核 + 临时切换（代管声明）**：引擎 worktree 原在 `engine/worktree` @ 014b4dfc（不含修复，工作区净仅 .zcodeignore 未跟踪）；已切至 `engine/snap-replica-20260921` @ 7e43c736（py_compile 5 文件全过 + `buildLocatorSnap` 四文件在场 grep 实证）。**测毕还原回 engine/worktree @ 014b4dfc**。服务 pid 9908 / health 200 不变；纯 Python 侧新录制会话即载，无需重启。
+- **范围（可写集）**：`tmp/contract-wet11-20260921/`、agent-log 本条目+收工条目。
+- **禁入区**：`scripts/**`、`src/**`、`tools/recording-coach/**`；引擎 worktree 写操作（除上述一次性 branch switch，测毕即还原）；远端代理 9228 与 D2 线证据目录；SUT 存量数据。
+- **执行方式**：主线程直接执行——create→prepare→CDP 预检→record/start（后台+60s 轮询）→**不 detach**→回放全链（steps/replay 202 异步，confirmed 判定）→DB 步级复核（close 步落库 element/xpath 结构 + 实际被点节点交叉比对）→detach→executor 日志 grep（本单 sid 界定）。
+- **验收判据**：①回放全链 confirmed；②X 关闭步落库 xpath 命中真实被点关闭控件（非未点节点）；③取消步（对照链）不退化；④零 SUT 写操作复核（steps 全审计）。
+- 注：录制湿测轮次，无代码改动
 
 ## 2026-09-21 16:40 · ZCode 引擎线（D2 线） — 收工：D2 A/C 代理加速件交付并已并入 V2.0（回链 14:15 开工；`eab5e83c`；用户批「这个 flag 可以加」）
 
@@ -80,6 +308,15 @@
 - 生效：Node 侧需重启控制面；执行机侧 Python 随新会话子进程加载（`event_dispatch.py`）。
 - 注：不维护 CHANGELOG。
 
+## 2026-09-21 15:40 · ZCode 引擎线 — 开工：phase_blocked reason 区分（#909 移交项②，用户点名），SDD 模式临时 worktree
+
+- 进行中：用户批「你做 phase_blocked reason 区分」。定谳落点=**Node 终局裁决**：`evaluateFinalVerdict`（`src/services/trajectory/phase-done-evidence-gate.js:168`）qualityFails 非空即判 `quality_failed`，不区分该阶段是否 agent 显式自报 `success=false`（诚实受阻上报）→ #909 P5 诚实 blocked 被误标「录制质量未达标」。区分规则（机械可判）：**失败全部来自显式 `success=false` 阶段，且质量标记仅 `missing_success_token`（受阻的必然推论）且全部附着于失败阶段 → failKind=`phase_blocked`**；含 `pending_fields:*`/`semantic_doubt_fields:*` 等真质量信号或标记附着于非显式失败阶段（#973 形态）→ 维持 `quality_failed`，零质量标记维持 `phase_failed`（3c 语义不变）。
+- 工作范围（临时 worktree `D:\dev\JS-gen-tmp-pblocked`，分支 `engine/phase-blocked-reason-20260921` 自 origin/uara_V2.0=**44164f30**）：`src/services/trajectory/phase-done-evidence-gate.js`（裁决函数+新纯 helper）、`src/models/failure-reason.js`（目录加 `phase_blocked: '阶段受阻'`）、`src/dashboard/api-docs/groups/trajectory.js`（failedReason 类别文案清单加「阶段受阻」）、三枚**既有** pin 扩展（`characterize-phase-done-evidence-gate.mjs` / `characterize-quality-final-gate.mjs` / `characterize-agent-llm-error.mjs`）；runner 零改动（persistFailReason 已按 failKind 泛化）。SDD：RED 先行 → 实现者子代理（不 commit）→ 任务评审 → 终审；台账 `.superpowers/sdd/engine-phase-blocked-reason-20260921/`。
+- 禁入区：**引擎 worktree `D:\dev\JS-gen-engine`（快照复刻线 15:27 声明占用——`_navigation.py`/`_misc.py`/`_table.py`/`click_action_engine.py`/js_snippets 及其新增 pin）**；`scripts/refactor/verify-all.sh`（本单元零新增 pin 不触碰，避其登记行冲突）；运行态服务（控制面 4097 pid 9908 / 执行机 32220 / 用户代理 9228）；OpenCode 回放线文件（`_replay.py`/`replay_table.py`/`replay-batch-runner.js`）；Cursor STC 文件集。
+- 验收基线（**已变**）：上游 `44164f30` 三基线红修复转绿、`KNOWN_BASELINE_RED` 清空——本单元验收=全量 verify-all **ALL GREEN 零已知红**。
+- 观察登记（不在本单元扩散）：runner catch 路径对一切 `phase_error` 落 `runner_error`——D2 守卫 soft/hard 触发的 `phase_error(reason=sut_unavailable_spin_guard)` 也将被标「录制执行异常」，reason 未透传到 failedKind；待 D2 湿测有真机命中后按需立单。
+- 注：不维护 CHANGELOG；子智能体一律不 commit，主会话显式 pathspec 代提交
+
 ## 2026-09-21 15:40 · OpenCode — 收工：修复回放误入表单结构自愈 + 增加回放内容日志（回链 14:00 开工）
 
 - 完成（6 files / +116 −1655；agent-log 差额系 09-16 及更早条目已归档）：
@@ -94,6 +331,23 @@
   - Node 侧改动需重启控制面生效；Python/执行机侧改动随新录制/回放会话加载生效。
   - `git pull origin uara_V2.0 --no-rebase` 合入 ZCode D2 代理加速件开工条目（`fad9050b`）零代码冲突；合并后定向 characterization 全绿；已 push 到远端（`uara_V2.0` `10452726`）。
   - `config/.db-whitelist-seen` 为运行时白名单时间戳改动，非本线所为，未提交。
+
+## 2026-09-21 15:27 · ZCode 引擎线 — 开工：同族快照复刻（more-btn locator-snap 模式复刻至导航/弹窗/表格点击链），引擎 worktree 本场
+
+- 工作范围：`scripts/controller/actions/_navigation.py`（switch_tab / click_menu_item）、`_misc.py`（close_dialog）、`_table.py`（click_table_row_button / click_table_row_radio）四条点击链；同族 js_snippets 与共享解析 helper（如需抽取，动 `click_action_engine.py` 或新建模块）；新增/扩展 characterization pin（`scripts/characterization/**`）；`scripts/refactor/verify-all.sh` 域注册表登记。
+- 禁入区：`src/services/trajectory/**`（用户已另派会话做 phase_blocked reason 区分，phase-done-evidence-gate 族归其所有）；主检出 `D:\dev\JS-gen` 他线 WIP（characterize-confirm-notification.py 在途）；OpenCode 回放线（`_replay.py` / `replay_table.py` / replay-batch-runner.js——注意与本批 `_table.py` 录制侧同名相邻、文件不相交）；D2 运行态（控制面 4097 pid 9908、用户自启代理 9228 一律不触碰）。
+- 执行方式：分支 `engine/snap-replica-20260921`（自 uara_V2.0 tip 5b315a29）；Explore 摸底 → 子智能体实现（一律不 commit，主会话显式 pathspec 代提交）→ 评审 → 域管线微步 + 合并态全量 verify-all 基线对比；纯 Python/pin 侧，合并后新录制会话即效、无需重启。
+- 基线：合并后验收全量以 5b315a29 合并态 3 已知红（step-highlight / layer-tree / confirm-notification）为零新增基线。
+
+## 2026-09-21 15:14 · ZCode 系统线 — 收工：verify-all 域管线化验收改造（微步验收 2m58s→15-20s，commit 48d277ab）
+
+- 完成（用户指令：功能变大后不必每次改动跑全量 characterization，切管线验收 + 优化验收时间）：`scripts/refactor/verify-all.sh` 域管线化改造——**12 域注册表**（core/phase/fill/select/click/xpath/tree/kb/executor/ui/export/misc）+ 三种用法（无参=全量 / `verify-all.sh select,fill`=按域选 / `--changed`=git diff 自动映射选域，无映射兜底全量）+ 有限并发（`VERIFY_JOBS` 默认 4）+ 基线红显式标注（KNOWN-RED 不再令域管线误报回归）。
+- 计时实测：**全量 2m58s→1m08s**（并发 4；瓶颈是 176 个进程串行启动非单 pin 慢，逐 pin 计时基线在案）；**单域管线 15-20s**（kb 17s/phase 20s/ui 16s/select 未单测估同量级）。AGENTS.md 口径已更新：微步验收=域管线/--changed，**合并后验收=全量不变**，新 pin 须登记域注册表（跨域 pin 可登记多域防漏跑，拿不准进 core）。
+- 安全性审计（并发前提）：全部写入类 pin 用 mkdtemp 自隔离（req-draft-traj/kb-insights/network-capture 等逐一核验）；浏览器 pin（g3-live/field-label/login-fallback/tree-select/probe）各自 headless launch 无固定端口；DB 写仅 phase-group-shot（不在注册表）。调试竞态时可 `VERIFY_JOBS=1` 回严格串行。
+- 验收：两轮全量 177 项（175 pin + eslint + ruff）稳定 ALL GREEN，3 红与基线逐项一致零新增；175 pin 与旧口径 comm 核验零丢失；域抽样 kb(17s)/phase(31 green)/ui(含 3 基线红正确标注)；--changed 抽测映射正确（select_dispatch→select、js_snippets→xpath、trajectory-runner→ui+export+core、data/kb→kb、executor→executor）。
+- **push 冲突与合并回执（15:20）**：push 被 non-fast-forward 拒（远端同窗口 OpenCode 线 push 了回放三修复 d18604d5）→ pull 合并，verify-all.sh 冲突按注册表口径消解（保留域管线化，OpenCode 新增 2 replay pin **登记进 executor 域**——回放语义域与 replay-batch 同域），agent-log 双方条目并排保留；合并提交 `abe10f5e` 已推送。**合并后验收（硬约定）**：合并态全量 verify-all **180 项（178 pin+eslint+ruff）ALL GREEN**，3 红与基线逐项一致零新增，1m10s——OpenCode 回放三修复未破坏本线改造、本线改造也未破坏其 pin（2 新 pin 经注册表正常跑绿）。
+- 遗留移交：①各线后续新 pin **登记进域注册表**（本次 pull 冲突即为实例：OpenCode 加 run 行与我改注册表撞车，注册表化后此类冲突改为清单内追加、好解得多）；②`--changed` 路径映射规则保守（未映射兜底全量），跑一段时间后可按实际 diff 命中情况微调规则；③并发度默认 4 是保守值，机器富裕可 `VERIFY_JOBS=6` 再压。
+- 注：不维护 CHANGELOG；本条与代码提交一并 push。
 
 ## 2026-09-21 14:25 · ZCode 引擎线（D2 线） — 回执：B 腿 PASS 归档 + 组件级半程已补（并入 V2.0 `c87b9be7`）+ A/C 三路径裁定（自然窗口为主 / 代理为加速件 / CDP 注入已否决）+ ③ 登记候选
 
@@ -1718,3 +1972,11 @@ erify-all.sh 默认集
 - 禁入区：`boundary_contract.py`/`recorder_emitters.py`/其他 phase 模块（本轮不动）、他线 WIP（`characterize-phase-done-validate.py` 等）、`scripts/prompts/**`、`config/`、SPA
 - 方式：主线程内联，先 RED pin（本案真实文本 + 真查询反例防过度排除）再一行分类修正；回归=classify/boundary 既有 pin 全跑 + ruff F821 + py_compile；全量 verify-all 基线比对（3 红基线）后收工
 
+## 2026-09-21 22:00 · ZCode 系统线 — 收工：3 项基线红全部修复转绿，KNOWN_BASELINE_RED 清空（用户指令：修 3 失败项，要么注释要么修复转绿）
+
+- 根因三判：①`characterize-confirm-notification`＝逻辑随 d9ca7990 迁入 ClickEngine 后 pin 仍读 `_misc.py` 旧标记（改靶不误判）；②`characterize-step-highlight`＝锚点 traj 181/shot 10615 被清库（历史第二次锚点死亡，traj 38→157→181）；③`characterize-layer-tree`＝锚点 traj 33 同因清库失效。
+- 修复：①confirm-notification pin 重指向——断言 A（notifications 收集器 rect 可见性判定）仍读 `_misc.py`，断言 B/C/回归改读 `click_action_engine.py`（JS_WATCH_SAVE_NOTIFICATIONS < err-notification: < toast_ok < confirm_click 时序、'状态更新成功'、engine.count 确认按钮唯一、btn_label 空白剔除守卫），断言语义全保留。②step-highlight + layer-tree **改动态锚点**：不再硬编码 traj/shot（本次已两次死于清库），每次运行从最近 40 张 phase_highlight 截图现场选锚——step-highlight 按「bbox 直用命中×步数」选优（FLOORS 下限 steps/json/bbox/solid≥10，按当前阶段化录制形态量级 ~15 步设定），layer-tree 优先选「全元素带 layers」的截图（选 #33503 traj 969，53/53）；step-highlight 的 byTraj/byPhase 断言从「=锚点」改为「=直查 DB 最新一张」对账（动态锚点未必是该 traj 最新，语义仍钉 loadPhaseData 倒序取第一条）。
+- verify-all.sh：`KNOWN_BASELINE_RED` 清空（注释留登记规则：待修红项可登记、修好须摘除），ALL GREEN 输出在无基线红时不再拖 "baseline reds excluded" 尾巴。
+- 验收（合并后硬约定）：`git pull`（up to date）后全量 verify-all **178 pins + 2 statics 全部真绿，EXIT=0，零 KNOWN-RED 零 FAILED**；三个改靶 pin 单跑均 OK（step-highlight 锚 #33388 traj 973：14 步/12 bbox 直用；layer-tree 锚 #33503：53 元素全带 layers、6 步 5 分区）。
+- 遗留移交：①FLOORS 下限（10）是按现势数据定的，若未来录制形态单阶段步数再降（如 <10），动态锚点会红——那是真回归信号，不是锚点问题，届时修录制链而非放宽阈值；②本次仅改 characterization 与 verify-all，无业务代码改动。
+- 本条与代码提交一并 push。

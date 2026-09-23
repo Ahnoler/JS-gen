@@ -156,19 +156,59 @@ export function collectFailedPhases(phaseOutcomes, phases) {
 }
 
 /**
+ * phase_blocked 区分判定（#909 移交项②）：判定终局输入是否为「诚实受阻」形态——
+ * 质量标记全部为受阻必然推论（missing_success_token）且只出现在已显式失败的阶段。
+ * 纯函数无副作用、不碰输入；任一条件不满足即非受阻（保守面：宁判 quality_failed
+ * 不假绿，红线不松）。
+ *
+ * 三条件（全满足才 true）：
+ * 1. failedPhases 非空（存在显式 success=false 阶段）；
+ * 2. qualityFails 非空，且每条的 reasons 非空并逐条精确等于 'missing_success_token'
+ *    （pending_fields / semantic_doubt_fields 等其余 reason 一律视为真质量信号，无前缀匹配）；
+ * 3. qualityFails 附着的 phase 全部落在 failedPhases 集合内。
+ * @param {{ failedPhases: Array<number|string>, qualityFails: Array<{ phase?: number|string, reasons?: string[] }> }} args
+ *   failedPhases = collectFailedPhases 输出（显式失败阶段号）；qualityFails = phase_end
+ *   QUALITY FAIL 清单（runner 捕获的 { phase, reasons } 形状）。
+ * @returns {boolean} true = blocked-only 形态（failKind 应降级为 'phase_blocked'）
+ */
+export function isBlockedOnlyFailure({ failedPhases, qualityFails }) {
+  const failedList = Array.isArray(failedPhases) ? failedPhases : [];
+  const qualityFailsList = Array.isArray(qualityFails) ? qualityFails : [];
+  if (!failedList.length || !qualityFailsList.length) return false;
+  const failedSet = new Set(failedList);
+  for (const q of qualityFailsList) {
+    const reasons = Array.isArray(q?.reasons) ? q.reasons : [];
+    if (!reasons.length) return false;
+    for (const reason of reasons) {
+      if (reason !== 'missing_success_token') return false;
+    }
+    if (q?.phase == null || !failedSet.has(q.phase)) return false;
+  }
+  return true;
+}
+
+/**
  * 终局成败裁决（v3 同步终局收敛）：任一显式失败阶段 / QUALITY FAIL / G3 聚合失败
  * → failure 收官（宁误拒不假绿）；判定序：qualityFails 决定 failedReason 取值，
  * failedPhases/qualityFails 任一非空或聚合为 false 即 failure。
+ * blocked 区分（#909 移交项②）：failedPhases 非空且 isBlockedOnlyFailure 三条件
+ * 全满足（质量标记全为 missing_success_token 且只附着于已显式失败阶段）→
+ * failKind 降级 'phase_blocked'（诚实受阻，非录制质量差）；任一条件不满足维持
+ * 现行二分（'quality_failed' | 'phase_failed'）。
  * @param {{ failedPhases: Array<number|string>, qualityFails: Array<object>, trajSuccess: boolean }} args
  *   failedPhases = collectFailedPhases 输出（显式失败阶段号）；qualityFails = phase_end
  *   QUALITY FAIL 清单；trajSuccess = aggregateTrajectorySuccessful 聚合结果。
  * @returns {{ success: boolean, failKind: string|null }} final verdict; failKind is
- *   'quality_failed' | 'phase_failed' | null（null = success 收官，不写失败原因）
+ *   'phase_blocked' | 'quality_failed' | 'phase_failed' | null（null = success 收官，
+ *   不写失败原因）
  */
 export function evaluateFinalVerdict({ failedPhases, qualityFails, trajSuccess }) {
   const qualityFailsList = Array.isArray(qualityFails) ? qualityFails : [];
   const failedList = Array.isArray(failedPhases) ? failedPhases : [];
   if (failedList.length || qualityFailsList.length || trajSuccess === false) {
+    if (isBlockedOnlyFailure({ failedPhases: failedList, qualityFails: qualityFailsList })) {
+      return { success: false, failKind: 'phase_blocked' };
+    }
     return { success: false, failKind: qualityFailsList.length ? 'quality_failed' : 'phase_failed' };
   }
   return { success: true, failKind: null };

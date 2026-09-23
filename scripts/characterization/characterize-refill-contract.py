@@ -49,7 +49,7 @@ def test_reviewer_prompt_tiebreaker() -> None:
     src = _read(PROMPTS_PHASE_REVIEWER)
 
     # F2 — new rule 9 exists.
-    assert "9. **泛指 vs 点名判定基准**" in src, "rule 9 tie-breaker header missing"
+    assert "10. **泛指 vs 点名判定基准**" in src, "rule 10 tie-breaker header missing"
 
     # F2 — anti-castration phrasing.
     assert "宁可全量覆盖录入" in src, "宁可全量覆盖录入 missing"
@@ -68,17 +68,19 @@ def test_reviewer_prompt_tiebreaker() -> None:
         "modify → all_editable mapping drifted"
     )
 
-    # The "模式判定规则" section must contain exactly 9 numbered top-level list
-    # items (rules 1..9). Slice the section by its heading boundaries and count
-    # lines matching ^N. ** at column 0.
+    # The "模式判定规则" section must contain exactly 10 numbered top-level list
+    # items (rules 1..10). Slice the section by its heading boundaries and count
+    # lines matching ^N. ** at column 0. (Rule 10 = 泛指 vs 点名判定基准, added
+    # with the phase-contract token-ownership fix; its numbering arrived as a
+    # duplicate "9." and was renumbered 2026-09-21.)
     section_match = re.search(
         r"(模式判定规则).*?(?=\n## |\Z)", src, flags=re.S
     )
     assert section_match is not None, "模式判定规则 section not found"
     section = section_match.group(0)
     nums = re.findall(r"(?m)^([0-9]+)\. \*\*", section)
-    assert nums == [str(i) for i in range(1, 10)], (
-        f"expected 9 numbered rules in 模式判定规则, got {nums}"
+    assert nums == [str(i) for i in range(1, 11)], (
+        f"expected 10 numbered rules in 模式判定规则, got {nums}"
     )
 
 

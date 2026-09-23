@@ -11,6 +11,7 @@ import {
   evaluateFinalVerdict,
   evaluateFinalizeGate,
   evaluatePhaseOutcome,
+  isBlockedOnlyFailure,
 } from '../../src/services/trajectory/phase-done-evidence-gate.js';
 import { META_STEP_ACTIONS } from '../../src/models/meta-step-actions.js';
 import { readFileSync } from 'node:fs';
@@ -173,6 +174,37 @@ assert.ok(evaluateFinalVerdict({ failedPhases: [], qualityFails: [], trajSuccess
 assert.ok(eq(evaluateFinalVerdict({ failedPhases: [], qualityFails: [], trajSuccess: true }),
   { success: true, failKind: null }), '3f 全干净→success收官');
 
+// 3g–3j + 纯函数直测：phase_blocked 区分（#909 移交项②，诚实受阻 vs 真质量缺陷，
+// 三条件全满足才降级；任一不满足维持现行二分）
+assert.ok(isBlockedOnlyFailure({ failedPhases: [2], qualityFails: [{ phase: 2, reasons: ['missing_success_token'] }] }),
+  'isBlockedOnlyFailure: blocked-only 三条件全满足→true');
+assert.ok(!isBlockedOnlyFailure({ failedPhases: [], qualityFails: [{ phase: 2, reasons: ['missing_success_token'] }] }),
+  'isBlockedOnlyFailure: 条件1 不满足（failedPhases 空）→false');
+assert.ok(!isBlockedOnlyFailure({ failedPhases: [2], qualityFails: [{ phase: 2, reasons: ['pending_fields:姓名'] }] }),
+  'isBlockedOnlyFailure: 条件2 不满足（pending_fields 属真质量信号）→false');
+assert.ok(!isBlockedOnlyFailure({ failedPhases: [2], qualityFails: [{ phase: 2, reasons: ['missing_success_token', 'semantic_doubt_fields:x'] }] }),
+  'isBlockedOnlyFailure: 条件2 不满足（混入任一非 missing_success_token）→false');
+assert.ok(!isBlockedOnlyFailure({ failedPhases: [1], qualityFails: [{ phase: 2, reasons: ['missing_success_token'] }] }),
+  'isBlockedOnlyFailure: 条件3 不满足（标记附着于非失败阶段）→false');
+assert.ok(!isBlockedOnlyFailure({ failedPhases: [2], qualityFails: [] }),
+  'isBlockedOnlyFailure: qualityFails 空→false');
+
+assert.ok(eq(evaluateFinalVerdict({ failedPhases: [2], qualityFails: [{ phase: 2, reasons: ['missing_success_token'] }], trajSuccess: false }),
+  { success: false, failKind: 'phase_blocked' }),
+  '3g blocked-only 形态（failed=[2]+missing_success_token@phase2）→phase_blocked');
+assert.ok(eq(evaluateFinalVerdict({ failedPhases: [2], qualityFails: [{ phase: 2, reasons: ['pending_fields:姓名'] }], trajSuccess: false }),
+  { success: false, failKind: 'quality_failed' }),
+  '3h 真质量形态（pending_fields）→quality_failed 不降级');
+assert.ok(eq(evaluateFinalVerdict({ failedPhases: [2], qualityFails: [{ phase: 2, reasons: ['missing_success_token', 'pending_fields:姓名'] }], trajSuccess: false }),
+  { success: false, failKind: 'quality_failed' }),
+  '3h 混合形态（missing_success_token+pending_fields）→quality_failed 不降级');
+assert.ok(eq(evaluateFinalVerdict({ failedPhases: [], qualityFails: [{ phase: 2, reasons: ['missing_success_token'] }], trajSuccess: true }),
+  { success: false, failKind: 'quality_failed' }),
+  '3i #973 纯核验形态（failedPhases 空）→quality_failed 不降级');
+assert.ok(eq(evaluateFinalVerdict({ failedPhases: [1], qualityFails: [{ phase: 2, reasons: ['missing_success_token'] }], trajSuccess: false }),
+  { success: false, failKind: 'quality_failed' }),
+  '3j 标记附着于非失败阶段→quality_failed 不降级');
+
 // 4. runner 接线（收敛后：消费模块输出，不再内联判定）
 assert.ok(runner.includes('const phaseOutcome = evaluatePhaseOutcome({ explicitSuccess, phaseStepCount, donePayload })'),
   'runner recordPhaseResult consumes evaluatePhaseOutcome');
@@ -182,5 +214,7 @@ assert.ok(runner.includes('collectFailedPhases(runtime.phaseOutcomes, phases)'),
   'runner final verdict consumes collectFailedPhases');
 assert.ok(runner.includes('const finalVerdict = evaluateFinalVerdict({ failedPhases: failedOutcomeKeys, qualityFails, trajSuccess })'),
   'runner final verdict consumes evaluateFinalVerdict');
+assert.ok(!runner.includes('phase_blocked'),
+  'runner does not inline phase_blocked (verdict stays in G3 gate module)');
 
-console.log('characterize-phase-done-evidence-gate: OK (+Step1 22 assertions)');
+console.log('characterize-phase-done-evidence-gate: OK (+Step1+blocked 34 assertions)');

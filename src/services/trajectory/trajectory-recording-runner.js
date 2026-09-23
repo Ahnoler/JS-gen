@@ -28,6 +28,7 @@ import {
   attachSpecialElementCandidates,
 } from './recording-runner-step-context.js';
 import { appendPhaseDoneLog } from './trajectory-phase-service.js';
+import { normalizePhaseContract } from './phase-contract.js';
 import { captureDeadlockForensics } from './deadlock-forensics.js';
 import { applyActionLogSync, countBusinessSteps, countBusinessStepsByPhase, clearActionLogCopy } from './action-log-copy.js';
 import { META_STEP_ACTIONS, isEngineeringStepAction } from '../../models/meta-step-actions.js';
@@ -1072,6 +1073,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         max_actions_per_step: MAX_ACTIONS_PER_STEP || undefined,
         phase_number: phase.phaseNumber,
       };
+      const phaseContract = normalizePhaseContract(phase.contractJson);
+      if (phaseContract) stepData.phase_contract = phaseContract;
       stepData.all_phases = all_phases;
       if (i > 0) {
         const prev = phases[i - 1];

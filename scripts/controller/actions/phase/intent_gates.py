@@ -301,11 +301,14 @@ def _default_recovery_next_action(contract: dict[str, Any] | None) -> str:
     A hardcoded ``click_save()`` fallback made non-submit phases (navigate /
     query / other / login) instruct the agent to click a 确定/保存 that the phase
     must not touch — sid 4460cf2a phase 3 clicked 确定 after 下一步 and hit a
-    server-side business error. Only create/modify may be told to click_save.
+    server-side business error. Only create/modify that actually require submit
+    may be told to click_save; fill-only create/modify must not cross the phase
+    boundary (2026-09-21 P6/P7 overrun fix).
     """
     mode = ((contract or {}).get('mode') or '').strip()
     submit = (contract or {}).get('submit') if isinstance((contract or {}).get('submit'), dict) else {}
-    if mode in ('create', 'modify'):
+    submit_required = bool(submit.get('required'))
+    if mode in ('create', 'modify') and submit_required:
         btn = str((submit or {}).get('button_text') or '保存') or '保存'
         return f'click_save(button_text="{btn}")'
     if mode == 'introduce_pick':

@@ -19,7 +19,7 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'POST', path: '/api/v2/trajectories/analyze',
         summary: 'AI 需求拆解为阶段（不落库）',
-        desc: '将需求拆成 phases（条数跟用户编号分步）。需求中的「关键数据/业务数据」段落语义上是**业务数据**（用户希望使用的值）：原文附加到每个 phase 描述末尾供 LLM 理解填表；其余字段仍可由 autofill 随机补。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。',
+        desc: '将需求拆成 phases（条数跟用户编号分步）。需求中的「关键数据/业务数据」段落语义上是**业务数据**（用户希望使用的值）：原文附加到每个 phase 描述末尾供 LLM 理解填表；其余字段仍可由 autofill 随机补。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。可选 phaseContracts 与 phases 等长；元素为合约 v1 或 null（null 表示录制时按描述分类）。',
         reqExample: J({
           description:
             '1、点击客户管理，点击对公客户管理。\n'
@@ -76,13 +76,13 @@ export const GROUP_TRAJECTORY = [
         }),
         notes: [
           '行内 authKind：null（普通交易）/ \'login\' / \'logout\'（登录/登出演练交易）— 前端列表据此渲染「登录」/「登出」徽标',
-          '行内 failedKind/failedReason/failedAt：仅 recordStatus=failed 时有值。failedReason 为用户可见类别文案（如「LLM 调用异常」「阶段执行失败」「录制质量未达标」「未录制到步骤」「录制执行异常」「人工标记录制异常」「批量任务失败」），与前端 toast/列表悬浮一致；failedKind 为机器码；无失败记录/旧数据为 null（前端不显示悬浮）；同类文案可含（阶段 N,M）后缀标注失败阶段',
+          '行内 failedKind/failedReason/failedAt：仅 recordStatus=failed 时有值。failedReason 为用户可见类别文案（如「LLM 调用异常」「阶段执行失败」「录制质量未达标」「阶段受阻」「未录制到步骤」「录制执行异常」「人工标记录制异常」「批量任务失败」），与前端 toast/列表悬浮一致；failedKind 为机器码；无失败记录/旧数据为 null（前端不显示悬浮）；同类文案可含（阶段 N,M）后缀标注失败阶段',
         ],
       },
       {
         method: 'POST', path: '/api/v2/trajectories',
         summary: '创建交易',
-        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 businessEntries 写入 legacy business_data_entry（勿与业务数据、system_ref 混用）。录制填表优先参考 phase 内【业务数据】（用户需求原文）。系统回写参考值见 PUT …/system-ref-entries。',
+        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 businessEntries 写入 legacy business_data_entry（勿与业务数据、system_ref 混用）。录制填表优先参考 phase 内【业务数据】（用户需求原文）。系统回写参考值见 PUT …/system-ref-entries。可选 phaseContracts 与 phases 按下标对齐写入 trajectory_phase.contract_json。',
         reqExample: J({
           functionId: 3,
           name: '开户交易',
@@ -104,7 +104,7 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
         summary: '交易详情（含 phases、businessEntries）',
-        desc: 'businessEntries 为交易级 legacy KV（business_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。'
+        desc: 'businessEntries 为交易级 legacy KV（business_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。phases[].contractJson 为分析时签下的合约或 null。'
           + ' KB 出处列（camelCase，缺省 null）：reqModuleKey / reqSourcePath / reqChapterRef / reqAtomKey / reqAtomSeq（force 重提交序号，默认 0）/ reqSourceHash（propose 时章节文件 sha256）/ reqChunkId（`<章节文件>#<H1 slug>`）/ kbFlowRef / kbFlowNodeId；章节内容变更后 commit 会跳过该原子（skipped.reason=stale_chapter_ref）。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },

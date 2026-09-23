@@ -16,6 +16,7 @@ import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import {
   USER_ABORT_CODE,
   isUserAbort,
+  makeUserAbortError,
   trajScope,
   emitReplay,
   toNumericStepId,
@@ -225,6 +226,30 @@ export async function handleFormStructureCheckpoint({
     return { ok: false, aborted: true, error: msg, results, healed };
   }
 
+  // stop-replay hardening (Task 1): user may have stopped while the scan was in
+  // flight — a stale scan result must never reach the delete/insert mutations.
+  // userAbort shape converges in replay-batch-runner (emitReplayAborted).
+  if (runtime.abortReplay) {
+    results.push({
+      index: stepNum,
+      action: entry.action,
+      params: entry.params,
+      result: USER_ABORT_CODE,
+      ok: false,
+      id: entry.id,
+      healType: 'form_structure',
+      aborted: true,
+    });
+    return {
+      ok: false,
+      aborted: true,
+      userAbort: true,
+      error: makeUserAbortError(),
+      results,
+      healed,
+    };
+  }
+
   const batchResults = Array.isArray(result?.results) ? result.results : [];
   const row = batchResults[0] || null;
   const report = parseFormStructureResult(row?.result || '');
@@ -327,6 +352,12 @@ export async function handleFormStructureCheckpoint({
       if (!label || !missingLabels.has(label)) continue;
       const sid = Number(r.id);
       if (sid === stepId) continue; // never delete checkpoint
+      // stop-replay hardening (Task 1): re-check before each irreversible
+      // delete — once stopped, never delete another recorded step. Already
+      // deleted ids stay recorded (no rollback) via deletedIds below.
+      if (runtime.abortReplay) {
+        break;
+      }
       await trajectoryStepDao.removeById(sid);
       deletedIds.push(sid);
       skippedIds.add(sid);
@@ -345,6 +376,31 @@ export async function handleFormStructureCheckpoint({
         phaseCount: counts.phaseCount,
       });
     }
+  }
+
+  // stop-replay hardening (Task 1): delete phase bookkeeping (reorder/counts)
+  // stays consistent for ids already removed, but stop here — never proceed to
+  // the insert phase or snapshot rewrite once the user has stopped.
+  if (runtime.abortReplay) {
+    results.push({
+      index: stepNum,
+      action: entry.action,
+      params: entry.params,
+      result: USER_ABORT_CODE,
+      ok: false,
+      id: entry.id,
+      healType: 'form_structure',
+      deletedStepIds: deletedIds,
+      aborted: true,
+    });
+    return {
+      ok: false,
+      aborted: true,
+      userAbort: true,
+      error: makeUserAbortError(),
+      results,
+      healed,
+    };
   }
 
   const addingLabels = [
