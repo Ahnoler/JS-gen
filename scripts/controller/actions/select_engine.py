@@ -26,6 +26,7 @@ from .form_scan_utils import (
     match_select_option_candidate,
     _resolve_control, lookup_field_kind, resolve_select_fallback, _task_done_impl,
 )
+from .same_family import resolve_same_family_target
 from .form_engine_base import (
     _FormActionEngineBase,
     _ReplayAutofillStub,
@@ -539,6 +540,29 @@ class SelectEngine(_FormActionEngineBase):
         await _wait_if_loading(page)
         await self._maybe_ensure_scanned(label_text, mode)
         field_kind = lookup_field_kind(self.business_data_store, label_text)
+        _sf_sel = resolve_same_family_target(
+            self.business_data_store.get('_scan_fields') or [],
+            label=label_text,
+            xpath_smart=(xpath_smart or '').strip(),
+            action='select',
+        )
+        if not _sf_sel.get('ok'):
+            _cands = _sf_sel.get('candidates') or []
+            if is_replay:
+                return _sf_sel.get('error') or 'err-ambiguous-field-slot'
+            _nxt = '; '.join(
+                f"field_slot={c.get('field_slot')!r} xpath_smart={c.get('xpath_smart')!r}"
+                for c in _cands
+            ) or 'scan_form_fields 后带 xpath_smart 重试'
+            return err_with(
+                _sf_sel.get('error') or 'err-ambiguous-field-slot',
+                '同标签多控件须带 xpath_smart 指定槽位',
+                observed=f'label={label_text} candidates={len(_cands)}',
+                next_action=_nxt,
+            )
+        if (_sf_sel.get('kind') or '') and (_sf_sel.get('xpath_smart') or '').strip():
+            xpath_smart = (_sf_sel.get('xpath_smart') or '').strip()
+            field_kind = (_sf_sel.get('kind') or '').strip() or field_kind
         dispatch = await resolve_select_dispatch(
             label=label_text,
             element=replay_element,
