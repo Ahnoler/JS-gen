@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 17:55 · Cursor — 收工：阶段7确认未录（回链 17:43 开工）
+
+- 完成：`670adba3`。`查询事由`/`查询类型`/`查询原因`/`征信查询` 不再把填写阶段签成 query；阶段6为纯填写（`success_when=[]`，弹窗可保持打开后 done）。阶段7动作子句点击【确认】时，保存合同按钮为「确认」，`click_save` 能匹配到该按钮并入轨迹。`verify-all.sh` 接入新 pin。
+- 验收：`characterize-query-field-not-query` OK；`characterize-reset-phase-not-query` / `characterize-case-data` / `cold/characterize-phase-boundary` / `characterize-phase-runtime` / `characterize-phase-reviewer` / `characterize-phase-save-cue-promote` / `cold/characterize-phase-intent` OK
+- 遗留：未做执行机湿测。`characterize-g3-done-gate-live` 本机缺 Playwright 浏览器，未跑。`phase_reviewer` 空异常仍走 rules_fallback，本缺陷根因是 fallback 把阶段6判成 query
+
 ## 2026-09-23 17:43 · Cursor — 开工：阶段7确认未录（阶段6被查询字段名误判）
 
 - 开工：17:43。执行机 sid 6038ecfa：阶段5/6操作步骤已录上，阶段6被 `查询事由`/`查询类型` 判成 query，`done()` 因缺少 `query_clicked` 被拒，阶段7的【确认】从未执行。阶段7若起步，create 合同按钮写死「保存」，点不到弹窗【确认】。
