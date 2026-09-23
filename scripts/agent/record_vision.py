@@ -20,6 +20,38 @@ def model_blocks_vision(model_name: str) -> bool:
     return 'deepseek' in name or 'grok' in name
 
 
+_VISION_LLM = None
+_VISION_LLM_CONFIG = None  # (model, base_url, api_key, timeout_ms) to detect config changes
+
+
+def _get_vision_llm(agent_llm):
+    """Dedicated vision LLM when AI_RECORD_VISION_LLM_* is configured, else the agent's LLM.
+
+    Same fallback contract as FORM_LLM_*: unset MODEL → use agent_llm unchanged.
+    The instance is cached so it's created once per config.
+    Returns (llm, ask_timeout_s) — the timeout follows AI_RECORD_VISION_LLM_TIMEOUT_MS.
+    """
+    global _VISION_LLM, _VISION_LLM_CONFIG
+    try:
+        from scripts.feature_flags import record_vision_llm_config
+
+        cfg = record_vision_llm_config()
+    except Exception:
+        return agent_llm, 20.0
+    if not cfg:
+        return agent_llm, 20.0
+    key = (cfg['model'], cfg['base_url'], cfg['api_key'], cfg['timeout_ms'])
+    if _VISION_LLM is None or _VISION_LLM_CONFIG != key:
+        from langchain_openai import ChatOpenAI
+
+        _VISION_LLM = ChatOpenAI(
+            model=cfg['model'], base_url=cfg['base_url'], api_key=cfg['api_key'],
+            temperature=0.0, timeout=cfg['timeout_ms'] / 1000.0,
+        )
+        _VISION_LLM_CONFIG = key
+    return _VISION_LLM, cfg['timeout_ms'] / 1000.0
+
+
 def _model_name(llm) -> str:
     return str(getattr(llm, 'model_name', None) or getattr(llm, 'model', '') or '')
 
@@ -59,17 +91,20 @@ async def ask_vision(llm, png_b64: str, question: str) -> str:
     """Return the model text, or '' when vision is unavailable or this call fails."""
     if not png_b64 or not question:
         return ''
-    if not await vision_supported(llm):
+    vision_llm, ask_timeout = _get_vision_llm(llm)
+    if vision_llm is None:
+        return ''
+    if not await vision_supported(vision_llm):
         return ''
     try:
         from langchain_core.messages import HumanMessage
 
         response = await asyncio.wait_for(
-            llm.ainvoke([HumanMessage(content=[
+            vision_llm.ainvoke([HumanMessage(content=[
                 {'type': 'text', 'text': question},
                 {'type': 'image_url', 'image_url': {'url': f'data:image/png;base64,{png_b64}'}},
             ])]),
-            timeout=20,
+            timeout=ask_timeout,
         )
     except Exception as exc:
         sys.stderr.write(f"[record-vision] ask failed, ignored: {exc}\n")
@@ -82,3 +117,6 @@ def reset_vision_probe_for_tests() -> None:
     """Clear the process cache. Characterization only."""
     global _supported
     _supported = None
+    global _VISION_LLM, _VISION_LLM_CONFIG
+    _VISION_LLM = None
+    _VISION_LLM_CONFIG = None

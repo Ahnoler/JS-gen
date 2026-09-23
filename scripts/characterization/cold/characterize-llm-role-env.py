@@ -38,6 +38,10 @@ new_keys = [
     'L1C_LLM_MODEL',
     'L1C_LLM_BASE_URL',
     'L1C_LLM_API_KEY',
+    'AI_RECORD_VISION_LLM_MODEL',
+    'AI_RECORD_VISION_LLM_BASE_URL',
+    'AI_RECORD_VISION_LLM_API_KEY',
+    'AI_RECORD_VISION_LLM_TIMEOUT_MS',
 ]
 for k in new_keys:
     check(f'.env.example has {k}', k in env_example)
@@ -67,6 +71,10 @@ config_exports = [
     'L1C_LLM_MODEL',
     'L1C_LLM_BASE_URL',
     'L1C_LLM_API_KEY',
+    'AI_RECORD_VISION_LLM_MODEL',
+    'AI_RECORD_VISION_LLM_BASE_URL',
+    'AI_RECORD_VISION_LLM_API_KEY',
+    'AI_RECORD_VISION_LLM_TIMEOUT_MS',
 ]
 for k in config_exports:
     check(f'config.js exports {k}', f'export const {k}' in config_js)
@@ -107,6 +115,32 @@ check('_scenario_describer.py passes timeout', "['timeout']" in scenario_py or '
 # ── agent_utils.py: create_llm with timeout=None ───────────────────────────
 agent_utils_py = (ROOT / 'scripts' / 'agent_utils.py').read_text(encoding='utf-8')
 check('agent_utils create_llm has timeout=None', 'def create_llm(model, base_url, api_key=None, timeout=None)' in agent_utils_py)
+
+# ── record_vision.py: dedicated vision LLM resolution ──────────────────────
+record_vision_py = (ROOT / 'scripts' / 'agent' / 'record_vision.py').read_text(encoding='utf-8')
+check('record_vision.py has _get_vision_llm', 'def _get_vision_llm' in record_vision_py)
+check('record_vision.py asks dedicated llm', 'vision_llm' in record_vision_py)
+
+# ── Functional: _get_vision_llm falls back without config ──────────────────
+import os  # noqa: E402
+from scripts.agent.record_vision import _get_vision_llm  # noqa: E402
+
+_saved_vision_keys = {k: os.environ.get(k) for k in (
+    'AI_RECORD_VISION_LLM_MODEL', 'AI_RECORD_VISION_LLM_BASE_URL',
+    'AI_RECORD_VISION_LLM_API_KEY', 'AI_RECORD_VISION_LLM_TIMEOUT_MS')}
+try:
+    for _k in _saved_vision_keys:
+        os.environ.pop(_k, None)
+    _sentinel_v = object()
+    _got, _t = _get_vision_llm(_sentinel_v)
+    check('_get_vision_llm returns agent_llm when no AI_RECORD_VISION_LLM_MODEL', _got is _sentinel_v)
+    check('_get_vision_llm default ask timeout 20s', _got is _sentinel_v and abs(_t - 20.0) < 1e-9)
+finally:
+    for _k, _v in _saved_vision_keys.items():
+        if _v is None:
+            os.environ.pop(_k, None)
+        else:
+            os.environ[_k] = _v
 
 # ── session_runner.py: _env_llm_timeout_sec ────────────────────────────────
 session_runner_py = (ROOT / 'scripts' / 'session_runner.py').read_text(encoding='utf-8')

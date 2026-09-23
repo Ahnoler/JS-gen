@@ -3,6 +3,14 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 18:20 · ZCode — 收工：识图旁路 LLM 独立配置四件套
+
+- 回链 17:20 开工。完成：识图专用 LLM 可独立配置——`config/.env` 新增 `AI_RECORD_VISION_LLM_MODEL/_BASE_URL/_API_KEY/_TIMEOUT_MS` 四键（语义同 FORM_LLM_*：MODEL 未设完全回落录制主 Agent 的 `agent.llm` 不建独立实例；BASE_URL/API_KEY 回落主 `LLM_*`；TIMEOUT_MS 回落 `LLM_TIMEOUT_MS` 再回落 20000，探活超时仍 15s）。Python 端 `feature_flags.record_vision_llm_config()` + `record_vision._get_vision_llm()`（按配置缓存、改配置重建）+ `ask_vision` 改走专用实例；控制面 `src/runtime/agent-process.js` 与执行机 `executor/config.js` 双侧透传（MODEL 未设不透传）。
+- 事故记录（自省）：17:53 `git pull` 快进合入上游 console 逐步反馈时，本线 11 个文件的未提交实现改动被覆盖丢失（未 stash、未 commit、无 git 对象可恢复；fsck 扫 dangling 对象均无）。已按原设计全部重做并重验。教训：**未提交改动存在时先 stash（或先提交 WIP）再做任何 pull/merge/checkout**；开工声明 commit 不保护工作区。
+- 越界说明（两笔，均有因）：① `characterize-llm-role-env.py` 按收编政策登记进 verify-all core 域（此前归档 cold/ 未受门禁保护，本次它钉到识图角色契约），并在 `--changed` 路径规则补 `scripts/feature_flags.py`；② `characterize-sso-auth.mjs` 重钉——今日上游 `d15482c6`（黄正祥）把 list 过滤 `keyword` 改名 `name`，存量断言断针，非本线所致，同步断言子串并注明。
+- 验收：合并后全量 `bash scripts/refactor/verify-all.sh` EXIT=0（198 pins + statics ALL GREEN，含新登记的 llm-role-env 与重钉的 sso-auth）；识图配置自测 6 组断言过（回落/独立实例/缓存/改配置重建/超时回落与容错/env 优先于文件）；eslint 改动 JS 三文件 0 error 0 warning；py_compile / node --check 过。
+- 遗留：识图是否真能看图取决于专用模型/网关支持 `image_url`（未配 MODEL 时=主模型通道，探活失败自动退回纯文本，stderr `[record-vision]` 可观测）；真实录制湿测未做（需在线 SUT）。
+
 ## 2026-09-23 17:52 · Cursor — 合并回执：逐步反馈 console / 新 tab 合入 uara_V2.0_dev
 
 - 合并：`cursor/step-feedback-console-20260923`（`55424ca0`）→ `uara_V2.0_dev`，`--no-ff`。agent-log 与识图旁路开工条目并排保留。主检出未提交的识图四件套 WIP 未触碰。

@@ -27,11 +27,12 @@ def main() -> int:
         parse_done_vision,
         remember_click_judgement,
     )
-    from scripts.agent.record_vision import model_blocks_vision
+    from scripts.agent.record_vision import model_blocks_vision, _get_vision_llm
     from scripts.feature_flags import (
         dotenv_value,
         record_gate_cue_enabled,
         record_vision_enabled,
+        record_vision_llm_config,
     )
 
     assert_true(format_gate_line(None) == '', 'no store')
@@ -161,6 +162,33 @@ def main() -> int:
     assert_true('[门禁]' in prompt and '[识图]' in prompt, 'prompt names both cues')
     side = (ROOT / 'scripts/agent/record_sidepath.py').read_text(encoding='utf-8')
     assert_true('ActionResult(extracted_content=message, include_in_memory=True)' in side, 'veto does not call the controller')
+
+    saved_vlm = {k: os.environ.get(k) for k in (
+        'AI_RECORD_VISION_LLM_MODEL', 'AI_RECORD_VISION_LLM_BASE_URL',
+        'AI_RECORD_VISION_LLM_API_KEY', 'AI_RECORD_VISION_LLM_TIMEOUT_MS')}
+    try:
+        for k in saved_vlm:
+            os.environ.pop(k, None)
+        assert_true(record_vision_llm_config() == {}, 'vision llm config unset')
+        sentinel = object()
+        got, ask_t = _get_vision_llm(sentinel)
+        assert_true(got is sentinel, 'vision falls back to agent llm')
+        assert_true(abs(ask_t - 20.0) < 1e-9, 'vision ask timeout default 20s')
+        os.environ['AI_RECORD_VISION_LLM_MODEL'] = 'vision-x'
+        os.environ['AI_RECORD_VISION_LLM_TIMEOUT_MS'] = '8000'
+        cfg = record_vision_llm_config()
+        assert_true(cfg['model'] == 'vision-x' and cfg['timeout_ms'] == 8000.0, 'vision llm dedicated config')
+        got2, ask_t2 = _get_vision_llm(sentinel)
+        assert_true(got2 is not sentinel and getattr(got2, 'model_name', '') == 'vision-x', 'dedicated instance')
+        assert_true(abs(ask_t2 - 8.0) < 1e-9, 'dedicated ask timeout follows key')
+    finally:
+        for k, v in saved_vlm.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        import scripts.agent.record_vision as _rv
+        _rv.reset_vision_probe_for_tests()
 
     print('characterize-record-sidepath: OK')
     return 0

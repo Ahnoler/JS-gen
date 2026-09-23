@@ -306,3 +306,36 @@ def record_vision_enabled() -> bool:
     if raw is None or str(raw).strip() == '':
         return True
     return str(raw).strip().lower() not in ('0', 'false', 'no', 'off')
+
+
+def record_vision_llm_config() -> dict:
+    """
+    识图旁路专用 LLM 四件套（独立于录制主 Agent 的 LLM）。
+
+    键名：AI_RECORD_VISION_LLM_MODEL / _BASE_URL / _API_KEY / _TIMEOUT_MS。
+    读取顺序：进程环境变量 → config/.env。语义同 FORM_LLM_*：
+    MODEL 未设置时返回 {}（调用方回落 agent 自身 LLM，不建独立实例）；
+    BASE_URL / API_KEY / TIMEOUT_MS 未设置时回落主 LLM_*。
+
+    返回：
+        dict: {'model', 'base_url', 'api_key', 'timeout_ms'}，MODEL 未配置时为空 dict。
+    """
+    def _pick(name: str) -> str:
+        raw = os.environ.get(name)
+        if raw is None or str(raw).strip() == '':
+            raw = _config_env_value(name)
+        return str(raw or '').strip()
+
+    model = _pick('AI_RECORD_VISION_LLM_MODEL')
+    if not model:
+        return {}
+    base_url = _pick('AI_RECORD_VISION_LLM_BASE_URL') or _pick('LLM_BASE_URL')
+    api_key = _pick('AI_RECORD_VISION_LLM_API_KEY') or _pick('OPENAI_API_KEY') or _pick('LLM_API_KEY')
+    timeout_ms_raw = _pick('AI_RECORD_VISION_LLM_TIMEOUT_MS') or _pick('LLM_TIMEOUT_MS') or '20000'
+    try:
+        timeout_ms = float(timeout_ms_raw)
+    except ValueError:
+        timeout_ms = 20000.0
+    if timeout_ms <= 0:
+        timeout_ms = 20000.0
+    return {'model': model, 'base_url': base_url, 'api_key': api_key, 'timeout_ms': timeout_ms}

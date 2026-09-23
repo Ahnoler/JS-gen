@@ -69,6 +69,7 @@ characterize-ai-recording-boundaries|node scripts/characterization/cold/characte
 characterize-verification-phase-gate|"$PY" scripts/characterization/characterize-verification-phase-gate.py
 characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
 characterize-record-sidepath|"$PY" scripts/characterization/cold/characterize-record-sidepath.py
+characterize-llm-role-env|"$PY" scripts/characterization/cold/characterize-llm-role-env.py
 '
 PINS_PHASE='
 characterize-record-sidepath|"$PY" scripts/characterization/cold/characterize-record-sidepath.py
@@ -349,7 +350,7 @@ if [ "${1:-}" = "--changed" ]; then
   while IFS= read -r f; do
     [ -z "$f" ] && continue
     case "$f" in
-      scripts/state.py|scripts/recorder.py|scripts/session_runner.py|scripts/agent/*|scripts/prompts/*) DOMAIN_HINTS="$DOMAIN_HINTS core phase";;
+      scripts/state.py|scripts/recorder.py|scripts/session_runner.py|scripts/agent/*|scripts/prompts/*|scripts/feature_flags.py) DOMAIN_HINTS="$DOMAIN_HINTS core phase";;
       scripts/controller/actions/phase/*|scripts/controller/actions/boundary*|scripts/controller/actions/classify*) DOMAIN_HINTS="$DOMAIN_HINTS phase";;
       scripts/controller/actions/fill*|scripts/controller/actions/form*|scripts/controller/actions/_form*|scripts/controller/actions/cascade*|scripts/controller/actions/autofill*|scripts/controller/actions/save*|scripts/controller/actions/*case_data*) DOMAIN_HINTS="$DOMAIN_HINTS fill";;
       scripts/controller/actions/select*|scripts/controller/actions/tssc*|scripts/controller/actions/radio*|scripts/controller/actions/picker*|scripts/controller/actions/close_dialog*) DOMAIN_HINTS="$DOMAIN_HINTS select";;

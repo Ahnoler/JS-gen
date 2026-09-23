@@ -317,6 +317,11 @@ export const SCENARIO_LLM_MODEL = resolve('SCENARIO_LLM_MODEL', LLM_MODEL);
 export const SCENARIO_LLM_BASE_URL = resolve('SCENARIO_LLM_BASE_URL', resolve('LLM_BASE_URL', 'http://218.77.58.156:3000/v1'));
 export const SCENARIO_LLM_API_KEY = resolve('SCENARIO_LLM_API_KEY', resolve('LLM_API_KEY', ''));
 export const SCENARIO_LLM_TIMEOUT_MS = Number(resolve('SCENARIO_LLM_TIMEOUT_MS', resolve('LLM_TIMEOUT_MS', '120000'))) || 120000;
+/** 识图专用 LLM（⑥；MODEL 未设 → Python 回落 agent.llm，同 FORM_LLM_* 语义） */
+export const AI_RECORD_VISION_LLM_MODEL = resolve('AI_RECORD_VISION_LLM_MODEL', '');
+export const AI_RECORD_VISION_LLM_BASE_URL = resolve('AI_RECORD_VISION_LLM_BASE_URL', resolve('LLM_BASE_URL', 'http://218.77.58.156:3000/v1'));
+export const AI_RECORD_VISION_LLM_API_KEY = resolve('AI_RECORD_VISION_LLM_API_KEY', resolve('LLM_API_KEY', ''));
+export const AI_RECORD_VISION_LLM_TIMEOUT_MS = Number(resolve('AI_RECORD_VISION_LLM_TIMEOUT_MS', resolve('LLM_TIMEOUT_MS', '20000'))) || 20000;
 export const LLM_API_KEY = resolve('LLM_API_KEY', '');
 export const CONTROL_PLANE_HTTP = resolve('CONTROL_PLANE_URL', 'http://127.0.0.1:4097').replace(/\/$/, '');
 
@@ -344,6 +349,12 @@ export function buildPythonSubprocessEnv(extraEnv = {}) {
   for (const key of ['AI_RECORD_GATE_CUE', 'AI_RECORD_VISION']) {
     const value = resolve(key, '');
     if (value && !env[key]) env[key] = value;
+  }
+  if (AI_RECORD_VISION_LLM_MODEL) {
+    env.AI_RECORD_VISION_LLM_MODEL = AI_RECORD_VISION_LLM_MODEL;
+    env.AI_RECORD_VISION_LLM_BASE_URL = AI_RECORD_VISION_LLM_BASE_URL;
+    env.AI_RECORD_VISION_LLM_API_KEY = AI_RECORD_VISION_LLM_API_KEY;
+    env.AI_RECORD_VISION_LLM_TIMEOUT_MS = String(AI_RECORD_VISION_LLM_TIMEOUT_MS);
   }
   return { ...env, ...extraEnv };
 }
