@@ -1,5 +1,5 @@
 """Pin the read_error_notify action contract (error-surface listening, run22):
-snippet strings, observe registration, aggregator import. Fails non-zero on mismatch."""
+snippet strings, aggregator import. _observe no longer registers read_error_notify."""
 
 import sys
 from pathlib import Path
@@ -16,6 +16,15 @@ def needle(path, *texts):
     return True
 
 
+def anti_needle(path, *texts):
+    src = (ROOT / path).read_text(encoding="utf-8")
+    for t in texts:
+        if t in src:
+            print("UNWANTED %s :: %r" % (path, t))
+            return False
+    return True
+
+
 checks = [
     ("scripts/controller/actions/js_snippets/error_notify.py", (
         "JS_READ_ERROR_NOTIFY",
@@ -24,15 +33,14 @@ checks = [
         "el-notification",
         "errors",
     )),
-    ("scripts/controller/actions/_observe.py", (
-        "read_error_notify",
-        "JS_READ_ERROR_NOTIFY",
-        "never trust a click receipt alone",
-    )),
     ("scripts/controller/actions/_js_snippets.py", ("error_notify",)),
 ]
 
 ok = all(needle(path, *texts) for path, texts in checks)
+ok = ok and anti_needle(
+    "scripts/controller/actions/_observe.py",
+    "async def read_error_notify",
+)
 if not ok:
     print("FAILED: characterize-error-notify")
     sys.exit(1)

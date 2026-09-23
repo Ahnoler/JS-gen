@@ -236,9 +236,13 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
             sys.stderr.write(f'[recorder] navigation cue error: {e}\n')
             sys.stderr.flush()
 
-        # Per-step toast/notification scan → 【页面通知】 (steering-only)
+        # Per-step toast/notification scan → [step-feedback] (steering-only)
         try:
-            await _emit_step_notice_scan(agent, business_data_store)
+            await _emit_step_notice_scan(
+                agent, business_data_store,
+                step=int(getattr(agent.state, 'n_steps', 0) or 0),
+                raw_actions=_actions_raw,
+            )
         except Exception as e:
             sys.stderr.write(f'[recorder] step-notice error: {e}\n')
             sys.stderr.flush()

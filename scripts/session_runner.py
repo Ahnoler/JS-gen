@@ -368,6 +368,18 @@ async def run_session(args):
         sys.stderr.write(f"[network-capture] attach failed (ignored): {type(_net_err).__name__}: {_net_err}\n")
         sys.stderr.flush()
 
+    try:
+        from scripts.controller.actions._js_snippets import JS_XHR_HOOK
+        _page_for_xhr = await browser_context.get_current_page()
+        if _page_for_xhr is not None:
+            await _page_for_xhr.add_init_script(JS_XHR_HOOK)
+            await _page_for_xhr.evaluate(JS_XHR_HOOK)
+    except Exception as _xhr_err:
+        sys.stderr.write(
+            f"[step-feedback] xhr hook install failed (ignored): {type(_xhr_err).__name__}: {_xhr_err}\n"
+        )
+        sys.stderr.flush()
+
     def _on_cdp_task_done(t):
         """记录 cdp watcher 任务异常退出，避免无人观测的静默死亡。
         Record CDP watcher task abnormal exit to avoid unobserved silent death.

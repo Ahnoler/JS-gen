@@ -35,14 +35,17 @@ def test_js_snippet_pins() -> None:
     assert_true(".el-notification" in src and ".el-message" in src, "scans toast surfaces")
     assert_true("__notify_log" in src, "reads notify log cursor")
     assert_true("successNotifs" in src or "level" in src, "classifies success/error")
+    assert_true("JS_SCAN_STEP_SURFACE" in src, "JS_SCAN_STEP_SURFACE export")
+    assert_true(
+        ".el-form-item__error" in src
+        and ".el-dialog__title" in src
+        and ".el-drawer" in src,
+        "surface scan selectors",
+    )
 
 
 def test_format_and_dedupe() -> None:
-    from scripts.agent.step_notice import (
-        format_notice_cue,
-        notice_fingerprint,
-        take_new_notices,
-    )
+    from scripts.agent.step_notice import notice_fingerprint, take_new_notices
 
     items = [
         {"level": "success", "text": "操作成功"},
@@ -56,10 +59,26 @@ def test_format_and_dedupe() -> None:
     assert_true(notice_fingerprint(items[0]) in seen, "fingerprints remembered")
     fresh2 = take_new_notices(store, items)
     assert_true(fresh2 == [], "second pass empty")
-    cue = format_notice_cue(fresh)
-    assert_true("【页面通知】" in cue, "cue header")
-    assert_true("操作成功" in cue and "客户名称不能为空" in cue, "both texts")
-    assert_true("勿 done" in cue, "error guidance present")
+    notice_src = (ROOT / "scripts/agent/step_notice.py").read_text(encoding="utf-8")
+    fn_start = notice_src.find("def format_notice_cue")
+    fn_end = notice_src.find("\nasync def", fn_start)
+    fn_block = notice_src[fn_start:fn_end] if fn_start >= 0 and fn_end > fn_start else ""
+    assert_true(
+        fn_block and "close_notification" not in fn_block,
+        "format_notice_cue must not mention close_notification",
+    )
+    from scripts.agent.step_feedback import format_step_feedback_cue
+
+    cue = format_step_feedback_cue(
+        ["click_save"],
+        [
+            {"kind": "toast", "level": "success", "text": "操作成功"},
+            {"kind": "toast", "level": "error", "text": "客户名称不能为空"},
+        ],
+    )
+    assert_true(cue.startswith("[step-feedback] click_save | "), cue)
+    assert_true("toast:ok:操作成功" in cue and "toast:err:客户名称不能为空" in cue, cue)
+    assert_true("close_notification" not in cue, cue)
 
 
 def test_rewind_when_notify_log_shrinks() -> None:
@@ -97,11 +116,14 @@ def test_scan_source_rewinds_before_advancing_cursor() -> None:
         "scan path references rewind",
     )
     idx = src.find("async def scan_and_emit_step_notices")
-    body = src[idx : idx + 2200]
+    body = src[idx : idx + 3200]
     assert_true(
         "rewind_notify_cursor_if_shrunk" in body,
         "scan_and_emit calls rewind helper",
     )
+    assert_true("format_step_feedback_cue" in body, "scan uses step-feedback cue")
+    assert_true("append_step_feedback" in body, "scan appends step-feedback history")
+    assert_true("【页面通知】" not in body, "scan path dropped old header")
 
 
 def test_recorder_wires_step_end() -> None:
@@ -117,7 +139,8 @@ def test_recorder_wires_step_end() -> None:
 
 def test_reexport_js() -> None:
     js = (ROOT / "scripts/controller/actions/_js_snippets.py").read_text(encoding="utf-8")
-    assert_true("JS_SCAN_STEP_NOTICES" in js, "_js_snippets re-exports")
+    assert_true("JS_SCAN_STEP_NOTICES" in js, "_js_snippets re-exports notices")
+    assert_true("JS_SCAN_STEP_SURFACE" in js, "_js_snippets re-exports surface")
 
 
 def main() -> int:

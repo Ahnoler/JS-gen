@@ -30,14 +30,17 @@ JS_XHR_HOOK = '''(args) => {
     if (window.__xhr_log_installed) return;
     Object.defineProperty(window, '__xhr_log_installed', { value: true, enumerable: false });
     window.__xhr_log = [];
+    window.__xhr_log_seq = 0;
     var MAX = 20, BODY_LIMIT = 2048;
     var push = function (method, url, status, body, reqBody) {
         try {
+            window.__xhr_log_seq = (window.__xhr_log_seq || 0) + 1;
             var rec = {
                 method: method || '',
                 url: String(url || ''),
                 status: status == null ? null : status,
                 ts: Date.now(),
+                seq: window.__xhr_log_seq,
                 requestBody: reqBody == null ? null : String(reqBody).slice(0, BODY_LIMIT),
                 responseBody: body == null ? null : String(body).slice(0, BODY_LIMIT)
             };

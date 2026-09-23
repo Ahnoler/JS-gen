@@ -458,7 +458,9 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         except Exception as e:
             return _err(f'save-error:{e}')
 
-    @controller.action('Close visible el-notification popup, read its text, and return it. Returns "no-notification" if none found. Use this for server-side validation errors — NOT for dialogs/drawers.')
+    @controller.action(
+        'Close the visible el-notification. Returns ok-closed, or no-notification when none is visible. Does not return the notification text.'
+    )
     async def close_notification():
         page = await browser_context.get_current_page()
         notif = await page.evaluate('''() => {
@@ -469,13 +471,6 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             return null;
         }''')
         if notif is not None:
-            notif_text = await page.evaluate('''() => {
-                for (const el of document.querySelectorAll('.el-notification')) {
-                    const r = el.getBoundingClientRect();
-                    if (r.width > 0 && r.height > 0) return (el.textContent || '').trim();
-                }
-                return '';
-            }''')
             try:
                 close_btn = page.locator('.el-notification__closeBtn').locator('visible=true').first
                 await close_btn.click(timeout=3000)
@@ -493,7 +488,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                     }
                 }''')
             await page.wait_for_timeout(WAIT_300_MS)
-            return _ok(f'ok-notification: {notif_text[:200]}', include_in_memory=True)
+            return _ok('ok-closed')
         return 'no-notification'
 
     @controller.action('Close the topmost el-dialog / el-drawer / el-message-box via the title-bar X close control. Message-box primary/cancel buttons should use click_element_by_index instead.')

@@ -9,6 +9,21 @@
 - **现场处置**：17:32 条目 commit 时发现主检出已被他线切到 cursor/recording-step-feedback-20260922（工作区有他线未提交改动 _observe.py 等 5 文件）——本线改动改走 worktree（../JS-gen-mockdoc，检出 uara_V2.0_dev），全程零触碰他线工作区；该条目本身误落 cursor 分支（8c7c7b81，纯 agent-log 文本，合流并排即可）。
 - dev 误动疑云澄清：reflog 实证 cursor 线把 4 个 spec/plan 提交直接打在 dev（6efa5952→e4cbf156）并推送，我线 009dbce2 为其祖先，无任何丢失。
 - 遗留：①全图导航待命——SUT 登录态已过期，用户要拍时重新登录导到弹窗/表单各拍摄点；②主检出的 agent-log 收工条目随他线分支合流时并排入库（本条在 dev 侧已含）。
+
+## 2026-09-22 17:32 · ZCode 引擎线 — 开工变更：用户带回挡板定性，扩围改 KB 卡 + 更新两报告
+
+- 授权：用户转达信贷侧答复——合同账户接口 `searchEnqrCoreAccinfByCustNumb` 当前为**挡板（mock）**，现场正式环境调行方接口按客户号查行内可用账户。反馈方向定为「mock 随机轮换实现方式对自动化不友好」。
+- 工作范围（在 16:27 声明基础上扩围）：`data/kb/flows/duigong_contract_sign.json`（仅「合同账户弹窗随机轮换」规则追加根因一句）；两报告（feedback/summary）按新事实改写相应段；agent-log 本条。
+- 禁入区不变：其余产品代码、`data/kb/**` 其余文件、他线在途面。
+- 执行方式：主会话改文案；卡面改字后复跑召回两侧 characterization + verify-all（金样例/评测门禁防绊）。
+
+## 2026-09-22 17:12 · Cursor — 开工：录制本步反馈实现（分支 cursor/recording-step-feedback-20260922）
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-22-recording-step-feedback.md`。
+- 工作范围：`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/agent/recorder_emitters.py`、`scripts/recorder.py`、`scripts/session_runner.py`、`scripts/controller/actions/_observe.py`、`scripts/controller/actions/_misc.py`、`scripts/controller/actions/_js_snippets.py`、`scripts/controller/actions/js_snippets/step_notice.py`、`src/models/meta-step-actions.js`、`scripts/prompts/agent-tools-common.md`、`scripts/prompts/agent-tools-form.md`、`scripts/prompts/agent-tools-table.md`、`scripts/prompts/agent-core.md`、`scripts/prompts/planner-prompt.md`、`scripts/characterization/cold/characterize-step-feedback.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`scripts/characterization/cold/characterize-error-notify.py`、`scripts/characterization/cold/characterize-xhr-log.py`、`scripts/characterization/characterize-save-section.py`、`scripts/refactor/verify-all.sh`。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/state.py` 的折叠逻辑、`docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`。不把反馈写入轨迹、阶段或交易。
+- 执行方式：主会话按任务派实现子智能体，每任务独立评审。子智能体可 commit，不 push。
+
 ## 2026-09-22 16:56 · Cursor — 开工：录制本步反馈实现计划（只写 plan）
 
 - 授权：用户对规格回复「继续」。
