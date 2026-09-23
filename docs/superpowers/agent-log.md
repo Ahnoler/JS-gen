@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 18:55 · Cursor — 收工：阶段判定文档与提示词对齐（回链 18:40 开工）
+
+- 完成：`e712b4dc`。令牌归属说明、结构化合约对照、阶段评审提示词、需求分析合约对照改成与 `f1bdb174` 相同的口径：控件结构遮罩，动作子句写明的点击不交出，查询/保存/下一步/登录/引入按下一阶段消歧。分类代码未改。
+- 验收：`characterize-refill-contract`、`characterize-phase-save-cue-promote`、`cold/characterize-search-then-click-prompts` OK。`characterize-phase-contract` 与 `characterize-analyze-case-data` 因本机无 `node_modules`（缺 knex）未跑；所钉的提示词原文仍在。
+- 遗留：无
+
 ## 2026-09-23 18:40 · Cursor — 开工：阶段判定文档与提示词对齐动作子句消歧
 
 - 开工：18:40。`f1bdb174` 已改分类，设计说明和评审/拆分提示词仍按旧口径写令牌归属。只改文档与提示词对照，不改分类代码。
