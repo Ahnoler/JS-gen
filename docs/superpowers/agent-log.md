@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 17:43 · Cursor — 开工：阶段7确认未录（阶段6被查询字段名误判）
+
+- 开工：17:43。执行机 sid 6038ecfa：阶段5/6操作步骤已录上，阶段6被 `查询事由`/`查询类型` 判成 query，`done()` 因缺少 `query_clicked` 被拒，阶段7的【确认】从未执行。阶段7若起步，create 合同按钮写死「保存」，点不到弹窗【确认】。
+- 范围：`scripts/controller/actions/phase/classify.py`、`scripts/controller/actions/phase/boundary_contract.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/characterization/characterize-query-field-not-query.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、他线 WIP
+- 方式：主会话直接改；先开工声明提交，再改分类与保存按钮，并加特征化
+
 ## 2026-09-23 16:53 · Cursor — 收工：运维页历史日志与知识库全文
 
 - 完成：`5afd4ba4`。顶栏增加「历史日志」；标签切换时未选面板隐藏；已落盘的截断知识库卡片按流程名取全文，新注入调用 `flow_summary_text(..., limit=None)`。
