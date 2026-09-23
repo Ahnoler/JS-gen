@@ -170,7 +170,7 @@ JS_TSSC_MULTI_SELECT = '''async ([label, option, xpath]) => {
     const triggerInput = scope.querySelector('.el-select .el-input__inner')
         || scope.querySelector('input:not([type="hidden"])')
         || (anchor && anchor.matches && anchor.matches('input') ? anchor : null);
-    if (isDisabled(triggerInput, null, fieldItem || scope)) return 'disabled';
+    if (isDisabled(triggerInput, null, xp ? scope : (fieldItem || scope))) return 'disabled';
     if (vm && (vm.disabled === true || (vm.$props && vm.$props.disabled === true))) return 'disabled';
 
     const readback = () => {

@@ -60,8 +60,8 @@ def pin_xpath_targeted_tssc() -> None:
         haystack=TSSC_SNIPPET,
     )
     need(
-        "if (isDisabled(triggerInput, null, fieldItem || scope)) return 'disabled';",
-        "isDisabled uses host scope not label-only form-item",
+        "if (isDisabled(triggerInput, null, xp ? scope : (fieldItem || scope))) return 'disabled';",
+        "xpath leaf: isDisabled on scope only; label-only keeps form-item",
         haystack=TSSC_SNIPPET,
     )
     need(
