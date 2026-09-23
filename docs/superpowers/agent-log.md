@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-22 19:05 · ZCode 引擎线 — 收工：三条 SUT 实证知识落流程卡（e0dd6e35）
+
+- 回链 18:40 开工。完成：session_login +2（按钮文案空格比对/二级菜单双 DOM）+ credit_usage +1（日期弹层 pickerVisible=false）；欢迎弹窗按用户澄清定性为「登录后自动读取天元配置的预期行为」不进卡。
+- 验收：两卡 JSON 合法；金样例 JS 26 passed + Py ok（便携 python.exe；anaconda base exit=49 无输出系环境差异与前例一致）；recall-eval 门禁 6 passed，指标与基线逐位一致（Acc@1 0.74/Recall@5 0.847/分层 A1·B0.233·C0.867·D0.933）。
+- 纪律：他线 WIP（product_library.json 未提交扩写）全程未触碰。
+- 遗留：无。悬置面不变（SUT 改挡板/合同生效路线）。
 ## 2026-09-22 18:40 · ZCode 引擎线 — 开工：三条 SUT 实证知识落流程卡（用户批准前三点；欢迎弹窗定性为自动读配置不进卡）
 
 - 授权：用户批准将记忆中三条测试有用的 SUT 操作级知识写入流程卡：①按钮文案内部空格（「取 消」不剔空白会误点「确 定」→关弹窗变保存）②Element UI 日期弹层须置 pickerVisible=false 否则 popper 重绘复现 ③SUT 双菜单 DOM（二级 li[data-id] 恒隐藏，可见性点击必败，用可见 flyout 链接/data-url）。用户澄清：欢迎弹窗是登录后自动读取天元配置的预期行为，不进卡。
