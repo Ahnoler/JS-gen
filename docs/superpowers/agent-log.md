@@ -10,6 +10,18 @@
 - **执行方式**：单行规则追加 → 同 commit 复跑双侧金样例（JS characterize-flow-card-recall + Python characterize-kb-recall）→ recall-eval 与基线 diff（召回零影响证明）→ commit → 自并 uara_V2.0（用户已批「合入 uara V2.0 dev 主开发分支」）→ 合并态验收 → push + 收工条目
 - 注：纯 KB 数据+文档轮次，无代码改动
 
+## 2026-09-23 17:10 · ZCode 合约线 — 收工：KB「硬前置语义」规则落地 + 自并 uara_V2.0 + 合并态验收 ALL GREEN（回链 14:30 开工）
+
+- **交付**：①`credit_application.json` 新增「硬前置语义」规则 1 条（`af752787`）——「有效评级」=审批通过终态（待发起/审批中/打回均不算）、「在途授信」含打回态，判据以服务端实时判定为准勿信上下文；②自并上游（用户批「合入 uara V2.0 dev 主开发分支」）：`b558a1a1` merge + `b595b096` 归序修正。**纯 KB 数据+文档轮次，零代码改动**。
+- **验收证据（合并后集成态）**：
+  - KB 双侧金样例：JS `characterize-flow-card-recall.mjs` 26 passed；Python `characterize-kb-recall.py` ok（既有 py-噪声照旧）。
+  - `recall-eval` 与基线逐字段零差异（Acc@1 0.740 / Recall@5 0.847 / MRR@5 0.784 / nDCG@5 0.798 / 拒答 0.633；仅 gitHead/亚毫秒延迟抖动不同）——新规则对既有 130 条评测集零召回影响。
+  - `verify-all` **185 pins + statics ALL GREEN，EXIT=0，零 FAILED**。
+- **合并冲突处置**：agent-log 210 块并集零丢失（HEAD 21 + UP 26，含 12:55 壳条目以 HEAD 全文替换；上游无时刻条目「09-21 基线红清零收工」补 `22:00` 移入时序位）；todo-list 取两侧超集并排（unboundlocal-retest 已闭保留 HEAD，recording-redundant-step / verify-phase-token / phase-structured-contract 取 UP 信息量更大版本）。
+- **8 环境红归因与本机修复**：合并态首跑 verify-all 8 FAILED（manual-radio-fill / date-range-recording / field-label-resolution / prefix-label-select+xpath / login-locator-fallback / tree-select-record / g3-done-gate-live）——根因=vendored playwright 1.61.0 要求 `chromium_headless_shell-1228` 而本机缓存只有 1208/1234（隔离 worktree 在 d5086613 复现同红=合并前已存在，非本合并所致；系统线环境有该浏览器故报 ALL GREEN）。本机处置=缓存内 `chromium_headless_shell-1228 → -1234` junction 替身（官方 CDN 限速，真装走不动；替身仅 user-cache 级可逆），替身后单 pin 复跑 OK → 全量 ALL GREEN。**注**：替身有 minor-rev 偏差（1234 vs 1228），表征 pin 全过说明页面形态面无漂移；他线若遇同红可用同法或真装 1228。
+- **遗留移交**：无阻塞项。推荐项②（产品库删除机制入卡）仍未批未动。值守不变：d2-503 自然窗口（grep `[spin-guard] observed` + `sut=page_text_503`）。
+- 现场清点：工作区干净（无未提交改动、无 stash 动作）；本条目随 push 同发。
+
 ## 2026-09-21 22:47 · Cursor — 收工：方案 D 第 2 刀并入 uara_V2.0（回链 21:05）
 
 - 完成：功能分支 `cursor/phase-structured-contract-20260921` 代码 `ea0ca6af`，`--no-ff` 并入 `uara_V2.0` = **79b4b8ba**（已在远端）。分析输出等长 `phaseContracts`，写入 `trajectory_phase.contract_json`；录制下发有效快照时执行机直接落阶段意图，不再跑 `compile_boundary` / `compile_phase_intent` / `review_phase_contract` / `_apply_cross_phase_token_guard`。缺失、非法或 heal 仍走文本分类。改描述清空合约。核验型阶段主收口未做。
