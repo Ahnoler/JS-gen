@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-23 16:15 · Cursor — 开工：识图辅助开关写入配置文件
+
+- 授权：用户要求把大模型识图辅助做成配置文件里的开关。
+- 工作范围：`config/.env.example`、`executor/.env.example`、`scripts/feature_flags.py`、`src/runtime/agent-process.js`、`scripts/characterization/cold/characterize-record-sidepath.py`、本条目。
+- 禁入区：`data/kb/**`、`migrations/**`、门禁一行 `AI_RECORD_GATE_CUE` 的默认行为、回放与 heal。不改识图判定本身。
+- 执行方式：主会话把 `AI_RECORD_VISION` 写成可改的配置项，并让执行机与控制面拉起的 Python 都读到它。
+
 ## 2026-09-23 15:40 · Cursor — 收工：录制旁路门禁说明与按需识图
 
 - 回链 15:05 开工。完成：`51b4360c`（变基后；原 `51480bc6`）。主模型 `use_vision` 仍为关闭。每步注入 `[门禁]`；门禁已通过的 `done(success=true)` 才单独看视口，看见错误文案才拒绝，同一阶段最多两次；高风险点击在 `multi_act` 前可否决且不写入轨迹，同一阶段最多两次，不确定或调用失败则放行。
