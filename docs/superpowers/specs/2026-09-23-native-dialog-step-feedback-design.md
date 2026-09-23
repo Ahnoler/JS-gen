@@ -1,7 +1,7 @@
 # Design: 录制时原生弹窗交给模型选择
 
 **日期**：2026-09-23  
-**状态**：对话已确认，待书面审阅  
+**状态**：已审阅（2026-09-23 用户确认继续）。实现计划：`docs/superpowers/plans/2026-09-23-native-dialog-step-feedback.md`  
 **范围**：录制线。回放线、Element 对话框（`el-dialog` / `el-drawer`）、控制台 warning/log、`network_capture` 新标签页不在本文。
 
 ## 1. 问题
