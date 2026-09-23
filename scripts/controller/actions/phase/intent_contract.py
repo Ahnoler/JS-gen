@@ -23,7 +23,17 @@ from .boundary_contract import (
     _has_save_terminal,
     _is_open_only_dialog_or_page,
     _terminal_action_in_later_phase,
+    action_owns_save,
     maintain_submit_button,
+)
+from .classify import (
+    _LOGIN_ACT_RE,
+    _OPEN_PAGE_ACTION_RE,
+    _action_clause,
+    explicit_query_action,
+    explicit_step_action,
+    expected_fill_done,
+    is_login_task,
 )
 
 RefillMode = Literal['none', 'touched', 'all_editable']
@@ -332,23 +342,159 @@ def _later_phase_has_terminal(
     return False
 
 
+def _guard_phase_text(contract: dict[str, Any], boundary: dict[str, Any]) -> str:
+    """本阶段全文。excerpt 只有前 200 字，动作写在后面时不能拿它判断归属。"""
+    return str(
+        boundary.get('task_text')
+        or contract.get('task_text')
+        or contract.get('task_text_excerpt')
+        or boundary.get('task_text_excerpt')
+        or ''
+    ).strip()
+
+
+def _downgrade_fill_only(contract: dict[str, Any], boundary: dict[str, Any]) -> None:
+    """本阶段只填写，保存或查询点击在下一阶段。"""
+    contract['mode'] = 'create'
+    contract['refill'] = 'all_editable'
+    contract['allow_form_assistant'] = True
+    contract['submit'] = {'required': False, 'via': 'any', 'button_text': ''}
+    contract['success'] = {'kinds': [], 'evidence': []}
+    contract['recovery'] = {
+        'next_action': '填写/选择字段完成后调用 done(success=true)（本阶段无保存动作）',
+        'forbid_reopen_modify_cycle': True,
+        'on_cycle': 'prescribe_once_then_stop_if_deviate',
+        'deviate_actions': ['reselect_row', 'reopen_modify', 'reopen_maintain_dialog'],
+        'allow': ['wait', 'get_page_state', 'wait_for_loading', 'click_element_by_index'],
+    }
+    boundary['role'] = 'maintain'
+    boundary['success_when'] = []
+    boundary['goals'] = ['fill_form']
+    boundary['requires_write_all_editable'] = True
+    boundary['task_mode'] = 'form_fill'
+
+
+def _downgrade_no_token(
+    contract: dict[str, Any],
+    boundary: dict[str, Any],
+    next_action: str,
+) -> None:
+    """本阶段产不出该令牌，清空证据要求。"""
+    contract['mode'] = 'other'
+    contract['refill'] = 'none'
+    contract['allow_form_assistant'] = False
+    contract['submit'] = {'required': False, 'via': 'any', 'button_text': ''}
+    contract['success'] = {'kinds': [], 'evidence': []}
+    contract['recovery'] = {
+        'next_action': next_action,
+        'forbid_reopen_modify_cycle': False,
+        'on_cycle': 'prescribe_once_then_stop_if_deviate',
+        'deviate_actions': [],
+        'allow': ['wait', 'get_page_state', 'wait_for_loading', 'click_element_by_index'],
+    }
+    boundary['role'] = 'other'
+    boundary['success_when'] = []
+    boundary['goals'] = ['navigate_or_misc']
+    boundary['requires_write_all_editable'] = False
+    boundary['task_mode'] = 'other'
+
+
 def _apply_cross_phase_token_guard(
     contract: dict[str, Any],
     boundary: dict[str, Any],
     all_phases: list | None,
     current_phase_number: int | None,
 ) -> None:
-    """L1c 跨阶段令牌归属兜底：当前阶段文本不含终态动作、后续阶段含时，
+    """本阶段没写明的终态动作若在下一阶段，就把令牌交出去。
 
-    清空当前阶段的终态令牌要求，避免 agent 被 recovery 处方推过阶段边界。
+    动作子句里已经写明的查询、引入、保存、下一步、登录不在这里改判。
     直接修改 contract/boundary（无返回值）。
     """
     if not all_phases or current_phase_number is None:
         return
     mode = contract.get('mode')
-    cur_text = str(
-        contract.get('task_text_excerpt') or boundary.get('task_text_excerpt') or ''
-    ).strip()
+    cur_text = _guard_phase_text(contract, boundary)
+    # 规则判成查询，且本阶段没有点击查询。填写完成，或下一阶段才点查询，
+    # 都不索要 query_clicked。规则判成维护、审查器改成查询的，不在这里推翻。
+    if (
+        mode == 'query'
+        and boundary.get('role') == 'query'
+        and cur_text
+        and not explicit_query_action(cur_text)
+    ):
+        later_query = _later_phase_has_terminal(
+            all_phases, current_phase_number, explicit_query_action,
+        )
+        if expected_fill_done(cur_text):
+            sys.stderr.write(
+                f"[contract] cross-phase guard: query token not owned here "
+                f"(phase={current_phase_number}) → fill-only\n"
+            )
+            sys.stderr.flush()
+            _downgrade_fill_only(contract, boundary)
+            return
+        if later_query:
+            sys.stderr.write(
+                f"[contract] cross-phase guard: query click owned by later phase "
+                f"(phase={current_phase_number}) → no query token\n"
+            )
+            sys.stderr.flush()
+            _downgrade_no_token(
+                contract, boundary,
+                '本阶段只设置条件，不要点击查询；点击查询属于后续阶段。完成后 done(success=true)。',
+            )
+            return
+    if mode == 'navigate' and cur_text and not explicit_step_action(cur_text):
+        goals = list(boundary.get('goals') or [])
+        success = list(boundary.get('success_when') or [])
+        owns_next = 'click_next' in goals or 'nav_next_clicked' in success
+        if owns_next and _later_phase_has_terminal(
+            all_phases, current_phase_number, explicit_step_action,
+        ):
+            sys.stderr.write(
+                f"[contract] cross-phase guard: next-step click owned by later phase "
+                f"(phase={current_phase_number}) → no nav token\n"
+            )
+            sys.stderr.flush()
+            _downgrade_no_token(
+                contract, boundary,
+                '本阶段不要点击下一步；下一步属于后续阶段。完成后 done(success=true)。',
+            )
+            return
+    action = _action_clause(cur_text)
+    if (
+        mode == 'login'
+        and cur_text
+        and _OPEN_PAGE_ACTION_RE.search(action)
+        and not _LOGIN_ACT_RE.search(action)
+        and _later_phase_has_terminal(all_phases, current_phase_number, is_login_task)
+    ):
+        sys.stderr.write(
+            f"[contract] cross-phase guard: login owned by later phase "
+            f"(phase={current_phase_number}) → open page\n"
+        )
+        sys.stderr.flush()
+        contract['mode'] = 'navigate'
+        contract['refill'] = 'none'
+        contract['allow_form_assistant'] = False
+        contract['submit'] = {'required': False, 'via': 'any', 'button_text': ''}
+        contract['success'] = {'kinds': ['url_change', 'page_opened'], 'evidence': []}
+        contract['recovery'] = {
+            'next_action': (
+                'done(success=true) once the login page appears '
+                '(do not enter credentials in this phase)'
+            ),
+            'forbid_reopen_modify_cycle': False,
+            'on_cycle': 'prescribe_once_then_stop_if_deviate',
+            'deviate_actions': [],
+            'allow': ['wait', 'get_page_state', 'wait_for_loading', 'click_element_by_index'],
+        }
+        boundary['role'] = 'navigate'
+        boundary['success_when'] = ['url_change', 'page_opened']
+        boundary['goals'] = ['open_page']
+        boundary['requires_write_all_editable'] = False
+        boundary['task_mode'] = 'other'
+        return
     if mode == 'introduce_pick':
         if (
             not _has_introduce_terminal(cur_text)
@@ -381,9 +527,9 @@ def _apply_cross_phase_token_guard(
             boundary['goals'] = ['open_page']
     elif mode in ('create', 'modify'):
         if (
-            not _has_save_terminal(cur_text)
+            not action_owns_save(cur_text)
             and _later_phase_has_terminal(
-                all_phases, current_phase_number, _has_save_terminal
+                all_phases, current_phase_number, action_owns_save
             )
         ):
             sys.stderr.write(

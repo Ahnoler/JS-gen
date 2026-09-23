@@ -19,7 +19,7 @@ from .._phase_context import (
     is_query_task,
     is_wizard_nav_task,
 )
-from .classify import _action_clause
+from .classify import _action_clause, mask_widget_ops
 
 Role = Literal['maintain', 'query', 'introduce', 'navigate', 'other']
 CompletionEvidence = Literal[
@@ -90,6 +90,17 @@ def _has_save_terminal(task_text: str) -> bool:
     return bool(_SAVE_TERMINAL_RE.search(stripped))
 
 
+def action_owns_save(task_text: str) -> bool:
+    """动作子句里是否有本阶段自己的保存/确认点击。
+
+    预期结果里的「保存成功」不算。没有阶段目录时仍由 _has_save_terminal
+    保留「预期即要保存」的旧行为。
+    """
+    action = _action_clause(task_text or '')
+    action = _NEGATED_TERMINAL_RE.sub('', action)
+    return bool(_SAVE_TERMINAL_RE.search(action))
+
+
 _ACTION_SUBMIT_BTN_RE = re.compile(
     r'点击\s*[【\[「『]?\s*(确认|确定|保存|提交)'
 )
@@ -147,6 +158,27 @@ def _terminal_action_in_later_phase(
     return False
 
 
+def _later_phase_is_login(all_phases: list, current_phase_number: int) -> bool:
+    """后续阶段是否才执行登录。"""
+    try:
+        cur = int(current_phase_number)
+    except (TypeError, ValueError):
+        return False
+    for p in all_phases:
+        if not isinstance(p, dict):
+            continue
+        n = p.get('phaseNumber') if p.get('phaseNumber') is not None else p.get('phase_number')
+        try:
+            if n is None or int(n) <= cur:
+                continue
+        except (TypeError, ValueError):
+            continue
+        desc = str(p.get('description') or p.get('title') or p.get('name') or '').strip()
+        if desc and is_login_task(desc):
+            return True
+    return False
+
+
 def _is_open_only_dialog_or_page(
     task_text: str,
     all_phases: list | None = None,
@@ -165,8 +197,11 @@ def _is_open_only_dialog_or_page(
     if _has_terminal_action(t):
         return False
     # 有全阶段目录时，要求后续阶段确实含终态动作，避免单阶段流程被误判。
+    # 下一阶段才登录时，本阶段「打开登录页」仍是开页。
     if all_phases is not None and current_phase_number is not None:
-        return _terminal_action_in_later_phase(t, all_phases, current_phase_number)
+        if _terminal_action_in_later_phase(t, all_phases, current_phase_number):
+            return True
+        return _later_phase_is_login(all_phases, current_phase_number)
     return True
 
 
@@ -214,7 +249,8 @@ def _is_introduce_primary(
     t = (task_text or '').strip()
     if not t or is_login_task(t):
         return False
-    if not _INTRODUCE_RE.search(t):
+    # 「选择客户类型下拉」是控件，不是选人。遮罩后再认引入词。
+    if not _INTRODUCE_RE.search(mask_widget_ops(t)):
         return False
     if _CRUD_PHASE_RE.search(t):
         return False
@@ -329,7 +365,7 @@ def compile_boundary(
         goals = ['navigate_or_misc']
         success_when = []
         forbid_index = False
-        picker_allowed = bool(_INTRODUCE_RE.search(t))
+        picker_allowed = bool(_INTRODUCE_RE.search(mask_widget_ops(t)))
 
     return {
         'role': role,
@@ -339,6 +375,7 @@ def compile_boundary(
         'forbid_index_submit': forbid_index,
         'picker_allowed': picker_allowed,
         'requires_introduce_then_save': needs_intro_then_save,
+        'task_text': t,
         'task_text_excerpt': t[:200],
         'explicit_all_fields': explicit_all,
         'container_kind': container_kind or '',
