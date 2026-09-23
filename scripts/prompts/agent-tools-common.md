@@ -11,7 +11,7 @@
 **成功可录制约定：** 动作结果字符串以 `ok` 开头（`ok` / `ok:` / `ok-clicked` / `ok-already:…` 等）才视为成功并写入轨迹。`ok-skip:label-not-found` 表示字段已不在 DOM（级联卸掉）——**视为成功跳过：不写入轨迹、不要滚动重试、不要自愈猎场**。`already-filled`、裸 `label-not-found`（旧码）等亦表示跳过或失败；新路径统一返回 `ok-skip:label-not-found`。
 
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**
-- close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。`no-notification` ≠ 保存成功。**
+- close_notification() — 关闭可见的 el-notification。关掉返回 `ok-closed`，没有则返回 `no-notification`。不返回通知原文。通知挡住下一步时才关。刚发生的文案在 `[step-feedback]`；要回看更早的步骤才调用 `read_step_feedback`。
 - expand_all_el_tree() — 完全展开 el-tree。**树/列表先查再点：** 侧栏/页内有可见搜索框或「查询」时，禁止用 `expand_all_el_tree()` + 滚屏/盲点代替查询定位；须先填搜索关键字（有查询则点查询）再点树节点；遇 **`err-search-first`** 按指引补步。
 - switch_tab(tab_name) — 切换 el-tabs 标签页。**⚠️ 切换前必须先点击"暂存"按钮保存数据，否则已填数据会丢失。**
 - click_menu_item(menu_text) — 点击 el-menu 菜单项（自动展开子菜单）
@@ -127,7 +127,4 @@
 2. `tree_picker_click` 已内嵌兜底：合成链开树失败（err-tree-node-not-found/err-tree-no-echo）时自动 real_click 触发器一次再重试逐级——无需手动介入；独立点击（节点/触发器/级联面板）可直接调 `real_click`（label_text=字段标签，弹窗/抽屉感知）。
 3. 适用范围：树/级联触发器与面板、树节点、以及合成点击无效的按钮（如「流程提交」）；**不得用于选择下拉选项**——下拉选项只能由 select_option 选择。
 
-# 🚨 XHR 响应体读取（静默拒绝自诊 — KB-I5 run11 实证）
-前端把服务端拒绝静默吞掉（无 toast、无 formErrors，如 doDclScmNextCheck code:100 征信步闸）时，用 **`read_xhr_log(url_filter='NextCheck')`** 读最近 XHR 响应体定位真实原因：`{ok, historyTraced, matched, items:[{url,status,responseBody}]}`。
-- `historyTraced:false` = hook 本调用才装、历史请求不可追溯 → **先重触发一次该操作（再点下一步/保存），再读**。
-- 响应体 code:100 会给出缺失/校验文案 → 按文案补数据后重试；保存后用 `read_xhr_log(url_filter='saveOrUpdate')` 核对请求体关键字段（配合 click_save）。
+页面没有 toast、也没有校验红字、但这一步被拒绝时，错误提示原文已经写在 `[step-feedback]` 的 `api:` 段。不要去读接口。

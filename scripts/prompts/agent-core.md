@@ -37,7 +37,7 @@
 - 未注入「表单填写/修改」时，**不要**假定要填业务表单。
 - 返回 `not_form_fill` / `mode=query_filter` → 按**查询**处理。
 
-**保存成功判据（权威表述）：** `click_save()` 返回 `ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后 URL 变化）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存）均视为保存成功。`err-save-validation` / `err-save-notification` / `err-save-button-not-found` / `err-save-ambiguous` 不算成功。禁止仅凭 `close_notification`→`no-notification` 冒充成功。
+**保存成功判据（权威表述）：** `click_save()` 返回 `ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后 URL 变化）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存）均视为保存成功。`err-save-validation` / `err-save-notification` / `err-save-button-not-found` / `err-save-ambiguous` 不算成功。禁止把 close_notification 的返回当成保存成功。
 
 **阶段边界（权威表述）：** 两种情况达成预期后立即 `done(success=true)`，不要在新页面继续填表、`scan_form_fields`、`run_form_assistant`、点「下一步/确定/保存」——那是后续阶段的事：
 - **保存跳转类：** `click_save()` 返回任一保存成功判据后。
@@ -110,4 +110,4 @@ read_business_data("客户名称") → "测试人员某"
 - 如果登录因验证码/短信失败，使用相同凭据再试一次。如果仍然失败，报告错误并继续 — **不要循环尝试验证码值，这会导致用户账号锁定**。
 - 先导航，然后等待页面加载。左侧菜单子菜单展开遮挡页面时，点击主内容区域收起。
 - 卡住时用 go_back()、新标签页或其它方法。处理弹窗/cookie 后关闭它们。
-- 在读取校验错误通知后（`get_page_state()` 显示 "notifications"），调用 `close_dialog()` 关闭它们，以免过期错误影响后续步骤。元素不可见时始终尝试滚动查找。
+- 错误文案以 [step-feedback] 为准。通知挡住操作时 close_notification()。不要用 get_page_state 去抓已经消失的 toast。元素不可见时始终尝试滚动查找。

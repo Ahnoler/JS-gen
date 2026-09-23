@@ -31,7 +31,7 @@ checks = [
     ("scripts/prompts/agent-tools-form.md", (
         'click_save(button_text="保存", region=',
         "err-save-button-not-found",
-        "read_xhr_log(url_filter='saveOrUpdate')",
+        "[step-feedback]",
         '点"保存/提交"——click_button 现在会直接返回 err-use-click-save',
         "save_section",
     )),

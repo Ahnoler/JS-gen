@@ -70,32 +70,17 @@ def _mask_objects(text: str) -> str:
     return "".join(chars)
 
 
-def is_verification_phase_task(
-    task_text: str, contract: dict | None, boundary_role: str | None = None
-) -> bool:
-    """机械判定阶段是否「纯核验型」（四条件全满足才 True；拿不准一律 False）。
+def _text_conditions_pass(task_text: str) -> bool:
+    """文本面三条件（①无保存线索 ②核验词根与宾语词 ±16 共现 ③写动词黑名单
+    零命中——宾语状态词先掩蔽）。
 
-    四条件（词表冻结，见模块 docstring）：
-      ① 无保存线索：task_text 不含任一 ``_SAVE_CUES`` 词；
-      ② 共现：含核验词根，且任一词根出现位置 ±16 字符窗口内含宾语词；
-      ③ 写动词黑名单零命中（宾语状态词先掩蔽）；
-      ④ mode 侧证：mode 明确为 create/modify/introduce_pick/login → False，
-         缺失/未知/{query,other,navigate} → 不否决；boundary_role ∈
-         {maintain, introduce, login} → 直接 False，None 不否决。
-
-    :param task_text: 阶段任务文本（完整 task_text，非截断 excerpt）
-    :param contract: 阶段意图合约（可为 None——条件④不否决也不加分）
-    :param boundary_role: boundary 角色（可 None；维持硬排除面 {maintain,
-        introduce, login}）
-    :returns: True = 纯核验型（门侧跳过 missing_success_token）；False = 维持
-        现行判定（FP 零容忍：拿不准一律 False）
+    四条件判定式的文本共同部分（单源共享）：``is_verification_phase_task``
+    在条件④（mode/boundary_role 侧证）之后调用本函数；persisted 合约侧
+    ``phase_contract_snapshot.downgrade_contract_for_verification``（设计稿
+    §6）直接调用本函数（持久化 mode 是被怀疑误标的对象，不作侧证，弃条件④）。
+    两处调用走同一代码路径，文本判定口径不漂移。
     """
     if not isinstance(task_text, str) or not task_text:
-        return False
-    if boundary_role is not None and boundary_role in _BOUNDARY_ROLE_VETO:
-        return False
-    mode = (contract or {}).get('mode')
-    if mode in _MODE_SIDEBAND_VETO:
         return False
     for cue in _SAVE_CUES:
         if cue in task_text:
@@ -112,3 +97,34 @@ def is_verification_phase_task(
             if any(obj in window for obj in _VERIFY_OBJECTS):
                 return True
     return False
+
+
+def is_verification_phase_task(
+    task_text: str, contract: dict | None, boundary_role: str | None = None
+) -> bool:
+    """机械判定阶段是否「纯核验型」（四条件全满足才 True；拿不准一律 False）。
+
+    四条件（词表冻结，见模块 docstring）：
+      ① 无保存线索：task_text 不含任一 ``_SAVE_CUES`` 词；
+      ② 共现：含核验词根，且任一词根出现位置 ±16 字符窗口内含宾语词；
+      ③ 写动词黑名单零命中（宾语状态词先掩蔽）；
+      ④ mode 侧证：mode 明确为 create/modify/introduce_pick/login → False，
+         缺失/未知/{query,other,navigate} → 不否决；boundary_role ∈
+         {maintain, introduce, login} → 直接 False，None 不否决。
+      ①②③ 走共享 helper ``_text_conditions_pass``（文本面判定单源）。
+
+    :param task_text: 阶段任务文本（完整 task_text，非截断 excerpt）
+    :param contract: 阶段意图合约（可为 None——条件④不否决也不加分）
+    :param boundary_role: boundary 角色（可 None；维持硬排除面 {maintain,
+        introduce, login}）
+    :returns: True = 纯核验型（门侧跳过 missing_success_token）；False = 维持
+        现行判定（FP 零容忍：拿不准一律 False）
+    """
+    if not isinstance(task_text, str) or not task_text:
+        return False
+    if boundary_role is not None and boundary_role in _BOUNDARY_ROLE_VETO:
+        return False
+    mode = (contract or {}).get('mode')
+    if mode in _MODE_SIDEBAND_VETO:
+        return False
+    return _text_conditions_pass(task_text)

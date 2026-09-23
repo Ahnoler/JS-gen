@@ -1,14 +1,15 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. **AGENTS.md is the single source of truth** and applies equally here — import it first:
-
-@AGENTS.md
-
-If your Claude Code version does not support `@` imports, read `AGENTS.md` at the repo root before working.
-
-Quick reminders (details in AGENTS.md):
-
-- Product APIs: `/api/v2/*` (MySQL). Legacy `/api/trajectory` / `/api/case-data` → **410 Gone**.
-- Refactor gate: `bash scripts/refactor/verify-all.sh`; core smokes: `node scripts/smoke/accept-recording-apis.mjs`, `node scripts/characterization/characterize-trajectory.mjs`.
-- 变更史以翔实的 git commit message 为准（CHANGELOG.md 已于 2026-09-04 废除，不要重建）。
-- Human docs: `README.md`; frontend contract: `http://localhost:4097/api/docs`.
+# CLAUDE.md
+
+供 Claude Code（claude.ai/code）在本仓库工作时阅读。**权威约定以 `AGENTS.md` 为准**；请先导入：
+
+@AGENTS.md
+
+若 Claude Code 不支持 `@` 导入，开工前先读仓库根目录 `AGENTS.md`。
+
+**速记（细节见 AGENTS.md）：**
+
+- 产品 API：`/api/v2/*`（MySQL）。旧 `/api/trajectory`、`/api/case-data` → **410 Gone**。
+- 重构门禁：`bash scripts/refactor/verify-all.sh`；核心 smoke：`node scripts/smoke/accept-recording-apis.mjs`、`node scripts/characterization/characterize-trajectory.mjs`。
+- 变更史以 git commit message 为准；根目录 `CHANGELOG.md` 仅用户指定时更新（见 AGENTS.md）。
+- 面向人的文档：`README.md`；前端契约：`http://localhost:4097/api/docs`。
+

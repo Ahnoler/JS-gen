@@ -37,8 +37,7 @@ const META_SET = new Set(META_STEP_ACTIONS);
  */
 export const ENGINEERING_STEP_ACTIONS = Object.freeze([
   'semantic_snapshot',
-  'read_error_notify',
-  'read_xhr_log',
+  'read_step_feedback',
   'kb_flow',
   'read_business_date',
 ]);

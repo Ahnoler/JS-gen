@@ -381,6 +381,14 @@ async def inject_scenario_summary(agent, business_data_store: dict | None = None
             })
         except Exception:
             pass
+
+        try:
+            from scripts.state import get_current_phase
+            from scripts.agent.stderr_cards import emit_card
+            phase = get_current_phase() or 0
+            emit_card("scenario", phase, "场景摘要", summary)
+        except Exception:
+            pass
     except Exception as e:
         sys.stderr.write(f'[scenario_describer] failed: {e}\n')
         sys.stderr.flush()

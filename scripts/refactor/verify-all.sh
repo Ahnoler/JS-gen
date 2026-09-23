@@ -32,6 +32,10 @@ resolve_python() {
 cd "$(dirname "$0")/../.."
 resolve_python || exit 1
 
+# Python Playwright pins one browser revision. Launch uses any installed
+# directory with the default prefix (chromium_headless_shell- / chromium-).
+export PYTHONPATH="$(pwd)/scripts/characterization/_pyhook${PYTHONPATH:+:$PYTHONPATH}"
+
 # ---------------------------------------------------------------------------
 # Domain registry: pipeline name → pin entries.
 # Entry format:  <name>|<command...>
@@ -57,8 +61,13 @@ characterize-record-status|node scripts/characterization/characterize-record-sta
 characterize-traj-recon-logging|node scripts/characterization/characterize-traj-recon-logging.mjs
 characterize-step-number-integrity|node scripts/characterization/characterize-step-number-integrity.mjs
 characterize-agent-llm-error|node scripts/characterization/characterize-agent-llm-error.mjs
+characterize-ops-log-cards|node scripts/characterization/characterize-ops-log-cards.mjs
+characterize-ops-step-line|"$PY" scripts/characterization/characterize-ops-step-line.py
+characterize-ops-card-line|"$PY" scripts/characterization/characterize-ops-card-line.py
+characterize-ops-page|node scripts/characterization/characterize-ops-page.mjs
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
 characterize-verification-phase-gate|"$PY" scripts/characterization/characterize-verification-phase-gate.py
+characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
 '
 PINS_PHASE='
 characterize-phase-section-scope|"$PY" scripts/characterization/characterize-phase-section-scope.py
@@ -94,6 +103,7 @@ characterize-done-accept-reason|"$PY" scripts/characterization/characterize-done
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
 characterize-phase-contract|node scripts/characterization/characterize-phase-contract.mjs
 characterize-persisted-phase-contract|"$PY" scripts/characterization/characterize-persisted-phase-contract.py
+characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
 '
 PINS_FILL='
 characterize-form-rules|"$PY" scripts/characterization/characterize-form-rules.py
@@ -235,6 +245,7 @@ characterize-before-close-screenshots|"$PY" scripts/characterization/characteriz
 characterize-phase-group-shot|"$PY" scripts/characterization/characterize-phase-group-shot.py
 characterize-step-region-bbox|"$PY" scripts/characterization/characterize-step-region-bbox.py
 characterize-step-notice-scan|"$PY" scripts/characterization/cold/characterize-step-notice-scan.py
+characterize-step-feedback|"$PY" scripts/characterization/cold/characterize-step-feedback.py
 characterize-step-move|node scripts/characterization/characterize-step-move.mjs
 characterize-sys-msg|node scripts/characterization/characterize-sys-msg.mjs
 characterize-batch-import|node scripts/characterization/characterize-batch-import.mjs
@@ -284,6 +295,7 @@ characterize-recording-coach-assert|node scripts/characterization/cold/character
 characterize-recording-coach-operator|node scripts/characterization/cold/characterize-recording-coach-operator.mjs
 characterize-recording-coach-skill-pack|node scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs
 characterize-recording-coach-tier-a-score|node scripts/characterization/cold/characterize-recording-coach-tier-a-score.mjs
+characterize-meta-step-filter|node scripts/characterization/cold/characterize-meta-step-filter.mjs
 '
 # eslint/ruff run in every invocation (cheap, catches merge-orphan defects).
 PINS_STATIC='

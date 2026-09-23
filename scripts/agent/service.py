@@ -171,7 +171,8 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
         sys.stderr.flush()
 
     contract = None
-    sys.stderr.write(f"Phase {step_index}: {task_text[:80]} (max_steps={max_steps})\n")
+    from .stderr_cards import format_phase_header_line, emit_card
+    sys.stderr.write(format_phase_header_line(step_index, task_text, max_steps) + "\n")
     sys.stderr.flush()
 
     nav_url = extract_first_url(task_text)
@@ -244,6 +245,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                     cur_phase = 0
                 from ..controller.actions.phase.phase_contract_snapshot import (
                     apply_persisted_phase_contract,
+                    downgrade_contract_for_verification,
                     persisted_contract_from_instruction,
                 )
                 raw_snapshot = persisted_contract_from_instruction(instruction, heal_mode=False)
@@ -258,6 +260,18 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                         f"success_when={(business_data_ref.get('_phase_boundary') or {}).get('success_when')}\n"
                     )
                     sys.stderr.flush()
+                    # 纯核验型文本降级（设计稿 §6 主收口）：分析侧误标 submitRequired=true
+                    # 时清掉保存令牌要求（持久化 mode 是被怀疑误标的对象，不作条件④侧证）。
+                    contract, boundary_after, downgraded = downgrade_contract_for_verification(
+                        contract, business_data_ref.get('_phase_boundary'), phase_core)
+                    if downgraded:
+                        business_data_ref['_phase_boundary'] = boundary_after
+                        sys.stderr.write(
+                            f"phase_contract=verify_downgraded mode={mode} "
+                            f"submit={bool((contract.get('submit') or {}).get('required'))} "
+                            f"success_when={(boundary_after or {}).get('success_when')}\n"
+                        )
+                        sys.stderr.flush()
                 else:
                     from ..controller.actions.phase.reviewer import _get_reviewer_llm
                     reviewed = await review_phase_contract(
@@ -340,6 +354,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                 all_phases=all_phases_for_preamble if isinstance(all_phases_for_preamble, list) else None,
                 business_data_store=business_data_ref,
             )
+            emit_card("phase-task", step_index, f"阶段 {step_index}", agent_task)
         # P1：记忆事实包注入（AI_MEMORY_FACT_PACK 默认关）——权威值/已保存值
         # 作为事实依据，替代「靠 MAX_RECENT 截断记忆猜」；失败不阻塞主链路。
         try:
@@ -351,6 +366,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                 fp_text = format_fact_pack((parsed or {}).get('facts') or [])
                 if fp_text:
                     agent_task = agent_task + '\n\n' + fp_text
+                    emit_card("fact-pack", step_index, "事实包", fp_text)
                     sys.stderr.write(
                         f"fact pack injected: {len((parsed or {}).get('facts') or [])} facts\n"
                     )
@@ -409,6 +425,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                             business_data_ref['_kb_special_hint'] = _se_hint
                         sys.stderr.write("kb_special_hint injected (special_element_candidates empty)\n")
                     agent_task = agent_task + '\n\n' + summary
+                    emit_card("kb", step_index, card.get("flow") or "", summary, score=score)
                     if business_data_ref is not None:
                         business_data_ref['_kb_flow_name'] = card.get('flow', '')
                         business_data_ref['_kb_flow_summary'] = summary
@@ -420,13 +437,19 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
         ceiling, max_steps = _resolve_phase_budget(max_steps, contract, heal_mode)
         max_steps_resolved = True
         if business_data_ref is not None and not heal_mode:
-            agent_task = agent_task + recording_refill_hint(
+            refill_text = recording_refill_hint(
                 mode,
                 force_refill_all=bool(business_data_ref.get('_force_refill_all')),
                 task_text=phase_task_text,
             )
+            if refill_text:
+                agent_task = agent_task + refill_text
+                emit_card("refill", step_index, "补录提示", refill_text)
             if contract:
-                agent_task = agent_task + contract_summary_hint(contract)
+                contract_text = contract_summary_hint(contract)
+                if contract_text:
+                    agent_task = agent_task + contract_text
+                    emit_card("contract", step_index, "阶段意图合约", contract_text)
             boundary = (business_data_ref or {}).get('_phase_boundary') if business_data_ref else None
             emit_json({
                 "event": "phase_intent_obs",
@@ -487,6 +510,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
             gates_text = str(business_data_ref.get('_success_gates_text') or '').strip()
             if gates_text:
                 agent_task = agent_task + '\n\n' + gates_text
+                emit_card("success-gates", step_index, "成功门闩", gates_text)
                 sys.stderr.write(f"Appended success gates ({len(gates_text)} chars)\n")
                 sys.stderr.flush()
     except Exception as e:
@@ -499,6 +523,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
             hint = format_business_data_hint(business_data_ref)
             if hint:
                 agent_task = agent_task + hint
+                emit_card("business-data", step_index, "业务数据", hint)
                 sys.stderr.write(f"Appended business data hint ({len(entries)} keys)\n")
                 sys.stderr.flush()
                 # KB 码表预检（零 token）：业务数据值 ↔ 字典 text 命中时附候选码表。
@@ -516,8 +541,10 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                             vals.append(v)
                     cands = dict_candidates_for_values(vals, data.get('by_type') or {}, alias)
                     if cands:
-                        agent_task = agent_task + '\n【KB 码表】' + '；'.join(
+                        dict_text = '\n【KB 码表】' + '；'.join(
                             '{value}∈{dict_type}'.format(**c) for c in cands)
+                        agent_task = agent_task + dict_text
+                        emit_card("kb-dict", step_index, "码表", dict_text)
                         sys.stderr.write("kb dict candidates: %d\n" % len(cands))
                         sys.stderr.flush()
                 except Exception as e:

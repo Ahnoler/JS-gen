@@ -1,5 +1,7 @@
 """Apply a persisted phase contract without text recompilation."""
 
+from .verification_gate import _text_conditions_pass  # 冻结词表单源：文本面三条件共用
+
 PHASE_CONTRACT_MODES = (
     'login', 'query', 'navigate', 'create', 'modify', 'introduce_pick', 'other',
 )
@@ -113,3 +115,44 @@ def apply_persisted_phase_contract(business_data_store, raw):
     business_data_store['_force_refill_all'] = boundary['requires_write_all_editable']
     business_data_store['_evidence_observed'] = []
     return contract
+
+
+def downgrade_contract_for_verification(contract, boundary, task_text):
+    """persisted 合约的纯核验型文本降级（刀 2 主收口，设计稿 §6）。
+
+    三条件全中才降级（词表复用 ``verification_gate`` 冻结 v1——文本面三条件
+    经共享 helper ``_text_conditions_pass`` 单源，禁止复制副本；FP 零容忍——
+    拿不准一律原样返回 ``(contract, boundary, False)``）：
+      ① task_text 无 ``_SAVE_CUES`` 命中
+      ② 核验词根与宾语词 ±16 字符共现（``_VERIFY_ROOTS``/``_VERIFY_OBJECTS``）
+      ③ 写动词黑名单零命中（宾语状态词先掩蔽，``_WRITE_VERBS``/``_mask_objects``）
+    条件④（mode/boundary_role 侧证）刻意弃用：持久化路径的 mode 是分析 LLM
+    的输出、正是被怀疑误标的对象，不能作侧证（设计稿 §6 事实①）。
+
+    降级动作：``contract['submit']['required']=False``、
+    ``contract['success']['kinds']=[]``、``boundary['success_when']=[]``；
+    boundary role 不动（设计稿 §6：role 降级牵动 section scope 面，且
+    success_when 清空后 role 已无 token 语义）。降级发生时
+    ``contract['source'] = 'persisted_verify_downgraded'``（可辨识、可 grep；
+    不属于 mode 字面值，设计稿 §5.3）。
+
+    :param contract: ``apply_persisted_phase_contract`` 产出的 intent dict
+    :param boundary: 同源 ``_phase_boundary`` dict
+    :param task_text: 阶段判定文本（``phase_core``，已剥离【业务数据】块）
+    :returns: ``(contract, boundary, downgraded: bool)``；任一输入非预期形态
+        （contract/boundary 为 None 或缺键）原样返回 False——防御性，不抛错。
+    """
+    if not isinstance(contract, dict) or not isinstance(boundary, dict):
+        return contract, boundary, False
+    if not isinstance(contract.get('submit'), dict) \
+            or not isinstance(contract.get('success'), dict):
+        return contract, boundary, False
+    if 'success_when' not in boundary:
+        return contract, boundary, False
+    if not _text_conditions_pass(task_text):
+        return contract, boundary, False
+    contract['submit']['required'] = False
+    contract['success']['kinds'] = []
+    boundary['success_when'] = []
+    contract['source'] = 'persisted_verify_downgraded'
+    return contract, boundary, True

@@ -40,6 +40,7 @@ app.use('/src/dashboard', express.static(path.join(PROJECT_DIR, 'src', 'dashboar
 }));
 app.get('/', (req, res) => res.sendFile(path.join(PROJECT_DIR, 'api-docs.html')));
 app.get('/api-docs.html', (req, res) => res.sendFile(path.join(PROJECT_DIR, 'api-docs.html')));
+app.get('/ops', (req, res) => res.sendFile(path.join(PROJECT_DIR, 'src', 'dashboard', 'ops-console', 'index.html')));
 
 // Register all route modules
 registerLLMProxyRoutes(app);
