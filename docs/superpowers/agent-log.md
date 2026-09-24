@@ -3,7 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
-## 2026-09-24 12:15 · Cursor — 收工：第1点决定 + step-feedback pin 已合入 uara_V2.0_dev（回链 12:10 开工）
+## 2026-09-24 11:56 · Cursor — 开工：五个录制方向写入 todo-list
+
+- 授权：用户要求按调研报告把五个方向写入总 TODO，再逐项评估做不做、怎么做。本单元只改清单。
+- 工作范围：`docs/superpowers/todo-list.md`、本条目。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`、`config/.env`、调研报告正文。
+- 执行方式：主会话直接写入。逐项方案在清单落定后另说，本单元不改产品代码。
 
 - 完成：merge 合入 `cursor/console-feedback-brainstorm-20260924`。决定稿 + `characterize-step-feedback` NameError 修复。冲突只在 agent-log，并排保留。
 - 验收（合并后）：`characterize-step-feedback.py` OK；`characterize-step-notice-scan.py` OK。
