@@ -36,6 +36,20 @@
 - 工作范围：`docs/superpowers/specs/2026-09-23-native-dialog-step-feedback-design.md`、本条目。不改产品代码。
 - 禁入区：`scripts/**`、`src/**`、`data/kb/**`。第 1、6 点（控制台级别、`network_capture` 新标签页）不在本稿。
 - 状态：书面稿待用户审阅后再写实现计划。
+=======
+## 2026-09-23 20:55 · Cursor — 收工：非 JSON 错误页、toast 旁保留接口错误、去掉接线中（4c3e6c11）
+
+- 回链 20:40 开工。完成：`4c3e6c11`。HTTP 失败且响应不是 JSON 时，逐步反馈写成 `HTTP <状态> <路径>`（200 的 HTML 仍不记）。toast/表单旁边保留接口错误；只有标明 `level=success` 的接口行才在有界面反馈时丢掉。`list_todo_cards`、`wf_submit_guard`、`verify_context` 去掉「接线中」。
+- 验收：`characterize-step-feedback`（含 node 探针：503 HTML → `HTTP 503 /api/save`，JSON 业务错误仍在）、`characterize-step-notice-scan`、real-click / search-then-click / close-dialog / set-vue-model / strip-dialogs / field-value-match 均 OK。`verify-all.sh ui` 仅 `layer-tree`、`step-highlight` 因本机无 `DB_PASS` 失败，与本次 diff 无关。
+- 遗留：未合入 `uara_V2.0_dev`。第 1、4、6 点未做。未做 503 真机湿测。
+
+## 2026-09-23 20:40 · Cursor — 开工：非 JSON 错误页、toast 旁保留接口错误、去掉接线中
+
+- 授权：用户确认补上次对照的第 2、3、5 点。第 1、4、6 点（谁来读、原生弹窗文案、network_capture 新 tab）下一步再做。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/step-feedback-api-prompt-20260923`（自 `origin/uara_V2.0_dev` `2d1739e8`）。
+- 工作范围：`scripts/controller/actions/js_snippets/step_notice.py`、`scripts/agent/step_feedback.py`、`scripts/prompts/agent-tools-common.md`、`scripts/characterization/cold/characterize-step-feedback.py`、本条目。
+- 禁入区：回放线、`scripts/agent/service.py`、`data/kb/**`、主检出未提交的识图四件套、原生 dialog 文案、`network_capture`。不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话先改 pin 再实现。微步 `bash scripts/refactor/verify-all.sh ui`。
 
 ## 2026-09-23 18:20 · ZCode — 收工：识图旁路 LLM 独立配置四件套
 

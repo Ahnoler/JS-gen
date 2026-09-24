@@ -144,10 +144,15 @@ def main() -> int:
         {"kind": "toast", "level": "error", "text": "利率不能为空"},
         {"kind": "form", "label": "利率", "text": "不能为空"},
         {"kind": "dialog", "surface": "dialog", "text": "流程选人"},
-        {"kind": "api", "text": "不应出现"},
+        {"kind": "api", "text": "证件重复"},
     ]
     kept = omit_api_if_ui(items)
-    assert_true(all(it["kind"] != "api" for it in kept), "drop api when ui present")
+    assert_true(any(it.get("text") == "证件重复" for it in kept), "keep api error beside toast")
+    dropped = omit_api_if_ui([
+        {"kind": "toast", "level": "success", "text": "操作成功"},
+        {"kind": "api", "level": "success", "text": "操作成功"},
+    ])
+    assert_true(all(it.get("kind") != "api" for it in dropped), "drop success api when ui present")
     assert_true(len(omit_api_if_ui([{"kind": "api", "text": "闸门拒绝"}])) == 1, "keep api alone")
 
     cue = format_step_feedback_cue(["click_save"], kept)
@@ -172,7 +177,7 @@ def main() -> int:
         {"kind": "console", "level": "error", "text": "TypeError"},
         {"kind": "api", "text": "闸门"},
     ])
-    assert_true(all(it["kind"] != "api" for it in mixed), "toast still drops api")
+    assert_true(any(it.get("text") == "闸门" for it in mixed), "toast keeps api error")
     assert_true(any(it["kind"] == "console" for it in mixed), "console survives toast suppression")
 
     from scripts.agent.console_feedback import RING_MAX, push_console_line, take_console_feedback
@@ -224,6 +229,11 @@ def main() -> int:
     xhr_snip = step_notice_js[q_open + 3 : q_close] if q_open >= 0 and q_close > q_open else ""
     assert_true("rec.seq" in xhr_snip, "MISSING seq filter in api snippet")
     assert_true("responseBody:" not in xhr_snip, "responseBody must not be returned field")
+    assert_true("HTTP " in xhr_snip, "non-json http status fallback")
+    _assert_non_json_http_fallback(xhr_snip)
+
+    common_prompt = (ROOT / "scripts/prompts/agent-tools-common.md").read_text(encoding="utf-8")
+    assert_true("接线中" not in common_prompt, "stale 接线中 notes")
 
     from scripts.agent.step_notice import rewind_xhr_cursor_if_shrunk
 
@@ -303,3 +313,27 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+def _assert_non_json_http_fallback(xhr_snip: str) -> None:
+    """503 HTML must become HTTP status text; JSON business errors stay."""
+    import subprocess
+    import tempfile
+
+    probe = (
+        "const fn = " + xhr_snip + ";\n"
+        "global.window = { __xhr_log: [\n"
+        "  { seq: 1, status: 503, url: 'https://sut.example/api/save?x=1', responseBody: '<html>unavailable</html>' },\n"
+        "  { seq: 2, status: 200, url: 'https://sut.example/api/ok', responseBody: JSON.stringify({ code: 100, description: '证件重复' }) },\n"
+        "  { seq: 3, status: 200, url: 'https://sut.example/api/html', responseBody: '<html>ok</html>' },\n"
+        "] };\n"
+        "const out = fn(0);\n"
+        "const texts = out.texts || [];\n"
+        "const hit = texts.some(t => t.indexOf('HTTP 503') === 0 && t.indexOf('/api/save') >= 0);\n"
+        "if (!hit) { console.error('missing 503 fallback ' + JSON.stringify(out)); process.exit(1); }\n"
+        "if (texts.indexOf('证件重复') < 0) { console.error('missing biz text ' + JSON.stringify(out)); process.exit(1); }\n"
+        "if (texts.some(t => String(t).indexOf('HTTP 200') === 0)) { console.error('200 html must stay quiet ' + JSON.stringify(out)); process.exit(1); }\n"
+    )
+    with tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False, encoding="utf-8") as fh:
+        fh.write(probe)
+        path = fh.name
+    proc = subprocess.run(["node", path], capture_output=True, text=True, encoding="utf-8")
+    assert_true(proc.returncode == 0, (proc.stderr or proc.stdout or "node probe failed").strip())

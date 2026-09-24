@@ -106,7 +106,14 @@ JS_TAKE_API_ERROR_TEXTS = r'''(lastSeq) => {
     const httpFail = typeof status === 'number' && (status < 200 || status >= 400);
     let payload = null;
     try { payload = JSON.parse(rec.responseBody || ''); } catch (e) { payload = null; }
-    if (!payload || typeof payload !== 'object') continue;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      if (httpFail) {
+        var path = String(rec.url || '').split('?')[0].replace(/^https?:\/\/[^/]+/, '');
+        var fallback = clip('HTTP ' + status + (path ? ' ' + path : ''));
+        if (fallback) texts.push(fallback);
+      }
+      continue;
+    }
     const code = payload.code;
     const bizFail = code != null && String(code) !== '0' && String(code) !== '200' && code !== 0 && code !== 200;
     if (!httpFail && !bizFail) continue;
