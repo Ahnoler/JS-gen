@@ -3,6 +3,18 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 11:55 · Cursor — 收工：第 1 点控制台口径关闭为维持现状（回链同条开工）
+
+- 完成：`docs/superpowers/specs/2026-09-24-console-feedback-status-quo-decision.md`。用户选 D：只收 error/pageerror、继续自动推送、不加按需读工具、不扩 warning/log。无产品代码改动。
+- 验收：书面决定与对话一致；重开条件写在决定稿 §5。
+- 遗留：无。对照 MCP 的 1–6 点至此均已落地或明确关闭（2/3/5、4、6 已合；1 关闭）。他线 `characterize-step-feedback` NameError 仍在 uara_V2.0_dev。
+
+## 2026-09-24 11:52 · Cursor — 开工：第 1 点控制台「谁来读 / 级别」brainstorm
+
+- 范围：`docs/superpowers/specs/2026-09-24-console-feedback-status-quo-decision.md`、本文件
+- 禁入：`scripts/**`、`src/**`（本项决定不改代码）
+- 执行：对话确认选 D 后落决定稿并收工
+
 ## 2026-09-24 11:50 · Cursor — 收工：network_capture 新标签页复挂已合入 uara_V2.0_dev（回链 11:45 开工）
 
 - 完成：`a941bb7e`。`cursor/network-capture-new-page-design-20260924` 以 `--no-ff` 合入。冲突只在 `docs/superpowers/agent-log.md`，双方条目并排保留。
