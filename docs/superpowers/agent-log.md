@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 14:40 · Cursor — 收工：draft-traj-coach runtime 设计规格已入库（回链 14:37 开工）
+
+- 完成：`55748342`。`docs/superpowers/specs/2026-09-24-draft-traj-coach-runtime-design.md` 与上传稿字节一致；SOP 顶部一行交叉链接指向该规格。未实现 `tools/draft-traj-coach/src`，未改产品 propose/atomize。
+- 验收：规格路径存在；SOP 状态块新增 Runtime 一行。实现仍须用户确认规格无歧义后再开 writing-plans。
+- 遗留：runtime 实现不在本单元。
+
 ## 2026-09-24 14:37 · Cursor — 开工：入库 draft-traj-coach runtime 设计规格
 
 - 授权：用户要求把 runtime 设计稿入库并开 PR，不实现 runtime。
