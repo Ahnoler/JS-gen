@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 11:45 · Cursor — 开工：合入 network_capture 新标签页复挂到 uara_V2.0_dev
+
+- 范围：`docs/superpowers/agent-log.md`；合入 `cursor/network-capture-new-page-design-20260924`（`--no-ff`）
+- 禁入：功能代码本会话不另改（冲突只解 agent-log）；他线 WIP 不碰
+- 执行：本会话于主仓合入 → 合并后复跑 feature pins → 收工 push
+
 ## 2026-09-24 11:28 · Cursor — 收工：录制效率与成功率调研报告（回链 11:20 开工）
 
 - 完成：`docs/superpowers/reports/2026-09-24-recording-efficiency-success-research.md`。五路只读调研合成五个方向：控件卡住、阶段判定看证据、确定性步骤不每步问模型、失败早发现、录完验证再沉淀。未改产品代码。
