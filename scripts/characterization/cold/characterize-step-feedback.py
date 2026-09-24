@@ -49,6 +49,77 @@ def test_native_dialog_parse_and_cue() -> None:
     assert_true("dialog:流程选人" in cue and "drawer:引入" in cue, cue)
 
 
+def test_apply_native_dialog() -> None:
+    import asyncio
+    from scripts.agent.native_dialog import apply_native_dialog, take_native_dialogs
+
+    class FakeDialog:
+        def __init__(self, dtype, message, default_value=""):
+            self.type = dtype
+            self.message = message
+            self.default_value = default_value
+            self.calls = []
+
+        async def accept(self, text=None):
+            self.calls.append(("accept", text))
+
+        async def dismiss(self):
+            self.calls.append(("dismiss", None))
+
+    asks = []
+
+    async def ask(dtype, message, default_value):
+        asks.append((dtype, message, default_value))
+        return "dismiss"
+
+    alert = FakeDialog("alert", "会话即将过期")
+    store = {}
+    asyncio.run(apply_native_dialog(alert, store, ask))
+    assert_true(alert.calls == [("accept", None)], alert.calls)
+    assert_true(asks == [], "alert must not ask")
+    rows = take_native_dialogs(store)
+    assert_true(rows[0]["surface"] == "alert" and rows[0]["text"] == "会话即将过期", rows)
+    assert_true(take_native_dialogs(store) == [], "drain once")
+
+    leaving = FakeDialog("beforeunload", "")
+    asyncio.run(apply_native_dialog(leaving, store, ask))
+    assert_true(leaving.calls == [("accept", None)], leaving.calls)
+    assert_true(asks == [], "beforeunload must not ask")
+    assert_true(take_native_dialogs(store)[0]["surface"] == "beforeunload", store)
+
+    confirm = FakeDialog("confirm", "确认删除？")
+    asyncio.run(apply_native_dialog(confirm, store, ask))
+    assert_true(confirm.calls == [("dismiss", None)], confirm.calls)
+    assert_true(take_native_dialogs(store)[0]["decision"] == "dismissed", store)
+
+    async def accept_prompt(dtype, message, default_value):
+        return "accept:同意"
+
+    prompt = FakeDialog("prompt", "请输入原因", "默认")
+    asyncio.run(apply_native_dialog(prompt, store, accept_prompt))
+    assert_true(prompt.calls == [("accept", "同意")], prompt.calls)
+
+    async def accept_empty(dtype, message, default_value):
+        return "accept:"
+
+    blank = FakeDialog("prompt", "请输入原因", "默认")
+    asyncio.run(apply_native_dialog(blank, store, accept_empty))
+    assert_true(blank.calls == [("accept", "")], blank.calls)
+
+    async def boom(dtype, message, default_value):
+        raise RuntimeError("down")
+
+    timed = FakeDialog("prompt", "请输入原因", "默认")
+    asyncio.run(apply_native_dialog(timed, store, boom))
+    assert_true(timed.calls == [("accept", "默认")], timed.calls)
+    last = take_native_dialogs(store)[-1]
+    assert_true(last["decision"] == "timeout-accepted", last)
+
+    src = (ROOT / "scripts/agent/step_notice.py").read_text(encoding="utf-8")
+    body = src[src.find("async def scan_and_emit_step_notices"):]
+    assert_true("take_native_dialogs" in body, "scan drains native dialogs")
+
+
 def main() -> int:
     from scripts.agent.step_feedback import (
         append_step_feedback,
@@ -223,6 +294,7 @@ def main() -> int:
     assert_true("[step-feedback]" in planner, "planner cue")
 
     test_native_dialog_parse_and_cue()
+    test_apply_native_dialog()
 
     print("characterize-step-feedback: OK")
     return 0
