@@ -296,6 +296,14 @@ async def scan_and_emit_step_notices(
         sys.stderr.write(f"[recorder] step-feedback console scan failed: {e}\n")
         sys.stderr.flush()
 
+    try:
+        from scripts.agent.native_dialog import take_native_dialogs
+        for row in take_native_dialogs(business_data_store):
+            feedback_items.append(row)
+    except Exception as e:
+        sys.stderr.write(f"[recorder] step-feedback native dialog scan failed: {e}\n")
+        sys.stderr.flush()
+
     feedback_items = omit_api_if_ui(feedback_items)
     if not feedback_items:
         return []

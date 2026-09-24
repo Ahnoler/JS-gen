@@ -73,8 +73,22 @@ def format_step_feedback_cue(actions: list[str], items: list[dict]) -> str:
         elif kind == "form":
             parts.append(f"form:{clip_text(it.get('label'))}:{text}")
         elif kind == "dialog":
-            surface = it.get("surface") if it.get("surface") in ("dialog", "drawer") else "dialog"
-            parts.append(f"{surface}:{text}")
+            surface = str(it.get("surface") or "dialog")
+            if surface == "alert":
+                parts.append(f"dialog:alert:{text}")
+            elif surface == "beforeunload":
+                parts.append(f"dialog:beforeunload:{text} | {it.get('decision') or 'accepted'}")
+            elif surface == "confirm":
+                parts.append(f"dialog:confirm:{text} | {it.get('decision') or 'accepted'}")
+            elif surface == "prompt":
+                decision = str(it.get("decision") or "accepted")
+                if decision == "accepted":
+                    parts.append(f"dialog:prompt:{text} | accepted:{clip_text(it.get('value'))}")
+                else:
+                    parts.append(f"dialog:prompt:{text} | {decision}")
+            else:
+                surface = surface if surface in ("dialog", "drawer") else "dialog"
+                parts.append(f"{surface}:{text}")
         elif kind == "api":
             parts.append(f"api:{text}")
         elif kind == "console":

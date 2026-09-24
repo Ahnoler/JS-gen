@@ -3,6 +3,27 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 09:02 · Cursor — 开工：录制原生弹窗交给模型选择
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-23-native-dialog-step-feedback.md`。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/native-dialog-feedback-design-20260923`（自 `2d1739e8`）。
+- 工作范围：`scripts/agent/native_dialog.py`、`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/browser/factory.py`、`scripts/agent/page_feedback_hooks.py`、`scripts/session_runner.py`、`scripts/characterization/cold/characterize-step-feedback.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、本条目。
+- 禁入区：回放线、`scripts/agent/service.py`、`data/kb/**`、控制台 warning/log、`network_capture` 挂载。不新增动作，不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话派实现子智能体，每任务评审。子智能体可 commit，不 push。
+
+## 2026-09-23 22:25 · Cursor — 实现计划：录制原生弹窗交给模型选择
+
+- 授权：用户确认设计稿后继续。
+- 工作范围：`docs/superpowers/plans/2026-09-23-native-dialog-step-feedback.md`；设计稿状态改为已审阅；本条目。不改产品代码。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`。实现等用户选定执行方式后再开工。
+
+## 2026-09-23 21:45 · Cursor — 设计稿：录制原生弹窗交给模型选择
+
+- 授权：用户选定 B（`alert` 自动接受；`confirm` / `prompt` 在当前点击内问一次）和做法 1（不把选择留到下一步），并确认行为、机制、验收三节。
+- 工作范围：`docs/superpowers/specs/2026-09-23-native-dialog-step-feedback-design.md`、本条目。不改产品代码。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`。第 1、6 点（控制台级别、`network_capture` 新标签页）不在本稿。
+- 状态：书面稿待用户审阅后再写实现计划。
+
 ## 2026-09-23 18:20 · ZCode — 收工：识图旁路 LLM 独立配置四件套
 
 - 回链 17:20 开工。完成：识图专用 LLM 可独立配置——`config/.env` 新增 `AI_RECORD_VISION_LLM_MODEL/_BASE_URL/_API_KEY/_TIMEOUT_MS` 四键（语义同 FORM_LLM_*：MODEL 未设完全回落录制主 Agent 的 `agent.llm` 不建独立实例；BASE_URL/API_KEY 回落主 `LLM_*`；TIMEOUT_MS 回落 `LLM_TIMEOUT_MS` 再回落 20000，探活超时仍 15s）。Python 端 `feature_flags.record_vision_llm_config()` + `record_vision._get_vision_llm()`（按配置缓存、改配置重建）+ `ask_vision` 改走专用实例；控制面 `src/runtime/agent-process.js` 与执行机 `executor/config.js` 双侧透传（MODEL 未设不透传）。

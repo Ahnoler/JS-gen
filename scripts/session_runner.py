@@ -241,7 +241,6 @@ async def _ensure_browser_and_cdp(cdp_url, cdp_port, session_id):
     await browser_context.get_session()
     await _ignore_certificate_errors(browser_context)
     await _fit_browser_window(browser_context, win_w, win_h)
-    await _dismiss_native_js_dialogs(browser_context)
     await _bypass_ssl_interstitial_if_any(browser_context)
 
     # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
@@ -368,9 +367,32 @@ async def run_session(args):
         sys.stderr.write(f"[network-capture] attach failed (ignored): {type(_net_err).__name__}: {_net_err}\n")
         sys.stderr.flush()
 
+    async def _ask_native_dialog(dialog_type, message, default_value):
+        from langchain_core.messages import HumanMessage
+        prompt = (
+            "Native browser dialog is blocking the page. "
+            "Reply with one line only: accept, dismiss, or accept:<text>.\n"
+            f"type: {dialog_type}\n"
+            f"message: {message}\n"
+            f"default: {default_value}\n"
+        )
+        result = await llm.ainvoke([HumanMessage(content=prompt)])
+        content = getattr(result, "content", result)
+        if isinstance(content, list):
+            parts = []
+            for part in content:
+                if isinstance(part, dict):
+                    parts.append(str(part.get("text", "")))
+                else:
+                    parts.append(str(part))
+            content = "".join(parts)
+        return str(content)
+
     try:
         from scripts.agent.page_feedback_hooks import install_recording_page_hooks
-        await install_recording_page_hooks(browser_context, business_data_store)
+        await install_recording_page_hooks(
+            browser_context, business_data_store, _ask_native_dialog
+        )
     except Exception as _xhr_err:
         sys.stderr.write(
             f"[step-feedback] page hook install failed (ignored): {type(_xhr_err).__name__}: {_xhr_err}\n"

@@ -68,7 +68,7 @@ def _bind_console(target, store) -> bool:
     return True
 
 
-async def _attach_page(page, xhr_hook: str, store) -> None:
+async def _attach_page(page, xhr_hook: str, store, ask=None) -> None:
     if page is None:
         return
     target = _target(page)
@@ -77,7 +77,7 @@ async def _attach_page(page, xhr_hook: str, store) -> None:
     console_ok = _bind_console(target, store)
     try:
         from scripts.browser.factory import attach_native_dialog_accept
-        attach_native_dialog_accept(target)
+        attach_native_dialog_accept(target, store, ask)
     except Exception as exc:
         sys.stderr.write(f"[step-feedback] dialog hook failed: {exc}\n")
         sys.stderr.flush()
@@ -92,7 +92,7 @@ async def _attach_page(page, xhr_hook: str, store) -> None:
         _remember(_attached_pages, _attached_ids, target)
 
 
-async def install_recording_page_hooks(browser_context, business_data_store=None) -> None:
+async def install_recording_page_hooks(browser_context, business_data_store=None, ask_dialog=None) -> None:
     """Install xhr, console/pageerror, and dialog accept on current and future pages."""
     from scripts.controller.actions._js_snippets import JS_XHR_HOOK
 
@@ -110,7 +110,7 @@ async def install_recording_page_hooks(browser_context, business_data_store=None
             def _on_page(new_page):
                 try:
                     task = asyncio.get_running_loop().create_task(
-                        _attach_page(new_page, JS_XHR_HOOK, business_data_store)
+                        _attach_page(new_page, JS_XHR_HOOK, business_data_store, ask_dialog)
                     )
                     _page_hook_tasks.add(task)
                     task.add_done_callback(_page_hook_tasks.discard)
@@ -137,4 +137,4 @@ async def install_recording_page_hooks(browser_context, business_data_store=None
         if current is not None:
             pages = [current]
     for page in pages:
-        await _attach_page(page, JS_XHR_HOOK, business_data_store)
+        await _attach_page(page, JS_XHR_HOOK, business_data_store, ask_dialog)
