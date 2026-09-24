@@ -12,6 +12,16 @@
 
 ## 当前工作线（2026-09-06 起）
 
+### ⑨ 录制效率与成功率（2026-09-24 立项 · 逐项评估，未开工实现）
+
+报告：[`reports/2026-09-24-recording-efficiency-success-research.md`](reports/2026-09-24-recording-efficiency-success-research.md)。基线：近 45 天 AI 录制成功率约 71%（208/292），近两周约 61%；失败轨迹活跃时间中位 7.6 分钟，成功轨迹 2 分钟。五项按报告顺序逐项评估「做不做、怎么做」，**评估写明「做」之前不改产品代码**。
+
+1. **控件卡住**（约占失败 30%，本产品能修的最大一块）— 待评估。近期候选：拒绝时给出唯一可行动作；湿测后打开 `AI_DUP_FAILURE_CUE`、`SUT_SPIN_GUARD_MODE`（挂起表 `recording-redundant-step` D2 已合入、默认 off）。长期候选：树 / 表格行 / 级联 / 弹窗「查询—选行—确定」做成参数化多步技能。
+2. **阶段完成判定改为看证据**（约占失败 10%）— 待评估。近期候选：legacy 令牌别名表；核验型阶段主收口（挂起表 `verify-phase-token` 第一步已合入，第二步等湿测）；仅导航阶段豁免零步门（733/741/742 被误伤）。证据逐条判 done 排在这三件之后。
+3. **确定性步骤不再每步问模型**（提速主线）— 待评估。候选：填写阶段按合约自动 `run_form_assistant`；登录组件回放推广到菜单导航 / 查询选行 / 选人；规划器与场景摘要降频或换小模型。知识库继续把活卡做准，不扩召回算法。
+4. **失败早发现，不从头重来** — 待评估。失败原因与页面错误落库已有挂起项 `record-page-errors`（P2，未做）。另：录前拦住在途流程 / 角色未配置；`phaseIds` 从失败阶段续录产品化；AI 录制中允许人工接管后交还。
+5. **录完即验证，验证过再沉淀** — 待评估。候选：录完对关键阶段冒烟回放；终局标出或清掉探索 / 重试 / 重复步（约 9%）；验证通过后才生成流程卡规则或组件草稿，人工发布。自动沉淀排在方向 2 的判定可靠之后。组件产品化仍属 ⑧′，不进本版实现。
+
 ### ⑧ 需求切片 → 原子草稿交易（2026-09-07 · 已落地；SPA 向导已交付）
 
 - **已合入**：两段式 API `draft-traj/propose|commit`；provenance 四字段迁移；propose cache；characterize **OK 25**（质量修复后）。
@@ -165,6 +175,7 @@
 
 > 逐日工作流水已移交 [agent-log.md](agent-log.md)（跨工具共享日志；「开场三件事 / 收工写日志」约定见 AGENTS.md）。本文件只维护工作线与挂起项。
 >
+> - 2026-09-24 ⑨ 录制效率与成功率：五个方向写入当前工作线，逐项评估，评估写明「做」之前不改产品代码。报告 `reports/2026-09-24-recording-efficiency-success-research.md`
 > - 2026-09-21 executor 未知会话终态快失败 + reconcile 清理残留内存绑定（#969）：executor `session.error` 带 `code`（`unknown_session`）；控制面 `attachLive`/`closeSession` 只对终态 code 快失败（网络无事件/非终态仍走原超时）；`reconcileRemoteSessions` 对执行机不存在的 session 补清 `state.sessions`/runtime/lease；轨迹锁默认等待 30s→60s（≥45s attach 等待）。新 pin `characterize-executor-unknown-session`；多实例分布式锁缺口另登记 `executor-multiprocess-concurrency`
 > - 2026-09-20 残留族清零 + KB 配方落地（⑥ 节详载）：wet9 族 8 节点经 Playwright 清理单全删净（机制：两类删除拦截皆为**纯前端预校验**——「删除仅限未启用」pdSt 静默吞掉无请求、「已存在产品引用」delStg 查关联即拒；解法=登录态复刻请求 / 先清 `prodPdStgRel` 悬挂关联后删阶段，后端均 200）；「选择阶段」弹窗配方 + 裁决规则已落 `product_library.json` 并并入 V2.0（`08afc16c`）
 > - 2026-09-19 上游换代落地：`uara_V2.0` 确立唯一上游（基点 `1b421bad`，engine 线 `22aa7648`+本线 `35527f80` 吸收 V1.2 全部历史，合约分支 `cf8cbe06` 并入）；V1.2 冻结；各线开工声明上游=V2.0，新分支从 V2.0 切；服务/主检出归属待用户协调（见顶部换代说明）
