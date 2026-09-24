@@ -259,6 +259,14 @@ def next_action_hint(business_data_store: dict | None) -> str:
     have = observed_kinds(business_data_store)
     intro_kinds = {'picker_closed', 'dialog_confirmed', 'introduced_backfilled'}
 
+    # introduce_pick ends at picker confirm. Later-phase fields that validation
+    # synced into pending must not hide the done cue or push a parent save.
+    if b.get('role') == 'introduce' and (have & intro_kinds):
+        return (
+            'NEXT_ACTION: done(success=true) | 选人已确认，本阶段结束。'
+            'Do NOT call click_save() on the parent form. '
+            'Do NOT fill later-phase fields or re-open 引入.'
+        )
     if fillable:
         return ''
     if b.get('requires_introduce_then_save') and not (have & intro_kinds):

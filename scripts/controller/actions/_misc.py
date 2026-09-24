@@ -416,6 +416,12 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         'Use get_page_state().iconButtons to discover true icon labels.'
     )
     async def click_button(button_text: str):
+        # 2026-09-23 merge(cursor/fix-phase5-introduce-rerecord): 引入阶段选人确认后
+        # 拦截父表单点击（introduce_done_block_message）；实现见 click_action_engine。
+        from scripts.controller.actions._phase_intent import introduce_done_block_message
+        blocked = introduce_done_block_message(business_data_store)
+        if blocked:
+            return _err(blocked, include_in_memory=True)
         return await _click_engine.click_button(button_text, mode="record")
 
     @controller.action('Save the accumulated trajectory in atp-record import-compatible JSON format.')
@@ -590,6 +596,12 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
 
     @controller.action('Click element by its [] index.')
     async def click_element_by_index(index: int):
+        # merge(cursor/fix-phase5-introduce-rerecord): introduce phase ends at
+        # picker confirm; block parent-form clicks (see click_action_engine).
+        from scripts.controller.actions._phase_intent import introduce_done_block_message
+        blocked = introduce_done_block_message(business_data_store)
+        if blocked:
+            return _err(blocked, include_in_memory=True)
         return await _click_engine.click_element_by_index(index, mode="record")
 
     @controller.action('Scroll down the page by pixel amount. Scrolls the main content container or window.')

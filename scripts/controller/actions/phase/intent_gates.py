@@ -117,6 +117,64 @@ def is_maintain_form_phase(contract: dict[str, Any] | None) -> bool:
 def is_introduce_phase(contract: dict[str, Any] | None) -> bool:
     return bool(contract and contract.get('mode') == 'introduce_pick')
 
+
+INTRODUCE_DONE_BLOCK = (
+    'introduce-phase-complete | 选人已确认，本阶段结束。'
+    '立刻 done(success=true)。'
+    '不要 click_save 父表单，不要填写后续阶段字段，不要重新打开引入或再次查询。'
+)
+
+INTRODUCE_DONE_CUE = (
+    '[SYSTEM] 选人窗口已确认，引入字段应已回填。本阶段到此结束。\n'
+    'NEXT_ACTION: Call done(success=true) NOW.\n'
+    'Do NOT call click_save() on the parent form — 父弹窗的确认/保存/提交是后续阶段。\n'
+    'Do NOT fill or select parent-form fields.\n'
+    'Do NOT re-open 引入, re-query, or re-select the row.'
+)
+
+
+def should_arm_parent_save_after_picker(business_data_store: dict | None) -> bool:
+    """Parent click_save belongs to create/modify. introduce_pick ends at confirm."""
+    return not is_introduce_phase(get_phase_intent(business_data_store))
+
+
+def arm_introduce_done(business_data_store: dict | None) -> None:
+    """Mark introduce_pick complete and disarm the parent click_save inject."""
+    if business_data_store is None:
+        return
+    business_data_store['_introduce_done_ready'] = True
+    business_data_store.pop('_submit_ready', None)
+    business_data_store.pop('_query_ui', None)
+
+
+def introduce_phase_confirmed(business_data_store: dict | None) -> bool:
+    """True after an introduce_pick phase has confirmed the picker."""
+    if not is_introduce_phase(get_phase_intent(business_data_store)):
+        return False
+    if (
+        business_data_store.get('_last_introduce_ok')
+        or business_data_store.get('_introduce_done_ready')
+    ):
+        return True
+    try:
+        from .._phase_boundary import observed_kinds
+        kinds = observed_kinds(business_data_store)
+    except Exception:
+        return False
+    return bool(kinds & {'picker_closed', 'dialog_confirmed', 'introduced_backfilled', 'confirm_click'})
+
+
+def introduce_done_block_message(business_data_store: dict | None) -> str | None:
+    """Error text when a post-confirm action must not be recorded.
+
+    Arms the recorder done-cue so the phase can end and the next phase can start.
+    """
+    if not introduce_phase_confirmed(business_data_store):
+        return None
+    arm_introduce_done(business_data_store)
+    return INTRODUCE_DONE_BLOCK
+
+
 def overlay_blocks_done(contract: dict | None) -> bool:
     """True → DOM done-heuristics (open overlay / visible errors) hard-reject.
 

@@ -99,9 +99,13 @@ def clear_phase_intent(business_data_store: dict | None) -> None:
         '_cycle_prescribed',
         '_recovery_active',
         '_last_introduce_ok',
+<<<<<<< HEAD
         '_last_save_ok',
         '_success_tokens',
         '_url_before_save',
+=======
+        '_introduce_done_ready',
+>>>>>>> origin/cursor/fix-phase5-introduce-rerecord-4766
         '_quality_failed',
         '_quality_failed_reasons',
         '_phase_section',

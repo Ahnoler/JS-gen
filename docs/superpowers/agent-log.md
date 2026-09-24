@@ -2211,3 +2211,14 @@ erify-all.sh 默认集
 - 验证：/api/docs 200（4097 直连 + 经 3000 nginx 双路）、server.log 干净启动、发版时无活跃录制
 - 执行机：发版时无一在线。local-server-proxy 进程 09-21 18:32(+08) 后已死（非本次重启所致，服务器未重启），需要录制时请自行拉起；LMY/HZX PC 执行机本就不在线
 - 回滚：ln -sfn /data/app/JS-gen-releases/20260919-085907 /data/app/JS-gen && 重启 node server.mjs
+
+## 2026-09-23 08:55 · Cursor — 收工：阶段5引入确认后误录父表单步骤（回链 08:40 开工）
+- 完成：`introduce_pick` 在选人确认后不再武装父表单 `click_save`；改为注入 done 提示，并拒绝把父弹窗确认/后续字段写入本阶段轨迹。嵌套在 create/modify 里的选人仍走父表单保存。commit **`0fc4dd94`**
+- 验收：`characterize-phase-intent` OK；`characterize-done-accept-reason` / `characterize-phase-boundary` / `characterize-phase-runtime` / `characterize-case-data` / `characterize-query-toolbar-snippet` / `characterize-phase-section-scope` / `characterize-save-section` OK
+- 遗留：未做执行机湿测（需在线浏览器复跑对公评级阶段5→6）。`phase_reviewer` 本轮日志为空异常后走了 rules fallback，合约本身已是 introduce_pick，不是本缺陷根因
+
+## 2026-09-23 08:40 · Cursor — 开工声明：阶段5引入确认后误录父表单步骤
+- 开工：08:40。录制阶段5（客户选择窗口选人并确认）在 picker 关闭后被 `_submit_ready` 推去 `click_save` 父弹窗，把阶段6字段与父表单确认录进本阶段，阶段无法 done，阶段6不起步
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/phase/boundary_gates.py`、`scripts/controller/actions/_misc.py`、`scripts/controller/actions/form_save.py`、`scripts/controller/actions/form_action_engines.py`、`scripts/controller/actions/_table.py`、`scripts/recorder.py`、`scripts/agent/recorder_emitters.py`、`scripts/characterization/characterize-phase-intent.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、他线 WIP
+- 方式：主会话直接改；先开工声明提交，再改代码与特征化

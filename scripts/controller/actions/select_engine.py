@@ -529,6 +529,12 @@ class SelectEngine(_FormActionEngineBase):
         exact_option: bool | None = None,
         element: dict | None = None,
     ):
+        if mode != "replay":
+            # merge(cursor/fix-phase5-introduce-rerecord): 引入阶段选人确认后停止下拉操作。
+            from scripts.controller.actions._phase_intent import introduce_done_block_message
+            blocked = introduce_done_block_message(self.business_data_store)
+            if blocked:
+                return blocked
         # N4 paged fallback budgets itself against the select_option action
         # budget measured from here (session_runner enforces the same budget
         # via asyncio.wait_for — overrun = budget-timeout).

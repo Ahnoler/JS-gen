@@ -118,6 +118,12 @@ class FillEngine(_FormActionEngineBase):
         element: dict | None = None,
         placeholder: str = "",
     ):
+        if mode != "replay":
+            # merge(cursor/fix-phase5-introduce-rerecord): 引入阶段选人确认后停止填写父表单。
+            from scripts.controller.actions._phase_intent import introduce_done_block_message
+            blocked = introduce_done_block_message(self.business_data_store)
+            if blocked:
+                return blocked
         if mode == "replay":
             return await self._fill_form_field_replay_impl(
                 label_text,
