@@ -1,7 +1,7 @@
 # Design: 新标签页复挂 network_capture 落库
 
 **日期**：2026-09-24  
-**状态**：对话已确认，待书面审阅  
+**状态**：已审阅；实现计划见 `docs/superpowers/plans/2026-09-24-network-capture-new-page.md`  
 **范围**：录制线。只补「新 page 上表单相关请求落库断掉」这一条。逐步反馈、回放、过滤放宽不在本文。
 
 ## 1. 问题
