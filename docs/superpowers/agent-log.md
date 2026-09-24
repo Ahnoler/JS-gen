@@ -2360,3 +2360,9 @@ erify-all.sh 默认集
 - 范围：`scripts/controller/actions/phase/intent_gates.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/phase/boundary_gates.py`、`scripts/controller/actions/_misc.py`、`scripts/controller/actions/form_save.py`、`scripts/controller/actions/form_action_engines.py`、`scripts/controller/actions/_table.py`、`scripts/recorder.py`、`scripts/agent/recorder_emitters.py`、`scripts/characterization/characterize-phase-intent.py`、本文件
 - 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、他线 WIP
 - 方式：主会话直接改；先开工声明提交，再改代码与特征化
+
+## 2026-09-24 12:40 · ZCode — 收工：前后端发版（前端 20260924-1237 / 后端 20260924-123804）
+- 前端：V2.0_dev @ a97e8e4 → front-dist/releases/20260924-1237（入口 index-pxlQ1J1k.js，资产哈希核验+API 200）
+- 后端：uara_V2.0_dev @ 3f73b6e5（dev 已并入稳定线，内容同 uara_V2.0）→ JS-gen-releases/20260924-123804；migrations 已是最新（本批无新迁移）；api/docs 200 双路、server.log 干净启动；发版时无活跃录制
+- 执行机：0 在线（各方本就未启动，非发版影响），需要录制时自行拉起
+- 回滚：后端 ln -sfn .../20260922-095101 /data/app/JS-gen && 重启；前端 ln -sfn .../releases/20260922 上一版（现 keep 列表见 releases 目录）
