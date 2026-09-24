@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 11:10 · Cursor — 开工：network_capture 新标签页复挂实现计划
+
+- 范围：`docs/superpowers/plans/2026-09-24-network-capture-new-page.md`、本文件；设计稿已在 `3915fbd2`
+- 禁入：`scripts/**` 实现（待用户选执行方式后再动）、他线 WIP
+- 执行：本会话写计划 → 用户选 Subagent-Driven / Inline 后再实现
+
 ## 2026-09-24 11:00 · Cursor — 开工：network_capture 新标签页复挂设计稿
 
 - 范围：`docs/superpowers/specs/2026-09-24-network-capture-new-page-design.md`、本文件
