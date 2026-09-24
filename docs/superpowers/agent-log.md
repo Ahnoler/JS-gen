@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 11:58 · Cursor — 收工：五个录制方向写入 todo-list（回链 11:56 开工）
+
+- 完成：`docs/superpowers/todo-list.md` 当前工作线新增 ⑨，五项均标「待评估」，并链到调研报告。评估结论未写入清单，本单元不改产品代码。
+- 验收：五项与报告第三节顺序一致，并指向已有挂起项（`recording-redundant-step`、`verify-phase-token`、`record-page-errors`、⑧′），没有另起一套重复待办。
+- 遗留：逐项方案在会话里接着做，写明「做」之前不改代码。
+
 ## 2026-09-24 11:56 · Cursor — 开工：五个录制方向写入 todo-list
 
 - 授权：用户要求按调研报告把五个方向写入总 TODO，再逐项评估做不做、怎么做。本单元只改清单。
@@ -60,6 +66,13 @@
 - 完成：`a08585cd` / `be58a2b1` / `4b9dfea2`（设计/计划 `3915fbd2`–`7b20194a`）。经 `page_feedback_hooks._attach_page` 挂 `attach_network_capture`，`teardown_network_captures` 在会话结束调用；`session_runner` 去掉启动单独挂与 `_net_cleanup`。
 - 验收：`characterize-network-capture.mjs` OK 6；`characterize-step-notice-scan.py` / `characterize-step-feedback.py` OK。整支终审 Approve with nits（header 注释与 teardown 不清 seen-set 可后补）。
 - 遗留移交：合入后湿测新标签页表单请求应有 `network_captured`；`verify-all kb,ui` 环境性失败（portable py / MySQL）与本改无关。第 1 点（控制台级别）未开。
+
+## 2026-09-24 12:05 · ZCode — 开工：uara_V2.0_dev 合入稳定线 uara_V2.0
+
+- 开工：12:05。用户指示把 dev 合入稳定 `uara_V2.0`（eab6c041 定盘点，dev 领先 165 提交，稳定无独有提交）。
+- 范围：`uara_V2.0` 分支合并提交（--no-ff）；`docs/superpowers/agent-log.md` 开工/收工条目；合并后全量 verify-all
+- 禁入：不 force push；不动 `uara_V2.0_dev` 上的其他线内容；engine worktree（D:\dev\JS-gen-engine）不碰
+- 方式：主会话直接合并；合并后全量验收再 push
 
 ## 2026-09-24 11:40 · ZCode — 收工：合入远端 5 条新分支（回链无开工条目，合并型任务补记）
 
