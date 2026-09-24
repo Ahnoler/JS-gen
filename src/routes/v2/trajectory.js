@@ -60,7 +60,7 @@ export default function (app) {
     }
   }));
 
-  /** List trajectories (paginated, filtered by functionId/keyword/recordStatus/batchTaskName/isExport). */
+  /** List trajectories (paginated, filtered by functionId/name/recordStatus/batchTaskName/isExport). */
   app.get('/api/v2/trajectories', asyncHandler(async (req, res) => {
     try {
       const {
@@ -68,7 +68,7 @@ export default function (app) {
         pageSize,
         functionId,
         functionIds,
-        keyword,
+        name,
         sortBy,
         order,
         recordStatus,
@@ -96,7 +96,7 @@ export default function (app) {
       const pagination = {
         page: +page || 1,
         pageSize: +pageSize || 20,
-        keyword,
+        name,
         sortBy,
         order,
         recordStatus: statusRaw,

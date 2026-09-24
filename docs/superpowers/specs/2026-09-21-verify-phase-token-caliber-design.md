@@ -48,3 +48,25 @@
 1. 判定式 v1 四条是否成立（尤其③写动词黑名单的取舍：黑名单缺词→漏豁免（保守安全），多词→误豁免（危险）——默认从严配置）；
 2. 落地节奏：一次到位（主收口） vs 先兜底后收口（默认推荐后者，风险面小一个量级）；
 3. 新 mode='verify' 不启用（死值维持）——如需台账级可辨识核验型阶段，另议 store 侧标记键而非 mode 字面值。
+
+## 6. 刀 2 后落点重推导（2026-09-22 补，方案 D 刀 2 = 79b4b8ba 合并后）
+
+§3/§5 写作时合约生成链还是录制时单路（review → apply_phase_contract 汇合）。方案 D 刀 2（`79b4b8ba`，分析落库合约 `trajectory_phase.contract_json`）改变了主路径，本节为主收口（第二步）的现行设计依据：
+
+**刀 2 后合约三路（`service.py:206-320` 现状）**：
+1. **持久化快照路径（新主路径）**：分析 LLM 在 analyze 时直接产出 `{v,mode,refill,submitRequired,successWhen}`，Node `normalizePhaseContract` 校验落库 `trajectory_phase.contract_json`，录制下发 → Python `apply_persisted_phase_contract`（`phase_contract_snapshot.py`）直接写 intent+boundary，**跳过 compile/review/apply_phase_contract 全链**；
+2. review 路径（快照缺失/非法/heal 外的回退）：原链路不变；
+3. rules 兜底（review 也失败）：原链路不变。
+
+**三个改变主收口设计的事实**：
+- **① mode 侧证（判定式条件④）在持久化路径失效**：门侧豁免（已交付，c55cc849）对 `mode ∈ veto` 直接 False——而持久化路径的 mode 恰是分析 LLM 的输出（phase-reviewer-prompt.md 对纯核验阶段零指引，误标 create/modify 风险真实）。对持久化误标形态，第一步豁免是死代码。
+- **② submit.required 的运行中危害升级**：分析侧误标 `submitRequired=true` 后，recovery 处方强推 click_save（prompt 第 61 条证据）、步数下限 8（prompt 第 36 条）、done 拒绝门/overlay 门四族消费方全部误发——不再只是收尾误杀，是行为腐化。
+- **③ 持久化路径的判定文本仍在**：阶段描述（phase_core）随下发流程可得，文本判定输入不缺。
+
+**主收口（第二步）落点 = 持久化消费点的文本降级**（非 §3 原定的 `apply_phase_contract`）：
+- 纯函数 `downgrade_contract_for_verification(contract, boundary, task_text)`（放 `phase_contract_snapshot.py`，**不碰** `normalize_phase_contract`——保持其纯校验语义，Cursor pin 零扰动）：输入 task_text 过**纯文本三条件**（①保存线索零命中 ②核验根+宾语 ±16 共现 ③写动词黑名单零命中（宾语掩蔽）——即冻结词表 v1 的条件①②③，**弃条件④**：持久化 mode 是被怀疑对象不能作侧证）；三条件全中 → `submit.required=False`、`success.kinds=[]`、`boundary.success_when=[]`（boundary role 不动——'other' 降级牵动 section scope 面爆炸半径不成比例，且 success_when 清空后 role 已无 token 语义）。
+- 接线：`service.py` persisted 分支成功后 3-5 行调用 + stderr 留痕 `phase_contract=verify_downgraded`；fallback 两路径不动（已有门侧豁免兜底，第一步交付）。
+- **FP 成本不对称再评估**：降级误判的代价=agent 不被要求保存证据但阶段文本仍指示做什么（且 #924 对照钉住核验+写混合形态）；收益=#973 型不再误杀且 recovery 不再腐化行为。词表冻结 v1 不动，词表修订仍须独立校准批。
+- 反例防线不变（§2 末段）：只移除「向保存令牌看齐」，零步门禁/G3/终局门闩/显式 success 自报全部照常。
+
+**实施顺序微调（对 §4.3 的修订）**：门侧兜底（第一步，c55cc849 已交付）观察窗证据=湿测零 FP 命中记录；主收口（第二步，本节）不再要求等待——因为落点从 apply_phase_contract（影响全部 fallback）收窄为 persisted 消费点（只影响分析侧误标形态），爆炸半径更小。历史盘点（§4.1）仍待判定式最终定稿后进行。

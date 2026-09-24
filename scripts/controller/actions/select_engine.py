@@ -26,6 +26,7 @@ from .form_scan_utils import (
     match_select_option_candidate,
     _resolve_control, lookup_field_kind, resolve_select_fallback, _task_done_impl,
 )
+from .same_family import format_same_family_candidates, resolve_same_family_target
 from .form_engine_base import (
     _FormActionEngineBase,
     _ReplayAutofillStub,
@@ -528,6 +529,12 @@ class SelectEngine(_FormActionEngineBase):
         exact_option: bool | None = None,
         element: dict | None = None,
     ):
+        if mode != "replay":
+            # merge(cursor/fix-phase5-introduce-rerecord): 引入阶段选人确认后停止下拉操作。
+            from scripts.controller.actions._phase_intent import introduce_done_block_message
+            blocked = introduce_done_block_message(self.business_data_store)
+            if blocked:
+                return blocked
         # N4 paged fallback budgets itself against the select_option action
         # budget measured from here (session_runner enforces the same budget
         # via asyncio.wait_for — overrun = budget-timeout).
@@ -539,6 +546,27 @@ class SelectEngine(_FormActionEngineBase):
         await _wait_if_loading(page)
         await self._maybe_ensure_scanned(label_text, mode)
         field_kind = lookup_field_kind(self.business_data_store, label_text)
+        _sf_sel = resolve_same_family_target(
+            self.business_data_store.get('_scan_fields') or [],
+            label=label_text,
+            xpath_smart=(xpath_smart or '').strip(),
+            action='select',
+        )
+        if not _sf_sel.get('ok'):
+            _cands = _sf_sel.get('candidates') or []
+            _nxt = format_same_family_candidates(_cands)
+            _err = _sf_sel.get('error') or 'err-ambiguous-field-slot'
+            if is_replay:
+                return f'{_err} | {_nxt}'
+            return err_with(
+                _err,
+                '同标签多控件须带 xpath_smart 指定槽位',
+                observed=f'label={label_text} candidates={len(_cands)}',
+                next_action=_nxt,
+            )
+        if (_sf_sel.get('kind') or '') and (_sf_sel.get('xpath_smart') or '').strip():
+            xpath_smart = (_sf_sel.get('xpath_smart') or '').strip()
+            field_kind = (_sf_sel.get('kind') or '').strip() or field_kind
         dispatch = await resolve_select_dispatch(
             label=label_text,
             element=replay_element,
@@ -1117,7 +1145,9 @@ class SelectEngine(_FormActionEngineBase):
             captured = await _capture_element(
                 page, label_text, target_kind='form_tssc_multi_select', xpath_smart=xp,
             )
-        result = await page.evaluate(JS_TSSC_MULTI_SELECT, [label_text, option_text])
+        result = await page.evaluate(
+            JS_TSSC_MULTI_SELECT, [label_text, option_text, xp or ''],
+        )
         if _is_ok_result(result):
             if is_replay:
                 return str(result)

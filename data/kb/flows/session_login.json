@@ -12,8 +12,10 @@
   "state_actions": [],
   "rules": [
     {"keyword": "会话", "rule": "登录约 50 分钟倒计时，剩余<20min 告警；过期自动回登录页"},
-    {"keyword": "营业日期", "rule": "localStorage businessDate（滞后真实日期）为业务日期字段默认；登记日期类系统戳用真实时间"}
+    {"keyword": "营业日期", "rule": "localStorage businessDate（滞后真实日期）为业务日期字段默认；登记日期类系统戳用真实时间"},
+    {"keyword": "按钮文案空格", "rule": "SUT 弹窗按钮文案内部可能带空格（如「取 消」「确 定」）——按文案比对定位按钮时必须先剔除全部空白再比；否则「取 消」匹配不中取消而误点「确 定」=关弹窗变保存（双侧已修：close_dialog 引擎+JS 片段；自写脚本/LLM 现场仍会踩）。点击前先读按钮全集核对目标，勿凭文案记忆直点"},
+    {"keyword": "二级菜单 DOM", "rule": "SUT 左侧菜单是双 DOM 结构：二级菜单 li[data-id] 恒隐藏（style 隐藏），用户可见的是 li.submenu-item[data-url] 飞出链接——对二级菜单用「可见性点击」类定位必败；正确做法=按菜单名点可见 flyout 链接，或读 data-url 直达路由（JS 原生 el.click() 不受隐藏影响）。一二级菜单导航配方见 2026-09-05 真机复核（410 条 xpath 全匹配）"}
   ],
   "exceptions": [],
-  "source": "K1/K2 2026-08-31 + 多轮实测"
+  "source": "K1/K2 2026-08-31 + 多轮实测；+2 规则 2026-09-22 记忆沉淀（close-dialog 空格 bug 双侧修 b4b832e0/873d534 + 菜单真机复核报告）"
 }

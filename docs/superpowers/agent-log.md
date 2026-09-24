@@ -1,6 +1,548 @@
 # Agent 协作日志
 
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
+> 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
+
+## 2026-09-24 11:58 · Cursor — 收工：五个录制方向写入 todo-list（回链 11:56 开工）
+
+- 完成：`docs/superpowers/todo-list.md` 当前工作线新增 ⑨，五项均标「待评估」，并链到调研报告。评估结论未写入清单，本单元不改产品代码。
+- 验收：五项与报告第三节顺序一致，并指向已有挂起项（`recording-redundant-step`、`verify-phase-token`、`record-page-errors`、⑧′），没有另起一套重复待办。
+- 遗留：逐项方案在会话里接着做，写明「做」之前不改代码。
+
+## 2026-09-24 11:56 · Cursor — 开工：五个录制方向写入 todo-list
+
+- 授权：用户要求按调研报告把五个方向写入总 TODO，再逐项评估做不做、怎么做。本单元只改清单。
+- 工作范围：`docs/superpowers/todo-list.md`、本条目。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`、`config/.env`、调研报告正文。
+- 执行方式：主会话直接写入。逐项方案在清单落定后另说，本单元不改产品代码。
+
+- 完成：merge 合入 `cursor/console-feedback-brainstorm-20260924`。决定稿 + `characterize-step-feedback` NameError 修复。冲突只在 agent-log，并排保留。
+- 验收（合并后）：`characterize-step-feedback.py` OK；`characterize-step-notice-scan.py` OK。
+- 遗留：无。对照 MCP 的 1–6 点全部闭环。
+## 2026-09-24 12:10 · Cursor — 开工：合入第1点决定 + step-feedback pin 修复
+
+- 范围：合入 `cursor/console-feedback-brainstorm-20260924`（决定稿 + `characterize-step-feedback` NameError 修复）；本文件
+- 禁入：不另改产品代码；冲突只解 agent-log
+- 执行：主仓 `--no-ff` 合入 → 合并后复跑 pin → 收工 push
+
+## 2026-09-24 12:05 · Cursor — 收工：修复 characterize-step-feedback NameError（回链 12:00 开工）
+
+- 完成：把 `_assert_non_json_http_fallback` 挪到 `main` 之前，消除 `if __name__` 后定义导致的 NameError（他线 `c54b6c19` 合入残留）。
+- 验收：`characterize-step-feedback.py` OK；`characterize-step-notice-scan.py` OK。
+- 遗留：无。第 1 点决定稿 + 本修复待一并合入 `uara_V2.0_dev`。
+
+## 2026-09-24 12:00 · Cursor — 开工：修复 characterize-step-feedback NameError
+
+- 范围：`scripts/characterization/cold/characterize-step-feedback.py`、本文件
+- 禁入：产品运行时代码；只把 `_assert_non_json_http_fallback` 挪到 `main` 之前
+- 执行：本会话修 pin → 验收绿 → 与第 1 点决定稿一并合入 `uara_V2.0_dev`
+
+## 2026-09-24 11:55 · Cursor — 收工：第 1 点控制台口径关闭为维持现状（回链同条开工）
+
+- 完成：`docs/superpowers/specs/2026-09-24-console-feedback-status-quo-decision.md`。用户选 D：只收 error/pageerror、继续自动推送、不加按需读工具、不扩 warning/log。无产品代码改动。
+- 验收：书面决定与对话一致；重开条件写在决定稿 §5。
+- 遗留：无。对照 MCP 的 1–6 点至此均已落地或明确关闭（2/3/5、4、6 已合；1 关闭）。他线 `characterize-step-feedback` NameError 仍在 uara_V2.0_dev。
+
+## 2026-09-24 11:52 · Cursor — 开工：第 1 点控制台「谁来读 / 级别」brainstorm
+
+- 范围：`docs/superpowers/specs/2026-09-24-console-feedback-status-quo-decision.md`、本文件
+- 禁入：`scripts/**`、`src/**`（本项决定不改代码）
+- 执行：对话确认选 D 后落决定稿并收工
+
+## 2026-09-24 11:50 · Cursor — 收工：network_capture 新标签页复挂已合入 uara_V2.0_dev（回链 11:45 开工）
+
+- 完成：`a941bb7e`。`cursor/network-capture-new-page-design-20260924` 以 `--no-ff` 合入。冲突只在 `docs/superpowers/agent-log.md`，双方条目并排保留。
+- 验收（合并后）：`characterize-network-capture.mjs` OK 6；`characterize-step-notice-scan.py` OK。
+- 遗留移交：`scripts/characterization/cold/characterize-step-feedback.py:316` 的 `_assert_non_json_http_fallback` 定义在 `if __name__` 之后，`main()` 调用时 `NameError`——来自他线 `c54b6c19`（step-feedback-api-prompt）合入，非本次 diff。复现：`PYTHONUTF8=1 python scripts/characterization/cold/characterize-step-feedback.py`。合入后湿测新标签页表单请求应有 `network_captured`。第 1 点未开。
+
+## 2026-09-24 11:45 · Cursor — 开工：合入 network_capture 新标签页复挂到 uara_V2.0_dev
+
+- 范围：`docs/superpowers/agent-log.md`；合入 `cursor/network-capture-new-page-design-20260924`（`--no-ff`）
+- 禁入：功能代码本会话不另改（冲突只解 agent-log）；他线 WIP 不碰
+- 执行：本会话于主仓合入 → 合并后复跑 feature pins → 收工 push
+
+## 2026-09-24 11:40 · Cursor — 收工：network_capture 新标签页复挂实现（回链 11:15 开工）
+
+- 完成：`a08585cd` / `be58a2b1` / `4b9dfea2`（设计/计划 `3915fbd2`–`7b20194a`）。经 `page_feedback_hooks._attach_page` 挂 `attach_network_capture`，`teardown_network_captures` 在会话结束调用；`session_runner` 去掉启动单独挂与 `_net_cleanup`。
+- 验收：`characterize-network-capture.mjs` OK 6；`characterize-step-notice-scan.py` / `characterize-step-feedback.py` OK。整支终审 Approve with nits（header 注释与 teardown 不清 seen-set 可后补）。
+- 遗留移交：合入后湿测新标签页表单请求应有 `network_captured`；`verify-all kb,ui` 环境性失败（portable py / MySQL）与本改无关。第 1 点（控制台级别）未开。
+
+## 2026-09-24 12:05 · ZCode — 开工：uara_V2.0_dev 合入稳定线 uara_V2.0
+
+- 开工：12:05。用户指示把 dev 合入稳定 `uara_V2.0`（eab6c041 定盘点，dev 领先 165 提交，稳定无独有提交）。
+- 范围：`uara_V2.0` 分支合并提交（--no-ff）；`docs/superpowers/agent-log.md` 开工/收工条目；合并后全量 verify-all
+- 禁入：不 force push；不动 `uara_V2.0_dev` 上的其他线内容；engine worktree（D:\dev\JS-gen-engine）不碰
+- 方式：主会话直接合并；合并后全量验收再 push
+
+## 2026-09-24 11:40 · ZCode — 收工：合入远端 5 条新分支（回链无开工条目，合并型任务补记）
+
+- 完成：origin/uara_V2.0_dev 快进至 6e5a600c（上游自合 phase7，跳过）；`cursor/fix-phase5-introduce-rerecord` 语义合入 `e6cded6a`；`cursor/step-feedback-api-prompt` 合入 `c54b6c19`；3 条日报分支合入 `87b508c8`/`f7b93f34`/`b6735e83`。
+- 冲突处置：phase5 分支基于 ClickEngine 统一前的旧基线，_misc/form_action_engines 不能整边取——introduce 门移植进 `_misc.py` 包装器、`click_action_engine.py`（父弹窗确认拦截 + picker 关闭按阶段角色分流）、`fill_engine.py`/`select_engine.py`（填写/下拉拦截）；phase-intent pin 由 git 重命名检测自动并入 cold/ 版（+51 断言）；step-feedback pin 冲突取并集；agent-log 并排保留（phase5 分支远古基线旧条目不入，仅取其 08:40/08:55 两条）；两份同名 2026-09-21 日报并存（分支版另存 -alt.md）。
+- 事故自纠：intent_contract.py 首次解决因本机 `python` 命中 WindowsApps 空壳（退出 49）静默失败，冲突标记被误暂存——fix 提交清除；后续均用 `./python/python.exe`。
+- 验收：合并后全量 `bash scripts/refactor/verify-all.sh` EXIT=0 全绿（含 spin-guard、三源 xpath 11×6 一致）。lint 284 条 warning 为合入他线代码新增（0 errors，verify-all 通过），留他线核对。
+- 遗留：DB 走服务器直连未遇阻断；未做执行机湿测（与 phase5/step-feedback 分支收工口径一致）。
+
+## 2026-09-24 11:28 · Cursor — 收工：录制效率与成功率调研报告（回链 11:20 开工）
+
+- 完成：`docs/superpowers/reports/2026-09-24-recording-efficiency-success-research.md`。五路只读调研合成五个方向：控件卡住、阶段判定看证据、确定性步骤不每步问模型、失败早发现、录完验证再沉淀。未改产品代码。
+- 验收：报告含近 45 天查库基线（成功率约 71%、失败 84 条分类、步间隔与重复步）、五个方向的证据与不做清单、建议顺序。占比已注明是估计；「控件卡住 +10–15 个百分点」已按条数改写为最多约 10 个百分点。
+- 遗留：未立项、未改代码。`config/.env` 仍指向隧道地址，本次查库只在临时脚本里直连，未改该文件。
+
+## 2026-09-24 11:20 · Cursor — 开工：录制效率与成功率调研报告
+
+- 授权：用户要求把本会话五路只读调研落成报告，不改产品代码。
+- 工作范围：`docs/superpowers/reports/2026-09-24-recording-efficiency-success-research.md`、本条目。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`、`config/.env`、他线未跟踪的 product-mgmt 草稿。
+- 执行方式：主会话根据已完成的调研成文。
+
+## 2026-09-24 11:15 · Cursor — 开工：network_capture 新标签页复挂实现（SDD）
+
+- 范围：`scripts/agent/page_feedback_hooks.py`、`scripts/session_runner.py`、`scripts/characterization/characterize-network-capture.mjs`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`docs/superpowers/plans/2026-09-24-network-capture-new-page.md`、本文件
+- 禁入：`scripts/controller/actions/network_capture.py` 过滤逻辑、回放线、step-feedback cue、他线 WIP
+- 执行：Subagent-Driven，按计划 Task 1→3；主会话验收与收工
+
+## 2026-09-24 11:10 · Cursor — 收工：识图辅助开关写入配置文件（补记，回链 2026-09-23 16:15）
+
+- 代码已在 `79631d3b`，并且是当前 `origin/uara_V2.0_dev`（`6e5a600c`）的祖先，无需再合一次。16:25 的收工当时停在工作区，这次快进后补上。
+- `config/.env.example` 写出未注释的 `AI_RECORD_VISION=true`。Python 在进程环境没有该键时读 `config/.env`；控制面拉起录制进程时也把该键传下去。执行机原本就会转发。
+- 验收：当时 `characterize-record-sidepath` OK。随后 `aebae414` 在同一分支上加了识图专用模型四件套，开关语义未改。
+- 遗留：仓库里没有 `config/.env`。正在用的那份需要自行加上 `AI_RECORD_VISION` 后重启执行机，运行中的开关才会变。
+
+## 2026-09-24 11:10 · Cursor — 开工：network_capture 新标签页复挂实现计划
+
+- 范围：`docs/superpowers/plans/2026-09-24-network-capture-new-page.md`、本文件；设计稿已在 `3915fbd2`
+- 禁入：`scripts/**` 实现（待用户选执行方式后再动）、他线 WIP
+- 执行：本会话写计划 → 用户选 Subagent-Driven / Inline 后再实现
+
+## 2026-09-24 11:00 · Cursor — 开工：network_capture 新标签页复挂设计稿
+
+- 范围：`docs/superpowers/specs/2026-09-24-network-capture-new-page-design.md`、本文件
+- 禁入：`scripts/**`、`src/**`、他线代码与未合并 WIP
+- 执行：本会话写设计稿 → 用户审阅 → 再写实现计划；实现另开任务
+
+## 2026-09-24 10:45 · Cursor — 收工：阶段7确认录制已合入 uara_V2.0_dev（回链 10:35 开工）
+
+- 完成：`519c4d93`。`cursor/fix-phase7-confirm-record-4766` 以 `--no-ff` 合入 `origin/uara_V2.0_dev`。冲突只在 `docs/superpowers/agent-log.md`，双方条目并排保留。分类代码未改。
+- 验收：合入后同一句阶段 6 为 `form_fill`、不索要 `query_clicked`；阶段 7 按钮文案为「确认」。
+- 遗留：执行机需拉取 `uara_V2.0_dev` 并重启后才会用到这次分类。未做湿测。
+
+## 2026-09-24 10:35 · Cursor — 开工：把阶段7确认录制合入 uara_V2.0_dev
+
+- 开工：10:35。用户要求把 `cursor/fix-phase7-confirm-record-4766`（`f1bdb174` 起）合入 `uara_V2.0_dev`。冲突按并排保留双方 agent-log 处理，不改分类逻辑。
+- 范围：合并本身；预期冲突文件 `docs/superpowers/agent-log.md`，其余能自动合则自动合
+- 禁入：不改阶段判定实现，不把 master 上的阶段5引入修复带进来
+- 方式：主会话在最新 `origin/uara_V2.0_dev` 上合并该分支后推送
+
+## 2026-09-24 09:02 · Cursor — 开工：录制原生弹窗交给模型选择
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-23-native-dialog-step-feedback.md`。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/native-dialog-feedback-design-20260923`（自 `2d1739e8`）。
+- 工作范围：`scripts/agent/native_dialog.py`、`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/browser/factory.py`、`scripts/agent/page_feedback_hooks.py`、`scripts/session_runner.py`、`scripts/characterization/cold/characterize-step-feedback.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、本条目。
+- 禁入区：回放线、`scripts/agent/service.py`、`data/kb/**`、控制台 warning/log、`network_capture` 挂载。不新增动作，不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话派实现子智能体，每任务评审。子智能体可 commit，不 push。
+
+## 2026-09-23 22:25 · Cursor — 实现计划：录制原生弹窗交给模型选择
+
+- 授权：用户确认设计稿后继续。
+- 工作范围：`docs/superpowers/plans/2026-09-23-native-dialog-step-feedback.md`；设计稿状态改为已审阅；本条目。不改产品代码。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`。实现等用户选定执行方式后再开工。
+
+## 2026-09-23 21:45 · Cursor — 设计稿：录制原生弹窗交给模型选择
+
+- 授权：用户选定 B（`alert` 自动接受；`confirm` / `prompt` 在当前点击内问一次）和做法 1（不把选择留到下一步），并确认行为、机制、验收三节。
+- 工作范围：`docs/superpowers/specs/2026-09-23-native-dialog-step-feedback-design.md`、本条目。不改产品代码。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`。第 1、6 点（控制台级别、`network_capture` 新标签页）不在本稿。
+- 状态：书面稿待用户审阅后再写实现计划。
+
+## 2026-09-23 20:55 · Cursor — 收工：非 JSON 错误页、toast 旁保留接口错误、去掉接线中（4c3e6c11）
+
+- 回链 20:40 开工。完成：`4c3e6c11`。HTTP 失败且响应不是 JSON 时，逐步反馈写成 `HTTP <状态> <路径>`（200 的 HTML 仍不记）。toast/表单旁边保留接口错误；只有标明 `level=success` 的接口行才在有界面反馈时丢掉。`list_todo_cards`、`wf_submit_guard`、`verify_context` 去掉「接线中」。
+- 验收：`characterize-step-feedback`（含 node 探针：503 HTML → `HTTP 503 /api/save`，JSON 业务错误仍在）、`characterize-step-notice-scan`、real-click / search-then-click / close-dialog / set-vue-model / strip-dialogs / field-value-match 均 OK。`verify-all.sh ui` 仅 `layer-tree`、`step-highlight` 因本机无 `DB_PASS` 失败，与本次 diff 无关。
+- 遗留：未合入 `uara_V2.0_dev`。第 1、4、6 点未做。未做 503 真机湿测。
+
+## 2026-09-23 20:40 · Cursor — 开工：非 JSON 错误页、toast 旁保留接口错误、去掉接线中
+
+- 授权：用户确认补上次对照的第 2、3、5 点。第 1、4、6 点（谁来读、原生弹窗文案、network_capture 新 tab）下一步再做。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/step-feedback-api-prompt-20260923`（自 `origin/uara_V2.0_dev` `2d1739e8`）。
+- 工作范围：`scripts/controller/actions/js_snippets/step_notice.py`、`scripts/agent/step_feedback.py`、`scripts/prompts/agent-tools-common.md`、`scripts/characterization/cold/characterize-step-feedback.py`、本条目。
+- 禁入区：回放线、`scripts/agent/service.py`、`data/kb/**`、主检出未提交的识图四件套、原生 dialog 文案、`network_capture`。不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话先改 pin 再实现。微步 `bash scripts/refactor/verify-all.sh ui`。
+
+## 2026-09-23 18:20 · ZCode — 收工：识图旁路 LLM 独立配置四件套
+
+- 回链 17:20 开工。完成：识图专用 LLM 可独立配置——`config/.env` 新增 `AI_RECORD_VISION_LLM_MODEL/_BASE_URL/_API_KEY/_TIMEOUT_MS` 四键（语义同 FORM_LLM_*：MODEL 未设完全回落录制主 Agent 的 `agent.llm` 不建独立实例；BASE_URL/API_KEY 回落主 `LLM_*`；TIMEOUT_MS 回落 `LLM_TIMEOUT_MS` 再回落 20000，探活超时仍 15s）。Python 端 `feature_flags.record_vision_llm_config()` + `record_vision._get_vision_llm()`（按配置缓存、改配置重建）+ `ask_vision` 改走专用实例；控制面 `src/runtime/agent-process.js` 与执行机 `executor/config.js` 双侧透传（MODEL 未设不透传）。
+- 事故记录（自省）：17:53 `git pull` 快进合入上游 console 逐步反馈时，本线 11 个文件的未提交实现改动被覆盖丢失（未 stash、未 commit、无 git 对象可恢复；fsck 扫 dangling 对象均无）。已按原设计全部重做并重验。教训：**未提交改动存在时先 stash（或先提交 WIP）再做任何 pull/merge/checkout**；开工声明 commit 不保护工作区。
+- 越界说明（两笔，均有因）：① `characterize-llm-role-env.py` 按收编政策登记进 verify-all core 域（此前归档 cold/ 未受门禁保护，本次它钉到识图角色契约），并在 `--changed` 路径规则补 `scripts/feature_flags.py`；② `characterize-sso-auth.mjs` 重钉——今日上游 `d15482c6`（黄正祥）把 list 过滤 `keyword` 改名 `name`，存量断言断针，非本线所致，同步断言子串并注明。
+- 验收：合并后全量 `bash scripts/refactor/verify-all.sh` EXIT=0（198 pins + statics ALL GREEN，含新登记的 llm-role-env 与重钉的 sso-auth）；识图配置自测 6 组断言过（回落/独立实例/缓存/改配置重建/超时回落与容错/env 优先于文件）；eslint 改动 JS 三文件 0 error 0 warning；py_compile / node --check 过。
+- 遗留：识图是否真能看图取决于专用模型/网关支持 `image_url`（未配 MODEL 时=主模型通道，探活失败自动退回纯文本，stderr `[record-vision]` 可观测）；真实录制湿测未做（需在线 SUT）。
+
+## 2026-09-23 17:52 · Cursor — 合并回执：逐步反馈 console / 新 tab 合入 uara_V2.0_dev
+
+- 合并：`cursor/step-feedback-console-20260923`（`55424ca0`）→ `uara_V2.0_dev`，`--no-ff`。agent-log 与识图旁路开工条目并排保留。主检出未提交的识图四件套 WIP 未触碰。
+- 生效：新开的录制会话即可。`console.error` / `pageerror` 进入下一步 `[step-feedback]`（`console:err:` / `console:pageerror:`）；新 tab 复挂 xhr、console 与原生弹窗接受。
+- 测试：触发一次 `console.error`，看下一步记忆是否出现 `console:err:`；再开一个标签页，确认接口错误和页面报错仍进反馈。未做这次湿测。
+
+## 2026-09-23 17:20 · ZCode — 开工：识图旁路 LLM 独立配置（⑥ 识图角色四件套）
+
+- 授权：用户要求识图模型可单独配置（不复用录制主 Agent 的 LLM）。
+- 工作范围：`scripts/feature_flags.py`（新增 record_vision_llm_config 四键解析）、`scripts/agent/record_vision.py`（_get_vision_llm 缓存实例 + ask_vision 接线）、`config/.env.example`、`executor/.env.example`、`src/runtime/agent-process.js`（仅转发 4 键）、`executor/config.js`（仅 buildPythonSubprocessEnv 传播 4 键）、`scripts/characterization/cold/characterize-record-sidepath.py` 与 `characterize-llm-role-env.py`（pin 增补）、本条目。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/agent/record_sidepath.py` 判定逻辑、`AI_RECORD_VISION`/`AI_RECORD_GATE_CUE` 开关语义、回放与 heal、`src/routes/setup.js`。
+- 执行方式：主会话直接实现；键名 `AI_RECORD_VISION_LLM_MODEL/_BASE_URL/_API_KEY/_TIMEOUT_MS`，未设 MODEL 完全回落 agent.llm（fail-open），语义同 FORM_LLM_*。
+
+## 2026-09-23 17:20 · Cursor — 验收：逐步反馈 console 分支可合入 uara_V2.0_dev
+
+- 集成：`ac27d1a4` 合入 `origin/uara_V2.0_dev`（agent-log 双方条目并排）。挂载修复 `e7a2226d`：新 page 的 `create_task` 持有强引用，挂载失败不记成已完成，页面身份用弱引用。
+- 评审：P0-A/P0-B 与开工范围一致；两处 Important（任务被回收、失败后不再重试）已修。
+- 全量 `verify-all.sh` 197 pins。本功能 pin（step-notice-scan、step-feedback）在集成态 OK。7 条红均非本 diff：`fill-err-with-scope`、`idempotent-click-gate` 是控制台 GBK 无法打印 ✓，`PYTHONUTF8=1` 重跑通过；`export-v3`、`layer-tree`、`step-highlight` 是本机无 `DB_PASS`；`network-capture` 的 Python 探针因工作区没有自带 `python/python.exe`（接线断言已过）；`sso-auth` 仍是 `d15482c6` 把 `keyword` 改成 `name`，pin 还在找 `keyword`。
+- 遗留：未做真机 `console.error` 湿测。P1 三项不在本分支。
+
+## 2026-09-23 17:05 · Cursor — 收工：录制逐步反馈补 console 与新 tab（d4030f1c）
+
+- 回链 16:47 开工。完成：`d4030f1c`。console.error 与 pageerror 写入会话环形缓冲（最多 20 条），下一步 cue 为 `console:err:` / `console:pageerror:`。`ctx.on('page')` 给之后打开的 page 复挂 xhr init script、console/pageerror 和原生弹窗自动接受。未恢复 `read_xhr_log` / `read_error_notify`。
+- 验收：`characterize-step-notice-scan`、`characterize-step-feedback`、`characterize-xhr-log`、`characterize-error-notify`、`characterize-phase-done-runid`、`characterize-replay-cancel-awareness`、`characterize-llm-role-env`、`characterize-probe-donelog-and-suspect-noise`、`characterize-runid-bridge` 均 OK。`verify-all.sh ui` 除 `characterize-step-highlight` 与 `characterize-layer-tree` 外通过；这两条是工作区没有数据库口令（`root@localhost` Access denied），与本次 diff 无关。
+- 遗留：未做真机 console.error 湿测。P1（非 JSON 错误体、omit_api 口径、prompt「接线中」）按开工范围未做。`network_capture` 仍只挂启动时的 page。
+
+## 2026-09-23 18:55 · Cursor — 收工：阶段判定文档与提示词对齐（回链 18:40 开工）
+
+- 完成：`e712b4dc`。令牌归属说明、结构化合约对照、阶段评审提示词、需求分析合约对照改成与 `f1bdb174` 相同的口径：控件结构遮罩，动作子句写明的点击不交出，查询/保存/下一步/登录/引入按下一阶段消歧。分类代码未改。
+- 验收：`characterize-refill-contract`、`characterize-phase-save-cue-promote`、`cold/characterize-search-then-click-prompts` OK。`characterize-phase-contract` 与 `characterize-analyze-case-data` 因本机无 `node_modules`（缺 knex）未跑；所钉的提示词原文仍在。
+- 遗留：无
+
+## 2026-09-23 18:40 · Cursor — 开工：阶段判定文档与提示词对齐动作子句消歧
+
+- 开工：18:40。`f1bdb174` 已改分类，设计说明和评审/拆分提示词仍按旧口径写令牌归属。只改文档与提示词对照，不改分类代码。
+- 范围：`docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`、`docs/superpowers/specs/2026-09-21-phase-structured-contract-design.md`、`scripts/prompts/phase-reviewer-prompt.md`、`src/services/trajectory/trajectory-meta-service.js`（仅合约对照与 3.3 一句）、本文件
+- 禁入：`scripts/controller/actions/phase/*.py`、`data/kb/**`、点击录制与回放、他线 WIP
+- 方式：主会话直接改说明；先开工声明提交
+
+## 2026-09-23 18:34 · Cursor — 收工：各操作类型按本阶段动作与下一阶段消歧（回链 18:22 开工）
+
+- 完成：`f1bdb174`。去掉查询字段名黑名单。下拉/输入框/日期控件整段遮住后再判查询和引入。本阶段写明的点击查询、点击保存/确认、点击下一步、登录保持原判。本阶段没写该动作、下一阶段写了，则查询、保存、下一步、登录令牌交给下一阶段。修改只认动作子句。保存按钮仍按动作子句最后一次点击取文案。
+- 验收：`characterize-query-field-not-query` OK；`characterize-reset-phase-not-query` / `characterize-case-data` / `characterize-cross-phase-token-guard` / `cold/characterize-phase-boundary` / `cold/characterize-phase-intent` / `characterize-phase-runtime` / `characterize-phase-reviewer` / `characterize-phase-save-cue-promote` / `characterize-contract-arbitration-circuit-breaker` / `characterize-phase-reviewer-flow` OK
+- 遗留：未做执行机湿测。`characterize-g3-done-gate-live` 本机缺 Playwright 浏览器，未跑
+
+## 2026-09-23 18:22 · Cursor — 开工：各操作类型按本阶段动作与下一阶段消歧
+
+- 开工：18:22。撤掉查询字段名黑名单。本阶段动作子句写明的查询/引入/保存/下一步/登录保持原判；只有本阶段没写该动作时，才用阶段目录把令牌交给下一阶段。控件操作按「下拉/输入框/日期控件」结构遮罩，不按字段名。
+- 范围：`scripts/controller/actions/phase/classify.py`、`scripts/controller/actions/phase/boundary_contract.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/characterization/characterize-query-field-not-query.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、点击录制与回放、他线 WIP
+- 方式：主会话直接改；先开工声明提交。既有重置/开页/查询条件后点击查询/引入打开窗口等特征化必须仍通过
+
+## 2026-09-23 17:55 · Cursor — 收工：阶段7确认未录（回链 17:43 开工）
+
+- 完成：`670adba3`。`查询事由`/`查询类型`/`查询原因`/`征信查询` 不再把填写阶段签成 query；阶段6为纯填写（`success_when=[]`，弹窗可保持打开后 done）。阶段7动作子句点击【确认】时，保存合同按钮为「确认」，`click_save` 能匹配到该按钮并入轨迹。`verify-all.sh` 接入新 pin。
+- 验收：`characterize-query-field-not-query` OK；`characterize-reset-phase-not-query` / `characterize-case-data` / `cold/characterize-phase-boundary` / `characterize-phase-runtime` / `characterize-phase-reviewer` / `characterize-phase-save-cue-promote` / `cold/characterize-phase-intent` OK
+- 遗留：未做执行机湿测。`characterize-g3-done-gate-live` 本机缺 Playwright 浏览器，未跑。`phase_reviewer` 空异常仍走 rules_fallback，本缺陷根因是 fallback 把阶段6判成 query
+
+## 2026-09-23 17:43 · Cursor — 开工：阶段7确认未录（阶段6被查询字段名误判）
+
+- 开工：17:43。执行机 sid 6038ecfa：阶段5/6操作步骤已录上，阶段6被 `查询事由`/`查询类型` 判成 query，`done()` 因缺少 `query_clicked` 被拒，阶段7的【确认】从未执行。阶段7若起步，create 合同按钮写死「保存」，点不到弹窗【确认】。
+- 范围：`scripts/controller/actions/phase/classify.py`、`scripts/controller/actions/phase/boundary_contract.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/characterization/characterize-query-field-not-query.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、他线 WIP
+- 方式：主会话直接改；先开工声明提交，再改分类与保存按钮，并加特征化
+
+## 2026-09-23 16:53 · Cursor — 收工：运维页历史日志与知识库全文
+
+- 完成：`5afd4ba4`。顶栏增加「历史日志」；标签切换时未选面板隐藏；已落盘的截断知识库卡片按流程名取全文，新注入调用 `flow_summary_text(..., limit=None)`。
+- 验收：`GET /api/v2/kb/flow-summary?flow=产品库管理（新增/启用）` 返回 200，正文 3554 字且无「截断」；浏览器打开该历史卡片，弹窗可滚到阶段删除规则。
+- 遗留：工作区仍有未纳入的 `data/kb/flows/product_library.json` 与 product-mgmt 草稿。
+
+## 2026-09-23 16:47 · Cursor — 开工：录制逐步反馈补 console 与新 tab
+
+- 授权：用户确认调研报告后开工。范围是 P0-A（console/pageerror 进入 `[step-feedback]`）和 P0-B（新 page 复挂 xhr / console / dialog）。P1 非 JSON 错误体、omit_api 口径、prompt「接线中」文案不在本单元。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/step-feedback-console-20260923`（自 `origin/uara_V2.0_dev` `79631d3b`）。主检出有他线未提交改动，本线不碰。
+- 工作范围：`scripts/agent/console_feedback.py`、`scripts/agent/page_feedback_hooks.py`、`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/session_runner.py`、`scripts/browser/factory.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`scripts/characterization/cold/characterize-step-feedback.py`、`docs/superpowers/reports/2026-09-23-step-feedback-console-gap-research.md`、本条目。
+- 禁入区：回放线（`_replay.py` 与各 Engine）、`scripts/agent/service.py`、`data/kb/**`、主检出未提交的 ops-console / product_library、引擎 worktree。不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话先写失败 pin 再实现。微步用 `bash scripts/refactor/verify-all.sh ui`（`--changed` 不会自动选中 ui 域）。
+
+## 2026-09-23 16:15 · Cursor — 开工：识图辅助开关写入配置文件
+
+- 授权：用户要求把大模型识图辅助做成配置文件里的开关。
+- 工作范围：`config/.env.example`、`executor/.env.example`、`scripts/feature_flags.py`、`src/runtime/agent-process.js`、`scripts/characterization/cold/characterize-record-sidepath.py`、本条目。
+- 禁入区：`data/kb/**`、`migrations/**`、门禁一行 `AI_RECORD_GATE_CUE` 的默认行为、回放与 heal。不改识图判定本身。
+- 执行方式：主会话把 `AI_RECORD_VISION` 写成可改的配置项，并让执行机与控制面拉起的 Python 都读到它。
+
+## 2026-09-23 15:40 · Cursor — 收工：录制旁路门禁说明与按需识图
+
+- 回链 15:05 开工。完成：`51b4360c`（变基后；原 `51480bc6`）。主模型 `use_vision` 仍为关闭。每步注入 `[门禁]`；门禁已通过的 `done(success=true)` 才单独看视口，看见错误文案才拒绝，同一阶段最多两次；高风险点击在 `multi_act` 前可否决且不写入轨迹，同一阶段最多两次，不确定或调用失败则放行。
+- 验收：`python3 scripts/characterization/cold/characterize-record-sidepath.py` OK。未做真实录制湿测，也未对当前网关做识图探活。
+- 遗留：执行机若主模型不接受图片，进程内探活失败后识图自动关闭，门禁一行仍在。湿测看 stderr 的 `[record-sidepath]` / `[record-vision]`。
+
+## 2026-09-23 15:05 · Cursor — 开工：录制旁路门禁说明与按需识图
+
+- 授权：用户确认旁路方案后，要求按建议建任务树并开发。
+- 工作范围：`scripts/agent/record_sidepath.py`、`scripts/agent/record_vision.py`、`scripts/feature_flags.py`、`scripts/recorder.py`（仅步骤开始注入门禁）、`scripts/agent/recorder_emitters.py`（仅 done 通过后门禁后的识图复核）、`scripts/agent/service.py`（仅点击否决包装）、`scripts/prompts/agent-core.md`、`executor/config.js`（仅把两个开关传入 Python）、`config/.env.example`、`executor/.env.example`、`scripts/characterization/cold/characterize-record-sidepath.py`、`scripts/refactor/verify-all.sh`（core 与 phase 登记）、本开工条目。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/state.py`、回放与 heal 判定、`use_vision` 仍保持关闭。识图失败不中断阶段，否决不写入轨迹步骤。
+- 执行方式：主会话按层实现。第 1 层每步一行门禁；第 3 层结束复核；第 2 层高风险点击落步前否决。
+
+## 2026-09-23 14:26 · Cursor — 开工：同表单项多控件扫描与保存否定句
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-23-same-family-scan-and-save-negation.md`。
+- 场地：`D:\dev\JS-gen\.worktrees\same-family-scan`，分支 `cursor/same-family-scan-20260923`（自 `878032bb`）。
+- 工作范围：`src/cdp/page-locator-helpers.js`、`scripts/controller/actions/js_snippets/scan_form.py`、生成物 `_locator_helpers_js.py`、`scripts/controller/actions/same_family.py`、`fill_engine.py`、`select_engine.py`、`scripts/controller/actions/phase/boundary_contract.py`、`reviewer.py`、对应 characterization、`scripts/refactor/verify-all.sh`、本条目。
+- 禁入区：`data/kb/**`、主检出未提交的 ops-console / product_library。不改模型 500 与空闲看门狗。
+- 执行方式：主会话派实现子智能体，每任务评审。子智能体可 commit，不 push。
+
+## 2026-09-22 19:05 · ZCode 引擎线 — 收工：三条 SUT 实证知识落流程卡（e0dd6e35）
+
+- 回链 18:40 开工。完成：session_login +2（按钮文案空格比对/二级菜单双 DOM）+ credit_usage +1（日期弹层 pickerVisible=false）；欢迎弹窗按用户澄清定性为「登录后自动读取天元配置的预期行为」不进卡。
+- 验收：两卡 JSON 合法；金样例 JS 26 passed + Py ok（便携 python.exe；anaconda base exit=49 无输出系环境差异与前例一致）；recall-eval 门禁 6 passed，指标与基线逐位一致（Acc@1 0.74/Recall@5 0.847/分层 A1·B0.233·C0.867·D0.933）。
+- 纪律：他线 WIP（product_library.json 未提交扩写）全程未触碰。
+- 遗留：无。悬置面不变（SUT 改挡板/合同生效路线）。
+## 2026-09-22 18:40 · ZCode 引擎线 — 开工：三条 SUT 实证知识落流程卡（用户批准前三点；欢迎弹窗定性为自动读配置不进卡）
+
+- 授权：用户批准将记忆中三条测试有用的 SUT 操作级知识写入流程卡：①按钮文案内部空格（「取 消」不剔空白会误点「确 定」→关弹窗变保存）②Element UI 日期弹层须置 pickerVisible=false 否则 popper 重绘复现 ③SUT 双菜单 DOM（二级 li[data-id] 恒隐藏，可见性点击必败，用可见 flyout 链接/data-url）。用户澄清：欢迎弹窗是登录后自动读取天元配置的预期行为，不进卡。
+- 工作范围：`data/kb/flows/session_login.json`（+2 规则：空格按钮/双菜单）、`data/kb/flows/credit_usage.json`（+1 规则：日期弹层关闭）；agent-log 开收工条目。
+- 禁入区：`product_library.json`（他线未提交 WIP 在工作区，绝不触碰）；其余产品代码、`scripts/**`。
+- 执行方式：主会话改卡；改后同 commit 复跑金样例双侧（characterize-flow-card-recall + characterize-kb-recall.py）+ recall-eval 与基线对齐 + JSON 校验。
+
+## 2026-09-23 14:21 · Cursor — 实现计划：同表单项多控件扫描与保存否定句
+
+- 授权：用户确认设计稿 `cb851289` 无问题。
+- 工作范围：`docs/superpowers/plans/2026-09-23-same-family-scan-and-save-negation.md`；设计稿状态改为已审阅；本条目。不改产品代码。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`。实现等用户选定执行方式后再开工。
+
+## 2026-09-23 14:17 · Cursor — 设计稿：同表单项多控件扫描分发与保存否定句
+
+- 授权：用户确认引擎段与合约段（扫描拆条、调用带定位、否则歧义；「不点保存」不算保存终态）。
+- 工作范围：`docs/superpowers/specs/2026-09-23-same-family-scan-and-save-negation-design.md`、本条目。不改产品代码。
+- 禁入区：`scripts/**`、`src/**`、`data/kb/**`（产品库流程卡的未提交改动不纳入本提交）。
+- 状态：书面稿待用户审阅后再写实现计划。
+
+## 2026-09-23 13:53 · ZCode 引擎线 — 合并回执：A/B 两候选修复并入 uara_V2.0_dev（用户批「合入吧」）——唯一红 sso-auth 系他线 d15482c6 预存回归，非本 diff
+
+- 合并：`engine/ab-gate-fixes-20260922`（fe7a3a27 + 收工条目 7cdf680b + 他线合流 4b2e97b5）→ `uara_V2.0_dev`，`--no-ff` 零冲突。他线 40+ 提交（ops-console 页面/录制本步反馈/KB/`d15482c6` 交易名称查询改名）已先在功能分支合流解冲突（agent-log 并排保留双方条目）。
+- 场地说明：主检出 D:\dev\JS-gen 工作区有他线未提交改动（ops-console/KB/agent-log），本合并改走临时 worktree（../JS-gen-tmp-abmerge），全程零触碰他线工作区；合并后清理。
+- 合并后验收（硬约定）：合并态（dev + 本线 = 4b2e97b5 同树）**全量 verify-all 194 pins（他线新增 5 登记后），唯一 FAILED=characterize-sso-auth**——归因实锤为他线 `d15482c6`（黄正祥，09-23 11:29「修复交易名称查询」）把 `trajectory-dao.js` `keyword` 过滤改 `name`（:724/:769 两调用点同步改名）但未同步 sso-auth pin 的调用形态断言（pin :222-224 仍字面要求 `keyword, recordStatus`）；该红在 origin dev 上即存在，**他线所致不修**，遗留移交见下。`characterize-layer-tree` 本轮绿（动态锚点选到新落库截图，traj 980 数据态红自愈）。后续仅追加 docs 条目，pin 相关文件树逐字节一致，不重复跑。
+- 生效面：①kind 同族互认=Python 侧，**新录制会话磁盘加载即效**；②零步 navigate 豁免=Node 侧，**等控制面重启窗口**（与 verify-token persisted 主路径同一窗口）。branch-only 待并入 dev 清零。
+
+## 2026-09-22 13:08 · ZCode 引擎线 — 收工：A/B 遗留两候选修复交付（kind 同族互认 + 零步 navigate 豁免；fe7a3a27 已推送，branch-only 待并入 dev）
+
+- 完成（`fe7a3a27`，6 文件 +430/−17，回链 12:16 开工条目）：
+  - **①744 修（Python，新录制会话磁盘加载即效）**：`intent_gates.py` 新增 `_SAVE_FAMILY`/`_INTRODUCE_FAMILY` 冻结元组（与 `boundary_gates.py:33-35` 镜像先例逐字一致）+ `_same_family` 助手（同名精确优先→族内互认→未知 kind 精确自匹配）；`has_contract_success` 三处消费点（`_last_save_ok` 分支改族内 any、introduce 分支、`_success_tokens` 循环）按证据等价类判；`done_accept_reason` 同族同步扩展（评审裁定正当，避免门过但 reason 撕裂）。**红线不松**：无族内证据 missing_success_token 照发、跨族不互认、`service.py` 质量门零改动、词表/`PHASE_CONTRACT_KINDS` 冻结清单零改动。
+  - **②零步修（Node，需控制面重启窗口才生效）**：`evaluatePhaseOutcome` 增可选 `phaseIsNavigateOnly` 参数（默认 false=逐字原行为）；`evaluateFinalizeGate` 主体零改动（既有 34 断言 pin 钉死）、v1.5 total==0 兜底**不豁免**；豁免在 runner 登记面三处（v3 perRun 登记/v2 嫌疑快照/门日志），新导出 `isNavigateOnlyPhase`（mode navigate/other 且无 14 词写动词才 true，保守向）+ 误豁免探针日志 `[record] phase #N navigate-only zero-step success`。登录回放代导航等合法零步阶段不再被 v3 假成功门整轨降级（733/741/742）。
+- 流程：SDD——worker-coder 两 pin RED→GREEN（15/15+30/30）+ reviewer 评审 **Spec ✅、0 Critical、0 Important、6 Minor 均不阻塞**（两披露偏离均裁定守住承诺：gate 主体逐字不变+三参 needle 保留；done_accept_reason 扩展正当）。
+- 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev`（带入 Cursor ops-console 3 docs commits，零冲突）→ **合并态全量 verify-all 189 pins（187+2 新登记），唯一 FAILED=characterize-layer-tree**（traj 980 phase_highlight 截图 91 元素仅 80 带 layers，落库数据态；实施者已用 stash 在 BASE 复现同红，预存非本 diff 所致）。
+- 遗留移交（评审 Minor 记档，均不阻塞）：①M1 角可选补 pin——introduce 合约 kinds 单值 `['confirm_click']` 不再被 legacy 分支识别（静态证明不可达：两 flag 写点必先落同名 token；legacy 编译器恒成对输出；persisted 走 boundary 路径），如需可补一条 pin；②M3——pin② 与既有 gate pin 同登 phase 域，`--changed` 对仅改 runner 的 diff 有盲区（继承惯例非本单元引入），后续加固可补登 ui/core；③M4——mode=other+描述无写动词的误豁免面属设计级残余，湿测期 grep `[record] phase #N navigate-only zero-step success` 作探针；④layer-tree 预存红数据态归因共享——他线触碰 traj 980 相关数据时注意。
+- 分支与生效面：`engine/ab-gate-fixes-20260922` 已推 origin，branch-only **待并入 dev**；①合并 dev 后新录制会话即效；②等控制面重启窗口（与 verify-token persisted 主路径同一窗口）。
+
+## 2026-09-23 11:32 · Cursor — 收工：录制本步页面反馈合入 uara_V2.0_dev
+
+- 回链 17:12 开工。用户指令合入开发分支并告一段落。
+- 完成：`dfe46abd`（`--no-ff`）将 `cursor/recording-step-feedback-20260922` 合入 `uara_V2.0_dev`。每步新出现的 toast、校验红字、对话框标题写入当次会话，并以 `[step-feedback]` 交给下一步模型；`read_step_feedback` 只读这段历史。`read_error_notify`、`read_xhr_log` 不再注册。`close_notification` 只关闭通知。页面错误不写入步骤、阶段或交易。agent-log 冲突并排保留引擎线挡板定性条目（含误落本分支的 `8c7c7b81`）。
+- 验收（合并后）：`characterize-step-feedback`、`characterize-step-notice-scan`、`characterize-error-notify`、`characterize-xhr-log`、`characterize-save-section` 均 OK。
+- 遗留：`verify-all.sh ui` 的 `characterize-layer-tree`（80/91）与本次无关，未修。步骤上落错误描述仍不做。
+
+## 2026-09-23 11:05 · Cursor — 收工：产品库流程卡补公共要素可填条件（回链 10:57 开工）
+
+- 完成：`data/kb/flows/product_library.json` 写入未启用版本才可填公共要素、启用态点产品修改不就地放开、保证金比例同一行四个控件、树节点带版本、筛树点放大镜。未改召回关键词大表以外的规则词「产品公共要素」「保证金比例」。
+- 验收：JSON 可解析；`node scripts/characterization/characterize-flow-card-recall.mjs` 26 passed（含 golden 24 条）。本机无 `python`/`py`，Python 侧 `characterize-kb-recall.py` 未跑。
+- 遗留：启用产品点「产品修改」是否另出新版本，本次未核，已写入 exceptions。未 commit。
+
+## 2026-09-23 10:57 · Cursor — 开工：产品库流程卡补公共要素可填条件
+
+- 授权：用户确认把 2026-09-23 湿测经验写入流程卡（先汇报后落卡）。
+- 工作范围：`data/kb/flows/product_library.json`、本条目。
+- 禁入区：录制本步反馈线声明的 `scripts/**`、`src/**`、`prompts/**`；其余 `data/kb/**`。
+- 执行方式：主会话改卡面文案。证据=轨迹 984 只读详情 + Playwright 对林业贷 V-1.0.1 填入 `9`、左下拉选项 `<`/`≤`。
+
+## 2026-09-22 17:55 · ZCode 引擎线 — 收工：挡板定性落地（4fc2efd0）+ 主检出被他线切分支的现场处置记录
+
+- 回链 17:32 开工变更。完成：反馈稿焦点改写（挡板实现对自动化不友好+两条建议）/成果介绍难题④遗留①补挡板背景/duigong_contract_sign 卡弹窗规则补根因句；门禁=金样例 26 passed+recall-eval 门禁 6 passed+指标与基线逐位一致（Acc@1 0.74）。
+- **现场处置**：17:32 条目 commit 时发现主检出已被他线切到 cursor/recording-step-feedback-20260922（工作区有他线未提交改动 _observe.py 等 5 文件）——本线改动改走 worktree（../JS-gen-mockdoc，检出 uara_V2.0_dev），全程零触碰他线工作区；该条目本身误落 cursor 分支（8c7c7b81，纯 agent-log 文本，合流并排即可）。
+- dev 误动疑云澄清：reflog 实证 cursor 线把 4 个 spec/plan 提交直接打在 dev（6efa5952→e4cbf156）并推送，我线 009dbce2 为其祖先，无任何丢失。
+- 遗留：①全图导航待命——SUT 登录态已过期，用户要拍时重新登录导到弹窗/表单各拍摄点；②主检出的 agent-log 收工条目随他线分支合流时并排入库（本条在 dev 侧已含）。
+
+## 2026-09-22 17:32 · ZCode 引擎线 — 开工变更：用户带回挡板定性，扩围改 KB 卡 + 更新两报告
+
+- 授权：用户转达信贷侧答复——合同账户接口 `searchEnqrCoreAccinfByCustNumb` 当前为**挡板（mock）**，现场正式环境调行方接口按客户号查行内可用账户。反馈方向定为「mock 随机轮换实现方式对自动化不友好」。
+- 工作范围（在 16:27 声明基础上扩围）：`data/kb/flows/duigong_contract_sign.json`（仅「合同账户弹窗随机轮换」规则追加根因一句）；两报告（feedback/summary）按新事实改写相应段；agent-log 本条。
+- 禁入区不变：其余产品代码、`data/kb/**` 其余文件、他线在途面。
+- 执行方式：主会话改文案；卡面改字后复跑召回两侧 characterization + verify-all（金样例/评测门禁防绊）。
+
+## 2026-09-22 17:12 · Cursor — 开工：录制本步反馈实现（分支 cursor/recording-step-feedback-20260922）
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-22-recording-step-feedback.md`。
+- 工作范围：`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/agent/recorder_emitters.py`、`scripts/recorder.py`、`scripts/session_runner.py`、`scripts/controller/actions/_observe.py`、`scripts/controller/actions/_misc.py`、`scripts/controller/actions/_js_snippets.py`、`scripts/controller/actions/js_snippets/step_notice.py`、`src/models/meta-step-actions.js`、`scripts/prompts/agent-tools-common.md`、`scripts/prompts/agent-tools-form.md`、`scripts/prompts/agent-tools-table.md`、`scripts/prompts/agent-core.md`、`scripts/prompts/planner-prompt.md`、`scripts/characterization/cold/characterize-step-feedback.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`scripts/characterization/cold/characterize-error-notify.py`、`scripts/characterization/cold/characterize-xhr-log.py`、`scripts/characterization/characterize-save-section.py`、`scripts/refactor/verify-all.sh`。
+- 禁入区：`data/kb/**`、`migrations/**`、`scripts/state.py` 的折叠逻辑、`docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`。不把反馈写入轨迹、阶段或交易。
+- 执行方式：主会话按任务派实现子智能体，每任务独立评审。子智能体可 commit，不 push。
+
+## 2026-09-22 16:56 · Cursor — 开工：录制本步反馈实现计划（只写 plan）
+
+- 授权：用户对规格回复「继续」。
+- 工作范围：新增 `docs/superpowers/plans/2026-09-22-recording-step-feedback.md`；本开工条目。
+- 禁入区：`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`；不改 `docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md` 与 `2026-09-22-recording-step-feedback-design.md`。不实现采集、不改录制代码。
+- 执行方式：主会话按 writing-plans 写计划并自检。用户选定执行方式之前不改产品代码。
+
+## 2026-09-22 16:53 · Cursor — 开工：录制本步反馈规格（只写 spec）
+
+- 授权：用户逐段确认后，放弃把失败原因写入阶段 `done_logs`、交易或步骤，改回会话内反馈这一版。
+- 工作范围：新增 `docs/superpowers/specs/2026-09-22-recording-step-feedback-design.md`；本开工条目。
+- 禁入区：`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`；不改 `docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`。不实现采集、不改录制代码。
+- 执行方式：主会话写规格并自检。用户评审 spec 之前不写实现计划、不改产品代码。
+
+## 2026-09-22 17:40 · ZCode 引擎线 — 收工：主链成果介绍 + 合同账户弹窗反馈材料交付
+
+- 回链 16:27 开工（b15ac51c）。GLM-5 已由用户自行切回（本单元零配置改动）；T3.1 heal live 用户明示移出本线不再跟进。
+- 完成：①`docs/superpowers/reports/2026-09-22-mainchain-full-through-summary.md`（主链七环节全通成果介绍：结论/单据链/三能力实测证据/计分板/六难题/沉淀资产/遗留建议，面向汇报）；②`docs/superpowers/reports/2026-09-22-contract-account-popup-feedback.md`（合同账户弹窗随机轮换反馈稿：可直接转发的文字 + 复现步骤 + 两次列表对照 + 接口报文 + 建议改法）。③todo ⑤ 节更新为全通态（R6.5/R7 行补入，09-07 挂起记录留档）。
+- 取证（MCP 有头浏览器，全程只读）：701994 登录 SUT → 合同 9881020048004【发起签订】→「合同账户信息」弹窗连开两次（均点【取消】，表单亦【取消】退出，零数据变更）。实锤：两批 10 账号零重叠，且均不含合同上已保存的 1155232889/1077022879；接口 `rtlContAccInf/searchEnqrCoreAccinfByCustNumb` 同参两次调用均报 total=10/pages=1/hasNextPage=false 但内容完全不同（服务端随机 + 假分页元信息）。截图 `tmp/kb-mainchain/R7-contract/popup-evidence-open{1,2}.png`（tmp 不入库，转发时随反馈文档附上）。
+- 验收：纯文档交付+只读取证，无代码改动，无 verify-all 义务。
+- 遗留移交：①弹窗轮换待信贷侧回复（材料 §五给了三条期望）②合同生效路线（纸质影像 vs 电子签）等产品排期 ③主链系列测试单据建议按引擎线口径保留。
+## 2026-09-22 17:05 · ZCode 引擎线 — 开工：主链全通成果介绍 + 合同账户弹窗反馈材料（只写文档/报告）
+
+- 授权：用户点单四项——GLM-5 已自行切回（无需动作）；①全链路贯通成果介绍（对外可转发的文档）②合同账户弹窗随机轮换问题反馈稿（文字+测试照片，供用户咨询信贷系统人员）③T3.1 heal live 用户明示不需要我管。
+- 工作范围：新增 `docs/superpowers/reports/2026-09-22-mainchain-full-through-summary.md`、`docs/superpowers/reports/2026-09-22-contract-account-popup-feedback.md`；`todo-list.md` 仅 ⑤ 节补 R6.5/R7 完成状态；截图取证落在 `tmp/kb-mainchain/**`（不入库）。
+- 禁入区：全部产品代码（`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`）；他线在途面（Cursor ops-console：`src/dashboard/**`/`server.mjs`/`scripts/agent/service.py` 等；引擎线 `intent_gates.py`/`phase-done-evidence-gate.js`/`trajectory-recording-runner.js`）。
+- 执行方式：主会话写文档；合同账户弹窗证据用 Playwright MCP 登录 SUT（701994）只读探测——只开「选择账户」弹窗两次截图对比顺序，不点保存/提交，不改任何 SUT 数据。
+## 2026-09-22 16:10 · Cursor — 开工：语料到原子组件草稿规格（只写 spec）
+
+- 授权：用户选定范围 A，并说明插件数据格式与规范尚未确定，先出规格。
+- 工作范围：新增 `docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`；本开工条目。
+- 禁入区：`src/**`、`scripts/**`、`migrations/**`、`data/kb/**`。不实现接入、不改组件库代码、不改录制/回放。
+- 执行方式：主会话写规格并自检。用户评审 spec 之前不写实现计划、不改产品代码。
+
+## 2026-09-22 15:32 · Cursor — 收工：执行机与日志页合入 uara_V2.0_dev
+
+- 回链 12:45 开工。分支 `cursor/ops-console-20260922`。用户指令「继续，合入 uara_V2.0_dev」。
+- 完成：`GET /ops` 独立页（执行机槽位、待上传截图、步骤/回放/注入卡片与全文弹窗）；`[step]` 去掉 200/500/120 截断；`[card]` 写入阶段任务与每次注入全文；文档页不再挂这两块面板。另按用户要求，Python Playwright 按目录前缀 `chromium_headless_shell-` / `chromium-` 找已安装浏览器，不再要求修订号 1217。
+- 验收：四条 ops pin 通过；此前因缺 1217 失败的 Python 浏览器检查，改前缀后 8 条通过。全量 verify-all 仍有与本次无关的失败：`characterize-network-capture`、`characterize-tssc-route-conflict`（`scripts.controller` 导入）、`characterize-layer-tree`（分层数据 80/91）。`/ops` 未在 4097 上做浏览器湿测（控制面不是该 worktree）。
+- 遗留：上述三条无关失败；浏览器湿测留到控制面切到含 `/ops` 的代码后。
+
+## 2026-09-22 12:45 · Cursor — 开工：执行机与日志页实现（分支 cursor/ops-console-20260922）
+
+- 授权：用户选择按计划分任务实现。计划 `docs/superpowers/plans/2026-09-22-ops-console.md`（`285f8a8f`）。
+- 场地：`D:\dev\JS-gen\.worktrees\ops-console`，分支 `cursor/ops-console-20260922`（自 `uara_V2.0_dev` `5dcc8fd1`）。
+- 工作范围：`src/dashboard/ops-console/**`、`server.mjs`（仅 `GET /ops`）、`api-docs.html`（侧栏链接）、`src/dashboard/api-docs/app.js`、`src/dashboard/api-docs/catalog.js`、删除 `slot-monitor.js` 与 `pending-screenshots.js`、`scripts/recorder.py`（仅 `[step]` 行）、`scripts/agent/stderr_cards.py`、`scripts/agent/service.py`（阶段标题与 `[card]`）、`scripts/controller/actions/_scenario_describer.py`（追加 `[card]`）、四个 characterization、`scripts/refactor/verify-all.sh`（登记 pin）。
+- 禁入区：引擎线 `intent_gates.py`、`phase-done-evidence-gate.js`、`trajectory-recording-runner.js`、`boundary_*`、`_replay.py`、`data/kb/**`。不改 `_ACTION_LOG` 切片、`flow_summary_text` 的 800 字、`_PREAMBLE_TOTAL_MAX`、`agent_utils.py` 的 `next_goal[:200]`、`api-docs.css`。
+
+## 2026-09-22 12:40 · Cursor — 续：执行机与日志页实现计划（仍不改产品代码）
+
+- 授权：用户评审 spec `75054337` 后回复「没问题，继续」。
+- 工作范围：新增 `docs/superpowers/plans/2026-09-22-ops-console.md`。实现按该计划另开工；本条仍不改 `scripts/recorder.py`、`scripts/agent/service.py`、`src/dashboard/**`。
+- 禁入区：同 12:22 开工条目。
+
+## 2026-09-22 12:22 · Cursor — 开工：执行机与日志页设计稿（/ops MVP，只写 spec）
+
+- 授权：用户在 brainstorming 里逐段确认（布局 C 两标签、独立静态页、步骤卡+弹窗全文、阶段任务与注入卡、recorder 三处截断直接去掉、验收五条）。
+- 工作范围：本单元只新增 `docs/superpowers/specs/2026-09-22-ops-console-design.md` 与本开工条目。**不改** `scripts/recorder.py`、`scripts/agent/service.py`、`src/dashboard/**`。
+- 禁入区：引擎线 12:16 开工声明的文件（`intent_gates.py`、`phase-done-evidence-gate.js`、`trajectory-recording-runner.js` 及该条禁入区）；`data/kb/**`；主链跑车数据。`recorder.py` / `service.py` 留到设计稿评审通过后的实现单元再声明。
+- 执行方式：主会话写设计稿并自检；用户评审 spec 之前不写实现计划、不改页面代码。
+
+## 2026-09-22 12:16 · ZCode 引擎线 — 开工：A/B 遗留两候选修复（①质量门 kind 别名互认 Python 侧 ②零步 navigate 豁免 Node 侧；SDD 两笔同批）
+
+- 授权：用户点单（「可以，我明白了，请开始吧」——方案经讨论确认为「校验时同族互认」，非加词表值/非统一凭证）。来源=KB 价值 A/B 线移交（报告 §6/§8：744 门伪 + 733/741/742 零步降级，归引擎线按 P1 排期）。
+- **①744 修**：`has_contract_success`（`scripts/controller/actions/phase/intent_gates.py:235`）legacy 路径精确匹配缺同族归一——录到 `saved_navigation` 而合约要求 `url_change/toast_ok` 被误杀（744 实证；刀 2 后分析 LLM 直产 successWhen 同族误配面更宽）。修法=证据族等价类互认（保存族 saved_navigation↔toast_ok↔url_change；引入族 picker_closed↔dialog_confirmed↔introduced_backfilled），对齐 boundary 路径 `observed_kinds` 既有归一（`boundary_gates.py:47-52`）；词表/`PHASE_CONTRACT_KINDS` 冻结清单零改动，匹配按类判不按名判，假成功防线不松（无族内证据照样拦）。
+- **②零步修**：`evaluatePhaseOutcome`/`evaluateFinalizeGate`（`src/services/trajectory/phase-done-evidence-gate.js`）对「登录回放代导航」合法零步形态误降级（733/741/742 实证）。修法=零步判定加 navigate-only 豁免（阶段无写动作线索且合约/文本判 navigate → 零步不登记嫌疑）；**v3 假成功防线不动**（非 navigate 阶段零步仍降级；self-reported success 语义不变）。
+- 工作范围：①`intent_gates.py`（互认逻辑+新 pin）②`phase-done-evidence-gate.js`（豁免参数+判定）+`trajectory-recording-runner.js`（接线传参）+新 pin（2 个，RED 先行）；verify-all 注册；agent-log/todo。**禁入区**：`boundary_gates.py`/`boundary_contract.py`/`phase_contract_snapshot.py`（昨日刚交付面，只读复用）；`_replay.py`/`event_dispatch.py`/`session_runner.py`/`recorder.py`/`service.py`（他会话 E1-E4 与我线主收口刚落地，避连带）；`scripts/prompts/**`、`data/kb/**` 只读。
+- 分支与场地：`engine/ab-gate-fixes-20260922` 自 `origin/uara_V2.0_dev`（=ee285043）新切，branch-only 待并入 dev；场地=D:\dev\JS-gen-engine。①Python 新会话即效；②Node 侧**需控制面重启窗口才生效**（本单元不改运行态）。
+- 执行方式：SDD——worker-coder（RED→GREEN）+ reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；合并后验收=合并 dev 重跑全量 verify-all。
+
+## 2026-09-22 11:29 · ZCode 引擎线 — 合并回执：今日两笔交付并入 uara_V2.0_dev（用户批「可以」；meta-step-filter f6f2c0aa + verify-token 主收口 516ca27b，零冲突）——合并态全量 187 pin ALL GREEN
+
+- 合并：`engine/meta-step-filter-pin-20260922`（f2b5cf77）→ **f6f2c0aa**、`engine/verify-token-downgrade-20260922`（3d9c2a7f）→ **516ca27b**，均 `--no-ff` 零冲突；已推 origin（8aed468c..516ca27b）。两分支至此闭环，「branch-only 待并入 dev」全部清零。
+- 合并后验收（硬约定）：主检出 dev 合并态**全量 verify-all 187 唯一 pin + statics ALL GREEN 零 FAILED**（186+meta-step-filter 入列，两笔叠加吻合）。
+- 生效面：meta-step-filter=纯 pin+注册行（verify-all 域管束生效）；verify-token 主收口=纯 Python 侧，**新录制会话磁盘加载即效**（注意：本地控制面仍待重启窗口，Node 侧不下发 `phase_contract` 快照时走文本分类兜底，降级函数在 fallback 路径由门侧豁免覆盖——重启后才挂到 persisted 主路径）。
+- 引擎线在途清零；挂账不变：D2 自然窗口值守 / 历史盘点（湿测后）/ step-highlight（触发式）/ 控制面重启（等用户窗口）。
+
+## 2026-09-22 11:15 · ZCode 引擎线 — 收工：verify-phase-token 第二步主收口交付（持久化合约消费点纯文本降级；3d9c2a7f 已推送，branch-only 待并入 dev）
+
+- 完成（`3d9c2a7f`，5 文件 +344/−15）：**刀 2 后主收口落地**——`phase_contract_snapshot.py` 新增 `downgrade_contract_for_verification`（复用 verification_gate 冻结词表 v1 单源 import，纯文本三条件全中才降级 `submit.required/kinds/boundary.success_when`，boundary role 不动，`source='persisted_verify_downgraded'` 可辨识；FP 零容忍）；`service.py` persisted 分支 8 行接线（判定文本=`phase_core`），stderr 留痕 `phase_contract=verify_downgraded`；fallback 两路径零改动（第一步门侧豁免 c55cc849 继续兜底）。设计依据=设计稿 §6（随开工条目 4245a456 入库）：刀 2 后分析 LLM 直产合约，误标纯核验阶段→收尾误杀+recovery 强推 click_save+8 步下限，而第一步豁免对该形态失效（条件④ mode 否决恰含被误标值）。
+- 流程：SDD——worker-coder RED（11/18 失败）→GREEN（35/35）+ reviewer 任务评审 **Spec ✅、0 Critical、1 Important（I1 计数证据）+4 Minor**。I1 主会话实跑裁决：全量 `pins=186` 与精确算术吻合（222 注册−36 双登=186 唯一；改前 185——**meta-step-filter f2b5cf77 branch-only 未并入 dev 故不在基线，我开工 brief 里"基线 186"注释系我写错**，实现者报告的 186=185+1 正确）；M1（接线 10 行超 2 行）/M3（no-op 重赋值，对未来返回新对象稳健）/M4（报告数字小误差）记档无害；**M2 记台账下次触碰顺手修**：降级留痕行 `mode={mode}` 用的是 `_task_mode`（form_modify）与上一行 persisted 日志的合约 mode（modify）字段名撞车，排查时可读性差。
+- 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev`（带入主链线 R6 日志，c8c06fbd 零冲突）→ **全量 verify-all 186 唯一 pin + statics ALL GREEN 零 FAILED**；新 pin 35/35、gate pin 40/40（helper 纯重构行为逐字不变）、Cursor persisted pin+Node phase-contract 全绿；改动面=恰 5 文件。
+- 分支与生效面：`engine/verify-token-downgrade-20260922` 已推 origin，branch-only **待并入 dev**（与 meta-step-filter f2b5cf77 同批待批）；纯 Python+pin 侧，合并 dev 后新录制会话磁盘加载即效、无需重启。**湿测观察点**：#973 型形态（分析侧误标纯核验阶段）预期 stderr 出现 `phase_contract=verify_downgraded` 且终局不再 quality_failed/missing_success_token；合约线湿测窗口顺手 grep 即可，零新增流程。
+- 遗留移交：无新移交。历史盘点（设计稿 §4.1）维持挂账：判定式经刀 2 落点修订（§6）后待湿测零 FP 证据再定稿盘点。
+- 台账：`.superpowers/sdd/verify-token-downgrade-20260922/progress.md`；注：不维护 CHANGELOG。
+
+## 2026-09-22 11:35 · ZCode 系统线 — 代提交：同事的 AGENTS.md / CLAUDE.md 未提交修改同步入库（用户指令「同步一下」）
+
+- 完成：同事在主检出（uara_V2.0_dev）的未提交改动今日 10:07 落盘——`AGENTS.md` 全文中文化（头部新增 Cursor 适用）+ 实质新增**「适用范围」节**（研发任务守全套开工/收工流程；**联调测试不改 tracked 文件免写 agent-log 条目**，结论走会话/他线收工「联测回执」交代；边界=联调中要改代码立即切研发任务先补开工声明）+ 开场三件事降为「建议做」；`CLAUDE.md` 同步中文化，CHANGELOG 表述对齐 09-19 例外。版本双线条款实质未变。
+- 代提交说明：本次 commit 系按用户指令将同事工作区改动入库（非 ZCode 线代码改动），纯文档/约定无代码影响，不触发 verify-all。已在 commit message 注明代提交。
+- 排查记录：`.gitignore`/`README.md` 本身**无**改动（工作区干净、远端各分支亦无相关提交）；用户口述「忽略规则」未找到对应落点，如同事的忽略规则改动在别处（未保存/他仓），待指认后另行同步。
+- 本条与代码提交一并 push。
+
+## 2026-09-22 11:20 · ZCode 引擎线 — 开工：verify-phase-token 第二步主收口（持久化合约消费点纯文本降级；SDD）
+
+- 授权：挂账清单推进（用户「继续」）；设计稿 §6 已补刀 2 后落点重推导（`docs/superpowers/specs/2026-09-21-verify-phase-token-caliber-design.md` §6，本 commit 一并入库）。核心裁定：方案 D 刀 2（`79b4b8ba`）后合约主路径=持久化快照（分析 LLM 直产 mode/submitRequired），①原判定式条件④（mode 侧证）对持久化误标形态失效、②submit.required 误标危害升级（recovery 强推 click_save+8 步下限+四族消费方）、③判定文本仍可得 → 主收口落点从 `apply_phase_contract` 收窄为 **persisted 消费点**：纯文本三条件（冻结词表 v1 条件①②③，弃条件④）降级 `submit.required/kinds/boundary.success_when`；fallback 两路径不动（第一步门侧豁免 c55cc849 已兜底）。
+- 工作范围：`scripts/controller/actions/phase/phase_contract_snapshot.py`（新增纯函数 `downgrade_contract_for_verification`，不碰 `normalize_phase_contract`——Cursor pin 零扰动）、`scripts/agent/service.py`（persisted 分支成功后 3-5 行接线+stderr 留痕 `phase_contract=verify_downgraded`）、新 pin `scripts/characterization/characterize-verify-token-downgrade.py`（RED 先行）、`scripts/refactor/verify-all.sh`（仅注册 1 行）；agent-log/todo 条目。
+- 分支与场地：`engine/verify-token-downgrade-20260922` 自 `origin/uara_V2.0_dev` 新切，branch-only 待并入 dev；场地=D:\dev\JS-gen-engine 主场（worktree 在 dev tip 基上的 meta-step-filter 分支，切走后运行态=meta-step-filter 磁盘，两分支仅差 pin 行、运行面零差异）。
+- 禁入区：`normalize_phase_contract`/Cursor 新 pin `characterize-persisted-phase-contract.py`（其断言面不得放宽）；`src/**`、`scripts/prompts/**`、`data/kb/**` 只读；`fill_engine.py`/`click_action_engine.py`/`select_engine.py` 他线热区。主链线 R6 在途（其范围=真机跑车与轨迹数据，与上述文件零交集）。
+- 执行方式：SDD——worker-coder RED→GREEN + reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；合并后验收=合并 dev 重跑全量 verify-all。
+
+## 2026-09-22 11:05 · ZCode 引擎线 — 回执存档：停止链路联测 #978 三腿+三对照全 PASS，E1-E4 根缺陷真机闭环（交付线=引擎树sub 会话，本会话代存回执）
+
+- 合约线 #978 联测（证据 `tmp/contract-wet12-20260921/`）确认 8e0dd470（E1-E4 Python 侧）+ 系统线 Node 12 项双侧生效：长动作步回放成立、停止 API 双侧 `{stopped:true, batchWasRunning:true, cancelStepDelivered:true}`、步边界中断双证（WS 补发终态帧 `aborted:true` 不悬挂 running + `replay:finished {aborted:true, reason:'user_stop'}`，Python 侧零后续步下发）、干净批次 payload 形状不变（④ 对照成立）。R2 实证协作式封顶=最坏单步时长；E1③ 实证 R2 残留 cancel 标志被 R3 首步清零（event_dispatch 入口清残留逻辑真机验证）。
+- **结构披露存档（引擎线确认，非缺陷）**：attached 逐步回放（单条下发、无菜单导航批）下，Python 侧 `cancel requested at step N/M / replay_done aborted+stoppedAt` 结构性不可达（该形态=整批预批经 Python `replay_action_entries` 循环才可达；逐步模式边界中断落 Node 循环边界）——与 E1 交付设计一致；单测 Python 边界须选含菜单导航预批的轨迹。
+- spin-guard 值守更新：全会话 0 签名（observation 常开零误报）；Stop requested 回放腿恰 2（符合触发面）。D2 A/C 自然窗口值守口径不变。
+- 遗留：#977 分类「合约停测cat0921」残留待有效会话/DB 补清（合约线自留，非引擎线）；#978 六自测阶段已清零残留、18 存量节点无损。
+- 引擎线在途为零；meta-step-filter 分支（f2b5cf77）仍 branch-only 待并入 dev。
+
+## 2026-09-22 16:20 · ZCode Lead — 收官：主链七环节全通（R7 合同签订止于已保存态达成）+ G10 回报
+- **G10 完成（R7=PASS，主链七环节全通）**：合同 9881020048004（一般流动资金贷款，关联用信批复 DGYXPF202609220016013）签订信息维护完成——份数 2/银行四件套/送达三件套/公证否/**合同账户 2 行（1155232889 放款+1077022879 还款主，saveCtrAccinf 200）**/saveSignContInfo 200——终态：合同状态=待签订、流程状态=待发起、**ctrSt=1 已保存态**（产品裁定的成功标准）。本次保存无闸门拦截（不提交故「担保合同期限」闸门未触发）。
+- 管线：轨迹 982（recorded/18 步，phase 1-8 完成）；phase 8-10 因 SUT 登录到期自停+LLM 504 转主会话 MCP 手工完成并从服务端读回核验（URL ctrSt=1/updateTime 15:26:19 佐证）。
+- 卡面 +1 规则（656a1a9d）：合同账户弹窗后端随机轮换账户集合（同客户 4 组互不重叠、无查询框固定 10 行）——按行位置选勿按账号数字；Qwen 小模型 504/analyze 500 超时与登录 1h 到期坑。
+- **主链终盘计分板（轨迹链）**：R1=595 → R2=604+607 → R3=605+608 → R4=606/607/608 → R5=613 → R6=615/616+续棒 → R6.5=979/980/981 → **R7=982+MCP 手工收尾**。业务链：客户（预客户 KB主链R1+正式客户贯通验证企业190416）→评级（PJ20260907016009 生效）→授信（DGSX20260907056033 通过→批复 DGSXPF20260907020005 生效）→用信（YXPC20260907012045 通过→用信批复 DGYXPF202609220016013 生效）→合同（9881020048004 已保存态）。
+- **遗留移交**：①T3.1 heal live 验收未做（独立验证项）；②卡面配方债务：账户弹窗随机轮换的根因（后端实现）值得向 SUT 团队反馈；③R7 合同最终提交受担保合同期限+影像上传封死（产品已知，待产品排期）；④SUT 测试数据残留清单（KB主链系列客户/评级/授信/用信/合同单据，口径=引擎线业务数据保留）。
+- 提交：656a1a9d（卡面）已推送。
+
+## 2026-09-22 14:50 · ZCode Lead — R6.5 用信审批三节点全通（979/980/981，批复 DGYXPF202609220016013 生效）+ G10 派发（R7 合同签订收官棒）
+- **G9 完成（R6.5，全链贯通）**：轨迹 A=979（WN0001 节点 2 二次调查，17 步）→ B=980（**135292 张某某** 节点 3 审查，15 步）→ C=981（WN0001 节点 4 终批，20 步）——YXPC20260907012045 状态=**通过**，**用信批复 DGYXPF202609220016013 自动生成已生效**（R7 输入；前缀实为 DGYXPF 非 YXDGP，与授信批复 DGSXPF 同族）。
+- **实质偏离披露（G9，处置正确）**：轨迹 A 选人时 agent 选了张某某为节点 3 处理人（下节点归属由前节点选人决定）；实证 701994 无法处理节点 3（待办范围过滤查无）后，按纪律改用 135292（/1 凭证探测成功，新建 systemAccountId=31）跑轨迹 B，并在 B 选人显式勾选黄亮保住节点 4 预设——C 按预设跑通。
+- **G9 坑位沉淀**：审批节点「流程操作」无「同意」选项（只有下一步/退回，文案须写「同意，若无则选下一步」）；下节点归属由前节点选人决定（选人树须用「岗位-姓名(账号)」全格式文本）；record/start 客户端 UND_ERR_HEADERS_TIMEOUT 300s 但服务端继续录制（以日志为准不重试 HTTP）；Qwen3.8-27B 下 agent 偶发空 act+LLM idle 10 分钟超时（轨迹 C 首轮 failed 重跑成功）；流程轨迹节点 2 意见显示系统模板非所填原文（核验口径注意）。
+- **G10 已派发（R7 合同签订收官棒，进行中）**：DGYXPF202609220016013 对应主合同（自动创建）签订——签订信息维护+分区保存，**止于已保存态（ctrSt=1，产品裁定）**；「担保合同期限不能为空」闸门为已知预期终点。
+- 主链计分板：R1-R6 全 ✅（595/604/607/608/613/605+608/979/980/981）→ **R7 进行中（最后一棒）**。
+
+## 2026-09-22 12:00 · ZCode Lead — G7 完成（与 G8 并发同单操作，结果一致无脏数据）+ 税E贷裁定不恢复
+- **G7（fork 前派发）完成**：R6 流程提交亦成功（submitProcess 200「流程提交成功！」，nextNodeAprvPsn=WN0001-9881-X0018）；**workflowTree 实返 4 个 X0018 客户经理**（张某某/黄亮/黄磊明/李克）——X0018 权限修复确凿。截图存 tmp/kb-mainchain/R6-usage-apply/evidence-submit-success-workflow-trail.png 等（成功证据非失败取证）。
+- **编排教训（自我记过）**：fork 恢复时未核查 G7 仍在途即派 G8——两代理并发操作同一单据 YXPC20260907012045。幸最终状态一致（审批中/节点 2 黄亮待处理/仅一般流动资金贷款 1 条明细），无脏数据；后续派发前必须先清点在途任务。
+- **税E贷裁定（G7 提请）**：不恢复。该行=09-21 环境漂移产物（非 09-07 建单内容），两代理殊途同归删除后单据回到原始单一品种状态，与主链一致。
+- G9（R6.5 用信审批三节点）继续在途。
+
+## 2026-09-22 11:35 · ZCode Lead — R6 流程提交成功（主链 R1→R6 贯通）+ R6.5 用信审批三节点棒派发
+- **G8 完成（R6 收口）**：YXPC20260907012045 【修改】续做→全区块核对→流程提交→**选人弹窗真实 UI 点击选黄亮→「流程提交成功！」→状态=审批中**（节点 2 信贷二次调查=黄亮 WN0001 待处理）。上轮 X0018 拒单确认=信贷侧配置已修复+本轮正规选人弹窗（非绕行）。
+- **环境漂移披露（G8）**：用信方案里多出一条 09-21 漂移加入的「税E贷(PD00032012)」空产品行（无金额/无利率/无主担保类型），致担保一致性校验拦（全局流水号 01a0c6f9…）——已 UI 删除该空行（deleteDclScmDtl 200），单据本体完整保留并成功提交。
+- **R6.5 已派发（进行中）**：用信审批三节点连贯棒——轨迹 A（WN0001 二次调查）→B（701994 审查）→C（WN0001 终批）→用信批复自动生成核验（R7 合同输入）。
+- 前置重盘（G8）：评级 PJ20260907016009=通过 / 授信 DGSX20260907056033=通过 / 批复 DGSXPF20260907020005=生效，前置链路完好；另发现同客户 09-10 新增评级 PJ20260910016010（审批中）非本链单据，未触碰。
+
+## 2026-09-22 10:45 · ZCode Lead（主链跑车线，fork 会话恢复）— 开工：R6 用信续做（信贷确认 701994 有客户经理权限）
+- 开工：10:45（fork 自昨晚主链会话恢复；距上次跑车 16 天，环境剧变重盘）。用户指令：信贷同事（吴建成）确认 701994 有客户经理权限——R6 流程提交重试；失败则 MCP 截图取证。
+- **环境重盘**：①当前分支已切 **uara_V2.0_dev**（版本双线 56d96859；阶段合约方案 D 79b4b8ba 已并入——录制行为可能变化，本棒即最新开发态验证）；②控制面+执行机已重启（LLM 默认模型已变 /Qwen3.8-27B，原 GLM-5——agent 质量影响观察中）；③后端 09-22 发版（73a173a6）。
+- **G8 已派发（进行中）**：SUT 三单现状重盘（PJ20260907016009/DGSX20260907056033+批复 DGSXPF20260907020005/YXPC20260907012045）→决策树续做（在则修改提交；不在则从批复重发；被拒则截图取证+切候选重试）。
+- 禁入：commit、影像/OCR、其他客户单据、他线 WIP（AGENTS.md/CLAUDE.md 修改、product-mgmt 备份）。
+
+## 2026-09-22 10:30 · ZCode 引擎线 — 收工：meta-step-filter 孤儿 pin 修复 + misc 域登记（回链 10:15 开工；f2b5cf77 已推送，branch-only 待并入 dev）
+
+- 完成（`f2b5cf77`，2 文件 +25/−2）：pin `:45` needle `/filterMetaSteps/`→`/filterProductSteps/`（08-12 `7b5945a3` 起 query-service 改用产品步双滤，旧 needle 必红）；新增 `filterProductSteps` 行为断言（混合数组双滤 + `includeMeta` 回含 + 与 `filterMetaSteps` 的工程步差异钉——回退单滤必红）；其余 9 条源码 needle 逐条核对成立一字未动；头部 Run 路径补 `cold/`；`verify-all.sh` PINS_MISC 登记 1 行（该 pin 因未登记脱管数月，入域后受门禁约束）。`src/**` 零改动。
+- 流程：SDD——worker-coder RED→GREEN + reviewer 任务评审（覆盖全分支 diff）**Spec ✅ / PASS（0 Critical，0 Important，2 Minor 非阻断：①:70 whereNotIn 单点覆盖属既有口径 ②报告行文行号瑕疵）**；主会话复跑闭环全部 Cannot-verify 项（pin 单跑/misc 域/改动面=恰 2 文件）。
+- 验收（合并后硬约定）：合并 `origin/uara_V2.0_dev` 入分支（already up to date）→ **全量 verify-all 186 唯一 pin + statics ALL GREEN 零 FAILED**（186=改前 185+本单元 1，去重计数他线新 pin 已归因）；misc 域 29 pins ALL GREEN。
+- 分支与生效面：`engine/meta-step-filter-pin-20260922` 已推 origin，branch-only **待并入 dev**（按 dev/test 定盘，后续 dev 合 `uara_V2.0` 时进稳定线）；纯 pin+注册行，零运行面。运行态披露同开工条目（worktree 磁盘已在 dev tip 基上，刀 2 Python 侧对新会话生效、Node 未重启不下发合约快照行为不变）。
+- 遗留移交：无。系统线 21:55 收工移交④至此闭环；移交③（step-highlight FLOORS 脆弱性）仍按「形态再红再修录制链」挂账。
+
+## 2026-09-22 10:15 · ZCode 引擎线 — 开工：meta-step-filter 孤儿 pin 修复 + misc 域登记（系统线移交④；SDD）
+
+- 授权与来源：系统线 09-21 21:55 收工移交④（`cold/characterize-meta-step-filter.mjs` 孤儿失效，未登记任何域）；实测确认红——函数 `filterMetaSteps` 仍在导出（行为断言可过），坏在源码 needle：`trajectory-query-service.js` 已改用 `filterProductSteps`（08-12 `7b5945a3` 起含工程步过滤语义），`assert.match(querySrc, /filterMetaSteps/)` 失败。
+- 工作范围：`scripts/characterization/cold/characterize-meta-step-filter.mjs`（needle 同步当前现实 + 补 `filterProductSteps` 行为断言 + 头部注释路径更正）、`scripts/refactor/verify-all.sh`（仅 PINS_MISC 注册 1 行）；agent-log/todo 条目。**`src/**` 零改动**（pin 只读断言 src 现实）。
+- 分支与场地：`engine/meta-step-filter-pin-20260922` 自 `origin/uara_V2.0_dev`（=73a173a6）新切（按 22:51 dev/test 定盘），branch-only 待并入 dev；场地=D:\dev\JS-gen-engine 主场（自 engine/replay-cancel 切换——该分支他会话单元已合并收工且已推 origin）。**运行态披露**：控制面/执行机 22:29 起自该 worktree 运行，切到 dev tip 后磁盘新增方案 D 刀 2 的 Python 侧（Node 未重启不下发合约快照→Python 走文本分类兜底，录制行为不变；Node 侧仍待重启窗口），本单元自身仅 pin+注册行零运行面。
+- 禁入区（他线知悉）：`src/**`、`scripts/prompts/**`、`data/kb/**` 只读；`fill_engine.py`/`click_action_engine.py`/`select_engine.py` 他线热区。
+- 执行方式：SDD——worker-coder 实现（RED→GREEN）+ reviewer 评审，子智能体零 commit，主会话显式 pathspec 代提交；合并后验收=合并 `origin/uara_V2.0_dev` 入分支重跑全量 verify-all。
+
+## 2026-09-21 22:51 · Cursor — 定盘：V2.0 拆成稳定 test 与开发 dev
+
+- 用户定盘：每个版本两套分支，日常只在 dev 上改。V2.0 的稳定 test 沿用现有 `uara_V2.0`，停在 `eab6c041`，不再直接提交。新分支 `uara_V2.0_dev` 从该点切开并已推送；主检出 `D:\dev\JS-gen` 已切到这条。
+- 以后新版本成对开 `uara_V<x.y>_dev` 与 `uara_V<x.y>_test`。V2.0 的 test 不另建 `uara_V2.0_test`，稳定线就是 `uara_V2.0`。功能分支从 `uara_V2.0_dev` 切出并合回 dev；要进稳定 test 时再把 dev 合入 `uara_V2.0`。
+- 约定已写入 `AGENTS.md` 与 `docs/superpowers/todo-list.md` 页首。其他 worktree（engine / contract / phase-contract）未切换。
+- 注：不维护 CHANGELOG。
+
+## 2026-09-23 18:20 · Cursor Automation — 收工：2026-09-22 试用期工作日报（cron 日报助手）
+
+- 完成：`docs/report/2026-09-22.md` + `docs/report/README.md` 索引行；统计窗北京 2026-09-22，50 条非 merge 提交；对照 09-21 遗留与 agent-log 主链/引擎条目。
+- 验收：git log `--since=2026-09-21 16:00 --until=2026-09-22 16:00` 与日报提交表一致。
+- 禁入区：无代码/运行态改动。
+
+## 2026-09-23 18:16 · Cursor Automation — 开工：2026-09-22 试用期工作日报（cron）
+
+- 工作范围：`docs/report/2026-09-22.md`、`docs/report/README.md`、`docs/superpowers/agent-log.md`（本收工条目）。
+- 禁入区：`src/**`、`scripts/**`（除 agent-log）、运行态服务。
+- 执行方式：git log + agent-log + 前日日报遗留对照，只写文档。
 
 ## 2026-09-21 22:47 · Cursor — 收工：方案 D 第 2 刀并入 uara_V2.0（回链 21:05）
 
@@ -1794,3 +2336,20 @@ erify-all.sh 默认集
 - 禁入区：`boundary_contract.py`/`recorder_emitters.py`/其他 phase 模块（本轮不动）、他线 WIP（`characterize-phase-done-validate.py` 等）、`scripts/prompts/**`、`config/`、SPA
 - 方式：主线程内联，先 RED pin（本案真实文本 + 真查询反例防过度排除）再一行分类修正；回归=classify/boundary 既有 pin 全跑 + ruff F821 + py_compile；全量 verify-all 基线比对（3 红基线）后收工
 
+
+## 2026-09-22 09:55 · ZCode — 收工：后端发版 20260922-095101
+- uara_V2.0 @ 56d96859 → /data/app/JS-gen-releases/20260922-095101；batch 48 跑 1 个 migration（含方案 D 第 2 刀 79b4b8ba 的分析落库合约迁移）
+- 验证：/api/docs 200（4097 直连 + 经 3000 nginx 双路）、server.log 干净启动、发版时无活跃录制
+- 执行机：发版时无一在线。local-server-proxy 进程 09-21 18:32(+08) 后已死（非本次重启所致，服务器未重启），需要录制时请自行拉起；LMY/HZX PC 执行机本就不在线
+- 回滚：ln -sfn /data/app/JS-gen-releases/20260919-085907 /data/app/JS-gen && 重启 node server.mjs
+
+## 2026-09-23 08:55 · Cursor — 收工：阶段5引入确认后误录父表单步骤（回链 08:40 开工）
+- 完成：`introduce_pick` 在选人确认后不再武装父表单 `click_save`；改为注入 done 提示，并拒绝把父弹窗确认/后续字段写入本阶段轨迹。嵌套在 create/modify 里的选人仍走父表单保存。commit **`0fc4dd94`**
+- 验收：`characterize-phase-intent` OK；`characterize-done-accept-reason` / `characterize-phase-boundary` / `characterize-phase-runtime` / `characterize-case-data` / `characterize-query-toolbar-snippet` / `characterize-phase-section-scope` / `characterize-save-section` OK
+- 遗留：未做执行机湿测（需在线浏览器复跑对公评级阶段5→6）。`phase_reviewer` 本轮日志为空异常后走了 rules fallback，合约本身已是 introduce_pick，不是本缺陷根因
+
+## 2026-09-23 08:40 · Cursor — 开工声明：阶段5引入确认后误录父表单步骤
+- 开工：08:40。录制阶段5（客户选择窗口选人并确认）在 picker 关闭后被 `_submit_ready` 推去 `click_save` 父弹窗，把阶段6字段与父表单确认录进本阶段，阶段无法 done，阶段6不起步
+- 范围：`scripts/controller/actions/phase/intent_gates.py`、`scripts/controller/actions/phase/intent_contract.py`、`scripts/controller/actions/phase/boundary_gates.py`、`scripts/controller/actions/_misc.py`、`scripts/controller/actions/form_save.py`、`scripts/controller/actions/form_action_engines.py`、`scripts/controller/actions/_table.py`、`scripts/recorder.py`、`scripts/agent/recorder_emitters.py`、`scripts/characterization/characterize-phase-intent.py`、本文件
+- 禁入：`data/kb/**`、`src/**`、`scripts/controller/actions/js_snippets/save_section.py`（禁止恢复）、他线 WIP
+- 方式：主会话直接改；先开工声明提交，再改代码与特征化

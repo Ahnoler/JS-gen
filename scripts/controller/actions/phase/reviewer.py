@@ -512,6 +512,10 @@ async def review_phase_contract(
         if isinstance(raw, list):
             raw = '\n'.join(str(x) for x in raw)
         return promote_contract_for_save_cues(normalize_reviewer_payload(str(raw)), task_text)
+    except asyncio.TimeoutError:
+        sys.stderr.write('[phase_reviewer] timeout\n')
+        sys.stderr.flush()
+        return None
     except Exception as e:
         sys.stderr.write(f'[phase_reviewer] failed: {e}\n')
         sys.stderr.flush()

@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import tempfile
+import weakref
 from pathlib import Path
 
 from browser_use import Browser
@@ -17,6 +18,8 @@ from ..cdp_ports import _pick_free_cdp_port
 # and forgets, and asyncio only weakly references tasks — without this set the
 # task can be garbage-collected mid-accept.
 _dialog_task_refs: set[asyncio.Task] = set()
+_dialog_bound_pages: weakref.WeakSet = weakref.WeakSet()
+_dialog_bound_ids: set[int] = set()
 
 
 class _Ipv4BrowserTypeProxy:
@@ -372,29 +375,54 @@ async def _fit_browser_window(browser_context, width: int = 1600, height: int = 
         sys.stderr.flush()
 
 
-async def _dismiss_native_js_dialogs(browser_context) -> None:
-    """Auto-accept in-page alert/confirm/prompt — agents struggle with modal JS dialogs."""
+def attach_native_dialog_accept(page, store=None, ask=None) -> None:
+    """Handle one page's native dialogs. A second call on the same page is a no-op."""
+    if page is None:
+        return
+    target = getattr(page, "page", page)
     try:
-        page = await browser_context.get_current_page()
+        if target in _dialog_bound_pages:
+            return
+    except TypeError:
+        if id(target) in _dialog_bound_ids:
+            return
+    try:
+        _dialog_bound_pages.add(target)
+    except TypeError:
+        _dialog_bound_ids.add(id(target))
 
-        async def _on_dialog(dialog):
+    async def _on_dialog(dialog):
+        try:
+            from scripts.agent.native_dialog import apply_native_dialog
+            await apply_native_dialog(dialog, store, ask)
+        except Exception as exc:
+            sys.stderr.write(f'WARN: native dialog handling failed: {exc}\n')
+            sys.stderr.flush()
             try:
-                sys.stderr.write(f'Auto-accept JS dialog: {dialog.type} {dialog.message[:80]!r}\n')
-                sys.stderr.flush()
                 await dialog.accept()
             except Exception:
                 pass
 
-        def _on_dialog_event(d):
-            """启动自动接受 dialog 的任务并持有强引用（即发即弃防护）。"""
-            task = asyncio.create_task(_on_dialog(d))
-            _dialog_task_refs.add(task)
-            task.add_done_callback(_dialog_task_refs.discard)
+    def _on_dialog_event(d):
+        """启动自动接受 dialog 的任务并持有强引用（即发即弃防护）。"""
+        task = asyncio.create_task(_on_dialog(d))
+        _dialog_task_refs.add(task)
+        task.add_done_callback(_dialog_task_refs.discard)
 
-        page.on('dialog', _on_dialog_event)
+    try:
+        target.on('dialog', _on_dialog_event)
     except Exception as e:
+        try:
+            _dialog_bound_pages.discard(target)
+        except TypeError:
+            _dialog_bound_ids.discard(id(target))
         sys.stderr.write(f'WARN: dialog handler setup failed: {e}\n')
         sys.stderr.flush()
+
+
+async def _dismiss_native_js_dialogs(browser_context) -> None:
+    """Deprecated. Native dialogs are bound by install_recording_page_hooks."""
+    return None
 
 
 async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):

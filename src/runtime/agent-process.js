@@ -129,6 +129,20 @@ export function spawnAgent(args, extraEnv = {}) {
   if (headless && !env.CHROME_HEADLESS) {
     env.CHROME_HEADLESS = headless;
   }
+  const recordVision = resolveConfig('AI_RECORD_VISION', '');
+  if (recordVision && !env.AI_RECORD_VISION) {
+    env.AI_RECORD_VISION = recordVision;
+  }
+  // 识图专用 LLM 四件套（⑥；MODEL 未设则不透传，Python 端回落 agent.llm）
+  for (const key of [
+    'AI_RECORD_VISION_LLM_MODEL',
+    'AI_RECORD_VISION_LLM_BASE_URL',
+    'AI_RECORD_VISION_LLM_API_KEY',
+    'AI_RECORD_VISION_LLM_TIMEOUT_MS',
+  ]) {
+    const value = resolveConfig(key, '');
+    if (value && !env[key]) env[key] = value;
+  }
   return spawn(PYTHON_EXE, ['-m', 'scripts.main', ...args], {
     cwd: PROJECT_DIR,
     stdio: ['pipe', 'pipe', 'pipe'],

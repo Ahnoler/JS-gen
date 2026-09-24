@@ -201,7 +201,7 @@ def build_controller(browser_context, business_data_store=None,
     _register_workspace_actions(controller, browser_context, business_data_store)
     _register_todo_actions(controller, browser_context)
     _register_tree_actions(controller, browser_context)
-    _register_observe_actions(controller, browser_context)
+    _register_observe_actions(controller, browser_context, business_data_store)
     _register_kb_actions(controller, browser_context)
     _register_special_element_actions(
         controller,

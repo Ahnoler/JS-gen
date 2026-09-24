@@ -62,12 +62,10 @@ export function invalidRecordStatuses(raw) {
   )];
 }
 
-function applyListFilters(query, { keyword, recordStatus, isExport } = {}) {
-  if (keyword && String(keyword).trim()) {
-    const kw = `%${String(keyword).trim()}%`;
-    query.where(function () {
-      this.where('t.name', 'like', kw).orWhere('t.task', 'like', kw);
-    });
+function applyListFilters(query, { name, recordStatus, isExport } = {}) {
+  if (name && String(name).trim()) {
+    const kw = `%${String(name).trim()}%`;
+    query.where('t.name', 'like', kw);
   }
   const statuses = parseRecordStatuses(recordStatus);
   if (statuses) {
@@ -91,17 +89,17 @@ const RECORD_STATUS_STATS = ['draft', 'recording', 'failed', 'recorded', 'comple
 
 /**
  * Get statistics for trajectory record statuses (draft, recording, failed, recorded, completed).
- * Filters match the same criteria as list queries (functionId/keyword/recordStatus/batchTaskName).
+ * Filters match the same criteria as list queries (functionId/name/recordStatus/batchTaskName).
  * @param {object} [options] Optional filter parameters
  * @param {number|null} [options.functionId] Filter by function ID
- * @param {string|null} [options.keyword] Search keyword for name or task
+ * @param {string|null} [options.name] Fuzzy match transaction name (trajectory.name)
  * @param {string|string[]|null} [options.recordStatus] Filter by record status
  * @param {string|null} [options.batchTaskName] Filter by batch task name
  * @param {number|null} [options.paasUserId] Filter by PaaS user ID
  * @param {number|null} [options.isExport] Filter by export flag (0 = not exported, 1 = exported, null = all)
  * @returns {Promise<{ total: number, draft: number, recording: number, failed: number, recorded: number, completed: number }>} 各状态统计
  */
-export async function countByRecordStatus({ functionId = null, functionIds = null, keyword = null, recordStatus = null, batchTaskName = null, paasUserId = null, isExport = null } = {}) {
+export async function countByRecordStatus({ functionId = null, functionIds = null, name = null, recordStatus = null, batchTaskName = null, paasUserId = null, isExport = null } = {}) {
   const db = getDB();
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
@@ -110,7 +108,7 @@ export async function countByRecordStatus({ functionId = null, functionIds = nul
   } else if (functionId != null && Number.isFinite(Number(functionId))) {
     base.where('t.function_id', Number(functionId));
   }
-  applyListFilters(base, { keyword, recordStatus, isExport });
+  applyListFilters(base, { name, recordStatus, isExport });
   applyBatchTaskNameFilter(base, batchTaskName);
   if (paasUserId) base.where('t.paas_user_id', paasUserId);
   const rows = await base
@@ -670,7 +668,7 @@ export async function getById(id) {
  * @param {object} [options] Optional pagination and filter parameters
  * @param {number} [options.page] Page number (1-based)
  * @param {number} [options.pageSize] Number of items per page
- * @param {string|null} [options.keyword] Search keyword for name or task
+ * @param {string|null} [options.name] Fuzzy match transaction name (trajectory.name)
  * @param {string|null} [options.sortBy] Sort column (createdAt, updatedAt, name, stepCount, phaseCount, recordStatus)
  * @param {string} [options.order] Sort order ('asc' or 'desc')
  * @param {string|string[]|null} [options.recordStatus] Filter by record status
@@ -691,7 +689,7 @@ export async function listByFunction(functionId, options = {}) {
  * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number, stats: object }>} Paginated trajectory list with statistics
  */
 export async function listByFunctionIds(functionIds, {
-  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null, isExport = null,
+  page = 1, pageSize = 20, name, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null, isExport = null,
 } = {}) {
   const db = getDB();
   const ids = (Array.isArray(functionIds) ? functionIds : []).map(Number).filter(Number.isFinite);
@@ -702,7 +700,7 @@ export async function listByFunctionIds(functionIds, {
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id')
     .whereIn('t.function_id', ids);
-  const query = applyListFilters(base, { keyword, recordStatus, isExport });
+  const query = applyListFilters(base, { name, recordStatus, isExport });
   applyBatchTaskNameFilter(query, batchTaskName);
   if (paasUserId) query.where('t.paas_user_id', paasUserId);
 
@@ -723,7 +721,7 @@ export async function listByFunctionIds(functionIds, {
     e.isExport = Number(e.isExport) ? 1 : 0;
     e.phaseCount = phaseCounts.get(Number(e.id)) || 0;
   }
-  const stats = await countByRecordStatus({ functionIds: ids, keyword, recordStatus, batchTaskName, paasUserId, isExport });
+  const stats = await countByRecordStatus({ functionIds: ids, name, recordStatus, batchTaskName, paasUserId, isExport });
   return { rows: entities, total, page, pageSize, stats };
 }
 
@@ -732,7 +730,7 @@ export async function listByFunctionIds(functionIds, {
  * @param {object} [options] Optional pagination and filter parameters
  * @param {number} [options.page] Page number (1-based)
  * @param {number} [options.pageSize] Number of items per page
- * @param {string|null} [options.keyword] Search keyword for name or task
+ * @param {string|null} [options.name] Fuzzy match transaction name (trajectory.name)
  * @param {string|null} [options.sortBy] Sort column (createdAt, updatedAt, name, stepCount, phaseCount, recordStatus)
  * @param {string} [options.order] Sort order ('asc' or 'desc')
  * @param {string|string[]|null} [options.recordStatus] Filter by record status
@@ -742,13 +740,13 @@ export async function listByFunctionIds(functionIds, {
  * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number, stats: object }>} Paginated trajectory list with statistics
  */
 export async function list({
-  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null, isExport = null,
+  page = 1, pageSize = 20, name, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null, isExport = null,
 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
-  const query = applyListFilters(base, { keyword, recordStatus, isExport });
+  const query = applyListFilters(base, { name, recordStatus, isExport });
   applyBatchTaskNameFilter(query, batchTaskName);
   if (paasUserId) query.where('t.paas_user_id', paasUserId);
 
@@ -768,7 +766,7 @@ export async function list({
     e.isExport = Number(e.isExport) ? 1 : 0;
     e.phaseCount = phaseCounts.get(Number(e.id)) || 0;
   }
-  const stats = await countByRecordStatus({ keyword, recordStatus, batchTaskName, paasUserId, isExport });
+  const stats = await countByRecordStatus({ name, recordStatus, batchTaskName, paasUserId, isExport });
   return { rows: entities, total, page, pageSize, stats };
 }
 

@@ -18,6 +18,26 @@ from .intent_contract import (
     phase_intent_active,
 )
 
+# 证据等价类（A/B 移交 744：校验时同族互认——按证据等价类判，不按名判）。
+# 成员与 boundary_gates.record_evidence 的族镜像 / observed_kinds 展开清单
+# 逐字一致（只读复用该归一先例，不改 boundary_gates.py）；只归组既有 kind，
+# 不新增 kind 值（名字与 PHASE_CONTRACT_KINDS 冻结清单一致）。其余 kind
+# （query_clicked / page_opened / nav_next_clicked 等）各自单元素族，不互认。
+_SAVE_FAMILY = ('toast_ok', 'url_change', 'saved_navigation')
+_INTRODUCE_FAMILY = ('picker_closed', 'dialog_confirmed', 'introduced_backfilled')
+
+def _same_family(kind_a: Any, kind_b: Any) -> bool:
+    """True when two kinds fall in the same evidence-equivalence class.
+
+    保存族 / 引入族成员按序互认；未知 kind 只与自身相等（精确匹配不变）。
+    """
+    if kind_a == kind_b:
+        return True
+    for family in (_SAVE_FAMILY, _INTRODUCE_FAMILY):
+        if kind_a in family and kind_b in family:
+            return True
+    return False
+
 def contract_allows_form_assistant(business_data_store: dict | None) -> bool:
     """Whether the form assistant may run under the current phase intent.
 
@@ -96,6 +116,64 @@ def is_maintain_form_phase(contract: dict[str, Any] | None) -> bool:
 
 def is_introduce_phase(contract: dict[str, Any] | None) -> bool:
     return bool(contract and contract.get('mode') == 'introduce_pick')
+
+
+INTRODUCE_DONE_BLOCK = (
+    'introduce-phase-complete | 选人已确认，本阶段结束。'
+    '立刻 done(success=true)。'
+    '不要 click_save 父表单，不要填写后续阶段字段，不要重新打开引入或再次查询。'
+)
+
+INTRODUCE_DONE_CUE = (
+    '[SYSTEM] 选人窗口已确认，引入字段应已回填。本阶段到此结束。\n'
+    'NEXT_ACTION: Call done(success=true) NOW.\n'
+    'Do NOT call click_save() on the parent form — 父弹窗的确认/保存/提交是后续阶段。\n'
+    'Do NOT fill or select parent-form fields.\n'
+    'Do NOT re-open 引入, re-query, or re-select the row.'
+)
+
+
+def should_arm_parent_save_after_picker(business_data_store: dict | None) -> bool:
+    """Parent click_save belongs to create/modify. introduce_pick ends at confirm."""
+    return not is_introduce_phase(get_phase_intent(business_data_store))
+
+
+def arm_introduce_done(business_data_store: dict | None) -> None:
+    """Mark introduce_pick complete and disarm the parent click_save inject."""
+    if business_data_store is None:
+        return
+    business_data_store['_introduce_done_ready'] = True
+    business_data_store.pop('_submit_ready', None)
+    business_data_store.pop('_query_ui', None)
+
+
+def introduce_phase_confirmed(business_data_store: dict | None) -> bool:
+    """True after an introduce_pick phase has confirmed the picker."""
+    if not is_introduce_phase(get_phase_intent(business_data_store)):
+        return False
+    if (
+        business_data_store.get('_last_introduce_ok')
+        or business_data_store.get('_introduce_done_ready')
+    ):
+        return True
+    try:
+        from .._phase_boundary import observed_kinds
+        kinds = observed_kinds(business_data_store)
+    except Exception:
+        return False
+    return bool(kinds & {'picker_closed', 'dialog_confirmed', 'introduced_backfilled', 'confirm_click'})
+
+
+def introduce_done_block_message(business_data_store: dict | None) -> str | None:
+    """Error text when a post-confirm action must not be recorded.
+
+    Arms the recorder done-cue so the phase can end and the next phase can start.
+    """
+    if not introduce_phase_confirmed(business_data_store):
+        return None
+    arm_introduce_done(business_data_store)
+    return INTRODUCE_DONE_BLOCK
+
 
 def overlay_blocks_done(contract: dict | None) -> bool:
     """True → DOM done-heuristics (open overlay / visible errors) hard-reject.
@@ -256,15 +334,15 @@ def has_contract_success(business_data_store: dict | None) -> bool:
     kinds = (c.get('success') or {}).get('kinds') or []
     if not kinds:
         return True
-    if business_data_store.get('_last_save_ok') and ('toast_ok' in kinds or 'url_change' in kinds):
+    if business_data_store.get('_last_save_ok') and any(k in kinds for k in _SAVE_FAMILY):
         return True
-    if business_data_store.get('_last_introduce_ok') and (
-        'confirm_click' in kinds or 'picker_closed' in kinds
+    if business_data_store.get('_last_introduce_ok') and any(
+        k in kinds for k in _INTRODUCE_FAMILY
     ):
         return True
     tokens = business_data_store.get('_success_tokens') or []
     for tok in tokens:
-        if isinstance(tok, dict) and tok.get('kind') in kinds:
+        if isinstance(tok, dict) and any(_same_family(tok.get('kind'), k) for k in kinds):
             return True
     return False
 
@@ -284,9 +362,9 @@ def done_accept_reason(
     kinds = ((contract or {}).get('success') or {}).get('kinds') or []
     if not isinstance(kinds, (list, tuple)):
         kinds = []
-    if save_ok and {'toast_ok', 'url_change'} & set(kinds):
+    if save_ok and set(_SAVE_FAMILY) & set(kinds):
         return 'navigation' if navigated_ok else 'save-ok'
-    if introduce_ok and {'confirm_click', 'picker_closed'} & set(kinds):
+    if introduce_ok and set(_INTRODUCE_FAMILY) & set(kinds):
         return 'introduce'
     if introduce_ok:
         return 'introduce'

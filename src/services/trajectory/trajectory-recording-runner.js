@@ -50,6 +50,30 @@ import {
   evaluatePhaseOutcome,
 } from './phase-done-evidence-gate.js';
 
+/** 零步 navigate 豁免判定用写动词表（A/B 移交 ②）：描述命中任一即非 navigate-only。 */
+const NAVIGATE_ONLY_WRITE_VERBS = ['保存', '提交', '填写', '输入', '勾选', '上传', '新增', '编辑', '修改', '删除', '启用', '停用', '导入', '确定'];
+
+/**
+ * navigate-only 阶段判定（A/B 移交 ②：登录回放代导航的合法零步形态识别，纯函数可单测）。
+ * 判定数据源：首选 phase 行的 v1 合约 mode（normalizePhaseContract 校验，非法合约
+ * 视为无合约）；无合法合约时退 phase.description 写动词表判定。保守口径——拿不准
+ * 一律 false（不豁免）：
+ * - 有合法合约：仅 mode=navigate/other 且描述无写动词 → true（mode=create/modify/
+ *   introduce_pick/query/login 等一律 false，豁免面不扩）；
+ * - 无合法合约：有描述且无写动词 → true；无描述 → false。
+ * @param {{ contractJson?: object|null, description?: string|null }} [phase] phase 行（DAO 形状）
+ * @returns {boolean} true = navigate-only（零步自报成功应豁免零步门嫌疑登记）
+ */
+export function isNavigateOnlyPhase(phase) {
+  const contract = normalizePhaseContract(phase?.contractJson ?? null);
+  const description = String(phase?.description || '').trim();
+  const hasWriteVerb = NAVIGATE_ONLY_WRITE_VERBS.some((verb) => description.includes(verb));
+  if (contract) {
+    return (contract.mode === 'navigate' || contract.mode === 'other') && !hasWriteVerb;
+  }
+  return description !== '' && !hasWriteVerb;
+}
+
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -925,8 +949,19 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     // 此处只消费判定结果做副作用（嫌疑登记 + 降级留痕 + outcomes 写入）。
     const phaseStepCount = runtime.phaseStepCounts.get(phase.id) || 0;
     const phaseOutcome = evaluatePhaseOutcome({ explicitSuccess, phaseStepCount, donePayload });
-    const zeroStepPhase = phaseOutcome.zeroStepPhase;
-    if (phaseOutcome.registerPerRun) {
+    // 零步 navigate 豁免（A/B 移交 ②）：代导航阶段（登录回放已代导航）业务步天然
+    // 为 0，自报 success 属合法形态——豁免发生在登记之前：该阶段不进 v3 perRun
+    // 嫌疑清单、不进 v2 phaseBusinessCounts 嫌疑快照、不发 [0步完成] 门日志；
+    // 零步门主体（evaluateFinalizeGate）与 v1.5 total==0 兜底不动（整轨全零步
+    // 仍降级，重录掩蔽疑点保留）。带 flag 复判走同一纯函数，豁免形状
+    // （success 保持 true、无前缀、registerPerRun=false）单源在
+    // evaluatePhaseOutcome；非 navigate 零步行为逐字不变。
+    const navigateExempt = phaseOutcome.registerPerRun && isNavigateOnlyPhase(phase);
+    const phaseOutcomeFinal = navigateExempt
+      ? evaluatePhaseOutcome({ explicitSuccess, phaseStepCount, donePayload, phaseIsNavigateOnly: true })
+      : phaseOutcome;
+    const zeroStepPhase = phaseOutcomeFinal.zeroStepPhase;
+    if (phaseOutcomeFinal.registerPerRun) {
       console.warn(
         `[record] phase #${phase.phaseNumber} self-reported success with 0 persisted steps — downgraded to unknown`,
       );
@@ -936,21 +971,25 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         id: phase.id,
         phaseNumber: phase.phaseNumber,
       });
+    } else if (navigateExempt) {
+      console.info(
+        `[record] phase #${phase.phaseNumber} navigate-only zero-step success — exempt from zero-step suspects`,
+      );
     }
     // 假成功防线 v2：自报 success=true 且 0 业务步的阶段即嫌疑（与上面阶段级
     // 降级同一判据），终局门闩对其做双源复核，仍 0 则整轨降级。
     try {
-      if (explicitSuccess === true) {
+      if (explicitSuccess === true && !navigateExempt) {
         runtime.phaseBusinessCounts.set(phase.phaseNumber, countBusinessStepsByPhase(tid, phase.phaseNumber));
       }
     } catch {}
-    runtime.phaseOutcomes[phase.id] = phaseOutcome;
-    runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;
+    runtime.phaseOutcomes[phase.id] = phaseOutcomeFinal;
+    runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcomeFinal;
     const rawDoneText = String(donePayload?.text || '').trim();
     if (rawDoneText) {
       await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
     }
-    if (zeroStepPhase) {
+    if (zeroStepPhase && !navigateExempt) {
       await appendPhaseDoneLog(phase.id, {
         text: `[0步完成] 本阶段无任何落库步骤${explicitSuccess === true ? '；已自报 success 但被降级' : ''}`,
         source: 'gate',

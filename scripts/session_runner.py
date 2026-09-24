@@ -19,7 +19,6 @@ from .agent_utils import (
     patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, patch_dom_tree_js, create_llm,
 )
 from .controller import build_controller
-from .controller.actions.network_capture import attach_network_capture
 from .controller.actions.replay_timing import budget_for, budget_overrun_hint
 from .recorder import build_recording_hooks
 
@@ -241,7 +240,6 @@ async def _ensure_browser_and_cdp(cdp_url, cdp_port, session_id):
     await browser_context.get_session()
     await _ignore_certificate_errors(browser_context)
     await _fit_browser_window(browser_context, win_w, win_h)
-    await _dismiss_native_js_dialogs(browser_context)
     await _bypass_ssl_interstitial_if_any(browser_context)
 
     # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
@@ -340,7 +338,6 @@ async def run_session(args):
 
     business_data_store = {}  # process-level in-memory store, persists across steps
     special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
-    _net_cleanup = None  # network capture detach closure (None until attached)
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
 
@@ -358,14 +355,36 @@ async def run_session(args):
     cdp_action_queue = asyncio.Queue()
     cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, business_data_store))
 
-    # Task 9: attach passive network capture (form-related XHR/fetch → memory events).
-    # Failure to attach must never break the recording session.
+    async def _ask_native_dialog(dialog_type, message, default_value):
+        from langchain_core.messages import HumanMessage
+        prompt = (
+            "Native browser dialog is blocking the page. "
+            "Reply with one line only: accept, dismiss, or accept:<text>.\n"
+            f"type: {dialog_type}\n"
+            f"message: {message}\n"
+            f"default: {default_value}\n"
+        )
+        result = await llm.ainvoke([HumanMessage(content=prompt)])
+        content = getattr(result, "content", result)
+        if isinstance(content, list):
+            parts = []
+            for part in content:
+                if isinstance(part, dict):
+                    parts.append(str(part.get("text", "")))
+                else:
+                    parts.append(str(part))
+            content = "".join(parts)
+        return str(content)
+
     try:
-        _page_for_capture = await browser_context.get_current_page()
-        _net_cleanup = attach_network_capture(_page_for_capture, business_data_store)
-    except Exception as _net_err:
-        _net_cleanup = None
-        sys.stderr.write(f"[network-capture] attach failed (ignored): {type(_net_err).__name__}: {_net_err}\n")
+        from scripts.agent.page_feedback_hooks import install_recording_page_hooks
+        await install_recording_page_hooks(
+            browser_context, business_data_store, _ask_native_dialog
+        )
+    except Exception as _xhr_err:
+        sys.stderr.write(
+            f"[step-feedback] page hook install failed (ignored): {type(_xhr_err).__name__}: {_xhr_err}\n"
+        )
         sys.stderr.flush()
 
     def _on_cdp_task_done(t):
@@ -715,12 +734,12 @@ async def run_session(args):
 
     await _teardown_session(browser, browser_context, reader_task, cdp_task, cdp_port, cdp_url, keep_browser)
 
-    # Task 9: detach network capture listener (best effort, before memory flush)
-    if _net_cleanup:
-        try:
-            _net_cleanup()
-        except Exception:
-            pass
+    # Detach network capture listeners collected by page hooks (best effort, before memory flush)
+    try:
+        from scripts.agent.page_feedback_hooks import teardown_network_captures
+        teardown_network_captures()
+    except Exception:
+        pass
 
     # P0：退出前冲刷记忆队列（不等待太久，避免拖慢关闭）
     flush_memory_writer(timeout=2.0)

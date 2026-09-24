@@ -25,24 +25,6 @@ import { GROUP_AUTH } from './groups/auth.js';
 import { GROUP_LLM } from './groups/llm.js';
 import { GROUP_AUTH_RECORDING } from './groups/auth-recording.js';
 
-/** Live slot occupancy board (not an HTTP endpoint group). */
-export const GROUP_SLOT_MONITOR = [{
-  id: 'slot-monitor',
-  name: '执行机监视',
-  description: '按执行机拆分槽位占用；断开画面 / 释放浏览器',
-  endpoints: [],
-  monitor: true,
-}];
-
-/** Live pending-screenshots board (not an HTTP endpoint group). */
-export const GROUP_PENDING_SCREENSHOTS = [{
-  id: 'pending-screenshots',
-  name: '待上传截图',
-  description: '本地暂存、尚未上传 MinIO 的截图；一键上传 / 单行上传 / 删除',
-  endpoints: [],
-  monitor: true,
-}];
-
 /** Live auth-recording trigger/status board (not an HTTP endpoint group). */
 export const GROUP_AUTH_RECORDING_PANEL = [{
   id: 'auth-recording-panel',
@@ -55,8 +37,6 @@ export const GROUP_AUTH_RECORDING_PANEL = [{
 /** @type {TagGroup[]} */
 export const API_GROUPS = [
   GROUP_OVERVIEW[0], // 概览
-  ...GROUP_SLOT_MONITOR,
-  ...GROUP_PENDING_SCREENSHOTS,
   ...GROUP_OVERVIEW.slice(1), // 系统管理 …
   ...GROUP_AUTH, // 登录鉴权（SSO）
   ...GROUP_LLM, // LLM 配置

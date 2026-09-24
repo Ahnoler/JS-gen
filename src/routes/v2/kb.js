@@ -1,7 +1,7 @@
 import { asyncHandler, AppError } from '../../http/app-error.js';
 import { sendOk } from '../../http/api-response.js';
 import { uploadFileSingle, multerHttpStatus } from '../../http/upload-file.js';
-import { listFlowCards } from '../../services/kb-flow-cards.js';
+import { listFlowCards, flowSummaryByName } from '../../services/kb-flow-cards.js';
 import { detectStaleCards } from '../../services/change-impact-service.js';
 import * as systemDao from '../../dao/system-dao.js';
 import * as reqModules from '../../services/kb-req-modules.js';
@@ -21,6 +21,15 @@ export default function registerKbRoutes(app) {
   /** GET /api/v2/kb/cards — 全部流程卡消费侧字段（含 source/source_refs 溯源）。 */
   app.get('/api/v2/kb/cards', asyncHandler(async (req, res) => {
     res.json(await listFlowCards());
+  }));
+
+  /** GET /api/v2/kb/flow-summary?flow= — 流程卡全文摘要，不按字数截断。 */
+  app.get('/api/v2/kb/flow-summary', asyncHandler(async (req, res) => {
+    const flow = String(req.query.flow || '').trim();
+    if (!flow) throw new AppError('flow required', { code: 'VALIDATION' });
+    const text = await flowSummaryByName(flow);
+    if (!text) throw new AppError('flow card not found', { code: 'NOT_FOUND', status: 404 });
+    res.json({ flow, text });
   }));
 
   /** GET /api/v2/kb/stale-cards — menu_path 对当前树三态解析（只读，不写卡）。 */

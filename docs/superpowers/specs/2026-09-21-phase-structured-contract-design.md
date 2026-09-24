@@ -64,7 +64,7 @@
 - `success = { kinds: successWhen, evidence: [] }`
 - `refill` 原样
 
-`button_text` 留空：恢复处方继续用现有 mode 默认文案（创建「保存」、修改「确认」、引入「确认」），不从分析文本再猜按钮名。
+持久化 JSON 仍没有按钮字段，应用快照时 `button_text` 留空。没有快照、走规则回退时，按钮文案取阶段动作子句最后一次「点击确认/确定/保存/提交」；动作里没有这句点击时，新增默认「保存」、修改默认「确认」、引入默认「确认」。
 
 ## 5. 谁来签
 
@@ -73,13 +73,14 @@
 提示词在现有规则 3.2 / 3.3 与示例 7 / 8 之后，增加输出字段说明（不改规则 1–10、3.1 的拆分主体）：
 
 - 每个阶段除描述字符串外，给出 `mode`、`refill`、`submitRequired`、`successWhen`。
-- 对照与方案 C 令牌表一致，写进提示词供模型照抄，不在 Node 里再编译一遍：
-  - 仅打开选择器/弹窗/页面 → `navigate`，`submitRequired=false`，`successWhen=["url_change","page_opened"]`，`refill=none`
-  - 纯填写/选择且保存在后续阶段 → `create` 或 `modify`，`refill=all_editable`，`submitRequired=false`，`successWhen=[]`
-  - 本阶段确有保存/确认 → `create` 或 `modify`，`refill=all_editable`，`submitRequired=true`，`successWhen=["toast_ok","url_change"]`
-  - 查询 → `query`，`successWhen=["query_clicked"]`
-  - 引入并在本阶段确认/回填 → `introduce_pick`，`submitRequired=true`，`successWhen` 取 `picker_closed` / `confirm_click` / `dialog_confirmed` / `introduced_backfilled` 中模型点名的子集，至少一个
-  - 登录 → `login`，`successWhen=[]`
+- 对照与令牌归属设计一致，写进提示词供模型照抄，不在 Node 里再编译一遍。消歧细则见 `2026-09-21-phase-contract-token-ownership-design.md`：
+  - 仅打开选择器/弹窗/页面，或只打开登录页而登录在后续阶段 → `navigate`，`submitRequired=false`，`successWhen=["url_change","page_opened"]`，`refill=none`
+  - 纯填写/选择，保存或查询点击在后续阶段；下拉框、输入框、日期控件上的字段即使名叫「查询…」也算这类 → `create` 或 `modify`，`refill=all_editable`，`submitRequired=false`，`successWhen=[]`。修改只在动作子句写了修改/维护时用 `modify`
+  - 本阶段动作子句确有点击保存/确认/提交 → `create` 或 `modify`，`refill=all_editable`，`submitRequired=true`，`successWhen=["toast_ok","url_change"]`
+  - 本阶段动作是点击查询/搜索、执行搜索，或在搜索框中搜索 → `query`，`successWhen=["query_clicked"]`。只设置条件、查询点击在后续阶段 → `other`，`successWhen=[]`
+  - 引入并在本阶段确认/回填 → `introduce_pick`，`submitRequired=true`，`successWhen` 取 `picker_closed` / `confirm_click` / `dialog_confirmed` / `introduced_backfilled` 中模型点名的子集，至少一个。选择某个下拉字段不是引入
+  - 本阶段登录系统、使用账号登录或输入账号密码 → `login`，`successWhen=[]`
+  - 本阶段没有点击下一步、下一步在后续阶段 → `other`，`successWhen=[]`。动作子句写明点击下一步仍是 `navigate`
   - 其余 → `other`，`successWhen=[]`，`refill=none`，`submitRequired=false`
 
 模型输出从「`phases` 字符串数组」改为对象数组。解析器**两种都接受**：

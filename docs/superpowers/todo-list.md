@@ -6,9 +6,21 @@
 
 > **2026-09-06 重整（用户定调）**：被测系统开发中，部分流程卡内容只适用当前 SUT 版本、部分模块功能跑不通——不追全量。主线聚焦=**引擎线跑通真实业务主链**（客户新增→对公评级→授信申请→审批→批复→用信→合同）；KB 从全量补测晋升转向**主链流程卡供给**；blocked 回收/T1-2批降级为按需顺路。
 
-> **2026-09-18/19 上游换代（用户定盘）**：**`uara_V2.0` 为唯一上游开发分支，V1.2 冻结**（V1.2 全部历史已吸收进 V2.0，含引擎线 B1-B3/B-6 修复与合约线 A 类全批修复，merge `cf8cbe06`）。此后各线：开工声明上游写 `uara_V2.0`，新分支从 V2.0 切。worktree 分工：`D:\dev\JS-gen-engine` = V2.0 全量态（引擎线主场）；`D:\dev\JS-gen-contract` = 合约线湿测证据 worktree（分支 `fix/phase-contract-20260918` 已并入 V2.0，保留回溯用）；4097+LMY 服务仍从 JS-gen-contract 旧态运行，**下次重启窗口改从 engine worktree 启动**（待用户协调）；主检出 `D:\dev\JS-gen` 仍在 V1.2 旧位，切 V2.0 或闲置待用户拍板。
+> **2026-09-21 版本双线（用户定盘）**：每个版本两套分支，**只在 dev 上改**。V2.0 稳定 test = 现有 **`uara_V2.0`**（停在 `eab6c041`，不再直接提交）；开发 = **`uara_V2.0_dev`**（从该点切开）。功能分支从 `uara_V2.0_dev` 切、合回 `uara_V2.0_dev`；要进稳定 test 时再把 dev 合入 `uara_V2.0`。V2.0 不另建 `uara_V2.0_test`。以后新版本成对：`uara_V<x.y>_dev` / `uara_V<x.y>_test`。主检出 `D:\dev\JS-gen` 已切到 `uara_V2.0_dev`。
+
+> **2026-09-18/19 上游换代（用户定盘，2026-09-21 起被上条双线取代）**：当时 **`uara_V2.0` 为唯一上游开发分支，V1.2 冻结**（V1.2 全部历史已吸收进 V2.0，含引擎线 B1-B3/B-6 修复与合约线 A 类全批修复，merge `cf8cbe06`）。worktree 分工仍有效：`D:\dev\JS-gen-engine` = 引擎线主场；`D:\dev\JS-gen-contract` = 合约线湿测证据 worktree（分支 `fix/phase-contract-20260918` 已并入 V2.0，保留回溯用）；4097+LMY 服务仍从 JS-gen-contract 旧态运行，**下次重启窗口改从 engine worktree 启动**（待用户协调）。
 
 ## 当前工作线（2026-09-06 起）
+
+### ⑨ 录制效率与成功率（2026-09-24 立项 · 逐项评估，未开工实现）
+
+报告：[`reports/2026-09-24-recording-efficiency-success-research.md`](reports/2026-09-24-recording-efficiency-success-research.md)。基线：近 45 天 AI 录制成功率约 71%（208/292），近两周约 61%；失败轨迹活跃时间中位 7.6 分钟，成功轨迹 2 分钟。五项按报告顺序逐项评估「做不做、怎么做」，**评估写明「做」之前不改产品代码**。
+
+1. **控件卡住**（约占失败 30%，本产品能修的最大一块）— 待评估。近期候选：拒绝时给出唯一可行动作；湿测后打开 `AI_DUP_FAILURE_CUE`、`SUT_SPIN_GUARD_MODE`（挂起表 `recording-redundant-step` D2 已合入、默认 off）。长期候选：树 / 表格行 / 级联 / 弹窗「查询—选行—确定」做成参数化多步技能。
+2. **阶段完成判定改为看证据**（约占失败 10%）— 待评估。近期候选：legacy 令牌别名表；核验型阶段主收口（挂起表 `verify-phase-token` 第一步已合入，第二步等湿测）；仅导航阶段豁免零步门（733/741/742 被误伤）。证据逐条判 done 排在这三件之后。
+3. **确定性步骤不再每步问模型**（提速主线）— 待评估。候选：填写阶段按合约自动 `run_form_assistant`；登录组件回放推广到菜单导航 / 查询选行 / 选人；规划器与场景摘要降频或换小模型。知识库继续把活卡做准，不扩召回算法。
+4. **失败早发现，不从头重来** — 待评估。失败原因与页面错误落库已有挂起项 `record-page-errors`（P2，未做）。另：录前拦住在途流程 / 角色未配置；`phaseIds` 从失败阶段续录产品化；AI 录制中允许人工接管后交还。
+5. **录完即验证，验证过再沉淀** — 待评估。候选：录完对关键阶段冒烟回放；终局标出或清掉探索 / 重试 / 重复步（约 9%）；验证通过后才生成流程卡规则或组件草稿，人工发布。自动沉淀排在方向 2 的判定可靠之后。组件产品化仍属 ⑧′，不进本版实现。
 
 ### ⑧ 需求切片 → 原子草稿交易（2026-09-07 · 已落地；SPA 向导已交付）
 
@@ -43,7 +55,7 @@
 - **不纳入本版实现**；需求评审时立项。
 - **F-15 湿测证据面错位（2026-09-08 KB 加固线登记，需 Lead 批准另开任务）**：湿测协议禁写操作，而草稿交易原子全是写操作 → blocked 686（35%）、草稿卡晋升率 63/177。拟议：湿测新增判定词 `readonly-partial`（走到最终确认前一步并记录字段/按钮/校验提示），涉及 `scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`scripts/kb/wet-test-check.mjs`、草稿卡 gate 计算与 30 模块语料重跑；spec=`specs/2026-09-08-kb-remediation-design.md` §11 R4。
 
-### ⑤ 引擎主链贯通（最高优先 · 2026-09-06 定调；2026-09-07 更新：R1-R5 PASS，R6/R7 挂起等 SUT 账号支持）
+### ⑤ 引擎主链贯通（最高优先 · 2026-09-06 定调；**2026-09-22 主链七环节全通**：R1-R7 全部走通，X0018 角色经信贷侧补配后解除）
 
 **主链**：客户新增 → 对公评级 → 授信申请 → 审批 → 批复 → 用信 → 合同（对公线）。涉及影像/OCR/文件上传的环节一律绕行（产品裁定 09-05：上传场景搁置，合同止于已保存态待产品排期）。
 
@@ -63,8 +75,10 @@
 | R4 审批 | 606/607/608 | WN0001 账号补建（systemAccountId=26，SUT 统一密码） |
 | R5 批复查看 | 613 | DGSXPF20260907020005 要素核对（生效/100 万/关联额度 EDBH20260905080002） |
 | R6 用信 | 616+续棒 | **YXPC20260907012045 已生成（待发起）**，98+57 步落库；利率/担保/行政区划三深坑全修（credit_usage 卡 +4 规则 71612302） |
+| R6.5 用信审批 | 979–981 | YXPC20260907012045 三个审批节点完成（含 135292 节点换人处置），用信批复 **DGYXPF202609220016013 生效** |
+| R7 合同签订 | 982+MCP 收尾 | 合同 **9881020048004** 签订信息全部维护并保存（ctrSt=1 已保存态；止于此为产品裁定，生效路线待产品排期） |
 
-**R6/R7 挂起（2026-09-07 用户拍板暂时搁置）**：
+**R6/R7 曾于 09-07 挂起（X0018 无用户），09-22 信贷侧补配后复跑完成——主链全通成果介绍：[`reports/2026-09-22-mainchain-full-through-summary.md`](reports/2026-09-22-mainchain-full-through-summary.md)；新遗留：合同账户弹窗候选随机轮换（反馈材料已备：[`reports/2026-09-22-contract-account-popup-feedback.md`](reports/2026-09-22-contract-account-popup-feedback.md)，等信贷侧确认）。以下为当时挂起记录（历史留档）**：
 
 - **阻塞点**：R6 流程提交被服务端拒「下一节点没有可处理的用户，请配置[客户经理]角色的用户！」——`wf_usecredit_001_002` 节点 `nextCandidateRoles=[X0018]`、`nodeSelMode=byLastTask`，测试环境 X0018（客户经理）角色当前无绑定用户（P3-B 时代 YXPC20260905012041 可通，人员配置漂移）。3 种 payload 变体均拒，非客户端可修。**用户已确认：被测系统暂时无法提供账号支持。**
 - **恢复条件**：SUT 管理员给 X0018 角色配置用户（建议绑 WN0001/黄亮）。
@@ -155,11 +169,13 @@
 | **deadlock-forensics** | P3（取证已挂，等证据根治） | 录制落库期偶发 InnoDB deadlock（B 类移交 traj #865，报告 `docs/reports/2026-09-20-b-class-handover-system-line.md` §二；09-17 日志三例牺牲语句恒=`UPDATE trajectory SET is_export=0` 即 markExportDirty，锁模型指向快照显式事务 FK 父行 S→X 锁升级但无 deadlock 打印原文未实锤）。兜底（retry 一次+双失败广播 `step_persist_failed`）自愈充分（四例全自愈零丢数，wet5–wet9 未复发）。**取证插桩已落（`db0ea76f`，2026-09-21）**：deadlock catch 自动抓 `SHOW ENGINE INNODB STATUS` 段落日志（`src/services/trajectory/deadlock-forensics.js`，pin `characterize-deadlock-forensics` 入 verify-all）。**根治待办**：下次复发取 deadlock 打印原文→实锤锁环→最小锁序调整（候选=快照事务内 markExportDirty 前置/移出事务，触及 `form-snapshot-append.js` 一处）+ 真机湿测（需在线 SUT）。**executor 双实例互踢（B 类移交第 1 项）已闭合**：守护三层由 `216b2688` 落地（启动锁/控制面拒绝/脚本清理），pin 全绿，湿测侧人工盯 pid 纪律对同 uuid 双实例可退役（前提=执行机跑 ≥216b2688 代码） |
 | **executor-multiprocess-concurrency** | P2（登记，未做） | 执行机管理的并发控制目前全为**控制面单进程内存态**：`executor-slot-lease`（slot 租约 + pending）、`withTrajectoryLock`、`runtime.aiRecording` claim 均不跨进程；多开控制面实例或双实例调度同一 nodeUuid 时，会各自认为槽位空闲 → 同一浏览器槽双开/同一轨迹并发 prepare。批量侧已有 DB 原子认领（`claimNextItem` FOR UPDATE + CAS + lease/renew）可借鉴。候选解法：①把 slot 租约与轨迹锁外置 Redis/DB（owner+expire+CAS 续约）；②按 nodeUuid 做控制面归属（一节点只由一个实例调度）；③执行机侧 `session.open` 自分配 slotIndex 并返回，弱化控制面对脑内租约的依赖。与本次 `characterize-executor-unknown-session` 修复配套（本次只清残留绑定+终态快失败，未动多实例正确性） |
 | **phase-structured-contract** | P2（长期） | **阶段结构元数据（方案 D）**：当前 `trajectory_phase` 仅存储 `description` 字符串，阶段合约全靠运行时文本分类，易因措辞/拆分差异误判。长期把 meta-service 输出扩展为 `{description, mode, success_when, submit_required, ...}` 结构并持久化到 DB，runner 直接透传给执行机作为 `_phase_intent` 初始值，runtime 分类退化为 fallback。前置（2026-09-21 更新）：**方案 C 已落地并跑稳**（合约引擎 open-only/fill-only/跨阶段令牌归属 + prompt 规则 3.2/3.3；`be21aafd`，合并 `5639541c`；实际流程与后续规则见 `docs/superpowers/specs/2026-09-21-phase-contract-token-ownership-design.md`）——本长期项据此按 ROI 评估推进。方案 D 落地仍涉及 DB 迁移、`trajectory-meta-service.js` 输出契约、`trajectory-recording-runner.js` 透传、执行机接收接线；目标=把运行时文本分类（`compile_boundary`/`compile_phase_intent`）退化为 fallback。 |
+| **record-page-errors** | P2（登记，未做） | **录制期页面错误信息落库**（2026-09-21 用户提出）：录制中被录页面的业务/校验错误（如阶段 7 保存被服务端拒「异常信息…存在重复添加相同的证件号码信息」、`err-save-notification`、`.el-form-item__error` 红字、SUT 5xx）目前只在每步 stderr cue 与页面内 `__notify_log` 里**短暂**存在，**不随轨迹落库**——录制产物里看不到「操作已执行但被 SUT 拒绝」的原因。目标：把每步可见的错误通知/校验错误作为**步骤级附加信息**（只记录、不参与 done 判定）随轨迹持久化，供人工排障、质量复盘，并为「终态动作已执行即完成」方向留下 SUT 拒绝证据。落点候选：`scripts/agent/step_notice.py`（`format_notice_cue`/`scan_and_emit_step_notices` 已产出 fresh items）、`scripts/controller/actions/js_snippets/error_notify.py`（`JS_READ_ERROR_NOTIFY` 的 errors/meaning/semantic_summary + `JS_NOTIFY_HOOK` 的 `__notify_log`）、`scripts/controller/actions/form_save.py`（`error_notifs`/`form_errors`）→ 经 `scripts/state.py` 步骤日志/落库通路携带。**本项只做记录，不改 done 判定语义** |
 
 ## 更新记录
 
 > 逐日工作流水已移交 [agent-log.md](agent-log.md)（跨工具共享日志；「开场三件事 / 收工写日志」约定见 AGENTS.md）。本文件只维护工作线与挂起项。
 >
+> - 2026-09-24 ⑨ 录制效率与成功率：五个方向写入当前工作线，逐项评估，评估写明「做」之前不改产品代码。报告 `reports/2026-09-24-recording-efficiency-success-research.md`
 > - 2026-09-21 executor 未知会话终态快失败 + reconcile 清理残留内存绑定（#969）：executor `session.error` 带 `code`（`unknown_session`）；控制面 `attachLive`/`closeSession` 只对终态 code 快失败（网络无事件/非终态仍走原超时）；`reconcileRemoteSessions` 对执行机不存在的 session 补清 `state.sessions`/runtime/lease；轨迹锁默认等待 30s→60s（≥45s attach 等待）。新 pin `characterize-executor-unknown-session`；多实例分布式锁缺口另登记 `executor-multiprocess-concurrency`
 > - 2026-09-20 残留族清零 + KB 配方落地（⑥ 节详载）：wet9 族 8 节点经 Playwright 清理单全删净（机制：两类删除拦截皆为**纯前端预校验**——「删除仅限未启用」pdSt 静默吞掉无请求、「已存在产品引用」delStg 查关联即拒；解法=登录态复刻请求 / 先清 `prodPdStgRel` 悬挂关联后删阶段，后端均 200）；「选择阶段」弹窗配方 + 裁决规则已落 `product_library.json` 并并入 V2.0（`08afc16c`）
 > - 2026-09-19 上游换代落地：`uara_V2.0` 确立唯一上游（基点 `1b421bad`，engine 线 `22aa7648`+本线 `35527f80` 吸收 V1.2 全部历史，合约分支 `cf8cbe06` 并入）；V1.2 冻结；各线开工声明上游=V2.0，新分支从 V2.0 切；服务/主检出归属待用户协调（见顶部换代说明）

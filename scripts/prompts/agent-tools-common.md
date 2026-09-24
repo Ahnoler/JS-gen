@@ -11,7 +11,7 @@
 **成功可录制约定：** 动作结果字符串以 `ok` 开头（`ok` / `ok:` / `ok-clicked` / `ok-already:…` 等）才视为成功并写入轨迹。`ok-skip:label-not-found` 表示字段已不在 DOM（级联卸掉）——**视为成功跳过：不写入轨迹、不要滚动重试、不要自愈猎场**。`already-filled`、裸 `label-not-found`（旧码）等亦表示跳过或失败；新路径统一返回 `ok-skip:label-not-found`。
 
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**
-- close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。`no-notification` ≠ 保存成功。**
+- close_notification() — 关闭可见的 el-notification。关掉返回 `ok-closed`，没有则返回 `no-notification`。不返回通知原文。通知挡住下一步时才关。刚发生的文案在 `[step-feedback]`；要回看更早的步骤才调用 `read_step_feedback`。
 - expand_all_el_tree() — 完全展开 el-tree。**树/列表先查再点：** 侧栏/页内有可见搜索框或「查询」时，禁止用 `expand_all_el_tree()` + 滚屏/盲点代替查询定位；须先填搜索关键字（有查询则点查询）再点树节点；遇 **`err-search-first`** 按指引补步。
 - switch_tab(tab_name) — 切换 el-tabs 标签页。**⚠️ 切换前必须先点击"暂存"按钮保存数据，否则已填数据会丢失。**
 - click_menu_item(menu_text) — 点击 el-menu 菜单项（自动展开子菜单）
@@ -61,7 +61,7 @@
 - **编辑抽屉（新增/编辑表单）：** 页面右侧 el-drawer 侧滑抽屉。抽屉内字段**扫描**（`scan_form_fields`）→ 填充（`run_form_assistant` / `fill_form_field`）→ 终检 → `click_save`。抽屉是独立容器，勿扫到抽屉外背景页元素。
 - **向导审批页：** 保存/**下一步**/**返回**的分步向导。按序点「下一步」推进到**末步**，再填写审批意见并提交；**禁止**跳步，**禁止**在中间步骤找审批意见框。
 - **上下文编辑页（第五类）：** 列表 radio 单选后点「修改」→ **新开页签**跳转（不是抽屉），URL 携带大量业务参数。页面字段**过半是 disabled**（场景锁定值，禁止改写，扫描后跳过即可）；可编辑主战场 = 地址 / 联系方式 / 经营范围 / 业务日期 / 国别类下拉。日期直接填（native setter + blur 提交，无需开日期面板）；页内「选择/引入」按钮打开选择器后，按当前场景实际发生的有效操作逐步执行并记录，操作可能包含搜索字段填写、查询、选行、确认，也可能只有其中一部分或包含其他有效动作；不要为了凑固定步骤而补调用，也不要把普通流程强行改成 `picker_dialog_query` / `picker_dialog_select`，只有任务明确要求的特殊组合控件才使用专用组合动作。新页签注意用 `workspace_tabs` / `go_to_url` 类切换语义回到主工作区。
-- **待办卡片页（第六类）：** 待办任务是卡片列表（todo-item）**不是表格**。用 `list_todo_cards()` 动作结构化读取（标题/业务主键/状态/可点动作）（接线中，若动作不存在先走 scan 兜底），按业务主键选卡，点卡上的「处理」进入向导审批页。
+- **待办卡片页（第六类）：** 待办任务是卡片列表（todo-item）**不是表格**。用 `list_todo_cards()` 动作结构化读取（标题/业务主键/状态/可点动作），按业务主键选卡，点卡上的「处理」进入向导审批页。
 - **日期默认值 = 系统营业日期：** 「今天」指系统**营业日期**（非自然今天），可用 `read_business_date()` 读取；默认值优先用营业日期，**不得填晚于营业日期的日期**。
 
 # 🚨 向导审批（W5）守卫（CRITICAL — 末步提交流程不可逆）
@@ -69,7 +69,7 @@
 向导审批页的推进方式是**步进循环**：扫描 → 填写/校验 → 保存/下一步（可点「上一步」回退修正）。
 
 **末步「提交流程」纪律：**
-- 先用 `wf_submit_guard()` 读取元信息（流程操作当前值/选项/意见详情长度/流程提交与撤销按钮状态/审批历史行数）（接线中，若动作不存在先走 scan 兜底）。**流程操作下拉的选项集随审批节点角色变化（发起节点可能只有「下一步」），必须先读选项再选，禁止假设选项存在；读法：用 scan_visible_fields / scan_form_fields 读该字段的 field.options（从 Vue 实例读，不打开下拉），select_option 自行负责开/关弹层与滚动，无需先点开下拉。**
+- 先用 `wf_submit_guard()` 读取元信息（流程操作当前值/选项/意见详情长度/流程提交与撤销按钮状态/审批历史行数）。**流程操作下拉的选项集随审批节点角色变化（发起节点可能只有「下一步」），必须先读选项再选，禁止假设选项存在；读法：用 scan_visible_fields / scan_form_fields 读该字段的 field.options（从 Vue 实例读，不打开下拉），select_option 自行负责开/关弹层与滚动，无需先点开下拉。**
 - **流程提交与流程撤销是不可逆动作**，遵守四步纪律：
   1. LLM 声明意图（选哪个操作 + 意见内容）；
   2. 调 `wf_submit_guard()` 复核；
@@ -88,7 +88,7 @@
 **观察从最便宜的阶梯开始，逐级升级，跳级要有理由：**
 
 1. **定向探测**（最便宜）：单点动作直接验证目标——`check_field_value`（字段当前值）、`read_business_date`（营业日期）、`workspace_tabs`（页签）等；
-2. **verify_context**：动作前校验页面身份（overlay_contains / hash_contains 等）（接线中，若动作不存在先用 `get_page_state` 兜底）；
+2. **verify_context**：动作前校验页面身份（overlay_contains / hash_contains 等）；
 3. **get_page_state**：局部状态诊断；
 4. **scan_visible_fields / scan_form_fields**：全量扫描（仅在低阶梯无法回答时）；
 5. **截图**：仅排版/画布类问题需要。
@@ -127,7 +127,4 @@
 2. `tree_picker_click` 已内嵌兜底：合成链开树失败（err-tree-node-not-found/err-tree-no-echo）时自动 real_click 触发器一次再重试逐级——无需手动介入；独立点击（节点/触发器/级联面板）可直接调 `real_click`（label_text=字段标签，弹窗/抽屉感知）。
 3. 适用范围：树/级联触发器与面板、树节点、以及合成点击无效的按钮（如「流程提交」）；**不得用于选择下拉选项**——下拉选项只能由 select_option 选择。
 
-# 🚨 XHR 响应体读取（静默拒绝自诊 — KB-I5 run11 实证）
-前端把服务端拒绝静默吞掉（无 toast、无 formErrors，如 doDclScmNextCheck code:100 征信步闸）时，用 **`read_xhr_log(url_filter='NextCheck')`** 读最近 XHR 响应体定位真实原因：`{ok, historyTraced, matched, items:[{url,status,responseBody}]}`。
-- `historyTraced:false` = hook 本调用才装、历史请求不可追溯 → **先重触发一次该操作（再点下一步/保存），再读**。
-- 响应体 code:100 会给出缺失/校验文案 → 按文案补数据后重试；保存后用 `read_xhr_log(url_filter='saveOrUpdate')` 核对请求体关键字段（配合 click_save）。
+页面没有 toast、也没有校验红字、但这一步被拒绝时，错误提示原文已经写在 `[step-feedback]` 的 `api:` 段。不要去读接口。

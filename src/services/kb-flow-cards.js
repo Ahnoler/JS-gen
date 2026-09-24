@@ -95,3 +95,51 @@ export async function listFlowCardsDetailed({ dir = DEFAULT_FLOWS_DIR } = {}) {
   }
   return cards;
 }
+
+/**
+ * Format one flow card the same way as Python flow_summary_text, without a length cap.
+ * @param {object} card full flow card
+ * @returns {string} multiline summary
+ */
+export function formatFlowSummary(card) {
+  const lines = [`【KB 流程知识】${card?.flow || ''}`];
+  for (const p of card?.preconditions || []) lines.push(`前置闸门：${p}`);
+  const nodes = card?.nodes || [];
+  if (nodes.length) {
+    lines.push(`节点：${nodes.map((n) => n?.id || n?.page || '').join(' → ')}`);
+  }
+  for (const s of card?.state_actions || []) {
+    const allow = Array.isArray(s?.allow) ? s.allow.join('/') : '';
+    lines.push(`状态：${s?.entity || ''} ${s?.status || ''} → 允许：${allow}`);
+  }
+  for (const d of card?.field_deps || []) {
+    const then = Array.isArray(d?.then) ? d.then.join(', ') : '';
+    lines.push(`字段依赖：${d?.if || ''} → ${then}`);
+  }
+  for (const r of card?.rules || []) {
+    lines.push(`规则[${r?.keyword || ''}]：${r?.rule || ''}`);
+  }
+  const pushSpecial = (se) => {
+    if (se && typeof se === 'object') lines.push(`特殊元素：${se.tag || ''} — ${se.note || ''}`);
+  };
+  for (const se of card?.special_elements || []) pushSpecial(se);
+  for (const node of nodes) {
+    for (const se of node?.special_elements || []) pushSpecial(se);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Full untruncated summary for a flow name.
+ * @param {string} flowName card.flow
+ * @param {{ dir?: string }} [opts] flows directory
+ * @returns {Promise<string|null>} summary or null when the card is missing
+ */
+export async function flowSummaryByName(flowName, opts = {}) {
+  const want = String(flowName || '').trim();
+  if (!want) return null;
+  const cards = await listFlowCardsDetailed(opts);
+  const card = cards.find((item) => item.flow === want);
+  if (!card) return null;
+  return formatFlowSummary(card);
+}

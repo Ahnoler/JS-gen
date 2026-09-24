@@ -32,6 +32,10 @@ resolve_python() {
 cd "$(dirname "$0")/../.."
 resolve_python || exit 1
 
+# Python Playwright pins one browser revision. Launch uses any installed
+# directory with the default prefix (chromium_headless_shell- / chromium-).
+export PYTHONPATH="$(pwd)/scripts/characterization/_pyhook${PYTHONPATH:+:$PYTHONPATH}"
+
 # ---------------------------------------------------------------------------
 # Domain registry: pipeline name → pin entries.
 # Entry format:  <name>|<command...>
@@ -57,10 +61,18 @@ characterize-record-status|node scripts/characterization/characterize-record-sta
 characterize-traj-recon-logging|node scripts/characterization/characterize-traj-recon-logging.mjs
 characterize-step-number-integrity|node scripts/characterization/characterize-step-number-integrity.mjs
 characterize-agent-llm-error|node scripts/characterization/characterize-agent-llm-error.mjs
+characterize-ops-log-cards|node scripts/characterization/characterize-ops-log-cards.mjs
+characterize-ops-step-line|"$PY" scripts/characterization/characterize-ops-step-line.py
+characterize-ops-card-line|"$PY" scripts/characterization/characterize-ops-card-line.py
+characterize-ops-page|node scripts/characterization/characterize-ops-page.mjs
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
 characterize-verification-phase-gate|"$PY" scripts/characterization/characterize-verification-phase-gate.py
+characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
+characterize-record-sidepath|"$PY" scripts/characterization/cold/characterize-record-sidepath.py
+characterize-llm-role-env|"$PY" scripts/characterization/cold/characterize-llm-role-env.py
 '
 PINS_PHASE='
+characterize-record-sidepath|"$PY" scripts/characterization/cold/characterize-record-sidepath.py
 characterize-phase-section-scope|"$PY" scripts/characterization/characterize-phase-section-scope.py
 characterize-phase-runtime|"$PY" scripts/characterization/characterize-phase-runtime.py
 characterize-recorder-phase-reset|"$PY" scripts/characterization/characterize-recorder-phase-reset.py
@@ -76,6 +88,7 @@ characterize-phase-save-cue-promote|"$PY" scripts/characterization/characterize-
 characterize-phase-end-pending-refresh|"$PY" scripts/characterization/characterize-phase-end-pending-refresh.py
 characterize-record-phase-finalize|node scripts/characterization/characterize-record-phase-finalize.mjs
 characterize-reset-phase-not-query|"$PY" scripts/characterization/characterize-reset-phase-not-query.py
+characterize-query-field-not-query|"$PY" scripts/characterization/characterize-query-field-not-query.py
 characterize-reset-button-guard|"$PY" scripts/characterization/characterize-reset-button-guard.py
 characterize-contract-arbitration-circuit-breaker|"$PY" scripts/characterization/characterize-contract-arbitration-circuit-breaker.py
 characterize-probe-donelog-and-suspect-noise|"$PY" scripts/characterization/characterize-probe-donelog-and-suspect-noise.py
@@ -94,6 +107,9 @@ characterize-done-accept-reason|"$PY" scripts/characterization/characterize-done
 characterize-ai-recording-boundaries|node scripts/characterization/cold/characterize-ai-recording-boundaries.mjs
 characterize-phase-contract|node scripts/characterization/characterize-phase-contract.mjs
 characterize-persisted-phase-contract|"$PY" scripts/characterization/characterize-persisted-phase-contract.py
+characterize-verify-token-downgrade|"$PY" scripts/characterization/characterize-verify-token-downgrade.py
+characterize-kind-family-alias|"$PY" scripts/characterization/characterize-kind-family-alias.py
+characterize-navigate-zero-step-exemption|node scripts/characterization/cold/characterize-navigate-zero-step-exemption.mjs
 '
 PINS_FILL='
 characterize-form-rules|"$PY" scripts/characterization/characterize-form-rules.py
@@ -110,6 +126,8 @@ characterize-form-engine-wiring|"$PY" scripts/characterization/characterize-form
 characterize-form-assistant|"$PY" scripts/characterization/characterize-form-assistant.py
 characterize-form-snapshot-trigger|node scripts/characterization/characterize-form-snapshot-trigger.mjs
 characterize-form-field-intra-slot|node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
+characterize-same-family-scan|node scripts/characterization/cold/characterize-same-family-scan.mjs
+characterize-same-family-resolve|"$PY" scripts/characterization/characterize-same-family-resolve.py
 characterize-form-structure-container|node scripts/characterization/cold/characterize-form-structure-container.mjs
 characterize-form-rules|"$PY" scripts/characterization/characterize-form-rules.py
 characterize-date-range-recording|"$PY" scripts/characterization/cold/characterize-date-range-recording.py
@@ -235,6 +253,7 @@ characterize-before-close-screenshots|"$PY" scripts/characterization/characteriz
 characterize-phase-group-shot|"$PY" scripts/characterization/characterize-phase-group-shot.py
 characterize-step-region-bbox|"$PY" scripts/characterization/characterize-step-region-bbox.py
 characterize-step-notice-scan|"$PY" scripts/characterization/cold/characterize-step-notice-scan.py
+characterize-step-feedback|"$PY" scripts/characterization/cold/characterize-step-feedback.py
 characterize-step-move|node scripts/characterization/characterize-step-move.mjs
 characterize-sys-msg|node scripts/characterization/characterize-sys-msg.mjs
 characterize-batch-import|node scripts/characterization/characterize-batch-import.mjs
@@ -279,11 +298,14 @@ characterize-backfill|node scripts/characterization/characterize-backfill.mjs
 characterize-refill-contract|"$PY" scripts/characterization/characterize-refill-contract.py
 characterize-system-import-json|node scripts/characterization/characterize-system-import-json.mjs
 characterize-form-field-intra-slot|node scripts/characterization/cold/characterize-form-field-intra-slot.mjs
+characterize-same-family-scan|node scripts/characterization/cold/characterize-same-family-scan.mjs
+characterize-same-family-resolve|"$PY" scripts/characterization/characterize-same-family-resolve.py
 characterize-form-structure-container|node scripts/characterization/cold/characterize-form-structure-container.mjs
 characterize-recording-coach-assert|node scripts/characterization/cold/characterize-recording-coach-assert.mjs
 characterize-recording-coach-operator|node scripts/characterization/cold/characterize-recording-coach-operator.mjs
 characterize-recording-coach-skill-pack|node scripts/characterization/cold/characterize-recording-coach-skill-pack.mjs
 characterize-recording-coach-tier-a-score|node scripts/characterization/cold/characterize-recording-coach-tier-a-score.mjs
+characterize-meta-step-filter|node scripts/characterization/cold/characterize-meta-step-filter.mjs
 '
 # eslint/ruff run in every invocation (cheap, catches merge-orphan defects).
 PINS_STATIC='
@@ -329,7 +351,7 @@ if [ "${1:-}" = "--changed" ]; then
   while IFS= read -r f; do
     [ -z "$f" ] && continue
     case "$f" in
-      scripts/state.py|scripts/recorder.py|scripts/session_runner.py|scripts/agent/*|scripts/prompts/*) DOMAIN_HINTS="$DOMAIN_HINTS core phase";;
+      scripts/state.py|scripts/recorder.py|scripts/session_runner.py|scripts/agent/*|scripts/prompts/*|scripts/feature_flags.py) DOMAIN_HINTS="$DOMAIN_HINTS core phase";;
       scripts/controller/actions/phase/*|scripts/controller/actions/boundary*|scripts/controller/actions/classify*) DOMAIN_HINTS="$DOMAIN_HINTS phase";;
       scripts/controller/actions/fill*|scripts/controller/actions/form*|scripts/controller/actions/_form*|scripts/controller/actions/cascade*|scripts/controller/actions/autofill*|scripts/controller/actions/save*|scripts/controller/actions/*case_data*) DOMAIN_HINTS="$DOMAIN_HINTS fill";;
       scripts/controller/actions/select*|scripts/controller/actions/tssc*|scripts/controller/actions/radio*|scripts/controller/actions/picker*|scripts/controller/actions/close_dialog*) DOMAIN_HINTS="$DOMAIN_HINTS select";;

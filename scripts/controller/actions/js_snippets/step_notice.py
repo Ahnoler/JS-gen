@@ -53,3 +53,72 @@ JS_SCAN_STEP_NOTICES = r'''(cursor) => {
   }
   return { items, notify_log_len: log.length };
 }'''
+
+JS_SCAN_STEP_SURFACE = r'''() => {
+  const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 200);
+  const visible = (el) => {
+    try {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+    } catch (e) { return false; }
+  };
+  const forms = [];
+  const seen = new Set();
+  for (const el of document.querySelectorAll('.el-form-item__error')) {
+    if (!visible(el)) continue;
+    const text = norm(el.textContent);
+    if (!text) continue;
+    const item = el.closest('.el-form-item');
+    const label = norm(item && item.querySelector('.el-form-item__label') && item.querySelector('.el-form-item__label').textContent);
+    const key = label + '|' + text;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    forms.push({ label, text });
+  }
+  const overlays = [];
+  for (const d of document.querySelectorAll('.el-dialog')) {
+    if (!visible(d)) continue;
+    const text = norm(d.querySelector('.el-dialog__title') && d.querySelector('.el-dialog__title').textContent);
+    if (text) overlays.push({ surface: 'dialog', text });
+  }
+  for (const d of document.querySelectorAll('.el-drawer')) {
+    if (!visible(d)) continue;
+    const text = norm(d.getAttribute('aria-label') || (d.querySelector('.el-drawer__header') && d.querySelector('.el-drawer__header').textContent));
+    if (text) overlays.push({ surface: 'drawer', text });
+  }
+  return { forms, overlays };
+}'''
+
+JS_TAKE_API_ERROR_TEXTS = r'''(lastSeq) => {
+  const log = Array.isArray(window.__xhr_log) ? window.__xhr_log : [];
+  const since = Math.max(0, Number(lastSeq) || 0);
+  const texts = [];
+  const clip = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 200);
+  let newestSeq = since;
+  for (let i = 0; i < log.length; i++) {
+    const rec = log[i] || {};
+    const seq = Number(rec.seq) || 0;
+    if (seq <= since) continue;
+    if (seq > newestSeq) newestSeq = seq;
+    const status = rec.status;
+    const httpFail = typeof status === 'number' && (status < 200 || status >= 400);
+    let payload = null;
+    try { payload = JSON.parse(rec.responseBody || ''); } catch (e) { payload = null; }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      if (httpFail) {
+        var path = String(rec.url || '').split('?')[0].replace(/^https?:\/\/[^/]+/, '');
+        var fallback = clip('HTTP ' + status + (path ? ' ' + path : ''));
+        if (fallback) texts.push(fallback);
+      }
+      continue;
+    }
+    const code = payload.code;
+    const bizFail = code != null && String(code) !== '0' && String(code) !== '200' && code !== 0 && code !== 200;
+    if (!httpFail && !bizFail) continue;
+    const text = clip(payload.description || payload.message || payload.msg || payload.error);
+    if (text) texts.push(text);
+  }
+  return { seq: newestSeq, len: log.length, texts };
+}'''

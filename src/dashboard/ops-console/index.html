@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>执行机与日志</title>
+  <link rel="stylesheet" href="/src/dashboard/ops-console/ops.css" />
+</head>
+<body>
+  <header class="ops-topbar">
+    <h1>执行机与日志</h1>
+    <nav class="ops-tabs" role="tablist" aria-label="执行机与日志">
+      <button type="button" id="ops-tab-exec" class="ops-tab is-active" role="tab" aria-selected="true" aria-controls="ops-panel-exec">
+        执行机
+      </button>
+      <button type="button" id="ops-tab-shots" class="ops-tab" role="tab" aria-selected="false" aria-controls="ops-panel-shots">
+        待上传截图
+      </button>
+      <button type="button" id="ops-tab-history" class="ops-tab" role="tab" aria-selected="false" aria-controls="ops-panel-history">
+        历史日志
+      </button>
+    </nav>
+    <a class="ops-docs-link" href="/api/docs">接口文档</a>
+  </header>
+  <div class="ops-body">
+    <section id="ops-panel-exec" class="ops-panel is-active" role="tabpanel" aria-labelledby="ops-tab-exec"></section>
+    <section id="ops-panel-shots" class="ops-panel" role="tabpanel" aria-labelledby="ops-tab-shots" hidden></section>
+    <section id="ops-panel-history" class="ops-panel" role="tabpanel" aria-labelledby="ops-tab-history" hidden></section>
+  </div>
+  <script type="module" src="/src/dashboard/ops-console/app.js"></script>
+</body>
+</html>

@@ -97,6 +97,13 @@ export const SCENARIO_LLM_API_KEY = _resolve('SCENARIO_LLM_API_KEY', LLM_API_KEY
 /** Scenario LLM 请求超时（毫秒；缺省回落 LLM_TIMEOUT_MS） */
 export const SCENARIO_LLM_TIMEOUT_MS = Number(_resolve('SCENARIO_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
 
+/** 识图专用 LLM（⑥ 识图角色四件套；MODEL 未设 → Python 端回落 agent.llm，不建独立实例；同 FORM_LLM_* 语义） */
+export const AI_RECORD_VISION_LLM_MODEL = _resolve('AI_RECORD_VISION_LLM_MODEL', '');
+export const AI_RECORD_VISION_LLM_BASE_URL = _resolve('AI_RECORD_VISION_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
+export const AI_RECORD_VISION_LLM_API_KEY = _resolve('AI_RECORD_VISION_LLM_API_KEY', LLM_API_KEY);
+/** 识图 LLM 请求超时（毫秒；缺省回落 LLM_TIMEOUT_MS，再回落 20000） */
+export const AI_RECORD_VISION_LLM_TIMEOUT_MS = Number(_resolve('AI_RECORD_VISION_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || 20000;
+
 /**
  * L1c = L1 region classify：对页面分区 feature card（shell/main/section/overlay/todo…）
  * 做 role/label 分类。规则优先；低置信或 other/custom:* 时可选 LLM。

@@ -733,6 +733,30 @@ class ClickEngine:
                 if compact.startswith(('保存', '提交')) and is_picker_ui:
                     block = True
 
+                # introduce_pick: 确认 on the parent form is a later phase.
+                # Picker 确认 (is_picker_ui) stays allowed and is recorded once.
+                if (
+                    not block
+                    and compact.startswith(('确认', '确定'))
+                    and not is_picker_ui
+                    and contract is not None
+                ):
+                    from scripts.controller.actions._phase_intent import (
+                        INTRODUCE_DONE_BLOCK,
+                        arm_introduce_done,
+                        introduce_phase_confirmed,
+                        is_introduce_phase,
+                    )
+                    if is_introduce_phase(contract):
+                        if introduce_phase_confirmed(self.business_data_store):
+                            arm_introduce_done(self.business_data_store)
+                            return _err(INTRODUCE_DONE_BLOCK, include_in_memory=True)
+                        return _err(
+                            'introduce-phase-picker-only | 本阶段只在客户选择窗口选行并点确认，'
+                            '不要点父弹窗的确认。父弹窗的确认/保存属于后续阶段。',
+                            include_in_memory=True,
+                        )
+
                 if block:
                     if compact.startswith(('保存', '提交')) and is_picker_ui:
                         return _err(
@@ -1048,12 +1072,23 @@ class ClickEngine:
                             self.business_data_store, still_query_ui=still, parent_container=parent,
                         )
                         if not still:
-                            # Parent maintain form still needs toast_ok via click_save.
-                            self.business_data_store['_submit_ready'] = True
-                            self.business_data_store.pop('_query_ui', None)
-                            sys.stderr.write(
-                                '[click] picker confirm closed → submit-ready for parent save\n'
+                            from scripts.controller.actions._phase_intent import (
+                                arm_introduce_done,
+                                should_arm_parent_save_after_picker,
                             )
+                            if should_arm_parent_save_after_picker(self.business_data_store):
+                                # Nested picker inside create/modify: parent still needs click_save.
+                                self.business_data_store['_submit_ready'] = True
+                                self.business_data_store.pop('_query_ui', None)
+                                sys.stderr.write(
+                                    '[click] picker confirm closed → submit-ready for parent save\n'
+                                )
+                            else:
+                                # introduce_pick ends here. Parent 确认/填表 belongs to later phases.
+                                arm_introduce_done(self.business_data_store)
+                                sys.stderr.write(
+                                    '[click] picker confirm closed → introduce phase complete, done() next\n'
+                                )
                             sys.stderr.flush()
                 except Exception:
                     sys.stderr.write("[click] picker confirm record/close helper failed" + '\n')

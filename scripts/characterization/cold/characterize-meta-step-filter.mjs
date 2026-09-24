@@ -1,13 +1,15 @@
 /**
  * Characterization: product hides meta steps (save_form_snapshot etc.).
- * Run: node scripts/characterization/characterize-meta-step-filter.mjs
+ * Run: node scripts/characterization/cold/characterize-meta-step-filter.mjs
  */
 import assert from 'node:assert/strict';
 import {
   META_STEP_ACTIONS,
   isMetaStepAction,
   isMetaStep,
+  isEngineeringStepAction,
   filterMetaSteps,
+  filterProductSteps,
 } from '../../../src/models/meta-step-actions.js';
 
 assert.ok(META_STEP_ACTIONS.includes('save_form_snapshot'));
@@ -28,6 +30,26 @@ assert.deepEqual(
 );
 assert.equal(filterMetaSteps(mixed, { includeMeta: true }).length, 4);
 
+// filterProductSteps: the post-08-12 product list filter — drops meta AND
+// engineering/observation steps (e.g. semantic_snapshot), which filterMetaSteps
+// alone would keep. Pin the dual-filter upgrade and its includeMeta re-include.
+assert.equal(isEngineeringStepAction('semantic_snapshot'), true);
+assert.equal(isMetaStep({ actionType: 'semantic_snapshot' }), false);
+const mixedProduct = [
+  { id: 1, actionType: 'fill_form_field' },
+  { id: 2, actionType: 'save_form_snapshot' },
+  { id: 3, actionType: 'select_option' },
+  { id: 4, actionType: 'get_pending_tasks' },
+  { id: 5, actionType: 'semantic_snapshot' },
+];
+assert.deepEqual(
+  filterProductSteps(mixedProduct).map((s) => s.id),
+  [1, 3],
+);
+assert.equal(filterProductSteps(mixedProduct, { includeMeta: true }).length, 5);
+assert.equal(filterMetaSteps([{ id: 5, actionType: 'semantic_snapshot' }]).length, 1);
+assert.equal(filterProductSteps([{ id: 5, actionType: 'semantic_snapshot' }]).length, 0);
+
 // Routes / query / persist / replay wiring cues
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -42,7 +64,7 @@ const replaySrc = readFileSync(join(root, 'src/services/trajectory/trajectory-se
 const treeRoute = readFileSync(join(root, 'src/routes/v2/trajectory.js'), 'utf8');
 const phaseRoute = readFileSync(join(root, 'src/routes/v2/trajectory-steps.js'), 'utf8');
 
-assert.match(querySrc, /filterMetaSteps/);
+assert.match(querySrc, /filterProductSteps/);
 assert.match(querySrc, /includeMeta/);
 assert.match(stepSrc, /META_STEP_ACTIONS/);
 assert.match(stepSrc, /whereNotIn\('action_type'/);
