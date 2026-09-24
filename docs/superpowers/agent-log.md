@@ -3,6 +3,11 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 11:40 · Cursor — 收工：network_capture 新标签页复挂实现（回链 11:15 开工）
+
+- 完成：`a08585cd` / `be58a2b1` / `4b9dfea2`（设计/计划 `3915fbd2`–`7b20194a`）。经 `page_feedback_hooks._attach_page` 挂 `attach_network_capture`，`teardown_network_captures` 在会话结束调用；`session_runner` 去掉启动单独挂与 `_net_cleanup`。
+- 验收：`characterize-network-capture.mjs` OK 6；`characterize-step-notice-scan.py` / `characterize-step-feedback.py` OK。整支终审 Approve with nits（header 注释与 teardown 不清 seen-set 可后补）。
+- 遗留移交：合入后湿测新标签页表单请求应有 `network_captured`；`verify-all kb,ui` 环境性失败（portable py / MySQL）与本改无关。第 1 点（控制台级别）未开。
 ## 2026-09-24 11:15 · Cursor — 开工：network_capture 新标签页复挂实现（SDD）
 
 - 范围：`scripts/agent/page_feedback_hooks.py`、`scripts/session_runner.py`、`scripts/characterization/characterize-network-capture.mjs`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`docs/superpowers/plans/2026-09-24-network-capture-new-page.md`、本文件
