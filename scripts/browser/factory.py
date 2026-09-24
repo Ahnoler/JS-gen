@@ -375,8 +375,8 @@ async def _fit_browser_window(browser_context, width: int = 1600, height: int = 
         sys.stderr.flush()
 
 
-def attach_native_dialog_accept(page) -> None:
-    """Auto-accept alert/confirm/prompt on one page. A second call on the same page is a no-op."""
+def attach_native_dialog_accept(page, store=None, ask=None) -> None:
+    """Handle one page's native dialogs. A second call on the same page is a no-op."""
     if page is None:
         return
     target = getattr(page, "page", page)
@@ -393,11 +393,15 @@ def attach_native_dialog_accept(page) -> None:
 
     async def _on_dialog(dialog):
         try:
-            sys.stderr.write(f'Auto-accept JS dialog: {dialog.type} {dialog.message[:80]!r}\n')
+            from scripts.agent.native_dialog import apply_native_dialog
+            await apply_native_dialog(dialog, store, ask)
+        except Exception as exc:
+            sys.stderr.write(f'WARN: native dialog handling failed: {exc}\n')
             sys.stderr.flush()
-            await dialog.accept()
-        except Exception:
-            pass
+            try:
+                await dialog.accept()
+            except Exception:
+                pass
 
     def _on_dialog_event(d):
         """启动自动接受 dialog 的任务并持有强引用（即发即弃防护）。"""
@@ -417,13 +421,8 @@ def attach_native_dialog_accept(page) -> None:
 
 
 async def _dismiss_native_js_dialogs(browser_context) -> None:
-    """Auto-accept in-page alert/confirm/prompt — agents struggle with modal JS dialogs."""
-    try:
-        page = await browser_context.get_current_page()
-        attach_native_dialog_accept(page)
-    except Exception as e:
-        sys.stderr.write(f'WARN: dialog handler setup failed: {e}\n')
-        sys.stderr.flush()
+    """Deprecated. Native dialogs are bound by install_recording_page_hooks."""
+    return None
 
 
 async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):

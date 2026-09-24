@@ -254,8 +254,9 @@ def main() -> int:
     observe = (ROOT / "scripts/controller/actions/_observe.py").read_text(encoding="utf-8")
     assert_true("async def read_step_feedback" in observe, "action registered")
     assert_true("does not scan the page" in observe, "tool description")
-    assert_true("async def read_error_notify" not in observe, "error notify gone")
-    assert_true("async def read_xhr_log" not in observe, "xhr log action gone")
+    assert_true("async def read_error_notify" not in observe, "error notify stays gone")
+    assert_true("async def read_xhr_log" not in observe, "xhr log action stays gone")
+    assert_true("answer_dialog" not in observe, "no answer_dialog action")
     body = observe.split("async def read_step_feedback", 1)[1].split("async def ", 1)[0]
     assert_true("page.evaluate" not in body and "_record_action" not in body, "no page scan")
     meta = (ROOT / "src/models/meta-step-actions.js").read_text(encoding="utf-8")

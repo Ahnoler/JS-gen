@@ -148,8 +148,12 @@ def test_scan_reads_console_and_pages_rebind() -> None:
     assert_true("on('page'" in hooks or 'on("page"' in hooks, "new page rebind")
     assert_true("add_init_script" in hooks and "JS_XHR_HOOK" in hooks, "xhr hook rebind")
     assert_true("attach_native_dialog_accept" in hooks, "dialog accept rebind")
+    assert_true("ask_dialog" in hooks, "dialog ask callback passed to new pages")
     runner = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
     assert_true("install_recording_page_hooks" in runner, "runner installs page hooks")
+    ensure = runner.split("async def _ensure_browser_and_cdp", 1)[1].split("async def ", 1)[0]
+    assert_true("_dismiss_native_js_dialogs" not in ensure, "startup must not bind always-accept")
+    assert_true("ask_dialog" in runner or "_ask_native_dialog" in runner, "runner builds dialog ask")
 
 
 def test_reexport_js() -> None:
