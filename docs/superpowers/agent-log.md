@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 10:45 · Cursor — 收工：阶段7确认录制已合入 uara_V2.0_dev（回链 10:35 开工）
+
+- 完成：`519c4d93`。`cursor/fix-phase7-confirm-record-4766` 以 `--no-ff` 合入 `origin/uara_V2.0_dev`。冲突只在 `docs/superpowers/agent-log.md`，双方条目并排保留。分类代码未改。
+- 验收：合入后同一句阶段 6 为 `form_fill`、不索要 `query_clicked`；阶段 7 按钮文案为「确认」。
+- 遗留：执行机需拉取 `uara_V2.0_dev` 并重启后才会用到这次分类。未做湿测。
+
 ## 2026-09-24 10:35 · Cursor — 开工：把阶段7确认录制合入 uara_V2.0_dev
 
 - 开工：10:35。用户要求把 `cursor/fix-phase7-confirm-record-4766`（`f1bdb174` 起）合入 `uara_V2.0_dev`。冲突按并排保留双方 agent-log 处理，不改分类逻辑。
