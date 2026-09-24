@@ -67,6 +67,13 @@
 - 验收：`characterize-network-capture.mjs` OK 6；`characterize-step-notice-scan.py` / `characterize-step-feedback.py` OK。整支终审 Approve with nits（header 注释与 teardown 不清 seen-set 可后补）。
 - 遗留移交：合入后湿测新标签页表单请求应有 `network_captured`；`verify-all kb,ui` 环境性失败（portable py / MySQL）与本改无关。第 1 点（控制台级别）未开。
 
+## 2026-09-24 12:45 · ZCode — 收工：dev 合入稳定线 uara_V2.0（回链 12:05 开工）
+
+- 完成：`58946b94`（--no-ff，eab6c041→含 165 提交，零冲突）+ 追平合并 `f9c2a60e`（识图 pin 修复）；已推送 `eab6c041..f9c2a60e`。
+- 合并后验收（真退出码）：主检出全量 verify-all 仅 4 红，均为环境因非代码——①`characterize-llm-role-env` 两断言：用户已在 config/.env 配置真实识图模型（Qwen3.8-27B），pin 未隔离 _CONFIG_ENV 误红→**已修**（cb9168a4，指向空临时文件）复跑 OK；②step-highlight/layer-tree/export-v3：.env 指向隧道 13306 而隧道窗口未启→`Start-Process open-db-tunnel.cmd` 拉起后三 pin 复跑全 OK。修复后 `git diff uara_V2.0_dev f9c2a60e` 为空（两树逐字节一致），主检出证据直接覆盖稳定线。
+- 事故记录：①临时 worktree 验收路线连环环境坑（python/ 与 node_modules 不入库→junction 补齐后仍静默失败），放弃 worktree 改用树一致性判据，worktree 已清理；②验收期间他线会话在同一检出上切回 dev 并落提交（reflog 实证），稳定线验证改在无检出依赖方式下完成，未影响他线。
+- 遗留：执行机湿测仍欠（与 dev 各线口径一致）；稳定线发布说明如需对外材料另行整理；隧道窗口须保持开启（.env 指向 127.0.0.1:13306）。
+
 ## 2026-09-24 12:05 · ZCode — 开工：uara_V2.0_dev 合入稳定线 uara_V2.0
 
 - 开工：12:05。用户指示把 dev 合入稳定 `uara_V2.0`（eab6c041 定盘点，dev 领先 165 提交，稳定无独有提交）。
