@@ -3,6 +3,14 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 09:02 · Cursor — 开工：录制原生弹窗交给模型选择
+
+- 授权：用户选择子智能体逐项执行计划 `docs/superpowers/plans/2026-09-23-native-dialog-step-feedback.md`。
+- 场地：`D:\dev\JS-gen\.worktrees\step-feedback-console`，分支 `cursor/native-dialog-feedback-design-20260923`（自 `2d1739e8`）。
+- 工作范围：`scripts/agent/native_dialog.py`、`scripts/agent/step_feedback.py`、`scripts/agent/step_notice.py`、`scripts/browser/factory.py`、`scripts/agent/page_feedback_hooks.py`、`scripts/session_runner.py`、`scripts/characterization/cold/characterize-step-feedback.py`、`scripts/characterization/cold/characterize-step-notice-scan.py`、本条目。
+- 禁入区：回放线、`scripts/agent/service.py`、`data/kb/**`、控制台 warning/log、`network_capture` 挂载。不新增动作，不恢复 `read_xhr_log` / `read_error_notify`。
+- 执行方式：主会话派实现子智能体，每任务评审。子智能体可 commit，不 push。
+
 ## 2026-09-23 22:25 · Cursor — 实现计划：录制原生弹窗交给模型选择
 
 - 授权：用户确认设计稿后继续。
