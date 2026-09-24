@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 11:15 · Cursor — 开工：network_capture 新标签页复挂实现（SDD）
+
+- 范围：`scripts/agent/page_feedback_hooks.py`、`scripts/session_runner.py`、`scripts/characterization/characterize-network-capture.mjs`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`docs/superpowers/plans/2026-09-24-network-capture-new-page.md`、本文件
+- 禁入：`scripts/controller/actions/network_capture.py` 过滤逻辑、回放线、step-feedback cue、他线 WIP
+- 执行：Subagent-Driven，按计划 Task 1→3；主会话验收与收工
+
 ## 2026-09-24 11:10 · Cursor — 开工：network_capture 新标签页复挂实现计划
 
 - 范围：`docs/superpowers/plans/2026-09-24-network-capture-new-page.md`、本文件；设计稿已在 `3915fbd2`
