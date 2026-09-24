@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 11:10 · Cursor — 收工：识图辅助开关写入配置文件（补记，回链 2026-09-23 16:15）
+
+- 代码已在 `79631d3b`，并且是当前 `origin/uara_V2.0_dev`（`6e5a600c`）的祖先，无需再合一次。16:25 的收工当时停在工作区，这次快进后补上。
+- `config/.env.example` 写出未注释的 `AI_RECORD_VISION=true`。Python 在进程环境没有该键时读 `config/.env`；控制面拉起录制进程时也把该键传下去。执行机原本就会转发。
+- 验收：当时 `characterize-record-sidepath` OK。随后 `aebae414` 在同一分支上加了识图专用模型四件套，开关语义未改。
+- 遗留：仓库里没有 `config/.env`。正在用的那份需要自行加上 `AI_RECORD_VISION` 后重启执行机，运行中的开关才会变。
+
 ## 2026-09-24 10:45 · Cursor — 收工：阶段7确认录制已合入 uara_V2.0_dev（回链 10:35 开工）
 
 - 完成：`519c4d93`。`cursor/fix-phase7-confirm-record-4766` 以 `--no-ff` 合入 `origin/uara_V2.0_dev`。冲突只在 `docs/superpowers/agent-log.md`，双方条目并排保留。分类代码未改。
