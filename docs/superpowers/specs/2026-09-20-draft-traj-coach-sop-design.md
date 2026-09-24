@@ -2,6 +2,7 @@
 
 > 日期：2026-09-20  
 > 状态：已批准（会话拍板：形态 C、交付 C、人闸 A、接活 C、改链 B）  
+> Runtime：后置的 `tools/draft-traj-coach/src` OpenCode plugin 现由 [`2026-09-24-draft-traj-coach-runtime-design.md`](2026-09-24-draft-traj-coach-runtime-design.md) 规定（runtime 实现以该较新设计为准）。  
 > Skill 真源：`tools/draft-traj-coach/skill/SKILL.md`  
 > 相关：`2026-09-07-req-to-draft-traj-design.md`、`2026-09-18-recording-coach-opencode-design.md`、`req-doc-to-kb`
 
