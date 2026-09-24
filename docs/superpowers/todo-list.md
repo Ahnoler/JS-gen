@@ -53,6 +53,7 @@
 - 已确认交易扫描 → 沉淀原子化操作组件（伙伴可组合）。
 - 批量推送改造：改为可直接推送原子化组件（非仅整笔交易）。
 - **不纳入本版实现**；需求评审时立项。
+- **语料到组件草稿（2026-09-24 交接，未开工）**：规格 [`specs/2026-09-22-telemetry-to-component-draft-design.md`](specs/2026-09-22-telemetry-to-component-draft-design.md)。会话结论与工期见 [`reports/2026-09-24-telemetry-component-session-handoff.md`](reports/2026-09-24-telemetry-component-session-handoff.md)。同事对接完成前不写实现计划。录制召回、复用另段，不并进这次。
 - **F-15 湿测证据面错位（2026-09-08 KB 加固线登记，需 Lead 批准另开任务）**：湿测协议禁写操作，而草稿交易原子全是写操作 → blocked 686（35%）、草稿卡晋升率 63/177。拟议：湿测新增判定词 `readonly-partial`（走到最终确认前一步并记录字段/按钮/校验提示），涉及 `scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`scripts/kb/wet-test-check.mjs`、草稿卡 gate 计算与 30 模块语料重跑；spec=`specs/2026-09-08-kb-remediation-design.md` §11 R4。
 
 ### ⑤ 引擎主链贯通（最高优先 · 2026-09-06 定调；**2026-09-22 主链七环节全通**：R1-R7 全部走通，X0018 角色经信贷侧补配后解除）

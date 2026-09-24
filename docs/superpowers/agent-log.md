@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 17:15 · Cursor — 收工：语料组件会话交接写入仓库（回链 16:10 开工）
+
+- 授权：用户要求本会话内容给其他会话看。
+- 完成：交接说明 `docs/superpowers/reports/2026-09-24-telemetry-component-session-handoff.md`；总清单 ⑧′ 增加指针。规格仍是 `docs/superpowers/specs/2026-09-22-telemetry-to-component-draft-design.md`（`061ed86e`）。实现计划未写。
+- 遗留：同事对接结论未回。对接完成前不改规格、不写实现计划、不改产品代码。后端日常开发已迁到 js-project，若开工实现须先确认仓库。
+
 ## 2026-09-24 11:58 · Cursor — 收工：五个录制方向写入 todo-list（回链 11:56 开工）
 
 - 完成：`docs/superpowers/todo-list.md` 当前工作线新增 ⑨，五项均标「待评估」，并链到调研报告。评估结论未写入清单，本单元不改产品代码。
