@@ -51,3 +51,4 @@
 | 2026-09-20 | [2026-09-20.md](./2026-09-20.md) | wet9首条成功轨迹#924；引擎#909–#917批次合入V2.0；KB stage-dialog/阶段删除规则；recording-coach四层包+评测8/8；65提交。 |
 | 2026-09-21 | [2026-09-21.md](./2026-09-21.md) | 停止回放12项+E1–E4合入；D2守卫B腿PASS+503代理件；verify-all域管线+183pin全绿；阶段合约方案D/analysis落库；106提交。 |
 | 2026-09-22 | [2026-09-22.md](./2026-09-22.md) | 主链七环节全通（979–982，R7已保存态）；#978停止回放E2 PASS；verify-token/A-B/meta-step-filter合dev；/ops MVP+step-feedback；50提交。 |
+| 2026-09-21 | [2026-09-21-alt.md](./2026-09-21-alt.md) | D2守卫合入+B腿湿测PASS；#971/#974/#975-976 wet9验证；phase_blocked与verify-phase-token门侧合入；停止回放8/12项；verify-all域管线化；99提交。（cursor/bc-a8cfe438 版，与上行同名日报并存） |
