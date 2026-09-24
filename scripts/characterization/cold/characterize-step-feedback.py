@@ -120,6 +120,32 @@ def test_apply_native_dialog() -> None:
     assert_true("take_native_dialogs" in body, "scan drains native dialogs")
 
 
+def _assert_non_json_http_fallback(xhr_snip: str) -> None:
+    """503 HTML must become HTTP status text; JSON business errors stay."""
+    import subprocess
+    import tempfile
+
+    probe = (
+        "const fn = " + xhr_snip + ";\n"
+        "global.window = { __xhr_log: [\n"
+        "  { seq: 1, status: 503, url: 'https://sut.example/api/save?x=1', responseBody: '<html>unavailable</html>' },\n"
+        "  { seq: 2, status: 200, url: 'https://sut.example/api/ok', responseBody: JSON.stringify({ code: 100, description: '证件重复' }) },\n"
+        "  { seq: 3, status: 200, url: 'https://sut.example/api/html', responseBody: '<html>ok</html>' },\n"
+        "] };\n"
+        "const out = fn(0);\n"
+        "const texts = out.texts || [];\n"
+        "const hit = texts.some(t => t.indexOf('HTTP 503') === 0 && t.indexOf('/api/save') >= 0);\n"
+        "if (!hit) { console.error('missing 503 fallback ' + JSON.stringify(out)); process.exit(1); }\n"
+        "if (texts.indexOf('证件重复') < 0) { console.error('missing biz text ' + JSON.stringify(out)); process.exit(1); }\n"
+        "if (texts.some(t => String(t).indexOf('HTTP 200') === 0)) { console.error('200 html must stay quiet ' + JSON.stringify(out)); process.exit(1); }\n"
+    )
+    with tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False, encoding="utf-8") as fh:
+        fh.write(probe)
+        path = fh.name
+    proc = subprocess.run(["node", path], capture_output=True, text=True, encoding="utf-8")
+    assert_true(proc.returncode == 0, (proc.stderr or proc.stdout or "node probe failed").strip())
+
+
 def main() -> int:
     from scripts.agent.step_feedback import (
         append_step_feedback,
@@ -313,27 +339,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-def _assert_non_json_http_fallback(xhr_snip: str) -> None:
-    """503 HTML must become HTTP status text; JSON business errors stay."""
-    import subprocess
-    import tempfile
-
-    probe = (
-        "const fn = " + xhr_snip + ";\n"
-        "global.window = { __xhr_log: [\n"
-        "  { seq: 1, status: 503, url: 'https://sut.example/api/save?x=1', responseBody: '<html>unavailable</html>' },\n"
-        "  { seq: 2, status: 200, url: 'https://sut.example/api/ok', responseBody: JSON.stringify({ code: 100, description: '证件重复' }) },\n"
-        "  { seq: 3, status: 200, url: 'https://sut.example/api/html', responseBody: '<html>ok</html>' },\n"
-        "] };\n"
-        "const out = fn(0);\n"
-        "const texts = out.texts || [];\n"
-        "const hit = texts.some(t => t.indexOf('HTTP 503') === 0 && t.indexOf('/api/save') >= 0);\n"
-        "if (!hit) { console.error('missing 503 fallback ' + JSON.stringify(out)); process.exit(1); }\n"
-        "if (texts.indexOf('证件重复') < 0) { console.error('missing biz text ' + JSON.stringify(out)); process.exit(1); }\n"
-        "if (texts.some(t => String(t).indexOf('HTTP 200') === 0)) { console.error('200 html must stay quiet ' + JSON.stringify(out)); process.exit(1); }\n"
-    )
-    with tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False, encoding="utf-8") as fh:
-        fh.write(probe)
-        path = fh.name
-    proc = subprocess.run(["node", path], capture_output=True, text=True, encoding="utf-8")
-    assert_true(proc.returncode == 0, (proc.stderr or proc.stdout or "node probe failed").strip())

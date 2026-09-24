@@ -8,6 +8,31 @@
 - 范围：合入 `cursor/console-feedback-brainstorm-20260924`（决定稿 + `characterize-step-feedback` NameError 修复）；本文件
 - 禁入：不另改产品代码；冲突只解 agent-log
 - 执行：主仓 `--no-ff` 合入 → 合并后复跑 pin → 收工 push
+
+## 2026-09-24 12:05 · Cursor — 收工：修复 characterize-step-feedback NameError（回链 12:00 开工）
+
+- 完成：把 `_assert_non_json_http_fallback` 挪到 `main` 之前，消除 `if __name__` 后定义导致的 NameError（他线 `c54b6c19` 合入残留）。
+- 验收：`characterize-step-feedback.py` OK；`characterize-step-notice-scan.py` OK。
+- 遗留：无。第 1 点决定稿 + 本修复待一并合入 `uara_V2.0_dev`。
+
+## 2026-09-24 12:00 · Cursor — 开工：修复 characterize-step-feedback NameError
+
+- 范围：`scripts/characterization/cold/characterize-step-feedback.py`、本文件
+- 禁入：产品运行时代码；只把 `_assert_non_json_http_fallback` 挪到 `main` 之前
+- 执行：本会话修 pin → 验收绿 → 与第 1 点决定稿一并合入 `uara_V2.0_dev`
+
+## 2026-09-24 11:55 · Cursor — 收工：第 1 点控制台口径关闭为维持现状（回链同条开工）
+
+- 完成：`docs/superpowers/specs/2026-09-24-console-feedback-status-quo-decision.md`。用户选 D：只收 error/pageerror、继续自动推送、不加按需读工具、不扩 warning/log。无产品代码改动。
+- 验收：书面决定与对话一致；重开条件写在决定稿 §5。
+- 遗留：无。对照 MCP 的 1–6 点至此均已落地或明确关闭（2/3/5、4、6 已合；1 关闭）。他线 `characterize-step-feedback` NameError 仍在 uara_V2.0_dev。
+
+## 2026-09-24 11:52 · Cursor — 开工：第 1 点控制台「谁来读 / 级别」brainstorm
+
+- 范围：`docs/superpowers/specs/2026-09-24-console-feedback-status-quo-decision.md`、本文件
+- 禁入：`scripts/**`、`src/**`（本项决定不改代码）
+- 执行：对话确认选 D 后落决定稿并收工
+
 ## 2026-09-24 11:50 · Cursor — 收工：network_capture 新标签页复挂已合入 uara_V2.0_dev（回链 11:45 开工）
 
 - 完成：`a941bb7e`。`cursor/network-capture-new-page-design-20260924` 以 `--no-ff` 合入。冲突只在 `docs/superpowers/agent-log.md`，双方条目并排保留。
