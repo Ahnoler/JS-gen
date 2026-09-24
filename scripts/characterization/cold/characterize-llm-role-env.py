@@ -124,18 +124,25 @@ check('record_vision.py asks dedicated llm', 'vision_llm' in record_vision_py)
 # ── Functional: _get_vision_llm falls back without config ──────────────────
 import os  # noqa: E402
 from scripts.agent.record_vision import _get_vision_llm  # noqa: E402
+import scripts.feature_flags as _ff_cfg  # noqa: E402
 
 _saved_vision_keys = {k: os.environ.get(k) for k in (
     'AI_RECORD_VISION_LLM_MODEL', 'AI_RECORD_VISION_LLM_BASE_URL',
     'AI_RECORD_VISION_LLM_API_KEY', 'AI_RECORD_VISION_LLM_TIMEOUT_MS')}
+_saved_cfg_env = _ff_cfg._CONFIG_ENV
 try:
     for _k in _saved_vision_keys:
         os.environ.pop(_k, None)
+    # Isolate config/.env too: the user's local .env may legitimately configure
+    # a dedicated vision model; these checks assert the no-config fallback.
+    import tempfile  # noqa: E402
+    _ff_cfg._CONFIG_ENV = Path(tempfile.mkstemp(suffix='.env')[1])
     _sentinel_v = object()
     _got, _t = _get_vision_llm(_sentinel_v)
     check('_get_vision_llm returns agent_llm when no AI_RECORD_VISION_LLM_MODEL', _got is _sentinel_v)
     check('_get_vision_llm default ask timeout 20s', _got is _sentinel_v and abs(_t - 20.0) < 1e-9)
 finally:
+    _ff_cfg._CONFIG_ENV = _saved_cfg_env
     for _k, _v in _saved_vision_keys.items():
         if _v is None:
             os.environ.pop(_k, None)
@@ -155,7 +162,13 @@ from scripts.controller.actions.phase.reviewer import _get_reviewer_llm  # noqa:
 
 # With no REVIEWER_LLM_MODEL env → returns the passed-in llm unchanged
 _sentinel = object()
-result = _get_reviewer_llm(_sentinel)
+_saved_cfg_env2 = _ff_cfg._CONFIG_ENV
+try:
+    import tempfile as _tf  # noqa: E402
+    _ff_cfg._CONFIG_ENV = Path(_tf.mkstemp(suffix='.env')[1])
+    result = _get_reviewer_llm(_sentinel)
+finally:
+    _ff_cfg._CONFIG_ENV = _saved_cfg_env2
 check('_get_reviewer_llm returns agent_llm when no REVIEWER_LLM_MODEL', result is _sentinel)
 
 # ── Functional: _env_llm_timeout_sec ───────────────────────────────────────
