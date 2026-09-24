@@ -3,6 +3,17 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 12:05 · Cursor — 收工：修复 characterize-step-feedback NameError（回链 12:00 开工）
+
+- 完成：把 `_assert_non_json_http_fallback` 挪到 `main` 之前，消除 `if __name__` 后定义导致的 NameError（他线 `c54b6c19` 合入残留）。
+- 验收：`characterize-step-feedback.py` OK；`characterize-step-notice-scan.py` OK。
+- 遗留：无。第 1 点决定稿 + 本修复待一并合入 `uara_V2.0_dev`。
+## 2026-09-24 12:00 · Cursor — 开工：修复 characterize-step-feedback NameError
+
+- 范围：`scripts/characterization/cold/characterize-step-feedback.py`、本文件
+- 禁入：产品运行时代码；只把 `_assert_non_json_http_fallback` 挪到 `main` 之前
+- 执行：本会话修 pin → 验收绿 → 与第 1 点决定稿一并合入 `uara_V2.0_dev`
+
 ## 2026-09-24 11:55 · Cursor — 收工：第 1 点控制台口径关闭为维持现状（回链同条开工）
 
 - 完成：`docs/superpowers/specs/2026-09-24-console-feedback-status-quo-decision.md`。用户选 D：只收 error/pageerror、继续自动推送、不加按需读工具、不扩 warning/log。无产品代码改动。
