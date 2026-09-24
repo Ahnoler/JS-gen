@@ -14,6 +14,41 @@ def assert_true(cond: bool, msg: str) -> None:
         raise AssertionError(msg)
 
 
+def test_native_dialog_parse_and_cue() -> None:
+    from scripts.agent.native_dialog import (
+        EMPTY_DIALOG_TEXT,
+        dialog_display_text,
+        native_dialog_item,
+        parse_dialog_answer,
+    )
+    from scripts.agent.step_feedback import format_step_feedback_cue
+
+    assert_true(parse_dialog_answer("accept") == ("accept", ""), "accept")
+    assert_true(parse_dialog_answer("  DISMISS  ") == ("dismiss", ""), "case")
+    assert_true(parse_dialog_answer("\n\naccept:同意") == ("accept", "同意"), "skip blank lines")
+    assert_true(parse_dialog_answer("accept:") == ("accept", ""), "empty prompt value")
+    assert_true(parse_dialog_answer("nope") is None, "garbage")
+    assert_true(parse_dialog_answer("") is None, "empty")
+    assert_true(dialog_display_text("  ") == EMPTY_DIALOG_TEXT, "blank message")
+    assert_true(dialog_display_text("确认删除？") == "确认删除？", "keep message")
+
+    cue = format_step_feedback_cue(["click_button"], [
+        native_dialog_item("alert", "会话即将过期", "accepted"),
+        native_dialog_item("confirm", "确认删除？", "dismissed"),
+        native_dialog_item("prompt", "请输入原因", "accepted", "同意"),
+        native_dialog_item("prompt", "请输入原因", "timeout-accepted", ""),
+        native_dialog_item("beforeunload", "", "accepted"),
+        {"kind": "dialog", "surface": "dialog", "text": "流程选人"},
+        {"kind": "dialog", "surface": "drawer", "text": "引入"},
+    ])
+    assert_true("dialog:alert:会话即将过期" in cue, cue)
+    assert_true("dialog:confirm:确认删除？ | dismissed" in cue, cue)
+    assert_true("dialog:prompt:请输入原因 | accepted:同意" in cue, cue)
+    assert_true("dialog:prompt:请输入原因 | timeout-accepted" in cue, cue)
+    assert_true("dialog:beforeunload:（无文案） | accepted" in cue, cue)
+    assert_true("dialog:流程选人" in cue and "drawer:引入" in cue, cue)
+
+
 def main() -> int:
     from scripts.agent.step_feedback import (
         append_step_feedback,
@@ -186,6 +221,8 @@ def main() -> int:
     planner = (ROOT / "scripts/prompts/planner-prompt.md").read_text(encoding="utf-8")
     assert_true("ok-notification" not in planner, "planner")
     assert_true("[step-feedback]" in planner, "planner cue")
+
+    test_native_dialog_parse_and_cue()
 
     print("characterize-step-feedback: OK")
     return 0
