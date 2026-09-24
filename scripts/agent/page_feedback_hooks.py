@@ -14,6 +14,19 @@ _console_ids: set[int] = set()
 _xhr_contexts: weakref.WeakSet = weakref.WeakSet()
 _xhr_context_ids: set[int] = set()
 _page_hook_tasks: set[asyncio.Task] = set()
+_network_pages: weakref.WeakSet = weakref.WeakSet()
+_network_ids: set[int] = set()
+_network_cleanups: list = []
+
+
+def teardown_network_captures() -> None:
+    """Detach every page response listener collected during the session."""
+    while _network_cleanups:
+        cleanup = _network_cleanups.pop()
+        try:
+            cleanup()
+        except Exception:
+            pass
 
 
 def _target(page):
@@ -82,6 +95,17 @@ async def _attach_page(page, xhr_hook: str, store, ask=None) -> None:
         sys.stderr.write(f"[step-feedback] dialog hook failed: {exc}\n")
         sys.stderr.flush()
     try:
+        from scripts.controller.actions.network_capture import attach_network_capture
+
+        if not _seen(_network_pages, _network_ids, target):
+            cleanup = attach_network_capture(target, store)
+            if callable(cleanup):
+                _network_cleanups.append(cleanup)
+            _remember(_network_pages, _network_ids, target)
+    except Exception as exc:
+        sys.stderr.write(f"[network-capture] page hook failed: {exc}\n")
+        sys.stderr.flush()
+    try:
         await target.add_init_script(xhr_hook)
         await target.evaluate(xhr_hook)
     except Exception as exc:
@@ -93,7 +117,7 @@ async def _attach_page(page, xhr_hook: str, store, ask=None) -> None:
 
 
 async def install_recording_page_hooks(browser_context, business_data_store=None, ask_dialog=None) -> None:
-    """Install xhr, console/pageerror, and dialog accept on current and future pages."""
+    """Install xhr, console/pageerror, dialog accept, and network capture on current and future pages."""
     from scripts.controller.actions._js_snippets import JS_XHR_HOOK
 
     session = getattr(browser_context, "session", None)
