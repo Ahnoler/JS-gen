@@ -54,17 +54,38 @@ assert(
 );
 ok('memory-service.js contains network_captured persist branch');
 
-// 4. session_runner.py source wiring
+// 4. page_feedback_hooks rebinds network capture; session_runner only tears down
+const hooksSrc = readFileSync(
+  path.join(ROOT, 'scripts', 'agent', 'page_feedback_hooks.py'),
+  'utf8',
+);
+assert(
+  hooksSrc.includes('attach_network_capture'),
+  'page_feedback_hooks.py calls attach_network_capture',
+);
+assert(
+  hooksSrc.includes('teardown_network_captures'),
+  'page_feedback_hooks.py exports teardown_network_captures',
+);
+ok('page_feedback_hooks.py wires attach_network_capture + teardown');
+
 const sessionRunnerSrc = readFileSync(
   path.join(ROOT, 'scripts', 'session_runner.py'),
   'utf8',
 );
 assert(
-  sessionRunnerSrc.includes('attach_network_capture'),
-  'session_runner.py imports/attaches attach_network_capture',
+  sessionRunnerSrc.includes('teardown_network_captures'),
+  'session_runner.py tears down network captures via hooks',
 );
-assert(sessionRunnerSrc.includes('_net_cleanup'), 'session_runner.py keeps _net_cleanup');
-ok('session_runner.py wires attach_network_capture + _net_cleanup');
+assert(
+  !sessionRunnerSrc.includes('from .controller.actions.network_capture import attach_network_capture'),
+  'session_runner.py must not import attach_network_capture (hooks own attach)',
+);
+assert(
+  !sessionRunnerSrc.includes('_net_cleanup'),
+  'session_runner.py must not keep _net_cleanup (moved to hooks teardown)',
+);
+ok('session_runner.py uses hooks teardown, not startup attach');
 
 // 5. Real import of network_capture.py under portable Python; check _normalize_url.
 function findPython() {

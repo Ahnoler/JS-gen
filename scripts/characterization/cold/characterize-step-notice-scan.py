@@ -148,6 +148,8 @@ def test_scan_reads_console_and_pages_rebind() -> None:
     assert_true("on('page'" in hooks or 'on("page"' in hooks, "new page rebind")
     assert_true("add_init_script" in hooks and "JS_XHR_HOOK" in hooks, "xhr hook rebind")
     assert_true("attach_native_dialog_accept" in hooks, "dialog accept rebind")
+    assert_true("attach_network_capture" in hooks, "network capture rebind on each page")
+    assert_true("teardown_network_captures" in hooks, "network capture teardown exported")
     assert_true("ask_dialog" in hooks, "dialog ask callback passed to new pages")
     runner = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
     assert_true("install_recording_page_hooks" in runner, "runner installs page hooks")
