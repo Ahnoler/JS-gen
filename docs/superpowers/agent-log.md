@@ -3,6 +3,11 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 12:10 · Cursor — 开工：合入第1点决定 + step-feedback pin 修复
+
+- 范围：合入 `cursor/console-feedback-brainstorm-20260924`（决定稿 + `characterize-step-feedback` NameError 修复）；本文件
+- 禁入：不另改产品代码；冲突只解 agent-log
+- 执行：主仓 `--no-ff` 合入 → 合并后复跑 pin → 收工 push
 ## 2026-09-24 11:50 · Cursor — 收工：network_capture 新标签页复挂已合入 uara_V2.0_dev（回链 11:45 开工）
 
 - 完成：`a941bb7e`。`cursor/network-capture-new-page-design-20260924` 以 `--no-ff` 合入。冲突只在 `docs/superpowers/agent-log.md`，双方条目并排保留。
