@@ -1,5 +1,8 @@
 # JS-gen 浏览器自动化录制与回放平台
 
+> **⚠️ 开发已迁出（2026-09-24）**  
+> 后端日常开发改到前后端同仓：`D:\dev\ui-auto-recording-agent-vue-master\js-project`（monorepo 分支 `V2.0_dev`）。本目录不再提交功能改动；保留作历史检出与对照。服务器部署路径仍为 `/data/app/JS-gen`。
+
 JS-gen 是面向 Element UI / Vue 类业务系统的浏览器自动化后端。它接收产品前端请求，调用 LLM 分析业务任务，启动本地或远程浏览器会话，驱动 Python `browser-use` Agent 完成 AI/人工录制，并将系统层级、交易（轨迹）、阶段、步骤、截图和业务数据持久化到 MySQL。
 
 本仓库是 Node.js 控制面，不包含完整的产品 Vue SPA。项目提供 HTTP API、前端状态 WebSocket、Executor WebSocket、Python Agent 运行时、可选远程执行机，以及前端对接用的 `/api/docs`。
