@@ -3,6 +3,12 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-09-24 11:50 · Cursor — 收工：network_capture 新标签页复挂已合入 uara_V2.0_dev（回链 11:45 开工）
+
+- 完成：`a941bb7e`。`cursor/network-capture-new-page-design-20260924` 以 `--no-ff` 合入。冲突只在 `docs/superpowers/agent-log.md`，双方条目并排保留。
+- 验收（合并后）：`characterize-network-capture.mjs` OK 6；`characterize-step-notice-scan.py` OK。
+- 遗留移交：`scripts/characterization/cold/characterize-step-feedback.py:316` 的 `_assert_non_json_http_fallback` 定义在 `if __name__` 之后，`main()` 调用时 `NameError`——来自他线 `c54b6c19`（step-feedback-api-prompt）合入，非本次 diff。复现：`PYTHONUTF8=1 python scripts/characterization/cold/characterize-step-feedback.py`。合入后湿测新标签页表单请求应有 `network_captured`。第 1 点未开。
+
 ## 2026-09-24 11:45 · Cursor — 开工：合入 network_capture 新标签页复挂到 uara_V2.0_dev
 
 - 范围：`docs/superpowers/agent-log.md`；合入 `cursor/network-capture-new-page-design-20260924`（`--no-ff`）
