@@ -9,6 +9,20 @@
 - 禁入：功能代码本会话不另改（冲突只解 agent-log）；他线 WIP 不碰
 - 执行：本会话于主仓合入 → 合并后复跑 feature pins → 收工 push
 
+## 2026-09-24 11:40 · Cursor — 收工：network_capture 新标签页复挂实现（回链 11:15 开工）
+
+- 完成：`a08585cd` / `be58a2b1` / `4b9dfea2`（设计/计划 `3915fbd2`–`7b20194a`）。经 `page_feedback_hooks._attach_page` 挂 `attach_network_capture`，`teardown_network_captures` 在会话结束调用；`session_runner` 去掉启动单独挂与 `_net_cleanup`。
+- 验收：`characterize-network-capture.mjs` OK 6；`characterize-step-notice-scan.py` / `characterize-step-feedback.py` OK。整支终审 Approve with nits（header 注释与 teardown 不清 seen-set 可后补）。
+- 遗留移交：合入后湿测新标签页表单请求应有 `network_captured`；`verify-all kb,ui` 环境性失败（portable py / MySQL）与本改无关。第 1 点（控制台级别）未开。
+
+## 2026-09-24 11:40 · ZCode — 收工：合入远端 5 条新分支（回链无开工条目，合并型任务补记）
+
+- 完成：origin/uara_V2.0_dev 快进至 6e5a600c（上游自合 phase7，跳过）；`cursor/fix-phase5-introduce-rerecord` 语义合入 `e6cded6a`；`cursor/step-feedback-api-prompt` 合入 `c54b6c19`；3 条日报分支合入 `87b508c8`/`f7b93f34`/`b6735e83`。
+- 冲突处置：phase5 分支基于 ClickEngine 统一前的旧基线，_misc/form_action_engines 不能整边取——introduce 门移植进 `_misc.py` 包装器、`click_action_engine.py`（父弹窗确认拦截 + picker 关闭按阶段角色分流）、`fill_engine.py`/`select_engine.py`（填写/下拉拦截）；phase-intent pin 由 git 重命名检测自动并入 cold/ 版（+51 断言）；step-feedback pin 冲突取并集；agent-log 并排保留（phase5 分支远古基线旧条目不入，仅取其 08:40/08:55 两条）；两份同名 2026-09-21 日报并存（分支版另存 -alt.md）。
+- 事故自纠：intent_contract.py 首次解决因本机 `python` 命中 WindowsApps 空壳（退出 49）静默失败，冲突标记被误暂存——fix 提交清除；后续均用 `./python/python.exe`。
+- 验收：合并后全量 `bash scripts/refactor/verify-all.sh` EXIT=0 全绿（含 spin-guard、三源 xpath 11×6 一致）。lint 284 条 warning 为合入他线代码新增（0 errors，verify-all 通过），留他线核对。
+- 遗留：DB 走服务器直连未遇阻断；未做执行机湿测（与 phase5/step-feedback 分支收工口径一致）。
+
 ## 2026-09-24 11:28 · Cursor — 收工：录制效率与成功率调研报告（回链 11:20 开工）
 
 - 完成：`docs/superpowers/reports/2026-09-24-recording-efficiency-success-research.md`。五路只读调研合成五个方向：控件卡住、阶段判定看证据、确定性步骤不每步问模型、失败早发现、录完验证再沉淀。未改产品代码。
@@ -22,6 +36,12 @@
 - 禁入区：`scripts/**`、`src/**`、`data/kb/**`、`config/.env`、他线未跟踪的 product-mgmt 草稿。
 - 执行方式：主会话根据已完成的调研成文。
 
+## 2026-09-24 11:15 · Cursor — 开工：network_capture 新标签页复挂实现（SDD）
+
+- 范围：`scripts/agent/page_feedback_hooks.py`、`scripts/session_runner.py`、`scripts/characterization/characterize-network-capture.mjs`、`scripts/characterization/cold/characterize-step-notice-scan.py`、`docs/superpowers/plans/2026-09-24-network-capture-new-page.md`、本文件
+- 禁入：`scripts/controller/actions/network_capture.py` 过滤逻辑、回放线、step-feedback cue、他线 WIP
+- 执行：Subagent-Driven，按计划 Task 1→3；主会话验收与收工
+
 ## 2026-09-24 11:10 · Cursor — 收工：识图辅助开关写入配置文件（补记，回链 2026-09-23 16:15）
 
 - 代码已在 `79631d3b`，并且是当前 `origin/uara_V2.0_dev`（`6e5a600c`）的祖先，无需再合一次。16:25 的收工当时停在工作区，这次快进后补上。
@@ -29,13 +49,17 @@
 - 验收：当时 `characterize-record-sidepath` OK。随后 `aebae414` 在同一分支上加了识图专用模型四件套，开关语义未改。
 - 遗留：仓库里没有 `config/.env`。正在用的那份需要自行加上 `AI_RECORD_VISION` 后重启执行机，运行中的开关才会变。
 
-## 2026-09-24 11:40 · ZCode — 收工：合入远端 5 条新分支（回链无开工条目，合并型任务补记）
+## 2026-09-24 11:10 · Cursor — 开工：network_capture 新标签页复挂实现计划
 
-- 完成：origin/uara_V2.0_dev 快进至 6e5a600c（上游自合 phase7，跳过）；`cursor/fix-phase5-introduce-rerecord` 语义合入 `e6cded6a`；`cursor/step-feedback-api-prompt` 合入 `c54b6c19`；3 条日报分支合入 `87b508c8`/`f7b93f34`/`b6735e83`。
-- 冲突处置：phase5 分支基于 ClickEngine 统一前的旧基线，_misc/form_action_engines 不能整边取——introduce 门移植进 `_misc.py` 包装器、`click_action_engine.py`（父弹窗确认拦截 + picker 关闭按阶段角色分流）、`fill_engine.py`/`select_engine.py`（填写/下拉拦截）；phase-intent pin 由 git 重命名检测自动并入 cold/ 版（+51 断言）；step-feedback pin 冲突取并集；agent-log 并排保留（phase5 分支远古基线旧条目不入，仅取其 08:40/08:55 两条）；两份同名 2026-09-21 日报并存（分支版另存 -alt.md）。
-- 事故自纠：intent_contract.py 首次解决因本机 `python` 命中 WindowsApps 空壳（退出 49）静默失败，冲突标记被误暂存——fix 提交清除；后续均用 `./python/python.exe`。
-- 验收：合并后全量 `bash scripts/refactor/verify-all.sh` EXIT=0 全绿（含 spin-guard、三源 xpath 11×6 一致）。lint 284 条 warning 为合入他线代码新增（0 errors，verify-all 通过），留他线核对。
-- 遗留：DB 走服务器直连未遇阻断；未做执行机湿测（与 phase5/step-feedback 分支收工口径一致）。
+- 范围：`docs/superpowers/plans/2026-09-24-network-capture-new-page.md`、本文件；设计稿已在 `3915fbd2`
+- 禁入：`scripts/**` 实现（待用户选执行方式后再动）、他线 WIP
+- 执行：本会话写计划 → 用户选 Subagent-Driven / Inline 后再实现
+
+## 2026-09-24 11:00 · Cursor — 开工：network_capture 新标签页复挂设计稿
+
+- 范围：`docs/superpowers/specs/2026-09-24-network-capture-new-page-design.md`、本文件
+- 禁入：`scripts/**`、`src/**`、他线代码与未合并 WIP
+- 执行：本会话写设计稿 → 用户审阅 → 再写实现计划；实现另开任务
 
 ## 2026-09-24 10:45 · Cursor — 收工：阶段7确认录制已合入 uara_V2.0_dev（回链 10:35 开工）
 
@@ -70,7 +94,7 @@
 - 工作范围：`docs/superpowers/specs/2026-09-23-native-dialog-step-feedback-design.md`、本条目。不改产品代码。
 - 禁入区：`scripts/**`、`src/**`、`data/kb/**`。第 1、6 点（控制台级别、`network_capture` 新标签页）不在本稿。
 - 状态：书面稿待用户审阅后再写实现计划。
-=======
+
 ## 2026-09-23 20:55 · Cursor — 收工：非 JSON 错误页、toast 旁保留接口错误、去掉接线中（4c3e6c11）
 
 - 回链 20:40 开工。完成：`4c3e6c11`。HTTP 失败且响应不是 JSON 时，逐步反馈写成 `HTTP <状态> <路径>`（200 的 HTML 仍不记）。toast/表单旁边保留接口错误；只有标明 `level=success` 的接口行才在有界面反馈时丢掉。`list_todo_cards`、`wf_submit_guard`、`verify_context` 去掉「接线中」。
