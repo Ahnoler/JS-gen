@@ -3,6 +3,13 @@
 > 归档指引：历史条目不删只归档——更早批次见 `archive/logs/`（最新一批 `agent-log-archive-2026-09-16.md` 收 2026-09-16 及更早；更早批次 -2026-09-11 / -09-06 / -09-05 同目录）。主文件只留近 5 天，权威状态以本文件 + git log + todo-list.md 为准。
 > 开工/收工格式与豁免（含联调测试不写条目）见根目录 `AGENTS.md`「跨 Agent 协作」。
 
+## 2026-10-30 20:50 · Cursor（云端）— 开工：记录用户 10-30 裁定与方向调整
+
+- 授权：用户采纳主方向，要求以技术总监身份把控方向、不做编程；就首次探索成功率、知识注入是否为负面信息、AI 核验器作用、回放自动修复、SUT 基准集提出问题。
+- 工作范围：`docs/superpowers/reports/2026-10-30-tech-director-direction-review.md`（新增第十节、更新状态与第八节）、两份 10-30 设计稿的状态行、本条目与收工条目。分支同前。
+- 禁入区：`src/**`、`scripts/**`、`executor/**`、`migrations/**`、`data/kb/**`、`config/**`、`todo-list.md`。不改产品代码。
+- 执行方式：主会话只读核对代码（知识注入两条通道、零步豁免判定、A/B 对照臂定义）后成文。
+
 ## 2026-10-30 20:17 · Cursor（云端）— 收工：技术总监审查报告与两份设计稿（回链 19:50 开工）
 
 - 完成：`8b203136` 审查报告 `docs/superpowers/reports/2026-10-30-tech-director-direction-review.md`；`42fb77d9` 设计稿 `specs/2026-10-30-verified-phase-reuse-design.md`（已验证阶段的确定性复用 v1：导航按系统树、查询按已确认组件）；`6aefa4dc` 设计稿 `specs/2026-10-30-bench-decision-loop-design.md`（评测与决策闭环、核验器校准）。无产品代码改动。
