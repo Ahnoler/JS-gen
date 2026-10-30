@@ -2,11 +2,11 @@
 
 > **状态**：主方向已由用户采纳（10-30）；裁定与方向调整见第十节，与前文冲突时以第十节为准。只读调研，未改产品代码。
 > **依据**：
-> 1. 本仓 `uara_V2.0_dev@6d2c770d`（2026-09-24 冻结快照，含 9 月全部报告、规格、计划、协作日志）。
+> 1. JS-gen 旧仓（GitHub `Ahnoler/JS-gen`）`uara_V2.0_dev@6d2c770d`（2026-09-24 冻结快照，含 9 月全部报告、规格、计划、协作日志）。文中代码路径均指这个快照；js-project 中对应文件的位置与内容可能已经变化。
 > 2. 部署实例 release `20261020-094018` 的公开接口文档（`/api/docs` 及其静态脚本 `src/dashboard/api-docs/**`）。只做了只读 GET，未调用业务接口，未连数据库。
 > 3. 9 月查库基线：[`2026-09-24-recording-efficiency-success-research.md`](2026-09-24-recording-efficiency-success-research.md)。
 >
-> **输入缺口**：用户所指简报 `2026-10-30-bench-p02-defect-review-and-direction-briefing.md`（commit `92759b0`）不在本机任何分支，也不在 GitHub 远端（09-24 起后端开发已迁到 js-project）。本报告没有读到它。第九节给出把简报缺陷并入本报告的办法。
+> **输入缺口**：用户所指简报 `2026-10-30-bench-p02-defect-review-and-direction-briefing.md`（commit `92759b0`）在用户本地的 js-project 中，撰写本报告的云端环境访问不到（JS-gen 各分支与 GitHub 远端都没有这份文件）。本报告没有读到它。第九节给出把简报缺陷并入本报告的办法。
 >
 > **配套设计稿**：
 > - [`../specs/2026-10-30-verified-phase-reuse-design.md`](../specs/2026-10-30-verified-phase-reuse-design.md)：已验证阶段的确定性复用 v1（导航与查询阶段）
@@ -144,7 +144,7 @@ LLM 核验只在 L1 证据缺失时作补充判据。核验器版本冻结，并
 | `system_account.password` | 明文列（`schemas/init.sql:44`） | 中 |
 | `/ws/executor` | 需 `EXECUTOR_TOKEN`，为空则拒绝 | 低：共享密钥需轮换 |
 
-部署实例的核查结果已在会话中单独告知用户，不写入本仓：本仓是公开仓库。
+部署实例的核查结果已在会话中单独告知用户，不写入文档：本文同时存放在公开仓库 JS-gen 中。
 
 调度与状态：slot 租约（`src/executor-slot-lease.js:16-24`）、轨迹锁（`src/services/remote-session-state.js:58`）、AI 录制占用（`trajectory-recording-runner.js:393-398`）和会话表都只在控制面进程内存里。重启时，启动对账只清理陈旧挂载并把批量在途项判失败（`server.mjs:199-218`），交互录制的租约和锁全部丢失；开两个实例会双占槽位。批量侧已有跨进程正确的 `FOR UPDATE` + CAS + 租约认领（`src/dao/batch-recording-dao.js:315-337`），可以照搬。另外，`trajectory_step` 和 `memory_event` 没有保留与归档策略；`gate_decision` 落库后 `memory_event` 增长更快。落库期偶发的 InnoDB 死锁仍待根治。
 
